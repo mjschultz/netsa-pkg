@@ -48,11 +48,34 @@ deb:
 		--description "YAF and SiLK from CERT NetSA Security Suite" \
 		--license "GPL version 2, LGPL version 2.1" \
 		--depends libglib2.0-0 \
-		--depends libpcap0.8 \
 		--depends liblzo2-2 \
+		--depends libpcap0.8 \
+		--depends zlib1g \
 		--after-install packaging/scripts/postinst.sh \
 		--after-remove packaging/scripts/postrm.sh \
 		--deb-no-default-config-files \
+		packaging/root/=/
+
+rpm:
+	mkdir -p packaging/output
+	fpm \
+		-s dir \
+		-t rpm \
+		-n netsa-pkg \
+		-v ${VERSION} \
+		-p packaging/output/netsa-pkg.rpm \
+		-a ${PROC_ARC} \
+		--category admin \
+		--force \
+		--rpm-compression bzip2 \
+		--description "YAF and SiLK from CERT NetSA Security Suite" \
+		--license "GPL version 2, LGPL version 2.1" \
+		--depends glib2 \
+		--depends libpcap \
+		--depends lzo \
+		--depends zlip \
+		--after-install packaging/scripts/postinst.sh \
+		--after-remove packaging/scripts/postrm.sh \
 		packaging/root/=/
 
 clean:
