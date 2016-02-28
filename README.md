@@ -19,5 +19,5 @@ Contained here are mirrors of the YAF, SiLK, and libfixbuf packages.
 These packages are governed by the following licenses:
 
 * __[YAF](yaf-src/COPYING)__: GNU General Public License, version 2
-* __[SiLK](silk-src/COPYING)__:GNU General Public License, version 2
+* __[SiLK](silk-src/COPYING)__: GNU General Public License, version 2
 * __[libfixbuf](libfixbuf-src/COPYING)__: GNU Lesser General Public License, version 2.1

@@ -7,14 +7,16 @@ LIBFIXBUF_PREFIX = ${TARGET_ROOT}/opt/libfixbuf
 
 libfixbuf:
 	mkdir -p ${LIBFIXBUF_PREFIX}
-	(cd libfixbuf-src; ./configure --prefix="${LIBFIXBUF_PREFIX}")
+	(cd libfixbuf-src; \
+		autoreconf -if; \
+		./configure --prefix="${LIBFIXBUF_PREFIX}")
 	make -C libfixbuf-src
 	make -C libfixbuf-src install
 
 yaf:
 	mkdir -p ${YAF_PREFIX}
-	(cd yaf-src; ./configure --prefix=${LIBFIXBUF_PREFIX})
 	(cd yaf-src; \
+		autoreconf -if; \
 		PKG_CONFIG_PATH="${LIBFIXBUF_PREFIX}/lib/pkgconfig" ./configure \
 			--prefix="${YAF_PREFIX}")
 	make -C yaf-src
@@ -23,6 +25,7 @@ yaf:
 silk:
 	mkdir -p ${SILK_PREFIX}
 	(cd silk-src; \
+		autoreconf -if; \
 		./configure \
 			--with-libfixbuf="${LIBFIXBUF_PREFIX}/lib/pkgconfig" \
 			--enable-ipv6 \
