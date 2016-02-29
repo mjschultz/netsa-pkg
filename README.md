@@ -24,6 +24,13 @@ zlib1g, zlib1g-dev | zlib-devel
 To build the .deb and .rpm files you will need a working Ruby installation
 capable of installing the [`fpm`](https://github.com/jordansissel/fpm/wiki) gem.
 
+From the project directory issue these commands:
+
+* `make libfixbuf`
+* `make yaf`
+* `make silk`
+* `make deb` or `make rpm`
+
 ## Credits and licenses
 
 Contained here are mirrors of the YAF, SiLK, and libfixbuf packages.

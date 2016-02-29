@@ -73,7 +73,7 @@ rpm:
 		--depends glib2 \
 		--depends libpcap \
 		--depends lzo \
-		--depends zlip \
+		--depends zlib \
 		--after-install packaging/scripts/postinst.sh \
 		--after-remove packaging/scripts/postrm.sh \
 		packaging/root/=/
