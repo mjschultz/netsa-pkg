@@ -49,6 +49,7 @@ deb:
 		--license "GPL version 2, LGPL version 2.1" \
 		--depends libglib2.0-0 \
 		--depends liblzo2-2 \
+		--depends libltdl7 \
 		--depends libpcap0.8 \
 		--depends zlib1g \
 		--after-install packaging/scripts/postinst.sh \
