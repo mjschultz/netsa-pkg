@@ -72,6 +72,7 @@ rpm:
 		--license "GPL version 2, LGPL version 2.1" \
 		--depends glib2 \
 		--depends libpcap \
+		--depends libtool-ltdl \
 		--depends lzo \
 		--depends zlib \
 		--after-install packaging/scripts/postinst.sh \

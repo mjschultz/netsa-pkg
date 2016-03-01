@@ -7,7 +7,7 @@ tools [YAF](https://tools.netsa.cert.org/yaf/index.html) and [SiLK](https://tool
 
 In order to build the packages you will need:
 
-Ubuntu systems | RHEL 6 systems
+Ubuntu systems | RHEL systems
 -------------|-------------
 autoconf | autoconf
 automake | automake
