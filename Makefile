@@ -80,5 +80,11 @@ rpm:
 		--after-remove packaging/scripts/postrm.sh \
 		packaging/root/=/
 
+build_centos:
+	docker build --file="packaging/scripts/buildimage_centos-6/Dockerfile" .
+
+build_ubuntu:
+	docker build --file="packaging/scripts/buildimage_ubuntu-12.04/Dockerfile" .
+
 clean:
 	git clean -dxf

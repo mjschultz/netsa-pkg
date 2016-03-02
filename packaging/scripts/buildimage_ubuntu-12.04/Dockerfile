@@ -21,7 +21,11 @@ RUN apt-get update && apt-get install -y \
 
 RUN gem install fpm
 
-RUN git clone https://github.com/bbayles/netsa-pkg.git
+ADD ["./libfixbuf-src/", "/netsa-pkg/libfixbuf-src/"]
+ADD ["./yaf-src/", "/netsa-pkg/yaf-src/"]
+ADD ["./silk-src/", "/netsa-pkg/silk-src/"]
+ADD ["./packaging/", "/netsa-pkg/packaging/"]
+ADD ["./Makefile", "/netsa-pkg/"]
 
 WORKDIR /netsa-pkg
 
