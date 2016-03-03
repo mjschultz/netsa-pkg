@@ -4,6 +4,7 @@ TARGET_ROOT = $(shell pwd)/packaging/root
 YAF_PREFIX = ${TARGET_ROOT}/opt/yaf
 SILK_PREFIX = ${TARGET_ROOT}/opt/silk
 LIBFIXBUF_PREFIX = ${TARGET_ROOT}/opt/libfixbuf
+OUTPUT_DIR = $(shell pwd)/packaging/output
 
 libfixbuf:
 	mkdir -p ${LIBFIXBUF_PREFIX}
@@ -34,7 +35,6 @@ silk:
 	make -C silk-src install
 
 deb:
-	mkdir -p packaging/output
 	fpm \
 		-s dir \
 		-t deb \
@@ -58,7 +58,6 @@ deb:
 		packaging/root/=/
 
 rpm:
-	mkdir -p packaging/output
 	fpm \
 		-s dir \
 		-t rpm \
@@ -80,11 +79,19 @@ rpm:
 		--after-remove packaging/scripts/postrm.sh \
 		packaging/root/=/
 
-build_centos:
-	docker build --file="packaging/scripts/buildimage_centos-6/Dockerfile" .
+build_deb: libfixbuf yaf silk deb
+
+build_rpm: libfixbuf yaf silk rpm
 
 build_ubuntu:
-	docker build --file="packaging/scripts/buildimage_ubuntu-12.04/Dockerfile" .
+	$(eval IMAGE_ID = $(shell docker build --force-rm -q -f "packaging/scripts/buildimage_centos-6/Dockerfile" .))
+	docker run -v "${OUTPUT_DIR}:/netsa-pkg/packaging/output" $(IMAGE_ID) /usr/bin/make build_deb
+	chmod -R 776 ${OUTPUT_DIR}/*
+
+build_centos:
+	$(eval IMAGE_ID = $(shell docker build --force-rm -q -f "packaging/scripts/buildimage_centos-6/Dockerfile" .))
+	docker run -v "${OUTPUT_DIR}:/netsa-pkg/packaging/output" $(IMAGE_ID) /usr/bin/make build_rpm
+	chmod -R 776 ${OUTPUT_DIR}/*
 
 clean:
 	git clean -dxf

@@ -27,7 +27,3 @@ ADD ["./packaging/", "/netsa-pkg/packaging/"]
 ADD ["./Makefile", "/netsa-pkg/"]
 
 WORKDIR /netsa-pkg
-
-RUN make libfixbuf && make yaf && make silk && make rpm
-
-ENTRYPOINT ["/bin/bash"]
