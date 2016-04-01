@@ -1,4 +1,4 @@
-VERSION = 20160228
+VERSION = 20160401
 PROC_ARC ?= amd64
 TARGET_ROOT = $(shell pwd)/packaging/root
 YAF_PREFIX = ${TARGET_ROOT}/opt/yaf
