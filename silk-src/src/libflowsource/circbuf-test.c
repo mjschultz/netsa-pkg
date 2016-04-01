@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2009-2015 by Carnegie Mellon University.
+** Copyright (C) 2009-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -57,13 +57,17 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: circbuf-test.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: circbuf-test.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
+#include <silk/skthread.h>
 #include <silk/utils.h>
 #include "circbuf.h"
 
 
 /* LOCAL DEFINES AND TYPEDEFS */
+
+/* where to write usage */
+#define USAGE_FH stderr
 
 /* size of items in the circbuf */
 #define ITEM_SIZE 1024
@@ -81,10 +85,10 @@ RCSIDENT("$SiLK: circbuf-test.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
 /* LOCAL VARIABLE DEFINITIONS */
 
 /* actual number of verbose runs */
-static int verbose_count = VERBOSE_COUNT;
+static unsigned int verbose_count = VERBOSE_COUNT;
 
 /* actual number of total runs */
-static int total_count = TOTAL_COUNT;
+static unsigned int total_count = TOTAL_COUNT;
 
 /* variables to handle shutdown */
 static pthread_mutex_t shutdown_mutex;
@@ -94,38 +98,67 @@ static pthread_cond_t shutdown_ok;
 /* FUNCTION DEFINITIONS */
 
 /*
+ *  appUsageLong();
+ *
+ *    Print complete usage information to USAGE_FH.  Pass this
+ *    function to skOptionsSetUsageCallback(); skOptionsParse() will
+ *    call this funciton and then exit the program when the --help
+ *    option is given.
+ */
+static void
+appUsageLong(
+    void)
+{
+#define USAGE_MSG_HELPER2(m_tot, m_verb)                                \
+    ("[TOTAL_RUNS [VERBOSE_RUNS]]\n"                                    \
+     "\tSmall application to test circular buffer code.\n"              \
+     "\tRuns TOTAL_RUN compete runs (default " #m_tot "),\n"            \
+     "\tthe first VERBOSE_RUNS (default " #m_verb ") of which are verbose.\n")
+
+#define USAGE_MSG_HELPER1(m_tot, m_verb) USAGE_MSG_HELPER2(m_tot, m_verb)
+
+#define USAGE_MSG USAGE_MSG_HELPER1(TOTAL_COUNT, VERBOSE_COUNT)
+
+    FILE *fh = USAGE_FH;
+
+    skAppStandardUsage(fh, USAGE_MSG, NULL, NULL);
+}
+
+/*
  *    Entry point for thread to put stuff into the circbuf.
  */
 static void *
 writer(
     void               *arg)
 {
-    circBuf_t *cbuf = (circBuf_t*)arg;
-    int count = 0;
+    sk_circbuf_t *cbuf = (sk_circbuf_t*)arg;
+    unsigned int count = 0;
     struct timeval t_pre;
     struct timeval t_post;
-    uint8_t *h;
+    uint32_t buf_count = 0;
+    uint8_t *h = NULL;
+    int rv;
 
     for ( ; count < verbose_count; ++count) {
         gettimeofday(&t_pre, NULL);
-        h = circBufNextHead(cbuf);
+        rv = skCircBufGetWriterBlock(cbuf, &h, &buf_count);
         gettimeofday(&t_post, NULL);
-        if (NULL == h) {
-            skAppPrintErr("Stopped writing after %d puts", count);
+        if (rv != SK_CIRCBUF_OK) {
+            skAppPrintErr("Stopped writing after %u puts", count);
             return NULL;
         }
         memset(h, count, ITEM_SIZE);
         memcpy(h, &count, sizeof(count));
-        fprintf(stderr, ("NextHead %5d %17ld.%06u  %4ld.%06u\n"),
-                count, t_pre.tv_sec % 3600, (unsigned int)t_pre.tv_usec,
+        fprintf(stderr, ("Writer   %5u %5" PRIu32 " %17ld.%06u  %4ld.%06u\n"),
+                count, buf_count,
+                t_pre.tv_sec % 3600, (unsigned int)t_pre.tv_usec,
                 t_post.tv_sec % 3600, (unsigned int)t_post.tv_usec);
         sleep(1);
     }
 
     for ( ; count < 1 + total_count; ++count) {
-        h = circBufNextHead(cbuf);
-        if (NULL == h) {
-            skAppPrintErr("Stopped writing after %d puts", count);
+        if (skCircBufGetWriterBlock(cbuf, &h, NULL) != SK_CIRCBUF_OK) {
+            skAppPrintErr("Stopped writing after %u puts", count);
             return NULL;
         }
         memset(h, count, ITEM_SIZE);
@@ -135,13 +168,13 @@ writer(
     /* we've written all we need to write.  continue to write until
      * the circbuf is destroyed  */
 
-    while ((h = circBufNextHead(cbuf)) != NULL) {
+    while (skCircBufGetWriterBlock(cbuf, &h, NULL) == SK_CIRCBUF_OK) {
         memset(h, count, ITEM_SIZE);
         memcpy(h, &count, sizeof(count));
         ++count;
     }
 
-    fprintf(stderr, "Final put count = %d\n", count);
+    fprintf(stderr, "Final put count = %u\n", count);
 
     return NULL;
 }
@@ -155,43 +188,45 @@ reader(
     void               *arg)
 {
     uint8_t cmpbuf[ITEM_SIZE];
-    circBuf_t *cbuf = (circBuf_t*)arg;
-    int count = 0;
+    sk_circbuf_t *cbuf = (sk_circbuf_t*)arg;
+    unsigned int count = 0;
     struct timeval t_pre;
     struct timeval t_post;
-    uint8_t *t;
+    uint32_t buf_items = 0;
+    uint8_t *t = NULL;
+    int rv;
     int i;
 
     for ( ; count < verbose_count; ++count) {
         memset(cmpbuf, count, sizeof(cmpbuf));
         memcpy(cmpbuf, &count, sizeof(count));
         gettimeofday(&t_pre, NULL);
-        t = circBufNextTail(cbuf);
+        rv = skCircBufGetReaderBlock(cbuf, &t, &buf_items);
         gettimeofday(&t_post, NULL);
-        if (NULL == t) {
-            skAppPrintErr("Stopped reading after %d gets", count);
+        if (rv != SK_CIRCBUF_OK) {
+            skAppPrintErr("Stopped reading after %u gets", count);
             return NULL;
         }
         if (0 != memcmp(t, cmpbuf, sizeof(cmpbuf))) {
-            skAppPrintErr("Invalid data for count %d", count);
+            skAppPrintErr("Invalid data for count %u", count);
         }
-        fprintf(stderr, ("NextTail %5d %4ld.%06u  %4ld.%06u\n"),
-                count, t_pre.tv_sec % 3600, (unsigned int)t_pre.tv_usec,
+        fprintf(stderr, ("Reader   %5u %5" PRIu32 " %4ld.%06u  %4ld.%06u\n"),
+                count, buf_items,
+                t_pre.tv_sec % 3600, (unsigned int)t_pre.tv_usec,
                 t_post.tv_sec % 3600, (unsigned int)t_post.tv_usec);
     }
 
     for (i = 1; i >= 0; --i) {
 
         for ( ; (count < (total_count >> i)); ++count) {
-            t = circBufNextTail(cbuf);
-            if (NULL == t) {
-                skAppPrintErr("Stopped reading after %d gets", count);
+            if (skCircBufGetReaderBlock(cbuf, &t, NULL) != SK_CIRCBUF_OK) {
+                skAppPrintErr("Stopped reading after %u gets", count);
                 return NULL;
             }
             memset(cmpbuf, count, sizeof(cmpbuf));
             memcpy(cmpbuf, &count, sizeof(count));
             if (0 != memcmp(t, cmpbuf, sizeof(cmpbuf))) {
-                skAppPrintErr("Invalid data for count %d", count);
+                skAppPrintErr("Invalid data for count %u", count);
             }
         }
 
@@ -207,16 +242,16 @@ reader(
     pthread_cond_broadcast(&shutdown_ok);
     pthread_mutex_unlock(&shutdown_mutex);
 
-    while ((t = circBufNextTail(cbuf)) != NULL) {
+    while (skCircBufGetReaderBlock(cbuf, &t, NULL) == SK_CIRCBUF_OK) {
         memset(cmpbuf, count, sizeof(cmpbuf));
         memcpy(cmpbuf, &count, sizeof(count));
         if (0 != memcmp(t, cmpbuf, sizeof(cmpbuf))) {
-            skAppPrintErr("Invalid data for count %d", count);
+            skAppPrintErr("Invalid data for count %u", count);
         }
         ++count;
     }
 
-    fprintf(stderr, "Final get count = %d\n", count);
+    fprintf(stderr, "Final get count = %u\n", count);
 
     return NULL;
 }
@@ -227,78 +262,94 @@ int main(int argc, char **argv)
     SILK_FEATURES_DEFINE_STRUCT(features);
     pthread_t read_thrd;
     pthread_t write_thrd;
-    circBuf_t *cbuf;
+    sk_circbuf_t *cbuf;
     uint32_t tmp32;
+    int arg_index;
+    int rv;
 
     skAppRegister(argv[0]);
     skAppVerifyFeatures(&features, NULL);
+    skOptionsSetUsageCallback(&appUsageLong);
 
-    pthread_mutex_init(&shutdown_mutex, NULL);
-    pthread_cond_init(&shutdown_ok, NULL);
-
-    if (argc > 1) {
-        if (skStringParseUint32(&tmp32, argv[1], 0, INT32_MAX)) {
-            skAppPrintErr("First arg should be total number of runs");
-            exit(EXIT_FAILURE);
-        }
-        total_count = (int)tmp32;
+    arg_index = skOptionsParse(argc, argv);
+    if (arg_index < 0) {
+        skAppUsage();
     }
-
-    if (argc > 2) {
-        if (skStringParseUint32(&tmp32, argv[2], 0, INT32_MAX)) {
-            skAppPrintErr("Second arg should be number of verbose runs");
+    if (arg_index < argc) {
+        rv = skStringParseUint32(&tmp32, argv[arg_index], 0, INT32_MAX);
+        if (rv) {
+            skAppPrintErr("Invalid total number of runs '%s': %s",
+                          argv[arg_index], skStringParseStrerror(rv));
             exit(EXIT_FAILURE);
         }
-        verbose_count = (int)tmp32;
+        total_count = (unsigned int)tmp32;
+        ++arg_index;
+    }
+    if (arg_index < argc) {
+        rv = skStringParseUint32(&tmp32, argv[arg_index], 0, INT32_MAX);
+        if (rv) {
+            skAppPrintErr("Invalid number of verbose runs '%s': %s",
+                          argv[arg_index], skStringParseStrerror(rv));
+            exit(EXIT_FAILURE);
+        }
+        verbose_count = (unsigned int)tmp32;
+        ++arg_index;
+    }
+    if (arg_index < argc) {
+        skAppPrintErr("Maximum of two arguments permitted");
+        exit(EXIT_FAILURE);
     }
 
     if (verbose_count > total_count) {
         verbose_count = total_count;
     }
 
+    pthread_mutex_init(&shutdown_mutex, NULL);
+    pthread_cond_init(&shutdown_ok, NULL);
+
     /* should fail due to item_size == 0 */
-    cbuf = circBufCreate(0, 1);
-    if (cbuf != NULL) {
+    rv = skCircBufCreate(&cbuf, 0, 1);
+    if (SK_CIRCBUF_E_BAD_PARAM != rv) {
         skAppPrintErr("FAIL");
         exit(EXIT_FAILURE);
     }
 
     /* should fail due to item_count == 0 */
-    cbuf = circBufCreate(1, 0);
-    if (cbuf != NULL) {
+    rv = skCircBufCreate(&cbuf, 1, 0);
+    if (SK_CIRCBUF_E_BAD_PARAM != rv) {
         skAppPrintErr("FAIL");
         exit(EXIT_FAILURE);
     }
 
     /* should fail due to item_size too large */
-    cbuf = circBufCreate(INT32_MAX, 3);
-    if (cbuf != NULL) {
+    rv = skCircBufCreate(&cbuf, INT32_MAX, 3);
+    if (SK_CIRCBUF_E_BAD_PARAM != rv) {
         skAppPrintErr("FAIL");
         exit(EXIT_FAILURE);
     }
 
     /* should succeed */
-    cbuf = circBufCreate(ITEM_SIZE, ITEM_COUNT);
-    if (cbuf == NULL) {
+    rv = skCircBufCreate(&cbuf, ITEM_SIZE, ITEM_COUNT);
+    if (SK_CIRCBUF_OK != rv) {
         skAppPrintErr("FAIL");
         exit(EXIT_FAILURE);
     }
 
     pthread_mutex_lock(&shutdown_mutex);
 
-    pthread_create(&read_thrd, NULL, &reader, cbuf);
+    skthread_create("reader", &read_thrd, &reader, cbuf);
 
-    pthread_create(&write_thrd, NULL, &writer, cbuf);
+    skthread_create("writer", &write_thrd, &writer, cbuf);
 
     pthread_cond_wait(&shutdown_ok, &shutdown_mutex);
     pthread_mutex_unlock(&shutdown_mutex);
 
-    circBufStop(cbuf);
+    skCircBufStop(cbuf);
 
     pthread_join(write_thrd, NULL);
     pthread_join(read_thrd, NULL);
 
-    circBufDestroy(cbuf);
+    skCircBufDestroy(cbuf);
 
     skAppUnregister();
 

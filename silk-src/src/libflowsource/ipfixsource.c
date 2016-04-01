@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -60,7 +60,7 @@
 #define LIBFLOWSOURCE_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: ipfixsource.c 69ac5c7dbbef 2015-09-24 16:27:37Z mthomas $");
+RCSIDENT("$SiLK: ipfixsource.c bd0d27178807 2016-03-16 17:40:21Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/redblack.h>
@@ -70,6 +70,8 @@ RCSIDENT("$SiLK: ipfixsource.c 69ac5c7dbbef 2015-09-24 16:27:37Z mthomas $");
 #include <silk/skthread.h>
 #include <silk/utils.h>
 #include "circbuf.h"
+
+#define SOURCE_LOG_MAX_PENDING_WRITE 0xFFFFFFFF
 
 #ifdef  SKIPFIXSOURCE_TRACE_LEVEL
 #define TRACEMSG_LEVEL SKIPFIXSOURCE_TRACE_LEVEL
@@ -370,7 +372,7 @@ struct skIPFIXSource_st {
      * collected for this probe but not yet requested.
      * 'current_record' is the current location in the
      * 'data_buffer'. */
-    circBuf_t              *data_buffer;
+    sk_circbuf_t           *data_buffer;
     skIPFIXSourceRecord_t  *current_record;
 
     /* buffer for file based reads */
@@ -386,6 +388,11 @@ struct skIPFIXSource_st {
 
     /* count of skIPFIXConnection_t's associated with this source */
     uint32_t                connection_count;
+
+    /* used by SOURCE_LOG_MAX_PENDING_WRITE, the maximum number of
+     * records sitting in the circular buffer since the previous
+     * flush */
+    uint32_t                max_pending;
 
     /* Whether this source has been stopped */
     unsigned                stopped             :1;
@@ -563,7 +570,7 @@ free_source(
 
     pthread_mutex_destroy(&source->stats_mutex);
     if (source->data_buffer) {
-        circBufDestroy(source->data_buffer);
+        skCircBufDestroy(source->data_buffer);
     }
     if (source->connections) {
         rbdestroy(source->connections);
@@ -926,6 +933,7 @@ ipfix_reader(
         while (!base->destroyed) {
             ski_rectype_t rectype;
             ski_yaf_stats_t stats;
+            uint32_t circbuf_count;
 
             /* Determine what type of record is next */
             rectype = skiGetNextRecordType(ipfix_buf, &err);
@@ -1027,36 +1035,43 @@ ipfix_reader(
                   case 1:
                     /* We have filled the empty source->current_record slot.
                      * Advance to the next record location.  */
-                    source->current_record
-                        = ((skIPFIXSourceRecord_t*)
-                           circBufNextHead(source->data_buffer));
-                    if (source->current_record == NULL) {
+                    if (skCircBufGetWriterBlock(source->data_buffer,
+                                                &source->current_record,
+                                                &circbuf_count))
+                    {
                         assert(source->stopped);
                         continue;
                     }
                     pthread_mutex_lock(&source->stats_mutex);
                     ++source->forward_flows;
+                    if (circbuf_count > source->max_pending) {
+                        source->max_pending = circbuf_count;
+                    }
                     pthread_mutex_unlock(&source->stats_mutex);
                     continue;
 
                   case 2:
-                    source->current_record
-                        = ((skIPFIXSourceRecord_t*)
-                           circBufNextHead(source->data_buffer));
-                    if (source->current_record) {
-                        memcpy(source->current_record, &reverse,
-                               sizeof(skIPFIXSourceRecord_t));
-                        source->current_record
-                            = ((skIPFIXSourceRecord_t*)
-                               circBufNextHead(source->data_buffer));
+                    if (skCircBufGetWriterBlock(
+                            source->data_buffer,&source->current_record,NULL))
+                    {
+                        assert(source->stopped);
+                        continue;
                     }
-                    if (source->current_record == NULL) {
+                    memcpy(source->current_record, &reverse,
+                           sizeof(skIPFIXSourceRecord_t));
+                    if (skCircBufGetWriterBlock(source->data_buffer,
+                                                &source->current_record,
+                                                &circbuf_count))
+                    {
                         assert(source->stopped);
                         continue;
                     }
                     pthread_mutex_lock(&source->stats_mutex);
                     ++source->forward_flows;
                     ++source->reverse_flows;
+                    if (circbuf_count > source->max_pending) {
+                        source->max_pending = circbuf_count;
+                    }
                     pthread_mutex_unlock(&source->stats_mutex);
                     continue;
 
@@ -1565,11 +1580,16 @@ ipfixSourceCreateFromSockaddr(
         base = NULL;
     } else {
         /* Loop through all current bases, and compare based on
-         * listen_address */
-        RBLIST *iter = rbopenlist(listener_to_source_base);
+         * listen_address and protocol */
+        fbTransport_t transport;
+        RBLIST *iter;
+
+        SILK_PROTO_TO_FIXBUF_TRANSPORT(protocol, &transport);
+        iter = rbopenlist(listener_to_source_base);
         while ((base = (skIPFIXSourceBase_t *)rbreadlist(iter)) != NULL) {
-            if (skSockaddrArrayMatches(base->listen_address,
-                                       listen_address, 0))
+            if (transport == base->connspec->transport
+                && skSockaddrArrayMatches(base->listen_address,
+                                          listen_address, 0))
             {
                 /* Found a match.  'base' is now set to the matching
                  * base */
@@ -1579,6 +1599,83 @@ ipfixSourceCreateFromSockaddr(
         rbcloselist(iter);
     }
     pthread_mutex_unlock(&global_tree_mutex);
+
+#if 0
+    /*
+     *    The following is #if 0'ed out because it fails to do what it
+     *    is intended to do.
+     *
+     *    The issue appears to be that fixbuf and SiLK use different
+     *    flags to getaddrinfo(), which changes the set of addresses
+     *    that are returned.
+     */
+
+    /*
+     *    fixbuf does not return an error when it cannot bind to any
+     *    listening address, which means the application can start
+     *    correctly but not be actively listening.  The following code
+     *    attempts to detect this situation before creating the fixbuf
+     *    listener by binding to the port.
+     */
+    if (NULL == base) {
+        const sk_sockaddr_t *addr;
+        char addr_name[PATH_MAX];
+        int *sock_array;
+        int *s;
+        uint16_t port = 0;
+
+        s = sock_array = (int *)calloc(skSockaddrArraySize(listen_address),
+                                       sizeof(int));
+        if (sock_array == NULL) {
+            goto ERROR;
+        }
+
+        DEBUGMSG(("Attempting to bind %" PRIu32 " addresses for %s"),
+                 skSockaddrArraySize(listen_address),
+                 skSockaddrArrayNameSafe(listen_address));
+        for (i = 0; i < skSockaddrArraySize(listen_address); ++i) {
+            addr = skSockaddrArrayGet(listen_address, i);
+            skSockaddrString(addr_name, sizeof(addr_name), addr);
+
+            /* Get a socket */
+            *s = socket(addr->sa.sa_family, SOCK_DGRAM, 0);
+            if (-1 == *s) {
+                DEBUGMSG("Skipping %s: Unable to create dgram socket: %s",
+                         addr_name, strerror(errno));
+                continue;
+            }
+            /* Bind socket to port */
+            if (bind(*s, &addr->sa, skSockaddrLen(addr)) == -1) {
+                DEBUGMSG("Skipping %s: Unable to bind: %s",
+                         addr_name, strerror(errno));
+                close(*s);
+                *s = -1;
+                continue;
+            }
+            DEBUGMSG("Bound %s for listening", addr_name);
+            ++s;
+
+            if (0 == port) {
+                port = skSockaddrPort(addr);
+            }
+            assert(port == skSockaddrPort(addr));
+        }
+        if (s == sock_array) {
+            ERRMSG("Failed to bind any addresses for %s",
+                   skSockaddrArrayNameSafe(listen_address));
+            free(sock_array);
+            goto ERROR;
+        }
+        DEBUGMSG(("Bound %" PRIu32 "/%" PRIu32 " addresses for %s"),
+                 (uint32_t)(s-sock_array), skSockaddrArraySize(listen_address),
+                 skSockaddrArrayNameSafe(listen_address));
+        while (s != sock_array) {
+            --s;
+            close(*s);
+        }
+        free(sock_array);
+    }
+#endif  /* 0 */
 
     if (base) {
         if (accept_from == NULL) {
@@ -1630,15 +1727,17 @@ ipfixSourceCreateFromSockaddr(
     }
 
     /* Create the circular buffer */
-    source->data_buffer
-        = circBufCreate(sizeof(skIPFIXSourceRecord_t), max_flows);
-    if (source->data_buffer == NULL) {
+    if (skCircBufCreate(
+            &source->data_buffer, sizeof(skIPFIXSourceRecord_t), max_flows))
+    {
         goto ERROR;
     }
     /* Ready the first location in the circular buffer for writing */
-    source->current_record = ((skIPFIXSourceRecord_t*)
-                              circBufNextHead(source->data_buffer));
-    assert(source->current_record);
+    if (skCircBufGetWriterBlock(
+            source->data_buffer, &source->current_record, NULL))
+    {
+        skAbort();
+    }
 
     pthread_mutex_init(&source->stats_mutex, NULL);
 
@@ -1815,7 +1914,7 @@ ipfixSourceCreateFromSockaddr(
     }
     if (source) {
         if (source->data_buffer) {
-            circBufDestroy(source->data_buffer);
+            skCircBufDestroy(source->data_buffer);
         }
         if (source->connections) {
             rbdestroy(source->connections);
@@ -2010,7 +2109,7 @@ skIPFIXSourceStop(
     /* Mark the source as stopped, and unblock the circular buffer */
     source->stopped = 1;
     if (source->data_buffer) {
-        circBufStop(source->data_buffer);
+        skCircBufStop(source->data_buffer);
     }
     TRACE_RETURN;
 }
@@ -2264,8 +2363,7 @@ skIPFIXSourceGetGeneric(
 
     if (source->data_buffer) {
         /* Reading from the circular buffer */
-        rec = (skIPFIXSourceRecord_t*)circBufNextTail(source->data_buffer);
-        if (rec == NULL) {
+        if (skCircBufGetReaderBlock(source->data_buffer, &rec, NULL)) {
             TRACE_RETURN(-1);
         }
         RWREC_COPY(rwrec, skIPFIXSourceRecordGetRwrec(rec));
@@ -2303,8 +2401,7 @@ skIPFIXSourceGetRecord(
 
     if (source->data_buffer) {
         /* Reading from the circular buffer */
-        rec = (skIPFIXSourceRecord_t*)circBufNextTail(source->data_buffer);
-        if (rec == NULL) {
+        if (skCircBufGetReaderBlock(source->data_buffer, &rec, NULL)) {
             TRACE_RETURN(-1);
         }
         memcpy(ipfix_rec, rec, sizeof(skIPFIXSourceRecord_t));
@@ -2447,6 +2544,11 @@ source_do_stats(
         }
     }
 
+    if (skpcProbeGetLogFlags(source->probe) & SOURCE_LOG_MAX_PENDING_WRITE) {
+        INFOMSG(("'%s': Maximum number of read records waiting to be written:"
+                 " %" PRIu32), source->name, source->max_pending);
+    }
+
     /* reset (set to zero) statistics on the skIPFIXSource_t
      * 'source' */
     if (flags & SOURCE_DO_STATS_CLEAR) {
@@ -2459,6 +2561,7 @@ source_do_stats(
         source->forward_flows = 0;
         source->reverse_flows = 0;
         source->ignored_flows = 0;
+        source->max_pending = 0;
     }
 
     pthread_mutex_unlock(&source->stats_mutex);

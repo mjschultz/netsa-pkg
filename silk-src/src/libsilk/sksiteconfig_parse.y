@@ -1,6 +1,6 @@
 %{
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -58,7 +58,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sksiteconfig_parse.y 4738e9e7f385 2015-08-05 18:08:02Z mthomas $");
+RCSIDENT("$SiLK: sksiteconfig_parse.y 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include "sksiteconfig.h"
 #include <silk/sksite.h>

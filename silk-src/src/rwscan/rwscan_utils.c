@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -52,7 +52,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwscan_utils.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwscan_utils.c 7dab1a2cd828 2016-03-01 16:21:03Z mthomas $");
 
 #include "rwscan.h"
 
@@ -116,8 +116,8 @@ static const char *appHelp[] = {
      "\t1 - Threshold Random Walk (TRW) only\n"
      "\t2 - Bayesian Logistic Regression (BLR) only"),
     "Write scan records to this file.  Def. stdout",
-    ("Specify IPset file containing ALL valid internal IPs.\n"
-     "\tThe TRW model requires a list of targeted IPs."),
+    ("Specify IPset file containing ALL valid internal\n"
+     "\tIP addresses. The TRW model requires a list of targeted IPs."),
      NULL, /* generate dynamically */
      NULL, /* generate dynamically */
     "Do not print column headers. Def. Print titles.",
@@ -164,12 +164,12 @@ appUsageLong(
      "\twith rwsort(1) by sip, proto, and dip.\n")
 
     FILE *fh = USAGE_FH;
-    int   i;
+    unsigned int i;
 
     fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
     fprintf(fh, "\nSWITCHES:\n");
     skOptionsDefaultUsage(fh);
-    for (i = 0; appOptions[i].name; i++) {
+    for (i = 0; appOptions[i].name; ++i) {
         fprintf(fh, "--%s %s. ", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]));
         switch ((appOptionsEnum)appOptions[i].val) {

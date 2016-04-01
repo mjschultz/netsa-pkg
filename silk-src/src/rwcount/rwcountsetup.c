@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -61,7 +61,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcountsetup.c c068e77432c6 2015-09-08 15:40:30Z mthomas $");
+RCSIDENT("$SiLK: rwcountsetup.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/skstringmap.h>
 #include "rwcount.h"

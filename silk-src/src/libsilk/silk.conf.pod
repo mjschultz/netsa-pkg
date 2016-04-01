@@ -34,8 +34,8 @@ into a flowtype.  Each flowtype has a unique name and numeric ID.
 
 =back
 
-Note that the SiLK flow records represent the sensor and flowtype by
-their numeric IDs, not by their names.
+Note that the binary form of SiLK flow records represent the sensor
+and flowtype by their numeric IDs, not by their names.
 
 For historic reasons, one rarely speaks of the flowtype of a SiLK Flow
 record, but instead refers to its I<class> and I<type>.  Every
@@ -435,11 +435,11 @@ B<Example:> default-types in inweb
 =item B<sensors> I<sensor-name-or-group-ref> I<...>
 
 The C<sensors> command is used to associate sensors with a class.  In
-short, to declare that these sensors have data for this class.
-Sensors may be listed by name or numeric ID, and sensor groups may
-also be added by prefixing their names with an at (C<@>) character.
-When you add a sensor group, it is the same as individually adding
-each sensor in that group to the class.
+short, to declare that these sensors have data for this class.  Each
+item in the list must be either the name of a sensor or the name of a
+sensor group preceded by an at (C<@>) character.  When you add a
+sensor group, it is the same as individually adding each sensor in
+that group to the class.
 
 B<Example:> sensors my-sensor-1 my-sensor-2 @my-group-1
 
@@ -488,10 +488,10 @@ B<Example:> end group
 =item B<sensors> I<sensor-name-or-group-ref> I<...>
 
 Sensors are associated with a sensor group by means of the C<sensors>
-command within a group block.  Sensors may be listed by name or
-numeric ID, and sensor groups may also be added by prefixing their
-names with an at (C<@>) character.  When you add a sensor group, it is
-the same as individually adding each sensor to the group being
+command within a group block.  Each item in the list must be either
+the name of a sensor or the name of a sensor group preceded by an at
+(C<@>) character.  When you add a sensor group, it is the same as
+individually adding each sensor in that group to the group being
 defined.
 
 B<Example:> sensors my-sensor-1 my-sensor-2 @my-group-1
@@ -507,7 +507,7 @@ I<SiLK Installation Handbook>
 
 =cut
 
-$SiLK: silk.conf.pod ef2f1b5a1810 2013-04-19 22:04:28Z mthomas $
+$SiLK: silk.conf.pod 78f2e6a72fd8 2016-02-04 15:19:35Z mthomas $
 
 Local Variables:
 mode:text

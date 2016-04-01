@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2015 by Carnegie Mellon University.
+** Copyright (C) 2007-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -59,7 +59,7 @@
 #include <Python.h>
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: silkpython.c 4dba2416c3d6 2015-09-10 19:03:20Z mthomas $");
+RCSIDENT("$SiLK: silkpython.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skplugin.h>

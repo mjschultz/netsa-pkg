@@ -3,7 +3,7 @@
 ## The canonical pathname for this file is
 ## @sysconfdir@/@myprog@.conf
 ##
-## RCSIDENT("$SiLK: rwsender.conf.in 7f4317c4a2a1 2014-05-22 21:38:41Z mthomas $")
+## RCSIDENT("$SiLK: rwsender.conf.in 57a2b3e91bee 2016-02-01 20:29:38Z mthomas $")
 ##
 ## This is a /bin/sh file that gets loaded by the init.d/@myprog@
 ## wrapper script, and this file must follow /bin/sh syntax rules.
@@ -208,6 +208,10 @@ LOCAL_IDENT=auto-ident
 #
 LOCAL_COPIES=link
 
+# Make this many attempts to send a file.  After this number of
+# attempts, ignore the file but leave it in the processing directory.
+# If not set, the default is 5.
+SEND_ATTEMPTS=
 
 # Interval between attempts to check the INCOMING_DIR for new files,
 # in seconds.  This may be left blank, and will default to 15.

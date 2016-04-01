@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -62,7 +62,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skheader.c 6c611fca4036 2015-09-17 14:44:18Z mthomas $");
+RCSIDENT("$SiLK: skheader.c 1b81ec708dc4 2016-02-24 17:33:16Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skheader.h>
@@ -832,17 +832,19 @@ skHeaderReadEntries(
         }
 
         /* read the bytes into the buffer */
-        len -= saw;
-        saw = skStreamRead(stream, &(((uint8_t*)spec)[saw]), len);
-        if (saw < 0) {
-            rv = -1;
-            goto END;
-        }
-        hdr->header_length += saw;
-        if (saw < (ssize_t)len) {
-            /* short read */
-            rv = SKHEADER_ERR_SHORTREAD;
-            goto END;
+        if (len > (uint32_t)saw) {
+            len -= saw;
+            saw = skStreamRead(stream, &(((uint8_t*)spec)[saw]), len);
+            if (saw < 0) {
+                rv = -1;
+                goto END;
+            }
+            hdr->header_length += saw;
+            if (saw < (ssize_t)len) {
+                /* short read */
+                rv = SKHEADER_ERR_SHORTREAD;
+                goto END;
+            }
         }
 
         if (spec->hes_id == 0) {

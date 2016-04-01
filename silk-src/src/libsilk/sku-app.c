@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -60,7 +60,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-app.c 242ba69cb734 2015-09-25 21:00:20Z mthomas $");
+RCSIDENT("$SiLK: sku-app.c a980e04f1cff 2016-01-21 18:30:48Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sksite.h>
@@ -256,13 +256,13 @@ skAppStandardUsage(
     const struct option    *app_options,
     const char            **app_help)
 {
-    int i;
+    unsigned int i;
 
     fprintf(fh, "%s %s", skAppName(), usage_msg);
     fprintf(fh, "\nSWITCHES:\n");
     skOptionsDefaultUsage(fh);
     if (app_options) {
-        for (i = 0; app_options[i].name; i++ ) {
+        for (i = 0; app_options[i].name; ++i) {
             if (app_help[i]) {
                 fprintf(fh, "--%s %s. %s\n", app_options[i].name,
                         SK_OPTION_HAS_ARG(app_options[i]), app_help[i]);

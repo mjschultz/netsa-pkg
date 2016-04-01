@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2009-2015 by Carnegie Mellon University.
+** Copyright (C) 2009-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -62,7 +62,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcompare.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwcompare.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>

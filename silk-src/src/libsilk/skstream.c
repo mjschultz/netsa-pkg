@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -61,7 +61,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skstream.c 6c611fca4036 2015-09-17 14:44:18Z mthomas $");
+RCSIDENT("$SiLK: skstream.c cd3a46cf59e7 2016-01-06 19:03:04Z mthomas $");
 
 #include <silk/skstream.h>
 #include <silk/sksite.h>
@@ -143,19 +143,19 @@ static int silk_clobber = 0;
 /* LOCAL FUNCTION PROTOTYPES */
 
 static ssize_t
-streamIOBufRead(
+streamIOBufCallbackRead(
     skstream_t         *stream,
     void               *buf,
     size_t              count);
 
 static ssize_t
-streamIOBufWrite(
+streamIOBufCallbackWrite(
     skstream_t         *stream,
     const void         *buf,
     size_t              count);
 
 static off_t
-streamIOBufSeek(
+streamIOBufCallbackSeek(
     skstream_t         *stream,
     off_t               offset,
     int                 whence);
@@ -497,9 +497,9 @@ streamIOBufCreate(
 #endif  /* SK_ENABLE_ZLIB */
     {
         /* if (skIOBufBind(stream->iobuf, stream->fd, compmethod) == -1) */
-        io_func.read = (skio_read_fn_t)&streamIOBufRead;
-        io_func.write = (skio_write_fn_t)&streamIOBufWrite;
-        io_func.seek = (skio_seek_fn_t)&streamIOBufSeek;
+        io_func.read = (skio_read_fn_t)&streamIOBufCallbackRead;
+        io_func.write = (skio_write_fn_t)&streamIOBufCallbackWrite;
+        io_func.seek = (skio_seek_fn_t)&streamIOBufCallbackSeek;
         io_func.strerror = (skio_strerror_fn_t)&streamCallbackStrerror;
         if (skIOBufBindAbstract(stream->iobuf, stream, compmethod, &io_func)
             == -1)
@@ -581,7 +581,7 @@ streamIOBufGetLine(
 
 
 /*
- *  status = streamIOBufRead(stream, buf, count);
+ *  status = streamIOBufCallbackRead(stream, buf, count);
  *
  *    Read 'count' bytes from the file descriptor associated with
  *    'stream' and put them into 'buf'.
@@ -589,7 +589,7 @@ streamIOBufGetLine(
  *    This function is a callback invoked by skIOBufRead().
  */
 static ssize_t
-streamIOBufRead(
+streamIOBufCallbackRead(
     skstream_t         *stream,
     void               *buf,
     size_t              count)
@@ -607,7 +607,7 @@ streamIOBufRead(
 
 
 /*
- *  status = streamIOBufWrite(stream, buf, count);
+ *  status = streamIOBufCallbackWrite(stream, buf, count);
  *
  *    Write 'count' bytes from 'buf' to the file descriptor associated
  *    with 'stream'.
@@ -615,7 +615,7 @@ streamIOBufRead(
  *    This function is a callback invoked by skIOBufWrite().
  */
 static ssize_t
-streamIOBufWrite(
+streamIOBufCallbackWrite(
     skstream_t         *stream,
     const void         *buf,
     size_t              count)
@@ -633,7 +633,7 @@ streamIOBufWrite(
 
 
 /*
- *  status = streamIOBufSeek(stream, offset, whence);
+ *  status = streamIOBufCallbackSeek(stream, offset, whence);
  *
  *    Seeks to a location in 'stream' from 'whence' modified by 'offset'.
  *
@@ -641,7 +641,7 @@ streamIOBufWrite(
  *    buffer in which to return the data is NULL.
  */
 static off_t
-streamIOBufSeek(
+streamIOBufCallbackSeek(
     skstream_t         *stream,
     off_t               offset,
     int                 whence)
@@ -3555,6 +3555,66 @@ skStreamWriteSilkHeader(
 
   END:
     return (stream->last_rv = rv);
+}
+
+
+/*
+ *    Though not functions on skstream_t, these are used heavily by
+ *    the code. Define them here and hope the compiler inlines them.
+ */
+
+/* Read count bytes from a file descriptor into buf */
+ssize_t
+skreadn(
+    int                 fd,
+    void               *buf,
+    size_t              count)
+{
+    ssize_t rv;
+    size_t  left = count;
+
+    while (left) {
+        rv = read(fd, buf, left);
+        if (rv == -1) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return -1;
+        }
+        if (rv == 0) {
+            break;
+        }
+        left -= rv;
+        buf = ((uint8_t *)buf) + rv;
+    }
+    return (count - left);
+}
+
+/* Read count bytes from buf to a file descriptor */
+ssize_t
+skwriten(
+    int                 fd,
+    const void         *buf,
+    size_t              count)
+{
+    ssize_t rv;
+    size_t  left = count;
+
+    while (left) {
+        rv = write(fd, buf, left);
+        if (rv == -1) {
+            if (errno == EINTR) {
+                continue;
+            }
+            return -1;
+        }
+        if (rv == 0) {
+            break;
+        }
+        left -= rv;
+        buf = ((const uint8_t *)buf) + rv;
+    }
+    return (count - left);
 }
 
 

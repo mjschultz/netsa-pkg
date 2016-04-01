@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -60,7 +60,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwdedupesetup.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwdedupesetup.c 35d28dbdfd0f 2016-02-24 16:28:44Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstringmap.h>
@@ -75,7 +75,7 @@ RCSIDENT("$SiLK: rwdedupesetup.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
 
 /* LOCAL VARIABLES */
 
-/* available key fields; rwAsciiFieldMapAddDefaultFields() fills this */
+/* available fields; rwAsciiFieldMapAddDefaultFields() fills this */
 static sk_stringmap_t *field_map = NULL;
 
 /* input checker */
@@ -146,7 +146,6 @@ static const char *appHelp[] = {
 };
 
 
-
 /* LOCAL FUNCTION PROTOTYPES */
 
 static int  appOptionsHandler(clientData cData, int opt_index, char *opt_arg);
@@ -183,16 +182,16 @@ appUsageLong(
      "\tthat the order of records is not maintained.\n")
 
     FILE *fh = USAGE_FH;
-    int i;
+    unsigned int i;
 
     fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
     fprintf(fh, "\nSWITCHES:\n");
     skOptionsDefaultUsage(fh);
 
-    for (i = 0; appOptions[i].name; i++ ) {
+    for (i = 0; appOptions[i].name; ++i) {
         fprintf(fh, "--%s %s. ", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]));
-        switch (i) {
+        switch ((appOptionsEnum)appOptions[i].val) {
           case OPT_IGNORE_FIELDS:
             /* Dynamically build the help */
             fprintf(fh, "%s\n", appHelp[i]);
@@ -203,8 +202,9 @@ appUsageLong(
                     ("Attempt to allocate this much memory for the in-core\n"
                      "\tbuffer, in bytes."
                      "  Append k, m, g, for kilo-, mega-, giga-bytes,\n"
-                     "\trespectively. Def. %" PRIu32 "\n"),
-                    (uint32_t)DEFAULT_BUFFER_SIZE);
+                     "\trespectively. Range: %" SK_PRIuZ "-%" SK_PRIuZ
+                     ". Def. " DEFAULT_BUFFER_SIZE "\n"),
+                    MINIMUM_BUFFER_SIZE, MAXIMUM_BUFFER_SIZE);
             break;
           default:
             /* Simple help text from the appHelp array */
@@ -243,13 +243,13 @@ appTeardown(
     teardownFlag = 1;
 
     /* close and destroy output */
-    if (out_rwios) {
-        rv = skStreamDestroy(&out_rwios);
+    if (out_stream) {
+        rv = skStreamDestroy(&out_stream);
         if (rv && !caught_signal) {
             /* only print error when not in signal handler */
-            skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
         }
-        out_rwios = NULL;
+        out_stream = NULL;
     }
 
     /* remove any temporary files */
@@ -297,6 +297,7 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
+    uint64_t tmp64;
     int optctx_flags;
     int rv;
 
@@ -311,6 +312,9 @@ appSetup(
 
     /* initialize globals */
     memset(&delta, 0, sizeof(flow_delta_t));
+    rv = skStringParseHumanUint64(&tmp64, DEFAULT_BUFFER_SIZE,SK_HUMAN_NORMAL);
+    assert(0 == rv);
+    buffer_size = tmp64;
 
     optctx_flags = (SK_OPTIONS_CTX_INPUT_SILK_FLOW | SK_OPTIONS_CTX_ALLOW_STDIN
                     | SK_OPTIONS_CTX_XARGS | SK_OPTIONS_CTX_PRINT_FILENAMES);
@@ -380,29 +384,29 @@ appSetup(
     }
 
     /* Check for an output stream; or default to stdout  */
-    if (out_rwios == NULL) {
-        if ((rv = skStreamCreate(&out_rwios, SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
-            || (rv = skStreamBind(out_rwios, "-")))
+    if (out_stream == NULL) {
+        if ((rv = skStreamCreate(&out_stream, SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+            || (rv = skStreamBind(out_stream, "-")))
         {
-            skStreamPrintLastErr(out_rwios, rv, NULL);
-            skStreamDestroy(&out_rwios);
+            skStreamPrintLastErr(out_stream, rv, NULL);
+            skStreamDestroy(&out_stream);
             appExit(EXIT_FAILURE);
         }
     }
 
     /* set the compmethod on the header */
-    rv = skHeaderSetCompressionMethod(skStreamGetSilkHeader(out_rwios),
+    rv = skHeaderSetCompressionMethod(skStreamGetSilkHeader(out_stream),
                                       comp_method);
     if (rv) {
         skAppPrintErr("Error setting header on %s: %s",
-                      skStreamGetPathname(out_rwios), skHeaderStrerror(rv));
+                      skStreamGetPathname(out_stream), skHeaderStrerror(rv));
         appExit(EXIT_FAILURE);
     }
 
     /* open output */
-    rv = skStreamOpen(out_rwios);
+    rv = skStreamOpen(out_stream);
     if (rv) {
-        skStreamPrintLastErr(out_rwios, rv, NULL);
+        skStreamPrintLastErr(out_stream, rv, NULL);
         skAppPrintErr("Could not open output file.  Exiting.");
         appExit(EXIT_FAILURE);
     }
@@ -439,6 +443,7 @@ appOptionsHandler(
     int                 opt_index,
     char               *opt_arg)
 {
+    uint64_t tmp64;
     uint32_t tmp32;
     int rv;
 
@@ -490,35 +495,35 @@ appOptionsHandler(
 
       case OPT_OUTPUT_PATH:
         /* check for switch given multiple times */
-        if (out_rwios) {
+        if (out_stream) {
             skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
-            skStreamDestroy(&out_rwios);
+            skStreamDestroy(&out_stream);
             return 1;
         }
-        if ((rv = skStreamCreate(&out_rwios, SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
-            || (rv = skStreamBind(out_rwios, opt_arg)))
+        if ((rv = skStreamCreate(&out_stream, SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+            || (rv = skStreamBind(out_stream, opt_arg)))
         {
-            skStreamPrintLastErr(out_rwios, rv, NULL);
+            skStreamPrintLastErr(out_stream, rv, NULL);
             return 1;
         }
         break;
 
       case OPT_BUFFER_SIZE:
-        rv = skStringParseHumanUint64(&buffer_size, opt_arg,
-                                      SK_HUMAN_NORMAL);
+        rv = skStringParseHumanUint64(&tmp64, opt_arg, SK_HUMAN_NORMAL);
         if (rv) {
             goto PARSE_ERROR;
         }
-        if ((buffer_size < MIN_IN_CORE_RECORDS * NODE_SIZE)
-            || (buffer_size >= UINT32_MAX))
+        if ((tmp64 < MIN_IN_CORE_RECORDS * NODE_SIZE)
+            || (tmp64 > MAXIMUM_BUFFER_SIZE))
         {
-            skAppPrintErr(("The --%s value must be between %" PRIu32
-                           " and %" PRIu32),
-                          appOptions[opt_index].name,
-                          (MIN_IN_CORE_RECORDS * NODE_SIZE), UINT32_MAX);
+            skAppPrintErr(
+                ("The --%s value must be between %" SK_PRIuZ " and %" SK_PRIuZ),
+                appOptions[opt_index].name,
+                (MIN_IN_CORE_RECORDS * NODE_SIZE), MAXIMUM_BUFFER_SIZE);
             return 1;
         }
+        buffer_size = tmp64;
         break;
     }
 
@@ -735,40 +740,40 @@ helpFields(
 
 
 /*
- *  int = appNextInput(&rwios);
+ *  int = appNextInput(&stream);
  *
- *    Fill 'rwios' with the next input file to read.  Return 0 if
- *    'rwios' was successfully opened or 1 if there are no more input
+ *    Fill 'stream' with the next input file to read.  Return 0 if
+ *    'stream' was successfully opened or 1 if there are no more input
  *    files.  Return -1 if a file cannot be opened.
  */
 int
 appNextInput(
-    skstream_t        **rwios)
+    skstream_t        **stream)
 {
     int retval;
     int rv;
 
-    retval = skOptionsCtxNextSilkFile(optctx, rwios, &skAppPrintErr);
+    retval = skOptionsCtxNextSilkFile(optctx, stream, &skAppPrintErr);
     if (0 == retval) {
         /* copy annotations and command line entries from the input to
          * the output */
-        if ((rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_rwios),
-                                      skStreamGetSilkHeader(*rwios),
+        if ((rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_stream),
+                                      skStreamGetSilkHeader(*stream),
                                       SK_HENTRY_INVOCATION_ID))
-            || (rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_rwios),
-                                         skStreamGetSilkHeader(*rwios),
+            || (rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_stream),
+                                         skStreamGetSilkHeader(*stream),
                                          SK_HENTRY_ANNOTATION_ID)))
         {
-            skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
             retval = -1;
         }
     } else if (1 == retval) {
         /* no more input.  add final information to header */
-        if ((rv = skHeaderAddInvocation(skStreamGetSilkHeader(out_rwios),
+        if ((rv = skHeaderAddInvocation(skStreamGetSilkHeader(out_stream),
                                         1, pargc, pargv))
-            || (rv = skOptionsNotesAddToStream(out_rwios)))
+            || (rv = skOptionsNotesAddToStream(out_stream)))
         {
-            skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
             retval = -1;
         }
     }

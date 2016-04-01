@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2015 by Carnegie Mellon University.
+** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -57,22 +57,73 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sktimer.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: sktimer.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sktimer.h>
 #include <silk/skthread.h>
 
 #ifdef SKTIMER_TRACE_LEVEL
-#define TRACEMSG_LEVEL 1
+#define TRACEMSG_LEVEL SKTIMER_TRACE_LEVEL
 #endif
-#define TRACEMSG(x)  TRACEMSG_TO_TRACEMSGLVL(1, x)
+#define TRACEMSG(lvl, msg)  TRACEMSG_TO_TRACEMSGLVL(lvl, msg)
 #include <silk/sktracemsg.h>
 
 
 /* LOCAL DEFINES AND TYPEDEFS */
 
-typedef struct sk_timer_st {
+#if TRACEMSG_LEVEL < 2
+
+#define sk_timer_lock(m_timer)      pthread_mutex_lock(&(m_timer)->mutex)
+
+#define sk_timer_unlock(m_timer)    pthread_mutex_unlock(&(m_timer)->mutex)
+
+#define sk_timer_wake(m_timer)      pthread_cond_broadcast(&(m_timer)->cond)
+
+#define sk_timer_wait(m_timer)                                  \
+    pthread_cond_wait(&(m_timer)->cond, &(m_timer)->mutex)
+
+#else
+
+#define sk_timer_lock(m_timer)                          \
+    {                                                   \
+        TRACEMSG(2, ("Timer %p: Acquiring lock [%d]",   \
+                     (void *)(m_timer), __LINE__));     \
+        pthread_mutex_lock(&(m_timer)->mutex);          \
+        TRACEMSG(2, ("Timer %p: Acquired lock [%d]",    \
+                     (void *)(m_timer), __LINE__));     \
+    }
+
+#define sk_timer_unlock(m_timer)                        \
+    {                                                   \
+        TRACEMSG(2, ("Timer %p: Releasing lock [%d]",   \
+                     (void *)(m_timer), __LINE__));     \
+        pthread_mutex_unlock(&(m_timer)->mutex);        \
+    }
+
+#define sk_timer_wake(m_timer)                          \
+    {                                                   \
+        TRACEMSG(2, ("Timer %p: Waking threads [%d]",   \
+                     (void *)(m_timer), __LINE__));     \
+        pthread_cond_broadcast(&(m_timer)->cond);       \
+    }
+
+#define sk_timer_wait(m_timer)                                          \
+    {                                                                   \
+        TRACEMSG(2, ("Timer %p: Releasing lock and waiting [%d]",       \
+                     (void *)(m_timer), __LINE__));                     \
+        pthread_cond_wait(&(m_timer)->cond, &(m_timer)->mutex);         \
+        TRACEMSG(2, ("Timer %p: Acquired lock after waiting [%d]",      \
+                     (void *)(m_timer), __LINE__));                     \
+    }
+
+#endif  /* #else of #if TRACEMSG_LEVEL < 2 */
+
+
+/*
+ *    Definition of sk_timer_t.
+ */
+struct sk_timer_st {
     /** function the user provided that is called when the timer fires */
     skTimerFn_t      callback_fn;
 
@@ -100,7 +151,8 @@ typedef struct sk_timer_st {
 
     /** whether the timer thread has stopped */
     unsigned         stopped : 1;
-} sk_timer_t;
+};
+typedef struct sk_timer_st sk_timer_t; /* skTimer_t */
 
 
 /* FUNCTION DEFINITIONS */
@@ -129,11 +181,11 @@ sk_timer_thread(
     struct timeval   current_time;
 
     /* Lock the mutex */
-    pthread_mutex_lock(&timer->mutex);
+    sk_timer_lock(timer);
 
     /* Have we been destroyed before we've even started? */
     if (timer->stopping) {
-        TRACEMSG(("Timer thread stopped before initial run"));
+        TRACEMSG(1, ("Timer %p: Thread stopped before initial run", v_timer));
         goto END;
     }
 
@@ -155,6 +207,13 @@ sk_timer_thread(
             int64_t seconds_into_interval
                 = ((int64_t)(current_time.tv_sec - timer->base_time.tv_sec)
                    % timer->interval);
+            TRACEMSG(1, (("Timer %p: next_time < current_time (%" PRId64
+                           " < %" PRId64 "); %" PRId64 " seconds into an"
+                          " interval; setting next_time to %" PRId64),
+                         v_timer, (int64_t)next_time.tv_sec,
+                         (int64_t)current_time.tv_sec, seconds_into_interval,
+                         (int64_t)((current_time.tv_sec + timer->interval
+                                    - seconds_into_interval))));
             next_time.tv_sec = (current_time.tv_sec + timer->interval
                                 - seconds_into_interval);
         }
@@ -162,8 +221,9 @@ sk_timer_thread(
         wait_time.tv_sec = next_time.tv_sec;
         next_time.tv_sec += timer->interval;
 
-        TRACEMSG((("Timer wait_time is %" PRId64 ".%09" PRId64),
-                  (int64_t)wait_time.tv_sec, (int64_t)wait_time.tv_nsec));
+        TRACEMSG(1, (("Timer %p: Scheduled to wake at %" PRId64 ".%09" PRId64),
+                     v_timer, (int64_t)wait_time.tv_sec,
+                     (int64_t)wait_time.tv_nsec));
 
         /* Loop around pthread_cond_timedwait() forever until the
          * timer actually fires or the condition variable is signaled
@@ -171,10 +231,16 @@ sk_timer_thread(
          * invoke the callback_fn function and exit this for() loop. */
         for (;;) {
             /* Mutex is released while within pthread_cond_timedwait */
+            TRACEMSG(2, ("Timer %p: Releasing lock and waiting [%d]",
+                         v_timer, __LINE__));
             rv = pthread_cond_timedwait(&timer->cond, &timer->mutex,
                                         &wait_time);
+            TRACEMSG(2, ("Timer %p: Acquired lock due to %s after waiting [%d]",
+                         v_timer, ((ETIMEDOUT == rv) ? "time-out"
+                                   : ((0 == rv) ? "signal" : "other")),
+                         __LINE__));
             if (timer->stopping) {
-                TRACEMSG(("Timer thread noticed stopping variable"));
+                TRACEMSG(1, ("Timer %p: Noticed stopping variable", v_timer));
                 goto END;
             }
             if (ETIMEDOUT == rv) {
@@ -200,33 +266,37 @@ sk_timer_thread(
                      * timedwait() may return immediately, so this has
                      * the potential to spike the CPU until the
                      * wait_time is reached. */
-                    TRACEMSG((("Timer pthread_cond_timedwait() fired %" PRId64
-                               " nanoseconds early"),
-                              (((int64_t)(wait_time.tv_sec - now.tv_sec)
-                                * 1000000000)
-                               + (int64_t)wait_time.tv_nsec
-                               - ((int64_t)now.tv_usec * 1000))));
+                    TRACEMSG(1, (("Timer %p: pthread_cond_timedwait() fired"
+                                  " %" PRId64 " nanoseconds early"),
+                                 v_timer,
+                                 (((int64_t)(wait_time.tv_sec - now.tv_sec)
+                                   * 1000000000)
+                                  + (int64_t)wait_time.tv_nsec
+                                  - ((int64_t)now.tv_usec * 1000))));
                     continue;
                 }
                 /* else timer fired at correct time (or later) */
 #endif  /* CHECK_PTHREAD_COND_TIMEDWAIT */
 
-                TRACEMSG(("Timer invoking callback"));
+                TRACEMSG(1, ("Timer %p: Invoking callback", v_timer));
                 repeat = timer->callback_fn(timer->callback_data);
+                TRACEMSG(1, ("Timer %p: Callback returned %d",
+                             v_timer, (int)repeat));
                 break;
             }
             /* else, a signal interrupted the call; continue waiting */
-            TRACEMSG(("Timer pthread_cond_timedwait() returned unexpected %d",
-                      rv));
+            TRACEMSG(1, (("Timer %p: pthread_cond_timedwait()"
+                          " returned unexpected value %d"),
+                         v_timer, rv));
         }
     } while (SK_TIMER_REPEAT == repeat);
 
   END:
     /* Notify destroy function that we have ended properly. */
-    TRACEMSG(("Timer thread stopped"));
+    TRACEMSG(1, ("Timer %p: Thread is ending", v_timer));
     timer->stopped = 1;
-    pthread_cond_broadcast(&timer->cond);
-    pthread_mutex_unlock(&timer->mutex);
+    sk_timer_wake(timer);
+    sk_timer_unlock(timer);
 
     return NULL;
 }
@@ -257,17 +327,17 @@ skTimerCreateAtTime(
     skTimerFn_t         callback_fn,
     void               *callback_data)
 {
+#if TRACEMSG_LEVEL > 0
+    char tstamp[SKTIMESTAMP_STRLEN];
+#endif
     sk_timer_t *timer;
     pthread_t   thread;
     int         err;
 
-#ifdef SKTIMER_TRACE_LEVEL
-    char tstamp[SKTIMESTAMP_STRLEN];
-    TRACEMSG((("Creating timer interval=%" PRIu32 ", start_time=%s"),
-              interval, sktimestamp_r(tstamp, start, 0)));
-#endif
-
     timer = (sk_timer_t *)calloc(1, sizeof(sk_timer_t));
+    if (NULL == timer) {
+        return errno;
+    }
     timer->interval = (int64_t)interval;
     timer->callback_fn = callback_fn;
     timer->callback_data = callback_data;
@@ -276,19 +346,27 @@ skTimerCreateAtTime(
     pthread_mutex_init(&timer->mutex, NULL);
     pthread_cond_init(&timer->cond, NULL);
 
+    TRACEMSG(1, (("Timer %p: Created with interval=%" PRId64
+                  ", start_time=%sZ"),
+                 (void *)timer, timer->interval,
+                 sktimestamp_r(tstamp, start, SKTIMESTAMP_UTC)));
+
     /* Mutex starts locked */
-    pthread_mutex_lock(&timer->mutex);
+    sk_timer_lock(timer);
     timer->started = 1;
     err = skthread_create_detached("sktimer", &thread, sk_timer_thread,
                                    (void *)timer);
     if (err) {
         timer->started = 0;
-        pthread_mutex_unlock(&timer->mutex);
+        sk_timer_unlock(timer);
+        TRACEMSG(1, ("Timer %p: Failed to start; errno = %d",
+                     (void *)timer, err));
         skTimerDestroy(timer);
         return err;
     }
 
-    pthread_mutex_unlock(&timer->mutex);
+    sk_timer_unlock(timer);
+    TRACEMSG(1, ("Timer %p: Started", (void *)timer));
     *new_timer = timer;
     return 0;
 }
@@ -301,19 +379,22 @@ skTimerDestroy(
     if (NULL == timer) {
         return 0;
     }
+    TRACEMSG(1, ("Timer %p: Starting to destroy", (void *)timer));
+
     /* Grab the mutex */
-    pthread_mutex_lock(&timer->mutex);
+    sk_timer_lock(timer);
     timer->stopping = 1;
     if (timer->started) {
         /* Wake the timer thread so it can check 'stopping' */
-        pthread_cond_broadcast(&timer->cond);
+        sk_timer_wake(timer);
         /* Wait for timer process to end */
         while (!timer->stopped) {
-            pthread_cond_wait(&timer->cond, &timer->mutex);
+            sk_timer_wait(timer);
         }
     }
     /* Unlock and destroy mutexes */
-    pthread_mutex_unlock(&timer->mutex);
+    sk_timer_unlock(timer);
+    TRACEMSG(1, ("Timer %p: Freeing all resources", (void *)timer));
     pthread_mutex_destroy(&timer->mutex);
     pthread_cond_destroy(&timer->cond);
     free(timer);

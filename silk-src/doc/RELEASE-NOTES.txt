@@ -1,3 +1,117 @@
+SiLK-3.12.0 Release, 2016-Mar-31
+
+* rwbag
+  -- Add a new switch --bag-file that replaces the numerous bag
+     creation switches that previously existed.  Deprecate the
+     previous bag creation switches.
+  -- Expand the list of keys that rwbag supports (e.g., start-time,
+     sensor, TCP flags).
+  -- Add support for creating a bag that contains country codes.
+  -- Add support for creating a bag whose key is derived from a prefix
+     map that maps either IP-addresses or protocol-port pairs.
+  -- Add a header to the Bag file that stores the command line used to
+     create the file.
+* rwbagcat
+  -- POTENTIAL INCOMPATIBILITY. Display a key whose type represents a
+     time using a human-readable timestamp.  Using --key-format=epoch
+     displays the integer value.
+  -- POTENTIAL INCOMPATIBILITY. Display a key whose type represents a
+     SiLK sensor using the the sensor name.  Using
+     --key-format=decimal displays the integer value.
+  -- POTENTIAL INCOMPATIBILITY. Display a key whose type represents
+     TCP flags using the standard FSRPAUEC letters.  Using
+     --key-format=decimal displays the integer value.
+  -- POTENTIAL INCOMPATIBILITY. Display a key whose type represents
+     SiLK attributes using the standard TCFS letters.  Use
+     --key-format=decimal to display the integer value.
+  -- Display a key whose type represents a country code using the two
+     letter abbreviation.
+  -- Require a prefix map to be specified via the --pmap-file switch
+     when attempting to display a key whose type represents a mapping
+     from a prefix map.  Require the type of the prefix map to match
+     the key-type specified in the Bag.
+  -- Allow the --key-format switch to accept time-formatting and
+     timezone arguments when printing a key that represents a time.
+     Exit with an error when a time-format is used on a Bag whose
+     key-type is neither a time nor 'custom'.
+  -- POTENTIAL INCOMPATIBILITY. Exit with an error when a --key-format
+     for an IP address is used on a Bag whose key-type is neither an
+     IP address nor 'custom'.
+  -- POTENTIAL INCOMPATIBILITY. Exit with an error when the
+     --network-structure switch is used on a Bag whose key-type is
+     neither an IP address nor 'custom'.
+  -- POTENTIAL INCOMPATIBILITY. Exit with an error when the --mask-ips
+     switch is using on a Bag whose key-type is neither an IP address
+     nor 'custom'.
+* rwbagbuild
+  -- Add support for creating a bag that contains country codes.
+  -- Add support for creating a bag whose key is derived from a prefix
+     map that maps either IP-addresses or protocol-port pairs.
+  -- When mapping from a protocol-port pair to a prefix map value,
+     allow the delimiter between the protocol and port to be different
+     than that between the port and the counter.
+  -- Add a header to the Bag file that stores the command line used to
+     create the file.
+* rwgeoip2ccmap
+  -- Use the first line of input to determine whether to create an
+     IPv4 or IPv6 country code map.
+  -- Add a header to the Bag file that stores the command line used to
+     create the file.
+  -- Modify the tool to more closely follow other SiLK tools.
+  -- POTENTIAL INCOMPATIBILITY. Do not read the binary form of the
+     Legacy GeoIP country code map.  Only accept the comma separated
+     value form.
+* rwstats
+  -- Allow the --count switch to accept an argument of 0 which
+     indicates that it should print all bins.
+  -- Allow the --percentage switch to accept a floating point value.
+* rwsort
+  -- Do not limit the maximum sort-buffer size to a 32-bit value on
+     64-bit platforms.
+* rwdedupe
+  -- Do not limit the maximum sort-buffer size to a 32-bit value on
+     64-bit platforms.
+* rwcombine
+  -- Do not limit the maximum sort-buffer size to a 32-bit value on
+     64-bit platforms.
+* rwpmapbuild
+  -- Add a header to the prefix map file that stores the command line
+     used to create the file.
+* rwsilk2ipfix
+  -- Use multiple IPFIX templates when converting SiLK flow records.
+  -- Add a --single-template switch to mimic the previous behavior.
+* rwbagtool
+  -- Fix an issue where the --compression-method switch was not
+     applied to the IPset created by --coverset.
+* rwflowpack, flowcap
+  -- Fix a call to abort() that would occur when processing IPFIX
+     records and a byte-count or packet-count of zero occurred in an
+     unexpected place.
+  -- Fix a bug that prevented creating a TCP IPFIX listener and a UDP
+     IPFIX listener on the same port number.
+* rwsender
+  -- Attempt to resend any file that is not transferred unless the
+     file is explicitly rejected by the rwreceiver.
+  -- Add the --send-attempts switch that allows setting the number of
+     attempts that are made to transfer a file.
+  -- If sending a file fails and another attempt is to be made, append
+     the file's name onto the back of the send queue.
+  -- Allow setting of the --send-attempts switch from the
+     configuration file and system initialization script.
+  -- Fix a memory leak that may occur when rwsender is processing a
+     file for an rwreceiver and their network connection ends.
+  -- Support partial reads of a message header when GnuTLS is used.
+  -- Log the GnuTLS error message that causes a connection to close.
+* rwreceiver
+  -- Support partial reads of a message header when GnuTLS is used.
+  -- Log the GnuTLS error message that causes a connection to close.
+* Building
+  -- Fix several "make check" failures on OS X when System Integrity
+     Protection is enabled.
+  -- Remove use of pthread_atfork that preventing compilation on some
+     systems.
+
+
 SiLK-3.11.0.1 Release, 2015-Oct-08
 
 * Building

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2008-2015 by Carnegie Mellon University.
+** Copyright (C) 2008-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -66,7 +66,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKIPSET_H, "$SiLK: skipset.h 229da830fb22 2015-09-08 22:04:00Z mthomas $");
+RCSIDENTVAR(rcsID_SKIPSET_H, "$SiLK: skipset.h 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/skheader.h>
@@ -412,14 +412,23 @@ skIPSetCountIPsString(
 
 
 /**
- *    Allocates and initializes a new IPset at the space specified by
- *    '*ipset'.  The set is initially empty.  When 'support_ipv6' is
- *    non-zero, the IPset will be initialized to store IPv6 addresses;
- *    otherwise it will hold IPv4 addresses.
+ *    Allocates and initializes a new IPset at the location referenced
+ *    specified by 'ipset'.  The set is initially empty.
  *
- *    Returns SKIPSET_OK if everything went well, else
- *    SKIPSET_ERR_ALLOC on a malloc failure, or SKIPSET_ERR_BADINPUT
- *    if the 'ipset' parameter was NULL.
+ *    Assuming IPv6 support is enabled in SiLK, the default behavior
+ *    is for an IPset to be initialized to store IPv4 addresses and to
+ *    convert itself to hold IPv6 addresses once an IPv6 address is
+ *    inserted.  When the 'support_ipv6' parameter is non-zero, the
+ *    IPset is initialized to store IPv6 addresses which eliminates
+ *    the need for the IPset to convert itself to the IPv6 format.
+ *    (See also skIPSetAutoConvertDisable().)
+ *
+ *    Returns SKIPSET_OK on success.  Returns SKIPSET_ERR_ALLOC on an
+ *    allocation failure, SKIPSET_ERR_BADINPUT if the 'ipset'
+ *    parameter was NULL, or SKIPSET_ERR_IPV6 if 'support_ipv6' is
+ *    non-zero and SiLK was configured without IPv6 support.  Leaves
+ *    the memory referenced by 'ipset' unchanged when an error code is
+ *    returned.
  *
  *    skIPSetDestroy() is the corresponding free function.
  */

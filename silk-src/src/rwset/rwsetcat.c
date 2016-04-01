@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2003-2015 by Carnegie Mellon University.
+** Copyright (C) 2003-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -57,7 +57,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsetcat.c 247a834fb9d7 2015-07-31 18:05:44Z mthomas $");
+RCSIDENT("$SiLK: rwsetcat.c e5d7217c6d5f 2016-01-21 18:24:52Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skipset.h>
@@ -182,14 +182,7 @@ static const char *appHelp[] = {
     "Print statistics about the IPset (min-/max-ip, etc);\n"
     "\tdisable default printing of IPs. Def. No",
     "Also print IPs when count or statistics switch is given",
-    ("Print the number of hosts for each specified CIDR\n"
-     "\tblock in the comma-separed list of CIDR block sizes (0--32) and/or\n"
-     "\tletters (T=0,A=8,B=16,C=24,X=27,H=32). If argument contains 'S' or\n"
-     "\t'/', for each CIDR block print host counts and number of occupied\n"
-     "\tsmaller CIDR blocks. Additional CIDR blocks to summarize can be\n"
-     "\tspecified by listing them after the '/'. Def. v4:TS/8,16,24,27.\n"
-     "\tA leading 'v6:' treats IPset as being IPv6, allows range 0--128,\n"
-     "\tdisallows A,B,C,X, sets H to 128, and sets default to TS/48,64"),
+    NULL,
     ("Print IPs in CIDR block notation when no argument given\n"
      "\tor argument is 1; otherwise, print individual IPs.\n"
      "\tDef. Individual IPs for IPv4 IPsets, CIDR blocks for IPv6 IPsets"),
@@ -235,10 +228,41 @@ appUsageLong(
      "\tstructure, or other statistics.  If no IPSET_FILEs are given on\n"    \
      "\tthe command line, the IPset will be read from the standard input.\n")
 
-    FILE *fh = USAGE_FH;
+    /* network-structure help string is longer than allowed by C90 */
+#define NETWORK_STRUCT_HELP1                                                  \
+    ("Print the number of hosts for each specified CIDR\n"                    \
+     "\tblock in the comma-separed list of CIDR block sizes (0--32) and/or\n" \
+     "\tletters (T=0,A=8,B=16,C=24,X=27,H=32). If argument contains 'S' or\n" \
+     "\t'/', for each CIDR block print host counts and number of occupied\n")
+#define NETWORK_STRUCT_HELP2                                                  \
+    ("\tsmaller CIDR blocks. Additional CIDR blocks to summarize can be\n"    \
+     "\tspecified by listing them after the '/'. Def. v4:TS/8,16,24,27.\n"    \
+     "\tA leading 'v6:' treats IPset as being IPv6, allows range 0--128,\n"   \
+     "\tdisallows A,B,C,X, sets H to 128, and sets default to TS/48,64")
 
-    skAppStandardUsage(fh, USAGE_MSG, appOptions, appHelp);
-    skOptionsIPFormatUsage(fh);
+    FILE *fh = USAGE_FH;
+    unsigned int i;
+
+    fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
+    fprintf(fh, "\nSWITCHES:\n");
+    skOptionsDefaultUsage(fh);
+    for (i = 0; appOptions[i].name; ++i) {
+        fprintf(fh, "--%s %s. ",
+                appOptions[i].name, SK_OPTION_HAS_ARG(appOptions[i]));
+        switch ((appOptionsEnum)appOptions[i].val) {
+          case OPT_NETWORK_STRUCTURE:
+            fprintf(fh, "%s%s\n", NETWORK_STRUCT_HELP1, NETWORK_STRUCT_HELP2);
+            break;
+          case OPT_IP_RANGES:
+            fprintf(fh, "%s\n", appHelp[i]);
+            /* insert the --ip-format switches */
+            skOptionsIPFormatUsage(fh);
+            break;
+          default:
+            fprintf(fh, "%s\n", appHelp[i]);
+            break;
+        }
+    }
 }
 
 

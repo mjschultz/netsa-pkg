@@ -1218,7 +1218,7 @@ For situations where the key and value are each a single field, the
 Bag tools usually provide better performance, especially when the key
 is one or two bytes:
 
- rwbag --sport-bytes=stdout | rwbagcat
+ rwbag --bag-file=sport,bytes,stdout | rwbagcat
 
 B<rwgroup(1)> works similarly to B<rwuniq>, except the data remains in
 the form of SiLK Flow records, and the next-hop-IP field is modified
@@ -1292,7 +1292,7 @@ B<yaf(1)>, B<dlopen(3)>, B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwuniq.pod 4dba2416c3d6 2015-09-10 19:03:20Z mthomas $
+$SiLK: rwuniq.pod 21ed2356639a 2016-03-24 15:40:15Z mthomas $
 
 Local Variables:
 mode:text

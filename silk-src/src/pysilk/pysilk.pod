@@ -851,7 +851,8 @@ not 6 (TCP) will raise an B<AttributeError>.
 
 The ICMP code of the flow I<rec>, an 8-bit integer.  The default
 icmpcode value is 0.  The value is only meaningful when
-I<rec>.protocol is ICMP (1) or when B<is_ipv6()|/I<rec>.is_ipv6(I<>)>
+I<rec>.protocol is ICMP (1) or when
+L<I<rec>.B<is_ipv6()>|/I<rec>.is_ipv6(I<>)>
 is B<True>
 and I<rec>.protocol is ICMPv6 (58).  Since a record's ICMP type and
 code are stored in the destination port, setting this value may modify
@@ -861,7 +862,8 @@ I<rec>.dport.
 
 The ICMP type of the flow I<rec>, an 8-bit integer.  The default
 icmptype value is 0.  The value is only meaningful when
-I<rec>.protocol is ICMP (1) or when B<is_ipv6()|/I<rec>.is_ipv6(I<>)>
+I<rec>.protocol is ICMP (1) or when
+L<I<rec>.B<is_ipv6()>|/I<rec>.is_ipv6(I<>)>
 is B<True>
 and I<rec>.protocol is ICMPv6 (58).  Since a record's ICMP type and
 code are stored in the destination port, setting this value may modify
@@ -1004,7 +1006,8 @@ Supported operations and methods:
 =item I<rec>.is_icmp(I<>)
 
 Return B<True> if the protocol of I<rec> is 1 (ICMP) or if the
-protocol of I<rec> is 58 (ICMPv6) and B<is_ipv6()/I<rec>.is_ipv6(I<>)>
+protocol of I<rec> is 58 (ICMPv6) and
+L<I<rec>.B<is_ipv6()>|/I<rec>.is_ipv6(I<>)>
 is B<True>.
 Return B<False> otherwise.
 
@@ -2784,7 +2787,7 @@ B<python(1)>, B<gzip(1)>, B<yaf(1)>, L<http://docs.python.org/>
 
 =cut
 
-$SiLK: pysilk.pod 8d2396812033 2015-06-05 14:50:16Z mthomas $
+$SiLK: pysilk.pod 0c4ff2945183 2016-03-07 17:23:02Z mthomas $
 
 Local Variables:
 mode:text

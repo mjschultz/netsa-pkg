@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2015 by Carnegie Mellon University.
+** Copyright (C) 2007-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -62,7 +62,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmapcat.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwpmapcat.c 97626d046599 2016-03-16 17:48:34Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
@@ -175,10 +175,10 @@ static struct option appOptions[] = {
 
 static const char *appHelp[] = {
     "Print the contents of this the prefix map",
-    ("Print the contents of the named address types mapping file, or\n"
-     "\tof the default file when no argument is provided"),
-    ("Print the contents of the named country code mapping file, or\n"
-     "\tof the default file when no argument is provided"),
+    ("Print the contents of the named address types mapping\n"
+     "\tfile or of the default file when no argument is provided"),
+    ("Print the contents of the named country code mapping\n"
+     "\tfile or of the default file when no argument is provided"),
     NULL, /* generated dynamically */
     "Do not print ranges having this label. Def. Print all",
     ("Do not print ranges having the label that\n"

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2015 by Carnegie Mellon University.
+** Copyright (C) 2005-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -103,7 +103,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwresolve.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwresolve.c 7dab1a2cd828 2016-03-01 16:21:03Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/skipaddr.h>
@@ -1007,6 +1007,9 @@ cacheName(
     static uint32_t vector_idx = 0;
     size_t len = 1 + strlen(name);
     uint32_t rv;
+
+    /* if namebuf is NULL, then namebuf_avail must be zero */
+    assert(NULL != namebuf || 0 == namebuf_avail);
 
     if (len > namebuf_avail) {
         if ((0 == namebuf_size) || (NAMEBUF_MAX_SIZE == namebuf_size)) {

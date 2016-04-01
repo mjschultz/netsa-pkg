@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2015 by Carnegie Mellon University.
+** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -53,7 +53,7 @@
 /*
 ** prefixmap_test.c
 **
-** John McClary Prevost
+** Katherine Prevost
 ** December 3rd, 2004
 **
 ** Small application to test the prefixmap library by taking a
@@ -65,7 +65,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skprefixmap-test.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: skprefixmap-test.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/skprefixmap.h>
 #include <silk/skstream.h>

@@ -1,4 +1,4 @@
-#  Copyright (C) 2009-2015 by Carnegie Mellon University.
+#  Copyright (C) 2009-2016 by Carnegie Mellon University.
 #
 #  See end of file for License
 #######################################################################
@@ -8,7 +8,7 @@
 #  March 2009
 #
 #######################################################################
-#  RCSIDENT("$SiLK: SiLKTests.pm 242ba69cb734 2015-09-25 21:00:20Z mthomas $")
+#  RCSIDENT("$SiLK: SiLKTests.pm be00e4ce901e 2016-02-25 18:50:11Z mthomas $")
 #######################################################################
 #
 #    Perl module used by the scripts that "make check" runs.
@@ -236,7 +236,8 @@ BEGIN {
                       &get_ephemeral_port &make_config_file
                       &make_packer_sensor_conf
                       &make_tempdir &make_tempname &make_test_scripts
-                      &print_tests_hash &run_command &skip_test
+                      &print_tests_hash &run_command
+                      &rwpollexec_use_alternate_shell &skip_test
                       &verify_archived_files &verify_directory_files
                       &verify_empty_dirs
                       $srcdir $top_srcdir
@@ -480,6 +481,14 @@ sub make_tempdir
     unless (-d $tmpdir) {
         skip_test("Unable to create temporary directory");
     }
+
+    my $testing = "$tmpdir/-silktests-";
+    open TESTING, '>', $testing
+        or die "$NAME: Cannot create '$testing': $!\n";
+    print TESTING "\$0 = '$0';\n\$PWD = '$SiLKTests::PWD';\n";
+    close TESTING
+        or die "$NAME: Cannot close '$testing': $!\n";
+
     return $tmpdir;
 }
 
@@ -487,7 +496,9 @@ sub make_tempdir
 #  $path = make_tempname($key);
 #
 #    Return a path to a temporary file.  Calls to this function with
-#    the same $key return the same name.
+#    the same $key return the same name.  Calls to this function
+#    within the same test return files in the same temporary
+#    directory.
 #
 sub make_tempname
 {
@@ -497,10 +508,7 @@ sub make_tempname
     our %TEMP_MAP;
 
     unless (defined $tmpdir) {
-        $tmpdir = File::Temp::tempdir(CLEANUP => !$ENV{SK_TESTS_SAVEOUTPUT});
-        unless (-d $tmpdir) {
-            skip_test("Unable to create tempdir");
-        }
+        $tmpdir = make_tempdir();
     }
 
     # change anything other than -, _, ., and alpha-numerics to a
@@ -835,8 +843,22 @@ sub check_features
 sub check_app_switch
 {
     my ($app, $switch, $re) = @_;
-    my $output = `$app --help 2>&1`;
+
+    my $cmd = $app.' --help 2>&1';
+    if ($ENV{SK_TESTS_VERBOSE}) {
+        print STDERR "RUNNING: ", print_command_with_env($cmd), "\n";
+    }
+    my $output = `$cmd`;
     if ($?) {
+        if (-1 == $?) {
+            die "$NAME: Failed to execute command: $!\n";
+        }
+        if ($? & 127) {
+            print STDERR "$NAME: Command died by signal ", ($? & 127), "\n";
+        }
+        elsif ($ENV{SK_TESTS_VERBOSE}) {
+            print STDERR "$NAME: Command exited with status ", ($? >> 8), "\n";
+        }
         return 0;
     }
     my $text;
@@ -1106,6 +1128,88 @@ EOF
     # $s->close();
     #
     # return $port;
+}
+
+
+#  rwpollexec_use_alternate_shell($tmpdir)
+#
+#    Work around an issue that occurs when running "make check" under
+#    OS X when System Integrity Protection is enabled.
+#
+#    As part of finding a valid shell to use when spawning programs,
+#    rwpollexec attempts to exec itself in a subshell.(NOTE-1)  This
+#    subprocess does not have access to the DYLD_LIBRARY_PATH
+#    environment variable since /bin/sh strips it from the
+#    environment, and therefore rwpollexec fails to run since it
+#    cannot locate libsilk.
+#
+#    The work-around is to copy /bin/sh out of the /bin directory and
+#    set SILK_RWPOLLEXEC_SHELL to that location.(NOTE-2) This function
+#    copies it into the $tmpdir.
+#
+#    NOTE-1: This is only a problem when running a non-installed
+#    version of rwpollexec.  In this case, rwpollexec thinks its
+#    complete path is in the .libs subdirectory, but that version
+#    requires DYLD_LIBRARY_PATH settings from libtool to work
+#    correctly.
+#
+#    NOTE-2: Copying /bin/sh to another directory works around the
+#    issue since stripping DYLD_LIBRARY_PATH from the environment
+#    occurs for all programs in /bin and is not inherent to /bin/sh
+#    itself.
+#
+sub rwpollexec_use_alternate_shell
+{
+    my ($dir) = @_;
+
+    my $bin_sh = '/bin/sh';
+    my $copy_sh = "$dir/sh";
+
+    for my $shell ($bin_sh, $copy_sh) {
+        # Fork, set the DYLD_LIBRARY_PATH environment variable in the
+        # child, and then exec $shell and echo the envvar's value.
+        # Have the parent read the output from the child.  Do not use
+        # backticks, since that may run /bin/sh for us.
+        my $pid = open ECHO, '-|';
+        if (!defined $pid) {
+            die "$NAME: Cannot fork: $!\n";
+        }
+        if (0 == $pid) {
+            # Child
+            $ENV{DYLD_LIBRARY_PATH} = "foo";
+            #print STDERR "\$i = $i; $shell -c 'echo \$DYLD_LIBRARY_PATH'\n";
+            exec $shell, '-c', 'echo $DYLD_LIBRARY_PATH'
+                or die "$NAME: Cannot exec: $!\n";
+        }
+        # Parent
+        my $result = '';
+        while (<ECHO>) {
+            $result .= $_;
+        }
+        close(ECHO);
+        #print STDERR "\$i = $i; \$result = '$result'\n";
+
+        if ($result =~ /^foo$/) {
+            # Either System Integrity Protection is not enabled or we
+            # worked around it
+            return;
+        }
+        if ($shell eq $copy_sh) {
+            # This is the second pass and we failed to work around it;
+            # should skip this test.
+            skip_test("Unable to work around OS X System Integrity Protection");
+        }
+
+        unless (-d $dir) {
+            die "$NAME: Directory '$dir' does not exist\n";
+        }
+        system '/bin/cp', $bin_sh, $copy_sh
+            and die "$NAME: Unable to copy $bin_sh\n";
+
+        $ENV{SILK_RWPOLLEXEC_SHELL} = $copy_sh;
+        push @DUMP_ENVVARS, 'SILK_RWPOLLEXEC_SHELL';
+    }
+    die "$NAME: Not reached!\n";
 }
 
 
@@ -1899,7 +2003,7 @@ sub make_packer_sensor_conf
 __END__
 
 #######################################################################
-# Copyright (C) 2009-2015 by Carnegie Mellon University.
+# Copyright (C) 2009-2016 by Carnegie Mellon University.
 #
 # @OPENSOURCE_HEADER_START@
 #

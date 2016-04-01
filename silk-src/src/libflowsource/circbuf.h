@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2015 by Carnegie Mellon University.
+** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -57,7 +57,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_CIRCBUF_H, "$SiLK: circbuf.h 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENTVAR(rcsID_CIRCBUF_H, "$SiLK: circbuf.h 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 /*
 **  circbuf.h
@@ -69,67 +69,135 @@ RCSIDENTVAR(rcsID_CIRCBUF_H, "$SiLK: circbuf.h 3b368a750438 2015-05-18 20:39:37Z
 */
 
 /*
+ *    The type for the circular buffer.
+ */
+struct sk_circbuf_st;
+typedef struct sk_circbuf_st sk_circbuf_t;
+
+
+/*
  *    The normal maximum size (in bytes) of a single chunk in a
  *    circular buffer.  (Circular buffers are allocated in chunks, as
  *    neeeded.)  A single chunk will will always be at least 3 times
  *    the item_size, regardless of the value of
- *    CIRCBUF_CHUNK_MAX_SIZE.
+ *    SK_CIRCBUF_CHUNK_MAX_SIZE.
  */
-#define CIRCBUF_CHUNK_MAX_SIZE 0x20000 /* 128k */
+#define SK_CIRCBUF_CHUNK_MAX_SIZE 0x20000   /* 128k */
 
-struct circBuf_st;
-typedef struct circBuf_st circBuf_t;
 
 /*
- *    Creates a circular buffer which can contain at least up to
- *    item_count items of size item_size.  Returns NULL if not enough
- *    memory.  The created circular buffer may contain space for more
- *    than item_count items, up to the size of a circbuf chunk.
+ *    Status codes returned by the sk_circbuf_t functions.
  */
-circBuf_t *
-circBufCreate(
+enum sk_circbuf_status_en {
+    /*  Success */
+    SK_CIRCBUF_OK = 0,
+    /*  Memory allocation error */
+    SK_CIRCBUF_E_ALLOC,
+    /*  Bad parameter to function */
+    SK_CIRCBUF_E_BAD_PARAM,
+    /*  The sk_circbuf_t is stopped. */
+    SK_CIRCBUF_E_STOPPED
+};
+typedef enum sk_circbuf_status_en sk_circbuf_status_t;
+
+
+/*
+ *    Creates a circular buffer which can contain at least
+ *    'item_count' items each of size 'item_size' and stores the
+ *    circular buffer at the location specified by 'buf'.
+ *
+ *    Returns SK_CIRCBUF_E_BAD_PARAM if 'buf' is NULL, if either
+ *    numeric parameter is 0, or if 'item_size' is larger than 85MiB.
+ *    Returns SK_CIRCBUF_E_ALLOC if there is not enough memory.  The
+ *    created circular buffer may contain space for more than
+ *    'item_count' items, up to the size of a circular buffer chunk.
+ */
+int
+skCircBufCreate(
+    sk_circbuf_t      **buf,
     uint32_t            item_size,
     uint32_t            item_count);
 
 /*
- *    Causes all threads waiting on a circular buffer to return.
+ *    Causes all threads waiting on the circular buffer 'buf' to
+ *    return.
  */
 void
-circBufStop(
-    circBuf_t          *buf);
+skCircBufStop(
+    sk_circbuf_t       *buf);
 
 /*
- *    Destroys a circular buffer.  Does nothing if 'buf' is NULL.
+ *    Destroys the circular buffer 'buf'.  For proper clean-up, the
+ *    caller should call skCircBufStop() before calling this function.
+ *    Does nothing if 'buf' is NULL.
  */
 void
-circBufDestroy(
-    circBuf_t          *buf);
+skCircBufDestroy(
+    sk_circbuf_t       *buf);
 
 /*
- *    Takes a circular buffer as an argument.  Returns a pointer to an
- *    empty memory location in the buffer of size item_size.  This
- *    location should be used to add data to the circular buffer.
- *    This location will not be returned by circBufNextTail() until
- *    circBufNextHead() is called again at least once.  This call will
- *    block if the buffer is full, and return NULL if circBufStop or
- *    circBufDestroy were called while waiting.
+ *    Sets the location referenced by 'writer_pos'--which should be a
+ *    pointer-pointer---to an empty memory block in the circular
+ *    buffer 'buf' and returns SK_CIRCBUF_OK.  When 'item_count' is
+ *    not NULL, the location it references is set to number of items
+ *    currently in 'buf' (the returned block is included in the item
+ *    count).
+ *
+ *    This block should be used to add data to the circular buffer.
+ *    The size of the block is the 'item_size' specified when 'buf'
+ *    was created.
+ *
+ *    This call blocks if the buffer is full. The function returns
+ *    SK_CIRCBUF_E_STOPPED if skCircBufStop() or skCircBufDestroy()
+ *    are called while waiting.  The function returns
+ *    SK_CIRCBUF_E_ALLOC when an attempt to allocate a new chunk
+ *    fails.
+ *
+ *    When the function returns a value other than SK_CIRCBUF_OK, the
+ *    pointer referenced by 'writer_pos' is set to NULL and the value
+ *    in 'item_count' is not defined.
+ *
+ *    The circular buffer considers the returned block locked by the
+ *    caller.  The block is not made available for use by
+ *    skCircBufGetReaderBlock() until skCircBufGetWriterBlock() is
+ *    called again.
  */
-uint8_t *
-circBufNextHead(
-    circBuf_t          *buf);
+int
+skCircBufGetWriterBlock(
+    sk_circbuf_t       *buf,
+    void               *writer_pos,
+    uint32_t           *item_count);
 
 /*
- *    Takes a circular buffer as an argument.  Returns a pointer to a
- *    full memory location from the circular buffer of size item_size.
- *    This location will be the least recently added item from a call
- *    to circBufNextHead().  This location should be used to get data
- *    from the circular buffer.  This call will block if the buffer is
- *    empty, and return NULL if circBufStop or circBufDestroy were
- *    called while waiting.
+ *    Sets the location referenced by 'reader_pos'--which should be a
+ *    pointer-pointer---to a full memory block in the circular buffer
+ *    'buf' and returns SK_CIRCBUF_OK.  When 'item_count' is not NULL,
+ *    the location it references is set to number of items currently
+ *    in 'buf' (the returned item is included in the item count).
+ *
+ *    This block should be used to get data from the circular buffer.
+ *    The size of the block is the 'item_size' specified when 'buf'
+ *    was created.  The block is the least recently added item from a
+ *    call to skCircBufGetWriterBlock().
+ *
+ *    This call blocks if the buffer is full. The function returns
+ *    SK_CIRCBUF_E_STOPPED if skCircBufStop() or skCircBufDestroy()
+ *    are called while waiting.
+ *
+ *    When the function returns a value other than SK_CIRCBUF_OK, the
+ *    pointer referenced by 'reader_pos' is set to NULL and the value
+ *    in 'item_count' is not defined.
+ *
+ *    The circular buffer considers the returned block locked by the
+ *    caller.  The block is not made available for use by
+ *    skCircBufGetWriterBlock() until skCircBufGetReaderBlock() is
+ *    called again.
  */
-uint8_t *
-circBufNextTail(
-    circBuf_t          *buf);
+int
+skCircBufGetReaderBlock(
+    sk_circbuf_t       *buf,
+    void               *reader_pos,
+    uint32_t           *item_count);
 
 #ifdef __cplusplus
 }

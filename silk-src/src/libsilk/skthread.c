@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -59,12 +59,16 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skthread.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: skthread.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skthread.h>
 
 /* LOCAL DEFINES AND TYPEDEFS */
+
+#ifndef SKTHREAD_LOG_IDS
+#define SKTHREAD_LOG_IDS    0
+#endif
 
 typedef struct skthread_data_st {
     const char *name;
@@ -93,22 +97,46 @@ static uint32_t next_thread_id = 0;
 /* FUNCTION DEFINITIONS */
 
 /*
- *    Allocate a uint32_t, set that value to the next avaible thread
- *    id, and set the thread's ID to that value.
+ *    Set the thread's name and id.
+ *
+ *    Set the thread's name to the specified argument.  For the ID,
+ *    allocate a uint32_t, set that value to the next unused thread
+ *    ID, and set the thread's ID to that value.
  */
 static void
-skthread_set_id(
-    void)
+skthread_set_name_id(
+    const char         *name)
 {
     uint32_t *id = (uint32_t*)malloc(sizeof(uint32_t));
     if (id != NULL) {
         pthread_mutex_lock(&mutex);
         *id = next_thread_id++;
-        pthread_setspecific(skthread_id_key, id);
         pthread_mutex_unlock(&mutex);
+
+        pthread_setspecific(skthread_id_key, id);
+#if SKTHREAD_LOG_IDS
+        skAppPrintErr("Thread ID:%" PRIu32 " ('%s') started", *id, name);
+#endif
+    }
+    pthread_setspecific(skthread_name_key, name);
+}
+
+/*
+ *    Free the id for the current thread.
+ */
+static void
+skthread_free_id(
+    void               *id)
+{
+    if (id) {
+#if SKTHREAD_LOG_IDS
+        skAppPrintErr("Thread ID:%" PRIu32 " ended", *(uint32_t*)id);
+#endif  /* SKTHREAD_LOG_IDS */
+        free(id);
     }
 }
 
+/* initialize skthread code.  called once by main thread */
 int
 skthread_init(
     const char         *name)
@@ -122,16 +150,16 @@ skthread_init(
     if (pthread_key_create(&skthread_name_key, NULL) != 0) {
         return -1;
     }
-    if (pthread_key_create(&skthread_id_key, free) != 0) {
+    if (pthread_key_create(&skthread_id_key, skthread_free_id) != 0) {
         return -1;
     }
-    pthread_setspecific(skthread_name_key, name);
-    skthread_set_id();
+    skthread_set_name_id(name);
 
     initialized = 1;
     return 0;
 }
 
+/* teardown skthread code.  called once by main thread */
 void
 skthread_teardown(
     void)
@@ -145,9 +173,10 @@ skthread_teardown(
     pthread_setspecific(skthread_id_key, NULL);
     pthread_key_delete(skthread_id_key);
     pthread_key_delete(skthread_name_key);
-    free(val);
+    skthread_free_id(val);
 }
 
+/* return thread's name */
 const char *
 skthread_name(
     void)
@@ -161,6 +190,7 @@ skthread_name(
     return "unknown";
 }
 
+/* return thread's ID */
 uint32_t
 skthread_id(
     void)
@@ -176,12 +206,17 @@ skthread_id(
 
 
 /*
- *    Wrapper function that is invoked by pthread_create().
+ *    Thread entry function.
  *
- *    Sets the thread's name, sets the thread's signal mask to ignore
- *    all signals, then invokes the caller's function with the
- *    caller's argument.  The 'vdata' parameter contains the thread's
- *    name, the caller's function and argument.
+ *    Wrapper function that is invoked by the pthread_create() call in
+ *    skthread_create_helper() function.
+ *
+ *    Sets the thread's name, the thread's ID, sets the thread's
+ *    signal mask to ignore all signals, then invokes the caller's
+ *    function with the caller's argument.
+ *
+ *    The 'vdata' parameter contains the thread's name, the caller's
+ *    function and argument.
  */
 static void *
 skthread_create_init(
@@ -195,8 +230,7 @@ skthread_create_init(
     skthread_ignore_signals();
 
     if (initialized) {
-        pthread_setspecific(skthread_name_key, data->name);
-        skthread_set_id();
+        skthread_set_name_id(data->name);
     }
     free(data);
 
@@ -204,12 +238,17 @@ skthread_create_init(
 }
 
 
-int
-skthread_create(
+/*
+ *    Helper function that implements common parts of
+ *    skthread_create() and skthread_create_detached().
+ */
+static int
+skthread_create_helper(
     const char         *name,
     pthread_t          *thread,
     void             *(*fn)(void *),
-    void               *arg)
+    void               *arg,
+    pthread_attr_t     *attr)
 {
     skthread_data_t *data;
     int rv;
@@ -222,11 +261,21 @@ skthread_create(
     data->fn = fn;
     data->arg = arg;
 
-    rv = pthread_create(thread, NULL, skthread_create_init, data);
+    rv = pthread_create(thread, attr, skthread_create_init, data);
     if (rv != 0) {
         free(data);
     }
     return rv;
+}
+
+int
+skthread_create(
+    const char         *name,
+    pthread_t          *thread,
+    void             *(*fn)(void *),
+    void               *arg)
+{
+    return skthread_create_helper(name, thread, fn, arg, NULL);
 }
 
 
@@ -237,7 +286,6 @@ skthread_create_detached(
     void             *(*fn)(void *),
     void               *arg)
 {
-    skthread_data_t *data;
     pthread_attr_t attr;
     int rv;
 
@@ -248,19 +296,7 @@ skthread_create_detached(
     rv = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     assert(rv == 0);
 
-    data = (skthread_data_t *)malloc(sizeof(*data));
-    if (NULL == data) {
-        pthread_attr_destroy(&attr);
-        return errno;
-    }
-    data->name = name;
-    data->fn = fn;
-    data->arg = arg;
-
-    rv = pthread_create(thread, &attr, skthread_create_init, data);
-    if (rv != 0) {
-        free(data);
-    }
+    rv = skthread_create_helper(name, thread, fn, arg, &attr);
     pthread_attr_destroy(&attr);
 
     return rv;

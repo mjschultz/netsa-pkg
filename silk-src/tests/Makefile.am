@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 242ba69cb734 2015-09-25 21:00:20Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 251ae5221d1f 2016-01-19 21:55:49Z mthomas $");
 
 # The targets in this file are used only by "make check" (and support
 # targest things like "make clean" and "make dist")
@@ -44,9 +44,13 @@ $(RWTUC):
 
 
 # this is a data file to ensure header-only files are handled correctly
+MAKE_EMPTY_RWF = \
+	$(RWTUC) --site-config-file=silk.conf --output-path=$@ < /dev/null \
+	|| { rm -f $@; exit 1; }
+
 empty.rwf: $(RWTUC) silk.conf
 	-rm -f $@
-	$(RWTUC) --site-config-file=silk.conf --output-path=$@ < /dev/null
+	$(MAKE_EMPTY_RWF)
 
 # the 'made-test-data' target will cause the following data file(s) to
 # be created.  these are the files that applications use for testing
@@ -63,24 +67,25 @@ endif
 $(data_files): made-test-data
 
 # rules to make the data file(s)
+MAKE_TESTDATA_V4 = --ipv4-output='| $(RWTUC) --site-config-file=silk.conf --compression=best --output-path=$(data_rwf)'
+
 if SK_ENABLE_IPV6
 
-made-test-data: $(RWTUC) silk.conf $(make_flows)
-	-rm -f $(data_files)
-	srcdir='' ; \
-	  test -f $(make_flows) || srcdir='$(srcdir)/' ; \
-	  $(PERL) $${srcdir}$(make_flows) --status --ipv4-output='| $(RWTUC) --site-config-file=silk.conf --compression=best --output-path=$(data_rwf)' --ipv6-output='| $(RWTUC) --site-config-file=silk.conf --compression=best --output-path=$(v6data_rwf)' && date > $@
-
-else
-
-made-test-data: $(RWTUC) silk.conf $(make_flows)
-	-rm -f $(data_files)
-	srcdir='' ; \
-	  test -f $(make_flows) || srcdir='$(srcdir)/' ; \
-	  $(PERL) $${srcdir}$(make_flows) --status --ipv4-output='| $(RWTUC) --site-config-file=silk.conf --compression=best --output-path=$(data_rwf)' && date > $@
+MAKE_TESTDATA_V6 = --ipv6-output='| $(RWTUC) --site-config-file=silk.conf --compression=best --output-path=$(v6data_rwf)'
 
 endif
 
+
+MAKE_TESTDATA = srcdir='' ; \
+	test -f $(make_flows) || srcdir='$(srcdir)/' ; \
+	$(PERL) $${srcdir}$(make_flows) --status \
+	$(MAKE_TESTDATA_V4) $(MAKE_TESTDATA_V6) \
+	|| { rm -f $(data_files); exit 1; }
+
+made-test-data: $(RWTUC) silk.conf $(make_flows)
+	-rm -f $(data_files) $@
+	$(MAKE_TESTDATA)
+	date > $@
 
 # sets for testing rwset*
 TEST_SET_FILES = set1-v4.set set2-v4.set set3-v4.set set4-v4.set
@@ -100,12 +105,12 @@ $(TEST_SET_FILES): $(RWSETBUILD)
 made-set-files: $(TEST_SET_FILES)
 	date > $@
 .txt.set:
-	-rm -f $@ $@.tmp
+	-rm -f $@
 	@srcdir='' ; \
 	  test -f $< || srcdir='$(srcdir)/' ; \
-	  echo "$(RWSETBUILD) $${srcdir}$< > $@.tmp" ; \
-	  $(RWSETBUILD) $${srcdir}$< > $@.tmp
-	mv $@.tmp $@
+	  echo "$(RWSETBUILD) $${srcdir}$< $@" ; \
+	  $(RWSETBUILD) $${srcdir}$< $@ \
+	  || { rm -f $@; exit 1; }
 
 
 # bags for testing rwbag*
@@ -126,20 +131,24 @@ $(TEST_BAG_FILES): $(RWBAGBUILD)
 made-bag-files: $(TEST_BAG_FILES)
 	date > $@
 .txt.bag:
-	-rm -f $@ $@.tmp
+	-rm -f $@
 	@srcdir='' ; \
 	  test -f $< || srcdir='$(srcdir)/' ; \
-	  echo "$(RWBAGBUILD) --bag-input=$${srcdir}$< > $@.tmp" ; \
-	  $(RWBAGBUILD) --bag-input=$${srcdir}$< > $@.tmp
-	mv $@.tmp $@
+	  echo "$(RWBAGBUILD) --bag-input=$${srcdir}$< --output-path=$@" ; \
+	  $(RWBAGBUILD) --bag-input=$${srcdir}$< --output-path=$@ \
+	  || { rm -f $@; exit 1; }
 
 
 # scan data for testing rwscan
+MAKE_SCANDATA_RWF = srcdir='' ; \
+	test -f $(make_scans) || srcdir='$(srcdir)/' ; \
+	{ $(PERL) $${srcdir}$(make_scans) --status \
+	  | $(RWTUC) --site-config-file=silk.conf --compression=best --output-path=$@; } \
+	|| { rm -f $@; exit 1; }
+
 scandata.rwf: $(RWTUC) silk.conf $(make_scans)
 	-rm -f $@
-	srcdir='' ; \
-	  test -f $(make_scans) || srcdir='$(srcdir)/' ; \
-	  $(PERL) $${srcdir}$(make_scans) --status | $(RWTUC) --site-config-file=silk.conf --compression=best --output-path=$@
+	$(MAKE_SCANDATA_RWF)
 
 # for testing rwguess and rwflowpack
 small.pdu: $(make_flows)
@@ -147,7 +156,8 @@ small.pdu: $(make_flows)
 	@srcdir='' ; \
 	  test -f $(make_flows) || srcdir='$(srcdir)/' ; \
 	  echo "$(PERL) $${srcdir}$(make_flows) --max=50000 --pdu-output=$@" ; \
-	  $(PERL) $${srcdir}$(make_flows) --max=50000 --pdu-output=$@
+	  $(PERL) $${srcdir}$(make_flows) --max=50000 --pdu-output=$@ \
+	  || { rm -f $@; exit 1; }
 
 
 # for testing the country-code plug-ins
@@ -163,20 +173,20 @@ $(RWGEOIP2CCMAP):
 	cd $(top_builddir)/src/rwpmap && $(MAKE) rwgeoip2ccmap
 
 fake-cc.pmap: $(RWGEOIP2CCMAP) fake-cc.csv
-	-rm -f $@ $@.tmp
+	-rm -f $@
 	@f=fake-cc.csv  ; srcdir='' ; \
 	  test -f $$f || srcdir='$(srcdir)/' ; \
-	  echo "$(PERL) $(RWGEOIP2CCMAP) --csv < $${srcdir}$$f > $@.tmp" ; \
-	  $(PERL) $(RWGEOIP2CCMAP) --csv < $${srcdir}$$f > $@.tmp
-	mv $@.tmp $@
+	  echo "$(PERL) $(RWGEOIP2CCMAP) --csv < $${srcdir}$$f > $@" ; \
+	  $(PERL) $(RWGEOIP2CCMAP) --csv < $${srcdir}$$f > $@ \
+	  || { rm -f $@; exit 1; }
 
 fake-cc-v6.pmap: $(RWGEOIP2CCMAP) fake-cc-v6.csv
-	-rm -f $@ $@.tmp
+	-rm -f $@
 	@f=fake-cc-v6.csv  ; srcdir='' ; \
 	  test -f $$f || srcdir='$(srcdir)/' ; \
-	  echo "$(PERL) $(RWGEOIP2CCMAP) --v6-csv < $${srcdir}$$f > $@.tmp" ; \
-	  $(PERL) $(RWGEOIP2CCMAP) --v6-csv < $${srcdir}$$f > $@.tmp
-	mv $@.tmp $@
+	  echo "$(PERL) $(RWGEOIP2CCMAP) --v6-csv < $${srcdir}$$f > $@" ; \
+	  $(PERL) $(RWGEOIP2CCMAP) --v6-csv < $${srcdir}$$f > $@ \
+	  || { rm -f $@; exit 1; }
 
 # for testing the addrtype plug-in and rwpmap features
 TEST_PMAP_FILES = address_types.pmap ip-map.pmap proto-port-map.pmap
@@ -196,12 +206,12 @@ $(TEST_PMAP_FILES): $(RWPMAPBUILD)
 made-pmap-files: $(TEST_PMAP_FILES) $(TEST_CC_FILES)
 	date > $@
 .txt.pmap:
-	-rm -f $@ $@.tmp
+	-rm -f $@
 	@srcdir='' ; \
 	  test -f $< || srcdir='$(srcdir)/' ; \
-	  echo "$(RWPMAPBUILD) --input-file=$${srcdir}$< --output-file=$@.tmp" ; \
-	  $(RWPMAPBUILD) --input-file=$${srcdir}$< --output-file=$@.tmp
-	mv $@.tmp $@
+	  echo "$(RWPMAPBUILD) --input-file=$${srcdir}$< --output-file=$@" ; \
+	  $(RWPMAPBUILD) --input-file=$${srcdir}$< --output-file=$@ \
+	  || { rm -f $@; exit 1; }
 
 
 # for generating files for testing rwsender/rwreceiver
@@ -245,26 +255,34 @@ pysilk-mini-uninstall:
 # data in the form that "rwcut --fields=... --delimited" creates
 data.txt: $(make_flows)
 	-rm -f $@
-	srcdir='' ; \
+	@srcdir='' ; \
 	  test -f $(make_flows) || srcdir='$(srcdir)/' ; \
-	  $(PERL) $${srcdir}$(make_flows) --ipv4-output='$@'
+	  echo "$(PERL) $${srcdir}$(make_flows) --ipv4-output='$@'" ; \
+	  $(PERL) $${srcdir}$(make_flows) --ipv4-output='$@' \
+	  || { rm -f '$@'; exit 1; }
 data-v6.txt: $(make_flows)
 	-rm -f $@
-	srcdir='' ; \
+	@srcdir='' ; \
 	  test -f $(make_flows) || srcdir='$(srcdir)/' ; \
-	  $(PERL) $${srcdir}$(make_flows) --ipv6-output='$@'
+	  echo "$(PERL) $${srcdir}$(make_flows) --ipv6-output='$@'" ; \
+	  $(PERL) $${srcdir}$(make_flows) --ipv6-output='$@' \
+	  || { rm -f '$@'; exit 1; }
 
 # in fixed-width columns (for IPv4, assumes --ipv6-policy=ignore)
 columnar-data.txt: $(make_flows)
 	-rm -f $@
-	srcdir='' ; \
+	@srcdir='' ; \
 	  test -f $(make_flows) || srcdir='$(srcdir)/' ; \
-	  $(PERL) $${srcdir}$(make_flows) --columnar --ipv4-output='$@'
+	  echo "$(PERL) $${srcdir}$(make_flows) --columnar --ipv4-output='$@'" ; \
+	  $(PERL) $${srcdir}$(make_flows) --columnar --ipv4-output='$@' \
+	  || { rm -f '$@'; exit 1; }
 columnar-data-v6.txt: $(make_flows)
 	-rm -f $@
-	srcdir='' ; \
+	@srcdir='' ; \
 	  test -f $(make_flows) || srcdir='$(srcdir)/' ; \
-	  $(PERL) $${srcdir}$(make_flows) --columnar --ipv6-output='$@'
+	  echo "$(PERL) $${srcdir}$(make_flows) --columnar --ipv6-output='$@'" ; \
+	  $(PERL) $${srcdir}$(make_flows) --columnar --ipv6-output='$@' \
+	  || { rm -f '$@'; exit 1; }
 
 
 # have all outputs depend on this Makefile

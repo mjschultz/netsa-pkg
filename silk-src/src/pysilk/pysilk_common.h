@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2011-2015 by Carnegie Mellon University.
+** Copyright (C) 2011-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -57,7 +57,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_PYSILK_COMMON_H, "$SiLK: pysilk_common.h 4dba2416c3d6 2015-09-10 19:03:20Z mthomas $");
+RCSIDENTVAR(rcsID_PYSILK_COMMON_H, "$SiLK: pysilk_common.h 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 /*
 **  pysilk_common.h

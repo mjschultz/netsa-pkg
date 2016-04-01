@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -95,7 +95,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsort.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwsort.c 35d28dbdfd0f 2016-02-24 16:28:44Z mthomas $");
 
 #include "rwsort.h"
 #include <silk/skheap.h>
@@ -115,7 +115,7 @@ uint32_t *sort_fields = NULL;
  * records, the node size includes the complete rwRec, plus any binary
  * fields that we get from plug-ins to use as the key.  This node_size
  * value may increase when we parse the --fields switch. */
-uint32_t node_size = sizeof(rwRec);
+size_t node_size = sizeof(rwRec);
 
 /* the columns that make up the key that come from plug-ins */
 key_field_t key_fields[MAX_PLUGIN_KEY_FIELDS];
@@ -124,7 +124,7 @@ key_field_t key_fields[MAX_PLUGIN_KEY_FIELDS];
 size_t key_num_fields = 0;
 
 /* output stream */
-skstream_t *out_rwios = NULL;
+skstream_t *out_stream = NULL;
 
 /* temp file context */
 sk_tempfilectx_t *tmpctx;
@@ -136,12 +136,10 @@ int reverse = 0;
 int presorted_input = 0;
 
 /* maximum amount of RAM to attempt to allocate */
-uint64_t sort_buffer_size = DEFAULT_SORT_BUFFER_SIZE;
-
+size_t sort_buffer_size;
 
 
 /* FUNCTION DEFINITIONS */
-
 
 /* How to sort the flows: forward or reverse? */
 #define RETURN_SORT_ORDER(val)                  \
@@ -391,16 +389,16 @@ compHeapNodes(
 
 
 /*
- *  status = fillRecordAndKey(rwios, buf);
+ *  status = fillRecordAndKey(stream, buf);
  *
- *    Reads a flow record from 'rwios', computes the key based on the
+ *    Reads a flow record from 'stream', computes the key based on the
  *    global key_fields[] settings, and fills in the parameter 'buf'
  *    with the record and then the key.  Return 1 if a record was
  *    read, or 0 if it was not.
  */
 static int
 fillRecordAndKey(
-    skstream_t         *rwios,
+    skstream_t         *stream,
     uint8_t            *buf)
 {
     rwRec *rwrec = (rwRec*)buf;
@@ -409,11 +407,11 @@ fillRecordAndKey(
     size_t i;
     int rv;
 
-    rv = skStreamReadRecord(rwios, rwrec);
+    rv = skStreamReadRecord(stream, rwrec);
     if (rv) {
         /* end of file or error getting record */
         if (SKSTREAM_ERR_EOF != rv) {
-            skStreamPrintLastErr(rwios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(stream, rv, &skAppPrintErr);
         }
         return 0;
     }
@@ -650,7 +648,7 @@ mergeFiles(
     int rv;
 
     TRACEMSG(("Merging #%d through #%d into '%s'",
-              0, temp_file_idx, skStreamGetPathname(out_rwios)));
+              0, temp_file_idx, skStreamGetPathname(out_stream)));
 
     heap = skHeapCreate2(compHeapNodes, MAX_MERGE_FILES, sizeof(uint16_t),
                          NULL, recs);
@@ -708,7 +706,7 @@ mergeFiles(
                      * tmp_idx_b to the file we just opened. */
                     tmp_idx_b = j;
                     TRACEMSG((("MAX_MERGE_FILES limit hit--"
-                               "merging #%d through #%d to #%d"),
+                               "merging #%d through #%d into #%d"),
                               tmp_idx_a, tmp_idx_b, tmp_idx_intermediate));
                     break;
                 }
@@ -759,9 +757,9 @@ mergeFiles(
             } else {
                 /* we successfully opened all (remaining) temp files,
                  * write to record to the final destination */
-                rv = skStreamWriteRecord(out_rwios,(rwRec*)recs[lowest]);
+                rv = skStreamWriteRecord(out_stream,(rwRec*)recs[lowest]);
                 if (0 != rv) {
-                    skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+                    skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
                     if (SKSTREAM_ERROR_IS_FATAL(rv)) {
                         appExit(EXIT_FAILURE);
                     }
@@ -794,9 +792,9 @@ mergeFiles(
             } while (sortTempRead(fps[lowest], recs[lowest], node_size));
         } else {
             do {
-                rv = skStreamWriteRecord(out_rwios, (rwRec*)recs[lowest]);
+                rv = skStreamWriteRecord(out_stream, (rwRec*)recs[lowest]);
                 if (0 != rv) {
-                    skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+                    skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
                     if (SKSTREAM_ERROR_IS_FATAL(rv)) {
                         appExit(EXIT_FAILURE);
                     }
@@ -855,7 +853,7 @@ static int
 sortPresorted(
     void)
 {
-    skstream_t *rwios[MAX_MERGE_FILES];
+    skstream_t *stream[MAX_MERGE_FILES];
     uint8_t recs[MAX_MERGE_FILES][MAX_NODE_SIZE];
     uint16_t i;
     uint16_t open_count;
@@ -868,7 +866,7 @@ sortPresorted(
     uint32_t heap_count;
     int rv;
 
-    memset(rwios, 0, sizeof(rwios));
+    memset(stream, 0, sizeof(stream));
     memset(recs, 0, sizeof(recs));
 
     heap = skHeapCreate2(compHeapNodes, MAX_MERGE_FILES, sizeof(uint16_t),
@@ -889,7 +887,7 @@ sortPresorted(
         /* Attempt to open up to MAX_MERGE_FILES, though we an open
          * may fail due to lack of resources (EMFILE or ENOMEM) */
         for (open_count = 0; open_count < MAX_MERGE_FILES; ++open_count) {
-            rv = appNextInput(&(rwios[open_count]));
+            rv = appNextInput(&(stream[open_count]));
             if (rv != 0) {
                 break;
             }
@@ -936,7 +934,7 @@ sortPresorted(
 
         /* Read the first record from each file into the work buffer */
         for (i = 0; i < open_count; ++i) {
-            if (fillRecordAndKey(rwios[i], recs[i])) {
+            if (fillRecordAndKey(stream[i], recs[i])) {
                 /* insert the file index into the heap */
                 skHeapInsert(heap, &i);
             }
@@ -962,9 +960,9 @@ sortPresorted(
             } else {
                 /* we are not using any temp files, write the
                  * record to the final destination */
-                rv = skStreamWriteRecord(out_rwios, (rwRec*)recs[lowest]);
+                rv = skStreamWriteRecord(out_stream, (rwRec*)recs[lowest]);
                 if (0 != rv) {
-                    skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+                    skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
                     if (SKSTREAM_ERROR_IS_FATAL(rv)) {
                         appExit(EXIT_FAILURE);
                     }
@@ -972,7 +970,7 @@ sortPresorted(
             }
 
             /* replace the record we just wrote */
-            if (fillRecordAndKey(rwios[lowest], recs[lowest])) {
+            if (fillRecordAndKey(stream[lowest], recs[lowest])) {
                 /* read was successful.  "insert" the new entry into
                  * the heap (which has same value as old entry). */
                 skHeapReplaceTop(heap, &lowest, NULL);
@@ -992,17 +990,17 @@ sortPresorted(
             if (fp_intermediate) {
                 do {
                     sortTempWrite(fp_intermediate, recs[lowest], node_size);
-                } while (fillRecordAndKey(rwios[lowest], recs[lowest]));
+                } while (fillRecordAndKey(stream[lowest], recs[lowest]));
             } else {
                 do {
-                    rv = skStreamWriteRecord(out_rwios, (rwRec*)recs[lowest]);
+                    rv = skStreamWriteRecord(out_stream, (rwRec*)recs[lowest]);
                     if (0 != rv) {
-                        skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+                        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
                         if (SKSTREAM_ERROR_IS_FATAL(rv)) {
                             appExit(EXIT_FAILURE);
                         }
                     }
-                } while (fillRecordAndKey(rwios[lowest], recs[lowest]));
+                } while (fillRecordAndKey(stream[lowest], recs[lowest]));
             }
             TRACEMSG(("Finished reading records from file #%u; 0 files remain",
                       lowest));
@@ -1010,7 +1008,7 @@ sortPresorted(
 
         /* Close the input files that we processed this time. */
         for (i = 0; i < open_count; ++i) {
-            skStreamDestroy(&rwios[i]);
+            skStreamDestroy(&stream[i]);
         }
 
         /* Close the intermediate temp file. */
@@ -1048,28 +1046,32 @@ sortRandom(
     void)
 {
     int temp_file_idx = -1;
-    skstream_t *input_rwios;        /* input stream */
+    skstream_t *input_stream;       /* input stream */
     uint8_t *record_buffer = NULL;  /* Region of memory for records */
     uint8_t *cur_node = NULL;       /* Ptr into record_buffer */
-    uint32_t buffer_max_recs;       /* max buffer size (in number of recs) */
-    uint32_t buffer_recs;           /* current buffer size (# records) */
-    uint32_t buffer_chunk_recs;     /* how to grow from current to max buf */
-    uint32_t num_chunks;            /* how quickly to grow buffer */
-    uint32_t record_count = 0;      /* Number of records read */
+    size_t buffer_max_recs;         /* max buffer size (in number of recs) */
+    size_t buffer_recs;             /* current buffer size (# records) */
+    size_t buffer_chunk_recs;       /* how to grow from current to max buf */
+    size_t num_chunks;              /* how quickly to grow buffer */
+    size_t record_count = 0;        /* Number of records read */
     int rv;
 
     /* Determine the maximum number of records that will fit into the
      * buffer if it grows the maximum size */
     buffer_max_recs = sort_buffer_size / node_size;
-    TRACEMSG((("sort_buffer_size = %" PRIu64
-               "\nnode_size = %" PRIu32
-               "\nbuffer_max_recs = %" PRIu32),
+    TRACEMSG((("sort_buffer_size = %" SK_PRIuZ
+               "\nnode_size = %" SK_PRIuZ
+               "\nbuffer_max_recs = %" SK_PRIuZ),
               sort_buffer_size, node_size, buffer_max_recs));
 
-    /* We will grow to the maximum size in chunks */
-    num_chunks = SORT_NUM_CHUNKS;
-    if (num_chunks <= 0) {
+    /* We will grow to the maximum size in chunks; do not allocate
+     * more than MAX_CHUNK_SIZE at any time */
+    num_chunks = NUM_CHUNKS;
+    if (num_chunks < 1) {
         num_chunks = 1;
+    }
+    if (sort_buffer_size / num_chunks > MAX_CHUNK_SIZE) {
+        num_chunks = sort_buffer_size / MAX_CHUNK_SIZE;
     }
 
     /* Attempt to allocate the initial chunk.  If we fail, increment
@@ -1077,8 +1079,8 @@ sortRandom(
      * attempt to allocate at once---and try again. */
     for (;;) {
         buffer_chunk_recs = buffer_max_recs / num_chunks;
-        TRACEMSG((("num_chunks = %" PRIu32
-                   "\nbuffer_chunk_recs = %" PRIu32),
+        TRACEMSG((("num_chunks = %" SK_PRIuZ
+                   "\nbuffer_chunk_recs = %" SK_PRIuZ),
                   num_chunks, buffer_chunk_recs));
 
         record_buffer = (uint8_t*)calloc(buffer_chunk_recs, node_size);
@@ -1099,10 +1101,10 @@ sortRandom(
     }
 
     buffer_recs = buffer_chunk_recs;
-    TRACEMSG((("buffer_recs = %" PRIu32), buffer_recs));
+    TRACEMSG((("buffer_recs = %" SK_PRIuZ), buffer_recs));
 
     /* open first file */
-    rv = appNextInput(&input_rwios);
+    rv = appNextInput(&input_stream);
     if (rv) {
         free(record_buffer);
         if (1 == rv) {
@@ -1113,13 +1115,13 @@ sortRandom(
 
     record_count = 0;
     cur_node = record_buffer;
-    while (input_rwios != NULL) {
+    while (input_stream != NULL) {
         /* read record */
-        rv = fillRecordAndKey(input_rwios, cur_node);
+        rv = fillRecordAndKey(input_stream, cur_node);
         if (rv == 0) {
             /* close current and open next */
-            skStreamDestroy(&input_rwios);
-            rv = appNextInput(&input_rwios);
+            skStreamDestroy(&input_stream);
+            rv = appNextInput(&input_stream);
             if (rv < 0) {
                 /* processing these input files one at a time, so we
                  * will not hit the EMFILE limit here */
@@ -1145,8 +1147,8 @@ sortRandom(
                 if (buffer_recs + buffer_chunk_recs > buffer_max_recs) {
                     buffer_recs = buffer_max_recs;
                 }
-                TRACEMSG((("Buffer full--attempt to grow to %" PRIu32
-                           " records, %" PRIu32 " bytes"),
+                TRACEMSG((("Buffer full--attempt to grow to %" SK_PRIuZ
+                           " records, %" SK_PRIuZ " bytes"),
                           buffer_recs, node_size * buffer_recs));
 
                 /* attempt to grow */
@@ -1168,9 +1170,10 @@ sortRandom(
              * failed. */
             if (record_count == buffer_max_recs) {
                 /* Sort */
-                TRACEMSG(("Sorting %" PRIu32 " records...", record_count));
+                TRACEMSG(("Sorting %" SK_PRIuZ " records...", record_count));
                 skQSort(record_buffer, record_count, node_size, &rwrecCompare);
-                TRACEMSG(("Sorting %" PRIu32 " records...done", record_count));
+                TRACEMSG(("Sorting %" SK_PRIuZ " records...done",
+                          record_count));
 
                 /* Write to temp file */
                 sortTempWriteBuffer(&temp_file_idx, record_buffer,
@@ -1185,9 +1188,9 @@ sortRandom(
 
     /* Sort (and maybe store) last batch of records */
     if (record_count > 0) {
-        TRACEMSG(("Sorting %" PRIu32 " records...", record_count));
+        TRACEMSG(("Sorting %" SK_PRIuZ " records...", record_count));
         skQSort(record_buffer, record_count, node_size, &rwrecCompare);
-        TRACEMSG(("Sorting %" PRIu32 " records...done", record_count));
+        TRACEMSG(("Sorting %" SK_PRIuZ " records...done", record_count));
 
         if (temp_file_idx >= 0) {
             /* Write last batch to temp file */
@@ -1200,17 +1203,17 @@ sortRandom(
 
     if (record_count > 0 && temp_file_idx == -1) {
         /* No temp files written, just output batch of records */
-        uint32_t c;
+        size_t c;
 
-        TRACEMSG((("Writing %" PRIu32 " records to '%s'"),
-                  record_count, skStreamGetPathname(out_rwios)));
+        TRACEMSG((("Writing %" SK_PRIuZ " records to '%s'"),
+                  record_count, skStreamGetPathname(out_stream)));
         for (c = 0, cur_node = record_buffer;
              c < record_count;
              ++c, cur_node += node_size)
         {
-            rv = skStreamWriteRecord(out_rwios, (rwRec*)cur_node);
+            rv = skStreamWriteRecord(out_stream, (rwRec*)cur_node);
             if (0 != rv) {
-                skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+                skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
                 if (SKSTREAM_ERROR_IS_FATAL(rv)) {
                     free(record_buffer);
                     appExit(EXIT_FAILURE);
@@ -1244,23 +1247,23 @@ int main(int argc, char **argv)
         mergeFiles(temp_idx);
     }
 
-    if (skStreamGetRecordCount(out_rwios) == 0) {
+    if (skStreamGetRecordCount(out_stream) == 0) {
         /* No records were read at all; write the header to the output
          * file */
-        rv = skStreamWriteSilkHeader(out_rwios);
+        rv = skStreamWriteSilkHeader(out_stream);
         if (0 != rv) {
-            skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
         }
     }
 
     /* close the file */
-    if ((rv = skStreamClose(out_rwios))
-        || (rv = skStreamDestroy(&out_rwios)))
+    if ((rv = skStreamClose(out_stream))
+        || (rv = skStreamDestroy(&out_stream)))
     {
-        skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
         appExit(EXIT_FAILURE);
     }
-    out_rwios = NULL;
+    out_stream = NULL;
 
     return 0;
 }

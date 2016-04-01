@@ -1,6 +1,6 @@
 %{
 /*
-** Copyright (C) 2007-2015 by Carnegie Mellon University.
+** Copyright (C) 2007-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -63,7 +63,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmapbuild.l 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwpmapbuild.l 555a887b31de 2016-03-24 15:18:09Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skprefixmap.h>
@@ -175,6 +175,10 @@ static int dry_run = 0;
  * by --ignore-errors */
 static int ignore_errors = 0;
 
+/* do not record the command line invocation in the generated prefix
+ * map file. set by --invocation-strip */
+static int invocation_strip = 0;
+
 
 /* OPTIONS SETUP */
 
@@ -183,7 +187,8 @@ typedef enum {
     OPT_OUTPUT_FILE,
     OPT_MODE,
     OPT_DRY_RUN,
-    OPT_IGNORE_ERRORS
+    OPT_IGNORE_ERRORS,
+    OPT_INVOCATION_STRIP
 } appOptionsEnum;
 
 static struct option appOptions[] = {
@@ -192,6 +197,7 @@ static struct option appOptions[] = {
     {"mode",                REQUIRED_ARG, 0, OPT_MODE},
     {"dry-run",             NO_ARG,       0, OPT_DRY_RUN},
     {"ignore-errors",       NO_ARG,       0, OPT_IGNORE_ERRORS},
+    {"invocation-strip",    NO_ARG,       0, OPT_INVOCATION_STRIP},
     {0,0,0,0}               /* sentinel entry */
 };
 
@@ -203,6 +209,8 @@ static const char *appHelp[] = {
      "\tstatement in the input."),
     "Do not write the output file",
     "Write the output file despite any errors in the input",
+    ("Strip invocation history from the prefix map file.\n"
+     "\tDef. Record command used to create the file"),
     (char *)NULL
 };
 
@@ -477,13 +485,18 @@ appUsageLong(
             fprintf(fh, "\n");
             break;
 
+          case OPT_INVOCATION_STRIP:
+            /* include the help for --notes before
+             * --invocation-strip */
+            skOptionsNotesUsage(fh);
+            /* FALLTHROUGH */
+
           default:
             fprintf(fh, "--%s %s. %s\n", appOptions[i].name,
                     SK_OPTION_HAS_ARG(appOptions[i]), appHelp[i]);
             break;
         }
     }
-    skOptionsNotesUsage(fh);
 }
 
 
@@ -577,6 +590,11 @@ appSetup(
 
     /* check for input; if none specified, use stdin */
     if (!in_stream.of_name) {
+        if (FILEIsATty(stdin)) {
+            skAppPrintErr("Specify '--%s=-' to read from the terminal",
+                          appOptions[OPT_INPUT_FILE].name);
+            exit(EXIT_FAILURE);
+        }
         in_stream.of_name = "-";
     }
 
@@ -629,7 +647,7 @@ appOptionsHandler(
     switch ((appOptionsEnum)opt_index) {
       case OPT_INPUT_FILE:
         if (in_stream.of_name) {
-            skAppPrintErr("Invalid %s: Switch used mutliple times",
+            skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
             return 1;
         }
@@ -638,7 +656,7 @@ appOptionsHandler(
 
       case OPT_OUTPUT_FILE:
         if (out_stream) {
-            skAppPrintErr("Invalid %s: Switch used mutliple times",
+            skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
             return 1;
         }
@@ -653,7 +671,7 @@ appOptionsHandler(
 
       case OPT_MODE:
         if (MODE_SET_DEFAULT != mode_set) {
-            skAppPrintErr("Invalid %s: Switch used mutliple times",
+            skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
             return 1;
         }
@@ -671,6 +689,10 @@ appOptionsHandler(
 
       case OPT_IGNORE_ERRORS:
         ignore_errors = 1;
+        break;
+
+      case OPT_INVOCATION_STRIP:
+        invocation_strip = 1;
         break;
     }
 
@@ -1348,6 +1370,16 @@ int main(
     if (dry_run) {
         appTeardown();
         return 0;
+    }
+
+    /* add invocation */
+    if (!invocation_strip) {
+        rv = skHeaderAddInvocation(skStreamGetSilkHeader(out_stream), 1,
+                                   argc, argv);
+        if (rv) {
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+            exit(EXIT_FAILURE);
+        }
     }
 
     /* add notes if given */

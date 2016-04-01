@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2015 by Carnegie Mellon University.
+** Copyright (C) 2005-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -52,7 +52,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skstringmap.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: skstringmap.c c121bd41bc4a 2016-03-30 21:06:27Z mthomas $");
 
 #include <silk/skdllist.h>
 #include <silk/skstringmap.h>
@@ -837,7 +837,7 @@ stringMapSetAttribute(
 
 /*
  *    A helper function for skStringMapMatch(), skStringMapParse(),
- *    and skStringMapParseWithAttr().
+ *    and skStringMapParseWithAttributes().
  */
 static sk_stringmap_status_t
 stringMapParseHelper(
@@ -1342,10 +1342,10 @@ skStringMapPrintUsage(
     }
 
     fprintf(fh,
-            "\t(Semicolon separates unique columns."
-            " Comma separates column aliases.\n"
+            "\t(Semicolon separates unique items."
+            " Comma separates item aliases.\n"
             "\t Names are case-insensitive and"
-            " can be abbreviated to the shortest\n"
+            " may be abbreviated to the shortest\n"
             "\t unique prefix.)\n");
 
     /* previous value from map */
@@ -1476,6 +1476,7 @@ skStringMapPrintDetailedUsage(
         continue_len = 8 + strlen(post_name);
         descript_len = sizeof(line_buf) - continue_len;
     }
+    assert(descript_len > 0);
 
     /* print all entries in the map */
     skDLLAssignIter(&node, (sk_stringmap_t*)str_map);

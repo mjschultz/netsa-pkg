@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2003-2015 by Carnegie Mellon University.
+** Copyright (C) 2003-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -52,7 +52,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: flowcapsetup.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: flowcapsetup.c a980e04f1cff 2016-01-21 18:30:48Z mthomas $");
 
 #include <silk/sksite.h>
 #include "flowcap.h"
@@ -162,14 +162,14 @@ appUsageLong(
      "\tforwards as a compressed stream to a flowcap client program.\n")
 
     FILE *fh = USAGE_FH;
-    int i;
+    unsigned int i;
 
     fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
     fprintf(fh, "\nSWITCHES:\n");
     skOptionsDefaultUsage(fh);
     sksiteOptionsUsage(fh);
 
-    for (i = 0; appOptions[i].name; i++ ) {
+    for (i = 0; appOptions[i].name; ++i) {
         fprintf(fh, "--%s %s. ", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]));
         switch ((appOptionsEnum)appOptions[i].val) {

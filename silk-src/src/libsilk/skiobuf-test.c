@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -57,7 +57,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skiobuf-test.c 6c611fca4036 2015-09-17 14:44:18Z mthomas $");
+RCSIDENT("$SiLK: skiobuf-test.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/skstream.h>
 #include "skiobuf.h"

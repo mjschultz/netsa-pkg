@@ -26,6 +26,9 @@ into a dotted decimal IP address.  Up to three IP fields can be
 specified via the B<--ip-fields>=I<FIELDS> option.  The B<--delimiter>
 option can be used to specify an alternate delimiter.
 
+B<num2dot> does not support IPv6 addresses.  The L</EXAMPLES> section
+below includes an example PySiLK script to handle IPv6.
+
 =head1 OPTIONS
 
 Option names may be abbreviated if the abbreviation is unique or is an
@@ -56,7 +59,7 @@ configured, then exit the application.
 
 =back
 
-=head1 EXAMPLE
+=head1 EXAMPLES
 
 In the following example, the dollar sign (C<$>) represents the shell
 prompt.  The text after the dollar sign represents the command line.
@@ -83,9 +86,35 @@ be printed as integers, but you only want the first column to have an
 integer representation.  The pipe through B<num2dot> will convert the
 third and fourth columns to dotted-decimal IP numbers.
 
+B<num2dot> does not support converting integers to IPv6 addresses.
+The following PySiLK script (see B<pysilk(3)>) could be used as a
+starting-point to create a version of B<num2dot> that supports IPv6
+addresses:
+
+ #! /usr/bin/env python
+ from __future__ import print_function
+ import sys
+ import silk
+ # The IPv6 fields to process; the ID of the first field is 0
+ ip_fields = (0, 1)
+ # The delimiter between fields
+ delim = '|'
+ # The width of the IPv6 fields
+ width = 39
+ # The file to process; this script processes standard input
+ f = sys.stdin
+ try:
+     for line in f:
+         fields = line.rstrip(f.newlines).split(delim)
+         for i in ip_fields:
+             fields[i] = "%*s" % (width, silk.IPv6Addr(int(fields[i])))
+         print(delim.join(fields))
+ finally:
+     f.close()
+
 =head1 SEE ALSO
 
-B<rwcut(1)>, B<silk(7)>
+B<rwcut(1)>, B<pysilk(3)>, B<silk(7)>
 
 =head1 BUGS
 
@@ -93,7 +122,7 @@ B<num2dot> has no support for IPv6 addresses.
 
 =cut
 
-$SiLK: num2dot.pod cd09f0a5fcc6 2014-06-14 15:43:33Z mthomas $
+$SiLK: num2dot.pod 57b4e75d4c8e 2015-10-20 15:41:08Z mthomas $
 
 Local Variables:
 mode:text

@@ -9,6 +9,7 @@ B<rwpmapbuild> - Create a binary prefix map from a text file
   rwpmapbuild [--input-file=FILENAME] [--output-file=FILENAME]
         [--mode={ipv4|ipv6|proto-port}] [--dry-run] [--ignore-errors]
         [--note-add=TEXT] [--note-file-add=FILENAME]
+        [--invocation-strip]
 
   rwpmapbuild --help
 
@@ -47,8 +48,10 @@ required for options that take optional parameters.
 
 Read the textual input from I<FILENAME>.  You may use C<stdin> or C<->
 to represent the standard input.  When this switch is not provided,
-the input is read from the standard input.  The input file format is
-described below.
+the input is read from the standard input unless the standard input is
+a terminal.  B<rwpmapbuild> will read textual input from the terminal
+if the standard input is explicitly specified as the input.  The input
+file format is described below.
 
 =item B<--output-file>=I<FILENAME>
 
@@ -86,6 +89,13 @@ the output file as an annotation.    This switch may be repeated to
 add multiple annotations.  Currently the application makes no effort
 to ensure that I<FILENAME> contains text; be careful that you do not
 attempt to add a SiLK data file as an annotation.
+
+=item B<--invocation-strip>
+
+Do not record the command used to create the prefix map in the output.
+When this switch is not given, the invocation is written to the file's
+header, and the invocation may be viewed with B<rwfileinfo(1)>.
+I<Since SiLK 3.12.0.>
 
 =item B<--help>
 
@@ -413,7 +423,7 @@ B<rwstats(1)>, B<rwuniq(1)>, B<silk(7)>
 
 =cut
 
-$SiLK: rwpmapbuild.pod cd09f0a5fcc6 2014-06-14 15:43:33Z mthomas $
+$SiLK: rwpmapbuild.pod 555a887b31de 2016-03-24 15:18:09Z mthomas $
 
 Local Variables:
 mode:text

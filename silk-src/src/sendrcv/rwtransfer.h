@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -57,7 +57,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWTRANSFER_H, "$SiLK: rwtransfer.h 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENTVAR(rcsID_RWTRANSFER_H, "$SiLK: rwtransfer.h 57a2b3e91bee 2016-02-01 20:29:38Z mthomas $");
 
 /*
 **  rwtransfer.h
@@ -79,14 +79,6 @@ RCSIDENTVAR(rcsID_RWTRANSFER_H, "$SiLK: rwtransfer.h 3b368a750438 2015-05-18 20:
 
 /* Maximum error message length */
 #define MAX_ERROR_MESSAGE 8096
-
-/* Block size */
-#define FILE_BLOCK_SIZE         8192
-#define FILE_BLOCK_SIZE_STRING "8192"
-
-/* Minimum block size (Must be larger than message overhead (14 bytes
- * when this comment was last updated) */
-#define MINIMUM_FILE_BLOCK_SIZE 256
 
 /* Password env postfix */
 #define PASSWORD_ENV_POSTFIX "_TLS_PASSWORD"

@@ -10,11 +10,12 @@ B<rwbagcat> - Output a binary Bag as text.
         [--print-statistics[=OUTFILE]]
         [--minkey=VALUE] [--maxkey=VALUE] [--mask-set=PATH]
         [--mincounter=VALUE] [--maxcounter=VALUE] [--zero-counts]
-        [--output-path=OUTPUTFILE]
+        [{ --pmap-file=PATH | --pmap-file=MAPNAME:PATH }]
         [--key-format=FORMAT] [--integer-keys] [--zero-pad-ips]
         [--no-columns] [--column-separator=C]
         [--no-final-delimiter] [{--delimited | --delimited=C}]
-        [--pager=PAGER_PROG] [BAGFILE...]
+        [--output-path=OUTPUTFILE] [--pager=PAGER_PROG]
+        [BAGFILE...]
 
   rwbagcat --help
 
@@ -27,6 +28,56 @@ B<rwbagbuild(1)>, converts it to text, and outputs it to the standard
 output or the specified file.  It can also print various statistics
 and summary information about the Bag.
 
+As of SiLK 3.12.0, B<rwbagcat> uses information in the Bag file's
+header to determine how to display the key column.
+
+=over 4
+
+=item *
+
+A key that is an IP address is printed in the canonical form.  May be
+modified by B<--key-format>.
+
+=item *
+
+A key that is a time is printed as a human-readable timestamp.  May be
+modified by B<--key-format>.
+
+=item *
+
+A sensor key prints the name of the sensor.  The C<decimal> and
+C<hexadecimal> arguments to B<--key-format> may be used.
+
+=item *
+
+A key holding TCP Flags is printed using the characters
+C<F,S,R,P,A,U,E,C>.  The C<decimal> and C<hexadecimal> arguments to
+B<--key-format> may be used.
+
+=item *
+
+A key holding SiLK attributes is printed using the characters
+C<T,C,F,S>.  The C<decimal> and C<hexadecimal> arguments to
+B<--key-format> may be used.
+
+=item *
+
+A country code key uses the abbreviations from the Root-Zone Whois
+Index (see for example L<http://www.iana.org/cctld/cctld-whois.htm>)
+or the following special codes: B<--> N/A (e.g. private and
+experimental reserved addresses); B<a1> anonymous proxy; B<a2>
+satellite provider; B<o1> other.
+
+=item *
+
+A key holding a value from prefix map requires that the B<--pmap-file>
+switch be specified to display the value.
+
+=back
+
+In addition, B<rwbagcat> exits with an error when asked to use an IP
+format to display keys that are not IP addresses.
+
 B<rwbagcat> reads the I<BAGFILE>s specified on the command line; if no
 I<BAGFILE> arguments are given, B<rwbagcat> attempts to read the Bag
 from the standard input.  I<BAGFILE> may also explicitly be the
@@ -35,9 +86,10 @@ files and piped input.  If any input does not contain a Bag,
 B<rwbagcat> prints an error to the standard error and exits
 abnormally.
 
-When multiple I<BAGFILE>s are specified, each is handled individually;
-to process the combination of the I<BAGFILE>s, invoke B<rwbagcat> on
-the output from B<rwbagtool(1)>.
+When multiple I<BAGFILE>s are specified on the command line, each is
+handled individually.  To process the combination of the I<BAGFILE>s,
+use B<rwbagtool(1)> to join the bags together and pipe its output into
+B<rwbagcat>.
 
 =head1 OPTIONS
 
@@ -115,11 +167,16 @@ The B<--network-structure> switch disables printing of the IPs in the
 Bag file; specify the C<H> argument to the switch to print each
 individual IP address and its counter.
 
+The B<--network-structure> switch may not be combined with the
+B<--bin-ips> switch.  As of SiLK 3.12.0, B<rwbagcat> exits with an
+error if the B<--network-structure> switch is used on a Bag file whose
+key-type is neither C<custom> nor an IP address type.
+
 =item B<--bin-ips>
 
 =item B<--bin-ips>=I<SCALE>
 
-Invert the bag and count the total number of unique IP addresses for a
+Invert the bag and count the total number of unique keys for a
 given value of the volume bin.  For example, turn a Bag {sip:flow}
 into {flow:count(sip)}.  I<SCALE> is a string containing the value
 C<linear>, C<binary>, or C<decimal>.
@@ -131,7 +188,8 @@ C<linear>, C<binary>, or C<decimal>.
 The default behavior is C<linear>: Each distinct counter gets its own
 bin.  Any counter in the input Bag file that is larger than the
 maximum possible key will be attributed to the maximum key; to prevent
-this, specify C<--maxcounter=4294967295>.
+this, specify C<--maxcounter=4294967295> which discards bins whose
+counter value does not fit into a key.
 
 =item *
 
@@ -152,7 +210,7 @@ bins.
 
 =item B<--print-statistics>=I<OUTFILE>
 
-Print out breakdown of the network hosts seen, and print out general
+Print a breakdown of the network hosts seen, and print general
 statistics about the keys and counters.
 
 =over 4
@@ -237,7 +295,8 @@ The default is to print all records with a non-zero counter.
 
 Output records whose key value is not more than I<VALUE>.  I<VALUE>
 may be an IP address or an integer in the range 0 to 4294967295
-inclusive.  The default is to print all records with a non-zero counter.
+inclusive.  The default is to print all records with a non-zero
+counter.
 
 =item B<--mask-set>=I<PATH>
 
@@ -245,7 +304,9 @@ Output records whose key appears in the binary IPset read from the
 file I<PATH>.  (To build an IPset, use B<rwset(1)> or
 B<rwsetbuild(1)>.)  When used with B<--minkey> and/or B<--maxkey>,
 output records whose key is in the IPset and is also within when the
-specified range.
+specified range.  As of SiLK 3.12.0, B<rwbagcat> exits with an
+error if the B<--network-structure> switch is used on a Bag file whose
+key-type is neither C<custom> nor an IP address type.
 
 =item B<--mincounter>=I<VALUE>
 
@@ -266,14 +327,23 @@ Print keys whose counter is zero.  Normally, keys with a counter of
 zero are suppressed since all keys have a default counter of zero.  In
 order to use this flag, either B<--mask-set> or both B<--minkey> and
 B<--maxkey> must be specified.  When this switch is specified, any
-counter limit explicitly set by the B<--maxcounter> switch will still
-be applied.
+counter limit explicitly set by the B<--maxcounter> switch is also
+applied.
 
-=item B<--output-path>=I<OUTPUTFILE>
+=item B<--pmap-file>=I<PATH>
 
-Redirect output of the B<--network-structure> or B<--bin-ips> options
-to I<OUTPUTFILE>.  I<OUTPUTFILE> is a filename, named pipe, or the
-values C<stdout> or C<-> to print to the standard output.
+=item B<--pmap-file>=I<MAPNAME>:I<PATH>
+
+Use the prefix map file located at I<PATH> to map the key to a string
+when the type of the Bag's key is one of C<sip-pmap>, C<dip-pmap>,
+C<any-ip-pmap>, C<sport-pmap>, C<dport-pmap>, or C<any-port-pmap>.
+This switch is required for Bag files whose key was derived from a
+prefix map file.  The type of the prefix map file must match the key's
+type, but a different prefix map file may be used.  Specify I<PATH> as
+C<-> or C<stdin> to read from the standard input.  A map-name may be
+included in the argument to the switch, but B<rwbagcat> currently does
+not use the map-name.  To create a prefix map file, use
+B<rwpmapbuild(1)>.  I<Since SiLK 3.12.0.>
 
 =item B<--key-format>=I<FORMAT>
 
@@ -290,14 +360,18 @@ of:
 Print keys as IP addresses in the canonical format: dotted quad for
 IPv4 (C<127.0.0.1>) and hexadectet for IPv6 (C<2001:db8::1>).  Note
 that IPv6 addresses in ::ffff:0:0/96 and some IPv6 addresses in ::/96
-will be printed as a mixture of IPv6 and IPv4.
+will be printed as a mixture of IPv6 and IPv4.  As of SiLK 3.12.0,
+B<rwbagcat> exits with an error when this format is used on a Bag file
+whose key-type is neither C<custom> nor an IP address type.
 
 =item zero-padded
 
 Print keys as IP addresses in their canonical form, but add zeros to
 the output so it fully fills the width of column.  The addresses
 C<127.0.0.1> and C<2001:db8::1> are printed as C<127.000.000.001> and
-C<2001:0db8:0000:0000:0000:0000:0000:0001>, respectively.
+C<2001:0db8:0000:0000:0000:0000:0000:0001>, respectively.  As of SiLK
+3.12.0, B<rwbagcat> exits with an error when this format is used on a
+Bag file whose key-type is neither C<custom> nor an IP address type.
 
 =item decimal
 
@@ -317,7 +391,50 @@ Print all keys as IP addresses in the canonical form for IPv6 without
 using any IPv4 notation.  Any integer key or IPv4 address is mapped
 into the ::ffff:0:0/96 netblock.  The addresses C<127.0.0.1> and
 C<2001:db8::1> are printed as C<::ffff:7f00:1> and C<2001:db8::1>,
-respectively.
+respectively.  As of SiLK 3.12.0,
+B<rwbagcat> exits with an error when this format is used on a Bag file
+whose key-type is neither C<custom> nor an IP address type.
+
+=item timestamp
+
+Print keys as time in standard SiLK format:
+I<yyyy>/I<mm>/I<dd>TI<hh>:I<mm>:I<ss>.  May be combined with C<utc> or
+C<localtime>.  May only be used on keys whose type is custom or a time
+value.  I<Since SiLK 3.12.0.>
+
+=item iso-time
+
+Print keys as time in the ISO time format
+S<I<yyyy>-I<mm>-I<dd> I<hh>:I<mm>:I<ss>>.  May be combined with C<utc>
+or C<localtime>.  May only be used on keys whose type is custom or a
+time value.  I<Since SiLK 3.12.0.>
+
+=item m/d/y
+
+Print keys as time in the format
+S<I<mm>/I<dd>/I<yyyy> I<hh>:I<mm>:I<ss>>.  May be combined with C<utc>
+or C<localtime>.  May only be used on keys whose type is custom or a
+time value.  I<Since SiLK 3.12.0.>
+
+=item utc
+
+Print the keys as time in UTC.  If no other time-related key-format is
+provided, formats the time using the C<timestamp> format.  May only be
+used on keys whose type is custom or a time value.  I<Since SiLK
+3.12.0.>
+
+=item localtime
+
+Print as the keys as time and get the timezone from either the TZ
+environment variable or local machine.  If no other time-related
+key-format is provided, formats the time using the C<timestamp>
+format.  May only be used on keys whose type is custom or a time
+value.  I<Since SiLK 3.12.0.>
+
+=item epoch
+
+Print keys as seconds since UNIX epoch.  May only be used on keys
+whose type is custom or a time value.  I<Since SiLK 3.12.0.>
 
 =back
 
@@ -346,7 +463,7 @@ When this switch is not specified, the default of 'B<|>' is used.
 Do not print the column separator after the final column.  Normally a
 delimiter is printed.  When the network summary is requested
 (B<--network-structure=S>), the separator is always printed before the
-summary column and never that column.
+summary column and never after that column.
 
 =item B<--delimited>
 
@@ -356,6 +473,12 @@ Run as if B<--no-columns> B<--no-final-delimiter> B<--column-sep>=I<C>
 had been specified.  That is, disable fixed-width columnar output; if
 character I<C> is provided, it is used as the delimiter between
 columns instead of the default 'B<|>'.
+
+=item B<--output-path>=I<OUTPUTFILE>
+
+Redirect output of the B<--network-structure> or B<--bin-ips> options
+to I<OUTPUTFILE>.  I<OUTPUTFILE> is a filename, named pipe, or the
+values C<stdout> or C<-> to print to the standard output.
 
 =item B<--pager>=I<PAGER_PROG>
 
@@ -509,12 +632,12 @@ this program to display its output a screen at a time.
 
 =head1 SEE ALSO
 
-B<rwbag(1)>, B<rwbagbuild(1)>, B<rwbagtool(1)>, B<rwset(1)>,
-B<rwsetbuild(1)>, B<silk(7)>
+B<rwbag(1)>, B<rwbagbuild(1)>, B<rwbagtool(1)>, B<rwpmapbuild(1)>,
+B<rwset(1)>, B<rwsetbuild(1)>, B<silk(7)>
 
 =cut
 
-$SiLK: rwbagcat.pod cd09f0a5fcc6 2014-06-14 15:43:33Z mthomas $
+$SiLK: rwbagcat.pod 5f2d30e80a6f 2016-03-30 22:09:49Z mthomas $
 
 Local Variables:
 mode:text

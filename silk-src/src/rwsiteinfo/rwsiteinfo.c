@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2011-2015 by Carnegie Mellon University.
+** Copyright (C) 2011-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -60,7 +60,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsiteinfo.c e81d0efa6bbe 2015-09-09 13:57:31Z mthomas $");
+RCSIDENT("$SiLK: rwsiteinfo.c e5d7217c6d5f 2016-01-21 18:24:52Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/skmempool.h>
@@ -345,7 +345,7 @@ static const char *appHelp[] = {
     ("Use specified character between items in FIELD:list\n"
      "\tfields. Def. ','"),
     ("Program to invoke to page output. Def. $SILK_PAGER or $PAGER"),
-    NULL, /* generated dynamically */
+    ("Root of directory tree containing packed data."),
     (char *)NULL
 };
 
@@ -399,13 +399,13 @@ appUsageLong(
     char *cp, *ep, *sp;
     char buf[2 * PATH_MAX];
     char path[PATH_MAX];
-    int i;
+    unsigned int i;
 
     fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
     fprintf(fh, "\nSWITCHES:\n");
     skOptionsDefaultUsage(fh);
 
-    for (i = 0; appOptions[i].name; i++ ) {
+    for (i = 0; appOptions[i].name; ++i) {
         fprintf(fh, "--%s %s. ",
                 appOptions[i].name, SK_OPTION_HAS_ARG(appOptions[i]));
         /* Print the static help text from the appHelp array */
@@ -428,14 +428,14 @@ appUsageLong(
             skOptionsTimestampFormatUsage(fh);
             break;
           case OPT_DATA_ROOTDIR:
-            /* put the text into a buffer, and then wrap the text in
-             * the buffer at space characters. */
+            fprintf(fh, "%s\n", appHelp[i]);
+            /* put the text containing the current value into a
+             * buffer, and then wrap the text in the buffer at space
+             * characters. */
             snprintf(buf, sizeof(buf),
-                     ("Root of directory tree containing packed data.\n"
-                      "Currently '%s'. Def. $" SILK_DATA_ROOTDIR_ENVAR
-                      " or '%s'"),
+                     "Currently '%s'. Def. $%s or '%s'",
                      sksiteGetRootDir(path, sizeof(path)),
-                     sksiteGetDefaultRootDir());
+                     SILK_DATA_ROOTDIR_ENVAR, sksiteGetDefaultRootDir());
             sp = buf;
             while (strlen(sp) > MAX_TEXT_ON_LINE) {
                 cp = &sp[MIN_TEXT_ON_LINE];
@@ -694,25 +694,25 @@ appOptionsHandler(
 
       case OPT_CLASSES:
         CHECK_MULTIPLE_USE(opt_index, classes_arg);
-        //CHECK_EMPTY_STRING(opt_index, opt_arg);
+        /* CHECK_EMPTY_STRING(opt_index, opt_arg); */
         classes_arg = opt_arg;
         break;
 
       case OPT_TYPES:
         CHECK_MULTIPLE_USE(opt_index, types_arg);
-        //CHECK_EMPTY_STRING(opt_index, opt_arg);
+        /* CHECK_EMPTY_STRING(opt_index, opt_arg); */
         types_arg = opt_arg;
         break;
 
       case OPT_FLOWTYPES:
         CHECK_MULTIPLE_USE(opt_index, flowtypes_arg);
-        //CHECK_EMPTY_STRING(opt_index, opt_arg);
+        /* CHECK_EMPTY_STRING(opt_index, opt_arg); */
         flowtypes_arg = opt_arg;
         break;
 
       case OPT_SENSORS:
         CHECK_MULTIPLE_USE(opt_index, sensors_arg);
-        //CHECK_EMPTY_STRING(opt_index, opt_arg);
+        /* CHECK_EMPTY_STRING(opt_index, opt_arg); */
         sensors_arg = opt_arg;
         break;
 

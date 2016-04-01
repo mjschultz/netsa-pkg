@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -60,7 +60,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: mapsid.c 4738e9e7f385 2015-08-05 18:08:02Z mthomas $");
+RCSIDENT("$SiLK: mapsid.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sksite.h>

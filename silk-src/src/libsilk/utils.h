@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -65,7 +65,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h 242ba69cb734 2015-09-25 21:00:20Z mthomas $");
+RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h 45531ea4fc10 2016-02-16 16:41:33Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -3119,8 +3119,8 @@ skStringParseCIDR(
     const char         *ip_string);
 
 
-/* typedef union sk_sockaddr_un sk_sockaddr_t;        // silk_types.h */
-/* typedef struct sk_sockaddr_array_st sk_sockaddr_t; // silk_types.h */
+/* typedef union sk_sockaddr_un sk_sockaddr_t;              // silk_types.h */
+/* typedef struct sk_sockaddr_array_st sk_sockaddr_array_t; // silk_types.h */
 
 
 /* It seems that solaris does not define SUN_LEN (yet) */

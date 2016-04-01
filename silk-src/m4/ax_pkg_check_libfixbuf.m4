@@ -1,4 +1,4 @@
-dnl Copyright (C) 2004-2015 by Carnegie Mellon University.
+dnl Copyright (C) 2004-2016 by Carnegie Mellon University.
 dnl
 dnl @OPENSOURCE_HEADER_START@
 dnl
@@ -48,7 +48,7 @@ dnl contract clause at 252.227.7013.
 dnl
 dnl @OPENSOURCE_HEADER_END@
 
-dnl RCSIDENT("$SiLK: ax_pkg_check_libfixbuf.m4 69ac5c7dbbef 2015-09-24 16:27:37Z mthomas $")
+dnl RCSIDENT("$SiLK: ax_pkg_check_libfixbuf.m4 71c2983c2702 2016-01-04 18:33:22Z mthomas $")
 
 
 # ---------------------------------------------------------------------------

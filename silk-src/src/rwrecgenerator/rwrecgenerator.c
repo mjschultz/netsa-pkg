@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2011-2015 by Carnegie Mellon University.
+** Copyright (C) 2011-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -70,7 +70,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwrecgenerator.c c068e77432c6 2015-09-08 15:40:30Z mthomas $");
+RCSIDENT("$SiLK: rwrecgenerator.c e5d7217c6d5f 2016-01-21 18:24:52Z mthomas $");
 
 #include <silk/rwascii.h>
 #include <silk/rwrec.h>
@@ -530,26 +530,28 @@ static void
 appUsageLong(
     void)
 {
-#define USAGE_MSG                                                       \
-    ("<SWITCHES>\n"                                                     \
-     "\tUse pseudo-random numbers to generate events, where each event\n" \
-     "\tconsists of one or more flow records.  The time window for the\n" \
+    /* usage string is longer than allowed by C90 */
+#define USAGE_MSG1                                                            \
+    ("<SWITCHES>\n"                                                           \
+     "\tUse pseudo-random numbers to generate events, where each event\n"     \
+     "\tconsists of one or more flow records.  The time window for the\n"     \
      "\tstart of each event can be set on the command line, and the window\n" \
-     "\tdefaults to the previous hour.  Switches exist for controlling the\n" \
-     "\tsize of each step taken in the window, and the number of events to\n" \
-     "\tcreate at each time step.  The output may be text, a single file\n" \
+     "\tdefaults to the previous hour.  Switches exist for controlling the\n")
+#define USAGE_MSG2                                                            \
+    ("\tsize of each step taken in the window, and the number of events to\n" \
+     "\tcreate at each time step.  The output may be text, a single file\n"   \
      "\tof flow records, or a directory full of incremental files (such as\n" \
-     "\tthose produced by rwflowpack.  When creating incremental files,\n" \
+     "\tthose produced by rwflowpack.  When creating incremental files,\n"    \
      "\tmultiple subprocesses can be specified.\n")
 
     FILE *fh = USAGE_FH;
-    int i;
+    unsigned int i;
 
-    fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
+    fprintf(fh, "%s %s%s", skAppName(), USAGE_MSG1, USAGE_MSG2);
     fprintf(fh, "\nGeneral Switches:\n");
     skOptionsDefaultUsage(fh);
     for (i = 0; appOptions[i].name; ++i) {
-        switch (appOptions[i].val) {
+        switch ((appOptionsEnum)appOptions[i].val) {
           case OPT_SILK_OUTPUT_PATH:
             sklogOptionsUsage(fh);
             fprintf(fh, "\nSingle SiLK Output File Switches:\n");

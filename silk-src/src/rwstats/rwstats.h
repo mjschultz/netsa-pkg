@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -57,7 +57,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWSTATS_H, "$SiLK: rwstats.h c068e77432c6 2015-09-08 15:40:30Z mthomas $");
+RCSIDENTVAR(rcsID_RWSTATS_H, "$SiLK: rwstats.h 0df4c34a63cf 2016-02-18 20:49:41Z mthomas $");
 
 
 /*
@@ -83,7 +83,6 @@ RCSIDENTVAR(rcsID_RWSTATS_H, "$SiLK: rwstats.h c068e77432c6 2015-09-08 15:40:30Z
 /* default sTime bin size to use when --bin-time is requested */
 #define DEFAULT_TIME_BIN  60
 
-
 #define HEAP_PTR_KEY(hp)                        \
     ((uint8_t*)(hp) + heap_offset_key)
 
@@ -107,8 +106,13 @@ typedef enum {
     RWSTATS_THRESHOLD = 1,
     /* output bins whose value relative to the total across all bins
      * is at-least/no-more-than this percentage */
-    RWSTATS_PERCENTAGE = 2
+    RWSTATS_PERCENTAGE = 2,
+    /* there is no limit; print all */
+    RWSTATS_ALL = 3
 } rwstats_limit_type_t;
+
+/* number of limit types; used for sizing arrays */
+#define NUM_RWSTATS_LIMIT_TYPE      4
 
 /* struct to hold information about built-in aggregate value fields */
 typedef struct builtin_field_st {
@@ -131,8 +135,12 @@ typedef struct builtin_field_st {
 /* used to convert a percentage or threshold limit to a number of bins */
 typedef struct rwstats_limit_st {
     char                    title[256];
-    /* three values that correspond to rwstats_limit_type_t */
-    uint64_t                value[3];
+    /* values that correspond to rwstats_limit_type_t.  the double
+     * value is used for RWSTATS_PERCENTAGE; the uint64_t otherwise */
+    union value_un {
+        double      d;
+        uint64_t    u64;
+    }                       value[NUM_RWSTATS_LIMIT_TYPE];
     /* number of entries in the hash table */
     uint64_t                entries;
     /* handles to the field to limit */

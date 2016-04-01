@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2015 by Carnegie Mellon University.
+** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -53,7 +53,7 @@
 /*
 **  pmapfilter.c
 **
-**    John McClary Prevost
+**    Katherine Prevost
 **    April 20th, 2004
 **
 **    Support for using prefix maps from within SiLK applications.
@@ -62,7 +62,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pmapfilter.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: pmapfilter.c 4e1dca2750a1 2016-03-31 13:31:36Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skplugin.h>
@@ -560,7 +560,7 @@ pmapfile_handler(
     int                  ok;
     const char          *filename;
     const char          *sep;
-    const char          *mapname;
+    const char          *mapname           = NULL;
     char                *prefixed_name     = NULL;
     char                *short_prefixed_name;
     size_t               namelen           = 0;
@@ -584,8 +584,12 @@ pmapfile_handler(
     if (NULL == sep) {
         /* We do not have a mapname.  We'll check for one in the pmap
          * once we read it. */
-        mapname = NULL;
         filename = opt_arg;
+    } else if (sep == opt_arg) {
+        /* Treat a 0-length mapname on the command as having none.
+         * Allows use of default mapname for files that contain the
+         * separator. */
+        filename = sep + 1;
     } else {
         /* A mapname was supplied on the command line */
         if (sep == opt_arg) {
@@ -798,7 +802,7 @@ pmapfile_handler(
 
 
     /* Verify unique field names */
-    for (i = 0; i < skVectorGetCount(pmap_vector); i++) {
+    for (i = 0; i < skVectorGetCount(pmap_vector); ++i) {
         pmap_data_t *p;
 
         skVectorGetValue(&p, pmap_vector, i);

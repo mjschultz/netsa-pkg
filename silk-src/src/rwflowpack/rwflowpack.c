@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2003-2015 by Carnegie Mellon University.
+** Copyright (C) 2003-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -125,7 +125,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwflowpack.c 69ac5c7dbbef 2015-09-24 16:27:37Z mthomas $");
+RCSIDENT("$SiLK: rwflowpack.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <dlfcn.h>
 

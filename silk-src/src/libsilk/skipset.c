@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2008-2015 by Carnegie Mellon University.
+** Copyright (C) 2008-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -68,7 +68,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipset.c 4738e9e7f385 2015-08-05 18:08:02Z mthomas $");
+RCSIDENT("$SiLK: skipset.c 4cc0fc11df74 2016-02-29 23:16:13Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
@@ -2323,7 +2323,8 @@ ipsetCopyOnWrite(
         ipset->s.v3->leaves.entry_capacity = ipset->s.v3->leaves.entry_count;
         return rv;
     }
-    rv = ipsetAllocEntries(&ipset->s.v3->nodes, ipset->s.v3->nodes.entry_count);
+    rv = ipsetAllocEntries(&ipset->s.v3->leaves,
+                           ipset->s.v3->leaves.entry_count);
     if (rv) {
         free(ipset->s.v3->nodes.buf);
         ipset->s.v3->nodes.buf = node_buf;

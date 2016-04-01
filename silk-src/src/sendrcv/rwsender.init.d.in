@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #######################################################################
-# RCSIDENT("$SiLK: rwsender.init.d.in 3b368a750438 2015-05-18 20:39:37Z mthomas $")
+# RCSIDENT("$SiLK: rwsender.init.d.in 57a2b3e91bee 2016-02-01 20:29:38Z mthomas $")
 #######################################################################
 
 # rwsender start/control script
@@ -278,6 +278,10 @@ if [ "x${LOCAL_DIRS}" != "x" ] ; then
 ${LOCAL_DIRS}
 EOF
     unset IFS
+fi
+
+if [ "x${SEND_ATTEMPTS}" != "x" ] ; then
+    PROG_OPTIONS="${PROG_OPTIONS} --send-attempts=${SEND_ATTEMPTS}"
 fi
 
 

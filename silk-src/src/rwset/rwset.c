@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -65,7 +65,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwset.c 242ba69cb734 2015-09-25 21:00:20Z mthomas $");
+RCSIDENT("$SiLK: rwset.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>

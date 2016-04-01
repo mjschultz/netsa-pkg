@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -60,7 +60,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsortsetup.c 4dba2416c3d6 2015-09-10 19:03:20Z mthomas $");
+RCSIDENT("$SiLK: rwsortsetup.c 35d28dbdfd0f 2016-02-24 16:28:44Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skcountry.h>
@@ -205,7 +205,7 @@ appUsageLong(
      "\tfrom the standard input.\n")
 
     FILE *fh = USAGE_FH;
-    int i;
+    unsigned int i;
 
     /* Create the string map for --fields */
     createStringmaps();
@@ -214,10 +214,10 @@ appUsageLong(
     fprintf(fh, "\nSWITCHES:\n");
     skOptionsDefaultUsage(fh);
 
-    for (i = 0; appOptions[i].name; i++ ) {
+    for (i = 0; appOptions[i].name; ++i) {
         fprintf(fh, "--%s %s. ", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]));
-        switch (i) {
+        switch ((appOptionsEnum)appOptions[i].val) {
           case OPT_FIELDS:
             /* Dynamically build the help */
             fprintf(fh, "%s\n", appHelp[i]);
@@ -228,8 +228,9 @@ appUsageLong(
                     ("Attempt to allocate this much memory for the sort\n"
                      "\tbuffer, in bytes."
                      "  Append k, m, g, for kilo-, mega-, giga-bytes,\n"
-                     "\trespectively. Def. %" PRIu32 "\n"),
-                    (uint32_t)DEFAULT_SORT_BUFFER_SIZE);
+                     "\trespectively. Range: %" SK_PRIuZ "-%" SK_PRIuZ
+                     ". Def. " DEFAULT_SORT_BUFFER_SIZE "\n"),
+                    MINIMUM_SORT_BUFFER_SIZE, MAXIMUM_SORT_BUFFER_SIZE);
             break;
           default:
             /* Simple help text from the appHelp array */
@@ -269,13 +270,13 @@ appTeardown(
     teardownFlag = 1;
 
     /* close and destroy output */
-    if (out_rwios) {
-        rv = skStreamDestroy(&out_rwios);
+    if (out_stream) {
+        rv = skStreamDestroy(&out_stream);
         if (rv && !caught_signal) {
             /* only print error when not in signal handler */
-            skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
         }
-        out_rwios = NULL;
+        out_stream = NULL;
     }
 
     /* remove any temporary files */
@@ -330,6 +331,7 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
+    uint64_t tmp64;
     int optctx_flags;
     int rv;
     int j;
@@ -345,6 +347,10 @@ appSetup(
 
     /* Initialize variables */
     memset(key_fields, 0, sizeof(key_fields));
+    rv = skStringParseHumanUint64(&tmp64, DEFAULT_SORT_BUFFER_SIZE,
+                                  SK_HUMAN_NORMAL);
+    assert(0 == rv);
+    sort_buffer_size = tmp64;
 
     optctx_flags = (SK_OPTIONS_CTX_INPUT_SILK_FLOW | SK_OPTIONS_CTX_ALLOW_STDIN
                     | SK_OPTIONS_CTX_XARGS | SK_OPTIONS_CTX_INPUT_PIPE);
@@ -419,29 +425,29 @@ appSetup(
     }
 
     /* Check for an output stream; or default to stdout  */
-    if (out_rwios == NULL) {
-        if ((rv = skStreamCreate(&out_rwios, SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
-            || (rv = skStreamBind(out_rwios, "-")))
+    if (out_stream == NULL) {
+        if ((rv = skStreamCreate(&out_stream, SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+            || (rv = skStreamBind(out_stream, "-")))
         {
-            skStreamPrintLastErr(out_rwios, rv, NULL);
-            skStreamDestroy(&out_rwios);
+            skStreamPrintLastErr(out_stream, rv, NULL);
+            skStreamDestroy(&out_stream);
             appExit(EXIT_FAILURE);
         }
     }
 
     /* set the compmethod on the header */
-    rv = skHeaderSetCompressionMethod(skStreamGetSilkHeader(out_rwios),
+    rv = skHeaderSetCompressionMethod(skStreamGetSilkHeader(out_stream),
                                       comp_method);
     if (rv) {
         skAppPrintErr("Error setting header on %s: %s",
-                      skStreamGetPathname(out_rwios), skHeaderStrerror(rv));
+                      skStreamGetPathname(out_stream), skHeaderStrerror(rv));
         appExit(EXIT_FAILURE);
     }
 
     /* open output */
-    rv = skStreamOpen(out_rwios);
+    rv = skStreamOpen(out_stream);
     if (rv) {
-        skStreamPrintLastErr(out_rwios, rv, NULL);
+        skStreamPrintLastErr(out_stream, rv, NULL);
         skAppPrintErr("Could not open output file.  Exiting.");
         appExit(EXIT_FAILURE);
     }
@@ -478,6 +484,7 @@ appOptionsHandler(
     int                 opt_index,
     char               *opt_arg)
 {
+    uint64_t tmp64;
     int rv;
 
     switch ((appOptionsEnum)opt_index) {
@@ -505,16 +512,16 @@ appOptionsHandler(
 
       case OPT_OUTPUT_PATH:
         /* check for switch given multiple times */
-        if (out_rwios) {
+        if (out_stream) {
             skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
-            skStreamDestroy(&out_rwios);
+            skStreamDestroy(&out_stream);
             return 1;
         }
-        if ((rv = skStreamCreate(&out_rwios, SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
-            || (rv = skStreamBind(out_rwios, opt_arg)))
+        if ((rv = skStreamCreate(&out_stream, SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+            || (rv = skStreamBind(out_stream, opt_arg)))
         {
-            skStreamPrintLastErr(out_rwios, rv, NULL);
+            skStreamPrintLastErr(out_stream, rv, NULL);
             return 1;
         }
         break;
@@ -531,20 +538,20 @@ appOptionsHandler(
         break;
 
       case OPT_SORT_BUFFER_SIZE:
-        rv = skStringParseHumanUint64(&sort_buffer_size, opt_arg,
-                                      SK_HUMAN_NORMAL);
+        rv = skStringParseHumanUint64(&tmp64, opt_arg, SK_HUMAN_NORMAL);
         if (rv) {
             goto PARSE_ERROR;
         }
-        if ((sort_buffer_size < MIN_IN_CORE_RECORDS * node_size)
-            || (sort_buffer_size >= UINT32_MAX))
+        if ((tmp64 < MINIMUM_SORT_BUFFER_SIZE)
+            || (tmp64 >= MAXIMUM_SORT_BUFFER_SIZE))
         {
-            skAppPrintErr(("The --%s value must be between %" PRIu32
-                           " and %" PRIu32),
-                          appOptions[opt_index].name,
-                          (MIN_IN_CORE_RECORDS * node_size), UINT32_MAX);
+            skAppPrintErr(
+                ("The --%s value must be between %" SK_PRIuZ " and %" SK_PRIuZ),
+                appOptions[opt_index].name,
+                MINIMUM_SORT_BUFFER_SIZE, MAXIMUM_SORT_BUFFER_SIZE);
             return 1;
         }
+        sort_buffer_size = tmp64;
         break;
     }
 
@@ -721,8 +728,9 @@ parseFields(
 
             node_size += bin_width;
             if (node_size > MAX_NODE_SIZE) {
-                skAppPrintErr("Sort key is too large %lu bytes > %d max",
-                              (unsigned long)node_size, MAX_NODE_SIZE);
+                skAppPrintErr(("Sort key is too large %" SK_PRIuZ
+                               " bytes > %" SK_PRIuZ " max"),
+                    node_size, MAX_NODE_SIZE);
                 goto END;
             }
         }
@@ -732,8 +740,9 @@ parseFields(
     /* records must be aligned */
     node_size = (1 + ((node_size - 1) / sizeof(uint64_t))) * sizeof(uint64_t);
     if (node_size > MAX_NODE_SIZE) {
-        skAppPrintErr("Sort key is too large %lu bytes > %d max",
-                      (unsigned long)node_size, MAX_NODE_SIZE);
+        skAppPrintErr(("Sort key is too large %" SK_PRIuZ
+                       " bytes > %" SK_PRIuZ " max"),
+                      node_size, MAX_NODE_SIZE);
         goto END;
     }
 #endif
@@ -773,10 +782,10 @@ helpFields(
 
 
 /*
- *  int = appNextInput(&rwios);
+ *  int = appNextInput(&stream);
  *
- *    Fill 'rwios' with the next input file to read.  Return 0 if
- *    'rwios' was successfully opened or 1 if there are no more input
+ *    Fill 'stream' with the next input file to read.  Return 0 if
+ *    'stream' was successfully opened or 1 if there are no more input
  *    files.
  *
  *    When an input file cannot be opened, the return value is
@@ -786,7 +795,7 @@ helpFields(
  */
 int
 appNextInput(
-    skstream_t        **rwios)
+    skstream_t        **stream)
 {
     static char *path = NULL;
     int rv;
@@ -801,19 +810,19 @@ appNextInput(
         }
         if (1 == rv) {
             /* no more input.  add final information to header */
-            if ((rv = skHeaderAddInvocation(skStreamGetSilkHeader(out_rwios),
+            if ((rv = skHeaderAddInvocation(skStreamGetSilkHeader(out_stream),
                                             1, pargc, pargv))
-                || (rv = skOptionsNotesAddToStream(out_rwios)))
+                || (rv = skOptionsNotesAddToStream(out_stream)))
             {
-                skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+                skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
             }
             return 1;
         }
     }
 
-    /* create rwios and open file */
+    /* create stream and open file */
     errno = 0;
-    rv = skStreamOpenSilkFlow(rwios, path, SK_IO_READ);
+    rv = skStreamOpenSilkFlow(stream, path, SK_IO_READ);
     if (rv) {
         if (errno == EMFILE || errno == ENOMEM) {
             TRACEMSG(("Unable to open '%s': %s", path, strerror(errno)));
@@ -821,12 +830,12 @@ appNextInput(
         } else {
             if (print_filenames) {
                 fprintf(PRINT_FILENAMES_FH, "%s\n",
-                        skStreamGetPathname(*rwios));
+                        skStreamGetPathname(*stream));
             }
-            skStreamPrintLastErr(*rwios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(*stream, rv, &skAppPrintErr);
             rv = -1;
         }
-        skStreamDestroy(rwios);
+        skStreamDestroy(stream);
         return rv;
     }
 
@@ -835,18 +844,18 @@ appNextInput(
 
     /* copy annotations and command line entries from the input to the
      * output */
-    if ((rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_rwios),
-                                  skStreamGetSilkHeader(*rwios),
+    if ((rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_stream),
+                                  skStreamGetSilkHeader(*stream),
                                   SK_HENTRY_INVOCATION_ID))
-        || (rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_rwios),
-                                     skStreamGetSilkHeader(*rwios),
+        || (rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_stream),
+                                     skStreamGetSilkHeader(*stream),
                                      SK_HENTRY_ANNOTATION_ID)))
     {
-        skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
     }
 
     if (print_filenames) {
-        fprintf(PRINT_FILENAMES_FH, "%s\n", skStreamGetPathname(*rwios));
+        fprintf(PRINT_FILENAMES_FH, "%s\n", skStreamGetPathname(*stream));
     }
 
     return 0;

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2015 by Carnegie Mellon University.
+** Copyright (C) 2007-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -64,7 +64,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_MULTIQUEUE_H, "$SiLK: multiqueue.h 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENTVAR(rcsID_MULTIQUEUE_H, "$SiLK: multiqueue.h 360c17f06713 2016-01-28 17:19:04Z mthomas $");
 
 /*
  *    Multiqueues are sets of subqueues that can work together as a
@@ -94,10 +94,7 @@ typedef enum mq_function_en {
 } mq_function_t;
 
 
-mq_multi_t *
-mqCreateUnfair(
-    void              (*free_fn)(void *));
-/*
+/**
  *    Create an unfair multiqueue.
  *
  *    An unfair multiqueue will drain all data from its first subqueue
@@ -107,11 +104,11 @@ mqCreateUnfair(
  *    multiqueue's subqueues upon destruction of the multiqueue.  It
  *    may be NULL.
  */
-
 mq_multi_t *
-mqCreateFair(
+mqCreateUnfair(
     void              (*free_fn)(void *));
-/*
+
+/**
  *    Create an fair multiqueue.
  *
  *    An fair multiqueue will drain data from its subqueues in a
@@ -121,23 +118,22 @@ mqCreateFair(
  *    multiqueue's subqueues upon destruction of the multiqueue.  It
  *    may be NULL.
  */
+mq_multi_t *
+mqCreateFair(
+    void              (*free_fn)(void *));
 
-void
-mqShutdown(
-    mq_multi_t         *q);
-/*
+/**
  *    Shutdown a multiqueue.
  *
  *    Shutting down a multiqueue unblocks all operations on that
  *    multiqueue, and makes the multiqueue unusable.  Generally a
  *    prelude to destroying a multiqueue.
  */
+void
+mqShutdown(
+    mq_multi_t         *q);
 
-mq_err_t
-mqDisable(
-    mq_multi_t         *q,
-    mq_function_t       which);
-/*
+/**
  *    Disable a part of functionality of a multiqueue.
  *
  *    One can disable either the ability to add or remove elements
@@ -147,102 +143,102 @@ mqDisable(
  *    multiqueue (but not its subqueues).  Multiqueue functionality
  *    can be reinstated using mqEnable().
  */
-
 mq_err_t
-mqEnable(
+mqDisable(
     mq_multi_t         *q,
     mq_function_t       which);
-/*
+
+/**
  *    Re-enable a part of functionality of a multiqueue.
  *
  *    Re-enables functionality of a multiqueue that has been
  *    previously disabled.
  */
+mq_err_t
+mqEnable(
+    mq_multi_t         *q,
+    mq_function_t       which);
 
-void
-mqDestroy(
-    mq_multi_t         *q);
-/*
- *    Destroys a multiqueue and all owned subqueues.
+/**
+ *    Destroy a multiqueue and all owned subqueues.
  *
  *    If the multiqueue was created with a non-null free_fn, this
  *    function will also call that free_fn on all elements in the
  *    multiqueue's subqueues.
  */
+void
+mqDestroy(
+    mq_multi_t         *q);
 
-mq_err_t
-mqGet(
-    mq_multi_t         *q,
-    void              **data);
-/*
+/**
  *    Get an element from a multiqueue.
  *
  *    This will block if the multiqueue is empty.  Returns MQ_NOERROR
  *    on success.  Returns MQ_SHUTDOWN or MQ_DISABLED if the
  *    multiqueue was shutdown or disabled.
  */
+mq_err_t
+mqGet(
+    mq_multi_t         *q,
+    void              **data);
 
+/**
+ *    Put an element back on a multiqueue, such that it will be the
+ *    next element returned by an mqGet() call.
+ */
 mq_err_t
 mqPushBack(
     mq_multi_t         *q,
     void               *data);
-/*
- *    Puts an element back on a multiqueue, such that it will be the
- *    next element returned by an mqget() call.
- */
 
+/**
+ *    Create and add a subqueue to a multiqueue.
+ */
 mq_queue_t *
 mqCreateQueue(
     mq_multi_t         *q);
-/*
- *    Creates and adds a subqueue to a multiqueue.
- */
 
+/**
+ *    Destroy a subqueue.
+ */
 void
 mqDestroyQueue(
     mq_queue_t         *sq);
-/*
- *    Destroys a subqueue.
- */
 
+/**
+ *    Add an element to a subqueue.
+ */
 mq_err_t
 mqQueueAdd(
     mq_queue_t         *sq,
     void               *data);
-/*
- *    Adds an element to a subqueue.
- */
 
+/**
+ *    Get an element from a subqueue.
+ */
 mq_err_t
 mqQueueGet(
     mq_queue_t         *sq,
     void              **data);
-/*
- *    Gets an element from a subqueue.
- */
 
+/**
+ *    Put an element back on a subqueue such that mqQueueGet() will
+ *    return that element.
+ */
 mq_err_t
 mqQueuePushBack(
     mq_queue_t         *sq,
     void               *data);
-/*
- *    Puts an element back on a subqueue such that mqQueueGet() will
- *    return that element.
- */
 
+/**
+ *    Move a subqueue to a particular multiqueue.
+ */
 mq_err_t
 mqQueueMove(
     mq_multi_t         *q,
     mq_queue_t         *sq);
-/*
- *    Moves a subqueue to a particular multiqueue.
- */
 
-mq_err_t
-mqQueueDisable(
-    mq_queue_t         *q,
-    mq_function_t       which);
-/*
+/**
  *    Disable a part of functionality of a subqueue.
  *
  *    One can disable either the ability to add or remove elements
@@ -250,17 +246,21 @@ mqQueueDisable(
  *    that subqueue.  Subqueue functionality can be reinstated using
  *    mqQueueEnable().
  */
-
 mq_err_t
-mqQueueEnable(
+mqQueueDisable(
     mq_queue_t         *q,
     mq_function_t       which);
-/*
+
+/**
  *    Re-enable a part of functionality of a subqueue.
  *
  *    Re-enables functionality of a subqueue that has been previously
  *    disabled.
  */
+mq_err_t
+mqQueueEnable(
+    mq_queue_t         *q,
+    mq_function_t       which);
 
 #ifdef __cplusplus
 }

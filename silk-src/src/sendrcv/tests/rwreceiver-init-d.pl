@@ -1,7 +1,7 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: rwreceiver-init-d.pl fc5a7e50648b 2015-09-23 19:30:01Z mthomas $")
+# RCSIDENT("$SiLK: rwreceiver-init-d.pl d6cdb4ca495b 2016-03-01 19:22:48Z mthomas $")
 
 use strict;
 use SiLKTests;
@@ -66,6 +66,10 @@ while (<SRC>) {
     }
     if (/^(LOG_TYPE=).*/) {
         $daemon_conf_text .= $1 . "legacy\n";
+        next;
+    }
+    if (/^(LOG_LEVEL=).*/ && $ENV{SK_TESTS_LOG_DEBUG}) {
+        $daemon_conf_text .= $1 . "debug\n";
         next;
     }
     if (/^(statedirectory=).*/) {
@@ -303,9 +307,21 @@ sub check_log_stopped
     open LOG, $log
         or die "$NAME: Cannot open log file '$log': $!\n";
     my $last_line;
-    while (defined(my $line = <LOG>)) {
-        $last_line = $line;
+
+    if ($ENV{SK_TESTS_VERBOSE}) {
+        print STDERR ">> START OF FILE '$log' >>>>>>>>>>\n";
+        while (defined(my $line = <LOG>)) {
+            print STDERR $line;
+            $last_line = $line;
+        }
+        print STDERR "<< END OF FILE '$log' <<<<<<<<<<<<\n";
     }
+    else {
+        while (defined(my $line = <LOG>)) {
+            $last_line = $line;
+        }
+    }
+
     close LOG;
     unless (defined $last_line) {
         die "$NAME: Log file '$log' is empty\n";

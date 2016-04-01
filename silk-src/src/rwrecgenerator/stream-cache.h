@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2015 by Carnegie Mellon University.
+** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -57,7 +57,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_STREAM_CACHE_H, "$SiLK: stream-cache.h 4738e9e7f385 2015-08-05 18:08:02Z mthomas $");
+RCSIDENTVAR(rcsID_STREAM_CACHE_H, "$SiLK: stream-cache.h 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/skstream.h>
 

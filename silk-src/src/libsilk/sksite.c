@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -64,7 +64,7 @@
 #define SKSITE_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sksite.c 1b5de79a8472 2015-09-15 19:56:44Z mthomas $");
+RCSIDENT("$SiLK: sksite.c 7dab1a2cd828 2016-03-01 16:21:03Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstream.h>
@@ -2215,6 +2215,7 @@ siteErrorIterCreate(
     }
     if (siteErrorIterCreateVector(*iter)) {
         free(*iter);
+        *iter = NULL;
         return -1;
     }
     sksiteErrorIteratorReset(*iter);
@@ -3341,6 +3342,8 @@ siteFileformatAdd(
 {
     fileformat_struct_t *ffi;
 
+    assert(fileformats.fl_list);
+
     /* check length of file format */
     if (strlen(name) > SK_MAX_STRLEN_FILE_FORMAT) {
         skAppPrintErr(("File format name '%s' is longer than allowed (%u)\n"
@@ -3437,6 +3440,8 @@ siteCompmethodAdd(
     uint8_t             comp_method)
 {
     compmethod_struct_t *cmi;
+
+    assert(compmethods.cml_list);
 
 #if 0
     /* check length of compression method name */

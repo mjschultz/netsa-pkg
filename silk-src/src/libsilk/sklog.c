@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -64,7 +64,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sklog.c 8513ea41586d 2015-09-24 15:52:13Z mthomas $");
+RCSIDENT("$SiLK: sklog.c 7dab1a2cd828 2016-03-01 16:21:03Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sklog.h>
@@ -515,6 +515,7 @@ logCompress(
     char               *file)
 {
     pid_t pid;
+    char *expanded_cmd = NULL;
 
     if (file == NULL) {
         INFOMSG("logCompress passed NULL pointer");
@@ -522,65 +523,17 @@ logCompress(
     }
 
     if (NULL != logctx->l_rot.post_rotate) {
+        size_t len;
+        size_t file_len;
+        const char *cp;
+        const char *sp;
+        char *exp_cp;
+
         /* do nothing if post-rotate command is empty string */
         if ('\0' == logctx->l_rot.post_rotate[0]) {
             free(file);
             return;
         }
-    }
-#ifndef SKLOG_COMPRESSOR
-    else {
-        free(file);
-        return;
-    }
-#endif
-
-    /* Fork */
-    pid = fork();
-    if (pid == -1) {
-        ERRMSG("Could not fork for %s command: %s",
-               logOptions[OPT_LOG_POST_ROTATE].name, strerror(errno));
-        free(file);
-        return;
-    }
-
-    /* Parent (original process) reaps Child 1 and returns */
-    if (pid != 0) {
-        /* Wait for Child 1 to exit. */
-        waitpid(pid, NULL, 0);
-        free(file);
-        return;
-    }
-
-    /* Change our process group, so a server program using this
-     * library that is waiting for any of its children (by process
-     * group) won't wait for this child. */
-    setpgid(0, 0);
-
-    /* Disable log rotation in Child 1 */
-    sklogDisableRotation();
-
-    /* Child 1 forks to create Child 2 */
-    pid = fork();
-    if (pid == -1) {
-        ERRMSG("Child could not fork for %s command: %s",
-               logOptions[OPT_LOG_POST_ROTATE].name, strerror(errno));
-        _exit(EXIT_FAILURE);
-    }
-
-    /* Child 1 immediately exits, so Parent can stop waiting */
-    if (pid != 0) {
-        _exit(EXIT_SUCCESS);
-    }
-
-    /* Child 2 executes the compression or log-post-rotate command */
-    if (NULL != logctx->l_rot.post_rotate) {
-        size_t len;
-        size_t file_len;
-        const char *cp;
-        const char *sp;
-        char *expanded_cmd;
-        char *exp_cp;
 
         /* Determine length of buffer needed to hold the expanded
          * command string and allocate it. */
@@ -604,7 +557,8 @@ logCompress(
         expanded_cmd = (char*)malloc(len + 1);
         if (expanded_cmd == NULL) {
             WARNINGMSG("Unable to allocate memory to create command string");
-            _exit(EXIT_FAILURE);
+            free(file);
+            return;
         }
 
         /* Copy command into buffer, handling %-expansions */
@@ -632,7 +586,63 @@ logCompress(
         }
         strcpy(exp_cp, cp);
         expanded_cmd[len] = '\0';
+    }
+#ifndef SKLOG_COMPRESSOR
+    else {
+        free(file);
+        return;
+    }
+#endif
 
+    /* Fork */
+    pid = fork();
+    if (pid == -1) {
+        ERRMSG("Could not fork for %s command: %s",
+               logOptions[OPT_LOG_POST_ROTATE].name, strerror(errno));
+        free(expanded_cmd);
+        free(file);
+        return;
+    }
+
+    /* Parent (original process) reaps Child 1 and returns */
+    if (pid != 0) {
+        free(expanded_cmd);
+        free(file);
+        /* Wait for Child 1 to exit. */
+        while (waitpid(pid, NULL, 0) == -1) {
+            if (EINTR != errno) {
+                NOTICEMSG("Error waiting for child %ld: %s",
+                          (long)pid, strerror(errno));
+                break;
+            }
+        }
+        return;
+    }
+
+    /* Change our process group, so a server program using this
+     * library that is waiting for any of its children (by process
+     * group) won't wait for this child. */
+    setpgid(0, 0);
+
+    /* Disable/Ignore locking of the log file; disable log rotation */
+    sklogSetLocking(NULL, NULL, NULL, NULL);
+    sklogDisableRotation();
+
+    /* Child 1 forks to create Child 2 */
+    pid = fork();
+    if (pid == -1) {
+        ERRMSG("Child could not fork for %s command: %s",
+               logOptions[OPT_LOG_POST_ROTATE].name, strerror(errno));
+        _exit(EXIT_FAILURE);
+    }
+
+    /* Child 1 immediately exits, so Parent can stop waiting */
+    if (pid != 0) {
+        _exit(EXIT_SUCCESS);
+    }
+
+    /* Child 2 executes the compression or log-post-rotate command */
+    if (NULL != logctx->l_rot.post_rotate) {
         DEBUGMSG("Invoking command: %s", expanded_cmd);
 
         /* Execute the command */
@@ -728,6 +738,7 @@ logRotatedLog(
         SKLOG_LOCK();
         if (logctx->l_rot.rolltime < time(NULL)) {
             /* Must rotate logs.  First, grab current log file. */
+            assert(logctx->l_sim.fp);
             rotated_fp = logctx->l_sim.fp;
             rotated_path = strdup(logctx->l_sim.path);
 
@@ -1198,10 +1209,11 @@ void
 sklogDisableRotation(
     void)
 {
-    if (!logctx) {
-        return;
+    if (logctx) {
+        SKLOG_LOCK();
+        logctx->l_rot.rolltime = (time_t)INT32_MAX;
+        SKLOG_UNLOCK();
     }
-    logctx->l_rot.rolltime = (time_t)INT32_MAX;
 }
 
 

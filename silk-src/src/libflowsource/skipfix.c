@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2015 by Carnegie Mellon University.
+** Copyright (C) 2007-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -62,7 +62,7 @@
 #define LIBFLOWSOURCE_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipfix.c 0274717355c9 2015-09-15 15:17:12Z mthomas $");
+RCSIDENT("$SiLK: skipfix.c 606127086f50 2016-03-16 16:16:53Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
@@ -737,10 +737,10 @@ static const struct elem_st {
 };
 
 #define TEMPLATE_SET_BIT(tsb_bitmap, tsb_member)        \
-    tsb_bitmap |= (1 << (elem. tsb_member ))
+    tsb_bitmap |= (UINT64_C(1) << (elem. tsb_member ))
 
 #define TEMPLATE_GET_BIT(tgb_bitmap, tgb_member)        \
-    ((tgb_bitmap) & (1 << elem. tgb_member ))
+    ((tgb_bitmap) & (UINT64_C(1) << elem. tgb_member ))
 
 #define ASSERT_IE_NAME_IS(aini_ie, aini_name)                           \
     assert(elem. aini_name                                              \
@@ -1170,6 +1170,7 @@ skiTemplateCallbackCtx(
               case FB_CISCO_ASA_EVENT_ID:
                 ASSERT_IE_NAME_IS(ie, NF_F_FW_EVENT);
                 TEMPLATE_SET_BIT(bmap, NF_F_FW_EVENT);
+                break;
 
                 /* REVERSE ELEMENTS */
               case FIELD_IDENT(FB_IE_PEN_REVERSE,   6):
@@ -1514,8 +1515,8 @@ skiGetNextRecordType(
             return SKI_RECTYPE_STATS;
         }
         bmap = GET_BITMAP_FROM_TEMPLATE(tmpl);
-        if (bmap & ((1 << elem.samplingAlgorithm)
-                    | (1 << elem.samplerMode)))
+        if (bmap & ((UINT64_C(1) << elem.samplingAlgorithm)
+                    | (UINT64_C(1) << elem.samplerMode)))
         {
             return SKI_RECTYPE_NF9_SAMPLING;
         }
@@ -1823,9 +1824,9 @@ skiRwNextRecord(
      *  3.11.0 we doctor the records to have a byte count of 1.
      */
     if ((skpcProbeGetQuirks(probe) & SKPC_QUIRK_FW_EVENT)
-        && (bmap & ((1 << elem.firewallEvent)
-                    | (1 << elem.NF_F_FW_EVENT)
-                    | (1 << elem.NF_F_FW_EXT_EVENT))))
+        && (bmap & ((UINT64_C(1) << elem.firewallEvent)
+                    | (UINT64_C(1) << elem.NF_F_FW_EVENT)
+                    | (UINT64_C(1) << elem.NF_F_FW_EXT_EVENT))))
     {
         char msg[64];
         uint8_t event = (fixrec.firewallEvent
@@ -2003,8 +2004,8 @@ skiRwNextRecord(
         rwRecSetProto(rec, fixrec.rw.protocolIdentifier);
 
         if (!rwRecIsICMP(rec)
-            || (0 == (bmap & ((1 << elem.icmpTypeCodeIPv4)
-                              | (1 << elem.icmpTypeIPv4)))))
+            || (0 == (bmap & ((UINT64_C(1) << elem.icmpTypeCodeIPv4)
+                              | (UINT64_C(1) << elem.icmpTypeIPv4)))))
         {
             rwRecSetSPort(rec, fixrec.rw.sourceTransportPort);
             rwRecSetDPort(rec, fixrec.rw.destinationTransportPort);
@@ -2053,11 +2054,8 @@ skiRwNextRecord(
         /* Store volume, clamping counts to 32 bits. */
         rwRecSetPkts(rec, CLAMP_VAL(pkts, UINT32_MAX));
         rwRecSetBytes(rec, CLAMP_VAL(bytes, UINT32_MAX));
-    } else {
-        if (0 == rev_pkts || 0 == rev_bytes) {
-            skAbort();
-        }
 
+    } else if (rev_pkts && rev_bytes) {
         /* We have no forward information, only reverse.  Write the
          * source and dest values from the IPFIX record to SiLK's dest
          * and source fields, respectively. */
@@ -2154,8 +2152,13 @@ skiRwNextRecord(
                            CLAMP_VAL(fixrec.rw.ingressInterface, UINT16_MAX));
         }
 
+    } else {
+        TRACEMSG((("Found zero bytes or packets; byte=%" PRIu64 ", pkt="
+                   "%" PRIu64 ", rev_byte=%" PRIu64 ", rev_pkt=%" PRIu64),
+                  bytes, pkts, rev_bytes, rev_pkts));
+        skiFlowIgnored(&fixrec, "byte or packet count is zero");
+        return 0;
     }
-
 
     /* Run the Gauntlet of Time - convert all the various ways an IPFIX
      * record's time could be represented into start and elapsed times. */

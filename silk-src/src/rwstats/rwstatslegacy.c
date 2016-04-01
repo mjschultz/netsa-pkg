@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -60,7 +60,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwstatslegacy.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwstatslegacy.c 7dab1a2cd828 2016-03-01 16:21:03Z mthomas $");
 
 #include "rwstats.h"
 
@@ -158,10 +158,10 @@ void
 legacyOptionsUsage(
     FILE               *fh)
 {
-    int i;
+    unsigned int i;
 
     fprintf(fh, "\nLEGACY SWITCHES:\n");
-    for (i = 0; legacyOptions[i].name; i++ ) {
+    for (i = 0; legacyOptions[i].name; ++i) {
         fprintf(fh, "--%s %s. %s\n", legacyOptions[i].name,
                 SK_OPTION_HAS_ARG(legacyOptions[i]), legacyHelp[i]);
     }
@@ -226,6 +226,8 @@ legacyOptionsHandler(
     }
 
     if (opt_index <= LEGOPT_ICMP) {
+        /* if old_id is -1, then leg->fields must be NULL */
+        assert(old_id >= 0 || NULL == leg->fields);
         if (NULL == leg->fields) {
             old_id = opt_index;
             leg->fields = legacyOptions[opt_index].name;

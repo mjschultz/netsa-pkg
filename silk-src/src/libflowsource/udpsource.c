@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2015 by Carnegie Mellon University.
+** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -58,7 +58,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: udpsource.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: udpsource.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #if SK_ENABLE_ZLIB
 #include <zlib.h>
@@ -126,7 +126,7 @@ struct skUDPSource_st {
     /* 'data_buffer' holds packets collected for this probe but not
      * yet requested.  'pkt_buffer' is the current location in the
      * 'data_buffer' */
-    circBuf_t                  *data_buffer;
+    sk_circbuf_t               *data_buffer;
     void                       *pkt_buffer;
 
     unsigned                    stopped : 1;
@@ -429,8 +429,10 @@ udp_reader(
             }
 
             /* Acquire the next location */
-            source->pkt_buffer = (void*)circBufNextHead(source->data_buffer);
-            if (source->pkt_buffer == NULL) {
+
+            if (skCircBufGetWriterBlock(
+                    source->data_buffer, &source->pkt_buffer, NULL))
+            {
                 NOTICEMSG("Non-existent data buffer for %s", base->name);
                 break;
             }
@@ -1138,13 +1140,15 @@ skUDPSourceCreate(
         /* A socket-based probe */
 
         /* Create circular buffer */
-        source->data_buffer = circBufCreate(itemsize, params->max_pkts);
-        if (source->data_buffer == NULL) {
+        if (skCircBufCreate(&source->data_buffer, itemsize, params->max_pkts)){
             free(source);
             return NULL;
         }
-        source->pkt_buffer = (void *)circBufNextHead(source->data_buffer);
-        assert(source->pkt_buffer != NULL);
+        if (skCircBufGetWriterBlock(
+                source->data_buffer, &source->pkt_buffer, NULL))
+        {
+            skAbort();
+        }
 
         if (NULL != skpcProbeGetListenOnUnixDomainSocket(probe)) {
             /* UNIX domain socket */
@@ -1195,7 +1199,7 @@ skUDPSourceStop(
 
         /* Unblock the data buffer */
         if (source->data_buffer) {
-            circBufStop(source->data_buffer);
+            skCircBufStop(source->data_buffer);
         }
     }
 }
@@ -1224,7 +1228,7 @@ skUDPSourceDestroy(
     base = source->base;
 
     if (NULL == base) {
-        circBufDestroy(source->data_buffer);
+        skCircBufDestroy(source->data_buffer);
         free(source);
         return;
     }
@@ -1248,7 +1252,7 @@ skUDPSourceDestroy(
     }
 
     /* Destroy the circular buffer */
-    circBufDestroy(source->data_buffer);
+    skCircBufDestroy(source->data_buffer);
 
     /* Decref and possibly delete the base */
     assert(base->refcount);
@@ -1283,11 +1287,15 @@ skUDPSourceNext(
         goto END;
     }
     if (!base->file) {
-        /* network based UDP source. circBufNextTail() will block
+        /* network based UDP source. skCircBufGetReaderBlock() blocks
          * until data is ready */
         pthread_mutex_unlock(&base->mutex);
         if (source->data_buffer) {
-            return circBufNextTail(source->data_buffer);
+            if (skCircBufGetReaderBlock(source->data_buffer, &data, NULL)
+                == SK_CIRCBUF_OK)
+            {
+                return data;
+            }
         }
         return NULL;
     }

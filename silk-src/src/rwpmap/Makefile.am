@@ -1,19 +1,13 @@
-# RCSIDENT("$SiLK: Makefile.am f162742a8f51 2014-05-09 18:47:33Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 9dcc642f0092 2016-03-24 15:26:17Z mthomas $");
 
 # Installed Targets
 
-bin_PROGRAMS = rwip2cc rwpmapbuild rwpmapcat rwpmaplookup
-bin_SCRIPTS = rwgeoip2ccmap
-EXTRA_DIST = rwgeoip2ccmap.in
+bin_PROGRAMS = rwgeoip2ccmap rwip2cc rwpmapbuild rwpmapcat rwpmaplookup
 
-EXTRA_DIST += addrtype.pod ccfilter.pod rwip2cc.pod \
-	rwpmapbuild.pod rwpmapcat.pod rwpmaplookup.pod pmapfilter.pod
+EXTRA_DIST = addrtype.pod ccfilter.pod pmapfilter.pod rwgeoip2ccmap.pod \
+	rwip2cc.pod rwpmapbuild.pod rwpmapcat.pod rwpmaplookup.pod
 if HAVE_POD2MAN
-if HAVE_PODSELECT
-# Perl files have POD embedded in the file which podselect extracts
-src2pod2man = rwgeoip2ccmap.1
-endif
-man1_MANS = rwip2cc.1 rwpmapbuild.1 rwpmapcat.1 rwpmaplookup.1 $(src2pod2man)
+man1_MANS = rwgeoip2ccmap.1 rwip2cc.1 rwpmapbuild.1 rwpmapcat.1 rwpmaplookup.1
 man3_MANS = addrtype.3 ccfilter.3 pmapfilter.3
 endif
 
@@ -27,6 +21,8 @@ AM_CFLAGS = $(WARN_CFLAGS) $(SK_CFLAGS)
 AM_LDFLAGS = $(SK_LDFLAGS) $(STATIC_APPLICATIONS)
 LDADD = ../libsilk/libsilk.la
 
+rwgeoip2ccmap_SOURCES = rwgeoip2ccmap.l
+
 rwip2cc_SOURCES = rwip2cc.c
 
 rwpmapbuild_SOURCES = rwpmapbuild.l
@@ -35,18 +31,9 @@ rwpmapcat_SOURCES = rwpmapcat.c
 
 rwpmaplookup_SOURCES = rwpmaplookup.c
 
-rwgeoip2ccmap: Makefile rwgeoip2ccmap.in
-	$(MAKE_PERL_SCRIPT)
-
-rwgeoip2ccmap.pod : rwgeoip2ccmap.in
-	$(AM_V_GEN)$(PODSELECT) $? > $@
-
 
 # add switches to flex that remove unused functions
 AM_LFLAGS = $(FLEX_NOFUNS)
-
-MOSTLYCLEANFILES = rwgeoip2ccmap.pod rwgeoip2ccmap.tmp
-CLEANFILES = rwgeoip2ccmap
 
 # Global Rules
 include $(top_srcdir)/build.mk

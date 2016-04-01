@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2015 by Carnegie Mellon University.
+** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -53,7 +53,7 @@
 /*
 **  skprefixmap.c
 **
-**  John McClary Prevost
+**  Katherine Prevost
 **  December 2nd, 2004
 **
 **    Data structure for binding values to IP address prefixes (for
@@ -116,7 +116,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skprefixmap.c 4738e9e7f385 2015-08-05 18:08:02Z mthomas $");
+RCSIDENT("$SiLK: skprefixmap.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/skprefixmap.h>
 #include <silk/skipaddr.h>
