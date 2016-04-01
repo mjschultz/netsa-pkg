@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -64,7 +64,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_LOG_H, "$SiLK: sklog.h 8513ea41586d 2015-09-24 15:52:13Z mthomas $");
+RCSIDENTVAR(rcsID_LOG_H, "$SiLK: sklog.h 97626d046599 2016-03-16 17:48:34Z mthomas $");
 
 #include <syslog.h>
 
@@ -221,6 +221,10 @@ sklogCommandLine(
  *    Disable log rotation once the log has been opened.  Once this
  *    function has been called, there is no way to re-enable log
  *    rotation.
+ *
+ *    This function should be called in the child process after a call
+ *    to fork() to avoid having multiple processes attempt to rotate
+ *    the log file.
  */
 void
 sklogDisableRotation(
@@ -235,6 +239,14 @@ sklogDisableRotation(
  *    function with the necessary function pointers.  This function
  *    returns the value returned by sklogSetLocking(); i.e., it
  *    returns 0 unless sklogSetup() has not yet been called.
+ *
+ *    If the multithreaded program calls fork(), the child process
+ *    should first call sklogSetLocking() using NULL for all
+ *    parameters.  This ensures that the (single-threaded) child
+ *    process ignores the log-file lock that the parent may have held
+ *    when fork() was called.  Next the child should call
+ *    sklogDisableRotation() to ensure it does not attempt to rotate
+ *    the log-file.
  */
 int
 sklogEnableThreadedLogging(
@@ -375,7 +387,7 @@ sklogSetDestination(
  *    This function is provided for backward compatibility.  We
  *    recommend the use of syslog(3) instead.
  *
- *    Set the destination for log messages to mutliple files in the
+ *    Set the destination for log messages to multiple files in the
  *    directory 'dir_name', using 'base_name' as part of the basename
  *    for the files, and the current date as the remainder of the
  *    name.  The format of the files will be
@@ -529,6 +541,9 @@ sklogTeardown(
     void);
 
 
+/**
+ *    Prototypes that match sk_msg_vargs_fn_t
+ */
 int
 EMERGMSG_v(
     const char         *fmt,
@@ -564,9 +579,6 @@ INFOMSG_v(
     const char         *fmt,
     va_list             args)
     SK_CHECK_PRINTF(1, 0);
-/**
- *    Prototypes that match sk_msg_vargs_fn_t
- */
 int
 DEBUGMSG_v(
     const char         *fmt,

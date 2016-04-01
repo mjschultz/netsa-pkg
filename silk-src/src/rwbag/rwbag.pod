@@ -6,6 +6,25 @@ B<rwbag> - Build a binary Bag from SiLK Flow records.
 
 =head1 SYNOPSIS
 
+  rwbag --bag-file=KEY,COUNTER,OUTPUTFILE
+        [--bag-file=KEY,COUNTER,OUTPUTFILE ...]
+        [{ --pmap-file=PATH | --pmap-file=MAPNAME:PATH }]
+        [--note-add=TEXT] [--note-file-add=FILE]
+        [--invocation-strip] [--print-filenames] [--copy-input=PATH]
+        [--compression-method=COMP_METHOD]
+        [--ipv6-policy={ignore,asv4,mix,force,only}]
+        [--site-config-file=FILENAME]
+        {[--xargs] | [--xargs=FILENAME] | [FILE [FILE ...]]}
+
+  rwbag --help
+
+  rwbag --legacy-help
+
+  rwbag --version
+
+
+LEGACY SYNOPSIS
+
   rwbag [--sip-flows=OUTPUTFILE] [--dip-flows=OUTPUTFILE]
         [--sport-flows=OUTPUTFILE] [--dport-flows=OUTPUTFILE]
         [--proto-flows=OUTPUTFILE] [--sensor-flows=OUTPUTFILE]
@@ -28,17 +47,16 @@ B<rwbag> - Build a binary Bag from SiLK Flow records.
         [--site-config-file=FILENAME]
         {[--xargs] | [--xargs=FILENAME] | [FILE [FILE ...]]}
 
-  rwbag --help
-
-  rwbag --version
-
 =head1 DESCRIPTION
 
-B<rwbag> reads SiLK Flow records and builds a Bag.  Source IP address,
-destination IP address, next hop IP address, source port, destination
-port, protocol, input interface index, output interface index, or
-sensor ID may be used as the unique key by which to count volumes.
-Flows, packets, or bytes may be used as the counter.
+B<rwbag> reads SiLK Flow records and builds a Bag.  A Bag is a set
+where each key is associated with a counter.  Usually the key is some
+aspect of a flow record (an IP address, a port, the protocol, et
+cetera), and the counter is a volume (such as the number of flow
+records or the sum or bytes or packets) for the flow records that
+match that key.  The B<--bag-file> switch determines the key and
+counter to use for the bag and the location where the bag file is to
+be written.
 
 B<rwbag> reads SiLK Flow records from the files named on the command
 line or from the standard input when no file names are specified and
@@ -70,120 +88,212 @@ exact match for an option.  A parameter to an option may be specified
 as B<--arg>=I<param> or S<B<--arg> I<param>>, though the first form is
 required for options that take optional parameters.
 
-At least one of the following output flags must be defined.  For each,
+=over 4
+
+=item B<--bag-file>=I<KEY>,I<COUNTER>,I<OUTPUTFILE>
+
+Bin flow records by unique I<KEY>, compute the I<COUNTER> for each
+bin, and write the result to I<OUTPUTFILE>.  The list of available
+I<KEY> and I<COUNTER> values are given immediately below.
 I<OUTPUTFILE> is the name of a non-existent file, a named pipe, or the
-keyword C<stdout> to write the binary Bag to the standard output.
-Only one switch may use the standard output as its output stream.
+keyword C<stdout> or C<-> to write the binary Bag to the standard
+output.  Repeat the B<--bag-file> switch to create multiple Bag files
+in a single pass over the data.  Only one I<OUTPUTFILE> may use the
+standard output.  See L</LEGACY BAG CREATION SWITCHES> for deprecated
+methods to create Bag files.  I<Since SiLK 3.12.0.>
+
+B<rwbag> supports the following names for I<KEY>.  The case of I<KEY>
+is ignored.
 
 =over 4
 
-=item B<--sip-flows>=I<OUTPUTFILE>
+=item sIPv4
 
-Count number of flows by unique source IP.
+source IP address, either IPv4 or IPv6
 
-=item B<--sip-packets>=I<OUTPUTFILE>
+=item sIPv6
 
-Count number of packets by unique source IP.
+source IP address, either IPv4 or IPv6
 
-=item B<--sip-bytes>=I<OUTPUTFILE>
+=item dIPv4
 
-Count number of bytes by unique source IP.
+destination IP address, either IPv4 or IPv6
 
-=item B<--dip-flows>=I<OUTPUTFILE>
+=item dIPv6
 
-Count number of flows by unique destination IP.
+destination IP address, either IPv4 or IPv6
 
-=item B<--dip-packets>=I<OUTPUTFILE>
+=item sPort
 
-Count number of packets by unique destination IP.
+source port for TCP or UDP, or equivalent
 
-=item B<--dip-bytes>=I<OUTPUTFILE>
+=item dPort
 
-Count number of bytes by unique destination IP.
+destination port for TCP or UDP, or equivalent
 
-=item B<--sport-flows>=I<OUTPUTFILE>
+=item protocol
 
-Count number of flows by unique source port.
+IP protocol
 
-=item B<--sport-packets>=I<OUTPUTFILE>
+=item packets
 
-Count number of packets by unique source port.
+count of packets recorded for this flow record
 
-=item B<--sport-bytes>=I<OUTPUTFILE>
+=item bytes
 
-Count number of bytes by unique source port.
+count of bytes recorded for this flow record
 
-=item B<--dport-flows>=I<OUTPUTFILE>
+=item flags
 
-Count number of flows by unique destination port.
+bit-wise OR of TCP flags over all packets in the flow
 
-=item B<--dport-packets>=I<OUTPUTFILE>
+=item sTime
 
-Count number of packets by unique destination port.
+starting time of the flow, in seconds resolution
 
-=item B<--dport-bytes>=I<OUTPUTFILE>
+=item duration
 
-Count number of bytes by unique destination port.
+duration of the flow, in seconds resolution
 
-=item B<--proto-flows>=I<OUTPUTFILE>
+=item eTime
 
-Count number of flows by unique protocol.
+ending time of the flow, in seconds resolution
 
-=item B<--proto-packets>=I<OUTPUTFILE>
+=item sensor
 
-Count number of packets by unique protocol.
+numeric ID of the sensor where the flow was collected
 
-=item B<--proto-bytes>=I<OUTPUTFILE>
+=item input
 
-Count number of bytes by unique protocol.
+router SNMP input interface or vlanId if packing tools were
+configured to capture it (see B<sensor.conf(5)>)
 
-=item B<--sensor-flows>=I<OUTPUTFILE>
+=item output
 
-Count number of flows by unique sensor ID.
+router SNMP output interface or postVlanId
 
-=item B<--sensor-packets>=I<OUTPUTFILE>
+=item nhIPv4
 
-Count number of packets by unique sensor ID.
+router next hop IP address, either IPv4 or IPv6
 
-=item B<--sensor-bytes>=I<OUTPUTFILE>
+=item nhIPv6
 
-Count number of bytes by unique sensor ID.
+router next hop IP address, either IPv4 or IPv6
 
-=item B<--input-flows>=I<OUTPUTFILE>
+=item initialFlags
 
-Count number of flows by unique input interface index.
+TCP flags on first packet in the flow
 
-=item B<--input-packets>=I<OUTPUTFILE>
+=item sessionFlags
 
-Count number of packets by unique input interface index.
+bit-wise OR of TCP flags over all packets except the first in the flow
 
-=item B<--input-bytes>=I<OUTPUTFILE>
+=item attributes
 
-Count number of bytes by unique input interface index.
+flow attributes set by the flow generator
 
-=item B<--output-flows>=I<OUTPUTFILE>
+=item application
 
-Count number of flows by unique output interface index.
+guess as to the content of the flow
 
-=item B<--output-packets>=I<OUTPUTFILE>
+=item sip-country
 
-Count number of packets by unique output interface index.
+the country code of the source IP address Uses the mapping file
+specified by the SILK_COUNTRY_CODES environment variable or the
+F<country_codes.pmap> mapping file, as described in L</FILES>.  (See
+also B<ccfilter(3)>.)  The abbreviations are those used by the
+Root-Zone Whois Index (see for example
+L<http://www.iana.org/cctld/cctld-whois.htm>) or the following special
+codes: B<--> N/A (e.g. private and experimental reserved addresses);
+B<a1> anonymous proxy; B<a2> satellite provider; B<o1> other I<Since
+SiLK 3.12.0.>
 
-=item B<--output-bytes>=I<OUTPUTFILE>
+=item scc
 
-Count number of bytes by unique output interface index.
+an alias for sip-country
 
-=item B<--nhip-flows>=I<OUTPUTFILE>
+=item dip-country
 
-Count number of flows by unique next hop IP.
+the country code of the destination IP address
 
-=item B<--nhip-packets>=I<OUTPUTFILE>
+=item dcc
 
-Count number of packets by unique next hop IP.
+an alias for dip-country
 
-=item B<--nhip-bytes>=I<OUTPUTFILE>
+=item sip-pmap:MAPNAME
 
-Count number of bytes by unique next hop IP.
+the value that the source IP address maps to in the mapping file whose
+map-name is MAPNAME.  The type of that prefix map must be IPv4-address
+or IPv6-address.  Use B<--pmap-file> to load the mapping file and
+optionally set its map-name.  Since the MAPNAME must be known when the
+B<--bag-file> switch is parsed, the B<--pmap-file> switch(es) should
+precede the B<--bag-file> switch(es).
+
+=item dip-pmap:MAPNAME
+
+the value that the destination IP address maps to in the mapping file
+whose map-name is MAPNAME.  See C<sip-pmap:MAPNAME>.
+
+=item sport-pmap:MAPNAME
+
+the value that the protocol/source-port pair maps to in the mapping
+file whose map-name is MAPNAME.  The type of that prefix map must be
+proto-port.  Use B<--pmap-file> to load the mapping file and
+optionally set its map-name.  Since the MAPNAME must be known when the
+B<--bag-file> switch is parsed, the B<--pmap-file> switch(es) should
+precede the B<--bag-file> switch(es).
+
+=item dport-pmap:MAPNAME
+
+the value that the protocol/destination-port pair maps to in the
+mapping file whose map-name is MAPNAME.  See C<sport-pmap:MAPNAME>.
+
+=back
+
+B<rwbag> supports the following names for I<COUNTER>.  The case of
+I<COUNTER> is ignored.
+
+=over 4
+
+=item records
+
+count of the number of flow records that match the key
+
+=item flows
+
+an alias for records
+
+=item sum-packets
+
+the sum of the packet counts for flow records that match the key
+
+=item packets
+
+an alias for sum-packets
+
+=item sum-bytes
+
+the sum of the byte counts for flow records that match the key
+
+=item bytes
+
+an alias for sum-bytes
+
+=back
+
+=item B<--pmap-file>=I<PATH>
+
+=item B<--pmap-file>=I<MAPNAME>:I<PATH>
+
+Load the the prefix map file from I<PATH> for use when the key part of
+the argument to the B<--bag-file> switch is one of C<sip-pmap>,
+C<dip-pmap>, C<sport-pmap>, or C<dport-pmap>.  Specify I<PATH> as C<->
+or C<stdin> to read from the standard input.  If I<MAPNAME> is
+specified, it overrides the map-name contained in the prefix map file
+itself.  If no map-name is available, B<rwbag> exits with an error.
+The switch may be repeated to load multiple prefix map files; each
+file must have a unique map-name.  To create a prefix map file, use
+B<rwpmapbuild(1)>.  I<Since SiLK 3.12.0.>
 
 =item B<--note-add>=I<TEXT>
 
@@ -198,6 +308,13 @@ every output file as an annotation.  This switch may be repeated to
 add multiple annotations.  Currently the application makes no effort
 to ensure that I<FILENAME> contains text; be careful that you do not
 attempt to add a SiLK data file as an annotation.
+
+=item B<--invocation-strip>
+
+Do not record the command used to create the Bag file in the output.
+When this switch is not given, the invocation is written to the file's
+header, and the invocation may be viewed with B<rwfileinfo(1)>.
+I<Since SiLK 3.12.0.>
 
 =item B<--print-filenames>
 
@@ -317,10 +434,159 @@ records from it, as if the files had been listed on the command line.
 
 Print the available options and exit.
 
+=item B<--legacy-help>
+
+Print help, including legacy switches.  See the L</LEGACY BAG CREATION
+SWITCHES> section below for these switches.
+
 =item B<--version>
 
 Print the version number and information about how SiLK was
 configured, then exit the application.
+
+=back
+
+=head1 LEGACY BAG CREATION SWITCHES
+
+The following switches are deprecated as of SiLK 3.12.0.  These
+switches may be used in conjunction with the B<--bag-file> switch.
+
+=over 4
+
+=item B<--sip-flows>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=sIPv4,records,I<OUTPUTFILE>.
+Count number of flows by unique source IP.
+
+=item B<--sip-packets>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=sIPv4,sum-packets,I<OUTPUTFILE>.
+Count number of packets by unique source IP.
+
+=item B<--sip-bytes>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=sIPv4,sum-bytes,I<OUTPUTFILE>.
+Count number of bytes by unique source IP.
+
+=item B<--dip-flows>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=dIPv4,records,I<OUTPUTFILE>.
+Count number of flows by unique destination IP.
+
+=item B<--dip-packets>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=dIPv4,sum-packets,I<OUTPUTFILE>.
+Count number of packets by unique destination IP.
+
+=item B<--dip-bytes>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=dIPv4,sum-bytes,I<OUTPUTFILE>.
+Count number of bytes by unique destination IP.
+
+=item B<--sport-flows>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=sPort,records,I<OUTPUTFILE>.
+Count number of flows by unique source port.
+
+=item B<--sport-packets>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=sPort,sum-packets,I<OUTPUTFILE>.
+Count number of packets by unique source port.
+
+=item B<--sport-bytes>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=sPort,sum-bytes,I<OUTPUTFILE>.
+Count number of bytes by unique source port.
+
+=item B<--dport-flows>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=dPort,records,I<OUTPUTFILE>.
+Count number of flows by unique destination port.
+
+=item B<--dport-packets>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=dPort,sum-packets,I<OUTPUTFILE>.
+Count number of packets by unique destination port.
+
+=item B<--dport-bytes>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=dPort,sum-bytes,I<OUTPUTFILE>.
+Count number of bytes by unique destination port.
+
+=item B<--proto-flows>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=protocol,records,I<OUTPUTFILE>.
+Count number of flows by unique protocol.
+
+=item B<--proto-packets>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=protocol,sum-packets,I<OUTPUTFILE>.
+Count number of packets by unique protocol.
+
+=item B<--proto-bytes>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=protocol,sum-bytes,I<OUTPUTFILE>.
+Count number of bytes by unique protocol.
+
+=item B<--sensor-flows>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=sensor,records,I<OUTPUTFILE>.
+Count number of flows by unique sensor ID.
+
+=item B<--sensor-packets>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=sensor,sum-packets,I<OUTPUTFILE>.
+Count number of packets by unique sensor ID.
+
+=item B<--sensor-bytes>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=sensor,sum-bytes,I<OUTPUTFILE>.
+Count number of bytes by unique sensor ID.
+
+=item B<--input-flows>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=input,records,I<OUTPUTFILE>.
+Count number of flows by unique input interface index.
+
+=item B<--input-packets>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=input,sum-packets,I<OUTPUTFILE>.
+Count number of packets by unique input interface index.
+
+=item B<--input-bytes>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=input,sum-bytes,I<OUTPUTFILE>.
+Count number of bytes by unique input interface index.
+
+=item B<--output-flows>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=output,records,I<OUTPUTFILE>.
+Count number of flows by unique output interface index.
+
+=item B<--output-packets>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=output,sum-packets,I<OUTPUTFILE>.
+Count number of packets by unique output interface index.
+
+=item B<--output-bytes>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=output,sum-bytes,I<OUTPUTFILE>.
+Count number of bytes by unique output interface index.
+
+=item B<--nhip-flows>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=nhIPv4,records,I<OUTPUTFILE>.
+Count number of flows by unique next hop IP.
+
+=item B<--nhip-packets>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=nhIPv4,sum-packets,I<OUTPUTFILE>.
+Count number of packets by unique next hop IP.
+
+=item B<--nhip-bytes>=I<OUTPUTFILE>
+
+Equivalent to B<--bag-file>=nhIPv4,sum-bytes,I<OUTPUTFILE>.
+Count number of bytes by unique next hop IP.
 
 =back
 
@@ -334,15 +600,16 @@ Lines have been wrapped for improved readability, and the back slash
 To build both source IP and destination IP Bags of flows:
 
  $ rwfilter ... --pass=stdout                   \
-   | rwbag --sip-flow=sf.bag --dip-flow=df.bag
+   | rwbag --bag-file=sipv4,records,sf.bag      \
+           --bag-file=dipv4,records,df.bag
 
 To build a Bag containing the number of bytes seen for each /16 prefix
 length of source addresses, use the B<rwnetmask(1)> tool prior to
 feeding the input to B<rwbag>:
 
- $ rwfilter ... --pass=stdout      \
-   | rwnetmask --4sip-prefix=16    \
-   | rwbag --sip-bytes=sf16.bag
+ $ rwfilter ... --pass=stdout                   \
+   | rwnetmask --4sip-prefix-length=16          \
+   | rwbag --bag-file=sipv4,sum-bytes,sf16.bag
 
 (To print the IP addresses of an existing Bag into /16 prefixes, use
 the B<--network-structure> switch of B<rwbagcat(1)>.)
@@ -350,6 +617,14 @@ the B<--network-structure> switch of B<rwbagcat(1)>.)
 =head1 ENVIRONMENT
 
 =over 4
+
+=item SILK_COUNTRY_CODES
+
+This environment variable allows the user to specify the country code
+mapping file that B<rwbag> uses when mapping an IP to a country for
+the C<sip-country> and C<dip-country> keys.  The value may be a
+complete path or a file relative to the SILK_PATH.  See the L</FILES>
+section for standard locations of this file.
 
 =item SILK_CLOBBER
 
@@ -397,16 +672,30 @@ variable.  See the L</FILES> section for details.
 Possible locations for the SiLK site configuration file which are
 checked when the B<--site-config-file> switch is not provided.
 
+=item F<$SILK_COUNTRY_CODES>
+
+=item F<$SILK_PATH/share/silk/country_codes.pmap>
+
+=item F<$SILK_PATH/share/country_codes.pmap>
+
+=item F<@prefix@/share/silk/country_codes.pmap>
+
+=item F<@prefix@/share/country_codes.pmap>
+
+Possible locations for the country code mapping file required by the
+C<sip-country> and C<dip-country> keys.
+
 =back
 
 =head1 SEE ALSO
 
 B<rwbagbuild(1)>, B<rwbagcat(1)>, B<rwbagtool(1)>, B<rwfileinfo(1)>,
-B<rwfilter(1)>, B<rwnetmask(1)>, B<silk(7)>, B<zlib(3)>
+B<rwfilter(1)>, B<rwnetmask(1)>, B<rwpmapbuild(1)>, B<ccfilter(3)>,
+B<silk(7)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwbag.pod cd09f0a5fcc6 2014-06-14 15:43:33Z mthomas $
+$SiLK: rwbag.pod 5f2d30e80a6f 2016-03-30 22:09:49Z mthomas $
 
 Local Variables:
 mode:text

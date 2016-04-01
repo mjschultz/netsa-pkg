@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2015 by Carnegie Mellon University.
+** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -57,7 +57,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: parse-tests.c c514ff6e7ef2 2015-09-16 15:12:38Z mthomas $");
+RCSIDENT("$SiLK: parse-tests.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/utils.h>

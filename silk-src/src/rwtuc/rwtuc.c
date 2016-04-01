@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -62,7 +62,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwtuc.c 4738e9e7f385 2015-08-05 18:08:02Z mthomas $");
+RCSIDENT("$SiLK: rwtuc.c e5d7217c6d5f 2016-01-21 18:24:52Z mthomas $");
 
 #include <silk/rwascii.h>
 #include <silk/rwrec.h>
@@ -94,7 +94,7 @@ RCSIDENT("$SiLK: rwtuc.c 4738e9e7f385 2015-08-05 18:08:02Z mthomas $");
  * values defined by rwascii.h; values must be contiguous with the
  * RWREC_FIELD_* values. */
 typedef enum {
-    TUC_FIELD_IGNORED = RWREC_PRINTABLE_FIELD_COUNT,
+    TUC_FIELD_IGNORED = RWREC_PRINTABLE_FIELD_COUNT
 } field_ident_t;
 
 /* depending on what we are parsing, there may be various parts of the
@@ -330,13 +330,13 @@ appUsageLong(
      "\tin a form similar to what rwcut generates.\n")
 
     FILE *fh = USAGE_FH;
-    int i;
+    unsigned int i;
 
     fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
     fprintf(fh, "\nSWITCHES:\n");
     skOptionsDefaultUsage(fh);
 
-    for (i = 0; appOptions[i].name; i++) {
+    for (i = 0; appOptions[i].name; ++i) {
         fprintf(fh, "--%s %s. ", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]));
         switch (appOptions[i].val) {

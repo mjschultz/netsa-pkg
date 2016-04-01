@@ -1,4 +1,4 @@
-dnl Copyright (C) 2003-2015 by Carnegie Mellon University.
+dnl Copyright (C) 2003-2016 by Carnegie Mellon University.
 dnl
 dnl @OPENSOURCE_HEADER_START@
 dnl
@@ -48,14 +48,14 @@ dnl contract clause at 252.227.7013.
 dnl
 dnl @OPENSOURCE_HEADER_END@
 
-dnl RCSIDENT("$SiLK: configure.ac 329106c5d390 2015-10-08 15:38:45Z mthomas $")
+dnl RCSIDENT("$SiLK: configure.ac 9e04c0349961 2016-03-31 20:03:31Z mthomas $")
 
 AC_PREREQ(2.64)
-AC_INIT([SiLK],[3.11.0.1],[netsa-help@cert.org],[silk],[http://tools.netsa.cert.org/silk/])
-AC_COPYRIGHT([Copyright (C) 2001-2015 by Carnegie Mellon University
+AC_INIT([SiLK],[3.12.0],[netsa-help@cert.org],[silk],[http://tools.netsa.cert.org/silk/])
+AC_COPYRIGHT([Copyright (C) 2001-2016 by Carnegie Mellon University
 GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
 Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013])
-AC_REVISION($SiLK: configure.ac 329106c5d390 2015-10-08 15:38:45Z mthomas $)
+AC_REVISION($SiLK: configure.ac 9e04c0349961 2016-03-31 20:03:31Z mthomas $)
 AC_CONFIG_SRCDIR([src/libsilk/silk.h])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_CONFIG_MACRO_DIR([m4])

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -182,7 +182,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwstats.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwstats.c 0df4c34a63cf 2016-02-18 20:49:41Z mthomas $");
 
 #include <silk/skheap.h>
 #include "rwstats.h"
@@ -247,10 +247,10 @@ RCSIDENT("$SiLK: rwstats.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
  *    user.  Uses the global 'limit' and 'direction' variables.
  */
 #define VALUE_MEETS_THRESHOLD(vmt_value)                        \
-    (((vmt_value) > limit.value[RWSTATS_THRESHOLD])             \
+    (((vmt_value) > limit.value[RWSTATS_THRESHOLD].u64)             \
      ? (RWSTATS_DIR_TOP == direction)                           \
      : ((RWSTATS_DIR_BOTTOM == direction)                       \
-        || ((vmt_value) == limit.value[RWSTATS_THRESHOLD])))
+        || ((vmt_value) == limit.value[RWSTATS_THRESHOLD].u64)))
 
 
 /* structure to get the distinct count when using IPv6 */
@@ -369,9 +369,6 @@ static skheap_t *heap = NULL;
 /* the comparison function to use for the heap */
 static skheapcmpfn_t cmp_fn = NULL;
 
-/* number of entries in the heap */
-static uint32_t heap_num_entries;
-
 
 /* LOCAL FUNCTION PROTOTYPES */
 
@@ -424,49 +421,43 @@ topnPrintHeader(
     }
     fprintf(output.of_fp, "\n");
 
-    /* handle the no data case */
-    if (limit.value[RWSTATS_COUNT] < 1) {
-        switch (limit.type) {
-          case RWSTATS_COUNT:
-            skAppPrintErr("User was allowed to enter count of 0");
-            skAbortBadCase(limit.type);
-
-          case RWSTATS_THRESHOLD:
-            fprintf(output.of_fp,
-                    ("OUTPUT: No bins %s threshold of %" PRIu64 " %s\n"),
-                    above_below, limit.value[RWSTATS_THRESHOLD], limit.title);
-            break;
-
-          case RWSTATS_PERCENTAGE:
-            fprintf(output.of_fp, ("OUTPUT: No bins %s threshold of %"
-                                PRIu64 "%% (%" PRIu64 " %s)\n"),
-                    above_below, limit.value[RWSTATS_PERCENTAGE],
-                    limit.value[RWSTATS_THRESHOLD], limit.title);
-            break;
-        }
-        return;
-    }
-
     switch (limit.type) {
       case RWSTATS_COUNT:
+        assert(limit.value[RWSTATS_COUNT].u64 > 0);
+        /* FALLTHROUGH */
+      case RWSTATS_ALL:
         fprintf(output.of_fp, ("OUTPUT: %s %" PRIu64 " Bin%s by %s\n"),
-                direction_name, limit.value[RWSTATS_COUNT],
-                PLURAL(limit.value[RWSTATS_COUNT]), limit.title);
+                direction_name, limit.value[RWSTATS_COUNT].u64,
+                PLURAL(limit.value[RWSTATS_COUNT].u64), limit.title);
         break;
 
       case RWSTATS_THRESHOLD:
-        fprintf(output.of_fp, ("OUTPUT: %s %" PRIu64 " bins by %s"
-                            " (threshold %" PRIu64 ")\n"),
-                direction_name, limit.value[RWSTATS_COUNT],
-                limit.title, limit.value[RWSTATS_THRESHOLD]);
+        if (limit.value[RWSTATS_COUNT].u64 < 1) {
+            fprintf(output.of_fp,
+                    ("OUTPUT: No bins %s threshold of %" PRIu64 " %s\n"),
+                    above_below, limit.value[RWSTATS_THRESHOLD].u64,
+                    limit.title);
+            return;
+        }
+        fprintf(output.of_fp,
+                "OUTPUT: %s %" PRIu64 " bins by %s (threshold %" PRIu64 ")\n",
+                direction_name, limit.value[RWSTATS_COUNT].u64,
+                limit.title, limit.value[RWSTATS_THRESHOLD].u64);
         break;
 
       case RWSTATS_PERCENTAGE:
-        fprintf(output.of_fp, ("OUTPUT: %s %" PRIu64 " bins by %s"
-                            " (%" PRIu64 "%% == %" PRIu64 ")\n"),
-                direction_name, limit.value[RWSTATS_COUNT],
-                limit.title, limit.value[RWSTATS_PERCENTAGE],
-                limit.value[RWSTATS_THRESHOLD]);
+        if (limit.value[RWSTATS_COUNT].u64 < 1) {
+            fprintf(output.of_fp,
+                    "OUTPUT: No bins %s threshold of %.4f%% (%" PRIu64" %s)\n",
+                    above_below, limit.value[RWSTATS_PERCENTAGE].d,
+                    limit.value[RWSTATS_THRESHOLD].u64, limit.title);
+            return;
+        }
+        fprintf(output.of_fp,
+                "OUTPUT: %s %" PRIu64 " bins by %s (%.4f%% == %" PRIu64 ")\n",
+                direction_name, limit.value[RWSTATS_COUNT].u64,
+                limit.title, limit.value[RWSTATS_PERCENTAGE].d,
+                limit.value[RWSTATS_THRESHOLD].u64);
         break;
     }
 
@@ -957,21 +948,41 @@ rwstatsCompareDistinctsAny(
 
 
 /*
- *  rwstatsThresholdMemory(newnode);
+ *  rwstatsHeapMemory(newnode);
  *
  *    Function called when an attempt to use a variable-sized heap
  *    fails due to lack of memory.
  */
 static void
-rwstatsThresholdMemory(
+rwstatsHeapMemory(
     uint8_t            *newnode)
 {
     uint8_t *top_heap;
 
-    skAppPrintErr(("Out of memory when attempting to use threshold\n"
-                   "\tof %" PRIu64
-                   "; using an absolute count of %" PRIu64 " instead"),
-                  limit.value[RWSTATS_THRESHOLD], limit.value[RWSTATS_COUNT]);
+    switch (limit.type) {
+      case RWSTATS_COUNT:
+        skAbortBadCase(limit.type);
+      case RWSTATS_ALL:
+        skAppPrintErr(("Out of memory when attempting to sort all bins;"
+                       " using an absolute bin count of %" PRIu64 " instead"),
+                      limit.value[RWSTATS_COUNT].u64);
+        break;
+      case RWSTATS_THRESHOLD:
+        skAppPrintErr(("Out of memory when attempting to use a threshold"
+                       "of %" PRIu64 ";"
+                       " using an absolute bin count of %" PRIu64 " instead"),
+                      limit.value[RWSTATS_THRESHOLD].u64,
+                      limit.value[RWSTATS_COUNT].u64);
+        break;
+      case RWSTATS_PERCENTAGE:
+        skAppPrintErr(("Out of memory when attempting to use a threshold"
+                       "of %" PRIu64 " (%.4f%%);"
+                       " using an absolute bin count of %" PRIu64 " instead"),
+                      limit.value[RWSTATS_THRESHOLD].u64,
+                      limit.value[RWSTATS_PERCENTAGE].d,
+                      limit.value[RWSTATS_COUNT].u64);
+        break;
+    }
 
     /* Add this record assuming a fixed heap size */
 
@@ -1039,11 +1050,11 @@ statsRandom(
     skUniquePrepareForOutput(uniq);
 
     if (RWSTATS_PERCENTAGE == limit.type) {
-        /* the limit is a percentage of bytes, of packets, or of
-         * flows; compute the threshold given that we now know the
-         * total */
-        limit.value[RWSTATS_THRESHOLD]
-            = value_total * limit.value[RWSTATS_PERCENTAGE] / 100;
+        /* the limit is a percentage of the sum of bytes, of packets,
+         * or of flows for all bins; compute the threshold given that
+         * we now know the total */
+        limit.value[RWSTATS_THRESHOLD].u64
+            = limit.value[RWSTATS_PERCENTAGE].d * value_total / 100.0;
     }
 
     /* create the iterator over skUnique's bins */
@@ -1056,10 +1067,11 @@ statsRandom(
     /* branch based on type of limit and type of value */
     if (RWSTATS_COUNT == limit.type) {
         /* fixed-size heap; this is easy to handle */
+        uint32_t heap_num_entries;
 
         /* put the first topn entries into the heap */
         for (heap_num_entries = 0;
-             ((heap_num_entries < limit.value[RWSTATS_COUNT])
+             ((heap_num_entries < limit.value[RWSTATS_COUNT].u64)
               && (skUniqueIteratorNext(iter, &outbuf[0], &outbuf[2],&outbuf[1])
                   == SK_ITERATOR_OK));
              ++heap_num_entries)
@@ -1072,6 +1084,22 @@ statsRandom(
         /* drop to code below where we handle adding more entries to a
          * fixed size heap */
 
+    } else if (RWSTATS_ALL == limit.type) {
+        while (skUniqueIteratorNext(iter, &outbuf[0], &outbuf[2], &outbuf[1])
+               == SK_ITERATOR_OK)
+        {
+            ++limit.entries;
+            MEMSET_HEAP_NODE(newnode, outbuf[0], outbuf[1], outbuf[2]);
+            if (skHeapInsert(heap, newnode) == SKHEAP_ERR_FULL) {
+                /* Cannot grow the heap any more; process remaining
+                 * records using this fixed heap size */
+                rwstatsHeapMemory(newnode);
+                break;
+            }
+            /* else insert was successful */
+            ++limit.value[RWSTATS_COUNT].u64;
+        }
+
     } else if (limit.distinct) {
         /* handling a distinct field */
         len = skFieldListEntryGetBinOctets(limit.fl_entry);
@@ -1079,7 +1107,6 @@ statsRandom(
                == SK_ITERATOR_OK)
         {
             ++limit.entries;
-
             switch (len) {
               case 1:
                 skFieldListExtractFromBuffer(distinct_fields, outbuf[2],
@@ -1148,12 +1175,11 @@ statsRandom(
             if (skHeapInsert(heap, newnode) == SKHEAP_ERR_FULL) {
                 /* Cannot grow the heap any more; process remaining
                  * records using this fixed heap size */
-                rwstatsThresholdMemory(newnode);
+                rwstatsHeapMemory(newnode);
                 break;
             }
             /* else insert was successful */
-            ++limit.value[RWSTATS_COUNT];
-            ++heap_num_entries;
+            ++limit.value[RWSTATS_COUNT].u64;
         }
 
     } else {
@@ -1163,7 +1189,6 @@ statsRandom(
                == SK_ITERATOR_OK)
         {
             ++limit.entries;
-
             switch (len) {
               case 1:
                 skFieldListExtractFromBuffer(value_fields, outbuf[1],
@@ -1232,12 +1257,11 @@ statsRandom(
             if (skHeapInsert(heap, newnode) == SKHEAP_ERR_FULL) {
                 /* Cannot grow the heap any more; process remaining
                  * records using this fixed heap size */
-                rwstatsThresholdMemory(newnode);
+                rwstatsHeapMemory(newnode);
                 break;
             }
             /* else insert was successful */
-            ++limit.value[RWSTATS_COUNT];
-            ++heap_num_entries;
+            ++limit.value[RWSTATS_COUNT].u64;
         }
     }
 
@@ -1292,6 +1316,7 @@ presortedEntryCallback(
         uint16_t  u16;
         uint8_t   u8;
     } count;
+    static uint32_t heap_num_entries = 0;
 
     ++limit.entries;
 
@@ -1312,7 +1337,19 @@ presortedEntryCallback(
         MEMSET_HEAP_NODE(newnode, key, value, distinct);
         skHeapInsert(heap, newnode);
         ++heap_num_entries;
-        if (heap_num_entries == limit.value[RWSTATS_COUNT]) {
+        if (heap_num_entries == limit.value[RWSTATS_COUNT].u64) {
+            /* we have filled the heap; get the top element */
+            skHeapPeekTop(heap, (skheapnode_t*)top_heap);
+        }
+
+    } else if (RWSTATS_ALL == limit.type) {
+        MEMSET_HEAP_NODE(newnode, key, value, distinct);
+        if (skHeapInsert(heap, newnode) == SKHEAP_OK) {
+            ++limit.value[RWSTATS_COUNT].u64;
+        } else {
+            /* Cannot grow the heap any more; process remaining
+             * records using this fixed heap size */
+            rwstatsHeapMemory(newnode);
             /* no more room; get the top element */
             skHeapPeekTop(heap, (skheapnode_t*)top_heap);
         }
@@ -1387,11 +1424,11 @@ presortedEntryCallback(
         /* record meets threshold; insert it */
         MEMSET_HEAP_NODE(newnode, key, value, distinct);
         if (skHeapInsert(heap, newnode) == SKHEAP_OK) {
-            ++limit.value[RWSTATS_COUNT];
+            ++limit.value[RWSTATS_COUNT].u64;
         } else {
             /* Cannot grow the heap any more; process remaining
              * records using this fixed heap size */
-            rwstatsThresholdMemory(newnode);
+            rwstatsHeapMemory(newnode);
             /* no more room; get the top element */
             skHeapPeekTop(heap, (skheapnode_t*)top_heap);
         }
@@ -1466,11 +1503,11 @@ presortedEntryCallback(
         /* record meets threshold; insert it */
         MEMSET_HEAP_NODE(newnode, key, value, distinct);
         if (skHeapInsert(heap, newnode) == SKHEAP_OK) {
-            ++limit.value[RWSTATS_COUNT];
+            ++limit.value[RWSTATS_COUNT].u64;
         } else {
             /* Cannot grow the heap any more; process remaining
              * records using this fixed heap size */
-            rwstatsThresholdMemory(newnode);
+            rwstatsHeapMemory(newnode);
             /* no more room; get the top element */
             skHeapPeekTop(heap, (skheapnode_t*)top_heap);
         }
@@ -1565,7 +1602,7 @@ topnMain(
     /* get the initial size of the heap */
     if (RWSTATS_COUNT == limit.type) {
         /* fixed size */
-        initial_entries = limit.value[RWSTATS_COUNT];
+        initial_entries = limit.value[RWSTATS_COUNT].u64;
     } else {
         /* guess the initial size of the heap and allow the heap to
          * grow if the guess is too small */

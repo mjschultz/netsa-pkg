@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2015 by Carnegie Mellon University.
+** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -53,7 +53,7 @@
 /*
 **  skcountry.c
 **
-**    John McClary Prevost
+**    Katherine Prevost
 **    December 6th, 2004
 **
 **    Country code lookups using the prefixmap data structure.
@@ -61,7 +61,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skcountry.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: skcountry.c 97626d046599 2016-03-16 17:48:34Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skcountry.h>
@@ -102,7 +102,7 @@ skCountryNameToCode(
 {
     sk_countrycode_t code;
 
-    if (strlen(name) < 2) {
+    if ('\0' == name[0] || '\0' == name[1] || '\0' != name[2]) {
         return SK_COUNTRYCODE_INVALID;
     }
 

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2015 by Carnegie Mellon University.
+** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -51,21 +51,24 @@
 */
 
 /*
-**    rwbagcat reads a binary bag, converts it to text, and outputs it
-**    to stdout.  It can also print various statistics and summary
-**    information about the bag.  It attempts to read the bag(s) from
-**    stdin or from any arguments.
-**
-*/
+ *    rwbagcat reads a binary bag, converts it to text, and outputs it
+ *    to stdout.  It can also print various statistics and summary
+ *    information about the bag.  It attempts to read the bag(s) from
+ *    stdin or from any arguments.
+ *
+ */
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagcat.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwbagcat.c 5f2d30e80a6f 2016-03-30 22:09:49Z mthomas $");
 
 #include <silk/skbag.h>
+#include <silk/skcountry.h>
 #include <silk/skipaddr.h>
 #include <silk/skipset.h>
+#include <silk/skprefixmap.h>
 #include <silk/skprintnets.h>
+#include <silk/sksite.h>
 #include <silk/skstringmap.h>
 #include <silk/skstream.h>
 #include <silk/utils.h>
@@ -76,23 +79,53 @@ RCSIDENT("$SiLK: rwbagcat.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
 /* where to write --help output */
 #define USAGE_FH stdout
 
+/* return 1 if 'm_arg' refers to the standard input */
+#define IS_STDIN(m_arg)                                                 \
+    (0 == strcmp((m_arg), "-") || 0 == strcmp((m_arg), "stdin"))
+
 /* width of count fields in columnar output */
 #define COUNT_WIDTH 20
 
 /* the minimum counter allowed by the --mincounter switch */
 #define BAGCAT_MIN_COUNTER  UINT64_C(1)
 
+/* mask for the key_format to determine which of these values it has */
+#define KEY_FORMAT_MASK     UINT32_C(0xF0000000)
+
+/* for the --key-format, value to indicate an IP address */
+#define KEY_FORMAT_IP       UINT32_C(0x80000000)
+
+/* for the --key-format, value to indicate a timestamp */
+#define KEY_FORMAT_TIME     UINT32_C(0x40000000)
+
+
 /* return a non-zero value if a record's 'key' and 'counter' values
  * are within the global limits and if the key is in the global
  * 'mask_set' if specified */
-#define CHECK_LIMITS(k, c)                                      \
-    (((c) >= limits.mincounter) && ((c) <= limits.maxcounter)   \
-     && ((0 == limits.key_is_min)                               \
-         || (skipaddrCompare(&limits.minkey_ip, (k)) <= 0))     \
-     && ((0 == limits.key_is_max)                               \
-         || (skipaddrCompare(&limits.maxkey_ip, (k)) >= 0))     \
-     && ((NULL == limits.mask_set)                              \
-         || skIPSetCheckAddress(limits.mask_set, (k))))
+#define CHECK_LIMITS_IPADDR(k, c)                                       \
+    (((c)->val.u64 >= limits.mincounter)                                \
+     && ((c)->val.u64 <= limits.maxcounter)                             \
+     && ((0 == limits.key_is_min)                                       \
+         || (skipaddrCompare(&limits.minkey_ip, &(k)->val.addr) <= 0))  \
+     && ((0 == limits.key_is_max)                                       \
+         || (skipaddrCompare(&limits.maxkey_ip, &(k)->val.addr) >= 0))  \
+     && ((NULL == limits.mask_set)                                      \
+         || skIPSetCheckAddress(limits.mask_set, &(k)->val.addr)))
+
+#define CHECK_LIMITS_UINT32(k, c)                       \
+    (((c)->val.u64 >= limits.mincounter)                \
+     && ((c)->val.u64 <= limits.maxcounter)             \
+     && ((0 == limits.key_is_min)                       \
+         || ((k)->val.u32 >= limits.minkey_u32))        \
+     && ((0 == limits.key_is_max)                       \
+         || ((k)->val.u32 <= limits.maxkey_u32)))
+
+/* Allow paging of the output */
+#define INVOKE_PAGER()                          \
+    if (pager_invoked) { /* no-op */ } else {   \
+        pager_invoked = 1;                      \
+        skStreamPageOutput(output, pager);      \
+    }
 
 typedef enum bin_scheme_en {
     BINSCHEME_NONE=0,
@@ -102,12 +135,42 @@ typedef enum bin_scheme_en {
 } bin_scheme_t;
 
 
+typedef enum bagcat_fmt_en {
+    BAGCAT_FMT_ATTRIBUTES,
+    BAGCAT_FMT_COUNTRY,
+    BAGCAT_FMT_IPADDR,
+    BAGCAT_FMT_PMAP,
+    BAGCAT_FMT_SENSOR,
+    BAGCAT_FMT_TCPFLAGS,
+    BAGCAT_FMT_TIME
+} bagcat_fmt_t;
+
+struct bagcat_key_st {
+    skBagKeyType_t      key_type;
+    bagcat_fmt_t        formatter;
+    uint32_t            formatter_flags;
+    int                 width;
+    size_t              buflen;
+};
+typedef struct bagcat_key_st bagcat_key_t;
+
+/* printing state */
+struct state_st {
+    const bagcat_key_t *bc_key;
+    char                end_of_line[2];
+    int                 width[2];
+    size_t              buflen;
+    char               *buf;
+};
+typedef struct state_st state_t;
+
+
 /* LOCAL VARIABLES */
 
 /* global I/O state */
 sk_options_ctx_t *optctx = NULL;
 static skstream_t *output = NULL;
-static skstream_t *stats = NULL;
+static skstream_t *stats_stream = NULL;
 static int print_statistics = 0;
 static int print_network = 0;
 static bin_scheme_t bin_scheme = BINSCHEME_NONE;
@@ -122,14 +185,19 @@ static int no_columns = 0;
 /* whether to suppress the final delimiter; default no (i.e. end with '|') */
 static int no_final_delimiter = 0;
 
-/* how to format the keys.  Value is set by the --key-format switch,
- * and the value is an skipaddr_flags_t from silk_types.h.  If the
- * Bag's key is known not to be an IP address, SKIPADDR_DECIMAL is
- * used unless the user explicitly provides --key-format. */
-static uint32_t key_format = SKIPADDR_CANONICAL;
+/* how to format the keys.  Value is set by the --key-format switch.
+ * Possible values include an skipaddr_flags_t value from silk_types.h
+ * or an sktimestamp_flags_t value from utils.h.  The default format
+ * is determined by the type of Bag, or it is SKIPADDR_CANONICAL for
+ * CUSTOM keys (including SiLK-2 Bag files) or SKIPADDR_DECIMAL
+ * otherwise. */
+static uint32_t key_format = 0;
 
-/* whether the --key-format switch was explicitly given */
-static int key_format_specified = 0;
+/* the caller's key format argument; for error messages */
+static const char *key_format_arg = NULL;
+
+/* prefix map to use for keys in bags whose key is a pmap dictionary */
+static skPrefixMap_t *prefix_map = NULL;
 
 /* print out keys whose counter is zero---requires a mask_set or that
  * both --minkey and --maxkey are specified */
@@ -148,6 +216,10 @@ static struct limits_st {
     skipaddr_t      minkey_ip;
     skipaddr_t      maxkey_ip;
 
+    /* the {min,max}key as a uint32_t */
+    uint32_t        minkey_u32;
+    uint32_t        maxkey_u32;
+
     /* true when any limit switch or mask-set was specified */
     unsigned        active     :1;
 
@@ -160,25 +232,45 @@ static struct limits_st {
 /* name of program to run to page output */
 static char *pager = NULL;
 
-/* buffers for printing IPs */
-static char ip_buf1[SK_NUM2DOT_STRLEN];
-static char ip_buf2[SK_NUM2DOT_STRLEN];
+/* whether the pager has been invoked */
+static int pager_invoked = 0;
 
-/* printed IP address formats: the first of these will be the
- * default */
-static const sk_stringmap_entry_t keyformat_names[] = {
-    {"canonical",   SKIPADDR_CANONICAL,     NULL,
-     "canonical IP format (127.0.0.0, ::1)"},
-    {"zero-padded", SKIPADDR_ZEROPAD,       NULL,
-     "fully expanded, zero-padded canonical IP format"},
-    {"decimal",     SKIPADDR_DECIMAL,       NULL,
-     "integer number in decimal format"},
-    {"hexadecimal", SKIPADDR_HEXADECIMAL,   NULL,
-     "integer number in hexadecimal format"},
-    {"force-ipv6",  SKIPADDR_FORCE_IPV6,    NULL,
-     "IPv6 hexadectet format with no IPv4 subpart"},
+/* values provided to min-key and max-key switches; for errros */
+static char *min_key = NULL;
+static char *max_key = NULL;
+
+/* possible key formats */
+static const sk_stringmap_entry_t key_format_names[] = {
+    {"canonical",       KEY_FORMAT_IP | SKIPADDR_CANONICAL,
+     "canonical IP format (127.0.0.0, ::1)", NULL},
+    {"zero-padded",     KEY_FORMAT_IP | SKIPADDR_ZEROPAD,
+     "fully expanded, zero-padded canonical IP format", NULL},
+    {"decimal",         KEY_FORMAT_IP | SKIPADDR_DECIMAL,
+     "integer number in decimal format", NULL},
+    {"hexadecimal",     KEY_FORMAT_IP | SKIPADDR_HEXADECIMAL,
+     "integer number in hexadecimal format", NULL},
+    {"force-ipv6",      KEY_FORMAT_IP | SKIPADDR_FORCE_IPV6,
+     "IPv6 hexadectet format with no IPv4 subpart", NULL},
+    {"timestamp",       KEY_FORMAT_TIME | 0,
+     "time in yyyy/mm/ddThh:mm:ss format", NULL},
+    {"iso-time",        KEY_FORMAT_TIME | SKTIMESTAMP_ISO,
+     "time in yyyy-mm-dd hh:mm:ss format", NULL},
+    {"m/d/y",           KEY_FORMAT_TIME | SKTIMESTAMP_MMDDYYYY,
+     "time in mm/dd/yyyy hh:mm:ss format", NULL},
+    {"utc",             KEY_FORMAT_TIME | SKTIMESTAMP_UTC,
+     "print as time using UTC", NULL},
+    {"localtime",       KEY_FORMAT_TIME | SKTIMESTAMP_LOCAL,
+     "print as time and use TZ environment variable or local timezone", NULL},
+    {"epoch",           KEY_FORMAT_TIME | SKTIMESTAMP_EPOCH,
+     "seconds since UNIX epoch (equivalent to decimal)", NULL},
     SK_STRINGMAP_SENTINEL
 };
+
+/* the stringmap that contains those formats */
+static sk_stringmap_t *key_format_map = NULL;
+
+/* whether stdin has been used */
+static int stdin_used = 0;
 
 
 /* OPTIONS SETUP */
@@ -193,7 +285,7 @@ typedef enum {
     OPT_MINCOUNTER,
     OPT_MAXCOUNTER,
     OPT_ZERO_COUNTS,
-    OPT_OUTPUT_PATH,
+    OPT_PMAP_FILE,
     OPT_KEY_FORMAT,
     OPT_INTEGER_KEYS,
     OPT_ZERO_PAD_IPS,
@@ -201,6 +293,7 @@ typedef enum {
     OPT_COLUMN_SEPARATOR,
     OPT_NO_FINAL_DELIMITER,
     OPT_DELIMITED,
+    OPT_OUTPUT_PATH,
     OPT_PAGER
 } appOptionsEnum;
 
@@ -215,7 +308,7 @@ static struct option appOptions[] = {
     {"mincounter",          REQUIRED_ARG, 0, OPT_MINCOUNTER},
     {"maxcounter",          REQUIRED_ARG, 0, OPT_MAXCOUNTER},
     {"zero-counts",         NO_ARG,       0, OPT_ZERO_COUNTS},
-    {"output-path",         REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {"pmap-file",           REQUIRED_ARG, 0, OPT_PMAP_FILE},
     {"key-format",          REQUIRED_ARG, 0, OPT_KEY_FORMAT},
     {"integer-keys",        NO_ARG,       0, OPT_INTEGER_KEYS},
     {"zero-pad-ips",        NO_ARG,       0, OPT_ZERO_PAD_IPS},
@@ -223,35 +316,33 @@ static struct option appOptions[] = {
     {"column-separator",    REQUIRED_ARG, 0, OPT_COLUMN_SEPARATOR},
     {"no-final-delimiter",  NO_ARG,       0, OPT_NO_FINAL_DELIMITER},
     {"delimited",           OPTIONAL_ARG, 0, OPT_DELIMITED},
+    {"output-path",         REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
     {"pager",               REQUIRED_ARG, 0, OPT_PAGER},
     {0,0,0,0 }              /* sentinel entry */
 };
 
 
 static const char *appHelp[] = {
-    ("Print the sum of counters for each specified CIDR\n"
-     "\tblock in the comma-separed list of CIDR block sizes (0--32) and/or\n"
-     "\tletters (T=0,A=8,B=16,C=24,X=27,H=32). If argument contains 'S' or\n"
-     "\t'/', for each CIDR block print host counts and number of occupied\n"
-     "\tsmaller CIDR blocks.  Additional CIDR blocks to summarize can be\n"
-     "\tspecified by listing them after the '/'. Def. v4:TS/8,16,24,27.\n"
-     "\tA leading 'v6:' treats Bag's keys as IPv6, allows range 0--128,\n"
-     "\tdisallows A,B,C,X, sets H to 128, and sets default to TS/48,64"),
-    ("Invert the bag and count by distinct volume values.\n"
-     "\tlinear   - volume => count(KEYS)\n"
+    NULL,
+    ("Invert the bag and count by distinct volume values.  May\n"
+     "\tnot be combined with --network-structure. Choices:\n"
+     "\tlinear   - volume => count(KEYS) [default when no argument]\n"
      "\tbinary   - log2(volume) => count(KEYS)\n"
      "\tdecimal  - variation on log10(volume) => count(KEYS)"),
     ("Print statistics about the bag.  Def. no. Write\n"
      "\toutput to the standard output unless an argument is given.\n"
      "\tUse 'stderr' to send the output to the standard error"),
-    "Output records that appear in this IPset. Def. All records",
+    ("Output records that appear in this IPset. Def. Records\n"
+     "\twith non-zero counters"),
     NULL,
     NULL,
     NULL,
     NULL,
     ("Print keys with a counter of zero. Def. No\n"
      "\t(requires --mask-set or both --minkey and --maxkey)"),
-    "Write output to named stream. Def. stdout",
+    ("Use this prefix map as the mapping file when Bag's key\n"
+     "\twas generated by a pmap. May be specified as MAPNAME:PATH, but the\n"
+     "\tmapname is currently ignored."),
     NULL,
     "DEPRECATED. Equivalent to --key-format=decimal",
     "DEPRECATED. Equivalent to --key-format=zero-padded",
@@ -259,6 +350,7 @@ static const char *appHelp[] = {
     "Use specified character between columns. Def. '|'",
     "Suppress column delimiter at end of line. Def. No",
     "Shortcut for --no-columns --no-final-del --column-sep=CHAR",
+    "Write output to named stream. Def. stdout",
     "Program to invoke to page output. Def. $SILK_PAGER or $PAGER",
     (char *) NULL
 };
@@ -268,12 +360,9 @@ static const char *appHelp[] = {
 
 static int  appOptionsHandler(clientData cData, int opt_index, char *opt_arg);
 static int  setOutput(const char* filename, skstream_t **stream_out);
+static int  parsePmapFileOption(const char *opt_arg);
 static int  keyFormatParse(const char *format);
 static void keyFormatUsage(FILE *fh);
-static int
-printStatistics(
-    const skBag_t      *bag,
-    skstream_t         *s_out);
 
 
 /* FUNCTION DEFINITIONS */
@@ -296,8 +385,21 @@ appUsageLong(
      "\tthe bags are processed sequentially---specifically, their entries\n" \
      "\tare not merged.\n")
 
+    /* network-structure help string is longer than allowed by C90 */
+#define NETWORK_STRUCT_HELP1                                                  \
+    ("Print the sum of counters for each specified CIDR\n"                    \
+     "\tblock in the comma-separed list of CIDR block sizes (0--32) and/or\n" \
+     "\tletters (T=0,A=8,B=16,C=24,X=27,H=32). If argument contains 'S' or\n" \
+     "\t'/', for each CIDR block print host counts and number of occupied\n")
+#define NETWORK_STRUCT_HELP2                                                 \
+    ("\tsmaller CIDR blocks.  Additional CIDR blocks to summarize can be\n"  \
+     "\tspecified by listing them after the '/'. Def. v4:TS/8,16,24,27.\n"   \
+     "\tA leading 'v6:' treats Bag's keys as IPv6, allows range 0--128,\n"   \
+     "\tdisallows A,B,C,X, sets H to 128, and sets default to TS/48,64.\n"   \
+     "\tMay not be combined with --bin-ips")
+
     FILE *fh = USAGE_FH;
-    int i;
+    unsigned int i;
 #if SK_ENABLE_IPV6
     const char *v4_or_v6 = "v6";
 #else
@@ -310,7 +412,10 @@ appUsageLong(
     for (i = 0; appOptions[i].name; ++i) {
         fprintf(fh, "--%s %s. ", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]));
-        switch (appOptions[i].val) {
+        switch ((appOptionsEnum)appOptions[i].val) {
+          case OPT_NETWORK_STRUCTURE:
+            fprintf(fh, "%s%s\n", NETWORK_STRUCT_HELP1, NETWORK_STRUCT_HELP2);
+            break;
           case OPT_MINKEY:
             fprintf(fh,
                     ("Output records whose key is at least VALUE,"
@@ -372,10 +477,13 @@ appTeardown(
     }
     teardownFlag = 1;
 
-    if (stats != output) {
-        skStreamDestroy(&stats);
+    if (stats_stream != output) {
+        skStreamDestroy(&stats_stream);
     }
     skStreamDestroy(&output);
+
+    skPrefixMapDelete(prefix_map);
+    skStringMapDestroy(key_format_map);
 
     skOptionsCtxDestroy(&optctx);
     skAppUnregister();
@@ -434,17 +542,36 @@ appSetup(
         exit(EXIT_FAILURE);
     }
 
+    /* create the string map of the possible key formats */
+    if ((skStringMapCreate(&key_format_map) != SKSTRINGMAP_OK)
+        || (skStringMapAddEntries(key_format_map, -1, key_format_names)
+            != SKSTRINGMAP_OK))
+    {
+        skAppPrintOutOfMemory(NULL);
+        exit(EXIT_FAILURE);
+    }
+
     /* parse options */
     rv = skOptionsCtxOptionsParse(optctx, argc, argv);
     if (rv < 0) {
         skAppUsage();           /* never returns */
     }
 
-    if (print_network == 1 && bin_scheme != BINSCHEME_NONE) {
-        skAppPrintErr("Cannot have both --%s and --%s",
-                      appOptions[OPT_NETWORK_STRUCTURE].name,
-                      appOptions[OPT_BIN_IPS].name);
-        skAppUsage();           /* never returns */
+    if (print_network) {
+        /* may not have --print-network and --bin-scheme */
+        if (bin_scheme != BINSCHEME_NONE) {
+            skAppPrintErr("Cannot specify both --%s and --%s",
+                          appOptions[OPT_NETWORK_STRUCTURE].name,
+                          appOptions[OPT_BIN_IPS].name);
+            exit(EXIT_FAILURE);
+        }
+        /* ensure key-format is an IP */
+        if (key_format && !(key_format & KEY_FORMAT_IP)) {
+            skAppPrintErr("Invalid %s: May only use an IP format with --%s",
+                          appOptions[OPT_KEY_FORMAT].name,
+                          appOptions[OPT_NETWORK_STRUCTURE].name);
+            exit(EXIT_FAILURE);
+        }
     }
 
     /* when printing of entries with counters of 0 is requested,
@@ -474,8 +601,7 @@ appSetup(
     if (limits.key_is_min && limits.key_is_max) {
         if (skipaddrCompare(&limits.maxkey_ip, &limits.minkey_ip) < 0) {
             skAppPrintErr("Minimum key greater than maximum: %s > %s",
-                          skipaddrString(ip_buf1, &limits.minkey_ip, 0),
-                          skipaddrString(ip_buf2, &limits.maxkey_ip, 0));
+                          min_key, max_key);
             exit(EXIT_FAILURE);
         }
     }
@@ -490,8 +616,8 @@ appSetup(
 
     /* If print-statistics was requested but its output stream hasn't
      * been set, set it to stdout. */
-    if (print_statistics && stats == NULL) {
-        if (setOutput("stdout", &stats)) {
+    if (print_statistics && stats_stream == NULL) {
+        if (setOutput("stdout", &stats_stream)) {
             skAppPrintErr("Unable to print to standard output");
             exit(EXIT_FAILURE);
         }
@@ -502,16 +628,13 @@ appSetup(
         skStreamPrintLastErr(output, rv, &skAppPrintErr);
         exit(EXIT_FAILURE);
     }
-    if (stats != NULL && stats != output) {
-        rv = skStreamOpen(stats);
+    if (stats_stream != NULL && stats_stream != output) {
+        rv = skStreamOpen(stats_stream);
         if (rv) {
-            skStreamPrintLastErr(stats, rv, &skAppPrintErr);
+            skStreamPrintLastErr(stats_stream, rv, &skAppPrintErr);
             exit(EXIT_FAILURE);
         }
     }
-
-    /* Allow paging of the output */
-    skStreamPageOutput(output, pager);
 
     return; /* OK */
 }
@@ -548,6 +671,20 @@ appOptionsHandler(
         print_network = 1;
         break;
 
+      case OPT_PMAP_FILE:
+        if (prefix_map) {
+            skAppPrintErr("Invalid %s: Switch used multiple times",
+                          appOptions[opt_index].name);
+            return 1;
+        }
+        if (IS_STDIN(opt_arg)) {
+            stdin_used = 1;
+        }
+        if (parsePmapFileOption(opt_arg)) {
+            return 1;
+        }
+        break;
+
       case OPT_BIN_IPS:
         if (opt_arg == NULL) {
             bin_scheme = BINSCHEME_LINEAR;
@@ -574,12 +711,12 @@ appOptionsHandler(
 
       case OPT_PRINT_STATISTICS:
         if (opt_arg != NULL) {
-            if (stats) {
+            if (stats_stream) {
                 skAppPrintErr("Invalid %s: Switch used multiple times",
                               appOptions[opt_index].name);
                 return 1;
             }
-            if (setOutput(opt_arg, &stats)) {
+            if (setOutput(opt_arg, &stats_stream)) {
                 skAppPrintErr("Invalid %s '%s'",
                               appOptions[opt_index].name, opt_arg);
                 return 1;
@@ -621,7 +758,12 @@ appOptionsHandler(
         if (rv) {
             goto PARSE_ERROR;
         }
+        if (skipaddrGetAsV4(&limits.minkey_ip, &limits.minkey_u32)) {
+            limits.minkey_u32 = 1;
+        }
+        min_key = opt_arg;
         limits.key_is_min = 1;
+        limits.active = 1;
         break;
 
       case OPT_MAXKEY:
@@ -629,7 +771,12 @@ appOptionsHandler(
         if (rv) {
             goto PARSE_ERROR;
         }
+        if (skipaddrGetAsV4(&limits.maxkey_ip, &limits.maxkey_u32)) {
+            limits.maxkey_u32 = UINT32_MAX;
+        }
+        max_key = opt_arg;
         limits.key_is_max = 1;
+        limits.active = 1;
         break;
 
       case OPT_MASK_SET:
@@ -659,6 +806,7 @@ appOptionsHandler(
             return 1;
         }
         skStreamDestroy(&stream);
+        limits.active = 1;
         break;
 
       case OPT_OUTPUT_PATH:
@@ -695,6 +843,7 @@ appOptionsHandler(
         break;
 
       case OPT_KEY_FORMAT:
+        key_format_arg = opt_arg;
         if (keyFormatParse(opt_arg)) {
             return 1;
         }
@@ -741,71 +890,65 @@ static int
 keyFormatParse(
     const char         *format)
 {
-    char buf[256];
+    const unsigned format_timezone = (SKTIMESTAMP_UTC | SKTIMESTAMP_LOCAL);
     char *errmsg;
-    sk_stringmap_t *str_map = NULL;
     sk_stringmap_iter_t *iter = NULL;
     sk_stringmap_entry_t *found_entry;
-    const sk_stringmap_entry_t *entry;
-    int name_seen = 0;
     int rv = -1;
 
-    /* create a stringmap of the available ip formats */
-    if (SKSTRINGMAP_OK != skStringMapCreate(&str_map)) {
-        skAppPrintOutOfMemory(NULL);
-        goto END;
-    }
-    if (skStringMapAddEntries(str_map, -1, keyformat_names) != SKSTRINGMAP_OK){
-        skAppPrintOutOfMemory(NULL);
-        goto END;
-    }
-
-    /* attempt to match */
-    if (skStringMapParse(str_map, format, SKSTRINGMAP_DUPES_ERROR,
-                         &iter, &errmsg))
+    /* attempt to match the user's format */
+    if (skStringMapParse(
+            key_format_map, format, SKSTRINGMAP_DUPES_ERROR, &iter, &errmsg))
     {
         skAppPrintErr("Invalid %s: %s",
                       appOptions[OPT_KEY_FORMAT].name, errmsg);
         goto END;
     }
 
+    /* determine which value(s) the user specified and check for
+     * conflicting values. The only multiple-value possibility that is
+     * allowed is a timezone with a time format. */
     while (skStringMapIterNext(iter, &found_entry, NULL) == SK_ITERATOR_OK) {
-        switch (found_entry->id) {
-          case SKIPADDR_CANONICAL:
-          case SKIPADDR_ZEROPAD:
-          case SKIPADDR_DECIMAL:
-          case SKIPADDR_HEXADECIMAL:
-          case SKIPADDR_FORCE_IPV6:
-            if (name_seen) {
-                entry = keyformat_names;
-                strncpy(buf, entry->name, sizeof(buf));
-                for (++entry; entry->name; ++entry) {
-                    strncat(buf, ",", sizeof(buf)-strlen(buf)-1);
-                    strncat(buf, entry->name, sizeof(buf)-strlen(buf)-1);
-                }
-                skAppPrintErr("Invalid %s: May only specify one of %s",
-                              appOptions[OPT_KEY_FORMAT].name, buf);
-                goto END;
-            }
-            name_seen = 1;
+        if (!key_format) {
             key_format = found_entry->id;
-            break;
-
-          default:
-            skAbortBadCase(found_entry->id);
+        } else if ((KEY_FORMAT_MASK & key_format)
+                   != (KEY_FORMAT_MASK & found_entry->id))
+        {
+            skAppPrintErr("Invalid %s '%s': Combination is nonsensical",
+                          appOptions[OPT_KEY_FORMAT].name, format);
+            goto END;
+        } else if ((KEY_FORMAT_MASK & key_format) == KEY_FORMAT_IP) {
+            skAppPrintErr("Invalid %s '%s': May only specify one IP format",
+                          appOptions[OPT_KEY_FORMAT].name, format);
+            goto END;
+        } else if (SKTIMESTAMP_EPOCH & (key_format | found_entry->id)) {
+            skAppPrintErr(
+                "Invalid %s '%s': May not use another time format with '%s'",
+                appOptions[OPT_KEY_FORMAT].name, format,
+                skStringMapGetFirstName(
+                    key_format_map, (KEY_FORMAT_TIME | SKTIMESTAMP_EPOCH)));
+            goto END;
+        } else if ((key_format & format_timezone)
+                   && (found_entry->id & format_timezone))
+        {
+            skAppPrintErr(
+                "Invalid %s '%s': May only specify one timezone format",
+                appOptions[OPT_KEY_FORMAT].name, format);
+            goto END;
+        } else if (0 == (format_timezone & (key_format | found_entry->id))) {
+            skAppPrintErr(
+                "Invalid %s '%s': May only specify one time format",
+                appOptions[OPT_KEY_FORMAT].name, format);
+            goto END;
+        } else {
+            key_format |= found_entry->id;
         }
     }
 
-    key_format_specified = 1;
     rv = 0;
 
   END:
-    if (str_map) {
-        skStringMapDestroy(str_map);
-    }
-    if (iter) {
-        skStringMapIterDestroy(iter);
-    }
+    skStringMapIterDestroy(iter);
     return rv;
 }
 
@@ -820,26 +963,111 @@ static void
 keyFormatUsage(
     FILE               *fh)
 {
-    const sk_stringmap_entry_t *e;
-    unsigned int decimal;
+    char bagtype[SKBAG_MAX_FIELD_BUFLEN];
 
-    for (e = keyformat_names, decimal = 0; e->name; ++e, ++decimal) {
-        if (SKIPADDR_DECIMAL == e->id) {
-            break;
+    fprintf(
+        fh, ("Print keys in specified format. Default is determined by\n"
+             "\tthe type of key in the bag;"
+             " the '%s' format is used when bag's\n"
+             "\tkey is %s or has no type, '%s' format otherwise. Choices:\n"),
+        skStringMapGetFirstName(
+            key_format_map, KEY_FORMAT_IP | SKIPADDR_CANONICAL),
+        skBagFieldTypeAsString(SKBAG_FIELD_CUSTOM, bagtype, sizeof(bagtype)),
+        skStringMapGetFirstName(
+            key_format_map, KEY_FORMAT_IP | SKIPADDR_DECIMAL));
+    skStringMapPrintDetailedUsage(key_format_map, fh);
+}
+
+
+/*
+ *    Parse the [MAPNAME:]PMAP_PATH option and set the result in the
+ *    global 'prefix_map'.  Return 0 on success or -1 on error.
+ */
+static int
+parsePmapFileOption(
+    const char         *opt_arg)
+{
+    skPrefixMapErr_t rv_map;
+    skstream_t *stream;
+    const char *sep;
+    const char *filename;
+    int rv;
+
+    /* check for a leading mapname */
+    sep = strchr(opt_arg, ':');
+    if (NULL == sep) {
+        /* no mapname; check for one in the pmap once we read it */
+        filename = opt_arg;
+    } else if (sep == opt_arg) {
+        /* treat a 0-length mapname on the command as having none.
+         * Allows use of default mapname for files that contain the
+         * separator. */
+        filename = sep + 1;
+    } else {
+        /* a mapname was supplied on the command line */
+        filename = sep + 1;
+#if 0
+        /* no need to keep the mapname */
+        size_t namelen;
+        char *mapname;
+
+        if (memchr(opt_arg, ',', sep - opt_arg) != NULL) {
+            skAppPrintErr("Invalid %s: The map-name may not include a comma",
+                          appOptions[OPT_PMAP_FILE].name);
+            goto END;
+        }
+        namelen = sep - opt_arg;
+        mapname = (char *)malloc(namelen + 1);
+        if (NULL == mapname) {
+            skAppPrintOutOfMemory(NULL);
+            goto END;
+        }
+        strncpy(mapname, opt_arg, namelen);
+        mapname[namelen] = '\0';
+#endif  /* 0 */
+    }
+
+    /* open the file and read the prefix map */
+    if ((rv = skStreamCreate(&stream, SK_IO_READ, SK_CONTENT_SILK))
+        || (rv = skStreamBind(stream, filename))
+        || (rv = skStreamOpen(stream)))
+    {
+        skStreamPrintLastErr(stream, rv, &skAppPrintErr);
+        skStreamDestroy(&stream);
+        return -1;
+    }
+    rv_map = skPrefixMapRead(&prefix_map, stream);
+    if (SKPREFIXMAP_OK != rv_map) {
+        if (SKPREFIXMAP_ERR_IO == rv_map) {
+            skStreamPrintLastErr(
+                stream, skStreamGetLastReturnValue(stream), &skAppPrintErr);
+        } else {
+            skAppPrintErr("Failed to read the prefix map file '%s': %s",
+                          filename, skPrefixMapStrerror(rv_map));
+        }
+        skStreamDestroy(&stream);
+        return -1;
+    }
+    skStreamDestroy(&stream);
+
+#if 0
+    /* get the mapname from the file when none on command line */
+    if (NULL == mapname) {
+        if (NULL == skPrefixMapGetMapName(prefix_map)) {
+            skAppPrintErr(("Invalid %s '%s': Prefix map file does not contain"
+                           " a map-name and none provided on the command line"),
+                appOptions[OPT_PMAP_FILE].name, filename);
+            goto END;
+        }
+        mapname = strdup(skPrefixMapGetMapName(prefix_map));
+        if (NULL == mapname) {
+            skAppPrintOutOfMemory(NULL);
+            goto END;
         }
     }
-    if (NULL == e->name) {
-        skAbort();
-    }
+#endif  /* 0 */
 
-    fprintf(fh,
-            ("Print keys in specified format. Def. '%s' unless\n"
-             "\tBag's key is known not to be an IP, then '%s'. Choices:\n"),
-            keyformat_names[0].name, keyformat_names[decimal].name);
-    for (e = keyformat_names; e->name; ++e) {
-        fprintf(fh, "\t%-12s - %s\n",
-                e->name, (const char*)e->userdata);
-    }
+    return 0;
 }
 
 
@@ -877,14 +1105,14 @@ setOutput(
             return 0;
         }
     }
-    if (stats) {
-        if ((0 == strcmp(skStreamGetPathname(stats), filename))
+    if (stats_stream) {
+        if ((0 == strcmp(skStreamGetPathname(stats_stream), filename))
             || (0 == strcmp(filename, "stdout")
-                && 0 == strcmp(skStreamGetPathname(stats), "-"))
+                && 0 == strcmp(skStreamGetPathname(stats_stream), "-"))
             || (0 == strcmp(filename, "-")
-                && 0 == strcmp(skStreamGetPathname(stats), "stdout")))
+                && 0 == strcmp(skStreamGetPathname(stats_stream), "stdout")))
         {
-            *stream = stats;
+            *stream = stats_stream;
             return 0;
         }
     }
@@ -901,6 +1129,11 @@ setOutput(
 }
 
 
+/*
+ *    Create and print a temporary bag whose keys are related to the
+ *    counters of the input bag and the counters are the number of
+ *    unique keys in the input bag.
+ */
 static int
 bagcatInvertBag(
     const skBag_t      *bag)
@@ -913,6 +1146,8 @@ bagcatInvertBag(
     char s_label[64];
     char final_delim[] = {'\0', '\0'};
     int rv = 1;
+
+    INVOKE_PAGER();
 
     if (!no_final_delimiter) {
         final_delim[0] = output_delimiter;
@@ -935,7 +1170,7 @@ bagcatInvertBag(
     /* loop over the entries, check whether they are in limits, and if
      * so, add the inverted entry to the bag */
     while (skBagIteratorNextTyped(iter, &key, &counter) == SKBAG_OK) {
-        if (!CHECK_LIMITS(&key.val.addr, counter.val.u64)) {
+        if (!CHECK_LIMITS_IPADDR(&key, &counter)) {
             continue;
         }
         switch (bin_scheme) {
@@ -1018,46 +1253,107 @@ bagcatInvertBag(
 
   END:
     skBagDestroy(&inverted_bag);
-    if (iter) {
-        skBagIteratorDestroy(iter);
-    }
+    skBagIteratorDestroy(iter);
 
     return rv;
 }
 
 
+/*
+ *    Print a single key-counter pair.  Used when the key is printed
+ *    as a non-IP and non-number.
+ *
+ *    Helper for bagcatPrintBag().
+ */
+static void
+bagcatPrintBagRow(
+    const state_t              *state,
+    const skBagTypedKey_t      *key,
+    const skBagTypedCounter_t  *counter)
+{
+    switch (state->bc_key->formatter) {
+      case BAGCAT_FMT_ATTRIBUTES:
+        skTCPStateString(key->val.u32, state->buf,
+                         state->bc_key->formatter_flags);
+        skStreamPrint(output, "%*s%c%*" PRIu64 "%s\n",
+                      state->width[0], state->buf, output_delimiter,
+                      state->width[1], counter->val.u64, state->end_of_line);
+        break;
+
+      case BAGCAT_FMT_COUNTRY:
+        skCountryCodeToName(key->val.u32, state->buf, state->buflen);
+        skStreamPrint(output, "%*s%c%*" PRIu64 "%s\n",
+                      state->width[0], state->buf, output_delimiter,
+                      state->width[1], counter->val.u64, state->end_of_line);
+        break;
+
+      case BAGCAT_FMT_IPADDR:
+        skAbortBadCase(state->bc_key->formatter);
+
+      case BAGCAT_FMT_PMAP:
+        skPrefixMapDictionaryGetEntry(prefix_map, key->val.u32, state->buf,
+                                      state->buflen);
+        skStreamPrint(output, "%*s%c%*" PRIu64 "%s\n",
+                      state->width[0], state->buf, output_delimiter,
+                      state->width[1], counter->val.u64, state->end_of_line);
+        break;
+
+      case BAGCAT_FMT_SENSOR:
+        sksiteSensorGetName(state->buf, state->buflen, key->val.u32);
+        skStreamPrint(output, "%*s%c%*" PRIu64 "%s\n",
+                      state->width[0], state->buf, output_delimiter,
+                      state->width[1], counter->val.u64, state->end_of_line);
+        break;
+
+      case BAGCAT_FMT_TCPFLAGS:
+        skTCPFlagsString(key->val.u32, state->buf,
+                         state->bc_key->formatter_flags);
+        skStreamPrint(output, "%*s%c%*" PRIu64 "%s\n",
+                      state->width[0], state->buf, output_delimiter,
+                      state->width[1], counter->val.u64, state->end_of_line);
+        break;
+
+      case BAGCAT_FMT_TIME:
+        sktimestamp_r(state->buf, sktimeCreate(key->val.u32, 0),
+                      state->bc_key->formatter_flags);
+        skStreamPrint(output, "%*s%c%*" PRIu64 "%s\n",
+                      state->width[0], state->buf, output_delimiter,
+                      state->width[1], counter->val.u64, state->end_of_line);
+        break;
+    }
+}
+
+/*
+ *    Print the contents of a bag file when the key is not be shown as
+ *    an IP or as a number.
+ */
 static int
-printNetwork(
+bagcatPrintBag(
+    const state_t      *state,
     const skBag_t      *bag)
 {
     skBagTypedKey_t key;
     skBagTypedCounter_t counter;
-    skNetStruct_t *ns;
 
-    /* Set up the skNetStruct */
-    if (skNetStructureCreate(&ns, 1)) {
-        skAppPrintErr("Error creating network-structure");
-        return 1;
-    }
-    skNetStructureSetCountWidth(ns, COUNT_WIDTH);
-    if (skNetStructureParse(ns, net_structure)) {
-        return 1;
-    }
-    skNetStructureSetOutputStream(ns, output);
-    skNetStructureSetDelimiter(ns, output_delimiter);
-    if (no_columns) {
-        skNetStructureSetNoColumns(ns);
-    }
-    if (no_final_delimiter) {
-        skNetStructureSetNoFinalDelimiter(ns);
-    }
-    skNetStructureSetIpFormat(ns, key_format);
+    INVOKE_PAGER();
 
     /* set type for key and counter */
-    key.type = SKBAG_KEY_IPADDR;
+    key.type = SKBAG_KEY_U32;
     counter.type = SKBAG_COUNTER_U64;
 
-    if (0 == print_zero_counts) {
+    if (!limits.active) {
+        /* print contents of the bag */
+        skBagIterator_t *b_iter;
+
+        if (skBagIteratorCreate(bag, &b_iter) != SKBAG_OK) {
+            return 1;
+        }
+        while (skBagIteratorNextTyped(b_iter, &key, &counter) == SKBAG_OK) {
+            bagcatPrintBagRow(state, &key, &counter);
+        }
+        skBagIteratorDestroy(b_iter);
+
+    } else if (0 == print_zero_counts) {
         /* print contents of the bag, subject to limits */
         skBagIterator_t *b_iter;
 
@@ -1065,9 +1361,89 @@ printNetwork(
             return 1;
         }
         while (skBagIteratorNextTyped(b_iter, &key, &counter) == SKBAG_OK) {
-            if (CHECK_LIMITS(&key.val.addr, counter.val.u64)) {
-                skNetStructureAddKeyCounter(ns, &key.val.addr,
-                                            &counter.val.u64);
+            if (CHECK_LIMITS_UINT32(&key, &counter)) {
+                bagcatPrintBagRow(state, &key, &counter);
+            }
+        }
+        skBagIteratorDestroy(b_iter);
+
+    } else {
+        /* print keys between two key values, subject to maximum
+         * counter limit */
+
+        /* handle first key */
+        key.val.u32 = limits.minkey_u32;
+        skBagCounterGet(bag, &key, &counter);
+        if (counter.val.u64 <= limits.maxcounter) {
+            bagcatPrintBagRow(state, &key, &counter);
+        }
+        /* handle remaining keys */
+        while (key.val.u32 < limits.maxkey_u32) {
+            ++key.val.u32;
+            skBagCounterGet(bag, &key, &counter);
+            if (counter.val.u64 <= limits.maxcounter) {
+                bagcatPrintBagRow(state, &key, &counter);
+            }
+        }
+    }
+
+    return 0;
+}
+
+
+/*
+ *    Print a single key-counter pair.  Used when the key is printed
+ *    as either an IP or as a decimal or hexadecimal number.
+ *
+ *    Helper for bagcatPrintNetwork().
+ */
+static void
+bagcatPrintNetworkRow(
+    skNetStruct_t              *ns,
+    const skBagTypedKey_t      *key,
+    const skBagTypedCounter_t  *counter)
+{
+    skNetStructureAddKeyCounter(ns, &key->val.addr, &counter->val.u64);
+}
+
+/*
+ *    Print the contents of a bag file using the print-network code
+ *    from libsilk.
+ */
+static int
+bagcatPrintNetwork(
+    skNetStruct_t      *ns,
+    const skBag_t      *bag)
+{
+    skBagTypedKey_t key;
+    skBagTypedCounter_t counter;
+
+    /* set type for key and counter */
+    key.type = SKBAG_KEY_IPADDR;
+    counter.type = SKBAG_COUNTER_U64;
+
+    if (!limits.active) {
+        /* print contents of the bag */
+        skBagIterator_t *b_iter;
+
+        if (skBagIteratorCreate(bag, &b_iter) != SKBAG_OK) {
+            return 1;
+        }
+        while (skBagIteratorNextTyped(b_iter, &key, &counter) == SKBAG_OK) {
+            bagcatPrintNetworkRow(ns, &key, &counter);
+        }
+        skBagIteratorDestroy(b_iter);
+
+    } else if (0 == print_zero_counts) {
+        /* print contents of the bag, subject to limits */
+        skBagIterator_t *b_iter;
+
+        if (skBagIteratorCreate(bag, &b_iter) != SKBAG_OK) {
+            return 1;
+        }
+        while (skBagIteratorNextTyped(b_iter, &key, &counter) == SKBAG_OK) {
+            if (CHECK_LIMITS_IPADDR(&key, &counter)) {
+                bagcatPrintNetworkRow(ns, &key, &counter);
             }
         }
         skBagIteratorDestroy(b_iter);
@@ -1080,7 +1456,7 @@ printNetwork(
         skipaddrCopy(&key.val.addr, &limits.minkey_ip);
         skBagCounterGet(bag, &key, &counter);
         if (counter.val.u64 <= limits.maxcounter) {
-            skNetStructureAddKeyCounter(ns, &key.val.addr, &counter.val.u64);
+            bagcatPrintNetworkRow(ns, &key, &counter);
         }
 
         /* handle remaining keys */
@@ -1088,8 +1464,7 @@ printNetwork(
             skipaddrIncrement(&key.val.addr);
             skBagCounterGet(bag, &key, &counter);
             if (counter.val.u64 <= limits.maxcounter) {
-                skNetStructureAddKeyCounter(ns, &key.val.addr,
-                                            &counter.val.u64);
+                bagcatPrintNetworkRow(ns, &key, &counter);
             }
         }
 
@@ -1105,8 +1480,7 @@ printNetwork(
         {
             skBagCounterGet(bag, &key, &counter);
             if (counter.val.u64 <= limits.maxcounter) {
-                skNetStructureAddKeyCounter(ns, &key.val.addr,
-                                            &counter.val.u64);
+                bagcatPrintNetworkRow(ns, &key, &counter);
             }
         }
 
@@ -1123,23 +1497,136 @@ printNetwork(
                == SK_ITERATOR_OK)
         {
             skBagCounterGet(bag, &key, &counter);
-            if (CHECK_LIMITS(&key.val.addr, counter.val.u64)) {
-                skNetStructureAddKeyCounter(ns, &key.val.addr,
-                                            &counter.val.u64);
+            if (CHECK_LIMITS_IPADDR(&key, &counter)) {
+                bagcatPrintNetworkRow(ns, &key, &counter);
             }
         }
     }
 
     skNetStructurePrintFinalize(ns);
-    skNetStructureDestroy(&ns);
 
     return 0;
+}
+
+
+/*
+ *    Output bag using current state of options
+ */
+static int
+bagcatProcessBag(
+    const skBag_t      *bag,
+    const bagcat_key_t *bc_key)
+{
+    char field_name[SKBAG_MAX_FIELD_BUFLEN];
+    skBagFieldType_t key_field;
+    const char *this_net_structure;
+    state_t state;
+    skNetStruct_t *ns;
+    int rv = 0;
+
+    /* structures that contain state to use while printing */
+    memset(&state, 0, sizeof(state));
+    ns = NULL;
+
+    key_field = skBagKeyFieldName(bag, field_name, sizeof(field_name));
+
+    /* it is an error when --network-structure is given and the bag
+     * does not contain IP addresses */
+    switch (key_field) {
+      case SKBAG_FIELD_CUSTOM:
+      case SKBAG_FIELD_SIPv4:
+      case SKBAG_FIELD_DIPv4:
+      case SKBAG_FIELD_NHIPv4:
+      case SKBAG_FIELD_ANY_IPv4:
+      case SKBAG_FIELD_SIPv6:
+      case SKBAG_FIELD_DIPv6:
+      case SKBAG_FIELD_NHIPv6:
+      case SKBAG_FIELD_ANY_IPv6:
+        if (net_structure) {
+            this_net_structure = net_structure;
+        } else if (print_network) {
+            if (16 == skBagKeyFieldLength(bag)) {
+                this_net_structure = "v6:";
+            } else {
+                this_net_structure = "v4:";
+            }
+        } else if (16 == skBagKeyFieldLength(bag)) {
+            this_net_structure = "v6:H";
+        } else {
+            this_net_structure = "v4:H";
+        }
+        break;
+      default:
+        /* set 'this_net_structure' in case bagcatPrintNetwork() is
+         * used to print values in decimal or hex */
+        this_net_structure = "v4:H";
+        if (print_network) {
+            skAppPrintErr("Cannot use --%s with a Bag containing %s keys",
+                          appOptions[OPT_NETWORK_STRUCTURE].name, field_name);
+            rv = 1;
+            goto END;
+        }
+        break;
+    }
+
+    if (BAGCAT_FMT_IPADDR == bc_key->formatter) {
+        /* Set up the skNetStruct */
+        if (skNetStructureCreate(&ns, 1)) {
+            skAppPrintErr("Error creating network-structure");
+            rv = 1;
+            goto END;
+        }
+        skNetStructureSetCountWidth(ns, COUNT_WIDTH);
+        if (skNetStructureParse(ns, this_net_structure)) {
+            rv = 1;
+            goto END;
+        }
+        skNetStructureSetOutputStream(ns, output);
+        skNetStructureSetDelimiter(ns, output_delimiter);
+        if (no_columns) {
+            skNetStructureSetNoColumns(ns);
+        }
+        if (no_final_delimiter) {
+            skNetStructureSetNoFinalDelimiter(ns);
+        }
+        skNetStructureSetIpFormat(ns, bc_key->formatter_flags);
+
+        if (bagcatPrintNetwork(ns, bag) != 0) {
+            rv = 1;
+            goto END;
+        }
+
+    } else {
+        /* state is the print state used by bagcatPrintBag() */
+        state.bc_key = bc_key;
+        if (!no_final_delimiter) {
+            state.end_of_line[0] = output_delimiter;
+        }
+        if (!no_columns) {
+            state.width[0] = bc_key->width;
+            state.width[1] = COUNT_WIDTH;
+        }
+        state.buflen = bc_key->buflen;
+        state.buf = (char *)malloc(state.buflen);
+        state.buf[0] = '\0';
+
+        if (bagcatPrintBag(&state, bag)) {
+            rv = 1;
+            goto END;
+        }
+    }
+
+  END:
+    skNetStructureDestroy(&ns);
+    free(state.buf);
+    return rv;
 }
 
 
 static int
 printStatistics(
     const skBag_t      *bag,
+    const bagcat_key_t *bc_key,
     skstream_t         *stream_out)
 {
     double counter_temp =  0.0;
@@ -1160,9 +1647,11 @@ printStatistics(
     skBagTypedKey_t key;
     skBagTypedCounter_t counter;
 
-    skipaddr_t min_seen_key, max_seen_key;
+    skipaddr_t min_max_key[2];
     uint64_t min_seen_counter, max_seen_counter;
+    char *key_buf[2];
     skBagErr_t rv;
+    size_t i;
 
 #define SUMS_OF_COUNTERS(soc_count)                     \
     {                                                   \
@@ -1176,6 +1665,8 @@ printStatistics(
         counter_mult *= counter_temp;                   \
         sum3 += counter_mult;                           \
     }
+
+    INVOKE_PAGER();
 
     assert(bag != NULL);
     assert(stream_out != NULL);
@@ -1191,7 +1682,7 @@ printStatistics(
     while ((rv = skBagIteratorNextTyped(iter, &key, &counter))
            == SKBAG_OK)
     {
-        if (CHECK_LIMITS(&key.val.addr, counter.val.u64)) {
+        if (CHECK_LIMITS_IPADDR(&key, &counter)) {
             break;
         }
         ++key_count;
@@ -1216,13 +1707,13 @@ printStatistics(
     }
 
     key_count = 1;
-    skipaddrCopy(&min_seen_key, &key.val.addr);
-    skipaddrCopy(&max_seen_key, &key.val.addr);
+    skipaddrCopy(&min_max_key[0], &key.val.addr);
+    skipaddrCopy(&min_max_key[1], &key.val.addr);
     min_seen_counter = max_seen_counter = counter.val.u64;
     SUMS_OF_COUNTERS(counter.val.u64);
 
     while (skBagIteratorNextTyped(iter, &key, &counter) == SKBAG_OK) {
-        if (!CHECK_LIMITS(&key.val.addr, counter.val.u64)) {
+        if (!CHECK_LIMITS_IPADDR(&key, &counter)) {
             continue;
         }
 
@@ -1234,10 +1725,10 @@ printStatistics(
         } else if (counter.val.u64 > max_seen_counter) {
             max_seen_counter = counter.val.u64;
         }
-        if (skipaddrCompare(&key.val.addr, &min_seen_key) < 0) {
-            skipaddrCopy(&min_seen_key, &key.val.addr);
-        } else if (skipaddrCompare(&key.val.addr, &max_seen_key) > 0) {
-            skipaddrCopy(&max_seen_key, &key.val.addr);
+        if (skipaddrCompare(&key.val.addr, &min_max_key[0]) < 0) {
+            skipaddrCopy(&min_max_key[0], &key.val.addr);
+        } else if (skipaddrCompare(&key.val.addr, &min_max_key[1]) > 0) {
+            skipaddrCopy(&min_max_key[1], &key.val.addr);
         }
     }
 
@@ -1245,10 +1736,58 @@ printStatistics(
         return 1;
     }
 
-    skStreamPrint(stream_out, "\nStatistics\n");
+    /* convert min/max keys to strings */
+    for (i = 0; i < 2; ++i) {
+        uint32_t u32;
 
-    skipaddrString(ip_buf1, &min_seen_key, key_format);
-    skipaddrString(ip_buf2, &max_seen_key, key_format);
+        key_buf[i] = (char *)malloc(bc_key->buflen);
+        if (NULL == key_buf[i]) {
+            skAppPrintOutOfMemory(NULL);
+            exit(EXIT_FAILURE);
+        }
+        if (bc_key->formatter == BAGCAT_FMT_IPADDR) {
+            skipaddrString(key_buf[i], &min_max_key[i],
+                           bc_key->formatter_flags);
+
+        } else if (skipaddrGetAsV4(&min_max_key[i], &u32)) {
+            skAppPrintErr("Cannot convert IP to 32bit number");
+            skipaddrString(key_buf[i], &min_max_key[i], SKIPADDR_DECIMAL);
+
+        } else {
+            switch (bc_key->formatter) {
+              case BAGCAT_FMT_ATTRIBUTES:
+                skTCPStateString(u32, key_buf[i], bc_key->formatter_flags);
+                break;
+
+              case BAGCAT_FMT_COUNTRY:
+                skCountryCodeToName(u32, key_buf[i], bc_key->buflen);
+                break;
+
+              case BAGCAT_FMT_IPADDR:
+                skAbortBadCase(bc_key->formatter);
+
+              case BAGCAT_FMT_PMAP:
+                skPrefixMapDictionaryGetEntry(prefix_map, u32, key_buf[i],
+                                              bc_key->buflen);
+                break;
+
+              case BAGCAT_FMT_SENSOR:
+                sksiteSensorGetName(key_buf[i], bc_key->buflen, u32);
+                break;
+
+              case BAGCAT_FMT_TCPFLAGS:
+                skTCPFlagsString(u32, key_buf[i], bc_key->formatter_flags);
+                break;
+
+              case BAGCAT_FMT_TIME:
+                sktimestamp_r(key_buf[i], sktimeCreate(u32, 0),
+                              bc_key->formatter_flags);
+                break;
+            }
+        }
+    }
+
+    skStreamPrint(stream_out, "\nStatistics\n");
 
     /* formulae derived from HyperStat Online - David M. Lane */
 
@@ -1287,10 +1826,10 @@ printStatistics(
                                "%18s:  %.4g\n"
                                "%18s:  %.4g\n"
                                "%18s:  %.4g\n"),
-                  "keys",               (uint64_t)key_count,
+                  "number of keys",     (uint64_t)key_count,
                   "sum of counters",    (uint64_t)sum,
-                  "minimum key",        ip_buf1,
-                  "maximum key",        ip_buf2,
+                  "minimum key",        key_buf[0],
+                  "maximum key",        key_buf[1],
                   "minimum counter",    (uint64_t)min_seen_counter,
                   "maximum counter",    (uint64_t)max_seen_counter,
                   "mean",               mean,
@@ -1300,21 +1839,275 @@ printStatistics(
                   "kurtosis",           kurtosis);
     skBagPrintTreeStats(bag, stream_out);
 
+    free(key_buf[0]);
+    free(key_buf[1]);
+
     return 0;
 }
 
 
 /*
- * Output bag using current state of options
+ *    Verify that the bag key-format makes sense for the bag we
+ *    loaded; determine the number of bytes necessary to hold the key.
  */
 static int
-processBag(
+bagcatCheckKeyFormat(
+    const skBag_t          *bag,
+    bagcat_key_t           *bc_key)
+{
+    char field_name[SKBAG_MAX_FIELD_BUFLEN];
+    skBagFieldType_t key_field;
+    int bad_format = 0;
+    int as_integer = 0;
+
+    memset(bc_key, 0, sizeof(*bc_key));
+
+    key_field = skBagKeyFieldName(bag, field_name, sizeof(field_name));
+
+    /* handle the case for a bag containing IPs */
+    switch (key_field) {
+      case SKBAG_FIELD_SIPv4:
+      case SKBAG_FIELD_DIPv4:
+      case SKBAG_FIELD_NHIPv4:
+      case SKBAG_FIELD_ANY_IPv4:
+      case SKBAG_FIELD_SIPv6:
+      case SKBAG_FIELD_DIPv6:
+      case SKBAG_FIELD_NHIPv6:
+      case SKBAG_FIELD_ANY_IPv6:
+        bc_key->key_type = SKBAG_KEY_IPADDR;
+        bc_key->buflen = 1 + SK_NUM2DOT_STRLEN;
+        bc_key->formatter = BAGCAT_FMT_IPADDR;
+        if (0 == key_format) {
+            bc_key->formatter_flags = SKIPADDR_CANONICAL;
+        } else if (key_format & KEY_FORMAT_IP) {
+            bc_key->formatter_flags = key_format & ~KEY_FORMAT_MASK;
+        } else {
+            bad_format = 1;
+        }
+        break;
+
+      case SKBAG_FIELD_STARTTIME:
+      case SKBAG_FIELD_ENDTIME:
+      case SKBAG_FIELD_ANY_TIME:
+        bc_key->key_type = SKBAG_KEY_U32;
+        bc_key->buflen = 1 + SKTIMESTAMP_STRLEN;
+        bc_key->formatter = BAGCAT_FMT_TIME;
+        if (0 == key_format) {
+            bc_key->formatter_flags = SKTIMESTAMP_NOMSEC;
+        } else if (key_format & KEY_FORMAT_TIME) {
+            bc_key->formatter_flags
+                = (SKTIMESTAMP_NOMSEC | (key_format & ~KEY_FORMAT_MASK));
+            if (SKTIMESTAMP_EPOCH & bc_key->formatter_flags) {
+                bc_key->width = 10;
+            } else {
+                bc_key->width = 19;
+            }
+        } else {
+            bad_format = 1;
+        }
+        break;
+
+      case SKBAG_FIELD_FLAGS:
+      case SKBAG_FIELD_INIT_FLAGS:
+      case SKBAG_FIELD_REST_FLAGS:
+        bc_key->key_type = SKBAG_KEY_U32;
+        if (0 == key_format) {
+            bc_key->buflen = 1 + SK_TCPFLAGS_STRLEN;
+            bc_key->formatter = BAGCAT_FMT_TCPFLAGS;
+            bc_key->formatter_flags = 0;
+            bc_key->width = 8;
+        } else {
+            as_integer = 1;
+        }
+        break;
+
+      case SKBAG_FIELD_TCP_STATE:
+        bc_key->key_type = SKBAG_KEY_U32;
+        if (0 == key_format) {
+            bc_key->buflen = 1 + SK_TCP_STATE_STRLEN;
+            bc_key->formatter = BAGCAT_FMT_ATTRIBUTES;
+            bc_key->formatter_flags = 0;
+            bc_key->width = 8;
+        } else {
+            as_integer = 1;
+        }
+        break;
+
+      case SKBAG_FIELD_SID:
+        bc_key->key_type = SKBAG_KEY_U32;
+        if (0 == key_format) {
+            /* set key-column width */
+            sksiteConfigure(0);
+            bc_key->width = sksiteSensorGetMaxNameStrLen();
+            bc_key->buflen = 1 + bc_key->width;
+            bc_key->formatter = BAGCAT_FMT_SENSOR;
+            bc_key->formatter_flags = 0;
+        } else {
+            as_integer = 1;
+        }
+        break;
+
+      case SKBAG_FIELD_SIP_COUNTRY:
+      case SKBAG_FIELD_DIP_COUNTRY:
+      case SKBAG_FIELD_ANY_COUNTRY:
+        if (0 == key_format) {
+            bc_key->key_type = SKBAG_KEY_U32;
+            bc_key->buflen = 3;
+            bc_key->formatter = BAGCAT_FMT_COUNTRY;
+            bc_key->formatter_flags = 0;
+            bc_key->width = 2;
+        } else {
+            bad_format = 1;
+        }
+        break;
+
+      case SKBAG_FIELD_SIP_PMAP:
+      case SKBAG_FIELD_DIP_PMAP:
+      case SKBAG_FIELD_ANY_IP_PMAP:
+      case SKBAG_FIELD_SPORT_PMAP:
+      case SKBAG_FIELD_DPORT_PMAP:
+      case SKBAG_FIELD_ANY_PORT_PMAP:
+        if (0 == key_format) {
+            bc_key->width = skPrefixMapDictionaryGetMaxWordSize(prefix_map);
+            bc_key->key_type = SKBAG_KEY_U32;
+            bc_key->buflen = 1 + bc_key->width;
+            bc_key->formatter = BAGCAT_FMT_PMAP;
+            bc_key->formatter_flags = 0;
+        } else {
+            bad_format = 1;
+        }
+        break;
+
+      case SKBAG_FIELD_CUSTOM:
+        if ((0 == key_format) || (key_format & KEY_FORMAT_IP)) {
+            bc_key->key_type = SKBAG_KEY_IPADDR;
+            bc_key->buflen = 1 + SK_NUM2DOT_STRLEN;
+            bc_key->formatter = BAGCAT_FMT_IPADDR;
+            bc_key->formatter_flags = ((0 == key_format)
+                                       ? (int)SKIPADDR_CANONICAL
+                                       : (key_format & ~KEY_FORMAT_IP));
+        } else if (16 == skBagKeyFieldLength(bag)) {
+            skAppPrintErr(("Invalid %s '%s':"
+                           " Bag's key length is too long for format"),
+                          appOptions[OPT_KEY_FORMAT].name, key_format_arg);
+            return -1;
+        } else {
+            assert(key_format & KEY_FORMAT_TIME);
+            bc_key->key_type = SKBAG_KEY_U32;
+            bc_key->buflen = 1 + SKTIMESTAMP_STRLEN;
+            bc_key->formatter = BAGCAT_FMT_TIME;
+            bc_key->formatter_flags
+                = (SKTIMESTAMP_NOMSEC | (key_format & ~KEY_FORMAT_MASK));
+            if (SKTIMESTAMP_EPOCH & bc_key->formatter_flags) {
+                bc_key->width = 10;
+            } else {
+                bc_key->width = 19;
+            }
+        }
+        break;
+
+      default:
+        as_integer = 1;
+    }
+
+    if (as_integer) {
+        bc_key->key_type = SKBAG_KEY_U32;
+        bc_key->buflen = 1 + SK_NUM2DOT_STRLEN;
+        bc_key->formatter = BAGCAT_FMT_IPADDR;
+        if (0 == key_format) {
+            bc_key->formatter_flags = SKIPADDR_DECIMAL;
+            bc_key->width = 10;
+        } else {
+            switch (key_format) {
+              case KEY_FORMAT_IP | SKIPADDR_DECIMAL:
+                bc_key->formatter_flags = SKIPADDR_DECIMAL;
+                bc_key->width = 10;
+                break;
+              case KEY_FORMAT_IP | SKIPADDR_HEXADECIMAL:
+                bc_key->formatter_flags = SKIPADDR_DECIMAL;
+                bc_key->width = 10;
+                break;
+              default:
+                bad_format = 1;
+                break;
+            }
+        }
+    }
+
+    if (bad_format) {
+        skAppPrintErr("Invalid %s '%s': Nonsensical for Bag containing %s keys",
+                      appOptions[OPT_KEY_FORMAT].name, key_format_arg,
+                      field_name);
+        return -1;
+    }
+
+    return 0;
+}
+
+
+/*
+ *    Verify we have a prefix map and that the prefix map is the
+ *    correct type for the type of bag.
+ */
+static int
+bagcatCheckPrefixMap(
     const skBag_t      *bag)
 {
-    /* determine output format based on type of key in the bag unless
-     * the user provided the --key-format switch. */
-    if (0 == key_format_specified) {
-        switch (skBagKeyFieldType(bag)) {
+    char field_name[SKBAG_MAX_FIELD_BUFLEN];
+    skBagFieldType_t key_field;
+    int key_is_ip_pmap = 0;
+
+    key_field = skBagKeyFieldName(bag, field_name, sizeof(field_name));
+
+    switch (key_field) {
+      case SKBAG_FIELD_SIP_PMAP:
+      case SKBAG_FIELD_DIP_PMAP:
+      case SKBAG_FIELD_ANY_IP_PMAP:
+        key_is_ip_pmap = 1;
+        /* FALLTHROUGH */
+      case SKBAG_FIELD_SPORT_PMAP:
+      case SKBAG_FIELD_DPORT_PMAP:
+      case SKBAG_FIELD_ANY_PORT_PMAP:
+        break;
+
+      default:
+        return 0;
+    }
+
+    if (!prefix_map) {
+        skAppPrintErr("The --%s switch is required for Bags containing %s keys",
+                      appOptions[OPT_PMAP_FILE].name, field_name);
+        return -1;
+    }
+    if ((skPrefixMapGetContentType(prefix_map) == SKPREFIXMAP_CONT_PROTO_PORT)
+        ? key_is_ip_pmap
+        : !key_is_ip_pmap)
+    {
+        skAppPrintErr("Cannot use %s prefix map for Bag containing %s keys",
+                      skPrefixMapGetContentName(
+                          skPrefixMapGetContentType(prefix_map)), field_name);
+        return -1;
+    }
+
+    return 0;
+}
+
+
+/*
+ *    Verify that the bag contains IP keys when the the --mask-set
+ *    switch is provided.
+ */
+static int
+bagcatCheckMaskSet(
+    const skBag_t      *bag)
+{
+    char field_name[SKBAG_MAX_FIELD_BUFLEN];
+    skBagFieldType_t key_field;
+
+    if (limits.mask_set) {
+        key_field = skBagKeyFieldName(bag, field_name, sizeof(field_name));
+
+        switch (key_field) {
           case SKBAG_FIELD_CUSTOM:
           case SKBAG_FIELD_SIPv4:
           case SKBAG_FIELD_DIPv4:
@@ -1324,40 +2117,13 @@ processBag(
           case SKBAG_FIELD_DIPv6:
           case SKBAG_FIELD_NHIPv6:
           case SKBAG_FIELD_ANY_IPv6:
-            key_format = SKIPADDR_CANONICAL;
             break;
           default:
-            key_format = SKIPADDR_DECIMAL;
-            break;
+            skAppPrintErr("Cannot use --%s with a Bag containing %s keys",
+                          appOptions[OPT_NETWORK_STRUCTURE].name, field_name);
+            return -1;
         }
     }
-
-    /* default to printing network hosts */
-    if (!print_statistics && !print_network
-        && (bin_scheme == BINSCHEME_NONE))
-    {
-        print_network = 1;
-        if (16 == skBagKeyFieldLength(bag)) {
-            net_structure = "v6:H";
-        } else {
-            net_structure = "v4:H";
-        }
-    }
-
-    if (print_network != 0) {
-        if (printNetwork(bag) != 0) {
-            skAppPrintErr("Cannot print network structure");
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    if (bin_scheme != BINSCHEME_NONE) {
-        bagcatInvertBag(bag);
-    }
-    if (print_statistics) {
-        printStatistics(bag, stats);
-    }
-
     return 0;
 }
 
@@ -1367,21 +2133,66 @@ int main(int argc, char **argv)
     skBagErr_t err;
     skBag_t *bag = NULL;
     char *filename;
+    bagcat_key_t bagcat_key;
     int rv;
 
     appSetup(argc, argv);       /* never returns on error */
 
     while ((rv = skOptionsCtxNextArgument(optctx, &filename)) == 0) {
+        if (IS_STDIN(filename)) {
+            if (stdin_used) {
+                skAppPrintErr("Multiple streams attempt"
+                              " to read from the standard input");
+            }
+            stdin_used = 1;
+        }
         err = skBagLoad(&bag, filename);
         if (err != SKBAG_OK) {
             skAppPrintErr("Error reading bag from input stream '%s': %s",
                           filename, skBagStrerror(err));
             exit(EXIT_FAILURE);
         }
-        if (processBag(bag)) {
-            skAppPrintErr("Error processing bag '%s'", filename);
+
+        /* --mask-set only allowed with IP bag */
+        if (bagcatCheckMaskSet(bag)) {
             skBagDestroy(&bag);
             exit(EXIT_FAILURE);
+        }
+
+        /* check featuers needed when producing output other than
+         * inverting the bag. */
+        if (print_statistics || bin_scheme == BINSCHEME_NONE) {
+            /* check for a valid prefix map if needed */
+            if (bagcatCheckPrefixMap(bag)) {
+                skBagDestroy(&bag);
+                exit(EXIT_FAILURE);
+            }
+
+            /* verify that the key-format makes sense */
+            if (bagcatCheckKeyFormat(bag, &bagcat_key)) {
+                skBagDestroy(&bag);
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        /* handle --bin-ips */
+        if (bin_scheme != BINSCHEME_NONE) {
+            if (bagcatInvertBag(bag)) {
+                skAppPrintErr("Error inverting bag '%s'", filename);
+                skBagDestroy(&bag);
+                exit(EXIT_FAILURE);
+            }
+        } else if (print_network || !print_statistics) {
+            /* either --network-structure explicitly given or there
+             * was no other output selected */
+            if (bagcatProcessBag(bag, &bagcat_key)) {
+                skAppPrintErr("Error processing bag '%s'", filename);
+                skBagDestroy(&bag);
+                exit(EXIT_FAILURE);
+            }
+        }
+        if (print_statistics) {
+            printStatistics(bag, &bagcat_key, stats_stream);
         }
         skBagDestroy(&bag);
     }

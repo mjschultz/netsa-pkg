@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2010-2015 by Carnegie Mellon University.
+** Copyright (C) 2010-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -59,7 +59,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpollexec.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwpollexec.c 5fd09fea13f7 2016-02-24 17:31:05Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skthread.h>
@@ -194,8 +194,8 @@ static int main_retval = EXIT_SUCCESS;
 /* OPTIONS SETUP */
 
 typedef enum {
-    OPT_INCOMING_DIR,
     OPT_COMMAND,
+    OPT_INCOMING_DIR,
     OPT_ERROR_DIR,
     OPT_ARCHIVE_DIR,
     OPT_FLAT_ARCHIVE,
@@ -205,8 +205,8 @@ typedef enum {
 } appOptionsEnum;
 
 static struct option appOptions[] = {
-    {"incoming-directory", REQUIRED_ARG, 0, OPT_INCOMING_DIR},
     {"command",            REQUIRED_ARG, 0, OPT_COMMAND},
+    {"incoming-directory", REQUIRED_ARG, 0, OPT_INCOMING_DIR},
     {"error-directory",    REQUIRED_ARG, 0, OPT_ERROR_DIR},
     {"archive-directory",  REQUIRED_ARG, 0, OPT_ARCHIVE_DIR},
     {"flat-archive",       NO_ARG,       0, OPT_FLAT_ARCHIVE},
@@ -217,24 +217,27 @@ static struct option appOptions[] = {
 };
 
 static const char *appHelp[] = {
-    ("Monitor this directory for new files to process"),
-    ("Run this command on each file placed in the incoming\n"
-     "\tdirectory. Each \"%s\" in the command is replaced by the\n"
-     "\tfile's path."),
-    ("Move files to this directory when the command\n"
-     "\texits with a non-zero return value."),
-    ("Move files to this directory tree when the command\n"
-     "\texits with a zero return value. Def. No archive"),
+    ("Run this command on each file found in the incoming\n"
+     "\tdirectory. Each \"%s\" in the argument is replaced by the complete\n"
+     "\tpath to the file"),
+    ("Monitor this directory for files to process"),
+    ("If the exit status of running the command on a file\n"
+     "\tis non-zero, move the file into this directory"),
+    ("If the exit status of running the command on a\n"
+     "\tfile is zero, move the file into this directory tree. If the archive\n"
+     "\tdirectory is not given, delete the file. Def. No archive"),
     ("Store files in the root of the archive directory.\n"
-     "\tWhen not given, files are stored in subdirectories of the\n"
-     "\tarchive-directory. Def. Use subdirectories"),
-    ("Allow at most this many commands to run simultaneously.\n"
-     "\tMax: " MAX_SIMULTANEOUS_STRING " Def. 1"),
-    ("Send SIGNAL after SECS seconds to command if it is still\n"
-     "\trunning. SIGNAL may be a signal name or number.\n"
-     "\tSIGNAL,SECS Repeatable."),
-    ("Interval (in seconds) between checks of the\n"
-     "\tincoming directory for new files. Def. "
+     "\tWhen not given, files are stored in subdirectories of the archive\n"
+     "\tdirectory based on the current time. Def. Use subdirectories"),
+    ("Run at most this many simultaneous invocations of the\n"
+     "\tcommand when multiple incoming files are present."
+     " Range 1-" MAX_SIMULTANEOUS_STRING ". Def. 1"),
+    ("Given an argument in the form SIGNAL,SECONDS, send the\n"
+     "\tspecified signal to the command if it has not completed within this\n"
+     "\tnumber of seconds. SIGNAL may be a signal name or a number. Repeat\n"
+     "\tthe switch to send signals at multiple timeouts"),
+    ("Check the incoming-directory for new files this\n"
+     "\toften (in seconds). Def. "
      DEFAULT_POLL_INTERVAL_STRING),
     (char*)NULL
 };
@@ -675,6 +678,16 @@ use_shell(
  *    Returns 0 if the shell is good, 1 if the shell works, but does
  *    not exec, -1 if the shell does not execute, and -2 on internal
  *    failures.
+ *
+ *    FIXME: Note that on OS X, when running from within the build
+ *    directory and System Integrity Protection (SIP) is enabled, this
+ *    check fails because the DYLD_LIBRARY_PATH variables required to
+ *    invoke rwpollexec initially are not passed through /bin/sh, and
+ *    the self-invocations of rwpollexec fail.
+ *
+ *    One work-around for this problem is to set the environment
+ *    variable named by SHELL_ENV to a shell that is not in /bin or
+ *    /usr/bin.
  */
 static int
 test_shell(
@@ -1096,7 +1109,8 @@ executeCommand(
         return pid;
     }
 
-    /* Disable log rotation in child */
+    /* Disable/Ignore locking of the log file; disable log rotation */
+    sklogSetLocking(NULL, NULL, NULL, NULL);
     sklogDisableRotation();
 
     /* Unmask signals */

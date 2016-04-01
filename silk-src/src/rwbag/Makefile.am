@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 247c2dd07f4f 2015-07-10 17:24:07Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 5bfcfa2ae79d 2016-03-31 18:03:11Z mthomas $");
 
 # Installed Targets
 
@@ -87,6 +87,14 @@ TESTS = \
 	tests/rwbag-dip-flo-v6.pl \
 	tests/rwbag-dip-pkt-v6.pl \
 	tests/rwbag-dip-byt-v6.pl \
+	tests/rwbag-stime-byt.pl \
+	tests/rwbag-sensor-pkt.pl \
+	tests/rwbag-flags-flo.pl \
+	tests/rwbag-scc-byt.pl \
+	tests/rwbag-dcc-pkt-v6.pl \
+	tests/rwbag-sippmap-flo.pl \
+	tests/rwbag-dippmap-byt-v6.pl \
+	tests/rwbag-dportpmap-pkt.pl \
 	tests/rwbagcat-null-input.pl \
 	tests/rwbagcat-bad-range-key.pl \
 	tests/rwbagcat-bad-range-counter.pl \
@@ -162,4 +170,14 @@ TESTS = \
 	tests/rwbagbuild-proto-overflow.pl \
 	tests/rwbagbuild-port-max.pl \
 	tests/rwbagbuild-port-overflow.pl \
-	tests/rwbagbuild-empty-v6.pl
+	tests/rwbagbuild-empty-v6.pl \
+	tests/rwbagbuild-stime-byt.pl \
+	tests/rwbagbuild-sensor-pkt.pl \
+	tests/rwbagbuild-flags-flo.pl \
+	tests/rwbagbuild-scc-byt.pl \
+	tests/rwbagbuild-dcc-pkt-v6.pl \
+	tests/rwbagbuild-sippmap-flo.pl \
+	tests/rwbagbuild-dippmap-byt-v6.pl \
+	tests/rwbagbuild-dportpmap-pkt.pl \
+	tests/rwbagbuild-setinput-sippmap-flo.pl \
+	tests/rwbagbuild-setinput-dcc-pkt-v6.pl

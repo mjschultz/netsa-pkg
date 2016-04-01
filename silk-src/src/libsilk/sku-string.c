@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -59,7 +59,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-string.c 280a4ae5221b 2015-09-25 19:03:46Z mthomas $");
+RCSIDENT("$SiLK: sku-string.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skipaddr.h>

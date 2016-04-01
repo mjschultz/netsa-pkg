@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -59,7 +59,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfilterio.c 4738e9e7f385 2015-08-05 18:08:02Z mthomas $");
+RCSIDENT("$SiLK: rwfilterio.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #define RWPACK_BYTES_PACKETS          1
 /* #define RWPACK_FLAGS_TIMES_VOLUMES    1 */

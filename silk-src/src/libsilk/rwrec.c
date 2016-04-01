@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2015 by Carnegie Mellon University.
+** Copyright (C) 2007-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -67,7 +67,7 @@
 #define RWREC_DEFINE_BODY 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwrec.c 6c611fca4036 2015-09-17 14:44:18Z mthomas $");
+RCSIDENT("$SiLK: rwrec.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>

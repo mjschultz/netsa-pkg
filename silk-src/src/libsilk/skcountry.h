@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2015 by Carnegie Mellon University.
+** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -56,7 +56,7 @@
 **    Functions for getting the two letter country code value for an
 **    IP address.
 **
-**    Based on ccfilter_priv.h by John McClary Prevost, December 2004
+**    Based on ccfilter_priv.h by Katherine Prevost, December 2004
 **
 **    Mark Thomas
 **
@@ -69,7 +69,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKCOUNTRY_H, "$SiLK: skcountry.h 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENTVAR(rcsID_SKCOUNTRY_H, "$SiLK: skcountry.h 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/skplugin.h>

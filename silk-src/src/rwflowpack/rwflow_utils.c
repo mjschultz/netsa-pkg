@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2003-2015 by Carnegie Mellon University.
+** Copyright (C) 2003-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -57,7 +57,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwflow_utils.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwflow_utils.c 5fd09fea13f7 2016-02-24 17:31:05Z mthomas $");
 
 #include <silk/sklog.h>
 #include <silk/utils.h>
@@ -370,6 +370,12 @@ verifyCommandString(
  *
  *    Spawn a new subprocess to run 'command'.  Formatting directives
  *    in 'command' may be expanded to hold to a 'filename'.
+ *
+ *    This is called by rwflowpack to run the command string specified
+ *    by --post-archive-command.
+ *
+ *    This is called by rwflowappend to run the command string
+ *    specified by --hour-file-command and --post-command.
  */
 void
 runCommand(
@@ -384,47 +390,6 @@ runCommand(
     const char *sp;
     char *expanded_cmd;
     char *exp_cp;
-
-    /* Parent (original process) forks to create Child 1 */
-    pid = fork();
-    if (-1 == pid) {
-        ERRMSG("Could not fork to run command: %s", strerror(errno));
-        return;
-    }
-
-    /* Parent reaps Child 1 and returns */
-    if (0 != pid) {
-        /* Wait for Child 1 to exit. */
-        while (waitpid(pid, NULL, 0) == -1) {
-            if (EINTR != errno) {
-                NOTICEMSG("Error waiting for child %ld: %s",
-                          (long)pid, strerror(errno));
-                break;
-            }
-        }
-        return;
-    }
-
-    /* Disable log rotation in Child 1 */
-    sklogDisableRotation();
-
-    /* Child 1 forks to create Child 2 */
-    pid = fork();
-    if (pid == -1) {
-        ERRMSG("Child could not fork for to run command: %s", strerror(errno));
-        _exit(EXIT_FAILURE);
-    }
-
-    /* Child 1 immediately exits, so Parent can stop waiting */
-    if (pid != 0) {
-        _exit(EXIT_SUCCESS);
-    }
-
-    /* Only Child 2 makes it here */
-
-    /* Unmask signals */
-    sigemptyset(&sigs);
-    sigprocmask(SIG_SETMASK, &sigs, NULL);
 
     /* Determine length of buffer needed to hold the expanded command
      * string and allocate it. */
@@ -448,8 +413,52 @@ runCommand(
     expanded_cmd = (char*)malloc(len + 1);
     if (expanded_cmd == NULL) {
         WARNINGMSG("Unable to allocate memory to create command string");
+        return;
+    }
+
+    /* Parent (original process) forks to create Child 1 */
+    pid = fork();
+    if (-1 == pid) {
+        ERRMSG("Could not fork to run command: %s", strerror(errno));
+        free(expanded_cmd);
+        return;
+    }
+
+    /* Parent reaps Child 1 and returns */
+    if (0 != pid) {
+        free(expanded_cmd);
+        /* Wait for Child 1 to exit. */
+        while (waitpid(pid, NULL, 0) == -1) {
+            if (EINTR != errno) {
+                NOTICEMSG("Error waiting for child %ld: %s",
+                          (long)pid, strerror(errno));
+                break;
+            }
+        }
+        return;
+    }
+
+    /* Disable/Ignore locking of the log file; disable log rotation */
+    sklogSetLocking(NULL, NULL, NULL, NULL);
+    sklogDisableRotation();
+
+    /* Child 1 forks to create Child 2 */
+    pid = fork();
+    if (pid == -1) {
+        ERRMSG("Child could not fork for to run command: %s", strerror(errno));
         _exit(EXIT_FAILURE);
     }
+
+    /* Child 1 immediately exits, so Parent can stop waiting */
+    if (pid != 0) {
+        _exit(EXIT_SUCCESS);
+    }
+
+    /* Only Child 2 makes it here */
+
+    /* Unmask signals */
+    sigemptyset(&sigs);
+    sigprocmask(SIG_SETMASK, &sigs, NULL);
 
     /* Copy command into buffer, handling %-expansions */
     cp = command;

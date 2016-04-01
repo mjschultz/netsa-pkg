@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -52,7 +52,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwscan.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwscan.c 7dab1a2cd828 2016-03-01 16:21:03Z mthomas $");
 
 #include "rwscan.h"
 #include "rwscan_db.h"
@@ -505,6 +505,7 @@ process_file(
     uint32_t         last_proto = 0;
     int              done       = 0;
     event_metrics_t *metrics    = NULL;
+    int              retval     = -1;
     int              rv;
 
     metrics = (event_metrics_t*)calloc(1, sizeof(event_metrics_t));
@@ -519,9 +520,7 @@ process_file(
     rv = skStreamOpenSilkFlow(&in, infile, SK_IO_READ);
     if (rv) {
         skStreamPrintLastErr(in, rv, &skAppPrintErr);
-        skStreamDestroy(&in);
-        free(metrics);
-        return -1;
+        goto END;
     }
     skStreamSetIPv6Policy(in, SK_IPV6POLICY_ASV4);
 
@@ -566,7 +565,7 @@ process_file(
                           calloc(1, sizeof(worker_thread_data_t)));
                 if (mywork == NULL) {
                     skAppPrintOutOfMemory("worker thread data");
-                    return -1;
+                    goto END;
                 }
                 mywork->flows   = event_flows;
                 mywork->metrics = metrics;
@@ -583,7 +582,7 @@ process_file(
                 event_flows = (rwRec*)malloc(RWSCAN_ALLOC_SIZE *sizeof(rwRec));
                 if (event_flows == NULL) {
                     skAppPrintOutOfMemory("event flow data");
-                    return -1;
+                    goto END;
                 }
             } else {
                 rwRec *old_event_flows = event_flows;
@@ -593,7 +592,7 @@ process_file(
                 if (event_flows == NULL) {
                     skAppPrintOutOfMemory("event flow data");
                     event_flows = old_event_flows;
-                    return -1;
+                    goto END;
                 }
             }
 
@@ -601,7 +600,7 @@ process_file(
                 metrics = (event_metrics_t*)malloc(sizeof(event_metrics_t));
                 if (metrics == NULL) {
                     skAppPrintOutOfMemory("metrics data");
-                    return -1;
+                    goto END;
                 }
             }
 
@@ -632,7 +631,7 @@ process_file(
             if (event_flows == NULL) {
                 skAppPrintOutOfMemory("event flow data");
                 event_flows = old_event_flows;
-                return -1;
+                goto END;
             }
         }
         metrics->event_size++;
@@ -642,15 +641,18 @@ process_file(
         last_sip   = rwRecGetSIPv4(&rwrec);
         last_proto = rwRecGetProto(&rwrec);
     }
-    skStreamDestroy(&in);
 
+    retval = 0;
+
+  END:
+    skStreamDestroy(&in);
     if (event_flows != NULL) {
         free(event_flows);
     }
     if (metrics != NULL) {
         free(metrics);
     }
-    return 0;
+    return retval;
 }
 
 int

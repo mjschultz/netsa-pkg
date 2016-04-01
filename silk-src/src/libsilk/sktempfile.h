@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -65,7 +65,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKTEMPFILE_H, "$SiLK: sktempfile.h 91a7a5b2a2d3 2015-08-05 19:11:50Z mthomas $");
+RCSIDENTVAR(rcsID_SKTEMPFILE_H, "$SiLK: sktempfile.h 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/silk_types.h>
 

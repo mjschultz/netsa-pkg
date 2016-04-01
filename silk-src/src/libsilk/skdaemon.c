@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -58,7 +58,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skdaemon.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: skdaemon.c 97626d046599 2016-03-16 17:48:34Z mthomas $");
 
 #include <silk/skdaemon.h>
 #include <silk/sklog.h>
@@ -249,7 +249,7 @@ daemonOptionsHandler(
     switch ((daemonOptionsEnum)opt_index) {
       case OPT_PIDFILE:
         if (skdaemon->pidfile) {
-            skAppPrintErr("The --%s switch is given mutliple times",
+            skAppPrintErr("The --%s switch is given multiple times",
                           daemonOptions[opt_index].name);
             return -1;
         }

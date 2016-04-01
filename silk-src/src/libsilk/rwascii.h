@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -57,7 +57,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWASCII_H, "$SiLK: rwascii.h 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENTVAR(rcsID_RWASCII_H, "$SiLK: rwascii.h 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/skstringmap.h>

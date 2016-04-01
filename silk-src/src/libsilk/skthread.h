@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -64,7 +64,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKTHREAD_H, "$SiLK: skthread.h 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENTVAR(rcsID_SKTHREAD_H, "$SiLK: skthread.h 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/sklog.h>
 
@@ -92,7 +92,9 @@ skthread_init(
     const char         *name);
 
 /**
- *    Teardown function for the skthread module.
+ *    Teardown function for the skthread module.  This function is
+ *    expected be called by the program's primary thread, and the
+ *    function should be called once all other threads have exited.
  */
 void
 skthread_teardown(
@@ -131,6 +133,9 @@ skthread_create_detached(
  *    Return the name of the calling thread that was specified with
  *    skthread_init(), skthread_create(), or
  *    skthread_create_detached().
+ *
+ *    Return the string "unknown" if a name was not set for the
+ *    calling thread.
  */
 const char *
 skthread_name(
@@ -138,6 +143,9 @@ skthread_name(
 
 /**
  *    Return the id of the calling thread.
+ *
+ *    Return the value SKTHREAD_UNKNOWN_ID if an id was not set for
+ *    the calling thread.
  */
 uint32_t
 skthread_id(
@@ -159,140 +167,216 @@ skthread_ignore_signals(
  *    Wrappers around DEBUGMSG() that prepend the message with the
  *    current file name, line number, thread name, and thread id.
  */
-#define SKTHREAD_DEBUG_PRINT1(x)                \
-    DEBUGMSG("%s:%d <%s:%" PRIu32 "> " x,       \
-             __FILE__, __LINE__,                \
-             skthread_name(), skthread_id())
-#define SKTHREAD_DEBUG_PRINT2(x, y)             \
-    DEBUGMSG("%s:%d <%s:%" PRIu32 "> " x,       \
-             __FILE__, __LINE__,                \
-             skthread_name(), skthread_id(),    \
-             (y))
-#define SKTHREAD_DEBUG_PRINT3(x, y, z)          \
-    DEBUGMSG("%s:%d <%s:%" PRIu32 "> " x,       \
-             __FILE__, __LINE__,                \
-             skthread_name(),                   \
-             skthread_id(),                     \
-             (y), (z))
-#define SKTHREAD_DEBUG_PRINT4(x, y, z, zz)      \
-    DEBUGMSG("%s:%d <%s:%" PRIu32 "> " x,       \
-             __FILE__, __LINE__,                \
-             skthread_name(),                   \
-             skthread_id(),                     \
-             (y), (z), (zz))
+#define SKTHREAD_DEBUG_PREFIX(m_fmt)                            \
+    "%s:%d <%s:%" PRIu32 "> " m_fmt,                            \
+        __FILE__, __LINE__, skthread_name(), skthread_id()
+
+#define SKTHREAD_DEBUG_PRINT1(m_fmt)            \
+    DEBUGMSG(SKTHREAD_DEBUG_PREFIX(m_fmt))
+#define SKTHREAD_DEBUG_PRINT2(m_fmt, m_a2)              \
+    DEBUGMSG(SKTHREAD_DEBUG_PREFIX(m_fmt), (m_a2))
+#define SKTHREAD_DEBUG_PRINT3(m_fmt, m_a2, m_a3)                \
+    DEBUGMSG(SKTHREAD_DEBUG_PREFIX(m_fmt), (m_a2), (m_a3))
+#define SKTHREAD_DEBUG_PRINT4(m_fmt, m_a2, m_a3, m_a4)                  \
+    DEBUGMSG(SKTHREAD_DEBUG_PREFIX(m_fmt), (m_a2), (m_a3), (m_a4))
 
 
-/* Mutex debugging */
-
-#ifdef SKTHREAD_DEBUG_MUTEX
-#define SKT_D2(x, y)    SKTHREAD_DEBUG_PRINT2(x, y)
-#define SKT_D3(x, y, z) SKTHREAD_DEBUG_PRINT3(x, y, z)
+/*
+ *    Use the above wrappers over DEBUGMSG() when SKTHREAD_DEBUG_MUTEX
+ *    is defined and has a value greater than 0.
+ */
+#if  defined(SKTHREAD_DEBUG_MUTEX) && SKTHREAD_DEBUG_MUTEX > 0
+#define SKT_D2(x, y)        SKTHREAD_DEBUG_PRINT2(x, y)
+#define SKT_D3(x, y, z)     SKTHREAD_DEBUG_PRINT3(x, y, z)
+#define SKT_D4(x, y, z, zz) SKTHREAD_DEBUG_PRINT4(x, y, z, zz)
 #else
 #define SKT_D2(x, y)
 #define SKT_D3(x, y, z)
+#define SKT_D4(x, y, z, zz)
 #endif
 
-#define MUTEX_INIT(x) pthread_mutex_init((x), NULL)
-#define MUTEX_DESTROY(x) pthread_mutex_destroy((x))
 
-/* Wrapper around pthread_mutex_lock */
-#define MUTEX_LOCK(x)                           \
-    do {                                        \
-        SKT_D2("MUTEX LOCKING %p", (void*)x);   \
-        pthread_mutex_lock(x);                  \
-        SKT_D2("MUTEX IN LOCK %p", (void*)x);   \
+/*
+ *    Wrappers around pthread mutex / condition functions
+ */
+
+/* Wrapper around pthread_mutex_init() */
+#define MUTEX_INIT(m_mutex)         pthread_mutex_init((m_mutex), NULL)
+
+/* Wrapper around pthread_mutex_destroy() */
+#define MUTEX_DESTROY(m_mutex)      pthread_mutex_destroy((m_mutex))
+
+/* Wrapper around pthread_cond_init() */
+#define MUTEX_COND_INIT(m_cond)     pthread_cond_init((m_cond), NULL)
+
+/* Wrapper around pthread_cond_destroy() */
+#define MUTEX_COND_DESTROY(m_cond)  pthread_cond_destroy((m_cond))
+
+/* Wrapper around pthread_mutex_lock() */
+#define MUTEX_LOCK(m_mutex)                             \
+    do {                                                \
+        SKT_D2("MUTEX LOCKING %p", (void *)(m_mutex));  \
+        pthread_mutex_lock(m_mutex);                    \
+        SKT_D2("MUTEX IN LOCK %p", (void *)(m_mutex));  \
     } while (0)
 
-/* Wrapper around pthread_mutex_unlock */
-#define MUTEX_UNLOCK(x)                         \
-    do {                                        \
-        SKT_D2("MUTEX UNLOCKING %p", (void*)x); \
-        pthread_mutex_unlock(x);                \
+/* Wrapper around pthread_mutex_unlock() */
+#define MUTEX_UNLOCK(m_mutex)                                   \
+    do {                                                        \
+        SKT_D2("MUTEX UNLOCKING %p", (void *)(m_mutex));        \
+        pthread_mutex_unlock(m_mutex);                          \
     } while (0)
 
-/* Wrapper around pthread_cond_wait */
-#define MUTEX_WAIT(x, y)                                \
+/* Wrapper around pthread_cond_wait() */
+#define MUTEX_WAIT(m_cond, m_mutex)                     \
     do {                                                \
         SKT_D3("MUTEX WAIT %p (Unlocked %p)",           \
-               (void*)x, (void*)y);                     \
-        pthread_cond_wait(x, y);                        \
-        SKT_D2("MUTEX RESUME (Locked %p)", (void*)y);   \
+               (void *)(m_cond), (void *)(m_mutex));    \
+        pthread_cond_wait((m_cond), (m_mutex));         \
+        SKT_D3("MUTEX RESUME %p (Locked %p)",           \
+               (void *)(m_cond), (void *)(m_mutex));    \
     } while (0)
 
-/* Wrapper around pthread_cond_signal */
-#define MUTEX_SIGNAL(x)                         \
-    do {                                        \
-        SKT_D2("SIGNALING %p", (void*)x);       \
-        pthread_cond_signal(x);                 \
+/* Wrapper around pthread_cond_timedwait(); result of call is stored
+ * in memory location referenced by 'm_retval'. */
+#define MUTEX_TIMEDWAIT(m_cond, m_mutex, m_timespec, m_retval)  \
+    do {                                                        \
+        SKT_D3("MUTEX WAIT %p (Unlocked %p)",                   \
+               (void *)(m_cond), (void *)(m_mutex));            \
+        *(m_retval) = (pthread_cond_timedwait(                  \
+                           (m_cond), (m_mutex), (m_timespec))); \
+        SKT_D4("MUTEX RESUME %p (Locked %p) (%s)",              \
+               (void *)(m_cond), (void *)(m_mutex),             \
+               (0 == *(m_retval)) ? "Signaled" : "Timed-out");  \
     } while (0)
 
-
-/* Wrapper around pthread_cond_broadcast */
-#define MUTEX_BROADCAST(x)                      \
-    do {                                        \
-        SKT_D2("BROADCASTING %p", (void*)x);    \
-        pthread_cond_broadcast(x);              \
+/* Wrapper around pthread_cond_signal() */
+#define MUTEX_SIGNAL(m_cond)                                    \
+    do {                                                        \
+        SKT_D2("SIGNALING %p", (void *)(m_cond));               \
+        pthread_cond_signal(m_cond);                            \
     } while (0)
 
-#define ASSERT_MUTEX_LOCKED(x)  assert(pthread_mutex_trylock((x)) == EBUSY)
+/* Wrapper around pthread_cond_broadcast() */
+#define MUTEX_BROADCAST(m_cond)                                 \
+    do {                                                        \
+        SKT_D2("BROADCASTING %p", (void *)(m_cond));            \
+        pthread_cond_broadcast(m_cond);                         \
+    } while (0)
+
+#if defined(SKTHREAD_DEBUG_MUTEX) && SKTHREAD_DEBUG_MUTEX > 0
+#define ASSERT_MUTEX_LOCKED(m_mutex)                            \
+    if (pthread_mutex_trylock((m_mutex)) == EBUSY) { } else {   \
+        SKT_D2("Unexpectedly found %p to be unlocked",          \
+               (void *)(m_mutex));                              \
+        skAbort();                                              \
+    }
+#else
+#define ASSERT_MUTEX_LOCKED(m_mutex)                    \
+    assert(pthread_mutex_trylock((m_mutex)) == EBUSY)
+#endif
+
+
+
+/*
+ *    Read / Write Lock Macros
+ */
 
 #ifdef SK_HAVE_PTHREAD_RWLOCK
 #  define RWMUTEX pthread_rwlock_t
 
 extern int skthread_too_many_readlocks;
 
-#  define READ_LOCK(x)                                                  \
+#  define RW_MUTEX_INIT(m_mutex)    pthread_rwlock_init((m_mutex), NULL)
+
+#  define RW_MUTEX_DESTROY(m_mutex)                             \
+    do {                                                        \
+        SKT_D2("RW MUTEX DESTROY %p", (void *)(m_mutex));       \
+        pthread_rwlock_destroy((m_mutex));                      \
+    } while (0)
+
+#  define READ_LOCK(m_mutex)                                            \
     do {                                                                \
-        SKT_D2("READ MUTEX LOCKING %p", (void*)x);                      \
-        while (pthread_rwlock_rdlock(x) == EAGAIN) {                    \
+        SKT_D2("READ MUTEX LOCKING %p", (void *)(m_mutex));             \
+        while (pthread_rwlock_rdlock(m_mutex) == EAGAIN) {              \
             if (!skthread_too_many_readlocks) {                         \
                 skthread_too_many_readlocks = 1;                        \
                 WARNINGMSG(("WARNING: Too many read locks; "            \
                             "spinlocking enabled to compensate"));      \
             }                                                           \
         }                                                               \
-        SKT_D2("READ MUTEX IN LOCK %p", (void*)x);                      \
+        SKT_D2("READ MUTEX IN LOCK %p", (void *)(m_mutex));             \
     } while (0)
-#  define WRITE_LOCK(x)                                 \
-    do {                                                \
-        SKT_D2("WRITE MUTEX LOCKING %p", (void*)x);     \
-        pthread_rwlock_wrlock(x);                       \
-        SKT_D2("WRITE MUTEX IN LOCK %p", (void*)x);     \
-    } while (0)
-#  define RW_MUTEX_UNLOCK(x)                            \
-    do {                                                \
-        SKT_D2("RW MUTEX UNLOCKING %p", (void*)x);      \
-        pthread_rwlock_unlock(x);                       \
-    } while (0)
-#  define RW_MUTEX_INIT(x)           pthread_rwlock_init((x), NULL)
-#  define RW_MUTEX_DESTROY(x)        pthread_rwlock_destroy(x)
-#ifdef NDEBUG
-/* no-ops */
-#  define ASSERT_RW_MUTEX_LOCKED(x)
-#  define ASSERT_RW_MUTEX_WRITE_LOCKED(x)
-#else
-#  define ASSERT_RW_MUTEX_LOCKED(x)                             \
+
+#  define WRITE_LOCK(m_mutex)                                   \
     do {                                                        \
-        int wrlock_ret = pthread_rwlock_trywrlock(x);           \
+        SKT_D2("WRITE MUTEX LOCKING %p", (void *)(m_mutex));    \
+        pthread_rwlock_wrlock(m_mutex);                         \
+        SKT_D2("WRITE MUTEX IN LOCK %p", (void *)(m_mutex));    \
+    } while (0)
+
+#  define RW_MUTEX_UNLOCK(m_mutex)                              \
+    do {                                                        \
+        SKT_D2("RW MUTEX UNLOCKING %p", (void *)(m_mutex));     \
+        pthread_rwlock_unlock(m_mutex);                         \
+    } while (0)
+
+#if defined(SKTHREAD_DEBUG_MUTEX) && SKTHREAD_DEBUG_MUTEX > 0
+
+#  define ASSERT_RW_MUTEX_LOCKED(m_mutex)                               \
+    do {                                                                \
+        int wrlock_ret = pthread_rwlock_trywrlock(m_mutex);             \
+        if (EBUSY == wrlock_ret || EDEADLK == wrlock_ret) { } else {    \
+            SKT_D2("Unexpectedly found %p to be unlocked",              \
+                   (void *)(m_mutex));                                  \
+            skAbort();                                                  \
+        }                                                               \
+    } while (0)
+
+#  define ASSERT_RW_MUTEX_WRITE_LOCKED(m_mutex)                         \
+    do {                                                                \
+        int rdlock_ret = pthread_rwlock_tryrdlock(m_mutex);             \
+        if (EBUSY == rdlock_ret || EDEADLK == rdlock_ret) { } else {    \
+            SKT_D2("Expected %p to be write locked but got a read lock", \
+                   (void *)(m_mutex));                                  \
+            skAbort();                                                  \
+        }                                                               \
+    } while (0)
+
+#elif !defined(NDEBUG)
+
+#  define ASSERT_RW_MUTEX_LOCKED(m_mutex)                       \
+    do {                                                        \
+        int wrlock_ret = pthread_rwlock_trywrlock(m_mutex);     \
         assert(EBUSY == wrlock_ret || EDEADLK == wrlock_ret);   \
-    }while(0)
-#  define ASSERT_RW_MUTEX_WRITE_LOCKED(x)                       \
+    } while (0)
+
+#  define ASSERT_RW_MUTEX_WRITE_LOCKED(m_mutex)                 \
     do {                                                        \
-        int rdlock_ret = pthread_rwlock_tryrdlock(x);           \
+        int rdlock_ret = pthread_rwlock_tryrdlock(m_mutex);     \
         assert(EBUSY == rdlock_ret || EDEADLK == rdlock_ret);   \
-    }while(0)
+    } while (0)
+
+#else
+/* no-ops */
+#  define ASSERT_RW_MUTEX_LOCKED(m_mutex)
+#  define ASSERT_RW_MUTEX_WRITE_LOCKED(m_mutex)
 #endif  /* NDEBUG */
 
 #else  /* #ifdef SK_HAVE_PTHREAD_RWLOCK */
 
-#  define RWMUTEX pthread_mutex_t
-#  define READ_LOCK MUTEX_LOCK
-#  define WRITE_LOCK MUTEX_LOCK
-#  define RW_MUTEX_UNLOCK MUTEX_UNLOCK
-#  define RW_MUTEX_INIT MUTEX_INIT
-#  define RW_MUTEX_DESTROY MUTEX_DESTROY
-#  define ASSERT_RW_MUTEX_LOCKED(x) assert(EBUSY == pthread_mutex_trylock(x))
-#  define ASSERT_RW_MUTEX_WRITE_LOCKED(x) ASSERT_RW_MUTEX_LOCKED(x)
+/*
+ *    No support for read/write locks; use ordinary locks
+ */
+
+#  define RWMUTEX                   pthread_mutex_t
+#  define RW_MUTEX_INIT             MUTEX_INIT
+#  define RW_MUTEX_DESTROY          MUTEX_DESTROY
+#  define READ_LOCK                 MUTEX_LOCK
+#  define WRITE_LOCK                MUTEX_LOCK
+#  define RW_MUTEX_UNLOCK           MUTEX_UNLOCK
+#  define ASSERT_RW_MUTEX_LOCKED(m_mutex)       ASSERT_MUTEX_LOCKED(m_mutex)
+#  define ASSERT_RW_MUTEX_WRITE_LOCKED(m_mutex) ASSERT_MUTEX_LOCKED(m_mutex)
 
 #endif  /* #else of #ifdef SK_HAVE_PTHREAD_RWLOCK */
 

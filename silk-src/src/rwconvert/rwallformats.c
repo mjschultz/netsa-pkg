@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2015 by Carnegie Mellon University.
+** Copyright (C) 2005-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -59,7 +59,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwallformats.c 4738e9e7f385 2015-08-05 18:08:02Z mthomas $");
+RCSIDENT("$SiLK: rwallformats.c a980e04f1cff 2016-01-21 18:30:48Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -166,24 +166,8 @@ appUsageLong(
      "\tbe prefixed by \"<basename>-\" when --basename is given.\n")
 
     FILE *fh = USAGE_FH;
-    int i;
 
-    fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
-    fprintf(fh, "\nSWITCHES:\n");
-    skOptionsDefaultUsage(fh);
-
-    for (i = 0; appOptions[i].name; i++ ) {
-        fprintf(fh, "--%s %s. ", appOptions[i].name,
-                SK_OPTION_HAS_ARG(appOptions[i]));
-        switch (i) {
-          default:
-            /* Simple help text from the appHelp array */
-            assert(appHelp[i]);
-            fprintf(fh, "%s\n", appHelp[i]);
-            break;
-        }
-    }
-
+    skAppStandardUsage(fh, USAGE_MSG, appOptions, appHelp);
     skOptionsCtxOptionsUsage(optctx, fh);
     skOptionsTempDirUsage(fh);
     sksiteOptionsUsage(fh);

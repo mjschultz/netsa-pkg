@@ -1,6 +1,6 @@
 %{
 /*
-** Copyright (C) 2005-2015 by Carnegie Mellon University.
+** Copyright (C) 2005-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -58,7 +58,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconfparse.y 0fc21d6f575d 2015-09-17 14:45:00Z mthomas $");
+RCSIDENT("$SiLK: probeconfparse.y 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/probeconf.h>

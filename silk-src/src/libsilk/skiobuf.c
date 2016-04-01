@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -56,7 +56,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skiobuf.c 6c611fca4036 2015-09-17 14:44:18Z mthomas $");
+RCSIDENT("$SiLK: skiobuf.c 7dab1a2cd828 2016-03-01 16:21:03Z mthomas $");
 
 #include <silk/utils.h>
 #include "skiobuf.h"
@@ -1484,6 +1484,7 @@ skIOBufBind(
 {
     skio_abstract_t io;
     int *fh;
+    int rv;
 
     fh = (int*)malloc(sizeof(*fh));
     if (fh == NULL) {
@@ -1496,7 +1497,11 @@ skIOBufBind(
     io.strerror = &raw_strerror;
     io.flush = NULL;
     io.free_fd = &free;
-    return skIOBufBindAbstract(fd, fh, compmethod, &io);
+    rv = skIOBufBindAbstract(fd, fh, compmethod, &io);
+    if (0 != rv) {
+        free(fh);
+    }
+    return rv;
 }
 
 

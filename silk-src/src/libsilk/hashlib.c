@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -54,7 +54,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: hashlib.c 97f9c76a9afe 2015-08-28 17:38:23Z mthomas $");
+RCSIDENT("$SiLK: hashlib.c 7dab1a2cd828 2016-03-01 16:21:03Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/utils.h>
@@ -968,6 +968,8 @@ hashlib_insert(
     unsigned int k;
     int rv;
 
+    assert(table_ptr);
+
 #ifdef HASHLIB_RECORD_STATS
     ++hashlib_stats.inserts;
 #endif
@@ -986,6 +988,7 @@ hashlib_insert(
             return rv;
         }
     }
+    assert(table_ptr->num_blocks);
 
     /* Look in each block for the key */
     for (k = 0; k < table_ptr->num_blocks; ++k) {

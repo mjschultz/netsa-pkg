@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2015 by Carnegie Mellon University.
+** Copyright (C) 2007-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -64,7 +64,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKIPFIX_H, "$SiLK: skipfix.h 473542edb952 2015-06-17 14:09:31Z mthomas $");
+RCSIDENTVAR(rcsID_SKIPFIX_H, "$SiLK: skipfix.h 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/libflowsource.h>

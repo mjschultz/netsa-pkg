@@ -118,6 +118,7 @@ sub check_file
 {
     # skip anything that is not a file
     return unless -f $_;
+    return if m,/-silktests-$,;
     my $path = $_;
     my $tail_name = $_;
     # set $tail_name to be the varying part of the filename; that is,

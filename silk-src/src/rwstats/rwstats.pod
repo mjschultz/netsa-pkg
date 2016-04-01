@@ -520,29 +520,36 @@ which switch may be specified.
 
 =over 4
 
-=item B<--count>=I<N>
+=item B<--count>=I<COUNT>
 
-Print the I<N> bins with the largest (or smallest) values.  This limit
-is always allowed.
+Print the I<COUNT> bins with the largest (or smallest) primary values.
+When I<COUNT> is 0, all bins are printed.  If I<COUNT> is 0 and
+B<rwstats> runs out of memory while attempting to sort all bins,
+B<rwstats> prints the Top-N or Bottom-N bins using the amount of
+memory it was able to allocate.  B<rwstats> did not accept a value of
+0 for I<COUNT> prior to SiLK 3.12.0,
 
-=item B<--threshold>=I<N>
-
-Print the bins where the primary value is greater-than (or less-than)
-the value I<N>.  This limit is not allowed when the primary value
-comes from a plug-in.  If the threshold causes the Top-N or Bottom-N
-to become large enough that B<rwstats> runs out of memory, B<rwstats>
-will compute the Top-N or Bottom-N using the amount of memory it was
-able to allocate.
-
-=item B<--percentage>=I<N>
+=item B<--threshold>=I<THESHOLD>
 
 Print the bins where the primary value is greater-than (or less-than)
-I<N> percent of the sum of the primary values across all bins.  To use
-this switch, the primary value must be C<Bytes>, C<Packets>, or
-C<Records>, and the B<--presorted-input> switch must not be present.
-If the percentage causes the Top-N or Bottom-N to become large enough
-that B<rwstats> runs out of memory, B<rwstats> will compute the Top-N
-or Bottom-N using the amount of memory it was able to allocate.
+the value I<THESHOLD>.  Using this switch when the primary value comes
+from a plug-in causes B<rwstats> to exit with an error.  If B<rwstats>
+runs out of memory while locating all bins that meet the threshold,
+B<rwstats> prints the Top-N or Bottom-N bins using the amount of
+memory it was able to allocate.  I<rwstats> did not accept a value of
+0 for I<THESHOLD> prior to SiLK 3.12.0,
+
+=item B<--percentage>=I<PERCENT>
+
+Print the bins where the primary value is greater-than (or less-than)
+I<PERCENT> percent of the sum of the primary values across all bins.
+I<PERCENT> may be a floating point value between 0.0 and 100.0
+inclusive.  To use this switch, the primary value must be C<Bytes>,
+C<Packets>, or C<Records>, and the B<--presorted-input> switch must
+not be present.  If B<rwstats> runs out of memory while locating all
+bins that meet the percentage, B<rwstats> prints the Top-N or Bottom-N
+using the amount of memory it was able to allocate.  The value of
+I<PERCENT> was required to be a positive integer prior to SiLK 3.12.0,
 
 =back
 
@@ -1468,7 +1475,7 @@ B<environ(7)>
 
 =cut
 
-$SiLK: rwstats.pod 4dba2416c3d6 2015-09-10 19:03:20Z mthomas $
+$SiLK: rwstats.pod c121bd41bc4a 2016-03-30 21:06:27Z mthomas $
 
 Local Variables:
 mode:text

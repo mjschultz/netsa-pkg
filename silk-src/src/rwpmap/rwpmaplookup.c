@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2015 by Carnegie Mellon University.
+** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -73,7 +73,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmaplookup.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwpmaplookup.c e5d7217c6d5f 2016-01-21 18:24:52Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
@@ -289,13 +289,15 @@ static void
 appUsageLong(
     void)
 {
-#define USAGE_MSG                                                             \
+    /* usage string is longer than allowed by C90 */
+#define USAGE_MSG1                                                            \
     ("<SWITCHES>\n"                                                           \
      "\tMap textual IPs, textual protocol/port pairs, or addresses in a\n"    \
      "\tbinary IPset file to entries in a binary prefix map and print the\n"  \
      "\tresults in a columnar, |-delimited format.\n"                         \
-     "\tExactly one of --map-file, --address-types, or --country-codes must\n" \
-     "\tbe specified, where --map-file requires a prefix map argument and\n"  \
+     "\tExactly one of --map-file, --address-types, or --country-codes must\n")
+#define USAGE_MSG2                                                            \
+    ("\tbe specified, where --map-file requires a prefix map argument and\n"  \
      "\tthe other switches use the default map unless an argument is\n"       \
      "\tprovided to the switch.  The textual input is read from files\n"      \
      "\tspecified on the command line, or you may specify the --no-files\n"   \
@@ -303,16 +305,16 @@ appUsageLong(
      "\tcommand line.  Use --ipset-files to process data from IPset files.\n")
 
     FILE *fh = USAGE_FH;
-    int i;
+    unsigned int i;
 
-    fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
+    fprintf(fh, "%s %s%s", skAppName(), USAGE_MSG1, USAGE_MSG2);
     fprintf(fh, "\nSWITCHES:\n");
     skOptionsDefaultUsage(fh);
 
-    for (i = 0; appOptions[i].name; i++ ) {
+    for (i = 0; appOptions[i].name; ++i) {
         fprintf(fh, "--%s %s. ", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]));
-        switch (appOptions[i].val) {
+        switch ((appOptionsEnum)appOptions[i].val) {
           case OPT_FIELDS:
             /* Dynamically build the help */
             usageFields(fh);

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -60,7 +60,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwreceiver.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwreceiver.c 5fd09fea13f7 2016-02-24 17:31:05Z mthomas $");
 
 #include <silk/skdaemon.h>
 #include <silk/skdllist.h>
@@ -705,47 +705,6 @@ runPostCommand(
     char *expanded_cmd;
     char *exp_cp;
 
-    /* Parent (original process) forks to create Child 1 */
-    pid = fork();
-    if (-1 == pid) {
-        ERRMSG("Could not fork to run command: %s", strerror(errno));
-        return;
-    }
-
-    /* Parent reaps Child 1 and returns */
-    if (0 != pid) {
-        /* Wait for Child 1 to exit. */
-        while (waitpid(pid, NULL, 0) == -1) {
-            if (EINTR != errno) {
-                NOTICEMSG("Error waiting for child %ld: %s",
-                          (long)pid, strerror(errno));
-                break;
-            }
-        }
-        return;
-    }
-
-    /* Disable log rotation in Child 1 */
-    sklogDisableRotation();
-
-    /* Child 1 forks to create Child 2 */
-    pid = fork();
-    if (pid == -1) {
-        ERRMSG("Child could not fork for to run command: %s", strerror(errno));
-        _exit(EXIT_FAILURE);
-    }
-
-    /* Child 1 immediately exits, so Parent can stop waiting */
-    if (pid != 0) {
-        _exit(EXIT_SUCCESS);
-    }
-
-    /* Only Child 2 makes it here */
-
-    /* Unmask signals */
-    sigemptyset(&sigs);
-    sigprocmask(SIG_SETMASK, &sigs, NULL);
-
     /* Determine length of buffer needed for the expanded command
      * string and allocate it.  */
     len = strlen(command);
@@ -772,8 +731,52 @@ runPostCommand(
     expanded_cmd = (char*)malloc(len + 1);
     if (expanded_cmd == NULL) {
         WARNINGMSG("Unable to allocate memory to create command string");
+        return;
+    }
+
+    /* Parent (original process) forks to create Child 1 */
+    pid = fork();
+    if (-1 == pid) {
+        ERRMSG("Could not fork to run command: %s", strerror(errno));
+        free(expanded_cmd);
+        return;
+    }
+
+    /* Parent reaps Child 1 and returns */
+    if (0 != pid) {
+        free(expanded_cmd);
+        /* Wait for Child 1 to exit. */
+        while (waitpid(pid, NULL, 0) == -1) {
+            if (EINTR != errno) {
+                NOTICEMSG("Error waiting for child %ld: %s",
+                          (long)pid, strerror(errno));
+                break;
+            }
+        }
+        return;
+    }
+
+    /* Disable/Ignore locking of the log file; disable log rotation */
+    sklogSetLocking(NULL, NULL, NULL, NULL);
+    sklogDisableRotation();
+
+    /* Child 1 forks to create Child 2 */
+    pid = fork();
+    if (pid == -1) {
+        ERRMSG("Child could not fork for to run command: %s", strerror(errno));
         _exit(EXIT_FAILURE);
     }
+
+    /* Child 1 immediately exits, so Parent can stop waiting */
+    if (pid != 0) {
+        _exit(EXIT_SUCCESS);
+    }
+
+    /* Only Child 2 makes it here */
+
+    /* Unmask signals */
+    sigemptyset(&sigs);
+    sigprocmask(SIG_SETMASK, &sigs, NULL);
 
     /* Copy command into buffer, handling %-expansions */
     cp = command;
@@ -1111,19 +1114,27 @@ transferFiles(
                 uint32_t len;
 
                 if (skMsgType(msg) != CONN_FILE_BLOCK) {
-                    if ((proto_err = checkMsg(msg, q, CONN_FILE_COMPLETE))) {
-                        break;
+                    /* have the error reflect that CONN_FILE_BLOCK was
+                     * expected unless msg is CONN_FILE_COMPLETE */
+                    if (skMsgType(msg) == CONN_FILE_COMPLETE) {
+                        DEBUG_PRINT1("Received CONN_FILE_COMPLETE");
+                        state = Complete_ack;
+                    } else {
+                        proto_err = checkMsg(msg, q, CONN_FILE_BLOCK);
                     }
-                    DEBUG_PRINT1("Received CONN_FILE_COMPLETE");
-                    state = Complete_ack;
                     break;
                 }
+#if !((SENDRCV_DEBUG) & DEBUG_RWTRANSFER_CONTENT)
+                /* no need to report when also reporting content */
+                DEBUG_PRINT1("Received CONN_FILE_BLOCK");
+#endif
 
                 block = (block_info_t *)skMsgMessage(msg);
                 len = skMsgLength(msg) - offsetof(block_info_t, block);
                 offset = (uint64_t)ntohl(block->high_offset) << 32 |
                          ntohl(block->low_offset);
-                DEBUG_CONTENT_PRINT("Receiving offset=%" PRIu64 " len=%" PRIu32,
+                DEBUG_CONTENT_PRINT("Received CONN_FILE_BLOCK"
+                                    "  offset=%" PRIu64 " len=%" PRIu32,
                                     offset, len);
                 if (offset + len > size) {
                     sendString(q, channel, EXTERNAL, CONN_DISCONNECT,

@@ -17,7 +17,8 @@ B<rwsender> - Watch directory for files and transfer them to rwreceiver(s)
           [--local-directory=[[IDENT]:]DIR ...]]
         [--unique-local-copies]
         [--filter=IDENT:REGEXP] [--priority=NUM:REGEXP]
-        [--polling-interval=NUM] [--block-size=NUM]
+        [--polling-interval=NUM]
+        [--send-attempts=NUM] [--block-size=NUM]
         { --log-destination=DESTINATION
           | --log-pathname=FILE_PATH
           | --log-directory=DIR_PATH [--log-basename=LOG_BASENAME]
@@ -36,7 +37,8 @@ B<rwsender> - Watch directory for files and transfer them to rwreceiver(s)
           [--local-directory=[[IDENT]:]DIR ...]]
         [--unique-local-copies]
         [--filter=IDENT:REGEXP] [--priority=NUM:REGEXP]
-        [--polling-interval=NUM] [--block-size=NUM]
+        [--polling-interval=NUM]
+        [--send-attempts=NUM] [--block-size=NUM]
         { --log-destination=DESTINATION
           | --log-pathname=FILE_PATH
           | --log-directory=DIR_PATH [--log-basename=LOG_BASENAME]
@@ -113,7 +115,11 @@ noticed.
 =item B<--processing-directory>=I<DIR>
 
 Use I<DIR> as a location to cache files until they are successfully
-transferred.
+transferred.  For each B<rwreceiver> I<IDENT> specified on the command
+line, a subdirectory is created under I<DIR> to hold a copy of each
+file that is to be sent to that B<rwreceiver>.  (B<rwsender> uses a
+reference (a hard link) to the file instead of a copy of the file when
+possible.)
 
 =item B<--error-directory>=I<DIR>
 
@@ -266,9 +272,11 @@ The following switches are optional:
 
 Create a duplicate of each incoming file in the directory I<DIR>.
 This option may be specified multiple times to create multiple
-duplicates.  The duplicate is made by a hard link to the file in the
-processing-directory if possible, otherwise a complete copy is made
-(see also B<--unique-local-copies>).  If I<IDENT> is specified,
+duplicates.  The duplicate is made by a reference (a hard link) to the
+file in the processing-directory if possible, otherwise a complete
+copy is made.  (Note that any modification-in-place to a file
+reference affects all references to that file; use
+B<--unique-local-copies> to avoid this).  If I<IDENT> is specified,
 filters can be used to determine which files get copied to I<DIR>.
 See L<--filter|/"B<--filter>=I<IDENT>:I<REGEXP>"> for filter details.
 When I<DIR> contains the colon character and no I<IDENT> is wanted, a
@@ -278,10 +286,12 @@ single colon can precede I<DIR> to designate an empty I<IDENT>.
 
 Force the duplicate file created in each local-directory to be a
 complete copy of the file in the processing-directory instead of a
-hard link to the file.  Using hard links saves disk space and is
-faster than making a complete copy; however, any modification-in-place
-to one file affects all files.  This switch is ignored when the
-B<--local-directory> switch is not provided.
+reference (a hard link) to the file.  Using references saves disk
+space and is faster than making a complete copy; however, any
+modification-in-place to one file affects all files.  B<rwsender>
+always makes a complete copy when it is unable to make a reference.
+This switch is ignored when the B<--local-directory> switch is not
+provided.
 
 =item B<--filter>=I<IDENT>:I<REGEXP>
 
@@ -312,6 +322,18 @@ a file is 50.  This switch can be repeated for multiple priorities.
 
 Configure B<rwsender> to check the incoming directory for new files
 every I<NUM> seconds.  The default polling interval is 15 seconds.
+
+=item B<--send-attempts>=I<NUM>
+
+For each file going to an B<rwreceiver>, make I<NUM> attempts to open
+the file, map its contents, and send the contents to that
+B<rwreceiver>.  After I<NUM> attempts, the file is ignored by
+B<rwsender> but the file remains in the B<rwreceiver>-specific
+subdirectory of the processing directory.  Unless the file is manually
+removed from the processing directory, B<rwsender> again attempts to
+send the file when B<rwsender> is restarted.  The limit may be set to
+a value from 1 to 65535.  When I<NUM> is 0, there is no limit.  The
+default number of attempts is 5.
 
 =item B<--block-size>=I<NUM>
 
@@ -408,12 +430,12 @@ I<SiLK Installation Handbook>
 An attempt should be made to use a unique name for each file put into
 the incoming directory.  When a file is added to the incoming
 directory that has the same name as a file in the processing
-directory, the file added to the incoming directoy replaces the
+directory, the file added to the incoming directory replaces the
 existing file in the processing directory.
 
 =cut
 
-$SiLK: rwsender.pod 5f1d69707e38 2013-03-22 21:10:51Z mthomas $
+$SiLK: rwsender.pod 94f573008393 2016-02-02 14:56:24Z mthomas $
 
 Local Variables:
 mode:text

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -57,7 +57,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: hashlib_tests.c e42ba45d9a93 2015-08-27 19:49:34Z mthomas $");
+RCSIDENT("$SiLK: hashlib_tests.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/hashlib.h>
 

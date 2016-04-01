@@ -1,7 +1,7 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: rwpollexec-killed.pl 90396a06eb67 2015-08-05 22:05:43Z mthomas $")
+# RCSIDENT("$SiLK: rwpollexec-killed.pl be00e4ce901e 2016-02-25 18:50:11Z mthomas $")
 
 use strict;
 use SiLKTests;
@@ -16,6 +16,9 @@ check_python_bin();
 
 # create our tempdir
 my $tmpdir = make_tempdir();
+
+# work around issue on OS X when System Integrity Protection enabled
+rwpollexec_use_alternate_shell($tmpdir);
 
 # the command that wraps rwpollexec
 my $rwpollexec_py = "$SiLKTests::PYTHON $srcdir/tests/rwpollexec-daemon.py";

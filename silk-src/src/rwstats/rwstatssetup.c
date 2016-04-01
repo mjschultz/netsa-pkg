@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -58,7 +58,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwstatssetup.c 4dba2416c3d6 2015-09-10 19:03:20Z mthomas $");
+RCSIDENT("$SiLK: rwstatssetup.c 0df4c34a63cf 2016-02-18 20:49:41Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skcountry.h>
@@ -414,6 +414,7 @@ appSetup(
     memset(&output, 0, sizeof(output));
     output.of_fp = stdout;
     memset(&leg, 0, sizeof(rwstats_legacy_t));
+    limit.type = RWSTATS_ALL;
 
     optctx_flags = (SK_OPTIONS_CTX_INPUT_SILK_FLOW | SK_OPTIONS_CTX_ALLOW_STDIN
                     | SK_OPTIONS_CTX_XARGS);
@@ -684,11 +685,20 @@ appOptionsHandler(
                           appOptions[OPT_PERCENTAGE].name);
             return 1;
         }
-        limit.type = (rwstats_limit_type_t)(opt_index - OPT_COUNT);
-        rv = skStringParseUint64(&limit.value[limit.type], opt_arg,
-                                 1, ((OPT_PERCENTAGE == opt_index) ? 100 : 0));
+        limit.type = ((rwstats_limit_type_t)
+                      (RWSTATS_COUNT + (opt_index - OPT_COUNT)));
+        if (OPT_PERCENTAGE == opt_index) {
+            rv = skStringParseDouble(&limit.value[limit.type].d, opt_arg,
+                                     0.0, 100.0);
+        } else {
+            rv = skStringParseUint64(&limit.value[limit.type].u64, opt_arg,
+                                     0, 0);
+        }
         if (rv) {
             goto PARSE_ERROR;
+        }
+        if (OPT_COUNT == opt_index && 0 == limit.value[limit.type].u64) {
+            limit.type = RWSTATS_ALL;
         }
         limit.seen = 1;
         break;
@@ -870,6 +880,8 @@ topnSetup(
 
     /* verify that we have an N for our top-N */
     if (!limit.seen) {
+        /* remove this block if we want printing all bins to be the
+         * default behavior of rwstats */
         skAppPrintErr(("No stopping condition was entered.\n"
                        "\tChoose one of --%s, --%s, or --%s"),
                       appOptions[OPT_COUNT].name,
@@ -2164,7 +2176,8 @@ appAddPlugin(
      * is valid. */
     if (NULL == limit.fl_entry) {
         if ((FIELD_TYPE_VALUE == field_type)
-            && (RWSTATS_COUNT != limit.type))
+            && (RWSTATS_PERCENTAGE == limit.type
+                || RWSTATS_THRESHOLD == limit.type))
         {
             skAppPrintErr(("Only the --%s limit is supported when the"
                            " primary values field is from a plug-in"),

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -60,7 +60,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsender.c 1b5de79a8472 2015-09-15 19:56:44Z mthomas $");
+RCSIDENT("$SiLK: rwsender.c 94f573008393 2016-02-02 14:56:24Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skdaemon.h>
@@ -74,15 +74,20 @@ RCSIDENT("$SiLK: rwsender.c 1b5de79a8472 2015-09-15 19:56:44Z mthomas $");
 /* where to write --help output */
 #define USAGE_FH stdout
 
-/* Number of seconds to wait between polling the incoming directory */
-#define DEFAULT_POLL_INTERVAL 15
-#define DEFAULT_POLL_INTERVAL_STRING "15"
-
-#define DEFAULT_PRIORITY        50
+/*    although priority is a range, files are either treated as high
+ *    or low, with values above this threashold considered high */
 #define HIGH_PRIORITY_THRESHOLD 50
 #define IS_HIGH_PRIORITY(x) ((x) > (HIGH_PRIORITY_THRESHOLD))
 
 #define RWSENDER_PASSWORD_ENV ("RWSENDER" PASSWORD_ENV_POSTFIX)
+
+/*    when parsing options, holds the default value and the min and
+ *    max values */
+typedef struct ranged_value_st {
+    uint32_t            val_default;
+    uint32_t            val_min;
+    uint32_t            val_max;
+} ranged_value_t;
 
 typedef struct priority_st {
     uint16_t priority;
@@ -96,8 +101,28 @@ typedef struct local_dest_st {
     unsigned    filter_exists : 1;
 } local_dest_t;
 
+/*    file_path_count_t contains the complete pathname to a file and
+ *    the number of times that file has been processed */
+typedef struct file_path_count_st {
+    uint16_t        attempts;
+    char            path[1];
+} file_path_count_t;
+
 typedef enum transfer_rv {
-    TR_SUCCEEEDED, TR_FAILED, TR_IMPOSSIBLE, TR_FATAL
+    /* file was transferred */
+    TR_SUCCEEEDED,
+    /* file was not transferred and should be retried */
+    TR_FAILED,
+    /* file was explicitly rejected by the remote side */
+    TR_IMPOSSIBLE,
+    /* a local problem prevented the file from being tranferred, and
+     * the file will be retried */
+    TR_LOCAL_FAILED,
+    /* the maximum number of attempts have been made for this file,
+     * and the file will not be retried */
+    TR_MAX_ATTEMPTS,
+    /* serious error, exit now */
+    TR_FATAL
 } transfer_rv_t;
 
 
@@ -118,6 +143,30 @@ const char *password_env = RWSENDER_PASSWORD_ENV;
 
 
 /* LOCAL VARIABLE DEFINITIONS */
+
+/*    The block size to use when transferring a file.  The minimum
+ *    must be larger than message overhead (14 bytes when this comment
+ *    was last updated). */
+static const ranged_value_t file_block_size_range = {
+    8192, 256, UINT16_MAX
+};
+
+/*    The number of times rwsender attempts to send a file.  A value
+ *    of 0 means no limit. */
+static const ranged_value_t send_attempts_range = {
+    5, 0, UINT16_MAX
+};
+
+/*    The number of seconds to wait between polling the incoming
+ *    directory */
+static const ranged_value_t polling_interval_range = {
+    15, 1, UINT32_MAX
+};
+
+/*    The priority for sending a file. */
+static const ranged_value_t priority_range = {
+    50, 0, 100
+};
 
 /* Filtering regular expressions that are used to determine which
  * receivers get which files (--filter) */
@@ -152,6 +201,10 @@ static uint32_t file_block_size;
 /* Directory poller for incoming-directory */
 static skPollDir_t *polldir;
 
+/* Number of attempts to send a file (--send-atttempts).  0 for
+ * unlimited */
+static uint16_t send_attempts;
+
 /* Set to true once skdaemonized() has been called---regardless of
  * whether the --no-daemon switch was given. */
 static int daemonized = 0;
@@ -174,6 +227,7 @@ typedef enum {
     OPT_FILTER,
     OPT_PRIORITY,
     OPT_POLLING_INTERVAL,
+    OPT_SEND_ATTEMPTS,
     OPT_FILE_BLOCK_SIZE
 } appOptionsEnum;
 
@@ -186,10 +240,13 @@ static struct option appOptions[] = {
     {"filter",               REQUIRED_ARG, 0, OPT_FILTER},
     {"priority",             REQUIRED_ARG, 0, OPT_PRIORITY},
     {"polling-interval",     REQUIRED_ARG, 0, OPT_POLLING_INTERVAL},
+    {"send-attempts",        REQUIRED_ARG, 0, OPT_SEND_ATTEMPTS},
     {"block-size",           REQUIRED_ARG, 0, OPT_FILE_BLOCK_SIZE},
     {0,0,0,0}           /* sentinel entry */
 };
 
+/* All usage must be specified in this array.  The usasge output is
+ * generated in rwtransfer.c.  */
 static const char *appHelp[] = {
     ("Monitor this directory for files to transfer"),
     ("Move each incoming file to this working\n"
@@ -197,25 +254,27 @@ static const char *appHelp[] = {
     ("Store in this directory files that are not accepted\n"
      "\tby an rwreceiver"),
     ("Create a duplicate of each incoming files in this\n"
-     "\tdirectory as a \"local\" destination. Repeat to create multiple\n"
-     "\tduplicates. Limit which files are copied to this directory by using\n"
-     "\tthe --filter switch and including an identifier and a colon before\n"
-     "\tthe local-directory name, specified as IDENT:DIR"),
+     "\tdirectory as a \"local\" destination. Repeat the switch to create\n"
+     "\tmultiple duplicates. Limit which files are copied to this directory\n"
+     "\tby using the --filter switch and including an identifier and a\n"
+     "\tcolon before the local-directory name, specified as IDENT:DIR"),
     ("Create a unique copy of the incoming file in each\n"
-     "\tlocal-directory. When not specified, files in each local-directory\n"
-     "\tare a reference (hard link) to each other and to the file in the\n"
-     "\tprocessing-directory"),
+     "\tlocal-directory. When this switch is not specified, files in each\n"
+     "\tlocal-directory are a reference (hard link) to each other and to\n"
+     "\tthe file in the processing-directory"),
     ("Send files only matching this regular expression to the\n"
      "\trwreceiver or local-directory having this identifier, specified\n"
-     "\tas IDENT:REGEXP. Repeat to specify multiple filters"),
+     "\tas IDENT:REGEXP. Repeat the switch to specify multiple filters"),
     ("Use this priority for sending files matching this regular\n"
-     "\texpression, specified as PRIORITY:REGEXP. Repeat to specify multiple\n"
-     "\tpriorities. Priority range: 0 (low) to 100 (high). Def. 50"),
+     "\texpression, specified as PRIORITY:REGEXP. Repeat the switch to\n"
+     "\tspecify multiple priorities. Range: 0 (low) to 100 (high). Def. 50"),
     ("Check the incoming-directory for new files this\n"
-     "\toften (in seconds). Def. " DEFAULT_POLL_INTERVAL_STRING),
+     "\toften (in seconds). Def. 15"),
+    ("Attempt to send a file this number of times. After\n"
+     "\tthis number of attempts, ignore the file. Range: 1-65535 or 0 for\n"
+     "\tno limit. Def. 5"),
     ("Specify the chunk size to use to use when transferring a\n"
-     "\tfile to an rwreceiver (in bytes)."
-     " Def. " FILE_BLOCK_SIZE_STRING ". Range 256-65535"),
+     "\tfile to an rwreceiver (in bytes). Range 256-65535. Def. 8192"),
     (char *)NULL
 };
 
@@ -387,9 +446,12 @@ appSetup(
     error_dir             = NULL;
     incoming_thread_valid = 0;
     polldir               = NULL;
-    polling_interval      = DEFAULT_POLL_INTERVAL;
-    file_block_size       = FILE_BLOCK_SIZE;
     unique_local_copies   = 0;
+    polling_interval      = polling_interval_range.val_default;
+    send_attempts         = send_attempts_range.val_default;
+    file_block_size       = file_block_size_range.val_default;
+
+    assert(file_block_size_range.val_min > SKMSG_MESSAGE_OVERHEAD);
 
     transfers = transferIdentTreeCreate();
     if (transfers == NULL) {
@@ -500,6 +562,7 @@ appOptionsHandler(
     int                 opt_index,
     char               *opt_arg)
 {
+    uint32_t tmp32;
     int rv;
 
     switch ((appOptionsEnum)opt_index) {
@@ -547,15 +610,28 @@ appOptionsHandler(
         break;
 
       case OPT_POLLING_INTERVAL:
-        rv = skStringParseUint32(&polling_interval, opt_arg, 1, 0);
+        rv = skStringParseUint32(&polling_interval, opt_arg,
+                                 polling_interval_range.val_min,
+                                 polling_interval_range.val_max);
         if (rv) {
             goto PARSE_ERROR;
         }
         break;
 
+      case OPT_SEND_ATTEMPTS:
+        rv = skStringParseUint32(&tmp32, opt_arg,
+                                 send_attempts_range.val_min,
+                                 send_attempts_range.val_max);
+        if (rv) {
+            goto PARSE_ERROR;
+        }
+        send_attempts = (uint16_t)tmp32;
+        break;
+
       case OPT_FILE_BLOCK_SIZE:
         rv = skStringParseUint32(&file_block_size, opt_arg,
-                                 MINIMUM_FILE_BLOCK_SIZE, UINT16_MAX);
+                                 file_block_size_range.val_min,
+                                 file_block_size_range.val_max);
         if (rv) {
             goto PARSE_ERROR;
         }
@@ -563,7 +639,6 @@ appOptionsHandler(
         file_block_size -= offsetof(block_info_t, block)
                            + SKMSG_MESSAGE_OVERHEAD;
         break;
-
     }
 
     return 0;  /* OK */
@@ -670,7 +745,8 @@ addPriority(
     }
     *rstr++ = '\0';
 
-    rv = skStringParseUint32(&tmp_32, pstr, 0, 100);
+    rv = skStringParseUint32(&tmp_32, pstr,
+                             priority_range.val_min, priority_range.val_max);
     if (rv) {
         skAppPrintErr("Invalid %s '%s': %s",
                       appOptions[OPT_PRIORITY].name, arg,
@@ -830,6 +906,32 @@ parseFilterData(
     filter_list = NULL;
 }
 
+
+/*
+ *    Allocate and return the structure that maintains the number of
+ *    times we attempt to send 'path'.  Set attempts to 0.  Copy
+ *    'path' into that structure.  Exit the application on allocation
+ *    failure.
+ */
+static file_path_count_t *
+file_path_count_alloc(
+    const char         *path)
+{
+    file_path_count_t *p;
+    size_t len;
+
+    assert(path);
+
+    len = 1 + strlen(path);
+    p = (file_path_count_t *)malloc(offsetof(file_path_count_t, path) + len);
+    CHECK_ALLOC(p);
+    p->attempts = 0;
+    strncpy(p->path, path, len);
+    p->path[len-1] = '\0';
+    return p;
+}
+
+
 /*
  *  link_or_copy_file(from, to);
  *
@@ -928,11 +1030,11 @@ read_processing_directory(
         }
 
         while ((entry = readdir(dir)) != NULL) {
-            char *filename;
+            file_path_count_t *filename;
             char filename_buffer[PATH_MAX];
             sk_dll_iter_t iter;
             priority_t *p;
-            uint16_t priority = DEFAULT_PRIORITY;
+            uint16_t priority = priority_range.val_default;
             mq_err_t err;
 
             /* ignore dot-files */
@@ -947,8 +1049,7 @@ read_processing_directory(
                           processing_dir, rcvr->ident, entry->d_name);
             assert((size_t)rv < sizeof(filename_buffer));
 
-            filename = strdup(filename_buffer);
-            CHECK_ALLOC(filename);
+            filename = file_path_count_alloc(filename_buffer);
 
             skDLLAssignIter(&iter, priority_regexps);
             while (skDLLIterForward(&iter, (void **)&p) == 0) {
@@ -965,12 +1066,12 @@ read_processing_directory(
             CHECK_ALLOC(err != MQ_MEMERROR);
             if (err != MQ_NOERROR) {
                 assert(shuttingdown);
+                free(filename);
                 break;
             }
             assert(err == MQ_NOERROR);
         }
         closedir(dir);
-
     }
     rbcloselist(list);
 }
@@ -998,7 +1099,7 @@ handle_new_file(
     uint16_t priority;
     priority_t *p;
     mq_err_t err;
-    char *dest_copy;
+    file_path_count_t *dest_copy;
     int handled = 0;
     int matched = 0;
     sk_dllist_t *high, *low;
@@ -1096,11 +1197,10 @@ handle_new_file(
             source = initial;
         }
 
-        dest_copy = strdup(destination);
-        CHECK_ALLOC(dest_copy);
+        dest_copy = file_path_count_alloc(destination);
 
         /* determine the priority for the file */
-        priority = DEFAULT_PRIORITY;
+        priority = priority_range.val_default;
         skDLLAssignIter(&node, priority_regexps);
         while (skDLLIterForward(&node, (void **)&p) == 0) {
             rv = regexec(&p->regex, name, 0, NULL, 0);
@@ -1337,6 +1437,10 @@ handleErrorFile(
     char path_buffer[PATH_MAX];
     int rv;
 
+    assert(path);
+    assert(name);
+    assert(ident);
+
     rv = snprintf(path_buffer, sizeof(path_buffer), "%s/%s",
                   error_dir, ident);
     if ((size_t)rv >= sizeof(path_buffer)) {
@@ -1365,7 +1469,7 @@ transferFile(
     sk_msg_queue_t     *q,
     skm_channel_t       channel,
     transfer_t         *rcvr,
-    const char         *path)
+    file_path_count_t  *path)
 {
     skm_type_t t;
     file_info_t *finfo;
@@ -1392,6 +1496,19 @@ transferFile(
     } state;
     transfer_rv_t retval = TR_FAILED;
 
+    assert(path);
+    assert(path->path);
+
+    ++path->attempts;
+
+    /* get the basename of the file */
+    name = strrchr(path->path, '/');
+    if (name == NULL) {
+        name = path->path;
+    } else {
+        ++name;
+    }
+
     state = File_info;
     proto_err = 0;
 
@@ -1409,7 +1526,8 @@ transferFile(
             }
             rv = handleDisconnect(msg, rcvr->ident);
             if (rv != 0) {
-                retval = (rv == -1) ? TR_IMPOSSIBLE : TR_FAILED;
+                /* retval = (rv == -1) ? TR_IMPOSSIBLE : TR_FAILED; */
+                retval = TR_FAILED;
                 state = Error;
             }
             break;
@@ -1429,39 +1547,31 @@ transferFile(
             if (fd != -1) {
                 close(fd);
             }
-            fd = open(path, O_RDONLY);
+            fd = open(path->path, O_RDONLY);
             if (fd == -1) {
                 ERRMSG("Could not open '%s' for reading: %s",
-                       path, strerror(errno));
-                retval = TR_IMPOSSIBLE;
+                       path->path, strerror(errno));
+                retval = TR_LOCAL_FAILED;
                 state = Error;
                 break;
             }
             rv = fstat(fd, &st);
             if (rv != 0) {
                 ERRMSG("Could not stat '%s': %s",
-                       path, strerror(errno));
-                retval = TR_IMPOSSIBLE;
+                       path->path, strerror(errno));
+                retval = TR_LOCAL_FAILED;
                 state = Error;
                 break;
             }
             if ((size_t)st.st_size > SIZE_MAX) {
                 /* TODO: allow files larger than size_t bytes */
-                ERRMSG("The file '%s' was too large to be mapped", path);
-                retval = TR_IMPOSSIBLE;
+                ERRMSG("The file '%s' is too large to be mapped", path->path);
+                retval = TR_LOCAL_FAILED;
                 state = Error;
                 break;
             }
             size = st.st_size;
             block_size = (size > file_block_size) ? file_block_size : size;
-
-            name = strrchr(path, '/');
-            if (name == NULL) {
-                name = path;
-            } else {
-                name++;
-            }
-            infolen = offsetof(file_info_t, filename) + strlen(name) + 1;
 
             INFOMSG("Transferring to %s: %s (%" PRIu64 " bytes)",
                     rcvr->ident, name, size);
@@ -1475,6 +1585,7 @@ transferFile(
             dropoff_time = st.st_ctime;
             send_time = time(NULL);
 
+            infolen = offsetof(file_info_t, filename) + strlen(name) + 1;
             finfo = (file_info_t*)malloc(infolen);
             CHECK_ALLOC(finfo);
             finfo->high_filesize = size >> 32;
@@ -1498,14 +1609,14 @@ transferFile(
                 if (t == CONN_DUPLICATE_FILE) {
                     WARNINGMSG("Duplicate instance of %s on %s.  %s",
                                name, rcvr->ident, (char *)skMsgMessage(msg));
-                    handleErrorFile(path, name, rcvr->ident);
+                    handleErrorFile(path->path, name, rcvr->ident);
                     state = Error;
                     retval = TR_IMPOSSIBLE;
                     break;
                 } else if (t == CONN_REJECT_FILE) {
                     WARNINGMSG("File %s was rejected by %s. %s",
                                name, rcvr->ident, (char *)skMsgMessage(msg));
-                    handleErrorFile(path, name, rcvr->ident);
+                    handleErrorFile(path->path, name, rcvr->ident);
                     state = Error;
                     retval = TR_IMPOSSIBLE;
                     break;
@@ -1525,16 +1636,16 @@ transferFile(
                 map = NULL;
                 ERRMSG("Failed to create mutex");
                 state = Error;
-                retval = TR_FAILED;
+                retval = TR_LOCAL_FAILED;
                 break;
             }
             map->map = mmap(0, size, PROT_READ, MAP_SHARED, fd, 0);
             if (map->map == MAP_FAILED) {
                 free(map);
                 map = NULL;
-                ERRMSG("Could not map '%s': %s", path, strerror(errno));
+                ERRMSG("Could not map '%s': %s", path->path, strerror(errno));
                 state = Error;
-                retval = TR_IMPOSSIBLE;
+                retval = TR_LOCAL_FAILED;
                 break;
             }
             map->count = 1;
@@ -1605,10 +1716,10 @@ transferFile(
             }
             DEBUG_PRINT1("Received CONN_FILE_COMPLETE");
             finished_time = time(NULL);
-            rv = unlink(path);
+            rv = unlink(path->path);
             if (rv != 0) {
                 CRITMSG("Unable to remove '%s' after sending: %s",
-                        path, strerror(errno));
+                        path->path, strerror(errno));
                 retval = TR_FATAL;
                 state = Error;
                 break;
@@ -1651,6 +1762,13 @@ transferFile(
         decref_map(map);
     }
 
+    if (send_attempts
+        && path->attempts >= send_attempts
+        && (TR_LOCAL_FAILED == retval || TR_FAILED == retval))
+    {
+        retval = TR_MAX_ATTEMPTS;
+    }
+
     return retval;
 }
 
@@ -1672,12 +1790,14 @@ transferFiles(
     mqEnable(rcvr->app.r.queue, MQ_REMOVE);
 
     while (!shuttingdown && !rcvr->disconnect) {
-        char *path;
+        file_path_count_t *path;
         mq_err_t err;
         transfer_rv_t rv;
 
         err = mqGet(rcvr->app.r.queue, (void **)&path);
         if (err == MQ_DISABLED || err == MQ_SHUTDOWN) {
+            /* the following assert() sometimes fired in testing when
+             * I modified rwreceiver to send wrong protocol message */
             assert(shuttingdown || rcvr->disconnect);
             break;
         }
@@ -1695,6 +1815,7 @@ transferFiles(
             CHECK_ALLOC(err != MQ_MEMERROR);
             if (err != MQ_NOERROR) {
                 assert(shuttingdown);
+                free(path);
             }
             break;
         }
@@ -1703,23 +1824,42 @@ transferFiles(
         switch (rv) {
           case TR_SUCCEEEDED:
             transferred_file = 1;
-            INFOMSG("Succeeded sending %s to %s", path, rcvr->ident);
+            INFOMSG("Succeeded sending %s to %s", path->path, rcvr->ident);
             free(path);
             break;
-          case TR_IMPOSSIBLE:
-            INFOMSG("Remote side %s rejected %s", rcvr->ident, path);
+          case TR_MAX_ATTEMPTS:
+            WARNINGMSG("Ignoring %s after %u attempts to send",
+                       path->path, path->attempts);
             free(path);
             break;
-          case TR_FAILED:
-            err = mqPushBack(rcvr->app.r.queue, path);
+          case TR_LOCAL_FAILED:
+            /* put file onto the end of the low priority queue */
+            err = mqQueueAdd(rcvr->app.r.low, path);
             CHECK_ALLOC(err != MQ_MEMERROR);
             if (err == MQ_NOERROR) {
-                INFOMSG("Remote side %s died unexpectedly.", rcvr->ident);
-                INFOMSG("Will attempt to re-send %s", path);
+                INFOMSG("Will attempt to re-send %s", path->path);
             } else{
                 assert(shuttingdown);
                 INFOMSG("Not scheduling %s to %s for retrying",
-                        path, rcvr->ident);
+                        path->path, rcvr->ident);
+                free(path);
+            }
+            break;
+          case TR_IMPOSSIBLE:
+            INFOMSG("Remote side %s rejected %s", rcvr->ident, path->path);
+            free(path);
+            break;
+          case TR_FAILED:
+            /* put file onto the end of the low priority queue */
+            err = mqQueueAdd(rcvr->app.r.low, path);
+            CHECK_ALLOC(err != MQ_MEMERROR);
+            if (err == MQ_NOERROR) {
+                INFOMSG("Remote side %s died unexpectedly.", rcvr->ident);
+                INFOMSG("Will attempt to re-send %s", path->path);
+            } else{
+                assert(shuttingdown);
+                INFOMSG("Not scheduling %s to %s for retrying",
+                        path->path, rcvr->ident);
                 free(path);
             }
             break;

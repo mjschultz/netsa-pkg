@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -62,7 +62,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwtransfer.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwtransfer.c 57a2b3e91bee 2016-02-01 20:29:38Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sklog.h>
@@ -369,7 +369,7 @@ appModeUsage(
     unsigned int i;
 
     fprintf(fh, "\n%s switches:\n", mode_str);
-    for (i = 0; options[i].name; i++) {
+    for (i = 0; options[i].name; ++i) {
         if (help[i]) {
             fprintf(fh, "--%s %s. %s\n", options[i].name,
                     SK_OPTION_HAS_ARG(options[i]), help[i]);
@@ -1164,7 +1164,6 @@ handleConnection(
                 } else {
                     reason = "Duplicate ident";
                 }
-
                 sendString(q, skMsgChannel(msg), EXTERNAL,
                            CONN_DISCONNECT, LOG_WARNING,
                            "%s %s", reason, target.ident);
@@ -1340,8 +1339,7 @@ serverMain(
                 skSockaddrString(buf, sizeof(buf), &addr_info->addr);
             }
             INFOMSG("Received connection from %s (%s)",
-                    (addr_info->known ? buf :
-                     "unknown address"), conn_type);
+                    (addr_info->known ? buf : "unknown address"), conn_type);
             info = (conn_info_t *)calloc(1, sizeof(*info));
             if (info == NULL) {
                 CRITMSG("Memory allocation failure");
@@ -1498,11 +1496,13 @@ startClientConnection(
         } else {
             conn_info_t *info;
             char conn_type[RWTRANSFER_CONNECTION_TYPE_SIZE_MAX];
+            uint16_t port = 0;
 
-            getConnectionInformation(control, channel, conn_type,
-                                     sizeof(conn_type));
-            DEBUGMSG("Connected (expecting ident %s) (%s)",
-                     item->ident, conn_type);
+            getConnectionInformation(control, channel,
+                                     conn_type, sizeof(conn_type));
+            skMsgGetLocalPort(control, channel, &port);
+            DEBUGMSG("Connected (expecting ident %s) (local port %u, %s)",
+                     item->ident, port, conn_type);
             info = (conn_info_t *)calloc(1, sizeof(*info));
             if (info == NULL) {
                 CRITMSG("Memory allocation failure");

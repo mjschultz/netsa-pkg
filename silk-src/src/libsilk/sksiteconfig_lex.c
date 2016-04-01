@@ -570,7 +570,7 @@ char *sksiteconfig_text;
 #line 1 "sksiteconfig_lex.l"
 #line 2 "sksiteconfig_lex.l"
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -628,7 +628,7 @@ char *sksiteconfig_text;
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sksiteconfig_lex.l 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: sksiteconfig_lex.l 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include "sksiteconfig.h"
 #include "sksiteconfig_parse.h"

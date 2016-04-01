@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -70,7 +70,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: iptree.c c4827f5079f1 2015-08-04 17:35:04Z mthomas $");
+RCSIDENT("$SiLK: iptree.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/iptree.h>
 #include <silk/rwrec.h>

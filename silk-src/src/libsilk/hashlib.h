@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -65,7 +65,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_HASHLIB_H, "$SiLK: hashlib.h e42ba45d9a93 2015-08-27 19:49:34Z mthomas $");
+RCSIDENTVAR(rcsID_HASHLIB_H, "$SiLK: hashlib.h 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 /**
  *  @file

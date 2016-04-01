@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2015 by Carnegie Mellon University.
+** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -81,7 +81,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKBAG_H, "$SiLK: skbag.h 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENTVAR(rcsID_SKBAG_H, "$SiLK: skbag.h 5f2d30e80a6f 2016-03-30 22:09:49Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -272,6 +272,18 @@ typedef enum skBagFieldType_en {
     SKBAG_FIELD_ANY_PORT,
     SKBAG_FIELD_ANY_SNMP,
     SKBAG_FIELD_ANY_TIME,
+
+    SKBAG_FIELD_SIP_COUNTRY,
+    SKBAG_FIELD_DIP_COUNTRY,
+    SKBAG_FIELD_ANY_COUNTRY,
+
+    SKBAG_FIELD_SIP_PMAP,
+    SKBAG_FIELD_DIP_PMAP,
+    SKBAG_FIELD_ANY_IP_PMAP,
+
+    SKBAG_FIELD_SPORT_PMAP,
+    SKBAG_FIELD_DPORT_PMAP,
+    SKBAG_FIELD_ANY_PORT_PMAP,
 
     SKBAG_FIELD_CUSTOM = 255
 } skBagFieldType_t;

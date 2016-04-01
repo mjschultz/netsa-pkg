@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-# RCSIDENT("$SiLK: Makefile.am 247c2dd07f4f 2015-07-10 17:24:07Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 5bfcfa2ae79d 2016-03-31 18:03:11Z mthomas $");
 
 # Installed Targets
 
@@ -838,6 +838,14 @@ TESTS = \
 	tests/rwbag-dip-flo-v6.pl \
 	tests/rwbag-dip-pkt-v6.pl \
 	tests/rwbag-dip-byt-v6.pl \
+	tests/rwbag-stime-byt.pl \
+	tests/rwbag-sensor-pkt.pl \
+	tests/rwbag-flags-flo.pl \
+	tests/rwbag-scc-byt.pl \
+	tests/rwbag-dcc-pkt-v6.pl \
+	tests/rwbag-sippmap-flo.pl \
+	tests/rwbag-dippmap-byt-v6.pl \
+	tests/rwbag-dportpmap-pkt.pl \
 	tests/rwbagcat-null-input.pl \
 	tests/rwbagcat-bad-range-key.pl \
 	tests/rwbagcat-bad-range-counter.pl \
@@ -913,7 +921,17 @@ TESTS = \
 	tests/rwbagbuild-proto-overflow.pl \
 	tests/rwbagbuild-port-max.pl \
 	tests/rwbagbuild-port-overflow.pl \
-	tests/rwbagbuild-empty-v6.pl
+	tests/rwbagbuild-empty-v6.pl \
+	tests/rwbagbuild-stime-byt.pl \
+	tests/rwbagbuild-sensor-pkt.pl \
+	tests/rwbagbuild-flags-flo.pl \
+	tests/rwbagbuild-scc-byt.pl \
+	tests/rwbagbuild-dcc-pkt-v6.pl \
+	tests/rwbagbuild-sippmap-flo.pl \
+	tests/rwbagbuild-dippmap-byt-v6.pl \
+	tests/rwbagbuild-dportpmap-pkt.pl \
+	tests/rwbagbuild-setinput-sippmap-flo.pl \
+	tests/rwbagbuild-setinput-dcc-pkt-v6.pl
 
 all: all-am
 
@@ -1642,6 +1660,62 @@ tests/rwbag-dip-byt-v6.pl.log: tests/rwbag-dip-byt-v6.pl
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbag-stime-byt.pl.log: tests/rwbag-stime-byt.pl
+	@p='tests/rwbag-stime-byt.pl'; \
+	b='tests/rwbag-stime-byt.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbag-sensor-pkt.pl.log: tests/rwbag-sensor-pkt.pl
+	@p='tests/rwbag-sensor-pkt.pl'; \
+	b='tests/rwbag-sensor-pkt.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbag-flags-flo.pl.log: tests/rwbag-flags-flo.pl
+	@p='tests/rwbag-flags-flo.pl'; \
+	b='tests/rwbag-flags-flo.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbag-scc-byt.pl.log: tests/rwbag-scc-byt.pl
+	@p='tests/rwbag-scc-byt.pl'; \
+	b='tests/rwbag-scc-byt.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbag-dcc-pkt-v6.pl.log: tests/rwbag-dcc-pkt-v6.pl
+	@p='tests/rwbag-dcc-pkt-v6.pl'; \
+	b='tests/rwbag-dcc-pkt-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbag-sippmap-flo.pl.log: tests/rwbag-sippmap-flo.pl
+	@p='tests/rwbag-sippmap-flo.pl'; \
+	b='tests/rwbag-sippmap-flo.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbag-dippmap-byt-v6.pl.log: tests/rwbag-dippmap-byt-v6.pl
+	@p='tests/rwbag-dippmap-byt-v6.pl'; \
+	b='tests/rwbag-dippmap-byt-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbag-dportpmap-pkt.pl.log: tests/rwbag-dportpmap-pkt.pl
+	@p='tests/rwbag-dportpmap-pkt.pl'; \
+	b='tests/rwbag-dportpmap-pkt.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 tests/rwbagcat-null-input.pl.log: tests/rwbagcat-null-input.pl
 	@p='tests/rwbagcat-null-input.pl'; \
 	b='tests/rwbagcat-null-input.pl'; \
@@ -2170,6 +2244,76 @@ tests/rwbagbuild-port-overflow.pl.log: tests/rwbagbuild-port-overflow.pl
 tests/rwbagbuild-empty-v6.pl.log: tests/rwbagbuild-empty-v6.pl
 	@p='tests/rwbagbuild-empty-v6.pl'; \
 	b='tests/rwbagbuild-empty-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagbuild-stime-byt.pl.log: tests/rwbagbuild-stime-byt.pl
+	@p='tests/rwbagbuild-stime-byt.pl'; \
+	b='tests/rwbagbuild-stime-byt.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagbuild-sensor-pkt.pl.log: tests/rwbagbuild-sensor-pkt.pl
+	@p='tests/rwbagbuild-sensor-pkt.pl'; \
+	b='tests/rwbagbuild-sensor-pkt.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagbuild-flags-flo.pl.log: tests/rwbagbuild-flags-flo.pl
+	@p='tests/rwbagbuild-flags-flo.pl'; \
+	b='tests/rwbagbuild-flags-flo.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagbuild-scc-byt.pl.log: tests/rwbagbuild-scc-byt.pl
+	@p='tests/rwbagbuild-scc-byt.pl'; \
+	b='tests/rwbagbuild-scc-byt.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagbuild-dcc-pkt-v6.pl.log: tests/rwbagbuild-dcc-pkt-v6.pl
+	@p='tests/rwbagbuild-dcc-pkt-v6.pl'; \
+	b='tests/rwbagbuild-dcc-pkt-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagbuild-sippmap-flo.pl.log: tests/rwbagbuild-sippmap-flo.pl
+	@p='tests/rwbagbuild-sippmap-flo.pl'; \
+	b='tests/rwbagbuild-sippmap-flo.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagbuild-dippmap-byt-v6.pl.log: tests/rwbagbuild-dippmap-byt-v6.pl
+	@p='tests/rwbagbuild-dippmap-byt-v6.pl'; \
+	b='tests/rwbagbuild-dippmap-byt-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagbuild-dportpmap-pkt.pl.log: tests/rwbagbuild-dportpmap-pkt.pl
+	@p='tests/rwbagbuild-dportpmap-pkt.pl'; \
+	b='tests/rwbagbuild-dportpmap-pkt.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagbuild-setinput-sippmap-flo.pl.log: tests/rwbagbuild-setinput-sippmap-flo.pl
+	@p='tests/rwbagbuild-setinput-sippmap-flo.pl'; \
+	b='tests/rwbagbuild-setinput-sippmap-flo.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagbuild-setinput-dcc-pkt-v6.pl.log: tests/rwbagbuild-setinput-dcc-pkt-v6.pl
+	@p='tests/rwbagbuild-setinput-dcc-pkt-v6.pl'; \
+	b='tests/rwbagbuild-setinput-dcc-pkt-v6.pl'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \

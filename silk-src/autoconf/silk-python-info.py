@@ -1,5 +1,5 @@
 #######################################################################
-# Copyright (C) 2008-2015 by Carnegie Mellon University.
+# Copyright (C) 2008-2016 by Carnegie Mellon University.
 #
 # @OPENSOURCE_HEADER_START@
 #
@@ -52,7 +52,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: silk-python-info.py 3b368a750438 2015-05-18 20:39:37Z mthomas $
+# $SiLK: silk-python-info.py 71c2983c2702 2016-01-04 18:33:22Z mthomas $
 #######################################################################
 
 from distutils.sysconfig import *

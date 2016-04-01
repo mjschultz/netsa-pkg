@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -64,7 +64,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWCOMBINE_H, "$SiLK: rwcombine.h 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENTVAR(rcsID_RWCOMBINE_H, "$SiLK: rwcombine.h 35d28dbdfd0f 2016-02-24 16:28:44Z mthomas $");
 
 #include <silk/rwascii.h>
 #include <silk/rwrec.h>
@@ -81,12 +81,12 @@ RCSIDENTVAR(rcsID_RWCOMBINE_H, "$SiLK: rwcombine.h 3b368a750438 2015-05-18 20:39
 /* LOCAL DEFINES AND TYPEDEFS */
 
 /*
- *    The largest buffer we attempt to use, unless the user selects a
+ *    The default buffer size to use, unless the user selects a
  *    different value with the --buffer-size switch.
  *
  *    Support of a buffer of almost 2GB.
  */
-#define DEFAULT_BUFFER_SIZE   0x78000000
+#define DEFAULT_BUFFER_SIZE     "1920m"
 
 /*
  *    We do not allocate the buffer at once, but use realloc() to grow
@@ -101,8 +101,19 @@ RCSIDENTVAR(rcsID_RWCOMBINE_H, "$SiLK: rwcombine.h 3b368a750438 2015-05-18 20:39
 #define NUM_CHUNKS  6
 
 /*
- *    If we can't allocate space for at least this many records, give
- *    up.
+ *    Do not allocate more than this number of bytes at a time.
+ *
+ *    If dividing the buffer size by NUM_CHUNKS gives a chunk size
+ *    larger than this; determine the number of chunks by dividing the
+ *    buffer size by this value.
+ *
+ *    Use a value of 1g
+ */
+#define MAX_CHUNK_SIZE      ((size_t)(0x40000000))
+
+/*
+ *    If we cannot allocate a buffer that will hold at least this many
+ *    records, give up.
  */
 #define MIN_IN_CORE_RECORDS     1000
 
@@ -114,8 +125,17 @@ RCSIDENTVAR(rcsID_RWCOMBINE_H, "$SiLK: rwcombine.h 3b368a750438 2015-05-18 20:39
 /*
  *    Size of a node is constant: the size of a complete rwRec.
  */
-#define NODE_SIZE       ((uint32_t)sizeof(rwRec))
+#define NODE_SIZE       sizeof(rwRec)
 
+/*
+ *    The maximum buffer size is the maximum size we can allocate.
+ */
+#define MAXIMUM_BUFFER_SIZE     ((size_t)(SIZE_MAX))
+
+/*
+ *    The minium buffer size.
+ */
+#define MINIMUM_BUFFER_SIZE     (NODE_SIZE * MIN_IN_CORE_RECORDS)
 
 
 /* VARIABLES */
@@ -137,7 +157,7 @@ extern skstream_t *print_statistics;
 extern sk_tempfilectx_t *tmpctx;
 
 /* maximum amount of RAM to attempt to allocate */
-extern uint64_t buffer_size;
+extern size_t buffer_size;
 
 /* maximum amount of idle time to allow between flows */
 extern int64_t max_idle_time;

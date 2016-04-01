@@ -1,7 +1,7 @@
 #! @PYTHON@
 
 #
-# Copyright (C) 2005-2015 by Carnegie Mellon University.
+# Copyright (C) 2005-2016 by Carnegie Mellon University.
 #
 # @OPENSOURCE_HEADER_START@
 #
@@ -58,7 +58,7 @@
 # easier parsing.
 #
 
-# RCSIDENT("$SiLK: rwpcut24.in 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+# RCSIDENT("$SiLK: rwpcut24.in 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 import calendar
 import os
@@ -128,7 +128,7 @@ re_flags = re.compile( re_flags_str )
 
 def tool_version_exit():
     print("""%s: Part of @PACKAGE_STRING@
-Copyright (C) 2001-2015 by Carnegie Mellon University
+Copyright (C) 2001-2016 by Carnegie Mellon University
 GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
 Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
 Send bug reports, feature requests, and comments to @PACKAGE_BUGREPORT@""" % (appname))

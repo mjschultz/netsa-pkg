@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2015 by Carnegie Mellon University.
+** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -50,16 +50,9 @@
 ** @OPENSOURCE_HEADER_END@
 */
 
-/*
-**
-**    Circular buffer API
-**
-*/
-
-
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: circbuf.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: circbuf.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/sklog.h>
 #include "circbuf.h"
@@ -71,82 +64,86 @@ RCSIDENT("$SiLK: circbuf.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
 #include <silk/sktracemsg.h>
 
 /* Minimum number of items which should be storable in a chunk */
-#define CIRCBUF_MINIMUM_ITEMS_PER_CHUNK 3
+#define SK_CIRCBUF_MINIMUM_ITEMS_PER_CHUNK 3
 
 /* Maximum possible size of a single item */
-#define CIRCBUF_CHUNK_MAXIMUM_ITEM_SIZE                 \
-    ((1 << 28) / CIRCBUF_MINIMUM_ITEMS_PER_CHUNK)
-
-
-struct circBuf_chunk_st;
-typedef struct circBuf_chunk_st circBuf_chunk_t;
+#define SK_CIRCBUF_CHUNK_MAXIMUM_ITEM_SIZE                 \
+    ((1 << 28) / SK_CIRCBUF_MINIMUM_ITEMS_PER_CHUNK)
 
 
 /*
- *    The circBuf_t hands cells to the writer which the writer fills.
- *    The circBuf_t holds onto these cells until the reader requests
- *    them.  The maxinum number of cells a circBuf_t may allocate is
- *    specified at creatation time.  However, the cells are not
- *    allocated as one block of memory.  Instead, the circBuf_t
- *    allocates smaller blocks of memory called chunks.  All chunks
- *    are the same size.  To summarize, the circBuf_t is composed of
- *    multiple chunks, and a chunk is composed of multiple cells.
+ *    The sk_circbuf_t hands cells to the writing thread which that
+ *    thread fills.  The sk_circbuf_t holds onto these cells until the
+ *    reading thread requests them.  The maxinum number of cells a
+ *    sk_circbuf_t may allocate is specified at creatation time.
+ *    However, the cells are not allocated as one block of memory.
+ *    Instead, the sk_circbuf_t allocates smaller blocks of memory
+ *    called chunks.  All chunks are the same size.  To summarize, the
+ *    sk_circbuf_t is composed of multiple chunks, and a chunk is
+ *    composed of multiple cells.
  *
- *    For each chunk, the 'head' points to the cell currently in use
- *    by the writer, and the 'tail' points to the cell currently in
- *    use by the reader.
+ *    For each chunk, the 'writer' member points to the cell currently
+ *    in use by the writing thread, and the 'reader' member points to
+ *    the cell currently in use by the reading thread.
  *
- *    All cells "between" the tail and the head have data.  In the
- *    diagram below, the writer (head) has wrapped around, and all
- *    cells with 'D' have data.  'W' is where the writer is currently
- *    writing data, and 'R' is where the reader is reading.
+ *    All cells "between" the 'reader' and the 'writer' have data.  In
+ *    the diagram below, the 'writer' has wrapped around, and all
+ *    cells with 'D' have data.  'W' is where the writing thread is
+ *    currently writing data, and 'R' is where the reading thread is
+ *    reading.
+ *
  *        _ _ _ _ _ _ _ _ _ _ _ _
  *       |D|D|W|_|_|_|_|_|R|D|D|D|
  *            A A         A A
  *            | |         | |
- *            | next_head | next_tail
+ *            | next_wtr  | next_rdr
  *            |           |
- *            head        tail
+ *            writer      reader
  *
- *    When the writer or reader finishes with a cell, they call the
- *    appropriate function which releases the current cell and moves
- *    them to the next cell.
+ *    When the writing thread or reading thread finishes with a cell,
+ *    it calls the appropriate "get next" function which releases the
+ *    current cell and moves the thread to the next cell.
  *
- *    If a chunk becomes full, a new chunk is allocated and the writer
- *    starts using cells from the new chunk.  Depending on the chunk
- *    size and maximum number of cells allowed, there may be multiple
- *    chunks in the chunk list between the writer and the reader.
+ *    If a chunk becomes full and the number of cells is not at the
+ *    maximum, a new chunk is allocated and the writer starts using
+ *    cells from the new chunk.  Depending on the chunk size and
+ *    maximum number of cells allowed, there may be multiple chunks in
+ *    the chunk list between the writer and the reader.
  *
- *    Once the reader finishes with all the cells in the current
- *    chunk, the reader moves to the first cell of the next chunk in
- *    the chunk list, and the chunk the reader just completed is
- *    discarded.  The circBuf_t is circular within a chunk, but linear
- *    between multiple chunks.
+ *    Once the reading thread finishes with all the cells in the
+ *    current chunk, the reader moves to the first cell of the next
+ *    chunk in the chunk list, and the chunk the reader just completed
+ *    is discarded.  The sk_circbuf_t is circular within a chunk, but
+ *    like a linked list between multiple chunks.
  *
- *    The first time the circBuf_t has a chunk to discard, the
- *    circBuf_t stores the chunk as spare (instead of deallocating the
- *    chunk).  When a chunk needs to be discard and the circBuf_t
- *    already has a spare chunk, the chunk is deallocated.
+ *    The first time the sk_circbuf_t has a chunk to discard, the
+ *    sk_circbuf_t stores the chunk as spare (instead of deallocating
+ *    the chunk).  When a chunk needs to be discard and the
+ *    sk_circbuf_t already has a spare chunk, the chunk is
+ *    deallocated.
  *
  */
-struct circBuf_chunk_st {
+typedef struct circbuf_chunk_st circbuf_chunk_t;
+struct circbuf_chunk_st {
     /* Next chunk in chunk list */
-    circBuf_chunk_t *next;
-    /* Next head (writer) cell index */
-    uint32_t         next_head;
-    /* Current head (writer) cell index */
-    uint32_t         head;
-    /* Next tail (reader) cell index */
-    uint32_t         next_tail;
-    /* Current tail (reader) cell index */
-    uint32_t         tail;
+    circbuf_chunk_t *next;
+    /* Next writer cell index */
+    uint32_t         next_writer;
+    /* Current writer cell index */
+    uint32_t         writer;
+    /* Next reader cell index */
+    uint32_t         next_reader;
+    /* Current reader cell index */
+    uint32_t         reader;
     /* Buffer containing cells */
     uint8_t         *data;
     /* True if all cells are used */
     unsigned         full   :1;
 };
 
-struct circBuf_st {
+
+/* sk_circbuf_t */
+struct sk_circbuf_st {
     /* Maximum number of cells */
     uint32_t         maxcells;
     /* Current number of cells in use, across all chunks */
@@ -155,12 +152,12 @@ struct circBuf_st {
     uint32_t         cellsize;
     /* Number of cells per chunk */
     uint32_t         cells_per_chunk;
-    /* Head (writer) chunk */
-    circBuf_chunk_t *head_chunk;
-    /* Tail (reader) chunk */
-    circBuf_chunk_t *tail_chunk;
+    /* Writer chunk */
+    circbuf_chunk_t *writer_chunk;
+    /* Rreader chunk */
+    circbuf_chunk_t *reader_chunk;
     /* Spare chunk */
-    circBuf_chunk_t *spare_chunk;
+    circbuf_chunk_t *spare_chunk;
     /* Mutex */
     pthread_mutex_t  mutex;
     /* Condition variable */
@@ -170,14 +167,15 @@ struct circBuf_st {
     /* True if the buf has been stopped */
     unsigned         destroyed : 1;
 };
+/* typedef struct sk_circbuf_st sk_circbuf_t; */
 
 
 /* Allocate a new chunk */
-static circBuf_chunk_t *
-alloc_chunk(
-    circBuf_t          *buf)
+static circbuf_chunk_t *
+circbuf_alloc_chunk(
+    sk_circbuf_t       *buf)
 {
-    circBuf_chunk_t *chunk;
+    circbuf_chunk_t *chunk;
 
     if (buf->spare_chunk) {
         /* If there is a spare chunk, use it.  We maintain a spare
@@ -185,10 +183,10 @@ alloc_chunk(
          * removed more quickly then they are added. */
         chunk = buf->spare_chunk;
         buf->spare_chunk = NULL;
-        chunk->next_head = chunk->tail = 0;
+        chunk->next_writer = chunk->reader = 0;
     } else {
         /* Otherwise, allocate a new chunk. */
-        chunk = (circBuf_chunk_t*)calloc(1, sizeof(circBuf_chunk_t));
+        chunk = (circbuf_chunk_t*)calloc(1, sizeof(circbuf_chunk_t));
         if (chunk == NULL) {
             return NULL;
         }
@@ -198,58 +196,80 @@ alloc_chunk(
             return NULL;
         }
     }
-    chunk->head = buf->cells_per_chunk - 1;
-    chunk->next_tail = 1;
+    chunk->writer = buf->cells_per_chunk - 1;
+    chunk->next_reader = 1;
     chunk->next = NULL;
 
     return chunk;
 }
 
 
-circBuf_t *
-circBufCreate(
+int
+skCircBufCreate(
+    sk_circbuf_t      **buf_out,
     uint32_t            item_size,
     uint32_t            item_count)
 {
-    circBuf_t *buf;
+    sk_circbuf_t *buf;
     uint32_t chunks;
+
+    if (NULL == buf_out) {
+        return SK_CIRCBUF_E_BAD_PARAM;
+    }
+    *buf_out = NULL;
 
     if (item_count == 0
         || item_size == 0
-        || item_size > CIRCBUF_CHUNK_MAXIMUM_ITEM_SIZE)
+        || item_size > SK_CIRCBUF_CHUNK_MAXIMUM_ITEM_SIZE)
     {
-        return NULL;
+        return SK_CIRCBUF_E_BAD_PARAM;
     }
 
-    buf = (circBuf_t*)calloc(1, sizeof(circBuf_t));
+    buf = (sk_circbuf_t*)calloc(1, sizeof(sk_circbuf_t));
     if (buf == NULL) {
-        return NULL;
+        return SK_CIRCBUF_E_ALLOC;
     }
 
     buf->cellsize = item_size;
 
-    buf->cells_per_chunk = CIRCBUF_CHUNK_MAX_SIZE / item_size;
-    if (buf->cells_per_chunk < CIRCBUF_MINIMUM_ITEMS_PER_CHUNK) {
-        buf->cells_per_chunk = CIRCBUF_MINIMUM_ITEMS_PER_CHUNK;
+    buf->cells_per_chunk = SK_CIRCBUF_CHUNK_MAX_SIZE / item_size;
+    if (buf->cells_per_chunk < SK_CIRCBUF_MINIMUM_ITEMS_PER_CHUNK) {
+        buf->cells_per_chunk = SK_CIRCBUF_MINIMUM_ITEMS_PER_CHUNK;
     }
 
     /* Number of chunks required to handle item_count cells */
     chunks = 1 + (item_count - 1) / buf->cells_per_chunk;
     buf->maxcells = buf->cells_per_chunk * chunks;
 
+    /* Create the initial chunk */
+    buf->reader_chunk = buf->writer_chunk = circbuf_alloc_chunk(buf);
+    if (buf->reader_chunk == NULL) {
+        free(buf);
+        return SK_CIRCBUF_E_ALLOC;
+    }
+    /* The initial chunk needs to pretend that its reader starts at -1
+     * instead of 0, because its reader is not coming from a previous
+     * chunk.  This is a special case that should only happen once. */
+    buf->reader_chunk->reader = buf->cells_per_chunk - 1;
+    buf->reader_chunk->next_reader = 0;
+
     pthread_mutex_init(&buf->mutex, NULL);
     pthread_cond_init(&buf->cond, NULL);
-    return buf;
+    *buf_out = buf;
+    return SK_CIRCBUF_OK;
 }
 
 
-uint8_t *
-circBufNextHead(
-    circBuf_t          *buf)
+int
+skCircBufGetWriterBlock(
+    sk_circbuf_t       *buf,
+    void               *writer_pos,
+    uint32_t           *out_item_count)
 {
-    uint8_t *retval;
+    int retval;
 
     assert(buf);
+    assert(writer_pos);
 
     pthread_mutex_lock(&buf->mutex);
 
@@ -257,7 +277,7 @@ circBufNextHead(
 
     /* Wait for an empty cell */
     while (!buf->destroyed && (buf->cellcount == buf->maxcells)) {
-        TRACEMSG((("circBufNextHead() full, count is %" PRIu32),
+        TRACEMSG((("skCircBufGetWriterBlock() full, count is %" PRIu32),
                   buf->cellcount));
         pthread_cond_wait(&buf->cond, &buf->mutex);
     }
@@ -265,61 +285,53 @@ circBufNextHead(
     if (buf->cellcount <= 1) {
         /* If previously, the buffer was empty, signal waiters */
         pthread_cond_broadcast(&buf->cond);
-
-        /* Create the initial chunk.  This should only happen once */
-        if (buf->head_chunk == NULL) {
-            buf->tail_chunk = buf->head_chunk = alloc_chunk(buf);
-            if (buf->tail_chunk == NULL) {
-                retval = NULL;
-                goto END;
-            }
-            /* The initial chunk need to pretend that its tail starts
-             * at -1 instead of 0, because its tail is not coming from
-             * a previous chunk.  This is a special case that should
-             * only happen once.  */
-            buf->tail_chunk->tail = buf->cells_per_chunk - 1;
-            buf->tail_chunk->next_tail = 0;
-        }
     }
 
     /* Increment the cell count */
     ++buf->cellcount;
 
+    if (out_item_count) {
+        *out_item_count = buf->cellcount;
+    }
+
     if (buf->destroyed) {
-        retval = NULL;
+        *(uint8_t**)writer_pos = NULL;
+        retval = SK_CIRCBUF_E_STOPPED;
         pthread_cond_broadcast(&buf->cond);
     } else {
-        /* Get the head chunk */
-        circBuf_chunk_t *chunk = buf->head_chunk;
+        /* Get the writer chunk */
+        circbuf_chunk_t *chunk = buf->writer_chunk;
 
-        /* If the head chunk is full */
+        /* If the writer chunk is full */
         if (chunk->full) {
             assert(chunk->next == NULL);
-            chunk->next = alloc_chunk(buf);
+            chunk->next = circbuf_alloc_chunk(buf);
             if (chunk->next == NULL) {
-                retval = NULL;
+                *(uint8_t**)writer_pos = NULL;
+                retval = SK_CIRCBUF_E_ALLOC;
                 goto END;
             }
 
-            /* Make the next chunk the new head chunk*/
+            /* Make the next chunk the new writer chunk*/
             chunk = chunk->next;
             assert(chunk->next == NULL);
-            buf->head_chunk = chunk;
+            buf->writer_chunk = chunk;
         }
-        /* Return value is the next head position */
-        retval = &chunk->data[chunk->next_head * buf->cellsize];
+        /* Return value is the next writer position */
+        *(uint8_t**)writer_pos = &chunk->data[chunk->next_writer
+                                              * buf->cellsize];
+        retval = SK_CIRCBUF_OK;
 
-        /* Increment the current head and the next_head */
-        chunk->head = chunk->next_head;
-        ++chunk->next_head;
-
-        /* Account for wrapping around the next head */
-        if (chunk->next_head == buf->cells_per_chunk) {
-            chunk->next_head = 0;
+        /* Increment the current writer and the next_writer,
+         * accounting for wrapping of the next_writer */
+        chunk->writer = chunk->next_writer;
+        ++chunk->next_writer;
+        if (chunk->next_writer == buf->cells_per_chunk) {
+            chunk->next_writer = 0;
         }
 
         /* Check to see if we have filled this chunk */
-        if (chunk->next_head == chunk->tail) {
+        if (chunk->next_writer == chunk->reader) {
             chunk->full = 1;
         }
     }
@@ -334,13 +346,16 @@ circBufNextHead(
 }
 
 
-uint8_t *
-circBufNextTail(
-    circBuf_t          *buf)
+int
+skCircBufGetReaderBlock(
+    sk_circbuf_t       *buf,
+    void               *reader_pos,
+    uint32_t           *out_item_count)
 {
-    uint8_t *retval;
+    int retval;
 
     assert(buf);
+    assert(reader_pos);
 
     pthread_mutex_lock(&buf->mutex);
 
@@ -356,35 +371,39 @@ circBufNextTail(
         pthread_cond_broadcast(&buf->cond);
     }
 
+    if (out_item_count) {
+        *out_item_count = buf->cellcount;
+    }
+
     /* Decrement the cell count */
     --buf->cellcount;
 
     if (buf->destroyed) {
-        retval = NULL;
+        *(uint8_t**)reader_pos = NULL;
+        retval = SK_CIRCBUF_E_STOPPED;
         pthread_cond_broadcast(&buf->cond);
     } else {
-        /* Get the tail chunk */
-        circBuf_chunk_t *chunk = buf->tail_chunk;
+        /* Get the reader chunk */
+        circbuf_chunk_t *chunk = buf->reader_chunk;
 
         /* Mark the chunk as not full */
         chunk->full = 0;
 
-        /* Increment the tail and the next_tail */
-        chunk->tail = chunk->next_tail;
-        ++chunk->next_tail;
-
-        /* Account for wrapping around the next tail */
-        if (chunk->next_tail == buf->cells_per_chunk) {
-            chunk->next_tail = 0;
+        /* Increment the reader and the next_reader, accounting for
+         * wrapping of the next_reader */
+        chunk->reader = chunk->next_reader;
+        ++chunk->next_reader;
+        if (chunk->next_reader == buf->cells_per_chunk) {
+            chunk->next_reader = 0;
         }
 
         /* Move to next chunk if we have emptied this one (and not last) */
-        if (chunk->tail == chunk->next_head) {
-            circBuf_chunk_t *next_chunk;
+        if (chunk->reader == chunk->next_writer) {
+            circbuf_chunk_t *next_chunk;
 
             next_chunk = chunk->next;
 
-            /* Free the tail chunk.  Save as spare_chunk if empty */
+            /* Free the reader chunk.  Save as spare_chunk if empty */
             if (buf->spare_chunk) {
                 free(chunk->data);
                 free(chunk);
@@ -392,12 +411,13 @@ circBufNextTail(
                 buf->spare_chunk = chunk;
             }
 
-            chunk = buf->tail_chunk = next_chunk;
+            chunk = buf->reader_chunk = next_chunk;
             assert(chunk);
         }
 
-        /* Return value is the current tail position */
-        retval = &chunk->data[chunk->tail * buf->cellsize];
+        /* Return value is the current reader position */
+        *(uint8_t**)reader_pos = &chunk->data[chunk->reader * buf->cellsize];
+        retval = SK_CIRCBUF_OK;
     }
 
     --buf->wait_count;
@@ -409,8 +429,8 @@ circBufNextTail(
 
 
 void
-circBufStop(
-    circBuf_t          *buf)
+skCircBufStop(
+    sk_circbuf_t       *buf)
 {
     pthread_mutex_lock(&buf->mutex);
     buf->destroyed = 1;
@@ -423,11 +443,11 @@ circBufStop(
 
 
 void
-circBufDestroy(
-    circBuf_t          *buf)
+skCircBufDestroy(
+    sk_circbuf_t       *buf)
 {
-    circBuf_chunk_t *chunk;
-    circBuf_chunk_t *next_chunk;
+    circbuf_chunk_t *chunk;
+    circbuf_chunk_t *next_chunk;
 
     if (!buf) {
         return;
@@ -440,14 +460,14 @@ circBufDestroy(
             pthread_cond_wait(&buf->cond, &buf->mutex);
         }
     }
-    TRACEMSG((("circBufDestroy(): Buffer has %" PRIu32 " records"),
+    TRACEMSG((("skCircBufDestroy(): Buffer has %" PRIu32 " records"),
               buf->cellcount));
     pthread_mutex_unlock(&buf->mutex);
 
     pthread_mutex_destroy(&buf->mutex);
     pthread_cond_destroy(&buf->cond);
 
-    chunk = buf->tail_chunk;
+    chunk = buf->reader_chunk;
     while (chunk) {
         next_chunk = chunk->next;
         free(chunk->data);

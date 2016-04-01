@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -61,7 +61,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-filesys.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: sku-filesys.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/utils.h>
 
@@ -1482,65 +1482,6 @@ skGetLine(
     out_buffer[0] = '\0';
     return 0;
 }
-
-
-/* Read count bytes from a file descriptor into buf */
-ssize_t
-skreadn(
-    int                 fd,
-    void               *buf,
-    size_t              count)
-{
-    ssize_t rv;
-    size_t  left = count;
-
-    while (left) {
-        rv = read(fd, buf, left);
-        if (rv == -1) {
-            if (errno == EINTR) {
-                continue;
-            }
-            return -1;
-        }
-        if (rv == 0) {
-            break;
-        }
-        left -= rv;
-        buf = ((uint8_t *)buf) + rv;
-    }
-
-    return (count - left);
-}
-
-
-/* Read count bytes from buf to a file descriptor */
-ssize_t
-skwriten(
-    int                 fd,
-    const void         *buf,
-    size_t              count)
-{
-    ssize_t rv;
-    size_t  left = count;
-
-    while (left) {
-        rv = write(fd, buf, left);
-        if (rv == -1) {
-            if (errno == EINTR) {
-                continue;
-            }
-            return -1;
-        }
-        if (rv == 0) {
-            break;
-        }
-        left -= rv;
-        buf = ((uint8_t *)buf) + rv;
-    }
-
-    return (count - left);
-}
-
 
 
 /*

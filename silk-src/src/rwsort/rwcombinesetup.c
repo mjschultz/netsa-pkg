@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -60,7 +60,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcombinesetup.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwcombinesetup.c 35d28dbdfd0f 2016-02-24 16:28:44Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstringmap.h>
@@ -152,7 +152,6 @@ static const char *appHelp[] = {
 };
 
 
-
 /* LOCAL FUNCTION PROTOTYPES */
 
 static int  appOptionsHandler(clientData cData, int opt_index, char *opt_arg);
@@ -200,7 +199,7 @@ appUsageLong(
     for (i = 0; appOptions[i].name; ++i) {
         fprintf(fh, "--%s %s. ", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]));
-        switch (i) {
+        switch ((appOptionsEnum)appOptions[i].val) {
           case OPT_IGNORE_FIELDS:
             /* Dynamically build the help */
             fprintf(fh, "%s\n", appHelp[i]);
@@ -220,8 +219,9 @@ appUsageLong(
                     ("Attempt to allocate this much memory for the in-core\n"
                      "\tbuffer, in bytes."
                      "  Append k, m, g, for kilo-, mega-, giga-bytes,\n"
-                     "\trespectively. Def. %" PRIu32 "\n"),
-                    (uint32_t)DEFAULT_BUFFER_SIZE);
+                     "\trespectively. Range: %" SK_PRIuZ "-%" SK_PRIuZ
+                     ". Def. " DEFAULT_BUFFER_SIZE "\n"),
+                    MINIMUM_BUFFER_SIZE, MAXIMUM_BUFFER_SIZE);
             break;
           default:
             /* Simple help text from the appHelp array */
@@ -318,6 +318,7 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
+    uint64_t tmp64;
     int optctx_flags;
     int rv;
 
@@ -330,6 +331,10 @@ appSetup(
     skAppVerifyFeatures(&features, NULL);
     skOptionsSetUsageCallback(&appUsageLong);
 
+    /* initialize globals */
+    rv = skStringParseHumanUint64(&tmp64, DEFAULT_BUFFER_SIZE,SK_HUMAN_NORMAL);
+    assert(0 == rv);
+    buffer_size = tmp64;
 
     optctx_flags = (SK_OPTIONS_CTX_INPUT_SILK_FLOW | SK_OPTIONS_CTX_ALLOW_STDIN
                     | SK_OPTIONS_CTX_XARGS | SK_OPTIONS_CTX_PRINT_FILENAMES);
@@ -429,7 +434,7 @@ appSetup(
             skStreamPrintLastErr(print_statistics, rv, NULL);
             skAppPrintErr("Could not open output file.  Exiting.");
             appExit(EXIT_FAILURE);
-    }
+        }
     }
 
     /* open output */
@@ -472,6 +477,7 @@ appOptionsHandler(
     int                 opt_index,
     char               *opt_arg)
 {
+    uint64_t tmp64;
     double d;
     int rv;
 
@@ -540,20 +546,20 @@ appOptionsHandler(
         break;
 
       case OPT_BUFFER_SIZE:
-        rv = skStringParseHumanUint64(&buffer_size, opt_arg,
-                                      SK_HUMAN_NORMAL);
+        rv = skStringParseHumanUint64(&tmp64, opt_arg, SK_HUMAN_NORMAL);
         if (rv) {
             goto PARSE_ERROR;
         }
-        if ((buffer_size < MIN_IN_CORE_RECORDS * NODE_SIZE)
-            || (buffer_size >= UINT32_MAX))
+        if ((tmp64 < MINIMUM_BUFFER_SIZE)
+            || (tmp64 > MAXIMUM_BUFFER_SIZE))
         {
-            skAppPrintErr(("The --%s value must be between %" PRIu32
-                           " and %" PRIu32),
-                          appOptions[opt_index].name,
-                          (MIN_IN_CORE_RECORDS * NODE_SIZE), UINT32_MAX);
+            skAppPrintErr(
+                ("The --%s value must be between %" SK_PRIuZ " and %" SK_PRIuZ),
+                appOptions[opt_index].name,
+                MINIMUM_BUFFER_SIZE, MAXIMUM_BUFFER_SIZE);
             return 1;
         }
+        buffer_size = tmp64;
         break;
     }
 

@@ -579,7 +579,7 @@ char *pmapbuild_text;
 #line 1 "rwpmapbuild.l"
 #line 2 "rwpmapbuild.l"
 /*
-** Copyright (C) 2007-2015 by Carnegie Mellon University.
+** Copyright (C) 2007-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -642,7 +642,7 @@ char *pmapbuild_text;
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmapbuild.l 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwpmapbuild.l 555a887b31de 2016-03-24 15:18:09Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skprefixmap.h>
@@ -754,6 +754,10 @@ static int dry_run = 0;
  * by --ignore-errors */
 static int ignore_errors = 0;
 
+/* do not record the command line invocation in the generated prefix
+ * map file. set by --invocation-strip */
+static int invocation_strip = 0;
+
 
 /* OPTIONS SETUP */
 
@@ -762,7 +766,8 @@ typedef enum {
     OPT_OUTPUT_FILE,
     OPT_MODE,
     OPT_DRY_RUN,
-    OPT_IGNORE_ERRORS
+    OPT_IGNORE_ERRORS,
+    OPT_INVOCATION_STRIP
 } appOptionsEnum;
 
 static struct option appOptions[] = {
@@ -771,6 +776,7 @@ static struct option appOptions[] = {
     {"mode",                REQUIRED_ARG, 0, OPT_MODE},
     {"dry-run",             NO_ARG,       0, OPT_DRY_RUN},
     {"ignore-errors",       NO_ARG,       0, OPT_IGNORE_ERRORS},
+    {"invocation-strip",    NO_ARG,       0, OPT_INVOCATION_STRIP},
     {0,0,0,0}               /* sentinel entry */
 };
 
@@ -782,6 +788,8 @@ static const char *appHelp[] = {
      "\tstatement in the input."),
     "Do not write the output file",
     "Write the output file despite any errors in the input",
+    ("Strip invocation history from the prefix map file.\n"
+     "\tDef. Record command used to create the file"),
     (char *)NULL
 };
 
@@ -863,7 +871,7 @@ SK_DIAGNOSTIC_IGNORE_PUSH("-Wwrite-strings")
 
 
 
-#line 867 "rwpmapbuild.c"
+#line 875 "rwpmapbuild.c"
 
 #define INITIAL 0
 #define ST_EOL 1
@@ -1032,10 +1040,10 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 312 "rwpmapbuild.l"
+#line 320 "rwpmapbuild.l"
 
 
-#line 1039 "rwpmapbuild.c"
+#line 1047 "rwpmapbuild.c"
 
 	if ( !(yy_init) )
 		{
@@ -1116,12 +1124,12 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 314 "rwpmapbuild.l"
+#line 322 "rwpmapbuild.l"
 { BEGIN(ST_MODE); }
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 316 "rwpmapbuild.l"
+#line 324 "rwpmapbuild.l"
 { if (stmtMode(0, pmapbuild_text)) {
                                         ++error_count;
                                     }
@@ -1129,12 +1137,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 322 "rwpmapbuild.l"
+#line 330 "rwpmapbuild.l"
 { BEGIN(ST_MAPNAME); }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 324 "rwpmapbuild.l"
+#line 332 "rwpmapbuild.l"
 { if (stmtMapName(0, pmapbuild_text)) {
                                         ++error_count;
                                     }
@@ -1142,7 +1150,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 330 "rwpmapbuild.l"
+#line 338 "rwpmapbuild.l"
 { if (stmtDefault(0, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1152,7 +1160,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 337 "rwpmapbuild.l"
+#line 345 "rwpmapbuild.l"
 { if (stmtLabel(0, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1162,7 +1170,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 344 "rwpmapbuild.l"
+#line 352 "rwpmapbuild.l"
 { if (stmtLabel(1, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1172,7 +1180,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 351 "rwpmapbuild.l"
+#line 359 "rwpmapbuild.l"
 { if (stmtCIDR(0, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1182,7 +1190,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 358 "rwpmapbuild.l"
+#line 366 "rwpmapbuild.l"
 { if (stmtIPs(0, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1192,7 +1200,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 365 "rwpmapbuild.l"
+#line 373 "rwpmapbuild.l"
 { if (stmtIPs(1, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1202,7 +1210,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 372 "rwpmapbuild.l"
+#line 380 "rwpmapbuild.l"
 { if (stmtProPorts(0, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1212,7 +1220,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 379 "rwpmapbuild.l"
+#line 387 "rwpmapbuild.l"
 { if (stmtProPorts(1, pmapbuild_text)) {
                                             ++error_count;
                                             BEGIN(ST_ERROR);
@@ -1222,7 +1230,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 386 "rwpmapbuild.l"
+#line 394 "rwpmapbuild.l"
 { if (stmtNumbers(0, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1232,7 +1240,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 393 "rwpmapbuild.l"
+#line 401 "rwpmapbuild.l"
 { if (stmtNumbers(1, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1242,7 +1250,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 400 "rwpmapbuild.l"
+#line 408 "rwpmapbuild.l"
 { if (gotLabel(pmapbuild_text)) {
                                         ++error_count;
                                     }
@@ -1251,18 +1259,18 @@ YY_RULE_SETUP
 case 16:
 /* rule 16 can match eol */
 YY_RULE_SETUP
-#line 405 "rwpmapbuild.l"
+#line 413 "rwpmapbuild.l"
 { ++linenum; BEGIN(INITIAL); }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 407 "rwpmapbuild.l"
+#line 415 "rwpmapbuild.l"
 ;
 	YY_BREAK
 case 18:
 /* rule 18 can match eol */
 YY_RULE_SETUP
-#line 409 "rwpmapbuild.l"
+#line 417 "rwpmapbuild.l"
 {
                             skAppPrintErr("Incomplete %s statement on line %d",
                                           pmapbuild_text, linenum);
@@ -1272,7 +1280,7 @@ YY_RULE_SETUP
 case 19:
 /* rule 19 can match eol */
 YY_RULE_SETUP
-#line 415 "rwpmapbuild.l"
+#line 423 "rwpmapbuild.l"
 {
                             skAppPrintErr("Incomplete statement on line %d",
                                           linenum);
@@ -1282,7 +1290,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 422 "rwpmapbuild.l"
+#line 430 "rwpmapbuild.l"
 { skAppPrintErr(("Too many arguments in statement"
                                            " on line %d"),
                                           linenum);
@@ -1291,7 +1299,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 428 "rwpmapbuild.l"
+#line 436 "rwpmapbuild.l"
 { skAppPrintErr("Unrecognized input on line %d",
                                           linenum);
                             ++error_count;
@@ -1300,15 +1308,15 @@ YY_RULE_SETUP
 case 22:
 /* rule 22 can match eol */
 YY_RULE_SETUP
-#line 433 "rwpmapbuild.l"
+#line 441 "rwpmapbuild.l"
 { ++linenum; BEGIN(INITIAL); }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 435 "rwpmapbuild.l"
+#line 443 "rwpmapbuild.l"
 ECHO;
 	YY_BREAK
-#line 1312 "rwpmapbuild.c"
+#line 1320 "rwpmapbuild.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(ST_EOL):
 case YY_STATE_EOF(ST_ERROR):
@@ -2210,7 +2218,7 @@ void pmapbuild_free (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 435 "rwpmapbuild.l"
+#line 443 "rwpmapbuild.l"
 
 
 
@@ -2257,13 +2265,18 @@ appUsageLong(
             fprintf(fh, "\n");
             break;
 
+          case OPT_INVOCATION_STRIP:
+            /* include the help for --notes before
+             * --invocation-strip */
+            skOptionsNotesUsage(fh);
+            /* FALLTHROUGH */
+
           default:
             fprintf(fh, "--%s %s. %s\n", appOptions[i].name,
                     SK_OPTION_HAS_ARG(appOptions[i]), appHelp[i]);
             break;
         }
     }
-    skOptionsNotesUsage(fh);
 }
 
 
@@ -2357,6 +2370,11 @@ appSetup(
 
     /* check for input; if none specified, use stdin */
     if (!in_stream.of_name) {
+        if (FILEIsATty(stdin)) {
+            skAppPrintErr("Specify '--%s=-' to read from the terminal",
+                          appOptions[OPT_INPUT_FILE].name);
+            exit(EXIT_FAILURE);
+        }
         in_stream.of_name = "-";
     }
 
@@ -2409,7 +2427,7 @@ appOptionsHandler(
     switch ((appOptionsEnum)opt_index) {
       case OPT_INPUT_FILE:
         if (in_stream.of_name) {
-            skAppPrintErr("Invalid %s: Switch used mutliple times",
+            skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
             return 1;
         }
@@ -2418,7 +2436,7 @@ appOptionsHandler(
 
       case OPT_OUTPUT_FILE:
         if (out_stream) {
-            skAppPrintErr("Invalid %s: Switch used mutliple times",
+            skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
             return 1;
         }
@@ -2433,7 +2451,7 @@ appOptionsHandler(
 
       case OPT_MODE:
         if (MODE_SET_DEFAULT != mode_set) {
-            skAppPrintErr("Invalid %s: Switch used mutliple times",
+            skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
             return 1;
         }
@@ -2451,6 +2469,10 @@ appOptionsHandler(
 
       case OPT_IGNORE_ERRORS:
         ignore_errors = 1;
+        break;
+
+      case OPT_INVOCATION_STRIP:
+        invocation_strip = 1;
         break;
     }
 
@@ -3128,6 +3150,16 @@ int main(
     if (dry_run) {
         appTeardown();
         return 0;
+    }
+
+    /* add invocation */
+    if (!invocation_strip) {
+        rv = skHeaderAddInvocation(skStreamGetSilkHeader(out_stream), 1,
+                                   argc, argv);
+        if (rv) {
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+            exit(EXIT_FAILURE);
+        }
     }
 
     /* add notes if given */

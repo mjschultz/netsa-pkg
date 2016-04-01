@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -75,7 +75,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: fglob.c e81d0efa6bbe 2015-09-09 13:57:31Z mthomas $");
+RCSIDENT("$SiLK: fglob.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/skvector.h>
 #include "rwfilter.h"

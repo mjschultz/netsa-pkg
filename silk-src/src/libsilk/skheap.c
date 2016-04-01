@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -79,7 +79,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skheap.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: skheap.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/skheap.h>
 

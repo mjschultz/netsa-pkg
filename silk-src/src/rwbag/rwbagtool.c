@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2015 by Carnegie Mellon University.
+** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -51,17 +51,17 @@
 */
 
 /*
-**    rwbagtool performs various operations on bags.  It can add bags
-**    together, subtract a subset of data from a bag, perform key
-**    intersection with an IPset, extract the key list of a bag as an
-**    IPset, or filter bag records based on their counter value.
-**
-*/
+ *    rwbagtool performs various operations on bags.  It can add bags
+ *    together, subtract a subset of data from a bag, perform key
+ *    intersection with an IPset, extract the key list of a bag as an
+ *    IPset, or filter bag records based on their counter value.
+ *
+ */
 
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagtool.c 247c2dd07f4f 2015-07-10 17:24:07Z mthomas $");
+RCSIDENT("$SiLK: rwbagtool.c 5f2d30e80a6f 2016-03-30 22:09:49Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skipaddr.h>
@@ -1365,6 +1365,7 @@ bagtoolCoverSet(
         skAppPrintErr("Error creating cover IPset: %s", skIPSetStrerror(rv));
         goto END;
     }
+    ipset_options.comp_method = comp_method;
     skIPSetOptionsBind(set, &ipset_options);
 
     /* set the types for the keys and counter */

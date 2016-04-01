@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2011-2015 by Carnegie Mellon University.
+** Copyright (C) 2011-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -63,7 +63,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: int-ext-fields.c 97f9c76a9afe 2015-08-28 17:38:23Z mthomas $");
+RCSIDENT("$SiLK: int-ext-fields.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>

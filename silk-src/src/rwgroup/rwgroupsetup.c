@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2015 by Carnegie Mellon University.
+** Copyright (C) 2005-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -59,7 +59,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwgroupsetup.c 4dba2416c3d6 2015-09-10 19:03:20Z mthomas $");
+RCSIDENT("$SiLK: rwgroupsetup.c a980e04f1cff 2016-01-21 18:30:48Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/sksite.h>
@@ -202,7 +202,7 @@ appUsageLong(
      "\tby the same keys as specified in --id-fields and --delta-field.\n")
 
     FILE *fh = USAGE_FH;
-    int i;
+    unsigned int i;
 
     /* Create the string map for --fields */
     createStringmaps();
@@ -210,10 +210,10 @@ appUsageLong(
     fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
     fprintf(fh, "\nSWITCHES:\n");
     skOptionsDefaultUsage(fh);
-    for (i = 0; appOptions[i].name; i++ ) {
+    for (i = 0; appOptions[i].name; ++i) {
         fprintf(fh, "--%s %s. ", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]));
-        switch (i) {
+        switch ((appOptionsEnum)appOptions[i].val) {
           case OPT_ID_FIELDS:
             /* Dynamically build the help */
             fprintf(fh, "%s\n", appHelp[i]);

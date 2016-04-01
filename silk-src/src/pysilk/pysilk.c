@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2015 by Carnegie Mellon University.
+** Copyright (C) 2007-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -60,7 +60,7 @@
                                    headers */
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pysilk.c 242ba69cb734 2015-09-25 21:00:20Z mthomas $");
+RCSIDENT("$SiLK: pysilk.c e5d7217c6d5f 2016-01-21 18:24:52Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skbag.h>
@@ -7497,18 +7497,14 @@ static PyMethodDef silk_methods[] = {
     {"init_site", (PyCFunction)silk_init_site,
      METH_VARARGS | METH_KEYWORDS,
      ("init_site([siteconf][, rootdir])\n"
-      "Initialize the silk site using the given siteconf file name\n"
-      "and rootdir.\n"
-      "If the siteconf is not supplied, the value of the environment\n"
-      "variable " SILK_CONFIG_FILE_ENVAR " will be used if available.\n"
-      "Otherwise, PySiLK will look for a file named 'silk.conf' in the\n"
-      "following directories: the rootdir, the directories\n"
-      "'$SILK_PATH/share/silk/' and '$SILK_PATH/share/'; and the\n"
-      "'share/silk/' and 'share/' directories parallel to the\n"
-      "application's directory.\n"
-      "If the rootdir is not supplied, SiLK's default value will be\n"
-      "used.\n"
-      "Will throw an exception if the site is already initialized.")},
+      "Initialize the silk site.\n"
+      "When siteconf is None, PySiLK uses the file named by the environment\n"
+      "variable " SILK_CONFIG_FILE_ENVAR ", if available, or the file\n"
+      "'silk.conf' in the rootdir, the directories '$SILK_PATH/share/silk/'\n"
+      "and '$SILK_PATH/share/', and the 'share/silk/' and 'share/'\n"
+      "directories parallel to the application's directory.\n"
+      "When rootdir is not supplied, SiLK's default value is used.\n"
+      "Throw an exception if the site is already initialized.")},
     {"have_site_config", (PyCFunction)silk_have_site_config,
      METH_NOARGS,
      ("Return whether the site configuration file has been loaded")},

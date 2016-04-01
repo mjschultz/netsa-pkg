@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -58,7 +58,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skmsg.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: skmsg.c 2a577692b52d 2016-02-18 17:10:37Z mthomas $");
 
 #include "intdict.h"
 #include "multiqueue.h"
@@ -135,6 +135,7 @@ SK_DIAGNOSTIC_IGNORE_POP("-Wdeprecated-declarations")
 #define SKMERR_SHORT   -8
 #define SKMERR_PARTIAL -9
 #define SKMERR_EMPTY   -10
+#define SKMERR_GNUTLS  -11
 
 #define LISTENQ 5
 
@@ -501,14 +502,6 @@ typedef enum {
 typedef struct sk_msg_channel_queue_st sk_msg_channel_queue_t;
 typedef struct sk_msg_conn_queue_st sk_msg_conn_queue_t;
 
-/* Protocol specific transport functions */
-typedef struct sk_msg_transport_fn_st {
-    int  (*send)(sk_msg_conn_queue_t   *conn,
-                 sk_msg_write_buf_t    *write_buf);
-    int  (*recv)(sk_msg_conn_queue_t   *conn,
-                 sk_msg_t             **msg);
-} sk_msg_transport_fn_t;
-
 /* Represents a connected socket or pipe */
 /* typedef struct sk_msg_conn_queue_st sk_msg_conn_queue_t; */
 struct sk_msg_conn_queue_st {
@@ -522,8 +515,6 @@ struct sk_msg_conn_queue_st {
     /* Length of address of connection */
     socklen_t               addrlen;
 
-    /* send and receive functions */
-    sk_msg_transport_fn_t   fn;
     /* Transport type */
     skm_conn_t              transport;
 
@@ -550,6 +541,10 @@ struct sk_msg_conn_queue_st {
     sk_thread_state_t       reader_state;
     /* Reader condition variable */
     pthread_cond_t          reader_cond;
+
+    /* Most recent error from read/write; paired with SKMERR_ERRNO and
+     * SKMERR_GNUTLS return values */
+    int                     last_errnum;
 
     /* Keepalive timeout */
     uint16_t                keepalive;
@@ -716,8 +711,11 @@ set_nonblock(
 
 static const char *
 skmerr_strerror(
-    int                 retval)
+    const sk_msg_conn_queue_t  *conn,
+    int                         retval)
 {
+    static char buf[256];
+
     switch (retval) {
       case SKMERR_MEMORY:
         return "Memory allocation failure";
@@ -730,6 +728,9 @@ skmerr_strerror(
       case SKMERR_ERROR:
         return "Generic error";
       case SKMERR_ERRNO:
+        if (conn) {
+            return strerror(conn->last_errnum);
+        }
         return strerror(errno);
       case SKMERR_CLOSED:
         return "Connection is closed";
@@ -739,9 +740,17 @@ skmerr_strerror(
         return "Partial read or write (will retry)";
       case SKMERR_EMPTY:
         return "Empty read (will retry)";
-      default:
-        return "Unknown SKMERR_ error code";
+#if SK_ENABLE_GNUTLS
+      case SKMERR_GNUTLS:
+        if (conn) {
+            return gnutls_strerror(conn->last_errnum);
+        }
+        return "GnuTLS error";
+#endif
     }
+
+    snprintf(buf, sizeof(buf), "Unknown SKMERR_ error code value %d", retval);
+    return buf;
 }
 
 
@@ -1259,8 +1268,13 @@ read_check_pkcs12(
 /*** TCP functions ***/
 
 /*
- *    Implementation of sk_msg_transport_fn_t.send().  Use standard
- *    TCP functions to write a message.
+ *    Use standard TCP functions to write (send) a message.
+ *
+ *    Either this function or tls_send() is used in the
+ *    writer_thread() to write a message.  The 'transport' member of
+ *    the sk_msg_conn_queue_t determines which function is used.
+ *
+ *    tcp_recv() is the matching function for receiving a message.
  */
 static int
 tcp_send(
@@ -1317,6 +1331,7 @@ tcp_send(
                 retval = SKMERR_CLOSED;
                 break;
             }
+            conn->last_errnum = errno;
             DEBUG_PRINT3("send: System error %d [%s]", errno, strerror(errno));
             retval = SKMERR_ERRNO;
             break;
@@ -1367,8 +1382,13 @@ tcp_send(
 
 
 /*
- *    Implementation of sk_msg_transport_fn_t.recv().  Use standard
- *    TCP functions to read a message.
+ *    Use standard TCP functions to read (receive) a message.
+ *
+ *    Either this function or tls_recv() is used in the
+ *    reader_thread() to read a message.  The 'transport' member of
+ *    the sk_msg_conn_queue_t determines which function is used.
+ *
+ *    tcp_send() is the matching function for sending a message.
  */
 static int
 tcp_recv(
@@ -1409,7 +1429,7 @@ tcp_recv(
         memset(hdr, 0, sizeof(*hdr));
 
         /* Read a header */
-        hdr_buf = ((uint8_t*)hdr);
+        hdr_buf = (uint8_t*)hdr;
         hdr_len = (ssize_t)sizeof(*hdr);
         while ((rv = read(conn->rsocket, hdr_buf, hdr_len))
                != hdr_len)
@@ -1431,6 +1451,7 @@ tcp_recv(
                     continue;
                 }
                 if (errno != EAGAIN) {
+                    conn->last_errnum = errno;
                     DEBUG_PRINT3("recv: System error %d [%s]",
                                  errno, strerror(errno));
                     retval = SKMERR_ERRNO;
@@ -1452,7 +1473,8 @@ tcp_recv(
             } else if (sizeof(*hdr) == (size_t)hdr_len) {
                 /* This read() returned 0, and we do not have any of
                  * the header; assume connection is closed. */
-                DEBUG_PRINT1("recv: Connection closed due to read returning 0");
+                DEBUG_PRINT1("recv: Connection closed due to attempted"
+                             " read of header returning 0");
                 retval = SKMERR_CLOSED;
             } else {
                 /* This read() returned 0, but we got part of the
@@ -1503,6 +1525,7 @@ tcp_recv(
                          buffer->count, strerror(errno));
             RETURN(SKMERR_PARTIAL);
         }
+        conn->last_errnum = errno;
         DEBUG_PRINT3("Failed to read %u bytes; return ERRNO [%s]",
                      buffer->count, strerror(errno));
         retval = SKMERR_ERRNO;
@@ -1546,8 +1569,16 @@ tcp_recv(
 /*** TLS functions ***/
 
 /*
- *    Implementation of sk_msg_transport_fn_t.send().  Use GnuTLS to
- *    write a message.
+ *    Use GnuTLS to write (send) a message.
+ *
+ *    Either this function or tcp_send() is used in the
+ *    writer_thread() to write a message.  The 'transport' member of
+ *    the sk_msg_conn_queue_t determines which function is used.
+ *
+ *    tls_recv() is the matching function for receiving a message.
+ *
+ *    The call to gnutls_record_send() in this function invokes the
+ *    tls_push() callback defined below.
  */
 static int
 tls_send(
@@ -1587,13 +1618,15 @@ tls_send(
                 if (rv == GNUTLS_E_INTERRUPTED || rv == GNUTLS_E_AGAIN) {
                     continue;
                 }
-                if (rv == GNUTLS_E_EXPIRED || rv == GNUTLS_E_INTERRUPTED ||
-                    (rv == GNUTLS_E_PUSH_ERROR &&
-                     (errno == EPIPE || errno == ECONNRESET)))
-                {
-                    RETURN(SKMERR_CLOSED);
+                if (rv == GNUTLS_E_PUSH_ERROR) {
+                    if (errno == EPIPE || errno == ECONNRESET) {
+                        RETURN(SKMERR_CLOSED);
+                    }
+                    conn->last_errnum = errno;
+                    RETURN(SKMERR_ERRNO);
                 }
-                RETURN(SKMERR_ERRNO);
+                conn->last_errnum = rv;
+                RETURN(SKMERR_GNUTLS);
             } else if (rv == 0) {
                 DEBUG_PRINT1("send: Connection closed"
                              " due to write returning 0");
@@ -1610,8 +1643,16 @@ tls_send(
 
 
 /*
- *    Implementation of sk_msg_transport_fn_t.recv().  Use GnuTLS to
- *    read a message.
+ *    Use GnuTLS to read (receive) a message.
+ *
+ *    Either this function or tcp_recv() is used in the
+ *    reader_thread() to read a message.  The 'transport' member of
+ *    the sk_msg_conn_queue_t determines which function is used.
+ *
+ *    tls_send() is the matching function for sending a message.
+ *
+ *    The call to gnutls_record_recv() in this function invokes the
+ *    tls_pull() callback defined below.
  */
 static int
 tls_recv(
@@ -1635,6 +1676,8 @@ tls_recv(
 
         sk_msg_hdr_t    *hdr;
         sk_msg_t        *msg;
+        uint8_t         *hdr_buf;
+        ssize_t          hdr_len;
 
         /* Create a message structure */
         buffer->msg = (sk_msg_t*)malloc(sizeof(sk_msg_t)
@@ -1649,27 +1692,55 @@ tls_recv(
         msg->segment[0].iov_len = sizeof(*hdr);
         memset(hdr, 0, sizeof(*hdr));
 
-        /* Read a header.  This code assumes we can read the entire
-         * header in one call to gnutls_record_recv(). */
-        DEBUG_PRINT2("calling gnutls_record_recv (%" SK_PRIuZ ")",
-                     sizeof(*hdr));
-        while ((rv = gnutls_record_recv(conn->session, hdr, sizeof(*hdr)))
-               != sizeof(*hdr))
+        /* Read a header */
+        hdr_buf = (uint8_t*)hdr;
+        hdr_len = (ssize_t)sizeof(*hdr);
+        DEBUG_PRINT2("calling gnutls_record_recv (%" SK_PRIdZ ")", hdr_len);
+        while ((rv = gnutls_record_recv(conn->session, hdr_buf, hdr_len))
+               != hdr_len)
         {
             DEBUG_PRINT2("gnutls_record_recv -> %" SK_PRIdZ, rv);
+            if (rv > 0) {
+                /* Partial read, reduce number of expected bytes and
+                 * try again. */
+                DEBUG_PRINT3("recv: Partial read of header; trying again"
+                             " (%" SK_PRIdZ "/%" SK_PRIdZ ")",
+                             rv, hdr_len);
+                hdr_buf += rv;
+                hdr_len -= rv;
+                DEBUG_PRINT2("calling gnutls_record_recv (%" SK_PRIdZ ")",
+                             hdr_len);
+                continue;
+            }
             if (rv < 0) {
                 if (rv == GNUTLS_E_INTERRUPTED || rv == GNUTLS_E_AGAIN) {
-                    DEBUG_PRINT2("calling gnutls_record_recv (%" PRIu64 ")",
-                                 (uint64_t)sizeof(*hdr));
+                    DEBUG_PRINT2("calling gnutls_record_recv (%" SK_PRIdZ ")",
+                                 hdr_len);
                     continue;
                 }
-                retval = SKMERR_ERRNO;
-            } else if (rv == 0) {
-                DEBUG_PRINT1("recv: Connection closed due to read returning 0");
+                if (rv == GNUTLS_E_PULL_ERROR) {
+                    conn->last_errnum = errno;
+                    retval = SKMERR_ERRNO;
+                } else {
+                    /* it seems that GnuTLS 2.x returns
+                     * GNUTLS_E_UNEXPECTED_PACKET_LENGTH when read()
+                     * in the tls_pull() function returns 0.  Perhaps
+                     * we ought to treat that as an ordinary close to
+                     * avoid an odd error msg in the log file. */
+                    conn->last_errnum = rv;
+                    retval = SKMERR_GNUTLS;
+                }
+            } else if (sizeof(*hdr) == (size_t)hdr_len) {
+                /* This read() returned 0, and we do not have any of
+                 * the header; assume connection is closed. */
+                DEBUG_PRINT1("recv: Connection closed due to attempted"
+                             " read of header returning 0");
                 retval = SKMERR_CLOSED;
             } else {
+                /* This read() returned 0, but we got part of the
+                 * header on a previous read(); treat as error. */
                 DEBUG_PRINT3("recv: Short read (%" SK_PRIdZ "/%" SK_PRIuZ ")",
-                             rv, sizeof(*hdr));
+                             (sizeof(*hdr) - hdr_len), sizeof(*hdr));
                 retval = SKMERR_SHORT;
             }
             goto error;
@@ -1717,8 +1788,15 @@ tls_recv(
             DEBUG_PRINT2("calling gnutls_record_recv (%d)", buffer->count);
             continue;
         }
-        DEBUG_PRINT2("read failure: [%s]", gnutls_strerror(rv));
-        retval = SKMERR_ERRNO;
+        if (rv == GNUTLS_E_PULL_ERROR) {
+            conn->last_errnum = errno;
+            retval = SKMERR_ERRNO;
+            DEBUG_PRINT3("read failure: %d [%s]", errno, strerror(errno));
+        } else {
+            conn->last_errnum = rv;
+            retval = SKMERR_GNUTLS;
+            DEBUG_PRINT2("read failure: [%s]", gnutls_strerror(rv));
+        }
         goto error;
     }
     DEBUG_PRINT2("gnutls_record_recv -> %" SK_PRIdZ, rv);
@@ -2208,6 +2286,13 @@ destroy_channel(
 
 
 #if SK_ENABLE_GNUTLS
+/*
+ *    A callback function used by GnuTLS for receiving (reading) data.
+ *
+ *    This callback is invoked by gnutls_record_recv(), which is
+ *    called by the tls_recv() function, which is called by the
+ *    reader_thread().
+ */
 static ssize_t
 tls_pull(
     gnutls_transport_ptr_t  fd,
@@ -2215,31 +2300,49 @@ tls_pull(
     size_t                  len)
 {
     struct pollfd pfd;
-    int           rv;
-    ssize_t       rlen;
+    ssize_t       rv;
 
     pfd.fd = (intptr_t)fd;
     pfd.events = POLLIN;
 
     rv = poll(&pfd, 1, TLS_POLL_TIMEOUT);
-    if (rv != 1) {
-        /* What should happen if rv == 0 (timed out?)  Currently we
-         * just return 0, as if there was a zero read.  Possibly we
-         * should return -1 with an errno of EAGAIN. */
-        return rv;
-    }
-    if (pfd.revents & (POLLERR | POLLNVAL | POLLHUP)) {
-        /* Log but ignore poll error events for now (allow the read to
-         * fail.  */
-        DEBUG_PRINT2("Poll returned %s", SK_POLL_EVENT_STR(pfd.revents));
-    }
+    if (1 == rv) {
+        rv = read(pfd.fd, buf, len);
 
-    rlen = read(pfd.fd, buf, len);
-
-    return rlen;
+#if (SENDRCV_DEBUG) & DEBUG_RWTRANSFER_PROTOCOL
+        if (pfd.revents & (POLLERR | POLLNVAL | POLLHUP)) {
+            /* Log but ignore poll error events for now (allow the
+             * read to fail).  */
+            DEBUG_PRINT2("Poll returned %s", SK_POLL_EVENT_STR(pfd.revents));
+        }
+        if (-1 == rv) {
+            DEBUG_PRINT2("Returning -1 from tls_pull (read()) [errno = %d]",
+                         errno);
+        } else if (0 == rv) {
+            DEBUG_PRINT1("Returning 0 from tls_pull (read())");
+        }
+    } else {
+        if (-1 == rv) {
+            DEBUG_PRINT2("Returning -1 from tls_pull (poll()) [errno = %d]",
+                         errno);
+        } else {
+            DEBUG_PRINT2("Returning %" SK_PRIdZ " from tls_pull (poll())", rv);
+        }
+#endif
+    }
+    /* What should happen if result of poll() is 0 (timed out)?
+     * Currently we just return 0, as if there was a zero read.
+     * Possibly we should return -1 with an errno of EAGAIN. */
+    return rv;
 }
 
-
+/*
+ *    A callback function used by GnuTLS for sending (writing) data.
+ *
+ *    This callback is invoked by gnutls_record_send(), which is
+ *    called by our tls_send() function, which is called by the
+ *    writer_thread().
+ */
 static ssize_t
 tls_push(
     gnutls_transport_ptr_t  fd,
@@ -2247,28 +2350,40 @@ tls_push(
     size_t                  len)
 {
     struct pollfd pfd;
-    int           rv;
-    ssize_t       wlen;
+    ssize_t       rv;
 
     pfd.fd = (intptr_t)fd;
     pfd.events = POLLOUT;
 
     rv = poll(&pfd, 1, TLS_POLL_TIMEOUT);
-    if (rv != 1) {
-        /* What should happen if rv == 0 (timed out?)  Currently we
-         * just return 0, as if there was a zero write.  Possibly we
-         * should return -1 with an errno of EAGAIN. */
-        return rv;
-    }
-    if (pfd.revents & (POLLERR | POLLNVAL | POLLHUP)) {
-        /* Log but ignore poll error events for now (allow the write
-         * to fail.  */
-        DEBUG_PRINT2("Poll returned %s", SK_POLL_EVENT_STR(pfd.revents));
-    }
+    if (1 == rv) {
+        rv = write(pfd.fd, buf, len);
 
-    wlen = write(pfd.fd, buf, len);
-
-    return wlen;
+#if (SENDRCV_DEBUG) & DEBUG_RWTRANSFER_PROTOCOL
+        if (pfd.revents & (POLLERR | POLLNVAL | POLLHUP)) {
+            /* Log but ignore poll error events for now (allow the
+             * write to fail).  */
+            DEBUG_PRINT2("Poll returned %s", SK_POLL_EVENT_STR(pfd.revents));
+        }
+        if (-1 == rv) {
+            DEBUG_PRINT2("Returning -1 from tls_push (write()) [errno = %d]",
+                         errno);
+        } else if (0 == rv) {
+            DEBUG_PRINT1("Returning 0 from tls_push (write())");
+        }
+    } else {
+        if (-1 == rv) {
+            DEBUG_PRINT2("Returning -1 from tls_push (poll()) [errno = %d]",
+                         errno);
+        } else {
+            DEBUG_PRINT2("Returning %" SK_PRIdZ " from tls_push (poll())", rv);
+        }
+#endif
+    }
+    /* What should happen if result of poll() is 0 (timed out)?
+     * Currently we just return 0, as if there was a zero write.
+     * Possibly we should return -1 with an errno of EAGAIN. */
+    return rv;
 }
 
 
@@ -2442,17 +2557,6 @@ create_connection(
     conn->addr = addr;
     conn->addrlen = addrlen;
 
-    /* Set the transport functions */
-#if SK_ENABLE_GNUTLS
-    if (tls != SKM_TLS_NONE) {
-        conn->fn.send = tls_send;
-        conn->fn.recv = tls_recv;
-    } else
-#endif
-    {
-        conn->fn.send = tcp_send;
-        conn->fn.recv = tcp_recv;
-    }
     conn->transport = (tls == SKM_TLS_NONE) ? CONN_TCP : CONN_TLS;
 
     /* Set up the channel queue and refcount */
@@ -2631,6 +2735,17 @@ destroy_connection(
     /* Destroy the channelmap */
     int_dict_destroy(conn->channelmap);
 
+#if SK_ENABLE_GNUTLS
+    /* End the connection */
+    if (conn->use_tls) {
+        int rv;
+        do {
+            rv = gnutls_bye(conn->session, GNUTLS_SHUT_RDWR);
+            DEBUG_PRINT2("gnutls_bye() -> %d", rv);
+        } while (rv == GNUTLS_E_AGAIN || rv == GNUTLS_E_INTERRUPTED);
+    }
+#endif /* SK_ENABLE_GNUTLS */
+
     /* Close the socket(s) */
     close(conn->rsocket);
     if (conn->rsocket != conn->wsocket) {
@@ -2644,10 +2759,6 @@ destroy_connection(
 #if SK_ENABLE_GNUTLS
     /* Destroy the session */
     if (conn->use_tls) {
-        int rv;
-        do {
-            rv = gnutls_bye(conn->session, GNUTLS_SHUT_RDWR);
-        } while (rv == GNUTLS_E_AGAIN || rv == GNUTLS_E_INTERRUPTED);
         gnutls_deinit(conn->session);
     }
 #endif /* SK_ENABLE_GNUTLS */
@@ -3112,7 +3223,7 @@ reader_thread(
         if (rv != 0) {
             /* Treat the connection as closed */
             INFOMSG("Closing connection to %s due to failed read: %s",
-                    addr_buf, skmerr_strerror(rv));
+                    addr_buf, skmerr_strerror(conn, rv));
             QUEUE_LOCK(q);
             destroyed = destroy_connection(q, conn);
             QUEUE_UNLOCK(q);
@@ -3319,7 +3430,7 @@ writer_thread(
         if (rv != 0) {
             /* Treat the connection as closed */
             INFOMSG("Closing connection to %s due to failed write: %s",
-                    addr_buf, skmerr_strerror(rv));
+                    addr_buf, skmerr_strerror(conn, rv));
             QUEUE_LOCK(q);
             destroyed = destroy_connection(q, conn);
             QUEUE_UNLOCK(q);
@@ -4084,13 +4195,20 @@ send_message(
 
     assert(q);
     assert(message || length == 0);
+    assert((NULL == free_fn) ? (0 == no_copy) : (1 == no_copy));
     ASSERT_QUEUE_LOCK(q);
 
     if (int_dict_get(q->root->channel, lchannel, &chan) == NULL) {
+        if (no_copy) {
+            free_fn(message);
+        }
         RETURN(-1);
     }
 
     if (chan->state == SKM_CLOSED && send_type != SKM_SEND_INTERNAL) {
+        if (no_copy) {
+            free_fn(message);
+        }
         RETURN(0);
     }
 
@@ -4263,11 +4381,13 @@ skMsgQueueScatterSendMessageNoCopy(
     QUEUE_LOCK(q);
 
     if (int_dict_get(q->root->channel, channel, &chan) == NULL) {
+        free_fn(num_segments, segments);
         rv = -1;
         goto end;
     }
 
     if (chan->state == SKM_CLOSED) {
+        free_fn(num_segments, segments);
         rv = 0;
         goto end;
     }
@@ -4286,16 +4406,18 @@ skMsgQueueScatterSendMessageNoCopy(
     msg->hdr.type = type;
     size = 0;
 
+    /* add all segments to msg before checking the size; this ensures
+     * they all get freed if the overall message size is too large */
     for (i = 0; i < num_segments; i++) {
         msg->segment[i + 1] = segments[i];
         size += segments[i].iov_len;
-        msg->segments++;
-        if (size > UINT16_MAX) {
-            memset(&msg->hdr, 0, sizeof(msg->hdr));
-            skMsgDestroy(msg);
-            rv = -1;
-            goto end;
-        }
+        ++msg->segments;
+    }
+    if (size > UINT16_MAX) {
+        memset(&msg->hdr, 0, sizeof(msg->hdr));
+        skMsgDestroy(msg);
+        rv = -1;
+        goto end;
     }
 
     msg->hdr.size = size;
@@ -4506,6 +4628,49 @@ skMsgGetConnectionInformation(
 
     QUEUE_UNLOCK(q);
     rv = snprintf(buffer, buffer_size, "TCP");
+    RETURN(rv);
+}
+
+
+int
+skMsgGetLocalPort(
+    sk_msg_queue_t     *q,
+    skm_channel_t       channel,
+    uint16_t           *port)
+{
+    sk_msg_channel_queue_t *chan;
+    sk_msg_conn_queue_t    *conn;
+    sk_sockaddr_t           addr;
+    socklen_t               addrlen;
+    int rv;
+
+    DEBUG_ENTER_FUNC;
+
+    assert(q);
+    assert(port);
+
+    rv = -1;
+
+    QUEUE_LOCK(q);
+    chan = find_channel(q, channel);
+    if (chan == NULL) {
+        goto END;
+    }
+    conn = chan->conn;
+    if (conn == NULL) {
+        goto END;
+    }
+
+    addrlen = sizeof(addr);
+    if (-1 == getsockname(conn->rsocket, &addr.sa, &addrlen)) {
+        goto END;
+    }
+
+    *port = skSockaddrPort(&addr);
+    rv = 0;
+
+  END:
+    QUEUE_UNLOCK(q);
     RETURN(rv);
 }
 

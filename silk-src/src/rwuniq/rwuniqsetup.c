@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -58,7 +58,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwuniqsetup.c 4dba2416c3d6 2015-09-10 19:03:20Z mthomas $");
+RCSIDENT("$SiLK: rwuniqsetup.c a980e04f1cff 2016-01-21 18:30:48Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skcountry.h>
@@ -316,7 +316,7 @@ appUsageLong(
     void)
 {
     FILE *fh = USAGE_FH;
-    int i;
+    unsigned int i;
 
 #define USAGE_MSG                                                             \
     ("--fields=N [SWITCHES] [FILES]\n"                                        \
@@ -332,10 +332,10 @@ appUsageLong(
 
     fprintf(fh, "\nSWITCHES:\n");
     skOptionsDefaultUsage(fh);
-    for (i = 0; appOptions[i].name; i++) {
+    for (i = 0; appOptions[i].name; ++i) {
         fprintf(fh, "--%s %s. ", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]));
-        switch ((appOptionsEnum)i) {
+        switch ((appOptionsEnum)appOptions[i].val) {
           case OPT_FIELDS:
             /* Dynamically build the help */
             fprintf(fh, "%s\n", appHelp[i]);

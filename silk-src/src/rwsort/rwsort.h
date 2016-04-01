@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2015 by Carnegie Mellon University.
+** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -65,7 +65,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWSORT_H, "$SiLK: rwsort.h 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENTVAR(rcsID_RWSORT_H, "$SiLK: rwsort.h 35d28dbdfd0f 2016-02-24 16:28:44Z mthomas $");
 
 #include <silk/rwascii.h>
 #include <silk/rwrec.h>
@@ -83,27 +83,38 @@ RCSIDENTVAR(rcsID_RWSORT_H, "$SiLK: rwsort.h 3b368a750438 2015-05-18 20:39:37Z m
 /* LOCAL DEFINES AND TYPEDEFS */
 
 /*
- *    The largest sort buffer we attempt to use, unless the user
- *    selects a different value with the --sort-buffer-size switch.
+ *    The default buffer size to use, unless the user selects a
+ *    different value with the --sort-buffer-size switch.
  *
  *    Support of a buffer of almost 2GB.
  */
-#define DEFAULT_SORT_BUFFER_SIZE   0x78000000
+#define DEFAULT_SORT_BUFFER_SIZE    "1920m"
 
 /*
- *    We do not allocate the sort buffer at once, but use realloc() to
- *    grow the buffer linearly to the maximum size.  The following is
- *    the number of steps to take to reach the maximum size.  The
- *    number of realloc() calls will be once less than this value.
+ *    We do not allocate the buffer at once, but use realloc() to grow
+ *    the buffer linearly to the maximum size.  The following is the
+ *    number of steps to take to reach the maximum size.  The number
+ *    of realloc() calls will be once less than this value.
  *
  *    If the initial allocation fails, the number of chunks is
  *    incremented---making the size of the initial malloc()
- *    smaller---and alloation is attempted again.
+ *    smaller---and allocation is attempted again.
  */
-#define SORT_NUM_CHUNKS  6
+#define NUM_CHUNKS  6
 
 /*
- *    If we can't allocate a buffer that will hold at least this many
+ *    Do not allocate more than this number of bytes at a time.
+ *
+ *    If dividing the buffer size by NUM_CHUNKS gives a chunk size
+ *    larger than this; determine the number of chunks by dividing the
+ *    buffer size by this value.
+ *
+ *    Use a value of 1g
+ */
+#define MAX_CHUNK_SIZE      ((size_t)(0x40000000))
+
+/*
+ *    If we cannot allocate a buffer that will hold at least this many
  *    records, give up.
  */
 #define MIN_IN_CORE_RECORDS     1000
@@ -111,20 +122,31 @@ RCSIDENTVAR(rcsID_RWSORT_H, "$SiLK: rwsort.h 3b368a750438 2015-05-18 20:39:37Z m
 /*
  *    Maximum number of files to attempt to merge-sort at once.
  */
-#define MAX_MERGE_FILES 1024
+#define MAX_MERGE_FILES         1024
 
 /*
  *    Maximum number of fields that can come from plugins.  Allow four
  *    per plug-in.
  */
-#define MAX_PLUGIN_KEY_FIELDS  32
+#define MAX_PLUGIN_KEY_FIELDS   32
 
 /*
  *    Maximum bytes allotted to a "node", which is the complete rwRec
  *    and the bytes required by all keys that can come from plug-ins.
  *    Allow 8 bytes per field, plus enough space for an rwRec.
  */
-#define MAX_NODE_SIZE  (256 + SK_MAX_RECORD_SIZE)
+#define MAX_NODE_SIZE ((size_t)(8 * MAX_PLUGIN_KEY_FIELDS + SK_MAX_RECORD_SIZE))
+
+/*
+ *    The maximum buffer size is the maximum size we can allocate.
+ */
+#define MAXIMUM_SORT_BUFFER_SIZE    ((size_t)(SIZE_MAX))
+
+/*
+ *    The minium buffer size.
+ */
+#define MINIMUM_SORT_BUFFER_SIZE ((size_t)(MAX_NODE_SIZE * MIN_IN_CORE_RECORDS))
+
 
 /* for key fields that come from plug-ins, this struct will hold
  * information about a single field */
@@ -153,7 +175,7 @@ extern uint32_t *sort_fields;
  * records, the node size includes the complete rwRec, plus any binary
  * fields that we get from plug-ins to use as the key.  This node_size
  * value may increase when we parse the --fields switch. */
-extern uint32_t node_size;
+extern size_t node_size;
 
 /* the columns that make up the key that come from plug-ins */
 extern key_field_t key_fields[MAX_PLUGIN_KEY_FIELDS];
@@ -162,7 +184,7 @@ extern key_field_t key_fields[MAX_PLUGIN_KEY_FIELDS];
 extern size_t key_num_fields;
 
 /* output stream */
-extern skstream_t *out_rwios;
+extern skstream_t *out_stream;
 
 /* temp file context */
 extern sk_tempfilectx_t *tmpctx;
@@ -174,8 +196,9 @@ extern int reverse;
 extern int presorted_input;
 
 /* maximum amount of RAM to attempt to allocate */
-extern uint64_t sort_buffer_size;
+extern size_t sort_buffer_size;
 
+/* FUNCTIONS */
 
 void
 appExit(
@@ -187,7 +210,7 @@ appSetup(
     char              **argv);
 int
 appNextInput(
-    skstream_t        **rwios);
+    skstream_t        **stream);
 
 #ifdef __cplusplus
 }

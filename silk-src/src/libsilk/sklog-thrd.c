@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2015 by Carnegie Mellon University.
+** Copyright (C) 2007-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -59,7 +59,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sklog-thrd.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: sklog-thrd.c 5fd09fea13f7 2016-02-24 17:31:05Z mthomas $");
 
 #include <silk/sklog.h>
 
@@ -68,58 +68,10 @@ RCSIDENT("$SiLK: sklog-thrd.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
 static pthread_mutex_t logmutex = PTHREAD_MUTEX_INITIALIZER;
 
 
-static void
-preforkLock(
-    void)
-{
-    pthread_mutex_lock(&logmutex);
-}
-
-static void
-postforkUnlockParent(
-    void)
-{
-    pthread_mutex_unlock(&logmutex);
-}
-
-static void
-postforkUnlockChild(
-    void)
-{
-    int count;
-
-    /*
-     *  HACK ALLERT!!  On OSX 10.7 (Lion), when the log file is
-     *  extremely busy, the first call to pthread_mutex_unlock()
-     *  does not seem to work.  We use the following do/while loop
-     *  to ensure the log is unlocked.
-     *
-     *  Of course, this assumes that once we unlock the mutex we
-     *  inherited across the fork() and get a new lock with trylock(),
-     *  we can successfully unlock the mutex.
-     */
-    count = 0;
-    do {
-        ++count;
-        pthread_mutex_unlock(&logmutex);
-    } while (pthread_mutex_trylock(&logmutex));
-
-    pthread_mutex_unlock(&logmutex);
-    if (count > 1) {
-        DEBUGMSG("Required %d attempts for child to release log mutex",
-                 count);
-    }
-}
-
-
 int
 sklogEnableThreadedLogging(
     void)
 {
-    /* When we fork, ensure the child gets an unlocked handle to
-     * log. */
-    pthread_atfork(&preforkLock, &postforkUnlockParent, &postforkUnlockChild);
-
     /* Set the lock/unlock function pointers on the log and the mutex
      * on which they operate. */
     return sklogSetLocking((sklog_lock_fn_t)&pthread_mutex_lock,

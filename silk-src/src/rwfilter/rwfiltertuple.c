@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2015 by Carnegie Mellon University.
+** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -84,7 +84,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfiltertuple.c 3b368a750438 2015-05-18 20:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwfiltertuple.c 7dab1a2cd828 2016-03-01 16:21:03Z mthomas $");
 
 #include <silk/skvector.h>
 #include <silk/redblack.h>
@@ -724,6 +724,8 @@ tupleParseFieldNames(
     char *errmsg;
     int rv = -1;
 
+    assert(0 == num_fields);
+
     if (NULL == field_map) {
         if (tupleCreateFieldMap()) {
             goto END;
@@ -800,6 +802,8 @@ tupleGetFieldsFromFirstLine(
 {
     char *cp = first_line;
     char *ep = first_line;
+
+    assert(0 == num_fields);
 
     /* need to get fields from the first line. convert the first line
      * in place to a list of fields by converting the delimiter to a
@@ -1239,16 +1243,13 @@ tupleParseFile(
 
             /* find end of current field */
             ep = strchr(cp, delimiter);
-            if (ep) {
-                *ep = '\0';
-            }
-
             if (NULL == ep) {
                 /* at end of line; break out of while() */
                 break;
             }
+            *ep = '\0';
 
-            /* we saw a delimiter earlier; goto next field */
+            /* goto next field */
             cp = ep + 1;
         } /* inner while over fields */
 

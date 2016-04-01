@@ -151,8 +151,8 @@ under-counts.
 
 To see the effect of the various load-schemes, suppose B<rwcount> is
 using 60-second bins and the input contains two records.  The first
-record begins at 12:03:50, ends at 12:06:20, and contains 12,600 bytes
-(60 bytes/second for 210 seconds).  This record may contribute to bins
+record begins at 12:03:50, ends at 12:06:20, and contains 9,000 bytes
+(60 bytes/second for 150 seconds).  This record may contribute to bins
 at 12:03, 12:04, 12:05, and 12:06.  The second record begins at
 12:04:05 and lasts 15 seconds; this record's volume always contributes
 its 200 bytes to the 12:04 bin.  The B<--load-scheme> option splits
@@ -161,11 +161,11 @@ the byte-counts of the records as follows:
  BIN                 12:03:00    12:04:00    12:05:00    12:06:00
                     
  time-proportional        600        3800        3600        1200
- bin-uniform             3150        3350        3150        3150
- start-spike            12600         200           0           0
- middle-spike               0         200       12600           0
- end-spike                  0         200           0       12600
- maximum-volume         12600       12800       12600       12600
+ bin-uniform             2250        2450        2250        2250
+ start-spike             9000         200           0           0
+ middle-spike               0         200        9000           0
+ end-spike                  0         200           0        9000
+ maximum-volume          9000        9200        9000        9000
  minimum-volume             0         200           0           0
 
 For the record that spans multiple bins: the C<time-proportional>
@@ -591,7 +591,7 @@ bins.
 
 =cut
 
-$SiLK: rwcount.pod 093f18894c79 2015-09-08 20:02:01Z mthomas $
+$SiLK: rwcount.pod 8e6b620df342 2015-10-01 17:52:57Z mthomas $
 
 Local Variables:
 mode:text

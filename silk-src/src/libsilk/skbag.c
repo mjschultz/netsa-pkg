@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2015 by Carnegie Mellon University.
+** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_HEADER_START@
 **
@@ -59,7 +59,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skbag.c 4738e9e7f385 2015-08-05 18:08:02Z mthomas $");
+RCSIDENT("$SiLK: skbag.c 5f2d30e80a6f 2016-03-30 22:09:49Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/redblack.h>
@@ -526,7 +526,17 @@ static const bag_field_info_t bag_field_info[] = {
     {16, "any-IPv6"},         /* SKBAG_FIELD_ANY_IPv6 */
     { 2, "any-port"},         /* SKBAG_FIELD_ANY_PORT */
     { 2, "any-snmp"},         /* SKBAG_FIELD_ANY_SNMP */
-    { 4, "any-time"}          /* SKBAG_FIELD_ANY_TIME */
+    { 4, "any-time"},         /* SKBAG_FIELD_ANY_TIME */
+    { 2, "sip-country"},      /* SKBAG_FIELD_SIP_COUNTRY */
+    { 2, "dip-country"},      /* SKBAG_FIELD_DIP_COUNTRY */
+    { 2, "any-country"},      /* SKBAG_FIELD_ANY_COUNTRY */
+
+    { 4, "sip-pmap"},         /* SKBAG_FIELD_SIP_PMAP */
+    { 4, "dip-pmap"},         /* SKBAG_FIELD_DIP_PMAP */
+    { 4, "any-ip-pmap"},      /* SKBAG_FIELD_ANY_IP_PMAP */
+    { 4, "sport-pmap"},       /* SKBAG_FIELD_SPORT_PMAP */
+    { 4, "dport-pmap"},       /* SKBAG_FIELD_DPORT_PMAP */
+    { 4, "any-port-pmap"}     /* SKBAG_FIELD_ANY_PORT_PMAP */
 };
 
 static const bag_field_info_t bag_field_info_custom = {
@@ -3011,7 +3021,6 @@ skBagFieldTypeMerge(
           case SKBAG_FIELD_NHIPv6:
           case SKBAG_FIELD_ANY_IPv6:
             return SKBAG_FIELD_ANY_IPv6;
-
           default:
             break;
         }
@@ -3025,7 +3034,6 @@ skBagFieldTypeMerge(
           case SKBAG_FIELD_DPORT:
           case SKBAG_FIELD_ANY_PORT:
             return SKBAG_FIELD_ANY_PORT;
-
           default:
             break;
         }
@@ -3039,7 +3047,6 @@ skBagFieldTypeMerge(
           case SKBAG_FIELD_OUTPUT:
           case SKBAG_FIELD_ANY_SNMP:
             return SKBAG_FIELD_ANY_SNMP;
-
           default:
             break;
         }
@@ -3051,7 +3058,6 @@ skBagFieldTypeMerge(
           case SKBAG_FIELD_PACKETS:
           case SKBAG_FIELD_SUM_PACKETS:
             return SKBAG_FIELD_SUM_PACKETS;
-
           default:
             break;
         }
@@ -3063,7 +3069,6 @@ skBagFieldTypeMerge(
           case SKBAG_FIELD_BYTES:
           case SKBAG_FIELD_SUM_BYTES:
             return SKBAG_FIELD_SUM_BYTES;
-
           default:
             break;
         }
@@ -3077,7 +3082,6 @@ skBagFieldTypeMerge(
           case SKBAG_FIELD_INIT_FLAGS:
           case SKBAG_FIELD_REST_FLAGS:
             return SKBAG_FIELD_FLAGS;
-
           default:
             break;
         }
@@ -3093,7 +3097,6 @@ skBagFieldTypeMerge(
           case SKBAG_FIELD_ELAPSED:
           case SKBAG_FIELD_SUM_ELAPSED:
             return SKBAG_FIELD_ANY_TIME;
-
           default:
             break;
         }
@@ -3111,6 +3114,45 @@ skBagFieldTypeMerge(
           case SKBAG_FIELD_ANY_TIME:
             return SKBAG_FIELD_ANY_TIME;
 
+          default:
+            break;
+        }
+        break;
+
+      case SKBAG_FIELD_SIP_COUNTRY:
+      case SKBAG_FIELD_DIP_COUNTRY:
+      case SKBAG_FIELD_ANY_COUNTRY:
+        switch (ftype2) {
+          case SKBAG_FIELD_SIP_COUNTRY:
+          case SKBAG_FIELD_DIP_COUNTRY:
+          case SKBAG_FIELD_ANY_COUNTRY:
+            return SKBAG_FIELD_ANY_COUNTRY;
+          default:
+            break;
+        }
+        break;
+
+      case SKBAG_FIELD_SIP_PMAP:
+      case SKBAG_FIELD_DIP_PMAP:
+      case SKBAG_FIELD_ANY_IP_PMAP:
+        switch (ftype2) {
+          case SKBAG_FIELD_SIP_PMAP:
+          case SKBAG_FIELD_DIP_PMAP:
+          case SKBAG_FIELD_ANY_IP_PMAP:
+            return SKBAG_FIELD_ANY_IP_PMAP;
+          default:
+            break;
+        }
+        break;
+
+      case SKBAG_FIELD_SPORT_PMAP:
+      case SKBAG_FIELD_DPORT_PMAP:
+      case SKBAG_FIELD_ANY_PORT_PMAP:
+        switch (ftype2) {
+          case SKBAG_FIELD_SPORT_PMAP:
+          case SKBAG_FIELD_DPORT_PMAP:
+          case SKBAG_FIELD_ANY_PORT_PMAP:
+            return SKBAG_FIELD_ANY_PORT_PMAP;
           default:
             break;
         }
