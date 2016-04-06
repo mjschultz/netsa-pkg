@@ -411,7 +411,7 @@ gboolean decodeTLSv1(
         offsetptr += 2 + ext_len;
 #if YAF_ENABLE_HOOKS
         /* only want Client Hello's server name */
-        if (type == 1) {
+        if (type == 1 && (offsetptr < payloadSize)) {
             while (ext_ptr < payloadSize && (tot_ext < ext_len)) {
                 sub_ext_type = ntohs(*(uint16_t *)(payload + ext_ptr));
                 ext_ptr += 2;
@@ -497,7 +497,7 @@ gboolean decodeTLSv1(
 
             offsetptr += 3; /* 1 for type, 2 for version */
 
-            if (offsetptr > payloadSize) {
+            if ((offsetptr + 2) > payloadSize) {
                 return TRUE; /* prob should be false */
             }
 
@@ -625,7 +625,7 @@ gboolean decodeSSLv2(
 
             offsetptr += 3; /* 1 for type, 2 for version */
 
-            if (offsetptr > payloadSize) {
+            if ((offsetptr + 2) > payloadSize) {
                 return TRUE; /* prob should be false */
             }
 

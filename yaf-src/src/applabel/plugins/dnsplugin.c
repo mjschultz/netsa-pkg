@@ -199,6 +199,7 @@ dnsplugin_LTX_ycDnsScanScan (
         if ((msglen + 2) == firstpkt) {
             /* this is the weird message length in TCP */
             payload += sizeof(uint16_t);
+            payloadSize -= sizeof(uint16_t);
         }
     }
 
@@ -244,6 +245,11 @@ dnsplugin_LTX_ycDnsScanScan (
      * in size */
     payloadOffset = sizeof (ycDnsScanMessageHeader_t);
     /* the the query entries */
+
+    if (payloadOffset >= payloadSize) {
+        return 0;
+    }
+
     for (loop = 0; loop < header.qdcount; loop++) {
         uint8_t             sizeOct = *(payload + payloadOffset);
         uint16_t            qclass;
@@ -272,6 +278,10 @@ dnsplugin_LTX_ycDnsScanScan (
         /* get past the terminating 0 length in the name if NO COMPRESSION*/
         if (!comp) {
             payloadOffset++;
+        }
+
+        if ((payloadOffset + 2) > payloadSize) {
+            return 0;
         }
 
         /* check the query type */
@@ -303,7 +313,7 @@ dnsplugin_LTX_ycDnsScanScan (
 
         payloadOffset += sizeof (uint16_t);
 
-        if (payloadOffset >= payloadSize) {
+        if ((payloadOffset + 2) > payloadSize) {
             return 0;
         }
 
@@ -337,6 +347,7 @@ dnsplugin_LTX_ycDnsScanScan (
     /* check each record for the answer record count */
     for (loop = 0; loop < header.ancount; loop++) {
         uint16_t            rc;
+
         rc =
             ycDnsScanCheckResourceRecord(payload, &payloadOffset,
                                          payloadSize);
@@ -533,11 +544,17 @@ ycDnsScanCheckResourceRecord (
     uint16_t * offset,
     unsigned int payloadSize)
 {
-    uint16_t            nameSize = *(payload + (*offset));
+    uint16_t            nameSize;
     uint16_t            rrType;
     uint16_t            rrClass;
     uint16_t            rdLength;
     gboolean compress_flag = FALSE;
+
+    if (*offset >= payloadSize) {
+        return 0;
+    }
+
+    nameSize  = *(payload + (*offset));
 
     while ((0 != nameSize) && (*offset < payloadSize)) {
         if (DNS_NAME_COMPRESSION == (nameSize & DNS_NAME_COMPRESSION)) {
@@ -559,7 +576,7 @@ ycDnsScanCheckResourceRecord (
         *offset += 1;
     }
 
-    if (*offset > payloadSize) {
+    if ((*offset + 2) > payloadSize) {
         return 0;
     }
 
@@ -583,7 +600,7 @@ ycDnsScanCheckResourceRecord (
         }
     }
 
-    if (*offset >= payloadSize) {
+    if ((*offset + 2) > payloadSize) {
         return 0;
     }
 
@@ -606,7 +623,7 @@ ycDnsScanCheckResourceRecord (
     /* skip past the time to live */
     *offset += sizeof (uint32_t);
 
-    if (*offset >= payloadSize) {
+    if ((*offset + 2) > payloadSize) {
         return 0;
     }
 

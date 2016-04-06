@@ -393,9 +393,9 @@ gboolean ypHookInitialize (
 
     dpiRuleFile = fopen(dpiFQFileName, "r");
     if (NULL == dpiRuleFile) {
-        fprintf(stderr, "Could not open "
-                "Deep Packet Inspection Rule File \"%s\" for reading\n",
-                dpiFQFileName);
+        *err = g_error_new(YAF_ERROR_DOMAIN, YAF_ERROR_INTERNAL, "Couldn't "
+                           "open Deep Packet Inspection Rule File \"%s\" for reading",
+                           dpiFQFileName);
         return FALSE;
     }
 
@@ -496,6 +496,10 @@ gboolean ypFlowClose(
 
     ctx = flowContext->yfctx;
 
+    if (ctx->dpiInitialized == 0) {
+        return TRUE;
+    }
+
     if (flowContext->dpi == NULL) {
         flowContext->dpi = yg_slice_alloc0(YAF_MAX_CAPTURE_FIELDS *
                                            sizeof(yfDPIData_t));
@@ -509,8 +513,7 @@ gboolean ypFlowClose(
             return TRUE;
         }
         /* Do DPI Processing from Rule Files */
-        newDPI = ypDPIScanner(flowContext, flow->val.payload,
-                              flow->val.paylen, 0, flow, &(flow->val));
+        newDPI = ypDPIScanner(flowContext, flow->val.payload,                              flow->val.paylen, 0, flow, &(flow->val));
         flowContext->captureFwd += newDPI;
         if (flow->rval.paylen) {
             newDPI = ypDPIScanner(flowContext, flow->rval.payload,
@@ -1371,7 +1374,11 @@ void ypFlowPacket(
 
     ctx = flowContext->yfctx;
 
-    flowContext->captureFwd = flowContext->dpinum;
+    if (ctx->dpiInitialized == 0) {
+        return;
+    }
+
+   flowContext->captureFwd = flowContext->dpinum;
 
     if (flowContext->captureFwd > YAF_MAX_CAPTURE_SIDE) {
         /* Max out at 25 per side  - usually won't happen in this case*/
@@ -1467,12 +1474,16 @@ gboolean ypFlowWrite(
         return FALSE;
     }
 
+    ctx = flowContext->yfctx;
+
+    if (ctx->dpiInitialized == 0) {
+        return TRUE;
+    }
+
     if (flowContext->dpinum == 0) {
         /* Nothing to write! */
         return TRUE;
     }
-
-    ctx = flowContext->yfctx;
 
     /*If there's no reverse payload & No Fwd captures this has to be uniflow*/
     if (!flow->rval.payload && !flowContext->captureFwd) {
@@ -1646,7 +1657,6 @@ gboolean ypGetTemplate(
     fbSession_t     *session)
 {
     GError               *err = NULL;
-
 
     if (ypSearchPlugOpts(global_active_protos, 194)) {
         if (!(ircTemplate = ypInitTemplate(session, yaf_singleBL_spec,
@@ -2248,6 +2258,10 @@ void ypScanPayload(
 
     ctx = flowContext->yfctx;
 
+    if (ctx->dpiInitialized == 0) {
+        return;
+    }
+
     if (caplen == 0 && applabel != 53) {
         return;
     }
@@ -2379,6 +2393,7 @@ uint8_t ypGetTemplateCount(
     }
 
     ctx = flowContext->yfctx;
+
     if (!ypSearchPlugOpts(ctx->dpiActiveHash, flow->appLabel)) {
         return 0;
     }
@@ -2466,7 +2481,6 @@ void ypFreeLists(
         g_warning("couldn't free flow %p; not in hash table\n", flow);
         return;
     }
-
 
     ctx = flowContext->yfctx;
 
@@ -4244,6 +4258,7 @@ void ypDNSParser(
         if ((msglen + 2) == firstpkt) {
             /* this is the weird message length in TCP */
             payload += sizeof(uint16_t);
+            payloadSize -= sizeof(uint16_t);
         }
     }
 
@@ -4273,7 +4288,7 @@ void ypDNSParser(
             (*dnsQRecord)->dnsRRSection = 0;
             (*dnsQRecord)->dnsQueryResponse = header.qr;
             (*dnsQRecord)->dnsID = header.id;
-            if (payloadOffset < payloadSize) {
+            if ((payloadOffset + 2) < payloadSize) {
                 (*dnsQRecord)->dnsQRType = ntohs(*((uint16_t *)(payload +
                                                         payloadOffset)));
             }

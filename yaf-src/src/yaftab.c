@@ -936,7 +936,6 @@ static void yfCloseActiveFlow(
     uint16_t                        iplen)
 {
     yfFlowNode_t *tfn;  /*temp flow to write*/
-    yfFlowKey_t rkey;
     yfFlowVal_t *valtemp;
 
 #if YAF_ENABLE_COMPACT_IP4
@@ -952,9 +951,9 @@ static void yfCloseActiveFlow(
 #endif
 
     if (&(fn->f.rval) == val) {
+        yfFlowKeyReverse(&(fn->f.key), &(tfn->f.key));
         memcpy(&(tfn->f.val), val, sizeof(yfFlowVal_t));
-        yfFlowKeyReverse(&(fn->f.key), &rkey);
-        yfFlowKeyCopy(&(rkey), &(tfn->f.key));
+        tfn->f.key.tos = fn->f.rtos;
     }
 
     /*"Uniflow"*/
@@ -2449,6 +2448,7 @@ void yfFlowPBuf(
                  (flowtab->udp_uniflow_port != fn->f.key.dp)))
             {
                 /* Get first packet payload from non-TCP flows */
+
                 yfFlowPktGenericTpt(flowtab, fn, val, payload, paylen);
             }
         }
