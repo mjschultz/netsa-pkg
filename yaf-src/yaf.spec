@@ -1,5 +1,5 @@
 %define name yaf
-%define version 2.8.1
+%define version 2.8.2
 %define release 2
 
 Summary: Yet Another Flow sensor

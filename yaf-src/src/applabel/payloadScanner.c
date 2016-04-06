@@ -765,8 +765,15 @@ ycScanPayload (
                                                          payloadData,
                                                          payloadSize,
                                                          flow, val);
-
+            if (rc > 0) {
+                if (rc == 1) {
+                    return ruleTable[loop].payloadLabelValue;
+                } else {
+                    return rc;
+                }
+            }
         }
+
     } else if ((MAX_PAYLOAD_RULES + 1) != (loop = ycPortHashSearch (dstPort)))
     {
         if (REGEX == ruleTable[loop].ruleType) {
@@ -786,6 +793,13 @@ ycScanPayload (
                                                           payloadData,
                                                           payloadSize,
                                                           flow, val);
+            if (rc > 0) {
+                if (rc == 1) {
+                    return ruleTable[loop].payloadLabelValue;
+                } else {
+                    return rc;
+                }
+            }
         }
     }
 
@@ -795,11 +809,7 @@ ycScanPayload (
                 ruleTable[loop].payloadLabelValue, rc);
         ycPayloadPrinter(payloadData, payloadSize, 20, "\t");
 #endif
-        if (rc == 1) {
-            return ruleTable[loop].payloadLabelValue;
-        } else {
-            return rc;
-        }
+        return ruleTable[loop].payloadLabelValue;
     }
 
 

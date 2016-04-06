@@ -1061,9 +1061,16 @@ static void yfDecodeTCPOptions(
         return;
     }
 
-    while ( offset < op_len ) {
+    while ( (offset + 2) < op_len ) {
 
         opth = (const yfHdrTcpOpt_t *)(pkt + offset);
+
+        if (opth->op_kind < 2) {
+            /* 0 is end of option list, 1 is no-op */
+            offset += 1;
+            continue;
+        }
+
         offset += sizeof(yfHdrTcpOpt_t);
 
         if ((opth->op_len > *caplen) || (opth->op_len < sizeof(yfHdrTcpOpt_t)))
