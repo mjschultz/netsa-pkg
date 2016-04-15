@@ -1,10 +1,19 @@
+Version 2.8.4: 2016-04-14
+=========================
+
+Fix incompatibility with older versions of libpcap introduced in 2.8.3
+
+Version 2.8.3: 2016-04-12
+=========================
+
+Important bug fix for versions 2.8.x.  Fixes a bug in decoding specific TCP Options headers.
+
 Version 2.8.2: 2016-04-05
 =========================
 
 Fix application labeling bug introduced in 2.8.0 which incorrectly labels particular REGEX labels
 
 Other Bug Fixes
-
 
 Version 2.8.1: 2016-02-04
 ==========================

@@ -440,19 +440,20 @@ gboolean decodeTLSv1(
     }
 
     if ((offsetptr - header_len) < record_len) {
+        int tot_ext = 0;
         /* extensions? */
         ext_len = ntohs(*(uint16_t *)(payload + offsetptr));
         ext_ptr = offsetptr + 2;
         offsetptr += ext_len + 2;
 #if YAF_ENABLE_HOOKS
         /* only want Client Hello's server name */
-        if (type == 1) {
-            while (ext_ptr < payloadSize) {
+        if (type == 1 && (offsetptr < payloadSize)) {
+            while (ext_ptr < payloadSize && (tot_ext < ext_len)) {
                 sub_ext_type = ntohs(*(uint16_t *)(payload + ext_ptr));
                 ext_ptr += 2;
                 sub_ext_len = ntohs(*(uint16_t *)(payload + ext_ptr));
                 ext_ptr += 2;
-
+                tot_ext += sizeof(uint16_t) + sizeof(uint16_t) + sub_ext_len;
                 if (sub_ext_type != 0) {
                     ext_ptr += sub_ext_len;
                     continue;
@@ -499,7 +500,7 @@ gboolean decodeTLSv1(
                         0xFFFFFF00) >> 8;
             offsetptr += 3;
 
-            while (payloadSize > offsetptr) {
+            while (payloadSize > (offsetptr + 4)) {
                 sub_cert_len = (ntohl(*(uint32_t *)(payload + offsetptr)) &
                                 0xFFFFFF00) >> 8;
                 if ((sub_cert_len > cert_len) || (sub_cert_len < 2))  {
@@ -536,7 +537,7 @@ gboolean decodeTLSv1(
 
             offsetptr += 3; /* 1 for type, 2 for version */
 
-            if (offsetptr > payloadSize) {
+            if ((offsetptr + 2) > payloadSize) {
                 return TRUE; /* prob should be false */
             }
 
@@ -666,7 +667,7 @@ gboolean decodeSSLv2(
 
             offsetptr += 3; /* 1 for type, 2 for version */
 
-            if (offsetptr > payloadSize) {
+            if ((offsetptr + 2) > payloadSize) {
                 return TRUE; /* prob should be false */
             }
 

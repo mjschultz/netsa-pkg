@@ -1436,7 +1436,18 @@ static void yfWritePcap(
             }
         } else { return; }
         if (flow->pcap == NULL) {
-            flow->pcap = pcap_dump_open(pbuf->pcapt, flowtab->pcap_dir);
+            if (g_file_test(flowtab->pcap_dir, G_FILE_TEST_EXISTS)) {
+                pfile = fopen(flowtab->pcap_dir, "ab");
+                if (pfile == NULL) {
+                    g_warning("Pcap Create File Error: %s",
+                              pcap_geterr((pcap_t *)pbuf->pcapt));
+                    return;
+                }
+                /* need to append to pcap - libpcap doesn't have an append fn*/
+                flow->pcap = (pcap_dumper_t *)pfile;
+            } else {
+                flow->pcap = pcap_dump_open(pbuf->pcapt, flowtab->pcap_dir);
+            }
             if (flow->pcap == NULL) {
                 g_warning("Pcap Create File Error: %s",
                           pcap_geterr((pcap_t *)pbuf->pcapt));
@@ -1500,9 +1511,7 @@ static void yfWritePcap(
         }
     }
 
-
     pcap_dump((u_char *)flow->pcap, &(pbuf->pcap_hdr), pbuf->payload);
-
     return;
 
   err:
@@ -2448,7 +2457,6 @@ void yfFlowPBuf(
                  (flowtab->udp_uniflow_port != fn->f.key.dp)))
             {
                 /* Get first packet payload from non-TCP flows */
-
                 yfFlowPktGenericTpt(flowtab, fn, val, payload, paylen);
             }
         }

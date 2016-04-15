@@ -1055,9 +1055,10 @@ static void yfDecodeTCPOptions(
     const yfHdrTcpOpt_t    *opth = (const yfHdrTcpOpt_t *)pkt;
     uint8_t                subtype, flags, backup, hash;
     size_t                 op_len = tcph_len - sizeof(yfHdrTcp_t);
-    uint8_t                offset = 0;
+    size_t                 offset = 0;
+    size_t                 pktlen = *caplen - sizeof(yfHdrTcp_t);
 
-    if (*caplen < op_len) {
+    if (pktlen < op_len) {
         return;
     }
 
@@ -1073,7 +1074,7 @@ static void yfDecodeTCPOptions(
 
         offset += sizeof(yfHdrTcpOpt_t);
 
-        if ((opth->op_len > *caplen) || (opth->op_len < sizeof(yfHdrTcpOpt_t)))
+        if ((opth->op_len > op_len) || (opth->op_len < sizeof(yfHdrTcpOpt_t)))
         {
             return;
         }
@@ -1134,6 +1135,8 @@ static void yfDecodeTCPOptions(
                                                                offset + len));
                         }
                     }
+                    /* added one so subtract one before length is added*/
+                    offset--;
                 }
                 break;
               case YF_MPTCP_ADD_ADDR:
@@ -1159,6 +1162,9 @@ static void yfDecodeTCPOptions(
               default:
                 return;
             }
+            /* added one so subtract it before we add op_len below */
+            offset--;
+
         } else if (opth->op_kind == YF_MSS_OPTION_CODE) {
             /* maximum segment size */
             tcpinfo->mptcp.mss = g_ntohs(*(uint16_t *)(pkt + offset));
@@ -1168,6 +1174,7 @@ static void yfDecodeTCPOptions(
         offset += (opth->op_len - sizeof(yfHdrTcpOpt_t));
 
     }
+
 }
 
 
