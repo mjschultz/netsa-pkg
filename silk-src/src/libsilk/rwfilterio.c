@@ -1,53 +1,9 @@
 /*
 ** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 /*
@@ -59,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfilterio.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
+RCSIDENT("$SiLK: rwfilterio.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 #define RWPACK_BYTES_PACKETS          1
 /* #define RWPACK_FLAGS_TIMES_VOLUMES    1 */
@@ -160,7 +116,7 @@ RCSIDENT("$SiLK: rwfilterio.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
  */
 static int
 filterioRecordUnpack_V4(
-    skstream_t         *rwIOS,
+    skstream_t         *stream,
     rwGenericRec_V5    *rwrec,
     uint8_t            *ar)
 {
@@ -170,7 +126,7 @@ filterioRecordUnpack_V4(
     uint8_t is_tcp;
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         filterioRecordSwap_V4(ar);
     }
 
@@ -226,7 +182,7 @@ filterioRecordUnpack_V4(
  */
 static int
 filterioRecordPack_V4(
-    skstream_t             *rwIOS,
+    skstream_t             *stream,
     const rwGenericRec_V5  *rwrec,
     uint8_t                *ar)
 {
@@ -277,7 +233,7 @@ filterioRecordPack_V4(
     rwRecMemGetApplication(rwrec, &ar[40]);
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         filterioRecordSwap_V4(ar);
     }
 
@@ -352,7 +308,7 @@ filterioRecordPack_V4(
  */
 static int
 filterioRecordUnpack_V3(
-    skstream_t         *rwIOS,
+    skstream_t         *stream,
     rwGenericRec_V5    *rwrec,
     uint8_t            *ar)
 {
@@ -360,7 +316,7 @@ filterioRecordUnpack_V3(
     uint32_t pkts, pflag;
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         filterioRecordSwap_V3(ar);
     }
 
@@ -410,7 +366,7 @@ filterioRecordUnpack_V3(
  */
 static int
 filterioRecordPack_V3(
-    skstream_t             *rwIOS,
+    skstream_t             *stream,
     const rwGenericRec_V5  *rwrec,
     uint8_t                *ar)
 {
@@ -457,7 +413,7 @@ filterioRecordPack_V3(
     ar[39] = rwRecGetFlags(rwrec);
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         filterioRecordSwap_V3(ar);
     }
 
@@ -565,7 +521,7 @@ filterioRecordPack_V3(
  */
 static int
 filterioRecordUnpack_V1V2(
-    skstream_t         *rwIOS,
+    skstream_t         *stream,
     rwGenericRec_V5    *rwrec,
     uint8_t            *ar)
 {
@@ -574,7 +530,7 @@ filterioRecordUnpack_V1V2(
     uint32_t sTime;
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         filterioRecordSwap_V1V2(ar);
     }
 
@@ -609,11 +565,11 @@ filterioRecordUnpack_V1V2(
 
     rwpackUnpackBytesPackets(rwrec, bpp, pkts, pflag);
 
-    if (skHeaderGetRecordVersion(rwIOS->silk_hdr) == 1) {
+    if (skHeaderGetRecordVersion(stream->silk_hdr) == 1) {
         /* handle sensor: sbb is (bPPkt:14; bPPFrac:6; sID:6; pad:6) */
         rwRecSetSensor(rwrec, (uint8_t)((sbb >> 6) & MASKARRAY_06));
     } else {
-        assert(skHeaderGetRecordVersion(rwIOS->silk_hdr) == 2);
+        assert(skHeaderGetRecordVersion(stream->silk_hdr) == 2);
         /* handle sensor: sbb is (bPPkt:14; bPPFrac:6; pad: 4; sID:8) */
         rwRecSetSensor(rwrec, (sk_sensor_id_t)(sbb & MASKARRAY_08));
     }
@@ -627,7 +583,7 @@ filterioRecordUnpack_V1V2(
  */
 static int
 filterioRecordPack_V1V2(
-    skstream_t             *rwIOS,
+    skstream_t             *stream,
     const rwGenericRec_V5  *rwrec,
     uint8_t                *ar)
 {
@@ -661,7 +617,7 @@ filterioRecordPack_V1V2(
     /* bbs: uint32_t bPPkt:14;  uint32_t bPPFrac:6; pad:4; sID:8 */
     bbs = ((bbs << 12) | (rwRecGetSensor(rwrec) & MASKARRAY_08));
 
-    if (skHeaderGetRecordVersion(rwIOS->silk_hdr) == 1) {
+    if (skHeaderGetRecordVersion(stream->silk_hdr) == 1) {
         /* For v1 of FT_RWFILTER files, only 6 bits allowed of sensor
          * is allowed.  Check that our value fits */
         if (rwRecGetSensor(rwrec) > MASKARRAY_06) {
@@ -705,7 +661,7 @@ filterioRecordPack_V1V2(
     memcpy(&ar[28], &bbs, 4);
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         filterioRecordSwap_V1V2(ar);
     }
 
@@ -742,7 +698,7 @@ filterioGetRecLen(
 
 
 /*
- *  status = filterioPrepare(&rwIOS);
+ *  status = filterioPrepare(&stream);
  *
  *    Sets the record version to the default if it is unspecified,
  *    checks that the record format supports the requested record
@@ -751,16 +707,16 @@ filterioGetRecLen(
  */
 int
 filterioPrepare(
-    skstream_t         *rwIOS)
+    skstream_t         *stream)
 {
 #define FILE_FORMAT "FT_RWFILTER"
-    sk_file_header_t *hdr = rwIOS->silk_hdr;
+    sk_file_header_t *hdr = stream->silk_hdr;
     int rv = SKSTREAM_OK; /* return value */
 
     assert(skHeaderGetFileFormat(hdr) == FT_RWFILTER);
 
     /* Set version if none was selected by caller */
-    if ((rwIOS->io_mode == SK_IO_WRITE)
+    if ((stream->io_mode == SK_IO_WRITE)
         && (skHeaderGetRecordVersion(hdr) == SK_RECORD_VERSION_ANY))
     {
         skHeaderSetRecordVersion(hdr, DEFAULT_RECORD_VERSION);
@@ -772,17 +728,17 @@ filterioPrepare(
       case 4:
         /* V4 and V5 differ only in that V5 supports compression on
          * read and write; V4 supports compression only on read */
-        rwIOS->rwUnpackFn = &filterioRecordUnpack_V4;
-        rwIOS->rwPackFn   = &filterioRecordPack_V4;
+        stream->rwUnpackFn = &filterioRecordUnpack_V4;
+        stream->rwPackFn   = &filterioRecordPack_V4;
         break;
       case 3:
-        rwIOS->rwUnpackFn = &filterioRecordUnpack_V3;
-        rwIOS->rwPackFn   = &filterioRecordPack_V3;
+        stream->rwUnpackFn = &filterioRecordUnpack_V3;
+        stream->rwPackFn   = &filterioRecordPack_V3;
         break;
       case 2:
       case 1:
-        rwIOS->rwUnpackFn = &filterioRecordUnpack_V1V2;
-        rwIOS->rwPackFn   = &filterioRecordPack_V1V2;
+        stream->rwUnpackFn = &filterioRecordUnpack_V1V2;
+        stream->rwPackFn   = &filterioRecordPack_V1V2;
         break;
       case 0:
         /* no longer supported */
@@ -791,22 +747,22 @@ filterioPrepare(
         goto END;
     }
 
-    rwIOS->recLen = filterioGetRecLen(skHeaderGetRecordVersion(hdr));
+    stream->recLen = filterioGetRecLen(skHeaderGetRecordVersion(hdr));
 
     /* verify lengths */
-    if (rwIOS->recLen == 0) {
+    if (stream->recLen == 0) {
         skAppPrintErr("Record length not set for %s version %u",
                       FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr));
         skAbort();
     }
-    if (rwIOS->recLen != skHeaderGetRecordLength(hdr)) {
+    if (stream->recLen != skHeaderGetRecordLength(hdr)) {
         if (0 == skHeaderGetRecordLength(hdr)) {
-            skHeaderSetRecordLength(hdr, rwIOS->recLen);
+            skHeaderSetRecordLength(hdr, stream->recLen);
         } else {
             skAppPrintErr(("Record length mismatch for %s version %u\n"
                            "\tcode = %" PRIu16 " bytes;  header = %lu bytes"),
                           FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr),
-                          rwIOS->recLen,
+                          stream->recLen,
                           (unsigned long)skHeaderGetRecordLength(hdr));
             skAbort();
         }

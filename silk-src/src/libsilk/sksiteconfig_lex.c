@@ -572,53 +572,9 @@ char *sksiteconfig_text;
 /*
 ** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 /*
@@ -628,7 +584,7 @@ char *sksiteconfig_text;
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sksiteconfig_lex.l 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
+RCSIDENT("$SiLK: sksiteconfig_lex.l 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 #include "sksiteconfig.h"
 #include "sksiteconfig_parse.h"
@@ -698,7 +654,7 @@ SK_DIAGNOSTIC_IGNORE_PUSH("-Wwrite-strings")
 /* Atoms (symbols) without quotes */
 /* Integral numbers (value returned to parser as a string) */
 /* End of line: command separator */
-#line 702 "sksiteconfig_lex.c"
+#line 658 "sksiteconfig_lex.c"
 
 #define INITIAL 0
 #define ST_ARGS 1
@@ -861,7 +817,7 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 152 "sksiteconfig_lex.l"
+#line 108 "sksiteconfig_lex.l"
 
 
     /* INITIAL state: Throw away comments, whitespace.  Treat any atom
@@ -872,7 +828,7 @@ YY_DECL
        everything to the EOL.  After a valid command, enter the ST_ARGS
        state for argument parsing. */
 
-#line 876 "sksiteconfig_lex.c"
+#line 832 "sksiteconfig_lex.c"
 
 	if ( !(yy_init) )
 		{
@@ -953,101 +909,101 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 162 "sksiteconfig_lex.l"
+#line 118 "sksiteconfig_lex.l"
 ;
 	YY_BREAK
 case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
-#line 163 "sksiteconfig_lex.l"
+#line 119 "sksiteconfig_lex.l"
 { ++sksiteconfig_file->line; return TOK_NL; }
 	YY_BREAK
 case 3:
 /* rule 3 can match eol */
 YY_RULE_SETUP
-#line 164 "sksiteconfig_lex.l"
+#line 120 "sksiteconfig_lex.l"
 { ++sksiteconfig_file->line; return TOK_NL; }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 165 "sksiteconfig_lex.l"
+#line 121 "sksiteconfig_lex.l"
 { BEGIN(ST_ARGS); return TOK_CLASS; }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 166 "sksiteconfig_lex.l"
+#line 122 "sksiteconfig_lex.l"
 { BEGIN(ST_ARGS); return TOK_DEF_CLASS; }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 167 "sksiteconfig_lex.l"
+#line 123 "sksiteconfig_lex.l"
 { BEGIN(ST_ARGS); return TOK_DEF_TYPES; }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 168 "sksiteconfig_lex.l"
+#line 124 "sksiteconfig_lex.l"
 { BEGIN(ST_ARGS); return TOK_END_CLASS; }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 169 "sksiteconfig_lex.l"
+#line 125 "sksiteconfig_lex.l"
 { BEGIN(ST_ARGS); return TOK_END_GROUP; }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 170 "sksiteconfig_lex.l"
+#line 126 "sksiteconfig_lex.l"
 { yylval.str = strdup(sksiteconfig_text);
                           BEGIN(ST_ERR);  return ERR_UNK_CMD; }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 172 "sksiteconfig_lex.l"
+#line 128 "sksiteconfig_lex.l"
 { BEGIN(ST_ARGS); return TOK_GROUP; }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 173 "sksiteconfig_lex.l"
+#line 129 "sksiteconfig_lex.l"
 { BEGIN(ST_ARGS); return TOK_INCLUDE; }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 174 "sksiteconfig_lex.l"
+#line 130 "sksiteconfig_lex.l"
 { BEGIN(ST_ARGS); return TOK_PATH_FORMAT; }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 175 "sksiteconfig_lex.l"
+#line 131 "sksiteconfig_lex.l"
 { BEGIN(ST_ARGS); return TOK_PACKING_LOGIC; }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 176 "sksiteconfig_lex.l"
+#line 132 "sksiteconfig_lex.l"
 { BEGIN(ST_ARGS); return TOK_SENSOR; }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 177 "sksiteconfig_lex.l"
+#line 133 "sksiteconfig_lex.l"
 { BEGIN(ST_ARGS); return TOK_SENSORS; }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 178 "sksiteconfig_lex.l"
+#line 134 "sksiteconfig_lex.l"
 { BEGIN(ST_ARGS); return TOK_TYPE; }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 179 "sksiteconfig_lex.l"
+#line 135 "sksiteconfig_lex.l"
 { BEGIN(ST_ARGS); return TOK_VERSION; }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 180 "sksiteconfig_lex.l"
+#line 136 "sksiteconfig_lex.l"
 { yylval.str = strdup(sksiteconfig_text);
                           BEGIN(ST_ERR);  return ERR_UNK_CMD; }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 182 "sksiteconfig_lex.l"
+#line 138 "sksiteconfig_lex.l"
 { BEGIN(ST_ERR);  return ERR_UNREC; }
 	YY_BREAK
 /* ST_ERR state: Throw away everything up to the newline, because we've
@@ -1055,7 +1011,7 @@ YY_RULE_SETUP
 case 20:
 /* rule 20 can match eol */
 YY_RULE_SETUP
-#line 187 "sksiteconfig_lex.l"
+#line 143 "sksiteconfig_lex.l"
 { BEGIN(INITIAL); ++sksiteconfig_file->line;
                           return TOK_NL; }
 	YY_BREAK
@@ -1064,42 +1020,42 @@ YY_RULE_SETUP
        strings are all valid input in this state. */
 case 21:
 YY_RULE_SETUP
-#line 194 "sksiteconfig_lex.l"
+#line 150 "sksiteconfig_lex.l"
 ;
 	YY_BREAK
 case 22:
 /* rule 22 can match eol */
 YY_RULE_SETUP
-#line 195 "sksiteconfig_lex.l"
+#line 151 "sksiteconfig_lex.l"
 { BEGIN(INITIAL); ++sksiteconfig_file->line;
                           return TOK_NL; }
 	YY_BREAK
 case 23:
 /* rule 23 can match eol */
 YY_RULE_SETUP
-#line 197 "sksiteconfig_lex.l"
+#line 153 "sksiteconfig_lex.l"
 { BEGIN(INITIAL); ++sksiteconfig_file->line;
                           return TOK_NL; }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 199 "sksiteconfig_lex.l"
+#line 155 "sksiteconfig_lex.l"
 { yylval.str = strdup(sksiteconfig_text); return TOK_INTEGER; }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 200 "sksiteconfig_lex.l"
+#line 156 "sksiteconfig_lex.l"
 { yylval.str = strdup(sksiteconfig_text); return TOK_ATOM; }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 201 "sksiteconfig_lex.l"
+#line 157 "sksiteconfig_lex.l"
 { BEGIN(ST_STRING);
                           sksiteconfig_buf_ptr = sksiteconfig_buf; }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 203 "sksiteconfig_lex.l"
+#line 159 "sksiteconfig_lex.l"
 { BEGIN(ST_ERR);  return ERR_UNREC; }
 	YY_BREAK
 /* ST_STRING state: Accepts the remainder of a quoted string (after the
@@ -1107,7 +1063,7 @@ YY_RULE_SETUP
        to quoted strings in C. */
 case 28:
 YY_RULE_SETUP
-#line 209 "sksiteconfig_lex.l"
+#line 165 "sksiteconfig_lex.l"
 { BEGIN(ST_ARGS); STRING_CHECK;
                           *sksiteconfig_buf_ptr = '\0';
                           yylval.str = strdup(sksiteconfig_buf);
@@ -1116,13 +1072,13 @@ YY_RULE_SETUP
 case 29:
 /* rule 29 can match eol */
 YY_RULE_SETUP
-#line 214 "sksiteconfig_lex.l"
+#line 170 "sksiteconfig_lex.l"
 { BEGIN(INITIAL); ++sksiteconfig_file->line;
                           return ERR_UNTERM_STRING; }
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 217 "sksiteconfig_lex.l"
+#line 173 "sksiteconfig_lex.l"
 { unsigned int oct_char;
                           STRING_CHECK;
                           (void) sscanf(sksiteconfig_text+1, "%o", &oct_char);
@@ -1134,48 +1090,48 @@ YY_RULE_SETUP
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 226 "sksiteconfig_lex.l"
+#line 182 "sksiteconfig_lex.l"
 { BEGIN(ST_ERR); return ERR_INVALID_OCTAL_ESCAPE; }
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 228 "sksiteconfig_lex.l"
+#line 184 "sksiteconfig_lex.l"
 { STRING_CHECK; *sksiteconfig_buf_ptr++ = '\n'; }
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 229 "sksiteconfig_lex.l"
+#line 185 "sksiteconfig_lex.l"
 { STRING_CHECK; *sksiteconfig_buf_ptr++ = '\t'; }
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 230 "sksiteconfig_lex.l"
+#line 186 "sksiteconfig_lex.l"
 { STRING_CHECK; *sksiteconfig_buf_ptr++ = '\r'; }
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 231 "sksiteconfig_lex.l"
+#line 187 "sksiteconfig_lex.l"
 { STRING_CHECK; *sksiteconfig_buf_ptr++ = '\b'; }
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 232 "sksiteconfig_lex.l"
+#line 188 "sksiteconfig_lex.l"
 { STRING_CHECK; *sksiteconfig_buf_ptr++ = '\f'; }
 	YY_BREAK
 case 37:
 /* rule 37 can match eol */
 YY_RULE_SETUP
-#line 233 "sksiteconfig_lex.l"
+#line 189 "sksiteconfig_lex.l"
 { STRING_CHECK; *sksiteconfig_buf_ptr++ = '\n'; }
 	YY_BREAK
 case 38:
 YY_RULE_SETUP
-#line 234 "sksiteconfig_lex.l"
+#line 190 "sksiteconfig_lex.l"
 { STRING_CHECK; *sksiteconfig_buf_ptr++ = sksiteconfig_text[1]; }
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 236 "sksiteconfig_lex.l"
+#line 192 "sksiteconfig_lex.l"
 { if ( (sksiteconfig_buf_ptr + sksiteconfig_leng) >
                                        sksiteconfig_buf_end ) {
                               BEGIN(ST_ERR);
@@ -1186,10 +1142,10 @@ YY_RULE_SETUP
 	YY_BREAK
 case 40:
 YY_RULE_SETUP
-#line 244 "sksiteconfig_lex.l"
+#line 200 "sksiteconfig_lex.l"
 ECHO;
 	YY_BREAK
-#line 1193 "sksiteconfig_lex.c"
+#line 1149 "sksiteconfig_lex.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(ST_ARGS):
 case YY_STATE_EOF(ST_ERR):
@@ -2085,7 +2041,7 @@ void sksiteconfig_free (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 244 "sksiteconfig_lex.l"
+#line 200 "sksiteconfig_lex.l"
 
 
 

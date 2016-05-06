@@ -1655,7 +1655,14 @@ count and number of flows.
  def avg_compare(rec1, rec2):
      (total1, count1) = fmt.unpack(rec1)
      (total2, count2) = fmt.unpack(rec2)
-     return cmp((float(total1) / count1), (float(total2) / count2))
+     # Python 2:
+     #return cmp((float(total1) / count1), (float(total2) / count2))
+     # Python 3:
+     avg1 = float(total1) / count1
+     avg2 = float(total2) / count2
+     if avg1 < avg2:
+         return -1
+     return avg1 > avg2
 
  register_field("avg-bytes",
                 column_width    = textsize,
@@ -1949,7 +1956,7 @@ B<silk(7)>, B<python(1)>, L<http://docs.python.org/>
 
 =cut
 
-$SiLK: silkpython.pod 4dba2416c3d6 2015-09-10 19:03:20Z mthomas $
+$SiLK: silkpython.pod 3cddb6030400 2016-04-20 19:08:48Z mthomas $
 
 Local Variables:
 mode:text

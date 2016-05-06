@@ -1,53 +1,9 @@
 /*
 ** Copyright (C) 2007-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 /*
@@ -58,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-ips.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
+RCSIDENT("$SiLK: sku-ips.c ff321d7bd08d 2016-05-05 21:18:46Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/utils.h>
@@ -1110,49 +1066,32 @@ skIPWildcardCheckIp(
     const skIPWildcard_t   *ipwild,
     const skipaddr_t       *ipaddr)
 {
+    uint32_t ip4;
+
     assert(ipwild);
     assert(ipaddr);
 
     if (skIPWildcardIsV6(ipwild)) {
         uint8_t ip6[16];
-        int i;
-
-        if (skipaddrIsV6(ipaddr)) {
-            skipaddrGetV6(ipaddr, ip6);
-        } else {
-            skipaddr_t tmpip;
-            skipaddrV4toV6(ipaddr, &tmpip);
-            skipaddrGetV6(&tmpip, ip6);
-        }
-
-        for (i = 0; i < 8; ++i) {
-            if (!_IPWILD_BLOCK_IS_SET(ipwild, i, ip6[2*i] << 8 | ip6[2*i+1])) {
-                return 0;
-            }
-        }
-
-        return 1;
+        skipaddrGetAsV6(ipaddr, ip6);
+        return (_IPWILD_BLOCK_IS_SET(ipwild, 0, ((ip6[ 0] << 8) | ip6[ 1])) &&
+                _IPWILD_BLOCK_IS_SET(ipwild, 1, ((ip6[ 2] << 8) | ip6[ 3])) &&
+                _IPWILD_BLOCK_IS_SET(ipwild, 2, ((ip6[ 4] << 8) | ip6[ 5])) &&
+                _IPWILD_BLOCK_IS_SET(ipwild, 3, ((ip6[ 6] << 8) | ip6[ 7])) &&
+                _IPWILD_BLOCK_IS_SET(ipwild, 4, ((ip6[ 8] << 8) | ip6[ 9])) &&
+                _IPWILD_BLOCK_IS_SET(ipwild, 5, ((ip6[10] << 8) | ip6[11])) &&
+                _IPWILD_BLOCK_IS_SET(ipwild, 6, ((ip6[12] << 8) | ip6[13])) &&
+                _IPWILD_BLOCK_IS_SET(ipwild, 7, ((ip6[14] << 8) | ip6[15])));
     }
 
-    if (skipaddrIsV6(ipaddr)) {
-        skipaddr_t tmpip;
-        const uint8_t ip4in6[12] = {0x0, 0x0, 0x0, 0x0,  0x0,  0x0,
-                                    0x0, 0x0, 0x0, 0x0, 0xFF, 0xFF};
-        uint8_t ip6[16];
-        uint32_t ip4;
-
-        skipaddrGetV6(ipaddr, ip6);
-        if (memcmp(ip6, ip4in6, sizeof(ip4in6)) != 0) {
-            return 0;
-        }
-
-        memcpy(&ip4, &ip6[12], 4);
-        ip4 = ntohl(ip4);
-        skipaddrSetV4(&tmpip, &ip4);
-        return _IPWILD_IPv4_IS_SET(ipwild, &tmpip);
+    if (skipaddrGetAsV4(ipaddr, &ip4)) {
+        return 0;
     }
 
-    return _IPWILD_IPv4_IS_SET(ipwild, ipaddr);
+    return (_IPWILD_BLOCK_IS_SET((ipwild), 0, 0xFF & (ip4 >> 24)) &&
+            _IPWILD_BLOCK_IS_SET((ipwild), 1, 0xFF & (ip4 >> 16)) &&
+            _IPWILD_BLOCK_IS_SET((ipwild), 2, 0xFF & (ip4 >>  8)) &&
+            _IPWILD_BLOCK_IS_SET((ipwild), 3, 0xFF & (ip4)));
 }
 
 

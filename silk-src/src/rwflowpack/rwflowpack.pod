@@ -1062,7 +1062,7 @@ packing-logic plug-in.
 =head1 SEE ALSO
 
 I<SiLK Installation Handbook>, B<sensor.conf(5)>, B<silk.conf(5)>,
-B<packlogic-twoway(3>), B<packlogic-generic(3)>, B<flowcap(8)>,
+B<packlogic-twoway(3)>, B<packlogic-generic(3)>, B<flowcap(8)>,
 B<rwfilter(1)>, B<rwflowappend(8)>, B<rwreceiver(8)>, B<rwsender(8)>,
 B<rwpollexec(8)>, B<rwpdu2silk(1)>, B<rwpackchecker(8)>, B<silk(7)>,
 B<gzip(1)>, B<yaf(1)>, B<dlopen(3)>, B<zlib(3)>, B<syslog(3)>
@@ -1107,7 +1107,7 @@ attempt to write to the same hourly file simultaneously.
 
 =cut
 
-$SiLK: rwflowpack.pod 69ac5c7dbbef 2015-09-24 16:27:37Z mthomas $
+$SiLK: rwflowpack.pod c24c943e8d9f 2016-04-01 20:55:25Z mthomas $
 
 Local variables:
 mode:text

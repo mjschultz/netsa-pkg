@@ -1,53 +1,9 @@
 /*
 ** Copyright (C) 2005-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 /*
@@ -59,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwallformats.c a980e04f1cff 2016-01-21 18:30:48Z mthomas $");
+RCSIDENT("$SiLK: rwallformats.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -139,7 +95,7 @@ static const char *appHelp[] = {
 
 static int  appOptionsHandler(clientData cData, int opt_index, char *opt_arg);
 static FILE *openTempFile(void);
-static size_t openOutput(skstream_t **out_rwios, const rwRec *rwrec);
+static size_t openOutput(skstream_t **out_stream, const rwRec *rwrec);
 
 
 /* FUNCTION DEFINITIONS */
@@ -358,18 +314,18 @@ openTempFile(
 
 
 /*
- *  status = openOutput(&rwios, rwrec);
+ *  status = openOutput(&stream, rwrec);
  *
  *    Open an output stream for every known type-version-endian
  *    combination.  The files are opened one at a time; a different
  *    file is opened each time this function is called.  The caller
  *    should skStreamClose() the file when finished with it.  The newly
- *    opened file is placed into the memory pointed at by 'rwios'.
+ *    opened file is placed into the memory pointed at by 'stream'.
  *    The 'rwrec' is used to write headers to the file.
  */
 static size_t
 openOutput(
-    skstream_t        **out_rwios,
+    skstream_t        **out_stream,
     const rwRec        *first_rec)
 {
     const size_t num_formats = (sizeof(stream_format)/sizeof(unsigned int));
@@ -381,7 +337,7 @@ openOutput(
     static sk_file_version_t v;
 
     silk_endian_t byte_order;
-    skstream_t *rwIOS;
+    skstream_t *stream;
     sk_file_header_t *hdr;
     int rv = SKSTREAM_OK;
     char path[PATH_MAX];
@@ -442,14 +398,14 @@ openOutput(
                     /* create and open the file */
                     rv = SKSTREAM_OK;
                     if ( !rv) {
-                        rv = skStreamCreate(&rwIOS, SK_IO_WRITE,
+                        rv = skStreamCreate(&stream, SK_IO_WRITE,
                                             SK_CONTENT_SILK_FLOW);
                     }
                     if ( !rv) {
-                        rv = skStreamBind(rwIOS, path);
+                        rv = skStreamBind(stream, path);
                     }
                     if ( !rv) {
-                        hdr = skStreamGetSilkHeader(rwIOS);
+                        hdr = skStreamGetSilkHeader(stream);
                         rv = skHeaderSetFileFormat(hdr, stream_format[f]);
                     }
                     if ( !rv) {
@@ -465,7 +421,7 @@ openOutput(
                     if ( !rv) {
                         /* force output to be in IPv4 for comparison
                          * with formats that do not support IPv6 */
-                        rv = skStreamSetIPv6Policy(rwIOS, SK_IPV6POLICY_ASV4);
+                        rv = skStreamSetIPv6Policy(stream, SK_IPV6POLICY_ASV4);
                     }
 #endif  /* 0 */
                     if ( !rv) {
@@ -481,17 +437,17 @@ openOutput(
                         rv = skHeaderAddInvocation(hdr, 1, g_argc, g_argv);
                     }
                     if ( !rv) {
-                        rv = skStreamOpen(rwIOS);
+                        rv = skStreamOpen(stream);
                     }
                     if ( !rv) {
-                        rv = skStreamWriteSilkHeader(rwIOS);
+                        rv = skStreamWriteSilkHeader(stream);
                     }
 
                     if (rv) {
                         if (rv == SKSTREAM_ERR_UNSUPPORT_VERSION) {
                             /* Reached max version for this type.  Try
                              * next type. */
-                            skStreamDestroy(&rwIOS);
+                            skStreamDestroy(&stream);
                             if (skFileExists(path)) {
                                 unlink(path);
                             }
@@ -499,9 +455,9 @@ openOutput(
                         }
 
                         /* Unexpected error.  Bail */
-                        skStreamPrintLastErr(rwIOS, rv, &skAppPrintErr);
+                        skStreamPrintLastErr(stream, rv, &skAppPrintErr);
                         skAppPrintErr("Error opening '%s'\n", path);
-                        skStreamDestroy(&rwIOS);
+                        skStreamDestroy(&stream);
                         return -1;
                     }
 
@@ -509,7 +465,7 @@ openOutput(
                     ++e;
 
                     /* and return */
-                    *out_rwios = rwIOS;
+                    *out_stream = stream;
                     return 0;
 
                 } /* for e */
@@ -543,7 +499,7 @@ static void
 writeOutputs(
     void)
 {
-    skstream_t *rwIOS;
+    skstream_t *stream;
     rwRec rwrec;
     int rv;
 
@@ -558,7 +514,7 @@ writeOutputs(
             exit(EXIT_FAILURE);
         }
 
-        rv = openOutput(&rwIOS, &rwrec);
+        rv = openOutput(&stream, &rwrec);
         if (rv != 0) {
             if (rv == 1) {
                 /* done */
@@ -569,20 +525,20 @@ writeOutputs(
         }
 
         do {
-            rv = skStreamWriteRecord(rwIOS, &rwrec);
+            rv = skStreamWriteRecord(stream, &rwrec);
             if (SKSTREAM_OK != rv) {
-                skStreamPrintLastErr(rwIOS, rv, &skAppPrintErr);
+                skStreamPrintLastErr(stream, rv, &skAppPrintErr);
                 if (SKSTREAM_ERROR_IS_FATAL(rv)) {
                     break;
                 }
             }
         } while (fread(&rwrec, sizeof(rwRec), 1, tmpf));
 
-        rv = skStreamClose(rwIOS);
+        rv = skStreamClose(stream);
         if (SKSTREAM_OK != rv) {
-            skStreamPrintLastErr(rwIOS, rv, &skAppPrintErr);
+            skStreamPrintLastErr(stream, rv, &skAppPrintErr);
         }
-        skStreamDestroy(&rwIOS);
+        skStreamDestroy(&stream);
     }
 }
 
@@ -615,7 +571,7 @@ readFileToTemp(
 
 int main(int argc, char **argv)
 {
-    skstream_t *rwios;
+    skstream_t *stream;
     int rv = 0;
 
     g_argc = argc;
@@ -624,14 +580,14 @@ int main(int argc, char **argv)
     appSetup(argc, argv);                       /* never returns on error */
 
     /* process input */
-    while ((rv = skOptionsCtxNextSilkFile(optctx, &rwios, &skAppPrintErr))
+    while ((rv = skOptionsCtxNextSilkFile(optctx, &stream, &skAppPrintErr))
            == 0)
     {
-        if (readFileToTemp(rwios)) {
-            skStreamDestroy(&rwios);
+        if (readFileToTemp(stream)) {
+            skStreamDestroy(&stream);
             exit(EXIT_FAILURE);
         }
-        skStreamDestroy(&rwios);
+        skStreamDestroy(&stream);
     }
     if (rv < 0) {
         exit(EXIT_FAILURE);

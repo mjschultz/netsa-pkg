@@ -1,53 +1,9 @@
 /*
 ** Copyright (C) 2009-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 /*
@@ -62,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcompare.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
+RCSIDENT("$SiLK: rwcompare.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -255,11 +211,149 @@ appOptionsHandler(
 }
 
 
+#ifdef RWCOMPARE_VERBOSE
+
+#define RWCOMPARE_BUFSIZ    64
+#if RWCOMPARE_BUFSIZ < SK_NUM2DOT_STRLEN
+#error "Buffer size is smaller than SK_NUM2DOT_STRLEN"
+#endif
+#if RWCOMPARE_BUFSIZ < SKTIMESTAMP_STRLEN
+#error "Buffer size is smaller than SKTIMESTAMP_STRLEN"
+#endif
+
+/* Width of the name column */
+#define WIDTH_NAME  11
+
+/* Width of value columns */
+#define WIDTH_VALUE 33
+
+#define DIFF_STRING "***"
+
+static void
+compareStrings(
+    const char         *title,
+    const char          str[][RWCOMPARE_BUFSIZ])
+{
+    char buf[16];
+    int width = WIDTH_NAME - strlen(DIFF_STRING);
+
+    if (0 == strcmp(str[0], str[1])) {
+        printf("%*.*s|%*s|%*s|\n",
+               WIDTH_NAME, WIDTH_NAME, title,
+               WIDTH_VALUE, str[0], WIDTH_VALUE, str[1]);
+        return;
+    }
+
+    snprintf(buf, sizeof(buf), "%*.*s%s",
+             width, width, title, DIFF_STRING);
+    printf("%*s|%*s|%*s|\n",
+           WIDTH_NAME, buf, WIDTH_VALUE, str[0], WIDTH_VALUE, str[1]);
+}
+
+static void
+compareNumbers(
+    const char         *title,
+    const uint32_t      num[])
+{
+    char buf[16];
+    int width = WIDTH_NAME - strlen(DIFF_STRING);
+
+    if (num[0] == num[1]) {
+        printf("%*.*s|%*" PRIu32 "|%*" PRIu32 "|\n",
+               WIDTH_NAME, WIDTH_NAME, title,
+               WIDTH_VALUE, num[0], WIDTH_VALUE, num[1]);
+        return;
+    }
+
+    snprintf(buf, sizeof(buf), "%*.*s%s",
+             width, width, title, DIFF_STRING);
+    printf("%*s|%*" PRIu32 "|%*" PRIu32 "|\n",
+           WIDTH_NAME, buf, WIDTH_VALUE, num[0], WIDTH_VALUE, num[1]);
+}
+
+static void
+printRecords(
+    const rwRec         rec[])
+{
+    char starttime[2][RWCOMPARE_BUFSIZ];
+    uint32_t elapsed[2];
+    uint32_t sport[2];
+    uint32_t dport[2];
+    uint32_t proto[2];
+    uint32_t flowtype[2];
+    uint32_t sensor[2];
+    uint32_t flags[2];
+    uint32_t initflags[2];
+    uint32_t restflags[2];
+    uint32_t tcpstate[2];
+    uint32_t application[2];
+    uint32_t memo[2];
+    uint32_t input[2];
+    uint32_t output[2];
+    uint32_t pkts[2];
+    uint32_t bytes[2];
+    char sip[2][RWCOMPARE_BUFSIZ];
+    char dip[2][RWCOMPARE_BUFSIZ];
+    char nhip[2][RWCOMPARE_BUFSIZ];
+    skipaddr_t ip;
+    unsigned i;
+
+    for (i = 0; i < 2; ++i) {
+        sktimestamp_r(
+            starttime[i], rwRecGetStartTime(&rec[i]), SKTIMESTAMP_EPOCH);
+        elapsed[i] = rwRecGetElapsed(&rec[i]);
+        sport[i] = rwRecGetSPort(&rec[i]);
+        dport[i] = rwRecGetDPort(&rec[i]);
+        proto[i] = rwRecGetProto(&rec[i]);
+        flowtype[i] = rwRecGetFlowType(&rec[i]);
+        sensor[i] = rwRecGetSensor(&rec[i]);
+        flags[i] = rwRecGetFlags(&rec[i]);
+        initflags[i] = rwRecGetInitFlags(&rec[i]);
+        restflags[i] = rwRecGetRestFlags(&rec[i]);
+        tcpstate[i] = rwRecGetTcpState(&rec[i]);
+        application[i] = rwRecGetApplication(&rec[i]);
+        memo[i] = rwRecGetMemo(&rec[i]);
+        input[i] = rwRecGetInput(&rec[i]);
+        output[i] = rwRecGetOutput(&rec[i]);
+        pkts[i] = rwRecGetPkts(&rec[i]);
+        bytes[i] = rwRecGetBytes(&rec[i]);
+        rwRecMemGetSIP(&rec[i], &ip);
+        skipaddrString(sip[i], &ip, SKIPADDR_HEXADECIMAL);
+        rwRecMemGetDIP(&rec[i], &ip);
+        skipaddrString(dip[i], &ip, SKIPADDR_HEXADECIMAL);
+        rwRecMemGetNhIP(&rec[i], &ip);
+        skipaddrString(nhip[i], &ip, SKIPADDR_HEXADECIMAL);
+    }
+
+    compareStrings("StartTime", starttime);
+    compareNumbers("Elapsed", elapsed);
+    compareNumbers("SPort", sport);
+    compareNumbers("DPort", dport);
+    compareNumbers("Proto", proto);
+    compareNumbers("FlowType", flowtype);
+    compareNumbers("Sensor", sensor);
+    compareNumbers("Flags", flags);
+    compareNumbers("InitFlags", initflags);
+    compareNumbers("RestFlags", restflags);
+    compareNumbers("TcpState", tcpstate);
+    compareNumbers("Application", application);
+    compareNumbers("Memo", memo);
+    compareNumbers("Input", input);
+    compareNumbers("Output", output);
+    compareNumbers("Pkts", pkts);
+    compareNumbers("Bytes", bytes);
+    compareStrings("SIP", sip);
+    compareStrings("DIP", dip);
+    compareStrings("NhIP", nhip);
+}
+#endif  /* RWCOMPARE_VERBOSE */
+
+
 static int
 compareFiles(
     char              **file)
 {
-    skstream_t *ios[2] = {NULL, NULL};
+    skstream_t *stream[2] = {NULL, NULL};
     rwRec rec[2];
     int i;
     int rv;
@@ -267,27 +361,27 @@ compareFiles(
     uint64_t rec_count = 0;
     int eof = -1;
 
-    memset(ios, 0, sizeof(ios));
+    memset(stream, 0, sizeof(stream));
     memset(rec, 0, sizeof(rec));
 
     for (i = 0; i < 2; ++i) {
-        if ((rv = skStreamCreate(&ios[i], SK_IO_READ, SK_CONTENT_SILK_FLOW))
-            || (rv = skStreamBind(ios[i], file[i]))
-            || (rv = skStreamOpen(ios[i]))
-            || (rv = skStreamReadSilkHeader(ios[i], NULL)))
+        if ((rv = skStreamCreate(&stream[i], SK_IO_READ, SK_CONTENT_SILK_FLOW))
+            || (rv = skStreamBind(stream[i], file[i]))
+            || (rv = skStreamOpen(stream[i]))
+            || (rv = skStreamReadSilkHeader(stream[i], NULL)))
         {
             /* Give up if we can't read the beginning of the silk header */
             if (rv != SKSTREAM_OK) {
                 if (!quiet) {
-                    skStreamPrintLastErr(ios[i], rv, &skAppPrintErr);
+                    skStreamPrintLastErr(stream[i], rv, &skAppPrintErr);
                 }
                 goto END;
             }
         }
     }
 
-    while ((rv = skStreamReadRecord(ios[0], &rec[0])) == SKSTREAM_OK) {
-        rv = skStreamReadRecord(ios[1], &rec[1]);
+    while ((rv = skStreamReadRecord(stream[0], &rec[0])) == SKSTREAM_OK) {
+        rv = skStreamReadRecord(stream[1], &rec[1]);
         if (rv != SKSTREAM_OK) {
             if (rv == SKSTREAM_ERR_EOF) {
                 /* file 0 longer than file 1 */
@@ -295,7 +389,7 @@ compareFiles(
                 eof = 1;
             } else {
                 if (!quiet) {
-                    skStreamPrintLastErr(ios[1], rv, &skAppPrintErr);
+                    skStreamPrintLastErr(stream[1], rv, &skAppPrintErr);
                 }
                 status = -1;
             }
@@ -311,10 +405,10 @@ compareFiles(
 
     if (rv != SKSTREAM_ERR_EOF) {
         if (!quiet) {
-            skStreamPrintLastErr(ios[0], rv, &skAppPrintErr);
+            skStreamPrintLastErr(stream[0], rv, &skAppPrintErr);
         }
     } else {
-        rv = skStreamReadRecord(ios[1], &rec[1]);
+        rv = skStreamReadRecord(stream[1], &rec[1]);
         switch (rv) {
           case SKSTREAM_OK:
             /* file 1 longer than file 0 */
@@ -329,7 +423,7 @@ compareFiles(
 
           default:
             if (!quiet) {
-                skStreamPrintLastErr(ios[1], rv, &skAppPrintErr);
+                skStreamPrintLastErr(stream[1], rv, &skAppPrintErr);
             }
             break;
         }
@@ -337,7 +431,7 @@ compareFiles(
 
   END:
     for (i = 0; i < 2; ++i) {
-        skStreamDestroy(&ios[i]);
+        skStreamDestroy(&stream[i]);
     }
     if (1 == status && !quiet) {
         if (eof != -1) {
@@ -346,6 +440,9 @@ compareFiles(
         } else {
             printf(("%s %s differ: record %" PRIu64 "\n"),
                    file[0], file[1], rec_count);
+#ifdef RWCOMPARE_VERBOSE
+            printRecords(rec);
+#endif
         }
     }
 

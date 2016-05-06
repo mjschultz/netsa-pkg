@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-# RCSIDENT($SiLK: Makefile.am 24e5040f7590 2011-01-24 18:55:20Z mthomas $)
+# RCSIDENT($SiLK: Makefile.am fb0b4814fb3d 2016-05-05 21:15:30Z mthomas $)
 VPATH = @srcdir@
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
@@ -414,7 +414,7 @@ SUBDIRS = tests src site
 DIST_SUBDIRS = doc $(SUBDIRS)
 
 # extra configuration files
-EXTRA_DIST = README.txt $(PYTHON_INFO_PROG)
+EXTRA_DIST = LICENSE.txt README.txt $(PYTHON_INFO_PROG)
 @BUILD_ANALYSIS_TOOLS_TRUE@@HAVE_PYTHON_TRUE@PYTHON_REMINDER = remind-python
 PYSILK_INSTALL_TXT = INSTALL-PySiLK.txt
 CLEANFILES = $(PYSILK_INSTALL_TXT)

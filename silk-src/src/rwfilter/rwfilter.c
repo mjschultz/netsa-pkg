@@ -1,53 +1,9 @@
 /*
 ** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 /*
@@ -70,7 +26,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfilter.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
+RCSIDENT("$SiLK: rwfilter.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 #include "rwfilter.h"
 
@@ -168,7 +124,7 @@ writeHeaders(
 
     for (i = 0; i < DESTINATION_TYPES; ++i) {
         for (dest = dest_type[i].dest_list; dest != NULL; dest = dest->next) {
-            out_hdr = skStreamGetSilkHeader(dest->ios);
+            out_hdr = skStreamGetSilkHeader(dest->stream);
 
             /* if 'in_ios' is provided, add its command invocation
              * history to each output file's headers */
@@ -184,13 +140,13 @@ writeHeaders(
                 rv = skHeaderAddInvocation(out_hdr, 1, pargc, pargv);
             }
             if (rv == SKSTREAM_OK) {
-                rv = skOptionsNotesAddToStream(dest->ios);
+                rv = skOptionsNotesAddToStream(dest->stream);
             }
             if (rv == SKSTREAM_OK) {
-                rv = skStreamWriteSilkHeader(dest->ios);
+                rv = skStreamWriteSilkHeader(dest->stream);
             }
             if (rv != SKSTREAM_OK) {
-                skStreamPrintLastErr(dest->ios, rv, &skAppPrintErr);
+                skStreamPrintLastErr(dest->stream, rv, &skAppPrintErr);
                 return rv;
             }
         }
@@ -418,7 +374,7 @@ closeAllDests(
     /* close all the output files (pass, fail, all-dest) */
     for (i = 0; i < DESTINATION_TYPES; ++i) {
         for (dest = dest_type[i].dest_list; dest != NULL; dest = next_dest) {
-            io_rv = skStreamClose(dest->ios);
+            io_rv = skStreamClose(dest->stream);
             switch (io_rv) {
               case SKSTREAM_OK:
               case SKSTREAM_ERR_NOT_OPEN:
@@ -427,10 +383,10 @@ closeAllDests(
               default:
                 rv |= io_rv;
                 if (io_rv) {
-                    skStreamPrintLastErr(dest->ios, io_rv, &skAppPrintErr);
+                    skStreamPrintLastErr(dest->stream, io_rv, &skAppPrintErr);
                 }
             }
-            rv |= skStreamDestroy(&dest->ios);
+            rv |= skStreamDestroy(&dest->stream);
             next_dest = dest->next;
             free(dest);
         }
@@ -466,11 +422,11 @@ closeOutputDests(
 
     for (dest = dest_type[dest_id].dest_list; dest != NULL; dest = next_dest) {
         next_dest = dest->next;
-        rv = skStreamClose(dest->ios);
+        rv = skStreamClose(dest->stream);
         if (rv && !quietly) {
-            skStreamPrintLastErr(dest->ios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(dest->stream, rv, &skAppPrintErr);
         }
-        skStreamDestroy(&dest->ios);
+        skStreamDestroy(&dest->stream);
         free(dest);
     }
     dest_type[dest_id].dest_list = NULL;
@@ -511,7 +467,7 @@ closeOneOutput(
     *dest_prev = dest->next;
 
     /* destroy 'dest' */
-    skStreamDestroy(&dest->ios);
+    skStreamDestroy(&dest->stream);
     free(dest);
     --dest_type[dest_id].count;
 
@@ -546,7 +502,7 @@ filterFile(
     filter_stats_t     *stats)
 {
     rwRec rwrec;
-    skstream_t *in_rwios;
+    skstream_t *in_stream;
     int i;
     int fail_entire_file = 0;
     int result = RWF_PASS;
@@ -561,14 +517,14 @@ filterFile(
         destination_t *dest_next;                                       \
         do {                                                            \
             dest_next = dest->next;                                     \
-            rv = skStreamWriteRecord(dest->ios, pr_rwrec);              \
+            rv = skStreamWriteRecord(dest->stream, pr_rwrec);           \
             if (SKSTREAM_ERROR_IS_FATAL(rv)) {                          \
-                if (skStreamGetLastErrno(dest->ios) == EPIPE) {         \
+                if (skStreamGetLastErrno(dest->stream) == EPIPE) {      \
                     /* close this one stream */                         \
                     reading_records = closeOneOutput(pr_dest_id, dest); \
                 } else {                                                \
                     /* print the error and return */                    \
-                    skStreamPrintLastErr(dest->ios, rv, &skAppPrintErr); \
+                    skStreamPrintLastErr(dest->stream, rv, &skAppPrintErr); \
                     reading_records = 0;                                \
                     goto END;                                           \
                 }                                                       \
@@ -593,7 +549,7 @@ filterFile(
     }
 
     /* open the input file */
-    in_rv = skStreamOpenSilkFlow(&in_rwios, datafile, SK_IO_READ);
+    in_rv = skStreamOpenSilkFlow(&in_stream, datafile, SK_IO_READ);
     if (in_rv) {
         goto END;
     }
@@ -602,14 +558,14 @@ filterFile(
 
     if (stats->files == 1) {
         /* first file, print the headers to the output file(s) */
-        rv = writeHeaders(in_rwios);
+        rv = writeHeaders(in_stream);
         if (rv) {
             goto END;
         }
     }
 
     /* determine if all the records in the file will fail the checks */
-    if (filterCheckFile(in_rwios, ipfile_basename) == 1) {
+    if (filterCheckFile(in_stream, ipfile_basename) == 1) {
         /* all records in the file will fail the user's tests */
         fail_entire_file = 1;
         result = RWF_FAIL;
@@ -628,7 +584,7 @@ filterFile(
                 /* all we need to do is to count the records in the
                  * file, which we can do by skipping them all. */
                 size_t skipped = 0;
-                in_rv = skStreamSkipRecords(in_rwios, SIZE_MAX, &skipped);
+                in_rv = skStreamSkipRecords(in_stream, SIZE_MAX, &skipped);
                 stats->read.flows += skipped;
                 goto END;
             }
@@ -639,7 +595,7 @@ filterFile(
 
     /* read and process each record */
     while (reading_records
-           && (SKSTREAM_OK == (in_rv = skStreamReadRecord(in_rwios, &rwrec))))
+           && (SKSTREAM_OK == (in_rv = skStreamReadRecord(in_stream, &rwrec))))
     {
         /* increment number of read records */
         INCR_REC_COUNT(stats->read, &rwrec);
@@ -709,12 +665,12 @@ filterFile(
     if (in_rv == SKSTREAM_OK || in_rv == SKSTREAM_ERR_EOF) {
         in_rv = 0;
     } else {
-        skStreamPrintLastErr(in_rwios, in_rv, &skAppPrintErr);
+        skStreamPrintLastErr(in_stream, in_rv, &skAppPrintErr);
         in_rv = 1;
     }
 
     /* close input */
-    skStreamDestroy(&in_rwios);
+    skStreamDestroy(&in_stream);
 
     if (rv) {
         return -1;

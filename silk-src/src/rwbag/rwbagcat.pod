@@ -509,7 +509,9 @@ prompt.  The text after the dollar sign represents the command line.
 Lines have been wrapped for improved readability, and the back slash
 (C<\>) is used to indicate a wrapped line.
 
-To print the bag:
+=head2 Printing a bag
+
+To print the contents of the bag file F<mybag.bag>:
 
  $ rwbagcat mybag.bag
       172.23.1.1|              5|
@@ -523,8 +525,9 @@ To print the bag:
   192.168.20.162|              5|
   192.168.20.163|              5|
 
+=head2 Displaying number of hosts by network
 
-To print it with full network:
+To print the bag with a full network breakdown:
 
  $ rwbagcat --network-structure=TABCHX mybag.bag
            172.23.1.1      |              5|
@@ -550,7 +553,11 @@ To print it with full network:
    192.0.0.0/8             |             28|
  TOTAL                     |            292|
 
-Or an abbreviated network structure by class A and C only,
+In the above, lines that include a CIDR prefix display the sum of the
+preceding hosts.  For example, there are 264 hosts in the
+172.23.1.0/27 net-block.
+
+To show an abbreviated network structure by class A and C only,
 including summary information:
 
  $ rwbagcat --network-structure=ACS mybag.bag
@@ -560,6 +567,7 @@ including summary information:
      192.168.20.0/24   |             11| 3 hosts in 1 /27
  192.0.0.0/8           |             28| 6 hosts in 1 /16, 2 /24s, and 3 /27s
 
+=head2 Inverting a bag
 
 To bin by number of unique IP addresses by volume:
 
@@ -584,29 +592,68 @@ For a log2 breakdown of the counts:
     2^4 to 2^5-1|              1|
     2^7 to 2^8-1|              1|
 
+=head2 Displaying bags that use prefix map values as the key
 
-Statistics:
+B<rwbag(1)> and B<rwbagbuild(1)> can use a prefix map file as the key
+in a bag file as of SiLK 3.12.0.  When attempting to display these Bag
+files, you must specify the B<--pmap-file> switch on the B<rwbagcat>
+command line can map the prefix map values to the labels.  If the
+B<--pmap-file> is not given, B<rwbagcat> displays an error.
 
- $ rwbagcat --stats mybag.bag
+ $ rwbagcat service.bag
+ rwbagcat: The --pmap-file switch is required for \
+         Bags containing sport-pmap keys
+
+In addition, the type of the prefix map file must match the key-type
+in the bag file: a prefix map type of IPv4-address or IPv6-address
+when the key was mapped from an IP address, and a prefix map type of
+proto-port when the key was mapped from a protocol-port pair.  The
+type of key in a bag may be determined by B<rwfileinfo(1)>.
+
+ $ rwfileinfo --fields=bag service.bag
+ service.bag:
+   bag          key: sport-pmap @ 4 octets; counter: custom @ 8 octets
+
+ $ rwbagcat --pmap-file=ip-map.pmap service.bag
+ rwbagcat: Cannot use IPv4-address prefix map for \
+        Bag containing sport-pmap keys
+
+ $ rwbagcat --pmap-file=port-map.pmap service.bag
+   TCP/SSH|                   1|
+  TCP/SMTP|                 800|
+  TCP/HTTP|                5642|
+
+The only check is whether the prefix map file is the correct type.  A
+different prefix map file could be used.  If a value in the bag file
+does not have an index in the prefix map file, the numeric index of
+the label is displayed.
+
+ $ echo 'label 1 none'                                      \
+   | rwpmapbuild --mode=proto-port --input-file=-           \
+        --output-file=tmp.pmap
+ $ rwbagcat --pmap-file=tmp.pmap service.bag
+   7|                   1|
+   8|                 800|
+   9|                5642|
+
+=head2 Displaying statistics
+
+ $ rwbagcat --print-statistics mybag.bag
 
  Statistics
-               keys:  10
+     number of keys:  10
     sum of counters:  292
         minimum key:  172.23.1.1
         maximum key:  192.168.20.163
-      minimum count:  1
-      maximum count:  231
+    minimum counter:  1
+    maximum counter:  231
                mean:  29.2
            variance:  5064
  standard deviation:  71.16
                skew:  2.246
            kurtosis:  8.1
-
- $ rwbagcat --tree-stats mybag.bag
-    nodes allocated:  5 (10240 bytes)
-   leaves allocated:  4 (1024 bytes)
-      keys inserted:  10 (10 unique)
-    counter density:  7.81%
+    nodes allocated:  0 (0 bytes)
+    counter density:  inf%
 
 =head1 ENVIRONMENT
 
@@ -633,11 +680,11 @@ this program to display its output a screen at a time.
 =head1 SEE ALSO
 
 B<rwbag(1)>, B<rwbagbuild(1)>, B<rwbagtool(1)>, B<rwpmapbuild(1)>,
-B<rwset(1)>, B<rwsetbuild(1)>, B<silk(7)>
+B<rwfileinfo(1)>, B<rwset(1)>, B<rwsetbuild(1)>, B<silk(7)>
 
 =cut
 
-$SiLK: rwbagcat.pod 5f2d30e80a6f 2016-03-30 22:09:49Z mthomas $
+$SiLK: rwbagcat.pod f0408b1cf446 2016-04-01 20:51:57Z mthomas $
 
 Local Variables:
 mode:text

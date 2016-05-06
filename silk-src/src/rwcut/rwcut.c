@@ -1,53 +1,9 @@
 /*
 ** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 /*
@@ -65,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcut.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
+RCSIDENT("$SiLK: rwcut.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 #include "rwcut.h"
 
@@ -125,11 +81,11 @@ static int tail_buf_full = 0;
  */
 static int
 tailFile(
-    skstream_t         *rwios)
+    skstream_t         *stream)
 {
     int rv = SKSTREAM_OK;
 
-    while ((rv = skStreamReadRecord(rwios, tail_buf_cur)) == SKSTREAM_OK) {
+    while ((rv = skStreamReadRecord(stream, tail_buf_cur)) == SKSTREAM_OK) {
         ++tail_buf_cur;
         if (tail_buf_cur == &tail_buf[tail_recs]) {
             tail_buf_cur = tail_buf;
@@ -137,7 +93,7 @@ tailFile(
         }
     }
     if (SKSTREAM_ERR_EOF != rv) {
-        skStreamPrintLastErr(rwios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(stream, rv, &skAppPrintErr);
         return -1;
     }
 
@@ -200,7 +156,7 @@ printTailBuffer(
  */
 static int
 cutFile(
-    skstream_t         *rwios)
+    skstream_t         *stream)
 {
     static int copy_input_only = 0;
     rwRec rwrec;
@@ -211,7 +167,7 @@ cutFile(
     /* handle case where all requested records have been printed, but
      * we need to write all records to the --copy-input stream. */
     if (copy_input_only) {
-        while ((rv = skStreamSkipRecords(rwios, CUT_SKIP_COUNT, NULL))
+        while ((rv = skStreamSkipRecords(stream, CUT_SKIP_COUNT, NULL))
                == SKSTREAM_OK)
             ;  /* empty */
 
@@ -223,7 +179,7 @@ cutFile(
 
     /* skip any leading records */
     if (skip_recs) {
-        rv = skStreamSkipRecords(rwios, skip_recs, &num_skipped);
+        rv = skStreamSkipRecords(stream, skip_recs, &num_skipped);
         switch (rv) {
           case SKSTREAM_OK:
             skip_recs -= num_skipped;
@@ -239,7 +195,7 @@ cutFile(
 
     if (0 == num_recs) {
         /* print all records */
-        while ((rv = skStreamReadRecord(rwios, &rwrec)) == SKSTREAM_OK) {
+        while ((rv = skStreamReadRecord(stream, &rwrec)) == SKSTREAM_OK) {
             rwAsciiPrintRec(ascii_str, &rwrec);
         }
         if (SKSTREAM_ERR_EOF != rv) {
@@ -247,7 +203,7 @@ cutFile(
         }
     } else {
         while (num_recs
-               && ((rv = skStreamReadRecord(rwios, &rwrec)) == SKSTREAM_OK))
+               && ((rv = skStreamReadRecord(stream, &rwrec)) == SKSTREAM_OK))
         {
             rwAsciiPrintRec(ascii_str, &rwrec);
             --num_recs;
@@ -267,7 +223,7 @@ cutFile(
             } else {
                 /* send all remaining records to copy-input */
                 copy_input_only = 1;
-                while ((rv = skStreamSkipRecords(rwios, CUT_SKIP_COUNT, NULL))
+                while ((rv = skStreamSkipRecords(stream, CUT_SKIP_COUNT, NULL))
                        == SKSTREAM_OK)
                     ;  /* empty */
                 if (SKSTREAM_ERR_EOF != rv) {
@@ -279,7 +235,7 @@ cutFile(
 
   END:
     if (-1 == ret_val) {
-        skStreamPrintLastErr(rwios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(stream, rv, &skAppPrintErr);
     }
     return ret_val;
 }
@@ -287,7 +243,7 @@ cutFile(
 
 int main(int argc, char **argv)
 {
-    skstream_t *rwios;
+    skstream_t *stream;
     int rv = 0;
 
     appSetup(argc, argv);                 /* never returns on error */
@@ -297,12 +253,12 @@ int main(int argc, char **argv)
         tail_buf_cur = tail_buf;
 
         /* Process the files from command line or stdin */
-        while ((rv = skOptionsCtxNextSilkFile(optctx, &rwios, &skAppPrintErr))
+        while ((rv = skOptionsCtxNextSilkFile(optctx, &stream, &skAppPrintErr))
                == 0)
         {
-            skStreamSetIPv6Policy(rwios, ipv6_policy);
-            rv = tailFile(rwios);
-            skStreamDestroy(&rwios);
+            skStreamSetIPv6Policy(stream, ipv6_policy);
+            rv = tailFile(stream);
+            skStreamDestroy(&stream);
             if (-1 == rv) {
                 exit(EXIT_FAILURE);
             }
@@ -315,7 +271,7 @@ int main(int argc, char **argv)
         /* Process the files on command line or records from stdin */
 
         /* get first file */
-        rv = skOptionsCtxNextSilkFile(optctx, &rwios, &skAppPrintErr);
+        rv = skOptionsCtxNextSilkFile(optctx, &stream, &skAppPrintErr);
         if (rv < 0) {
             exit(EXIT_FAILURE);
         }
@@ -330,16 +286,16 @@ int main(int argc, char **argv)
         }
 
         do {
-            skStreamSetIPv6Policy(rwios, ipv6_policy);
-            rv = cutFile(rwios);
-            skStreamDestroy(&rwios);
+            skStreamSetIPv6Policy(stream, ipv6_policy);
+            rv = cutFile(stream);
+            skStreamDestroy(&stream);
             if (-1 == rv) {
                 exit(EXIT_FAILURE);
             }
             if (1 == rv) {
                 break;
             }
-        } while ((rv = skOptionsCtxNextSilkFile(optctx, &rwios,&skAppPrintErr))
+        } while ((rv =skOptionsCtxNextSilkFile(optctx, &stream,&skAppPrintErr))
                  == 0);
         if (rv < 0) {
             exit(EXIT_FAILURE);

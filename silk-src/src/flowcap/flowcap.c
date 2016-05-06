@@ -1,67 +1,20 @@
 /*
 ** Copyright (C) 2003-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: flowcap.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
+RCSIDENT("$SiLK: flowcap.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/rwrec.h>
 #include <silk/skheader.h>
 #include <silk/skthread.h>      /* MUTEX_LOCK,MUTEX_UNLOCK */
 #include <silk/sktimer.h>
-#if SK_ENABLE_IPFIX
-#include <silk/skipfix.h>
-#endif
 #include <sys/un.h>
 #ifdef SK_HAVE_SYS_STATVFS_H
 #include <sys/statvfs.h>
@@ -110,7 +63,7 @@ typedef struct flowcap_reader_st {
     const char         *probename;
 
     /* the skStream that is used for writing */
-    skstream_t         *ios;
+    skstream_t         *stream;
 
     /* base name of the file; a pointer into 'path' */
     char               *filename;
@@ -547,33 +500,33 @@ openFileBase(
     DEBUGMSG("Opened working file '%s'", dotpath);
 
     /* create a stream bound to the dotfile */
-    if ((rv = skStreamCreate(&reader->ios, SK_IO_WRITE, SK_CONTENT_SILK_FLOW))
-        || (rv = skStreamBind(reader->ios, dotpath))
-        || (rv = skStreamFDOpen(reader->ios, fd)))
+    if ((rv = skStreamCreate(&reader->stream,SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+        || (rv = skStreamBind(reader->stream, dotpath))
+        || (rv = skStreamFDOpen(reader->stream, fd)))
     {
-        skStreamPrintLastErr(reader->ios, rv, &ERRMSG);
+        skStreamPrintLastErr(reader->stream, rv, &ERRMSG);
         /* NOTE: it is possible for skStreamFDOpen() to have stored
          * the value of 'fd' but return an error. */
-        if (reader->ios && skStreamGetDescriptor(reader->ios) != fd) {
+        if (reader->stream && skStreamGetDescriptor(reader->stream) != fd) {
             close(fd);
         }
-        skStreamDestroy(&reader->ios);
+        skStreamDestroy(&reader->stream);
         unlink(dotpath);
         unlink(reader->path);
         return -1;
     }
 
     /* set and write the file's header */
-    hdr = skStreamGetSilkHeader(reader->ios);
+    hdr = skStreamGetSilkHeader(reader->stream);
     if ((rv = skHeaderSetFileFormat(hdr, file_format))
         || (rv = skHeaderSetRecordVersion(hdr, rec_version))
         || (rv = skHeaderSetByteOrder(hdr, SILK_ENDIAN_BIG))
         || (rv = skHeaderSetCompressionMethod(hdr, comp_method))
         || (rv = skHeaderAddProbename(hdr, reader->probename))
-        || (rv = skStreamWriteSilkHeader(reader->ios)))
+        || (rv = skStreamWriteSilkHeader(reader->stream)))
     {
-        skStreamPrintLastErr(reader->ios, rv, &ERRMSG);
-        skStreamDestroy(&reader->ios);
+        skStreamPrintLastErr(reader->stream, rv, &ERRMSG);
+        skStreamDestroy(&reader->stream);
         unlink(dotpath);
         unlink(reader->path);
         return -1;
@@ -725,13 +678,13 @@ closeFileBase(
     /* if no records were written, close and remove the file */
     if (reader->records == 0) {
         end_time = time(NULL);
-        rv = skStreamClose(reader->ios);
+        rv = skStreamClose(reader->stream);
         if (rv) {
-            skStreamPrintLastErr(reader->ios, rv, &ERRMSG);
+            skStreamPrintLastErr(reader->stream, rv, &ERRMSG);
             CRITMSG("Fatal error closing '%s'", dotpath);
             return -1;
         }
-        skStreamDestroy(&reader->ios);
+        skStreamDestroy(&reader->stream);
         unlink(dotpath);
         unlink(reader->path);
 
@@ -761,21 +714,21 @@ closeFileBase(
     }
 
     /* flush the file so we can get its final size */
-    rv = skStreamFlush(reader->ios);
+    rv = skStreamFlush(reader->stream);
     if (rv) {
-        skStreamPrintLastErr(reader->ios, rv, &ERRMSG);
+        skStreamPrintLastErr(reader->stream, rv, &ERRMSG);
         CRITMSG("Fatal error flushing file '%s'", reader->path);
         return -1;
     }
     end_time = time(NULL);
 
     /* how many uncompressed bytes were processed? */
-    hdr = skStreamGetSilkHeader(reader->ios);
+    hdr = skStreamGetSilkHeader(reader->stream);
     uncompress_size = (skHeaderGetLength(hdr)
                        + reader->records * skHeaderGetRecordLength(hdr));
 
     /* how many bytes were written to disk? */
-    size = (int64_t)skStreamTell(reader->ios);
+    size = (int64_t)skStreamTell(reader->stream);
 
     /* what's the compression ratio? */
     if (uncompress_size == 0) {
@@ -812,13 +765,13 @@ closeFileBase(
     }
 
     /* close the file and destroy the handle */
-    rv = skStreamClose(reader->ios);
+    rv = skStreamClose(reader->stream);
     if (rv) {
-        skStreamPrintLastErr(reader->ios, rv, &ERRMSG);
+        skStreamPrintLastErr(reader->stream, rv, &ERRMSG);
         CRITMSG("Fatal error closing '%s'", dotpath);
         return -1;
     }
-    skStreamDestroy(&(reader->ios));
+    skStreamDestroy(&(reader->stream));
 
 
     /* move the dot-file over the placeholder file. */
@@ -916,9 +869,9 @@ readerWriteRecord(
     MUTEX_LOCK(&reader->mutex);
 
     /* Write the record to the file */
-    rv = skStreamWriteRecord(reader->ios, rec);
+    rv = skStreamWriteRecord(reader->stream, rec);
     if (rv) {
-        skStreamPrintLastErr(reader->ios, rv, &ERRMSG);
+        skStreamPrintLastErr(reader->stream, rv, &ERRMSG);
         CRITMSG("Fatal error writing record.");
         MUTEX_UNLOCK(&reader->mutex);
         exit(EXIT_FAILURE);
@@ -926,7 +879,7 @@ readerWriteRecord(
     ++reader->records;
 
     /* Check to see if we have reached the size limit */
-    if (skStreamGetUpperBound(reader->ios) < max_file_size) {
+    if (skStreamGetUpperBound(reader->stream) < max_file_size) {
         MUTEX_UNLOCK(&reader->mutex);
     } else {
         reader->close = 1;

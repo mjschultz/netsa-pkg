@@ -492,53 +492,9 @@ char *geoip2ccmap_text;
 /*
 ** Copyright (C) 2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 /*
@@ -571,7 +527,7 @@ char *geoip2ccmap_text;
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwgeoip2ccmap.l 9dcc642f0092 2016-03-24 15:26:17Z mthomas $");
+RCSIDENT("$SiLK: rwgeoip2ccmap.l 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
@@ -731,7 +687,7 @@ SK_DIAGNOSTIC_IGNORE_PUSH("-Wwrite-strings")
 
 
 
-#line 735 "rwgeoip2ccmap.c"
+#line 691 "rwgeoip2ccmap.c"
 
 #define INITIAL 0
 #define ST_ENTRY 1
@@ -895,10 +851,10 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 260 "rwgeoip2ccmap.l"
+#line 216 "rwgeoip2ccmap.l"
 
 
-#line 902 "rwgeoip2ccmap.c"
+#line 858 "rwgeoip2ccmap.c"
 
 	if ( !(yy_init) )
 		{
@@ -980,17 +936,17 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 262 "rwgeoip2ccmap.l"
+#line 218 "rwgeoip2ccmap.l"
 { ++linenum; stmtReset(); }
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 264 "rwgeoip2ccmap.l"
+#line 220 "rwgeoip2ccmap.l"
 { BEGIN(ST_ENTRY); }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 266 "rwgeoip2ccmap.l"
+#line 222 "rwgeoip2ccmap.l"
 { if (stmtEntry(geoip2ccmap_text)) {
                                             ++error_count;
                                             BEGIN(ST_ERROR);
@@ -1000,29 +956,29 @@ YY_RULE_SETUP
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 273 "rwgeoip2ccmap.l"
+#line 229 "rwgeoip2ccmap.l"
 { BEGIN(ST_NEXT_ENTRY); }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 275 "rwgeoip2ccmap.l"
+#line 231 "rwgeoip2ccmap.l"
 { ++stmt.position; }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 277 "rwgeoip2ccmap.l"
+#line 233 "rwgeoip2ccmap.l"
 { BEGIN(ST_ENTRY); }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 279 "rwgeoip2ccmap.l"
+#line 235 "rwgeoip2ccmap.l"
 ;
 	YY_BREAK
 case 8:
 /* rule 8 can match eol */
-#line 282 "rwgeoip2ccmap.l"
+#line 238 "rwgeoip2ccmap.l"
 case YY_STATE_EOF(ST_NEXT_ENTRY):
-#line 282 "rwgeoip2ccmap.l"
+#line 238 "rwgeoip2ccmap.l"
 { ++stmt.position;
                                         stmtCreateEntry();
                                         ++linenum;
@@ -1031,7 +987,7 @@ case YY_STATE_EOF(ST_NEXT_ENTRY):
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 288 "rwgeoip2ccmap.l"
+#line 244 "rwgeoip2ccmap.l"
 { skAppPrintErr("Empty value on line %d",
                                                       linenum);
                                         ++error_count;
@@ -1041,7 +997,7 @@ YY_RULE_SETUP
 case 10:
 /* rule 10 can match eol */
 YY_RULE_SETUP
-#line 294 "rwgeoip2ccmap.l"
+#line 250 "rwgeoip2ccmap.l"
 { skAppPrintErr(("Line break appears"
                                                        " in value on line %d"),
                                                       linenum);
@@ -1052,7 +1008,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case YY_STATE_EOF(ST_ENTRY):
 case YY_STATE_EOF(ST_CLOSE_ENTRY):
-#line 302 "rwgeoip2ccmap.l"
+#line 258 "rwgeoip2ccmap.l"
 { skAppPrintErr(("End of stream appears"
                                                        " in value on line %d"),
                                                       linenum);
@@ -1061,7 +1017,7 @@ case YY_STATE_EOF(ST_CLOSE_ENTRY):
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 308 "rwgeoip2ccmap.l"
+#line 264 "rwgeoip2ccmap.l"
 { skAppPrintErr(
                                             "Unexpected input on line %d",
                                             linenum);
@@ -1070,28 +1026,28 @@ YY_RULE_SETUP
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 314 "rwgeoip2ccmap.l"
+#line 270 "rwgeoip2ccmap.l"
 ;
 	YY_BREAK
 case 13:
 /* rule 13 can match eol */
 YY_RULE_SETUP
-#line 315 "rwgeoip2ccmap.l"
+#line 271 "rwgeoip2ccmap.l"
 { ++linenum;
                                         stmtReset();
                                         BEGIN(INITIAL); }
 	YY_BREAK
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(ST_ERROR):
-#line 319 "rwgeoip2ccmap.l"
+#line 275 "rwgeoip2ccmap.l"
 { return 0; }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 321 "rwgeoip2ccmap.l"
+#line 277 "rwgeoip2ccmap.l"
 ECHO;
 	YY_BREAK
-#line 1095 "rwgeoip2ccmap.c"
+#line 1051 "rwgeoip2ccmap.c"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -1982,7 +1938,7 @@ void geoip2ccmap_free (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 321 "rwgeoip2ccmap.l"
+#line 277 "rwgeoip2ccmap.l"
 
 
 
