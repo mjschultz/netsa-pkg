@@ -1,53 +1,9 @@
 /*
 ** Copyright (C) 2001-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 /*
@@ -58,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwipv6io.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
+RCSIDENT("$SiLK: rwipv6io.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 /* #define RWPACK_BYTES_PACKETS          1 */
 /* #define RWPACK_FLAGS_TIMES_VOLUMES    1 */
@@ -139,19 +95,19 @@ static const uint8_t IP4in6_prefix[12] =
  */
 static int
 ipv6ioRecordUnpack_V2(
-    skstream_t         *rwIOS,
+    skstream_t         *stream,
     rwGenericRec_V5    *rwrec,
     uint8_t            *ar)
 {
     uint32_t ip;
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         ipv6ioRecordSwap_V2(ar);
     }
 
     /* Start time, TCP flags, Protocol, TCP State */
-    rwpackUnpackTimesFlagsProto(rwrec, ar, rwIOS->hdr_starttime);
+    rwpackUnpackTimesFlagsProto(rwrec, ar, stream->hdr_starttime);
 
     /* application */
     rwRecMemSetApplication(rwrec, &ar[ 6]);
@@ -187,8 +143,8 @@ ipv6ioRecordUnpack_V2(
     }
 
     /* sensor, flow_type from file name/header */
-    rwRecSetSensor(rwrec, rwIOS->hdr_sensor);
-    rwRecSetFlowType(rwrec, rwIOS->hdr_flowtype);
+    rwRecSetSensor(rwrec, stream->hdr_sensor);
+    rwRecSetFlowType(rwrec, stream->hdr_flowtype);
 
     return SKSTREAM_OK;
 }
@@ -199,7 +155,7 @@ ipv6ioRecordUnpack_V2(
  */
 static int
 ipv6ioRecordPack_V2(
-    skstream_t             *rwIOS,
+    skstream_t             *stream,
     const rwGenericRec_V5  *rwrec,
     uint8_t                *ar)
 {
@@ -207,7 +163,7 @@ ipv6ioRecordPack_V2(
     int rv;
 
     /* Start time, TCP Flags, Protocol, TCP State */
-    rv = rwpackPackTimesFlagsProto(rwrec, ar, rwIOS->hdr_starttime);
+    rv = rwpackPackTimesFlagsProto(rwrec, ar, stream->hdr_starttime);
     if (rv) {
         return rv;
     }
@@ -248,7 +204,7 @@ ipv6ioRecordPack_V2(
     }
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         ipv6ioRecordSwap_V2(ar);
     }
 
@@ -323,14 +279,14 @@ ipv6ioRecordPack_V2(
  */
 static int
 ipv6ioRecordUnpack_V1(
-    skstream_t         *rwIOS,
+    skstream_t         *stream,
     rwGenericRec_V5    *rwrec,
     uint8_t            *ar)
 {
     uint32_t ip;
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         ipv6ioRecordSwap_V1(ar);
     }
 
@@ -382,7 +338,7 @@ ipv6ioRecordUnpack_V1(
  */
 static int
 ipv6ioRecordPack_V1(
-    skstream_t             *rwIOS,
+    skstream_t             *stream,
     const rwGenericRec_V5  *rwrec,
     uint8_t                *ar)
 {
@@ -428,7 +384,7 @@ ipv6ioRecordPack_V1(
     }
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         ipv6ioRecordSwap_V1(ar);
     }
 
@@ -458,7 +414,7 @@ ipv6ioGetRecLen(
 
 
 /*
- *  status = ipv6ioPrepare(&rwIOSPtr);
+ *  status = ipv6ioPrepare(&stream);
  *
  *    Sets the record version to the default if it is unspecified,
  *    checks that the record format supports the requested record
@@ -467,16 +423,16 @@ ipv6ioGetRecLen(
  */
 int
 ipv6ioPrepare(
-    skstream_t         *rwIOS)
+    skstream_t         *stream)
 {
 #define FILE_FORMAT "FT_RWIPV6"
-    sk_file_header_t *hdr = rwIOS->silk_hdr;
+    sk_file_header_t *hdr = stream->silk_hdr;
     int rv = SKSTREAM_OK; /* return value */
 
     assert(skHeaderGetFileFormat(hdr) == FT_RWIPV6);
 
     /* Set version if none was selected by caller */
-    if ((rwIOS->io_mode == SK_IO_WRITE)
+    if ((stream->io_mode == SK_IO_WRITE)
         && (skHeaderGetRecordVersion(hdr) == SK_RECORD_VERSION_ANY))
     {
         skHeaderSetRecordVersion(hdr, DEFAULT_RECORD_VERSION);
@@ -485,12 +441,12 @@ ipv6ioPrepare(
     /* version check; set values based on version */
     switch (skHeaderGetRecordVersion(hdr)) {
       case 2:
-        rwIOS->rwUnpackFn = &ipv6ioRecordUnpack_V2;
-        rwIOS->rwPackFn   = &ipv6ioRecordPack_V2;
+        stream->rwUnpackFn = &ipv6ioRecordUnpack_V2;
+        stream->rwPackFn   = &ipv6ioRecordPack_V2;
         break;
       case 1:
-        rwIOS->rwUnpackFn = &ipv6ioRecordUnpack_V1;
-        rwIOS->rwPackFn   = &ipv6ioRecordPack_V1;
+        stream->rwUnpackFn = &ipv6ioRecordUnpack_V1;
+        stream->rwPackFn   = &ipv6ioRecordPack_V1;
         break;
       case 0:
       default:
@@ -498,22 +454,22 @@ ipv6ioPrepare(
         goto END;
     }
 
-    rwIOS->recLen = ipv6ioGetRecLen(skHeaderGetRecordVersion(hdr));
+    stream->recLen = ipv6ioGetRecLen(skHeaderGetRecordVersion(hdr));
 
     /* verify lengths */
-    if (rwIOS->recLen == 0) {
+    if (stream->recLen == 0) {
         skAppPrintErr("Record length not set for %s version %u",
                       FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr));
         skAbort();
     }
-    if (rwIOS->recLen != skHeaderGetRecordLength(hdr)) {
+    if (stream->recLen != skHeaderGetRecordLength(hdr)) {
         if (0 == skHeaderGetRecordLength(hdr)) {
-            skHeaderSetRecordLength(hdr, rwIOS->recLen);
+            skHeaderSetRecordLength(hdr, stream->recLen);
         } else {
             skAppPrintErr(("Record length mismatch for %s version %u\n"
                            "\tcode = %" PRIu16 " bytes;  header = %lu bytes"),
                           FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr),
-                          rwIOS->recLen,
+                          stream->recLen,
                           (unsigned long)skHeaderGetRecordLength(hdr));
             skAbort();
         }

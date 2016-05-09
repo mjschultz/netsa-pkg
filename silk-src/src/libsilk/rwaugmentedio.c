@@ -1,53 +1,9 @@
 /*
 ** Copyright (C) 2005-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 /*
@@ -59,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaugmentedio.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
+RCSIDENT("$SiLK: rwaugmentedio.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 /* #define RWPACK_BYTES_PACKETS          1 */
 #define RWPACK_FLAGS_TIMES_VOLUMES    1
@@ -137,17 +93,17 @@ RCSIDENT("$SiLK: rwaugmentedio.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
  */
 static int
 augmentedioRecordUnpack_V5(
-    skstream_t         *rwIOS,
+    skstream_t         *stream,
     rwGenericRec_V5    *rwrec,
     uint8_t            *ar)
 {
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         augmentedioRecordSwap_V5(ar);
     }
 
     /* Start time, TCP flags, Protocol, TCP State */
-    rwpackUnpackTimesFlagsProto(rwrec, ar, rwIOS->hdr_starttime);
+    rwpackUnpackTimesFlagsProto(rwrec, ar, stream->hdr_starttime);
 
     /* application */
     rwRecMemSetApplication(rwrec, &ar[ 6]);
@@ -168,8 +124,8 @@ augmentedioRecordUnpack_V5(
     rwRecMemSetDIPv4(rwrec, &ar[28]);
 
     /* sensor, flow_type from file name/header */
-    rwRecSetSensor(rwrec, rwIOS->hdr_sensor);
-    rwRecSetFlowType(rwrec, rwIOS->hdr_flowtype);
+    rwRecSetSensor(rwrec, stream->hdr_sensor);
+    rwRecSetFlowType(rwrec, stream->hdr_flowtype);
 
     return SKSTREAM_OK;
 }
@@ -180,14 +136,14 @@ augmentedioRecordUnpack_V5(
  */
 static int
 augmentedioRecordPack_V5(
-    skstream_t             *rwIOS,
+    skstream_t             *stream,
     const rwGenericRec_V5  *rwrec,
     uint8_t                *ar)
 {
     int rv;
 
     /* Start time, TCP Flags, Protocol, TCP State */
-    rv = rwpackPackTimesFlagsProto(rwrec, ar, rwIOS->hdr_starttime);
+    rv = rwpackPackTimesFlagsProto(rwrec, ar, stream->hdr_starttime);
     if (rv) {
         return rv;
     }
@@ -211,7 +167,7 @@ augmentedioRecordPack_V5(
     rwRecMemGetDIPv4(rwrec, &ar[28]);
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         augmentedioRecordSwap_V5(ar);
     }
 
@@ -287,17 +243,17 @@ augmentedioRecordPack_V5(
  */
 static int
 augmentedioRecordUnpack_V4(
-    skstream_t         *rwIOS,
+    skstream_t         *stream,
     rwGenericRec_V5    *rwrec,
     uint8_t            *ar)
 {
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         augmentedioRecordSwap_V4(ar);
     }
 
     /* sTime, elapsed, pkts, bytes, proto, tcp-flags, state, application */
-    rwpackUnpackFlagsTimesVolumes(rwrec, ar, rwIOS->hdr_starttime, 16, 0);
+    rwpackUnpackFlagsTimesVolumes(rwrec, ar, stream->hdr_starttime, 16, 0);
 
     /* sPort, dPort */
     rwRecMemSetSPort(rwrec, &ar[16]);
@@ -308,8 +264,8 @@ augmentedioRecordUnpack_V4(
     rwRecMemSetDIPv4(rwrec, &ar[24]);
 
     /* sensor, flow_type from file name/header */
-    rwRecSetSensor(rwrec, rwIOS->hdr_sensor);
-    rwRecSetFlowType(rwrec, rwIOS->hdr_flowtype);
+    rwRecSetSensor(rwrec, stream->hdr_sensor);
+    rwRecSetFlowType(rwrec, stream->hdr_flowtype);
 
     return SKSTREAM_OK;
 }
@@ -320,14 +276,14 @@ augmentedioRecordUnpack_V4(
  */
 static int
 augmentedioRecordPack_V4(
-    skstream_t             *rwIOS,
+    skstream_t             *stream,
     const rwGenericRec_V5  *rwrec,
     uint8_t                *ar)
 {
     int rv = SKSTREAM_OK; /* return value */
 
     /* sTime, elapsed, pkts, bytes, proto, tcp-flags, state, application */
-    rv = rwpackPackFlagsTimesVolumes(ar, rwrec, rwIOS->hdr_starttime, 16);
+    rv = rwpackPackFlagsTimesVolumes(ar, rwrec, stream->hdr_starttime, 16);
     if (rv) {
         return rv;
     }
@@ -341,7 +297,7 @@ augmentedioRecordPack_V4(
     rwRecMemGetDIPv4(rwrec, &ar[24]);
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         augmentedioRecordSwap_V4(ar);
     }
 
@@ -421,7 +377,7 @@ augmentedioRecordPack_V4(
  */
 static int
 augmentedioRecordUnpack_V1(
-    skstream_t         *rwIOS,
+    skstream_t         *stream,
     rwGenericRec_V5    *rwrec,
     uint8_t            *ar)
 {
@@ -429,7 +385,7 @@ augmentedioRecordUnpack_V1(
     uint8_t is_tcp, prot_flags;
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         augmentedioRecordSwap_V1(ar);
     }
 
@@ -446,7 +402,7 @@ augmentedioRecordUnpack_V1(
     rwRecMemSetApplication(rwrec, &ar[24]);
 
     /* sTime, pkts, bytes, elapsed, proto, tcp-flags, bpp */
-    rwpackUnpackTimeBytesPktsFlags(rwrec, rwIOS->hdr_starttime,
+    rwpackUnpackTimeBytesPktsFlags(rwrec, stream->hdr_starttime,
                                    (uint32_t*)&ar[12], (uint32_t*)&ar[16],
                                    &msec_flags);
 
@@ -456,8 +412,8 @@ augmentedioRecordUnpack_V1(
     rwpackUnpackProtoFlags(rwrec, is_tcp, prot_flags, ar[26], ar[27]);
 
     /* sensor, flow_type from file name/header */
-    rwRecSetSensor(rwrec, rwIOS->hdr_sensor);
-    rwRecSetFlowType(rwrec, rwIOS->hdr_flowtype);
+    rwRecSetSensor(rwrec, stream->hdr_sensor);
+    rwRecSetFlowType(rwrec, stream->hdr_flowtype);
 
     return SKSTREAM_OK;
 }
@@ -468,7 +424,7 @@ augmentedioRecordUnpack_V1(
  */
 static int
 augmentedioRecordPack_V1(
-    skstream_t             *rwIOS,
+    skstream_t             *stream,
     const rwGenericRec_V5  *rwrec,
     uint8_t                *ar)
 {
@@ -479,7 +435,7 @@ augmentedioRecordPack_V1(
     /* sTime, pkts, bytes, elapsed, proto, tcp-flags, bpp */
     rv = rwpackPackTimeBytesPktsFlags((uint32_t*)&ar[12], (uint32_t*)&ar[16],
                                       &msec_flags,
-                                      rwrec, rwIOS->hdr_starttime);
+                                      rwrec, stream->hdr_starttime);
     if (rv) {
         return rv;
     }
@@ -506,7 +462,7 @@ augmentedioRecordPack_V1(
     rwRecMemGetApplication(rwrec, &ar[24]);
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         augmentedioRecordSwap_V1(ar);
     }
 
@@ -542,7 +498,7 @@ augmentedioGetRecLen(
 
 
 /*
- *  status = augmentedioPrepare(&rwIOSPtr);
+ *  status = augmentedioPrepare(&stream);
  *
  *    Sets the record version to the default if it is unspecified,
  *    checks that the record format supports the requested record
@@ -551,16 +507,16 @@ augmentedioGetRecLen(
  */
 int
 augmentedioPrepare(
-    skstream_t         *rwIOS)
+    skstream_t         *stream)
 {
 #define FILE_FORMAT "FT_RWAUGMENTED"
-    sk_file_header_t *hdr = rwIOS->silk_hdr;
+    sk_file_header_t *hdr = stream->silk_hdr;
     int rv = SKSTREAM_OK; /* return value */
 
     assert(skHeaderGetFileFormat(hdr) == FT_RWAUGMENTED);
 
     /* Set version if none was selected by caller */
-    if ((rwIOS->io_mode == SK_IO_WRITE)
+    if ((stream->io_mode == SK_IO_WRITE)
         && (skHeaderGetRecordVersion(hdr) == SK_RECORD_VERSION_ANY))
     {
         skHeaderSetRecordVersion(hdr, DEFAULT_RECORD_VERSION);
@@ -569,12 +525,12 @@ augmentedioPrepare(
     /* version check; set values based on version */
     switch (skHeaderGetRecordVersion(hdr)) {
       case 5:
-        rwIOS->rwUnpackFn = &augmentedioRecordUnpack_V5;
-        rwIOS->rwPackFn   = &augmentedioRecordPack_V5;
+        stream->rwUnpackFn = &augmentedioRecordUnpack_V5;
+        stream->rwPackFn   = &augmentedioRecordPack_V5;
         break;
       case 4:
-        rwIOS->rwUnpackFn = &augmentedioRecordUnpack_V4;
-        rwIOS->rwPackFn   = &augmentedioRecordPack_V4;
+        stream->rwUnpackFn = &augmentedioRecordUnpack_V4;
+        stream->rwPackFn   = &augmentedioRecordPack_V4;
         break;
       case 3:
       case 2:
@@ -582,8 +538,8 @@ augmentedioPrepare(
         /* V1 and V2 differ only in the padding of the header */
         /* V2 and V3 differ only in that V3 supports compression on
          * read and write; V2 supports compression only on read */
-        rwIOS->rwUnpackFn = &augmentedioRecordUnpack_V1;
-        rwIOS->rwPackFn   = &augmentedioRecordPack_V1;
+        stream->rwUnpackFn = &augmentedioRecordUnpack_V1;
+        stream->rwPackFn   = &augmentedioRecordPack_V1;
         break;
       case 0:
       default:
@@ -591,22 +547,22 @@ augmentedioPrepare(
         goto END;
     }
 
-    rwIOS->recLen = augmentedioGetRecLen(skHeaderGetRecordVersion(hdr));
+    stream->recLen = augmentedioGetRecLen(skHeaderGetRecordVersion(hdr));
 
     /* verify lengths */
-    if (rwIOS->recLen == 0) {
+    if (stream->recLen == 0) {
         skAppPrintErr("Record length not set for %s version %u",
                       FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr));
         skAbort();
     }
-    if (rwIOS->recLen != skHeaderGetRecordLength(hdr)) {
+    if (stream->recLen != skHeaderGetRecordLength(hdr)) {
         if (0 == skHeaderGetRecordLength(hdr)) {
-            skHeaderSetRecordLength(hdr, rwIOS->recLen);
+            skHeaderSetRecordLength(hdr, stream->recLen);
         } else {
             skAppPrintErr(("Record length mismatch for %s version %u\n"
                            "\tcode = %" PRIu16 " bytes;  header = %lu bytes"),
                           FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr),
-                          rwIOS->recLen,
+                          stream->recLen,
                           (unsigned long)skHeaderGetRecordLength(hdr));
             skAbort();
         }

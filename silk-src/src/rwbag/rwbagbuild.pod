@@ -22,9 +22,16 @@ B<rwbagbuild> - Create a binary Bag from non-flow data.
 =head1 DESCRIPTION
 
 B<rwbagbuild> builds a binary Bag file from an IPset file or from
-textual input.  Either B<--set-input> or B<--bag-input> must be
-provided to specify the type of input; give the switch as argument of
-C<stdin> or C<-> to read from the standard input.
+textual input.  A Bag is a set where each key is associated with a
+counter.  Usually the key is some aspect of a flow record (an IP
+address, a port, the protocol, et cetera), and the counter is a volume
+(such as the number of flow records or the sum or bytes or packets)
+for the flow records that match that key.
+
+Either B<--set-input> or B<--bag-input> must be provided to specify
+the type and the location of the input file.  To read from the
+standard input, specify C<stdin> or C<-> as the argument to the
+switch.
 
 =head2 SET INPUT
 
@@ -667,6 +674,67 @@ to F<total3.bag>:
         10.0.0.3|                   1|
         10.0.0.4|                   1|
 
+=head2 Create a bag where the key is the country code
+
+As of SiLK 3.12.0, a Bag file may contain a country code as its key.
+In B<rwbagbuild>, specify the B<--key-type> as C<sip-country>,
+C<dip-country>, or C<any-country>.  That key-type works with either
+textual input or IPset input.  The form of the textual input when
+mapping an IP address to a country code is identical to that when
+building an ordinary bag.
+
+ $ rwbagbuild --bag-input=mybag.txt --delimiter=,       \
+        --key-type=any-country --output-file=scc1.bag
+ $ rwbagcat scc1.bag
+ --|                 527|
+
+ $ rwbagbuild --set-input=A.set --key-type=any-country  \
+        --output-file=scc2.bag
+ $ rwbagcat scc2.bag
+ --|                   2|
+
+=head2 Create a bag using a prefix map value as the key
+
+B<rwbagbuild> and B<rwbag(1)> can use a prefix map file as the key in
+a Bag file as of SiLK 3.12.0.  Use the B<--pmap-file> switch to
+specify the prefix map file, and specify the B<--key-type> using one
+of the types that end in C<-pmap>.
+
+For a prefix map that maps by IP addresses, use a key-type of
+C<sip-pmap>, C<dip-pmap>, or C<any-ip-pmap>.  The input may be an
+IPset or text.  The form of the textual input is the same as for a
+normal bag file.
+
+ $ rwbagbuild --set-input=A.set --key-type=sip-pmap     \
+        --pmap-file=ip-map.pmap --output=test1.bag
+
+ $ rwbagbuild --bag-input=mybag.txt --delimiter=,       \
+        --key-type=sip-pmap --pmap-file=ip-map.pmap     \
+        --output-file=test2.bag
+
+The prefix map file is not stored as part of the Bag, so you must
+provide the name of the prefix map when running B<rwbagcat(1)>.
+
+ $ rwbagcat --pmap-file=ip-map.pmap test2.bag
+          internal|                 527|
+
+For a prefix map file that maps by protocol-port pairs, the textual
+input must contain either three column (protocol, port, counter) or
+two columns (protocol and port) which uses the B<--default-counter>.
+
+ $ cat proto-port-count.txt
+ 6| 25|  800|
+ 6| 80| 5642|
+ 6| 22
+ $ rwbagbuild --key-type=sport-pmap                 \
+        --bag-input=proto-port-count.txt            \
+        --pmap-file=proto-port-map.pmap             \
+        --output-path=service.bag
+ $ rwbagcat --pmap-file=port-map.pmap service.bag
+   TCP/SSH|                   1|
+  TCP/SMTP|                 800|
+  TCP/HTTP|                5642|
+
 =head1 ENVIRONMENT
 
 =over 4
@@ -723,7 +791,7 @@ The B<--default-count> switch is poorly named.
 
 =cut
 
-$SiLK: rwbagbuild.pod 5f2d30e80a6f 2016-03-30 22:09:49Z mthomas $
+$SiLK: rwbagbuild.pod f0408b1cf446 2016-04-01 20:51:57Z mthomas $
 
 Local Variables:
 mode:text

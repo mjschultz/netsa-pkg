@@ -1,53 +1,9 @@
 /*
 ** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 /*
@@ -66,7 +22,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_PROBECONF_H, "$SiLK: probeconf.h 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
+RCSIDENTVAR(rcsID_PROBECONF_H, "$SiLK: probeconf.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -276,7 +232,7 @@ typedef struct skpc_probe_st {
     char                   *poll_directory;
 
     /** the name of the probe */
-    char                   *probe_name;
+    const char             *probe_name;
 
     /** length of the accept_from_addr array */
     uint32_t                accept_from_addr_count;
@@ -741,9 +697,12 @@ skpcProbeDestroy(
  *    Return the name of a probe.  The caller should not modify the
  *    name, and does not need to free() it.
  */
+#define skpcProbeGetName(m_probe)       ((m_probe)->probe_name)
+#ifndef skpcProbeGetName
 const char *
 skpcProbeGetName(
     const skpc_probe_t *probe);
+#endif  /* skpcProbeGetName */
 
 
 /**
@@ -764,9 +723,12 @@ skpcProbeSetName(
  *    Return the type of the probe.  Before it is set by the user, the
  *    probe's type is PROBE_ENUM_INVALID.
  */
+#define skpcProbeGetType(m_probe)       ((m_probe)->probe_type)
+#ifndef skpcProbeGetType
 skpc_probetype_t
 skpcProbeGetType(
     const skpc_probe_t *probe);
+#endif  /* skpcProbeGetType */
 
 /**
  *    Set the probe's type.
@@ -797,9 +759,12 @@ skpcProbeSetProtocol(
 /**
  *    Get the probe's logging-flags.
  */
+#define skpcProbeGetLogFlags(m_probe)   ((m_probe)->log_flags)
+#ifndef skpcProbeGetLogFlags
 uint8_t
 skpcProbeGetLogFlags(
     const skpc_probe_t *probe);
+#endif  /* skpcProbeGetLogFlags */
 
 /**
  *    Add 'log_flag' to the logging flags for 'probe'; these logging
@@ -835,9 +800,13 @@ skpcProbeClearLogFlags(
  *    Determine whether the probe is currently configured to store
  *    SNMP interfaces or VLAN tags.
  */
+#define skpcProbeGetInterfaceValueType(m_probe)                         \
+    (((m_probe)->ifvalue_vlan) ? SKPC_IFVALUE_VLAN : SKPC_IFVALUE_SNMP)
+#ifndef skpcProbeGetInterfaceValueType
 skpc_ifvaluetype_t
 skpcProbeGetInterfaceValueType(
     const skpc_probe_t *probe);
+#endif  /* skpcProbeGetInterfaceValueType */
 
 
 /**
@@ -858,9 +827,12 @@ skpcProbeSetInterfaceValueType(
  *    Return a bitmap that specifies any special (or "peculiar" or
  *    "quirky") data handling for the probe.
  */
+#define skpcProbeGetQuirks(m_probe)     ((uint32_t)((m_probe)->quirks))
+#ifndef skpcProbeGetQuirks
 uint32_t
 skpcProbeGetQuirks(
     const skpc_probe_t *probe);
+#endif  /* skpcProbeGetQuirks */
 
 
 /**

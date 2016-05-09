@@ -1,11 +1,11 @@
-# RCSIDENT($SiLK: Makefile.am 24e5040f7590 2011-01-24 18:55:20Z mthomas $)
+# RCSIDENT($SiLK: Makefile.am fb0b4814fb3d 2016-05-05 21:15:30Z mthomas $)
 
 ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = tests src site
 DIST_SUBDIRS = doc $(SUBDIRS)
 
-EXTRA_DIST = README.txt
+EXTRA_DIST = LICENSE.txt README.txt
 
 # extra configuration files
 EXTRA_DIST += $(PYTHON_INFO_PROG)

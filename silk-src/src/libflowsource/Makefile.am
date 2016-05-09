@@ -1,10 +1,10 @@
-# RCSIDENT("$SiLK: Makefile.am 9e04c0349961 2016-03-31 20:03:31Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 462d35be4f93 2016-05-05 22:00:05Z mthomas $");
 
 # Installed Targets
 
 lib_LTLIBRARIES = libflowsource.la
-libflowsource_version = 13:1:0
-# At previous release: libflowsource_version = 13:1:0
+libflowsource_version = 14:0:0
+# At previous release: libflowsource_version = 14:0:0
 
 EXTRA_DIST = sensor.conf.pod
 if HAVE_POD2MAN
@@ -19,9 +19,11 @@ pkginclude_HEADERS = libflowsource.h probeconf.h \
 # Dependencies on libfixbuf
 if HAVE_FIXBUF
 extra_check_programs = check-struct
-extra_sources2 = skipfix.c ipfixsource.c
-extra_headers2 = skipfix.h
+# The *.h files are listed sources since they are not installed
+extra_sources2 = ipfixsource.c ipfixsource.h skipfix.c skipfix.h
+extra_headers2 =
 endif
+EXTRA_DIST +=
 
 
 # Additional Targets

@@ -581,53 +581,9 @@ char *pmapbuild_text;
 /*
 ** Copyright (C) 2007-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 /*
@@ -642,7 +598,7 @@ char *pmapbuild_text;
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmapbuild.l 555a887b31de 2016-03-24 15:18:09Z mthomas $");
+RCSIDENT("$SiLK: rwpmapbuild.l 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skprefixmap.h>
@@ -871,7 +827,7 @@ SK_DIAGNOSTIC_IGNORE_PUSH("-Wwrite-strings")
 
 
 
-#line 875 "rwpmapbuild.c"
+#line 831 "rwpmapbuild.c"
 
 #define INITIAL 0
 #define ST_EOL 1
@@ -1040,10 +996,10 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 320 "rwpmapbuild.l"
+#line 276 "rwpmapbuild.l"
 
 
-#line 1047 "rwpmapbuild.c"
+#line 1003 "rwpmapbuild.c"
 
 	if ( !(yy_init) )
 		{
@@ -1124,12 +1080,12 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 322 "rwpmapbuild.l"
+#line 278 "rwpmapbuild.l"
 { BEGIN(ST_MODE); }
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 324 "rwpmapbuild.l"
+#line 280 "rwpmapbuild.l"
 { if (stmtMode(0, pmapbuild_text)) {
                                         ++error_count;
                                     }
@@ -1137,12 +1093,12 @@ YY_RULE_SETUP
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 330 "rwpmapbuild.l"
+#line 286 "rwpmapbuild.l"
 { BEGIN(ST_MAPNAME); }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 332 "rwpmapbuild.l"
+#line 288 "rwpmapbuild.l"
 { if (stmtMapName(0, pmapbuild_text)) {
                                         ++error_count;
                                     }
@@ -1150,7 +1106,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 338 "rwpmapbuild.l"
+#line 294 "rwpmapbuild.l"
 { if (stmtDefault(0, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1160,7 +1116,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 345 "rwpmapbuild.l"
+#line 301 "rwpmapbuild.l"
 { if (stmtLabel(0, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1170,7 +1126,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 352 "rwpmapbuild.l"
+#line 308 "rwpmapbuild.l"
 { if (stmtLabel(1, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1180,7 +1136,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 359 "rwpmapbuild.l"
+#line 315 "rwpmapbuild.l"
 { if (stmtCIDR(0, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1190,7 +1146,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 366 "rwpmapbuild.l"
+#line 322 "rwpmapbuild.l"
 { if (stmtIPs(0, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1200,7 +1156,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 373 "rwpmapbuild.l"
+#line 329 "rwpmapbuild.l"
 { if (stmtIPs(1, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1210,7 +1166,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 380 "rwpmapbuild.l"
+#line 336 "rwpmapbuild.l"
 { if (stmtProPorts(0, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1220,7 +1176,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 387 "rwpmapbuild.l"
+#line 343 "rwpmapbuild.l"
 { if (stmtProPorts(1, pmapbuild_text)) {
                                             ++error_count;
                                             BEGIN(ST_ERROR);
@@ -1230,7 +1186,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 394 "rwpmapbuild.l"
+#line 350 "rwpmapbuild.l"
 { if (stmtNumbers(0, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1240,7 +1196,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 401 "rwpmapbuild.l"
+#line 357 "rwpmapbuild.l"
 { if (stmtNumbers(1, pmapbuild_text)) {
                                         ++error_count;
                                         BEGIN(ST_ERROR);
@@ -1250,7 +1206,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 408 "rwpmapbuild.l"
+#line 364 "rwpmapbuild.l"
 { if (gotLabel(pmapbuild_text)) {
                                         ++error_count;
                                     }
@@ -1259,18 +1215,18 @@ YY_RULE_SETUP
 case 16:
 /* rule 16 can match eol */
 YY_RULE_SETUP
-#line 413 "rwpmapbuild.l"
+#line 369 "rwpmapbuild.l"
 { ++linenum; BEGIN(INITIAL); }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 415 "rwpmapbuild.l"
+#line 371 "rwpmapbuild.l"
 ;
 	YY_BREAK
 case 18:
 /* rule 18 can match eol */
 YY_RULE_SETUP
-#line 417 "rwpmapbuild.l"
+#line 373 "rwpmapbuild.l"
 {
                             skAppPrintErr("Incomplete %s statement on line %d",
                                           pmapbuild_text, linenum);
@@ -1280,7 +1236,7 @@ YY_RULE_SETUP
 case 19:
 /* rule 19 can match eol */
 YY_RULE_SETUP
-#line 423 "rwpmapbuild.l"
+#line 379 "rwpmapbuild.l"
 {
                             skAppPrintErr("Incomplete statement on line %d",
                                           linenum);
@@ -1290,7 +1246,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 430 "rwpmapbuild.l"
+#line 386 "rwpmapbuild.l"
 { skAppPrintErr(("Too many arguments in statement"
                                            " on line %d"),
                                           linenum);
@@ -1299,7 +1255,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 436 "rwpmapbuild.l"
+#line 392 "rwpmapbuild.l"
 { skAppPrintErr("Unrecognized input on line %d",
                                           linenum);
                             ++error_count;
@@ -1308,15 +1264,15 @@ YY_RULE_SETUP
 case 22:
 /* rule 22 can match eol */
 YY_RULE_SETUP
-#line 441 "rwpmapbuild.l"
+#line 397 "rwpmapbuild.l"
 { ++linenum; BEGIN(INITIAL); }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 443 "rwpmapbuild.l"
+#line 399 "rwpmapbuild.l"
 ECHO;
 	YY_BREAK
-#line 1320 "rwpmapbuild.c"
+#line 1276 "rwpmapbuild.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(ST_EOL):
 case YY_STATE_EOF(ST_ERROR):
@@ -2218,7 +2174,7 @@ void pmapbuild_free (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 443 "rwpmapbuild.l"
+#line 399 "rwpmapbuild.l"
 
 
 

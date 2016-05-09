@@ -147,53 +147,9 @@
 /*
 ** Copyright (C) 2005-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 /*
@@ -203,7 +159,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconfparse.y 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
+RCSIDENT("$SiLK: probeconfparse.y 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/probeconf.h>
@@ -377,7 +333,7 @@ static skIPWildcard_t *parse_wildcard_addr(char *s);
 
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 typedef union YYSTYPE
-#line 214 "probeconfparse.y"
+#line 170 "probeconfparse.y"
 {
     char               *string;
     sk_vector_t        *vector;
@@ -386,7 +342,7 @@ typedef union YYSTYPE
     skpc_filter_t       filter;
 }
 /* Line 193 of yacc.c.  */
-#line 390 "probeconfparse.c"
+#line 346 "probeconfparse.c"
 	YYSTYPE;
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
@@ -399,7 +355,7 @@ typedef union YYSTYPE
 
 
 /* Line 216 of yacc.c.  */
-#line 403 "probeconfparse.c"
+#line 359 "probeconfparse.c"
 
 #ifdef short
 # undef short
@@ -725,17 +681,17 @@ static const yytype_int8 yyrhs[] =
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint16 yyrline[] =
 {
-       0,   267,   267,   268,   269,   270,   271,   272,   283,   287,
-     297,   300,   304,   309,   315,   319,   325,   333,   334,   337,
-     338,   339,   340,   341,   342,   343,   344,   345,   346,   347,
-     348,   357,   361,   366,   370,   375,   379,   384,   388,   393,
-     397,   402,   406,   411,   415,   420,   424,   430,   434,   439,
-     443,   448,   452,   462,   465,   466,   469,   470,   471,   472,
-     473,   474,   475,   476,   485,   489,   494,   498,   504,   511,
-     515,   520,   524,   528,   536,   540,   544,   552,   556,   560,
-     568,   574,   579,   583,   588,   592,   605,   608,   609,   612,
-     613,   614,   615,   624,   628,   633,   637,   643,   650,   654,
-     659,   663,   668,   672,   684,   691,   697
+       0,   223,   223,   224,   225,   226,   227,   228,   239,   243,
+     253,   256,   260,   265,   271,   275,   281,   289,   290,   293,
+     294,   295,   296,   297,   298,   299,   300,   301,   302,   303,
+     304,   313,   317,   322,   326,   331,   335,   340,   344,   349,
+     353,   358,   362,   367,   371,   376,   380,   386,   390,   395,
+     399,   404,   408,   418,   421,   422,   425,   426,   427,   428,
+     429,   430,   431,   432,   441,   445,   450,   454,   460,   467,
+     471,   476,   480,   484,   492,   496,   500,   508,   512,   516,
+     524,   530,   535,   539,   544,   548,   561,   564,   565,   568,
+     569,   570,   571,   580,   584,   589,   593,   599,   606,   610,
+     615,   619,   624,   628,   640,   647,   653
 };
 #endif
 
@@ -1773,7 +1729,7 @@ yyreduce:
   switch (yyn)
     {
         case 7:
-#line 273 "probeconfparse.y"
+#line 229 "probeconfparse.y"
     {
     skpcParseErr("Misplaced or unrecognized keyword");
     ++pcscan_errors;
@@ -1781,28 +1737,28 @@ yyreduce:
     break;
 
   case 8:
-#line 284 "probeconfparse.y"
+#line 240 "probeconfparse.y"
     {
     include_file((yyvsp[(2) - (3)].string));
 }
     break;
 
   case 9:
-#line 288 "probeconfparse.y"
+#line 244 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 11:
-#line 301 "probeconfparse.y"
+#line 257 "probeconfparse.y"
     {
     probe_begin((yyvsp[(2) - (4)].string), (yyvsp[(3) - (4)].string));
 }
     break;
 
   case 12:
-#line 305 "probeconfparse.y"
+#line 261 "probeconfparse.y"
     {
     /* error */
     probe_begin(NULL, (yyvsp[(2) - (3)].string));
@@ -1810,7 +1766,7 @@ yyreduce:
     break;
 
   case 13:
-#line 310 "probeconfparse.y"
+#line 266 "probeconfparse.y"
     {
     /* error */
     probe_begin(NULL, NULL);
@@ -1818,14 +1774,14 @@ yyreduce:
     break;
 
   case 14:
-#line 316 "probeconfparse.y"
+#line 272 "probeconfparse.y"
     {
     probe_end();
 }
     break;
 
   case 15:
-#line 320 "probeconfparse.y"
+#line 276 "probeconfparse.y"
     {
     ++defn_errors;
     skpcParseErr("%s used to close probe", pcscan_clause);
@@ -1834,7 +1790,7 @@ yyreduce:
     break;
 
   case 16:
-#line 326 "probeconfparse.y"
+#line 282 "probeconfparse.y"
     {
     ++defn_errors;
     skpcParseErr("%s used to close probe", pcscan_clause);
@@ -1843,7 +1799,7 @@ yyreduce:
     break;
 
   case 30:
-#line 349 "probeconfparse.y"
+#line 305 "probeconfparse.y"
     {
     ++defn_errors;
     skpcParseErr(("Error in probe %s:"
@@ -1853,161 +1809,161 @@ yyreduce:
     break;
 
   case 31:
-#line 358 "probeconfparse.y"
+#line 314 "probeconfparse.y"
     {
     probe_priority((yyvsp[(2) - (3)].vector));
 }
     break;
 
   case 32:
-#line 362 "probeconfparse.y"
+#line 318 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 33:
-#line 367 "probeconfparse.y"
+#line 323 "probeconfparse.y"
     {
     probe_protocol((yyvsp[(2) - (3)].vector));
 }
     break;
 
   case 34:
-#line 371 "probeconfparse.y"
+#line 327 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 35:
-#line 376 "probeconfparse.y"
+#line 332 "probeconfparse.y"
     {
     probe_listen_as_host((yyvsp[(2) - (3)].vector));
 }
     break;
 
   case 36:
-#line 380 "probeconfparse.y"
+#line 336 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 37:
-#line 385 "probeconfparse.y"
+#line 341 "probeconfparse.y"
     {
     probe_listen_on_port((yyvsp[(2) - (3)].vector));
 }
     break;
 
   case 38:
-#line 389 "probeconfparse.y"
+#line 345 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 39:
-#line 394 "probeconfparse.y"
+#line 350 "probeconfparse.y"
     {
     probe_listen_on_usocket((yyvsp[(2) - (3)].vector));
 }
     break;
 
   case 40:
-#line 398 "probeconfparse.y"
+#line 354 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 41:
-#line 403 "probeconfparse.y"
+#line 359 "probeconfparse.y"
     {
     probe_read_from_file((yyvsp[(2) - (3)].vector));
 }
     break;
 
   case 42:
-#line 407 "probeconfparse.y"
+#line 363 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 43:
-#line 412 "probeconfparse.y"
+#line 368 "probeconfparse.y"
     {
     probe_poll_directory((yyvsp[(2) - (3)].vector));
 }
     break;
 
   case 44:
-#line 416 "probeconfparse.y"
+#line 372 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 45:
-#line 421 "probeconfparse.y"
+#line 377 "probeconfparse.y"
     {
     probe_accept_from_host((yyvsp[(2) - (3)].vector));
 }
     break;
 
   case 46:
-#line 425 "probeconfparse.y"
+#line 381 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 47:
-#line 431 "probeconfparse.y"
+#line 387 "probeconfparse.y"
     {
     probe_log_flags((yyvsp[(2) - (3)].vector));
 }
     break;
 
   case 48:
-#line 435 "probeconfparse.y"
+#line 391 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 49:
-#line 440 "probeconfparse.y"
+#line 396 "probeconfparse.y"
     {
     probe_interface_values((yyvsp[(2) - (3)].vector));
 }
     break;
 
   case 50:
-#line 444 "probeconfparse.y"
+#line 400 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 51:
-#line 449 "probeconfparse.y"
+#line 405 "probeconfparse.y"
     {
     probe_quirks((yyvsp[(2) - (3)].vector));
 }
     break;
 
   case 52:
-#line 453 "probeconfparse.y"
+#line 409 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 63:
-#line 477 "probeconfparse.y"
+#line 433 "probeconfparse.y"
     {
     ++defn_errors;
     skpcParseErr(("Error in sensor %s:"
@@ -2017,28 +1973,28 @@ yyreduce:
     break;
 
   case 64:
-#line 486 "probeconfparse.y"
+#line 442 "probeconfparse.y"
     {
     sensor_begin((yyvsp[(2) - (3)].string));
 }
     break;
 
   case 65:
-#line 490 "probeconfparse.y"
+#line 446 "probeconfparse.y"
     {
     sensor_begin(NULL);
 }
     break;
 
   case 66:
-#line 495 "probeconfparse.y"
+#line 451 "probeconfparse.y"
     {
     sensor_end();
 }
     break;
 
   case 67:
-#line 499 "probeconfparse.y"
+#line 455 "probeconfparse.y"
     {
     ++defn_errors;
     skpcParseErr("%s used to close sensor", pcscan_clause);
@@ -2047,7 +2003,7 @@ yyreduce:
     break;
 
   case 68:
-#line 505 "probeconfparse.y"
+#line 461 "probeconfparse.y"
     {
     ++defn_errors;
     skpcParseErr("%s used to close sensor", pcscan_clause);
@@ -2056,35 +2012,35 @@ yyreduce:
     break;
 
   case 69:
-#line 512 "probeconfparse.y"
+#line 468 "probeconfparse.y"
     {
     sensor_isp_ip((yyvsp[(2) - (3)].vector));
 }
     break;
 
   case 70:
-#line 516 "probeconfparse.y"
+#line 472 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 71:
-#line 521 "probeconfparse.y"
+#line 477 "probeconfparse.y"
     {
     sensor_interface((yyvsp[(1) - (3)].string), (yyvsp[(2) - (3)].vector));
 }
     break;
 
   case 72:
-#line 525 "probeconfparse.y"
+#line 481 "probeconfparse.y"
     {
     sensor_interface((yyvsp[(1) - (3)].string), NULL);
 }
     break;
 
   case 73:
-#line 529 "probeconfparse.y"
+#line 485 "probeconfparse.y"
     {
     missing_value();
     if ((yyvsp[(1) - (2)].string)) {
@@ -2094,21 +2050,21 @@ yyreduce:
     break;
 
   case 74:
-#line 537 "probeconfparse.y"
+#line 493 "probeconfparse.y"
     {
     sensor_ipblock((yyvsp[(1) - (3)].string), (yyvsp[(2) - (3)].vector));
 }
     break;
 
   case 75:
-#line 541 "probeconfparse.y"
+#line 497 "probeconfparse.y"
     {
     sensor_ipblock((yyvsp[(1) - (3)].string), NULL);
 }
     break;
 
   case 76:
-#line 545 "probeconfparse.y"
+#line 501 "probeconfparse.y"
     {
     missing_value();
     if ((yyvsp[(1) - (2)].string)) {
@@ -2118,21 +2074,21 @@ yyreduce:
     break;
 
   case 77:
-#line 553 "probeconfparse.y"
+#line 509 "probeconfparse.y"
     {
     sensor_ipset((yyvsp[(1) - (3)].string), (yyvsp[(2) - (3)].vector));
 }
     break;
 
   case 78:
-#line 557 "probeconfparse.y"
+#line 513 "probeconfparse.y"
     {
     sensor_ipset((yyvsp[(1) - (3)].string), NULL);
 }
     break;
 
   case 79:
-#line 561 "probeconfparse.y"
+#line 517 "probeconfparse.y"
     {
     missing_value();
     if ((yyvsp[(1) - (2)].string)) {
@@ -2142,7 +2098,7 @@ yyreduce:
     break;
 
   case 80:
-#line 569 "probeconfparse.y"
+#line 525 "probeconfparse.y"
     {
     /* discard-{when,unless}
      * {source,destination,any}-{interfaces,ipblocks,ipsets} */
@@ -2151,35 +2107,35 @@ yyreduce:
     break;
 
   case 81:
-#line 575 "probeconfparse.y"
+#line 531 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 82:
-#line 580 "probeconfparse.y"
+#line 536 "probeconfparse.y"
     {
     sensor_network((yyvsp[(1) - (3)].net_dir), (yyvsp[(2) - (3)].string));
 }
     break;
 
   case 83:
-#line 584 "probeconfparse.y"
+#line 540 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 84:
-#line 589 "probeconfparse.y"
+#line 545 "probeconfparse.y"
     {
     sensor_probes((yyvsp[(1) - (3)].string), (yyvsp[(2) - (3)].vector));
 }
     break;
 
   case 85:
-#line 593 "probeconfparse.y"
+#line 549 "probeconfparse.y"
     {
     missing_value();
     if ((yyvsp[(1) - (2)].string)) {
@@ -2189,7 +2145,7 @@ yyreduce:
     break;
 
   case 92:
-#line 616 "probeconfparse.y"
+#line 572 "probeconfparse.y"
     {
     ++defn_errors;
     skpcParseErr(("Error in group %s:"
@@ -2199,28 +2155,28 @@ yyreduce:
     break;
 
   case 93:
-#line 625 "probeconfparse.y"
+#line 581 "probeconfparse.y"
     {
     group_begin((yyvsp[(2) - (3)].string));
 }
     break;
 
   case 94:
-#line 629 "probeconfparse.y"
+#line 585 "probeconfparse.y"
     {
     group_begin(NULL);
 }
     break;
 
   case 95:
-#line 634 "probeconfparse.y"
+#line 590 "probeconfparse.y"
     {
     group_end();
 }
     break;
 
   case 96:
-#line 638 "probeconfparse.y"
+#line 594 "probeconfparse.y"
     {
     ++defn_errors;
     skpcParseErr("%s used to close group", pcscan_clause);
@@ -2229,7 +2185,7 @@ yyreduce:
     break;
 
   case 97:
-#line 644 "probeconfparse.y"
+#line 600 "probeconfparse.y"
     {
     ++defn_errors;
     skpcParseErr("%s used to close group", pcscan_clause);
@@ -2238,49 +2194,49 @@ yyreduce:
     break;
 
   case 98:
-#line 651 "probeconfparse.y"
+#line 607 "probeconfparse.y"
     {
     group_add_data((yyvsp[(2) - (3)].vector), SKPC_GROUP_INTERFACE);
 }
     break;
 
   case 99:
-#line 655 "probeconfparse.y"
+#line 611 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 100:
-#line 660 "probeconfparse.y"
+#line 616 "probeconfparse.y"
     {
     group_add_data((yyvsp[(2) - (3)].vector), SKPC_GROUP_IPBLOCK);
 }
     break;
 
   case 101:
-#line 664 "probeconfparse.y"
+#line 620 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 102:
-#line 669 "probeconfparse.y"
+#line 625 "probeconfparse.y"
     {
     group_add_data((yyvsp[(2) - (3)].vector), SKPC_GROUP_IPSET);
 }
     break;
 
   case 103:
-#line 673 "probeconfparse.y"
+#line 629 "probeconfparse.y"
     {
     missing_value();
 }
     break;
 
   case 104:
-#line 685 "probeconfparse.y"
+#line 641 "probeconfparse.y"
     {
     sk_vector_t *v = vectorPoolGet(ptr_pool);
     char *s = (yyvsp[(1) - (1)].string);
@@ -2290,7 +2246,7 @@ yyreduce:
     break;
 
   case 105:
-#line 692 "probeconfparse.y"
+#line 648 "probeconfparse.y"
     {
     char *s = (yyvsp[(2) - (2)].string);
     skVectorAppendValue((yyvsp[(1) - (2)].vector), &s);
@@ -2299,7 +2255,7 @@ yyreduce:
     break;
 
   case 106:
-#line 698 "probeconfparse.y"
+#line 654 "probeconfparse.y"
     {
     char *s = (yyvsp[(3) - (3)].string);
     skVectorAppendValue((yyvsp[(1) - (3)].vector), &s);
@@ -2309,7 +2265,7 @@ yyreduce:
 
 
 /* Line 1267 of yacc.c.  */
-#line 2313 "probeconfparse.c"
+#line 2269 "probeconfparse.c"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -2523,7 +2479,7 @@ yyreturn:
 }
 
 
-#line 705 "probeconfparse.y"
+#line 661 "probeconfparse.y"
 
 
 /*

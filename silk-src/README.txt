@@ -8,10 +8,10 @@ ideally suited for analyzing traffic on the backbone or border of a
 large, distributed enterprise or mid-sized ISP.
 
 SiLK comes with NO WARRANTY.  The SiLK software components are
-released under the GNU General Public License V2 and Government Purpose
-License Rights.  See the files doc/LICENSES.txt and doc/GPL.txt for
-details.  Some included library code is covered under LGPL 2.1; see
-source files for details.
+released under the GNU General Public License V2 and Government
+Purpose License Rights.  See the files LICENSE.txt and doc/GPL.txt
+for details.  Some included library code is covered under LGPL 2.1;
+see source files for details.
 
 In general, you can install SiLK by running
     configure ; make ; make install
@@ -26,11 +26,14 @@ Manual pages for each tool are installed when SiLK is installed.
 These manual pages and additional documentation are available from
 http://tools.netsa.cert.org/silk/
 
-The following documents are available in the doc/ directory:
+The following documents are available in either this directory or in
+the doc/ directory:
+
     RELEASE-NOTES.txt
         -- history of changes to SiLK
-    LICENSES.txt
+    LICENSE.txt
         -- brief description of licenses under which SiLK is released
+           and the no warranty disclaimer
     GPL.txt
         -- complete text of the GNU General Public License V2
     silk-install-handbook.pdf

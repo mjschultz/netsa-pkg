@@ -1,58 +1,14 @@
 /*
 ** Copyright (C) 2004-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: flowcapio.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
+RCSIDENT("$SiLK: flowcapio.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 #include "skstream_priv.h"
 
@@ -70,17 +26,17 @@ RCSIDENT("$SiLK: flowcapio.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
 
 static int
 flowcapioRecordUnpack_V5(
-    skstream_t         *rwIOS,
+    skstream_t         *stream,
     rwGenericRec_V5    *rwrec,
     uint8_t            *ar);
 static int
 flowcapioRecordUnpack_V3(
-    skstream_t         *rwIOS,
+    skstream_t         *stream,
     rwGenericRec_V5    *rwrec,
     uint8_t            *ar);
 static int
 flowcapioRecordPack_V3(
-    skstream_t             *rwIOS,
+    skstream_t             *stream,
     const rwGenericRec_V5  *rwrec,
     uint8_t                *ar);
 
@@ -98,13 +54,13 @@ flowcapioRecordPack_V3(
 
 static int
 flowcapioRecordUnpack_V6(
-    skstream_t         *rwIOS,
+    skstream_t         *stream,
     rwGenericRec_V5    *rwrec,
     uint8_t            *ar)
 {
     int rv;
 
-    rv = flowcapioRecordUnpack_V5(rwIOS, rwrec, ar);
+    rv = flowcapioRecordUnpack_V5(stream, rwrec, ar);
     rwRecSetApplication(rwrec, 0);
     return rv;
 }
@@ -182,7 +138,7 @@ flowcapioRecordUnpack_V6(
  */
 static int
 flowcapioRecordUnpack_V5(
-    skstream_t         *rwIOS,
+    skstream_t         *stream,
     rwGenericRec_V5    *rwrec,
     uint8_t            *ar)
 {
@@ -190,7 +146,7 @@ flowcapioRecordUnpack_V5(
     uint16_t elapsed = 0;
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         flowcapioRecordSwap_V5(ar);
     }
 
@@ -243,7 +199,7 @@ flowcapioRecordUnpack_V5(
     /* Fractional times in bytes 35-37 handled above */
 
     /* Get sensor from header */
-    rwRecSetSensor(rwrec, rwIOS->hdr_sensor);
+    rwRecSetSensor(rwrec, stream->hdr_sensor);
 
     return SKSTREAM_OK;
 }
@@ -254,7 +210,7 @@ flowcapioRecordUnpack_V5(
  */
 static int
 flowcapioRecordPack_V5(
-    skstream_t             *rwIOS,
+    skstream_t             *stream,
     const rwGenericRec_V5  *rwrec,
     uint8_t                *ar)
 {
@@ -314,7 +270,7 @@ flowcapioRecordPack_V5(
     ar[37] = 0xFF & (rwRecGetElapsedMSec(rwrec) << 4);
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         flowcapioRecordSwap_V5(ar);
     }
 
@@ -369,17 +325,17 @@ flowcapioRecordPack_V5(
  */
 static int
 flowcapioRecordUnpack_V4(
-    skstream_t         *rwIOS,
+    skstream_t         *stream,
     rwGenericRec_V5    *rwrec,
     uint8_t            *ar)
 {
     int rv;
 
     /* The first 36 bytes of a V4 are identical to V3 */
-    rv = flowcapioRecordUnpack_V3(rwIOS, rwrec, ar);
+    rv = flowcapioRecordUnpack_V3(stream, rwrec, ar);
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         /* only need to swap the payload hash */
         SWAP_DATA32((ar) + 36);
     }
@@ -398,21 +354,21 @@ flowcapioRecordUnpack_V4(
  */
 static int
 flowcapioRecordPack_V4(
-    skstream_t             *rwIOS,
+    skstream_t             *stream,
     const rwGenericRec_V5  *rwrec,
     uint8_t                *ar)
 {
     int rv;
 
     /* The first 36 bytes of a V4 are identical to V3 */
-    rv = flowcapioRecordPack_V3(rwIOS, rwrec, ar);
+    rv = flowcapioRecordPack_V3(stream, rwrec, ar);
 
     if (rv == SKSTREAM_OK) {
         rwRecMemGetNhIPv4(rwrec, &ar[36]);
     }
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         /* only need to swap the payload hash */
         SWAP_DATA32((ar) + 36);
     }
@@ -492,7 +448,7 @@ flowcapioRecordPack_V4(
  */
 static int
 flowcapioRecordUnpack_V3(
-    skstream_t         *rwIOS,
+    skstream_t         *stream,
     rwGenericRec_V5    *rwrec,
     uint8_t            *ar)
 {
@@ -500,7 +456,7 @@ flowcapioRecordUnpack_V3(
     uint16_t elapsed = 0;
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         flowcapioRecordSwap_V3(ar);
     }
 
@@ -555,7 +511,7 @@ flowcapioRecordUnpack_V3(
     /* Fractional times in bytes 33-35 handled above */
 
     /* Get sensor from header */
-    rwRecSetSensor(rwrec, rwIOS->hdr_sensor);
+    rwRecSetSensor(rwrec, stream->hdr_sensor);
 
     return SKSTREAM_OK;
 }
@@ -566,7 +522,7 @@ flowcapioRecordUnpack_V3(
  */
 static int
 flowcapioRecordPack_V3(
-    skstream_t             *rwIOS,
+    skstream_t             *stream,
     const rwGenericRec_V5  *rwrec,
     uint8_t                *ar)
 {
@@ -628,7 +584,7 @@ flowcapioRecordPack_V3(
     ar[35] = 0xFF & (rwRecGetElapsedMSec(rwrec) << 4);
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         flowcapioRecordSwap_V3(ar);
     }
 
@@ -698,7 +654,7 @@ flowcapioRecordPack_V3(
  */
 static int
 flowcapioRecordUnpack_V2(
-    skstream_t         *rwIOS,
+    skstream_t         *stream,
     rwGenericRec_V5    *rwrec,
     uint8_t            *ar)
 {
@@ -706,7 +662,7 @@ flowcapioRecordUnpack_V2(
     uint16_t elapsed = 0;
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         flowcapioRecordSwap_V2(ar);
     }
 
@@ -745,7 +701,7 @@ flowcapioRecordUnpack_V2(
     rwRecSetFlags(rwrec, ar[28]);
 
     /* Get sensor from header */
-    rwRecSetSensor(rwrec, rwIOS->hdr_sensor);
+    rwRecSetSensor(rwrec, stream->hdr_sensor);
 
     return SKSTREAM_OK;
 }
@@ -756,7 +712,7 @@ flowcapioRecordUnpack_V2(
  */
 static int
 flowcapioRecordPack_V2(
-    skstream_t             *rwIOS,
+    skstream_t             *stream,
     const rwGenericRec_V5  *rwrec,
     uint8_t                *ar)
 {
@@ -803,7 +759,7 @@ flowcapioRecordPack_V2(
     ar[29] = 0;
 
     /* swap if required */
-    if (rwIOS->swapFlag) {
+    if (stream->swapFlag) {
         flowcapioRecordSwap_V2(ar);
     }
 
@@ -838,7 +794,7 @@ flowcapioGetRecLen(
 
 
 /*
- *  status = flowcapioPrepare(&rwIOSPtr);
+ *  status = flowcapioPrepare(&stream);
  *
  *    Sets the record version to the default if it is unspecified,
  *    checks that the record format supports the requested record
@@ -847,16 +803,16 @@ flowcapioGetRecLen(
  */
 int
 flowcapioPrepare(
-    skstream_t         *rwIOS)
+    skstream_t         *stream)
 {
 #define FILE_FORMAT "FT_FLOWCAP"
-    sk_file_header_t *hdr = rwIOS->silk_hdr;
+    sk_file_header_t *hdr = stream->silk_hdr;
     int rv = SKSTREAM_OK; /* return value */
 
     assert(skHeaderGetFileFormat(hdr) == FT_FLOWCAP);
 
     /* Set version if none was selected by caller */
-    if ((rwIOS->io_mode == SK_IO_WRITE)
+    if ((stream->io_mode == SK_IO_WRITE)
         && (skHeaderGetRecordVersion(hdr) == SK_RECORD_VERSION_ANY))
     {
         skHeaderSetRecordVersion(hdr, DEFAULT_RECORD_VERSION);
@@ -865,24 +821,24 @@ flowcapioPrepare(
     /* version check; set values based on version */
     switch (skHeaderGetRecordVersion(hdr)) {
       case 6:
-        rwIOS->rwUnpackFn = &flowcapioRecordUnpack_V6;
-        rwIOS->rwPackFn   = &flowcapioRecordPack_V5;
+        stream->rwUnpackFn = &flowcapioRecordUnpack_V6;
+        stream->rwPackFn   = &flowcapioRecordPack_V5;
         break;
       case 5:
-        rwIOS->rwUnpackFn = &flowcapioRecordUnpack_V5;
-        rwIOS->rwPackFn   = &flowcapioRecordPack_V5;
+        stream->rwUnpackFn = &flowcapioRecordUnpack_V5;
+        stream->rwPackFn   = &flowcapioRecordPack_V5;
         break;
       case 4:
-        rwIOS->rwUnpackFn = &flowcapioRecordUnpack_V4;
-        rwIOS->rwPackFn   = &flowcapioRecordPack_V4;
+        stream->rwUnpackFn = &flowcapioRecordUnpack_V4;
+        stream->rwPackFn   = &flowcapioRecordPack_V4;
         break;
       case 3:
-        rwIOS->rwUnpackFn = &flowcapioRecordUnpack_V3;
-        rwIOS->rwPackFn   = &flowcapioRecordPack_V3;
+        stream->rwUnpackFn = &flowcapioRecordUnpack_V3;
+        stream->rwPackFn   = &flowcapioRecordPack_V3;
         break;
       case 2:
-        rwIOS->rwUnpackFn = &flowcapioRecordUnpack_V2;
-        rwIOS->rwPackFn   = &flowcapioRecordPack_V2;
+        stream->rwUnpackFn = &flowcapioRecordUnpack_V2;
+        stream->rwPackFn   = &flowcapioRecordPack_V2;
         break;
       case 1:
         /* no longer supported */
@@ -892,22 +848,22 @@ flowcapioPrepare(
         goto END;
     }
 
-    rwIOS->recLen = flowcapioGetRecLen(skHeaderGetRecordVersion(hdr));
+    stream->recLen = flowcapioGetRecLen(skHeaderGetRecordVersion(hdr));
 
     /* verify lengths */
-    if (rwIOS->recLen == 0) {
+    if (stream->recLen == 0) {
         skAppPrintErr("Record length not set for %s version %u",
                       FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr));
         skAbort();
     }
-    if (rwIOS->recLen != skHeaderGetRecordLength(hdr)) {
+    if (stream->recLen != skHeaderGetRecordLength(hdr)) {
         if (0 == skHeaderGetRecordLength(hdr)) {
-            skHeaderSetRecordLength(hdr, rwIOS->recLen);
+            skHeaderSetRecordLength(hdr, stream->recLen);
         } else {
             skAppPrintErr(("Record length mismatch for %s version %u\n"
                            "\tcode = %" PRIu16 " bytes;  header = %lu bytes"),
                           FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr),
-                          rwIOS->recLen,
+                          stream->recLen,
                           (unsigned long)skHeaderGetRecordLength(hdr));
             skAbort();
         }

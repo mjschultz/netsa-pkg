@@ -844,53 +844,9 @@ char *probeconfscan_text;
 /*
 ** Copyright (C) 2005-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 /*
@@ -900,7 +856,7 @@ char *probeconfscan_text;
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconfscan.l 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
+RCSIDENT("$SiLK: probeconfscan.l 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 #include "probeconfscan.h"
 #include "probeconfparse.h"
@@ -999,7 +955,7 @@ SK_DIAGNOSTIC_IGNORE_PUSH("-Wwrite-strings")
 /* comment; ignore */
 /* newline, maybe preceded by whitespace */
 /* end of line, maybe preceded by comment; increment line count */
-#line 1003 "probeconfscan.c"
+#line 959 "probeconfscan.c"
 
 #define INITIAL 0
 #define ST_ARGS 1
@@ -1166,7 +1122,7 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 207 "probeconfscan.l"
+#line 163 "probeconfscan.l"
 
 
     /* ST_NEWLINE state: increment the line-count for the newline we
@@ -1175,7 +1131,7 @@ YY_DECL
      * Otherwise, go into the INITIAL state by reading a character
      * then putting it back. */
 
-#line 1179 "probeconfscan.c"
+#line 1135 "probeconfscan.c"
 
 	if ( !(yy_init) )
 		{
@@ -1257,193 +1213,193 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 215 "probeconfscan.l"
+#line 171 "probeconfscan.l"
 { ++pcscan_file->line; }
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 216 "probeconfscan.l"
+#line 172 "probeconfscan.l"
 { yyless(0); ++pcscan_file->line;
                                           BEGIN(INITIAL); }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 219 "probeconfscan.l"
+#line 175 "probeconfscan.l"
 ;
 	YY_BREAK
 /* handle comment at end of file with no trailing newline */
 case 4:
 YY_RULE_SETUP
-#line 223 "probeconfscan.l"
+#line 179 "probeconfscan.l"
 { BEGIN(ST_NEWLINE); }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 224 "probeconfscan.l"
+#line 180 "probeconfscan.l"
 { BEGIN(ST_ERR); }
 	YY_BREAK
 /* read first keyword on a line */
 case 6:
 /* rule 6 can match eol */
 YY_RULE_SETUP
-#line 228 "probeconfscan.l"
+#line 184 "probeconfscan.l"
 { BEGIN(ST_NEWLINE);}
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 230 "probeconfscan.l"
+#line 186 "probeconfscan.l"
 { yylval.string = get_name(probeconfscan_text,'-');
                                           return stash(NET_NAME_INTERFACE); }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 233 "probeconfscan.l"
+#line 189 "probeconfscan.l"
 { yylval.string = get_name(probeconfscan_text,'-');
                                           return stash(NET_NAME_IPBLOCK); }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 236 "probeconfscan.l"
+#line 192 "probeconfscan.l"
 { yylval.string = get_name(probeconfscan_text,'-');
                                           return stash(NET_NAME_IPSET); }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 239 "probeconfscan.l"
+#line 195 "probeconfscan.l"
 { yylval.string = get_name(probeconfscan_text,'-');
                                           return stash(PROBES); }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 242 "probeconfscan.l"
+#line 198 "probeconfscan.l"
 { return stash(ACCEPT_FROM_HOST_T); }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 243 "probeconfscan.l"
+#line 199 "probeconfscan.l"
 { yylval.net_dir = SKPC_DIR_DST;
                                           return stash(NET_DIRECTION);}
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 245 "probeconfscan.l"
+#line 201 "probeconfscan.l"
 { return stash(END_GROUP_T); }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 246 "probeconfscan.l"
+#line 202 "probeconfscan.l"
 { return stash(END_PROBE_T); }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 247 "probeconfscan.l"
+#line 203 "probeconfscan.l"
 { return stash(END_SENSOR_T); }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 248 "probeconfscan.l"
+#line 204 "probeconfscan.l"
 { return stash(GROUP_T); }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 249 "probeconfscan.l"
+#line 205 "probeconfscan.l"
 { return stash(INCLUDE_T); }
 	YY_BREAK
 case 18:
 /* rule 18 can match eol */
 YY_RULE_SETUP
-#line 250 "probeconfscan.l"
+#line 206 "probeconfscan.l"
 { err_include_arg();BEGIN(ST_NEWLINE);}
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 251 "probeconfscan.l"
+#line 207 "probeconfscan.l"
 { return stash(INTERFACES_T); }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 252 "probeconfscan.l"
+#line 208 "probeconfscan.l"
 { return stash(INTERFACE_VALUES_T); }
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 253 "probeconfscan.l"
+#line 209 "probeconfscan.l"
 { return stash(IPBLOCKS_T); }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 254 "probeconfscan.l"
+#line 210 "probeconfscan.l"
 { return stash(IPSETS_T); }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 255 "probeconfscan.l"
+#line 211 "probeconfscan.l"
 { return stash(ISP_IP_T); }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 256 "probeconfscan.l"
+#line 212 "probeconfscan.l"
 { return stash(LISTEN_AS_HOST_T); }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 257 "probeconfscan.l"
+#line 213 "probeconfscan.l"
 { return stash(LISTEN_ON_PORT_T); }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 258 "probeconfscan.l"
+#line 214 "probeconfscan.l"
 { return stash(LISTEN_ON_USOCKET_T);}
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 259 "probeconfscan.l"
+#line 215 "probeconfscan.l"
 { return stash(LISTEN_ON_USOCKET_T);}
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 260 "probeconfscan.l"
+#line 216 "probeconfscan.l"
 { return stash(LOG_FLAGS_T); }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 261 "probeconfscan.l"
+#line 217 "probeconfscan.l"
 { return stash(POLL_DIRECTORY_T); }
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 262 "probeconfscan.l"
+#line 218 "probeconfscan.l"
 { return stash(PRIORITY_T); }
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 263 "probeconfscan.l"
+#line 219 "probeconfscan.l"
 { return stash(PROBE_T); }
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 264 "probeconfscan.l"
+#line 220 "probeconfscan.l"
 { return stash(PROTOCOL_T); }
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 265 "probeconfscan.l"
+#line 221 "probeconfscan.l"
 { return stash(QUIRKS_T); }
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 266 "probeconfscan.l"
+#line 222 "probeconfscan.l"
 { return stash(READ_FROM_FILE_T); }
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 267 "probeconfscan.l"
+#line 223 "probeconfscan.l"
 { yylval.net_dir = SKPC_DIR_SRC;
                                           return stash(NET_DIRECTION); }
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 269 "probeconfscan.l"
+#line 225 "probeconfscan.l"
 { if (extra_sensor_verify_fn) {
                                               return stash(SENSOR_T);
                                           } else {
@@ -1452,70 +1408,70 @@ YY_RULE_SETUP
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 275 "probeconfscan.l"
+#line 231 "probeconfscan.l"
 { yyless(0); BEGIN(ST_ERR); }
 	YY_BREAK
 /* go into the ST_FILTER state */
 case 38:
 YY_RULE_SETUP
-#line 279 "probeconfscan.l"
+#line 235 "probeconfscan.l"
 { filter_start('u'); }
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 280 "probeconfscan.l"
+#line 236 "probeconfscan.l"
 { filter_start('w'); }
 	YY_BREAK
 /* ST_FILTER state: handle the second keyword for "discard-when"
      * and "discard-unless" */
 case 40:
 YY_RULE_SETUP
-#line 285 "probeconfscan.l"
+#line 241 "probeconfscan.l"
 { return filter_set_type('a', 'n'); }
 	YY_BREAK
 case 41:
 YY_RULE_SETUP
-#line 286 "probeconfscan.l"
+#line 242 "probeconfscan.l"
 { return filter_set_type('d', 'n'); }
 	YY_BREAK
 case 42:
 YY_RULE_SETUP
-#line 287 "probeconfscan.l"
+#line 243 "probeconfscan.l"
 { return filter_set_type('s', 'n'); }
 	YY_BREAK
 case 43:
 YY_RULE_SETUP
-#line 289 "probeconfscan.l"
+#line 245 "probeconfscan.l"
 { return filter_set_type('a', 'w'); }
 	YY_BREAK
 case 44:
 YY_RULE_SETUP
-#line 290 "probeconfscan.l"
+#line 246 "probeconfscan.l"
 { return filter_set_type('d', 'w'); }
 	YY_BREAK
 case 45:
 YY_RULE_SETUP
-#line 291 "probeconfscan.l"
+#line 247 "probeconfscan.l"
 { return filter_set_type('s', 'w'); }
 	YY_BREAK
 case 46:
 YY_RULE_SETUP
-#line 293 "probeconfscan.l"
+#line 249 "probeconfscan.l"
 { return filter_set_type('a', 's'); }
 	YY_BREAK
 case 47:
 YY_RULE_SETUP
-#line 294 "probeconfscan.l"
+#line 250 "probeconfscan.l"
 { return filter_set_type('d', 's'); }
 	YY_BREAK
 case 48:
 YY_RULE_SETUP
-#line 295 "probeconfscan.l"
+#line 251 "probeconfscan.l"
 { return filter_set_type('s', 's'); }
 	YY_BREAK
 case 49:
 YY_RULE_SETUP
-#line 297 "probeconfscan.l"
+#line 253 "probeconfscan.l"
 { yyless(0);
                                           filter_set_type('-', '-');
                                           BEGIN(ST_ERR); }
@@ -1524,52 +1480,52 @@ YY_RULE_SETUP
 case 50:
 /* rule 50 can match eol */
 YY_RULE_SETUP
-#line 304 "probeconfscan.l"
+#line 260 "probeconfscan.l"
 { BEGIN(ST_NEWLINE); return EOL; }
 	YY_BREAK
 case 51:
 YY_RULE_SETUP
-#line 306 "probeconfscan.l"
+#line 262 "probeconfscan.l"
 { return REMAINDER_T; }
 	YY_BREAK
 case 52:
 YY_RULE_SETUP
-#line 308 "probeconfscan.l"
+#line 264 "probeconfscan.l"
 { yylval.string = strdup(probeconfscan_text);
                                           return ID; }
 	YY_BREAK
 case 53:
 YY_RULE_SETUP
-#line 311 "probeconfscan.l"
+#line 267 "probeconfscan.l"
 { BEGIN(ST_STRING);
                                           pcscan_buf_ptr = pcscan_buf; }
 	YY_BREAK
 case 54:
 YY_RULE_SETUP
-#line 314 "probeconfscan.l"
+#line 270 "probeconfscan.l"
 { return COMMA; }
 	YY_BREAK
 case 55:
 YY_RULE_SETUP
-#line 316 "probeconfscan.l"
+#line 272 "probeconfscan.l"
 { yyless(0); BEGIN(ST_ARG_ERR); }
 	YY_BREAK
 /* handle errors */
 case 56:
 YY_RULE_SETUP
-#line 321 "probeconfscan.l"
+#line 277 "probeconfscan.l"
 { err_bad_line(1); }
 	YY_BREAK
 case 57:
 YY_RULE_SETUP
-#line 323 "probeconfscan.l"
+#line 279 "probeconfscan.l"
 { err_bad_line(0); }
 	YY_BREAK
 /* return EOL so the parser can throw away its current state */
 case 58:
 /* rule 58 can match eol */
 YY_RULE_SETUP
-#line 327 "probeconfscan.l"
+#line 283 "probeconfscan.l"
 { BEGIN(ST_NEWLINE); return EOL; }
 	YY_BREAK
 /* ST_IGNORE_SENSOR state: ignore everything until we reach the
@@ -1577,23 +1533,23 @@ YY_RULE_SETUP
 case 59:
 /* rule 59 can match eol */
 YY_RULE_SETUP
-#line 333 "probeconfscan.l"
+#line 289 "probeconfscan.l"
 { BEGIN(ST_NEWLINE);}
 	YY_BREAK
 case 60:
 YY_RULE_SETUP
-#line 334 "probeconfscan.l"
+#line 290 "probeconfscan.l"
 { BEGIN(ST_ERR); }
 	YY_BREAK
 case 61:
 /* rule 61 can match eol */
 YY_RULE_SETUP
-#line 335 "probeconfscan.l"
+#line 291 "probeconfscan.l"
 { ++pcscan_file->line; }
 	YY_BREAK
 case 62:
 YY_RULE_SETUP
-#line 336 "probeconfscan.l"
+#line 292 "probeconfscan.l"
 ;
 	YY_BREAK
 /* ST_STRING state: Accepts the remainder of a quoted string
@@ -1601,7 +1557,7 @@ YY_RULE_SETUP
      * pretty much equivalent to quoted strings in C. */
 case 63:
 YY_RULE_SETUP
-#line 343 "probeconfscan.l"
+#line 299 "probeconfscan.l"
 { BEGIN(ST_ARGS);
                           STRING_CHECK;
                           *pcscan_buf_ptr = '\0';
@@ -1611,50 +1567,50 @@ YY_RULE_SETUP
 case 64:
 /* rule 64 can match eol */
 YY_RULE_SETUP
-#line 349 "probeconfscan.l"
+#line 305 "probeconfscan.l"
 { BEGIN(ST_NEWLINE);
                           skpcParseErr("Quoted string missing closing quote");
                           return EOL; }
 	YY_BREAK
 case 65:
 YY_RULE_SETUP
-#line 353 "probeconfscan.l"
+#line 309 "probeconfscan.l"
 { STRING_CHECK; *pcscan_buf_ptr++ = '\n'; }
 	YY_BREAK
 case 66:
 YY_RULE_SETUP
-#line 354 "probeconfscan.l"
+#line 310 "probeconfscan.l"
 { STRING_CHECK; *pcscan_buf_ptr++ = '\t'; }
 	YY_BREAK
 case 67:
 YY_RULE_SETUP
-#line 355 "probeconfscan.l"
+#line 311 "probeconfscan.l"
 { STRING_CHECK; *pcscan_buf_ptr++ = '\r'; }
 	YY_BREAK
 case 68:
 YY_RULE_SETUP
-#line 356 "probeconfscan.l"
+#line 312 "probeconfscan.l"
 { STRING_CHECK; *pcscan_buf_ptr++ = '\b'; }
 	YY_BREAK
 case 69:
 YY_RULE_SETUP
-#line 357 "probeconfscan.l"
+#line 313 "probeconfscan.l"
 { STRING_CHECK; *pcscan_buf_ptr++ = '\f'; }
 	YY_BREAK
 case 70:
 /* rule 70 can match eol */
 YY_RULE_SETUP
-#line 358 "probeconfscan.l"
+#line 314 "probeconfscan.l"
 { STRING_CHECK; *pcscan_buf_ptr++ = '\n'; }
 	YY_BREAK
 case 71:
 YY_RULE_SETUP
-#line 359 "probeconfscan.l"
+#line 315 "probeconfscan.l"
 { STRING_CHECK; *pcscan_buf_ptr++ = probeconfscan_text[1]; }
 	YY_BREAK
 case 72:
 YY_RULE_SETUP
-#line 361 "probeconfscan.l"
+#line 317 "probeconfscan.l"
 { if ((pcscan_buf_ptr + probeconfscan_leng) > pcscan_buf_end ) {
                               BEGIN(ST_ERR);
                               return ERR_STR_TOO_LONG;
@@ -1664,10 +1620,10 @@ YY_RULE_SETUP
 	YY_BREAK
 case 73:
 YY_RULE_SETUP
-#line 368 "probeconfscan.l"
+#line 324 "probeconfscan.l"
 ECHO;
 	YY_BREAK
-#line 1671 "probeconfscan.c"
+#line 1627 "probeconfscan.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(ST_ARGS):
 case YY_STATE_EOF(ST_FILTER):
@@ -2567,7 +2523,7 @@ void probeconfscan_free (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 368 "probeconfscan.l"
+#line 324 "probeconfscan.l"
 
 
 

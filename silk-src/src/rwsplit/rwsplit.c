@@ -1,53 +1,9 @@
 /*
 ** Copyright (C) 2006-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 /*
@@ -70,7 +26,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsplit.c 71c2983c2702 2016-01-04 18:33:22Z mthomas $");
+RCSIDENT("$SiLK: rwsplit.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipset.h>
@@ -105,10 +61,10 @@ static sk_options_ctx_t *optctx;
 static char *out_basename = NULL;
 
 /* current output file */
-static skstream_t *rwios_out = NULL;
+static skstream_t *stream_out = NULL;
 
 /* current input file */
-static skstream_t *rwios_in;
+static skstream_t *stream_in;
 
 /* IPset in which to store unique IPs */
 static skipset_t *ips = NULL;
@@ -279,7 +235,7 @@ appTeardown(
     teardownFlag = 1;
 
     closeOutput();
-    skStreamDestroy(&rwios_in);
+    skStreamDestroy(&stream_in);
 
     if (ips) {
         skIPSetDestroy(&ips);
@@ -493,12 +449,12 @@ closeOutput(
 {
     int rv = 0;
 
-    if (rwios_out) {
-        rv = skStreamClose(rwios_out);
+    if (stream_out) {
+        rv = skStreamClose(stream_out);
         if (rv) {
-            skStreamPrintLastErr(rwios_out, rv, &skAppPrintErr);
+            skStreamPrintLastErr(stream_out, rv, &skAppPrintErr);
         }
-        skStreamDestroy(&rwios_out);
+        skStreamDestroy(&stream_out);
     }
     return rv;
 }
@@ -537,17 +493,17 @@ newOutput(
     /* create new file name, open it, write the headers */
     snprintf(datafn, sizeof(datafn),  ("%s.%08" PRIu32 ".rwf"),
              out_basename, output_ctr);
-    if ((rv = skStreamCreate(&rwios_out, SK_IO_WRITE, SK_CONTENT_SILK_FLOW))
-        || (rv = skStreamBind(rwios_out, datafn))
-        || (rv = skStreamSetCompressionMethod(rwios_out, comp_method))
-        || (rv = skOptionsNotesAddToStream(rwios_out))
-        || (rv = skHeaderAddInvocation(skStreamGetSilkHeader(rwios_out),
+    if ((rv = skStreamCreate(&stream_out, SK_IO_WRITE, SK_CONTENT_SILK_FLOW))
+        || (rv = skStreamBind(stream_out, datafn))
+        || (rv = skStreamSetCompressionMethod(stream_out, comp_method))
+        || (rv = skOptionsNotesAddToStream(stream_out))
+        || (rv = skHeaderAddInvocation(skStreamGetSilkHeader(stream_out),
                                        1, pargc, pargv))
-        || (rv = skStreamOpen(rwios_out))
-        || (rv = skStreamWriteSilkHeader(rwios_out)))
+        || (rv = skStreamOpen(stream_out))
+        || (rv = skStreamWriteSilkHeader(stream_out)))
     {
-        skStreamPrintLastErr(rwios_out, rv, &skAppPrintErr);
-        skStreamDestroy(&rwios_out);
+        skStreamPrintLastErr(stream_out, rv, &skAppPrintErr);
+        skStreamDestroy(&stream_out);
         exit(EXIT_FAILURE);
     }
 
@@ -595,11 +551,11 @@ processRec(
         newOutput();
     }
 
-    if (rwios_out) {
-        rv = skStreamWriteRecord(rwios_out, rwrec);
+    if (stream_out) {
+        rv = skStreamWriteRecord(stream_out, rwrec);
         if (SKSTREAM_ERROR_IS_FATAL(rv)) {
-            skStreamPrintLastErr(rwios_out, rv, &skAppPrintErr);
-            skStreamDestroy(&rwios_out);
+            skStreamPrintLastErr(stream_out, rv, &skAppPrintErr);
+            skStreamDestroy(&stream_out);
             exit(EXIT_FAILURE);
         }
     }
@@ -686,17 +642,17 @@ int main(int argc, char **argv)
 
     /* for all inputs, read all records */
     /* process input */
-    while ((rv = skOptionsCtxNextSilkFile(optctx, &rwios_in, &skAppPrintErr))
+    while ((rv = skOptionsCtxNextSilkFile(optctx, &stream_in, &skAppPrintErr))
            == 0)
     {
-        while ((rv = skStreamReadRecord(rwios_in, &in_rec)) == SKSTREAM_OK) {
+        while ((rv = skStreamReadRecord(stream_in, &in_rec)) == SKSTREAM_OK) {
             processRec(&in_rec);
         }
         if (SKSTREAM_ERR_EOF != rv) {
-            skStreamPrintLastErr(rwios_in, rv, &skAppPrintErr);
+            skStreamPrintLastErr(stream_in, rv, &skAppPrintErr);
             ret_val = EXIT_FAILURE;
         }
-        skStreamDestroy(&rwios_in);
+        skStreamDestroy(&stream_in);
     }
     if (rv < 0) {
         ret_val = EXIT_FAILURE;

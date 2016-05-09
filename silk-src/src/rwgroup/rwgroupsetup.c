@@ -1,53 +1,9 @@
 /*
 ** Copyright (C) 2005-2016 by Carnegie Mellon University.
 **
-** @OPENSOURCE_HEADER_START@
-**
-** Use of the SILK system and related source code is subject to the terms
-** of the following licenses:
-**
-** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
-**
-** NO WARRANTY
-**
-** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
-** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
-** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
-** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
-** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
-** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
-** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
-** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
-** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
-** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
-** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
-** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
-** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
-** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
-** DELIVERABLES UNDER THIS LICENSE.
-**
-** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
-** Mellon University, its trustees, officers, employees, and agents from
-** all claims or demands made against them (and any related losses,
-** expenses, or attorney's fees) arising out of, or relating to Licensee's
-** and/or its sub licensees' negligent use or willful misuse of or
-** negligent conduct or willful misconduct regarding the Software,
-** facilities, or other rights or assistance granted by Carnegie Mellon
-** University under this License, including, but not limited to, any
-** claims of product liability, personal injury, death, damage to
-** property, or violation of any laws or regulations.
-**
-** Carnegie Mellon University Software Engineering Institute authored
-** documents are sponsored by the U.S. Department of Defense under
-** Contract FA8721-05-C-0003. Carnegie Mellon University retains
-** copyrights in all material produced under this contract. The U.S.
-** Government retains a non-exclusive, royalty-free license to publish or
-** reproduce these documents, or allow others to do so, for U.S.
-** Government purposes only pursuant to the copyright license under the
-** contract clause at 252.227.7013.
-**
-** @OPENSOURCE_HEADER_END@
+** @OPENSOURCE_LICENSE_START@
+** See license information in ../../LICENSE.txt
+** @OPENSOURCE_LICENSE_END@
 */
 
 /*
@@ -59,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwgroupsetup.c a980e04f1cff 2016-01-21 18:30:48Z mthomas $");
+RCSIDENT("$SiLK: rwgroupsetup.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/sksite.h>
@@ -264,17 +220,17 @@ appTeardown(
     }
 
     /* close and destroy output */
-    if (out_rwios) {
-        rv = skStreamDestroy(&out_rwios);
+    if (out_stream) {
+        rv = skStreamDestroy(&out_stream);
         if (rv) {
             /* only print error when not in signal handler */
-            skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
         }
-        out_rwios = NULL;
+        out_stream = NULL;
     }
 
     /* close input */
-    skStreamDestroy(&in_rwios);
+    skStreamDestroy(&in_stream);
 
     /* plug-in teardown */
     skPluginRunCleanup(SKPLUGIN_APP_SORT);
@@ -424,81 +380,81 @@ appSetup(
     }
 
     /* check for an output stream; or default to stdout  */
-    if (out_rwios == NULL) {
+    if (out_stream == NULL) {
         if (stdout_used) {
             skAppPrintErr("Only one output stream may use stdout");
             exit(EXIT_FAILURE);
         }
-        if ((rv = skStreamCreate(&out_rwios, SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
-            || (rv = skStreamBind(out_rwios, "stdout")))
+        if ((rv = skStreamCreate(&out_stream,SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+            || (rv = skStreamBind(out_stream, "stdout")))
         {
-            skStreamPrintLastErr(out_rwios, rv, NULL);
-            skStreamDestroy(&out_rwios);
+            skStreamPrintLastErr(out_stream, rv, NULL);
+            skStreamDestroy(&out_stream);
             exit(EXIT_FAILURE);
         }
     }
 
     /* open the input stream */
-    rv = skStreamOpenSilkFlow(&in_rwios, in_path, SK_IO_READ);
+    rv = skStreamOpenSilkFlow(&in_stream, in_path, SK_IO_READ);
     if (rv) {
-        skStreamPrintLastErr(in_rwios, rv, &skAppPrintErr);
-        skStreamDestroy(&in_rwios);
+        skStreamPrintLastErr(in_stream, rv, &skAppPrintErr);
+        skStreamDestroy(&in_stream);
         skAppPrintErr("Could not open %s for reading.  Exiting.", in_path);
         exit(EXIT_FAILURE);
     }
 
     /* set the copy-input stream to get everything we read */
     if (copy_input) {
-        rv = skStreamSetCopyInput(in_rwios, copy_input);
+        rv = skStreamSetCopyInput(in_stream, copy_input);
         if (rv) {
-            skStreamPrintLastErr(in_rwios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(in_stream, rv, &skAppPrintErr);
             exit(EXIT_FAILURE);
         }
     }
 
     /* set the compmethod on the output */
-    rv = skHeaderSetCompressionMethod(skStreamGetSilkHeader(out_rwios),
+    rv = skHeaderSetCompressionMethod(skStreamGetSilkHeader(out_stream),
                                       comp_method);
     if (rv) {
         skAppPrintErr("Error setting header on %s: %s",
-                      skStreamGetPathname(out_rwios), skHeaderStrerror(rv));
+                      skStreamGetPathname(out_stream), skHeaderStrerror(rv));
         exit(EXIT_FAILURE);
     }
 
     /* copy annotations and command line entries from the input to the
      * output */
-    if ((rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_rwios),
-                                  skStreamGetSilkHeader(in_rwios),
+    if ((rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_stream),
+                                  skStreamGetSilkHeader(in_stream),
                                   SK_HENTRY_INVOCATION_ID))
-        || (rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_rwios),
-                                     skStreamGetSilkHeader(in_rwios),
+        || (rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_stream),
+                                     skStreamGetSilkHeader(in_stream),
                                      SK_HENTRY_ANNOTATION_ID)))
     {
-        skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
         exit(EXIT_FAILURE);
     }
 
     /* add invocation and notes to the output */
-    if ((rv = skHeaderAddInvocation(skStreamGetSilkHeader(out_rwios),
+    if ((rv = skHeaderAddInvocation(skStreamGetSilkHeader(out_stream),
                                     1, argc, argv))
-        || (rv = skOptionsNotesAddToStream(out_rwios)))
+        || (rv = skOptionsNotesAddToStream(out_stream)))
     {
-        skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
         exit(EXIT_FAILURE);
     }
 
     /* open output */
-    rv = skStreamOpen(out_rwios);
+    rv = skStreamOpen(out_stream);
     if (rv) {
-        skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
         skAppPrintErr("Could not open output file.");
         exit(EXIT_FAILURE);
     }
 
     /* write the header */
-    rv = skStreamWriteSilkHeader(out_rwios);
+    rv = skStreamWriteSilkHeader(out_stream);
     if (rv) {
-        skStreamPrintLastErr(out_rwios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
         skAppPrintErr("Could not write header to output file.");
         exit(EXIT_FAILURE);
     }
@@ -552,7 +508,7 @@ appOptionsHandler(
                           appOptions[opt_index].name);
             return 1;
         }
-        if (out_rwios) {
+        if (out_stream) {
             skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
             return 1;
@@ -564,10 +520,10 @@ appOptionsHandler(
             }
             stdout_used = 1;
         }
-        if ((rv = skStreamCreate(&out_rwios, SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
-            || (rv = skStreamBind(out_rwios, opt_arg)))
+        if ((rv = skStreamCreate(&out_stream,SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+            || (rv = skStreamBind(out_stream, opt_arg)))
         {
-            skStreamPrintLastErr(out_rwios, rv, NULL);
+            skStreamPrintLastErr(out_stream, rv, NULL);
             return 1;
         }
         break;

@@ -1,3 +1,13 @@
+SiLK-3.12.1 Release, 2016-May-05
+
+* rwbagcat
+  -- Fix a bug where the pager was not invoked when displaying keys as
+     IPs or integers.
+* rwflowpack, flowcap
+  -- Make substantial changes to the handling of IPFIX and NetFlow v9
+     records to decrease per-record processing time.
+
+
 SiLK-3.12.0 Release, 2016-Mar-31
 
 * rwbag

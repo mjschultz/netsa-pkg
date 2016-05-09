@@ -597,22 +597,144 @@ prompt.  The text after the dollar sign represents the command line.
 Lines have been wrapped for improved readability, and the back slash
 (C<\>) is used to indicate a wrapped line.
 
-To build both source IP and destination IP Bags of flows:
+=head2 Bag of Protocol:Byte
+
+Read the SiLK Flow file F<data.rw> and create the Bag
+F<proto-byte.bag> that contains the total byte-count seen for each
+protocol by using protocol as the key and sum-bytes as the counter:
+
+ $ rwbag --bag-file=protocol,sum-bytes,proto-byte.bag data.rw
+
+Use B<rwbagcat(1)> to view the result:
+
+ $ rwbagcat proto-byte.bag
+          1|            10695328|
+          6|        120536195111|
+         17|            24500079|
+
+Specify the output path as C<-> to pass the Bag file from B<rwbag>
+directly into B<rwbagcat>.
+
+ $ rwbag --bag-file=protocol,sum-bytes,- data.rw    \
+   | rwbagcat
+          1|            10695328|
+          6|        120536195111|
+         17|            24500079|
+
+Compare that to this B<rwuniq(1)> command.
+
+ $ rwuniq --field=protocol --value=bytes --sort-output data.rw
+ pro|               Bytes|
+   1|            10695328|
+   6|        120536195111|
+  17|            24500079|
+
+One advantage of Bag files over B<rwuniq> is that the data remains in
+binary form where it can be manipulated by B<rwbagtool(1)>.
+
+=head2 Two Bags in a Single Pass
+
+Read records from B<rwfilter(1)> and build Bag files F<sip-flow.bag>
+and F<dip-flow.bag> that count the number of flows seen for each
+source address and for each destination address, respectively.
+
+ $ rwfilter ... --pass=stdout                       \
+   | rwbag --bag-file=sipv4,records,sip-flow.bag    \
+        --bag-file=dipv4,records,dip-flow.bag
+
+=head2 Using a Network Prefix
+
+To create F<sip16-byte.bag> that contains the number of bytes seen for
+each /16 found in the source address field, use the B<rwnetmask(1)>
+tool prior to feeding the input to B<rwbag>:
+
+ $ rwfilter ... --pass=stdout                       \
+   | rwnetmask --4sip-prefix-length=16              \
+   | rwbag --bag-file=sipv4,sum-bytes,sip16-byte.bag
+
+ $ rwbagcat sip16-byte.bag | head -4
+        10.4.0.0|               18260|
+        10.5.0.0|              536169|
+        10.9.0.0|               55386|
+       10.11.0.0|             5110438|
+
+To print the IP addresses of an existing Bag into /16 prefixes, use
+the B<--network-structure> switch of B<rwbagcat(1)>.
 
  $ rwfilter ... --pass=stdout                   \
-   | rwbag --bag-file=sipv4,records,sf.bag      \
-           --bag-file=dipv4,records,df.bag
+   | rwbag --bag-file=sipv4,sum-bytes,-         \
+   | rwbagcat --network-structure=B             \
+   | head -4
+        10.4.0.0/16|               18260|
+        10.5.0.0/16|              536169|
+        10.9.0.0/16|               55386|
+       10.11.0.0/16|             5110438|
 
-To build a Bag containing the number of bytes seen for each /16 prefix
-length of source addresses, use the B<rwnetmask(1)> tool prior to
-feeding the input to B<rwbag>:
+=head2 Bag of Country Codes
 
- $ rwfilter ... --pass=stdout                   \
-   | rwnetmask --4sip-prefix-length=16          \
-   | rwbag --bag-file=sipv4,sum-bytes,sf16.bag
+As of SiLK 3.12.0, a Bag file may contain a country code as its key.
+Create F<scc-pkt.bag> that sums the packet count by country.
 
-(To print the IP addresses of an existing Bag into /16 prefixes, use
-the B<--network-structure> switch of B<rwbagcat(1)>.)
+ $ rwbag --bag-file=sip-country,sum-packets,scc-pkt.bag
+ $ rwbagcat scc-pkt.bag
+ --|                 840|
+ a1|                 284|
+ a2|                   1|
+ ae|                   8|
+
+=head2 Bag of Prefix Map Values
+
+B<rwbag> and B<rwbagbuild(1)> can use a prefix map file as the key in
+a Bag file as of SiLK 3.12.0.  For example, to lookup each source
+address in the prefix map file F<ip-map.pmap> that maps from address
+to "type of service", use the B<--pmap-file> switch to specify the
+prefix map file, and specify the Bag's key as C<sip-pmap:>I<MAPNAME>,
+where I<MAPNAME> is either the map-name stored in the prefix map file
+or a name that is provided as part of the B<--pmap-file> argument.  (A
+prefix map's map-name is available via the B<rwfileinfo(1)> command.)
+
+ $ rwfileinfo --field=prefix-map ip-map.pmap
+ ip-map.pmap:
+   prefix-map          v1: service-host
+ $
+ $ rwbag --pmap-file=ip-map.pmap                            \
+        --bag-file=sip-pmap:service-host,bytes,srvhost.bag  \
+        data.rw
+
+Multiple B<--pmap-file> switches may be specified which may be useful
+when generating multiple Bag files in a single invocation.  On the
+command line, the B<--pmap-file> switch that defines the map-name must
+preceded the B<--bag-file> where the map-name is used.
+
+The prefix map file is not stored as part of the Bag, so you must
+provide the name of the prefix map when running B<rwbagcat>.
+
+ $ rwbagcat srvhost.bag
+ rwbagcat: The --pmap-file switch is required for \
+         Bags containing sip-pmap keys
+ $ rwbagcat --pmap-file=ip-map.pmap srvhost.bag
+          external|         59950837766|
+          internal|         60602999159|
+               ntp|              588316|
+               dns|            14404581|
+              dhcp|             2560696|
+
+B<rwbag> also has support for prefix map files that map from a
+protocol-port pair to a label.  The F<proto-port.pmap> file does not
+have a map-name so a name must be provided on the B<rwbag> command
+line.
+
+ $ rwfileinfo --field=prefix-map proto-port.pmap
+ proto-port.pmap:
+ $
+ $ rwbag --pmap-file=srvport:proto-port.pmap                \
+        --bag-file=sip-pmap:srvport,flows,srvport.bag       \
+        data.rw
+ $ rwbagcat --pmap-file=proto-port.pmap srvport.bag | head -4
+      ICMP|               15622|
+       UDP|               62216|
+   UDP/DNS|               62216|
+  UDP/DHCP|               15614|
 
 =head1 ENVIRONMENT
 
@@ -690,12 +812,12 @@ C<sip-country> and C<dip-country> keys.
 =head1 SEE ALSO
 
 B<rwbagbuild(1)>, B<rwbagcat(1)>, B<rwbagtool(1)>, B<rwfileinfo(1)>,
-B<rwfilter(1)>, B<rwnetmask(1)>, B<rwpmapbuild(1)>, B<ccfilter(3)>,
-B<silk(7)>, B<zlib(3)>
+B<rwfilter(1)>, B<rwnetmask(1)>, B<rwpmapbuild(1)>, B<rwuniq(1)>,
+B<ccfilter(3)>, B<sensor.conf(5)>, B<silk(7)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwbag.pod 5f2d30e80a6f 2016-03-30 22:09:49Z mthomas $
+$SiLK: rwbag.pod f0408b1cf446 2016-04-01 20:51:57Z mthomas $
 
 Local Variables:
 mode:text
