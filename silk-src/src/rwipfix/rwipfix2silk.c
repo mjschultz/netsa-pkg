@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwipfix2silk.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwipfix2silk.c e3a6acd5f250 2016-06-16 22:15:56Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/rwrec.h>
@@ -247,6 +247,8 @@ appSetup(
     if ('\0' == log_destination[0]) {
         strncpy(log_destination, LOG_DESTINATION_DEFAULT,
                 sizeof(log_destination));
+    } else {
+        sklogSetLevel("debug");
     }
     sklogSetDestination(log_destination);
 

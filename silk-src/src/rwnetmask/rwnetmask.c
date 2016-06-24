@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwnetmask.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwnetmask.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -388,22 +388,22 @@ appOptionsHandler(
 
 
 /*
- *  maskInput(in_ios, out_ios);
+ *  maskInput(in_stream, out_stream);
  *
- *    Read SiLK Flow records from the 'in_ios' stream, mask off the
+ *    Read SiLK Flow records from the 'in_stream' stream, mask off the
  *    source, destination, and/or next-hop IP addresses, and print the
- *    records to the 'out_ios' stream.
+ *    records to the 'out_stream' stream.
  */
 static int
 maskInput(
-    skstream_t         *in_ios,
-    skstream_t         *out_ios)
+    skstream_t         *in_stream,
+    skstream_t         *out_stream)
 {
     rwRec rwrec;
     int rv;
 
     /* read the records and mask the IP addresses */
-    while ((rv = skStreamReadRecord(in_ios, &rwrec)) == SKSTREAM_OK) {
+    while ((rv = skStreamReadRecord(in_stream, &rwrec)) == SKSTREAM_OK) {
 #if SK_ENABLE_IPV6
         if (rwRecIsIPv6(&rwrec)) {
             if (net_mask[SIP_MASK].bits6) {
@@ -429,15 +429,15 @@ maskInput(
             }
         }
 
-        rv = skStreamWriteRecord(out_ios, &rwrec);
+        rv = skStreamWriteRecord(out_stream, &rwrec);
         if (SKSTREAM_ERROR_IS_FATAL(rv)) {
-            skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
             return rv;
         }
     }
 
     if (SKSTREAM_ERR_EOF != rv) {
-        skStreamPrintLastErr(in_ios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(in_stream, rv, &skAppPrintErr);
     }
     return SKSTREAM_OK;
 }

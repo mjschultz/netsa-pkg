@@ -48,7 +48,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-options.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: sku-options.c d49b1e47d2e3 2016-06-15 20:31:17Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sksite.h>

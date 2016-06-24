@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sklog.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: sklog.c 558ff1948cad 2016-06-16 18:41:50Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sklog.h>
@@ -69,7 +69,7 @@ RCSIDENT("$SiLK: sklog.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 #define SKLOG_VARARG_CALL_LOGGER(pri, fmt)      \
     {                                           \
         va_list _args;                          \
-        va_start(_args, (fmt));                 \
+        va_start(_args, fmt);                   \
         SKLOG_CALL_LOGGER((pri), (fmt), _args); \
         va_end(_args);                          \
     }

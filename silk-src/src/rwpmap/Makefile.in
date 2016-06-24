@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-# RCSIDENT("$SiLK: Makefile.am 9dcc642f0092 2016-03-24 15:26:17Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am e460180628b1 2016-06-13 20:58:23Z mthomas $");
 
 # Installed Targets
 
@@ -828,6 +828,7 @@ TESTS = \
 	tests/rwgeoip2ccmap-null-input.pl \
 	tests/rwpmapbuild-help.pl \
 	tests/rwpmapbuild-version.pl \
+	tests/rwpmapbuild-lone-command.pl \
 	tests/rwpmapbuild-null-input.pl \
 	tests/rwpmapcat-help.pl \
 	tests/rwpmapcat-version.pl \
@@ -1436,6 +1437,13 @@ tests/rwpmapbuild-help.pl.log: tests/rwpmapbuild-help.pl
 tests/rwpmapbuild-version.pl.log: tests/rwpmapbuild-version.pl
 	@p='tests/rwpmapbuild-version.pl'; \
 	b='tests/rwpmapbuild-version.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwpmapbuild-lone-command.pl.log: tests/rwpmapbuild-lone-command.pl
+	@p='tests/rwpmapbuild-lone-command.pl'; \
+	b='tests/rwpmapbuild-lone-command.pl'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \

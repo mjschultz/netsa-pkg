@@ -20,7 +20,7 @@
 #define SKSITE_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sksite.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: sksite.c 73c4e79b709d 2016-06-16 13:59:02Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstream.h>
@@ -492,6 +492,12 @@ int
 sksiteConfigure(
     int                 verbose)
 {
+    char cl_name[SK_MAX_STRLEN_FLOWTYPE+1];
+    sk_class_iter_t cl_iter;
+    sk_class_id_t cl_id;
+    sk_flowtype_iter_t ft_iter;
+    sk_flowtype_id_t ft_id;
+
     /* once we've attempted to parse a file, this function no longer
      * attempts configuration */
     if (configured != 0) {
@@ -534,8 +540,21 @@ sksiteConfigure(
         /* Failed */
         configured = -1;
     } else {
-        /* Success */
+        /* Success (so far) */
         configured = 1;
+
+        sksiteClassIterator(&cl_iter);
+        while (sksiteClassIteratorNext(&cl_iter, &cl_id)) {
+            sksiteClassFlowtypeIterator(cl_id, &ft_iter);
+            if (!sksiteFlowtypeIteratorNext(&ft_iter, &ft_id)) {
+                sksiteClassGetName(cl_name, sizeof(cl_name), cl_id);
+                sksiteconfigErr(
+                    "Site configuration error: class '%s' contains no types",
+                    cl_name);
+                configured = -1;
+            }
+        }
+        /* a total absence of classes is not an error */
     }
     return ((configured == -1) ? -1 : 0);
 }
@@ -1195,7 +1214,22 @@ int
 sksiteClassSetDefault(
     sk_class_id_t       class_id)
 {
+    sk_flowtype_iter_t ft_iter;
+    sk_flowtype_id_t ft_id;
+    sk_sensor_iter_t sn_iter;
+    sk_sensor_id_t sn_id;
+
     if (0 == sksiteClassExists(class_id)) {
+        return -1;
+    }
+    sksiteClassFlowtypeIterator(class_id, &ft_iter);
+    if (!sksiteFlowtypeIteratorNext(&ft_iter, &ft_id)) {
+        /* no flowtypes exist for this class */
+        return -1;
+    }
+    sksiteClassSensorIterator(class_id, &sn_iter);
+    if (!sksiteSensorIteratorNext(&sn_iter, &sn_id)) {
+        /* no sensors exist for this class */
         return -1;
     }
     default_class = class_id;
@@ -2900,6 +2934,10 @@ sksiteParseSensorList(
     if (skVectorGetElementSize(sensor_vector) != sizeof(sk_sensor_id_t)) {
         goto END;
     }
+    if (SK_INVALID_SENSOR == min_sensor_id) {
+        rv = 0;
+        goto END;
+    }
     if ('\0' == *sensor_name_list) {
         rv = 0;
         goto END;
@@ -2993,7 +3031,7 @@ sksiteParseSensorList(
                 }
             } else if (!sksiteSensorExists((sk_sensor_id_t)val_min)) {
                 /* start of range is not valid */
-                snprintf(numbuf, sizeof(numbuf), "%"PRIu32, val_min);
+                snprintf(numbuf, sizeof(numbuf), "%" PRIu32, val_min);
                 ++invalid_count;
                 if (siteErrorIterPush(
                         error_iter, SKSITE_ERR_UNKNOWN_SENSOR_ID, numbuf))
@@ -3002,7 +3040,7 @@ sksiteParseSensorList(
                 }
             } else if (!sksiteSensorExists((sk_sensor_id_t)val_max)) {
                 /* end of range is not valid */
-                snprintf(numbuf, sizeof(numbuf), "%"PRIu32, val_max);
+                snprintf(numbuf, sizeof(numbuf), "%" PRIu32, val_max);
                 ++invalid_count;
                 if (siteErrorIterPush(
                         error_iter, SKSITE_ERR_UNKNOWN_SENSOR_ID, numbuf))
@@ -3032,7 +3070,7 @@ sksiteParseSensorList(
                             goto END;
                         }
                     } else {
-                        snprintf(numbuf, sizeof(numbuf), "%"PRIu32, val_min);
+                        snprintf(numbuf, sizeof(numbuf), "%" PRIu32, val_min);
                         ++invalid_count;
                         if (siteErrorIterPush(error_iter,
                                               SKSITE_ERR_SENSOR_NOT_IN_CLASSES,

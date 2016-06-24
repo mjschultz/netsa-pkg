@@ -138,7 +138,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwstats.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwstats.c 73c4e79b709d 2016-06-16 13:59:02Z mthomas $");
 
 #include <silk/skheap.h>
 #include "rwstats.h"
@@ -404,7 +404,7 @@ topnPrintHeader(
       case RWSTATS_PERCENTAGE:
         if (limit.value[RWSTATS_COUNT].u64 < 1) {
             fprintf(output.of_fp,
-                    "OUTPUT: No bins %s threshold of %.4f%% (%" PRIu64" %s)\n",
+                    "OUTPUT: No bins %s threshold of %.4f%% (%" PRIu64 " %s)\n",
                     above_below, limit.value[RWSTATS_PERCENTAGE].d,
                     limit.value[RWSTATS_THRESHOLD].u64, limit.title);
             return;

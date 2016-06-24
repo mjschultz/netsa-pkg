@@ -19,7 +19,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfiltercheck.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwfiltercheck.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
 
 #include "rwfilter.h"
 #include <silk/skipset.h>
@@ -1409,9 +1409,9 @@ filterCheck(
 
 
 /*
- *  pass = filterCheckFile(rwio, ip_dir)
+ *  pass = filterCheckFile(stream, ip_dir)
  *
- *    Check whether the SiLK Packed data file 'rwio' contains records
+ *    Check whether the SiLK Packed data file 'stream' contains records
  *    that match the user's query.  This function uses information
  *    from the file's header and/or outside the data file---such as
  *    external IPsets or Bloom filters located in the 'ip_dir'---to
@@ -1422,7 +1422,7 @@ filterCheck(
  */
 int
 filterCheckFile(
-    skstream_t         *rwio,
+    skstream_t         *stream,
     const char  UNUSED(*ip_dir))
 {
     sk_header_entry_t *pfh;
@@ -1453,7 +1453,7 @@ filterCheckFile(
 **    }
 */
 
-    hdr = skStreamGetSilkHeader(rwio);
+    hdr = skStreamGetSilkHeader(stream);
     file_format = skHeaderGetFileFormat(hdr);
 
     /* get handle to the header and the file's start time */

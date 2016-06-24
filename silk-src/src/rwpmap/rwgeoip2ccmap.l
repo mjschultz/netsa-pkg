@@ -10,7 +10,8 @@
 /*
  *  rwgeoip2ccmap.l
  *
- *    Create a country code prefixmap (pmap) file from textual CSV input.
+ *    Create a country code prefixmap (pmap) file from textual CSV
+ *    input or binary input in the GeoIP Legacy format.
  *
  *
  *    The lexer expects each line of the input to have six
@@ -37,13 +38,18 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwgeoip2ccmap.l 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwgeoip2ccmap.l a67233a9fda8 2016-06-13 19:04:29Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
 #include <silk/skprefixmap.h>
 #include <silk/skstream.h>
+#include <silk/skvector.h>
 #include <silk/utils.h>
+
+/* use TRACEMSG_LEVEL as our tracing variable */
+#define TRACEMSG(msg) TRACEMSG_TO_TRACEMSGLVL(1, msg)
+#include <silk/sktracemsg.h>
 
 
 /* LOCAL DEFINES AND TYPEDEFS */
@@ -54,16 +60,20 @@ RCSIDENT("$SiLK: rwgeoip2ccmap.l 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 /* label to use for unknown ranges */
 #define DEFAULT_LABEL   "--"
 
-/* since a country code map is for IP addresses, this file uses the
- * proto/port prefixmap type to indicate that the type of prefix map
- * to create is determined by the first entry we parse */
-#define GEOIP2CCMAP_CONT_AUTO   SKPREFIXMAP_CONT_PROTO_PORT
-
-/* default mode to use */
-#define DEFAULT_MODE    GEOIP2CCMAP_CONT_AUTO
+/* default mode (type of input) to use */
+#define DEFAULT_MODE    GEOIP2CCMAP_MODE_AUTO
 
 /* number of fields expected on each line */
 #define NUM_FIELDS      6
+
+/* type of input to expect */
+enum geoip2ccmap_mode_en {
+    GEOIP2CCMAP_MODE_AUTO,
+    GEOIP2CCMAP_MODE_IPV4,
+    GEOIP2CCMAP_MODE_IPV6,
+    GEOIP2CCMAP_MODE_BINARY
+};
+typedef enum geoip2ccmap_mode_en geoip2ccmap_mode_t;
 
 /* information for the current statement */
 typedef struct pmap_stmt_st {
@@ -88,20 +98,29 @@ static int linenum = 1;
 /* number of errors encountered during processing */
 static int error_count = 0;
 
-/* type of input: ipv4, ipv6, or determined by first IP */
-static skPrefixMapContent_t mode = DEFAULT_MODE;
+/* type of input: ipv4, ipv6, binary, or determined by first IP */
+static geoip2ccmap_mode_t mode = DEFAULT_MODE;
 
 /* default country code value */
 static uint32_t default_value;
 
 /* structure to map between mode names and mode IDs */
 static struct mode_name_id_map_st {
-    const char            *name;
-    skPrefixMapContent_t   id;
+    const char         *name;
+    geoip2ccmap_mode_t  id;
 } mode_name_id_map[] = {
-    {"auto",       GEOIP2CCMAP_CONT_AUTO},
-    {"ipv6",       SKPREFIXMAP_CONT_ADDR_V6},
-    {"ipv4",       SKPREFIXMAP_CONT_ADDR_V4}
+    {"auto",       GEOIP2CCMAP_MODE_AUTO},
+    {"ipv6",       GEOIP2CCMAP_MODE_IPV6},
+    {"ipv4",       GEOIP2CCMAP_MODE_IPV4},
+    {"binary",     GEOIP2CCMAP_MODE_BINARY}
+};
+
+/* help for each mode */
+static const char *mode_help[] = {
+    "Automatically determine the type of input",
+    "Read textual IPv6 input and create an IPv6 prefix map",
+    "Read textual IPv4 input and create an IPv4 prefix map",
+    "Read binary input and create an IPv4 or IPv6 prefix map"
 };
 
 /* number of entries in 'mode_name_id_map' */
@@ -150,13 +169,14 @@ static struct option appOptions[] = {
 
 
 static const char *appHelp[] = {
-    ("Read the comma-separated-value form of the GeoIP Legacy\n"
-     "\tcountry code data from this file. Read from the standard input\n"
-     "\twhen switch is not provided"),
+    ("Read the CSV form or the binary form of the GeoIP Legacy\n"
+     "\tcountry code data from this file. Read from the standard input when\n"
+     "\tthe switch is not provided"),
     ("Write the binary country code prefix map to this file.\n"
      "\tWrite to the standard output when the switch is not provided"),
-    ("Set the type of country code file to create. By default, the\n"
-     "\ttype of prefix map is determined by the first IP address seen.\n"),
+    ("Set the type of the input and the type country code file to\n"
+     "\tcreate. By default, the type of prefix map is determined by the\n"
+     "\tfirst IP address seen."),
     "Parse the input but do not write the output file",
     ("Strip invocation history from the prefix map file.\n"
      "\tDef. Record command used to create the file"),
@@ -164,7 +184,9 @@ static const char *appHelp[] = {
      "\tAssume the input is the CSV GeoIP Legacy country code data for IPv4"),
     ("Deprecated.  Replace with --mode=ipv6.\n"
      "\tAssume the input is the CSV GeoIP Legacy country code data for IPv6"),
-    "No longer supported.  The CSV input is required",
+    ("Deprecated.  Replace with --mode=binary.\n"
+     "\tAssume the input is binary GeoIP Legacy country code data for either\n"
+     "\tIPv4 or IPv6"),
     (char *)NULL
 };
 
@@ -172,8 +194,8 @@ static const char *appHelp[] = {
 /* LOCAL FUNCTION PROTOTYPES */
 
 static int appOptionsHandler(clientData cData, int opt_index, char *opt_arg);
-static int parseMode(int idx, const char *str, skPrefixMapContent_t *new_mode);
-static const char *modeToName(skPrefixMapContent_t m);
+static int parseMode(int idx, const char *str, geoip2ccmap_mode_t *new_mode);
+static const char *modeToName(geoip2ccmap_mode_t m);
 
 static int  stmtEntry(const char *string);
 static void stmtCreateEntry(void);
@@ -294,10 +316,12 @@ appUsageLong(
 {
 #define USAGE_MSG                                                             \
     ("[SWITCHES]\n"                                                           \
-     "\tCreate a binary prefix map file from a textual input file.  The\n"    \
-     "\tinput is read from the named input file or from the standard\n"       \
-     "\tinput.  The prefix map file is written to the named location or\n"    \
-     "\tto the standard output if stdout is not connected to a terminal.\n")
+     "\tCreate a binary prefix map file from an input file in the MaxMind\n"  \
+     "\tGeoIP Legacy format.  Both the comma separated value (CSV) and the\n" \
+     "\tbinary forms of the input are supported.  The input is read from\n"   \
+     "\tthe named input file or from the standard input.  The prefix map\n"   \
+     "\tfile is written to the named location or to the standard output if\n" \
+     "\tstdout is not connected to a terminal.\n")
 
     FILE *fh = USAGE_FH;
     int i;
@@ -309,14 +333,14 @@ appUsageLong(
     for (i = 0; appOptions[i].name; ++i) {
         switch (appOptions[i].val) {
           case OPT_MODE:
-            fprintf(fh, "--%s %s. %s\tDef. %s. Choices: %s",
+            fprintf(fh, "--%s %s. %s\tDef. %s. Choices:\n",
                     appOptions[i].name,
                     SK_OPTION_HAS_ARG(appOptions[i]), appHelp[i],
-                    modeToName(DEFAULT_MODE), mode_name_id_map[0].name);
-            for (j = 1; j < mode_name_id_map_len; ++j) {
-                fprintf(fh, ", %s", mode_name_id_map[j].name);
+                    modeToName(DEFAULT_MODE));
+            for (j = 0; j < mode_name_id_map_len; ++j) {
+                fprintf(fh, "\t%-6s - %s\n",
+                        mode_name_id_map[j].name, mode_help[j]);
             }
-            fprintf(fh, "\n");
             break;
 
           case OPT_INVOCATION_STRIP:
@@ -387,6 +411,7 @@ appSetup(
     /* verify same number of options and help strings */
     assert((sizeof(appHelp)/sizeof(char *)) ==
            (sizeof(appOptions)/sizeof(struct option)));
+    assert((sizeof(mode_help)/sizeof(mode_help[0])) == mode_name_id_map_len);
 
     /* register the application */
     skAppRegister(argv[0]);
@@ -521,21 +546,22 @@ appOptionsHandler(
         break;
 
       case OPT_CSV_INPUT:
-        if (parseMode(opt_index, modeToName(SKPREFIXMAP_CONT_ADDR_V4), &mode)){
+        if (parseMode(opt_index, modeToName(GEOIP2CCMAP_MODE_IPV4), &mode)) {
             return 1;
         }
         break;
 
       case OPT_V6_CSV_INPUT:
-        if (parseMode(opt_index, modeToName(SKPREFIXMAP_CONT_ADDR_V6), &mode)){
+        if (parseMode(opt_index, modeToName(GEOIP2CCMAP_MODE_IPV6), &mode)) {
             return 1;
         }
         break;
 
       case OPT_ENCODED_INPUT:
-        skAppPrintErr("Binary encoded input is no longer supported."
-                      " Use the CSV input method instead");
-        exit(EXIT_FAILURE);
+        if (parseMode(opt_index, modeToName(GEOIP2CCMAP_MODE_BINARY), &mode)) {
+            return 1;
+        }
+        break;
     }
 
     return 0; /* OK */
@@ -552,11 +578,12 @@ appOptionsHandler(
  */
 static int
 parseMode(
-    int                     opt_index,
-    const char             *string,
-    skPrefixMapContent_t   *new_mode)
+    int                 opt_index,
+    const char         *string,
+    geoip2ccmap_mode_t *new_mode)
 {
     static int mode_seen = 0;
+    const char *err;
     size_t j;
 
     if (mode_seen) {
@@ -564,17 +591,24 @@ parseMode(
                       appOptions[opt_index].name);
         return -1;
     }
-    mode_seen = 1;
 
     for (j = 0; j < mode_name_id_map_len; ++j) {
-        if (0 == strcmp(string, mode_name_id_map[j].name)) {
+        if (0 == strncmp(string, mode_name_id_map[j].name, strlen(string))) {
+            ++mode_seen;
             *new_mode = mode_name_id_map[j].id;
-            return 0;
         }
     }
-
-    skAppPrintErr("Invalid %s '%s': Unrecognized mode name",
-                  appOptions[opt_index].name, string);
+    if (1 == mode_seen) {
+        return 0;
+    }
+    if (mode_seen > 1) {
+        err = "Name is ambiguous";
+    } else {
+        err = "Unrecognized name";
+        mode_seen = -1;
+    }
+    skAppPrintErr("Invalid %s '%s': %s",
+                  appOptions[opt_index].name, string, err);
     return -1;
 }
 
@@ -587,7 +621,7 @@ parseMode(
  */
 static const char *
 modeToName(
-    skPrefixMapContent_t    m)
+    geoip2ccmap_mode_t  m)
 {
     size_t j;
 
@@ -696,22 +730,21 @@ stmtCreateEntry(
 
     if (first_entry) {
         first_entry = 0;
-        if (GEOIP2CCMAP_CONT_AUTO == mode) {
+        if (GEOIP2CCMAP_MODE_AUTO == mode) {
+            skPrefixMapContent_t content;
             if (skipaddrIsV6(&stmt.range_start)) {
-                mode = SKPREFIXMAP_CONT_ADDR_V6;
+                mode = GEOIP2CCMAP_MODE_IPV6;
+                content = SKPREFIXMAP_CONT_ADDR_V6;
             } else {
-                mode = SKPREFIXMAP_CONT_ADDR_V4;
+                mode = GEOIP2CCMAP_MODE_IPV4;
+                content = SKPREFIXMAP_CONT_ADDR_V4;
             }
-        }
-        rv = skPrefixMapSetContentType(map, mode);
-        if (rv) {
-            skAppPrintErr("Error setting prefix map content type: %s",
-                          skPrefixMapStrerror(rv));
+            skPrefixMapSetContentType(map, content);
         }
     }
 
 #if SK_ENABLE_IPV6
-    if (SKPREFIXMAP_CONT_ADDR_V4 == mode) {
+    if (GEOIP2CCMAP_MODE_IPV4 == mode) {
         uint32_t ipv4;
         if (skipaddrGetAsV4(&stmt.range_start, &ipv4)
             || skipaddrGetAsV4(&stmt.range_end, &ipv4))
@@ -735,6 +768,251 @@ stmtCreateEntry(
 }
 
 
+/*
+ *    Read the binary GeoIP Legacy format and create a prefix map.
+ *
+ *    Each node in input consists of 6 bytes: two 24-bit,
+ *    little-endian numbers representing the left and right branches
+ *    of the tree.  If the most significant 16 bits of the input value
+ *    are all high, that value is a leaf and the least-significant
+ *    btye is an index into the country code look-up table.
+ *
+ */
+/* number of country codes */
+#define NUM_CC          256
+
+/* how our prefixmap code marks a leaf */
+#define PMAP_LEAF_BIT   UINT32_C(0x80000000)
+
+/* how the input marks a leaf */
+#define INPUT_LEAF_MASK UINT32_C(0x00ffff00)
+
+static void
+handleBinaryInput(
+    int                 argc,
+    char              **argv)
+{
+    const char cc[NUM_CC][3] = {
+        "--", "ap", "eu", "ad", "ae", "af", "ag", "ai",
+        "al", "am", "cw", "ao", "aq", "ar", "as", "at",
+        "au", "aw", "az", "ba", "bb", "bd", "be", "bf",
+        "bg", "bh", "bi", "bj", "bm", "bn", "bo", "br",
+
+        "bs", "bt", "bv", "bw", "by", "bz", "ca", "cc",
+        "cd", "cf", "cg", "ch", "ci", "ck", "cl", "cm",
+        "cn", "co", "cr", "cu", "cv", "cx", "cy", "cz",
+        "de", "dj", "dk", "dm", "do", "dz", "ec", "ee",
+
+        "eg", "eh", "er", "es", "et", "fi", "fj", "fk",
+        "fm", "fo", "fr", "sx", "ga", "gb", "gd", "ge",
+        "gf", "gh", "gi", "gl", "gm", "gn", "gp", "gq",
+        "gr", "gs", "gt", "gu", "gw", "gy", "hk", "hm",
+
+        "hn", "hr", "ht", "hu", "id", "ie", "il", "in",
+        "io", "iq", "ir", "is", "it", "jm", "jo", "jp",
+        "ke", "kg", "kh", "ki", "km", "kn", "kp", "kr",
+        "kw", "ky", "kz", "la", "lb", "lc", "li", "lk",
+
+        "lr", "ls", "lt", "lu", "lv", "ly", "ma", "mc",
+        "md", "mg", "mh", "mk", "ml", "mm", "mn", "mo",
+        "mp", "mq", "mr", "ms", "mt", "mu", "mv", "mw",
+        "mx", "my", "mz", "na", "nc", "ne", "nf", "ng",
+
+        "ni", "nl", "no", "np", "nr", "nu", "nz", "om",
+        "pa", "pe", "pf", "pg", "ph", "pk", "pl", "pm",
+        "pn", "pr", "ps", "pt", "pw", "py", "qa", "re",
+        "ro", "ru", "rw", "sa", "sb", "sc", "sd", "se",
+
+        "sg", "sh", "si", "sj", "sk", "sl", "sm", "sn",
+        "so", "sr", "st", "sv", "sy", "sz", "tc", "td",
+        "tf", "tg", "th", "tj", "tk", "tm", "tn", "to",
+        "tl", "tr", "tt", "tv", "tw", "tz", "ua", "ug",
+
+        "um", "us", "uy", "uz", "va", "vc", "ve", "vg",
+        "vi", "vn", "vu", "wf", "ws", "ye", "yt", "rs",
+        "za", "zm", "me", "zw", "a1", "a2", "o1", "ax",
+        "gg", "im", "je", "bl", "mf", "bq", "ss", "o1"
+    };
+    uint32_t leaf_cc[NUM_CC];
+    sk_file_header_t *hdr;
+    sk_vector_t *vec;
+    uint8_t buf[6];
+    size_t i;
+    size_t j;
+    uint32_t count;
+    ssize_t rv;
+    uint32_t node[2];
+    int is_ipv6;
+
+    /* convert string country codes to leaf values */
+    for (i = 0; i < NUM_CC; ++i) {
+        assert(skCountryNameToCode(cc[i]) != SK_COUNTRYCODE_INVALID);
+        leaf_cc[i] = PMAP_LEAF_BIT | skCountryNameToCode(cc[i]);
+    }
+
+    /* create a vector to hold the nodes */
+    vec = skVectorNew(sizeof(node));
+    if (NULL == vec) {
+        skAppPrintOutOfMemory("vector");
+        exit(EXIT_FAILURE);
+    }
+
+    /* read input and add nodes to the vector */
+    while (fread(buf, sizeof(buf), 1, in_stream.of_fp)) {
+        for (i = 0, j = 0; i < 2; ++i, j += 3) {
+            node[i] = ((buf[j+2] << 16) | (buf[j+1] << 8) | buf[j]);
+            if (node[i] >= INPUT_LEAF_MASK) {
+                node[i] = leaf_cc[buf[j]];
+            }
+        }
+        if (skVectorAppendValue(vec, &node)) {
+            skAppPrintOutOfMemory("vector elements");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    /* finished reading the input; verify the tree */
+
+    /* visit each node until we find a node that points to a node
+     * outside the tree; set the number of nodes to the index of the
+     * node that points outside the tree */
+    count = skVectorGetCount(vec);
+    for (i = 0; i < count; ++i) {
+        skVectorGetValue(&node, vec, i);
+        if (((node[0] >= count) && !(node[0] & PMAP_LEAF_BIT))
+            || ((node[1] >= count) && !(node[1] & PMAP_LEAF_BIT)))
+        {
+            count = i;
+            break;
+        }
+    }
+    if (0 == count) {
+        skAppPrintErr("No valid nodes read from input");
+        exit(EXIT_FAILURE);
+    }
+
+    /* detemine whether the input is IPv4 by looking over all paths
+     * and recording the maximum depth */
+    is_ipv6 = 0;
+    {
+#define MAX_DEPTH           128
+#define LEAF_VALUE(leaf)    (((leaf) & ~PMAP_LEAF_BIT) & UINT32_MAX)
+
+#if TRACEMSG_LEVEL > 0
+        const char isleaf[2] = {' ', 'L'};
+#endif
+        uint32_t path[MAX_DEPTH];
+        uint8_t lr[MAX_DEPTH];
+        uint32_t n;
+        int depth;
+        int max_seen;
+
+        depth = max_seen = 0;
+        lr[depth] = 0;
+        path[depth] = 0;
+        while (depth >= 0) {
+            if (lr[depth] > 1) {
+                /* done with this level */
+                TRACEMSG(("%4d  %8u  %u", depth, path[depth], lr[depth]));
+                --depth;
+            } else {
+                skVectorGetValue(&node, vec, path[depth]);
+                TRACEMSG(("%4d  %8u  %u  %8u%c  %8u%c",
+                          depth, path[depth], lr[depth],
+                          LEAF_VALUE(node[0]), isleaf[ node[0]>>31 ],
+                          LEAF_VALUE(node[1]), isleaf[ node[1]>>31 ]));
+                n = node[lr[depth]];
+                ++lr[depth];
+                if (!(n & PMAP_LEAF_BIT)) {
+                    /* add a level */
+                    ++depth;
+                    if (depth > max_seen) {
+                        max_seen = depth;
+                        if (depth >= MAX_DEPTH) {
+                            skAppPrintErr(
+                                "Tree is malformed; tree is too deep");
+                            exit(EXIT_FAILURE);
+                        }
+                    }
+                    /* initialize the level */
+                    lr[depth] = 0;
+                    path[depth] = n;
+                    if (n >= count) {
+                        skAppPrintErr(("Tree is malformed; value %" PRIu32
+                                       " is larger than tree size %" PRIu32),
+                                      n, count);
+                        exit(EXIT_FAILURE);
+                    }
+                }
+            }
+        }
+        TRACEMSG(("max depth is %d", max_seen));
+        if (max_seen > 31) {
+            is_ipv6 = 1;
+        }
+    }
+
+    /* we finished with verification; prepare and write the output */
+    if (dry_run) {
+        return;
+    }
+
+    /* initialize the stream's header (from skprefixmap.c) */
+    hdr = skStreamGetSilkHeader(out_stream);
+    skHeaderSetFileFormat(hdr, FT_PREFIXMAP);
+    /* Country Code file versions: IPv4 is v1; IPv6 is v5 */
+    skHeaderSetRecordVersion(hdr, (is_ipv6 ? 5 : 1));
+    skHeaderSetCompressionMethod(hdr, SK_COMPMETHOD_NONE);
+    skHeaderSetRecordLength(hdr, 1);
+
+    /* add invocation */
+    if (!invocation_strip) {
+        rv = skHeaderAddInvocation(hdr, 1, argc, argv);
+        if (rv) {
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    /* add notes */
+    rv = skOptionsNotesAddToStream(out_stream);
+    if (rv) {
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+        exit(EXIT_FAILURE);
+    }
+    skOptionsNotesTeardown();
+
+    /* open the output and write the header output */
+    if ((rv = skStreamOpen(out_stream))
+        || (rv = skStreamWriteSilkHeader(out_stream)))
+    {
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+        exit(EXIT_FAILURE);
+    }
+
+    /* write the number of nodes, then write each node */
+    if (skStreamWrite(out_stream, &count, sizeof(count)) == -1) {
+        skStreamPrintLastErr(out_stream, -1, &skAppPrintErr);
+        exit(EXIT_FAILURE);
+    }
+    for (i = 0; i < count; ++i) {
+        skVectorGetValue(&node, vec, i);
+        if (skStreamWrite(out_stream, &node, sizeof(node)) == -1) {
+            skStreamPrintLastErr(out_stream, -1, &skAppPrintErr);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    skVectorDestroy(vec);
+
+    rv = skStreamClose(out_stream);
+    if (rv) {
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+        exit(EXIT_FAILURE);
+    }
+}
+
+
 int main(
     int         argc,
     char      **argv)
@@ -743,17 +1021,52 @@ int main(
 
     appSetup(argc, argv);       /* never returns on error */
 
-    /* Create the global prefix map */
+    if (GEOIP2CCMAP_MODE_AUTO == mode) {
+        /* read first char to see if stream is binary */
+        int c;
+        c = getc(in_stream.of_fp);
+        if (EOF == c) {
+            if (ferror(in_stream.of_fp)) {
+                skAppPrintSyserror("Unable to read from %s",
+                                   in_stream.of_name);
+                exit(EXIT_FAILURE);
+            }
+        } else {
+            if (!isprint(c) && !isspace(c)) {
+                mode = GEOIP2CCMAP_MODE_BINARY;
+            }
+            c = ungetc(c, in_stream.of_fp);
+            if (EOF == c) {
+                skAppPrintErr("Unable to put back character");
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+    if (GEOIP2CCMAP_MODE_BINARY == mode) {
+        handleBinaryInput(argc, argv);
+        return 0;
+    }
+
+    /* Create the output prefix map */
     if (skPrefixMapCreate(&map) != SKPREFIXMAP_OK) {
         skAppPrintErr("Error creating prefix map");
         exit(EXIT_FAILURE);
     }
 
     /* set the content type to the current mode, or to IPv4 if the
-     * mode is "auto"; this can be changed at a later time */
-    skPrefixMapSetContentType(map, ((GEOIP2CCMAP_CONT_AUTO == mode)
-                                    ? SKPREFIXMAP_CONT_ADDR_V4
-                                    : mode));
+     * mode is "auto"; if auto, the content type may be changed once
+     * we have the first line of input */
+    switch (mode) {
+      case GEOIP2CCMAP_MODE_IPV6:
+        skPrefixMapSetContentType(map, SKPREFIXMAP_CONT_ADDR_V6);
+        break;
+      case GEOIP2CCMAP_MODE_IPV4:
+      case GEOIP2CCMAP_MODE_AUTO:
+        skPrefixMapSetContentType(map, SKPREFIXMAP_CONT_ADDR_V4);
+        break;
+      case GEOIP2CCMAP_MODE_BINARY:
+        skAbortBadCase(mode);
+    }
 
     rv = skPrefixMapSetDefaultVal(map, default_value);
     if (rv) {
@@ -783,7 +1096,6 @@ int main(
             exit(EXIT_FAILURE);
         }
     }
-
     if (dry_run) {
         appTeardown();
         return 0;

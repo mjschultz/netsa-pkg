@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwappend.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwappend.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -37,12 +37,12 @@ RCSIDENT("$SiLK: rwappend.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 /* LOCAL VARIABLES */
 
 /* file to append to */
-static skstream_t *out_ios = NULL;
+static skstream_t *out_stream = NULL;
 
-/* whether to create the out_ios file if it does not exist */
+/* whether to create the out_stream file if it does not exist */
 static int allow_create = 0;
 
-/* if creating the out_ios file, this is the name of the file to
+/* if creating the out_stream file, this is the name of the file to
  * use as the template for the new file. */
 static const char *create_format = NULL;
 
@@ -130,10 +130,10 @@ appTeardown(
     teardownFlag = 1;
 
     /* close appended-to file */
-    if (out_ios) {
-        rv = skStreamDestroy(&out_ios);
+    if (out_stream) {
+        rv = skStreamDestroy(&out_stream);
         if (rv) {
-            skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
         }
     }
 
@@ -239,14 +239,14 @@ appSetup(
     }
 
     /* open the target file for append */
-    rv = skStreamOpenSilkFlow(&out_ios, output_path, SK_IO_APPEND);
+    rv = skStreamOpenSilkFlow(&out_stream, output_path, SK_IO_APPEND);
     if (rv) {
         if (did_create) {
             skAppPrintErr("Unable to open newly created target file '%s'",
                           output_path);
         }
-        skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
-        skStreamDestroy(&out_ios);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+        skStreamDestroy(&out_stream);
         exit(EXIT_FAILURE);
     }
 
@@ -313,13 +313,13 @@ createFromTemplate(
     const char         *new_path,
     const char         *templ_file)
 {
-    skstream_t *new_ios = NULL;
+    skstream_t *new_stream = NULL;
     skstream_t *stream = NULL;
     int rv, rv_temp;
 
     /* open the target file for write---this will create the file */
-    if ((rv = skStreamCreate(&new_ios, SK_IO_WRITE, SK_CONTENT_SILK_FLOW))
-        || (rv = skStreamBind(new_ios, new_path)))
+    if ((rv = skStreamCreate(&new_stream, SK_IO_WRITE, SK_CONTENT_SILK_FLOW))
+        || (rv = skStreamBind(new_stream, new_path)))
     {
         goto END;
     }
@@ -333,33 +333,33 @@ createFromTemplate(
             skAppPrintErr("Cannot open template file '%s'",
                           templ_file);
             skStreamDestroy(&stream);
-            skStreamDestroy(&new_ios);
+            skStreamDestroy(&new_stream);
             return 1;
         }
 
-        rv = skHeaderCopy(skStreamGetSilkHeader(new_ios),
+        rv = skHeaderCopy(skStreamGetSilkHeader(new_stream),
                           skStreamGetSilkHeader(stream),
                           SKHDR_CP_ALL);
     }
 
     /* open the target file, write the header, then close it */
     if (rv == SKSTREAM_OK) {
-        rv = skStreamOpen(new_ios);
+        rv = skStreamOpen(new_stream);
     }
     if (rv == SKSTREAM_OK) {
-        rv = skStreamWriteSilkHeader(new_ios);
+        rv = skStreamWriteSilkHeader(new_stream);
     }
     if (rv == SKSTREAM_OK) {
-        rv = skStreamClose(new_ios);
+        rv = skStreamClose(new_stream);
     }
 
   END:
     if (rv != SKSTREAM_OK) {
-        skStreamPrintLastErr(new_ios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(new_stream, rv, &skAppPrintErr);
         skAppPrintErr("Cannot create output file '%s'", new_path);
     }
     skStreamDestroy(&stream);
-    skStreamDestroy(&new_ios);
+    skStreamDestroy(&new_stream);
     return rv;
 }
 
@@ -367,7 +367,7 @@ createFromTemplate(
 int main(int argc, char **argv)
 {
     const char *input_path;
-    skstream_t *in_ios;
+    skstream_t *in_stream;
     rwRec rwrec;
     int file_count = 0;
     int rv;
@@ -380,66 +380,66 @@ int main(int argc, char **argv)
 
         /* skip files that are identical to the target or that we
          * cannot open */
-        if (0 == strcmp(input_path, skStreamGetPathname(out_ios))) {
+        if (0 == strcmp(input_path, skStreamGetPathname(out_stream))) {
             skAppPrintErr(("Warning: skipping source-file%d:"
                            " identical to target file '%s'"),
                           file_count, input_path);
             continue;
         }
-        rv = skStreamOpenSilkFlow(&in_ios, input_path, SK_IO_READ);
+        rv = skStreamOpenSilkFlow(&in_stream, input_path, SK_IO_READ);
         if (rv) {
-            skStreamPrintLastErr(in_ios, rv, &skAppPrintErr);
-            skStreamDestroy(&in_ios);
+            skStreamPrintLastErr(in_stream, rv, &skAppPrintErr);
+            skStreamDestroy(&in_stream);
             continue;
         }
 
         /* determine whether target file supports IPv6; if not, ignore
          * IPv6 flows */
-        if (skStreamGetSupportsIPv6(out_ios) == 0) {
-            skStreamSetIPv6Policy(in_ios, SK_IPV6POLICY_ASV4);
+        if (skStreamGetSupportsIPv6(out_stream) == 0) {
+            skStreamSetIPv6Policy(in_stream, SK_IPV6POLICY_ASV4);
         }
 
-        while ((rv = skStreamReadRecord(in_ios, &rwrec)) == SKSTREAM_OK) {
-            rv = skStreamWriteRecord(out_ios, &rwrec);
+        while ((rv = skStreamReadRecord(in_stream, &rwrec)) == SKSTREAM_OK) {
+            rv = skStreamWriteRecord(out_stream, &rwrec);
             if (rv) {
-                skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+                skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
                 if (SKSTREAM_ERROR_IS_FATAL(rv)) {
-                    skStreamDestroy(&in_ios);
+                    skStreamDestroy(&in_stream);
                     goto END;
                 }
             }
         }
         if (rv != SKSTREAM_ERR_EOF) {
-            skStreamPrintLastErr(in_ios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(in_stream, rv, &skAppPrintErr);
         }
 
         if (print_statistics) {
             ++file_count;
             fprintf(STATISTICS_FH,
                     ("%s: appended %" PRIu64 " records from %s to %s\n"),
-                    skAppName(), skStreamGetRecordCount(in_ios),
-                    skStreamGetPathname(in_ios),
-                    skStreamGetPathname(out_ios));
+                    skAppName(), skStreamGetRecordCount(in_stream),
+                    skStreamGetPathname(in_stream),
+                    skStreamGetPathname(out_stream));
         }
-        skStreamDestroy(&in_ios);
+        skStreamDestroy(&in_stream);
     }
 
     /* close target */
-    rv = skStreamClose(out_ios);
+    rv = skStreamClose(out_stream);
     if (rv) {
-        skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
     }
 
     if (print_statistics) {
         fprintf(STATISTICS_FH,
                 ("%s: appended %" PRIu64 " records from %d file%s to %s\n"),
-                skAppName(), skStreamGetRecordCount(out_ios),
+                skAppName(), skStreamGetRecordCount(out_stream),
                 file_count, ((file_count == 1) ? "" : "s"),
-                skStreamGetPathname(out_ios));
+                skStreamGetPathname(out_stream));
     }
 
   END:
-    skStreamDestroy(&out_ios);
+    skStreamDestroy(&out_stream);
     appTeardown();
 
     return 0;

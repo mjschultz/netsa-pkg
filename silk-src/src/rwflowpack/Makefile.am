@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 3c4d6696a20e 2014-10-15 19:18:45Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 8b44d08476b6 2016-06-03 22:17:44Z mthomas $");
 
 # Installed Targets
 
@@ -173,4 +173,5 @@ TESTS += \
 	tests/rwflowappend-append-ipv6.pl \
 	tests/rwflowappend-append-cmd.pl \
 	tests/rwflowappend-append-hours.pl \
-	tests/rwflowappend-append-bad.pl
+	tests/rwflowappend-append-bad.pl \
+	tests/rwflowpack-split-rwflowappend.pl

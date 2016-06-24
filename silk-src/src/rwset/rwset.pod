@@ -9,7 +9,7 @@ B<rwset> - Generate binary IPset files of unique IP addresses
   rwset {--sip-file=FILE | --dip-file=FILE
          | --nhip-file=FILE | --any-file=FILE [...]}
         [--record-version=VERSION] [--invocation-strip]
-        [--note-add=TEXT] [--note-file-add=FILE]
+        [--note-strip] [--note-add=TEXT] [--note-file-add=FILE]
         [--print-filenames] [--copy-input=PATH]
         [--compression-method=COMP_METHOD]
         [--ipv6-policy={ignore,asv4,mix,force,only}]
@@ -79,8 +79,8 @@ command
 
  $ rwset --sip-file=stdout flows.rw | rwsetcat
 
-will be faster than B<rwuniq(1)>, but B<rwset> cannot report total
-volume or do the thresholding that B<rwuniq> supports.
+is faster than B<rwuniq(1)>, but B<rwset> does not report the number
+of flow records or compute byte and packets counts.
 
 =head1 OPTIONS
 
@@ -144,9 +144,15 @@ for IPv4 IPsets and version 3 for IPv6 IPsets.
 
 =item B<--invocation-strip>
 
-Do not record any command line history; that is, do not copy the
-invocation history from the input files to the output file, and do not
-record the current command line invocation in the output.
+Do not record any command line history: do not copy the invocation
+history from the input files to the output file, and do not record the
+current command line invocation in the output.  The invocation may be
+viewed with B<rwfileinfo(1)>.
+
+=item B<--note-strip>
+
+Do not copy the notes (annotations) from the input files to the output
+file.  Normally notes from the input files are copied to the output.
 
 =item B<--note-add>=I<TEXT>
 
@@ -387,7 +393,7 @@ Version 4 was added in S<SiLK 3.7>.
 
 =cut
 
-$SiLK: rwset.pod cd09f0a5fcc6 2014-06-14 15:43:33Z mthomas $
+$SiLK: rwset.pod de315f28e2b0 2016-06-03 17:27:21Z mthomas $
 
 Local Variables:
 mode:text

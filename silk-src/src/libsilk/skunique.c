@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skunique.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: skunique.c 558ff1948cad 2016-06-16 18:41:50Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/rwascii.h>
@@ -2073,7 +2073,11 @@ uniqDistinctAllocMerging(
     distinct_value_t *dist;
     uint8_t total_octets = 0;
 
+    assert(field_info);
+    assert(new_distincts);
+
     if (0 == field_info->distinct_num_fields) {
+        *new_distincts = NULL;
         return 0;
     }
 
@@ -2082,6 +2086,7 @@ uniqDistinctAllocMerging(
     if (NULL == distincts) {
         TRACEMSG(("%s:%d: Error allocating distinct field_info",
                   __FILE__, __LINE__));
+        *new_distincts = NULL;
         return -1;
     }
 
@@ -2129,10 +2134,15 @@ uniqDistinctAlloc(
     distinct_value_t *distincts;
     distinct_value_t *dist;
 
+    assert(field_info);
+    assert(new_distincts);
+
     if (0 == field_info->distinct_num_fields) {
+        *new_distincts = NULL;
         return 0;
     }
     if (uniqDistinctAllocMerging(field_info, &distincts)) {
+        *new_distincts = NULL;
         return -1;
     }
 
@@ -2172,6 +2182,7 @@ uniqDistinctAlloc(
 
   ERROR:
     uniqDistinctFree(field_info, distincts);
+    *new_distincts = NULL;
     return -1;
 }
 

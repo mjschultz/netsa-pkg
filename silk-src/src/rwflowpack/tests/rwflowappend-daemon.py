@@ -9,7 +9,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: rwflowappend-daemon.py 85572f89ddf9 2016-05-05 20:07:39Z mthomas $
+# $SiLK: rwflowappend-daemon.py 8b44d08476b6 2016-06-03 22:17:44Z mthomas $
 #######################################################################
 from __future__ import print_function
 import optparse
@@ -64,6 +64,10 @@ def main():
                       default=[])
     parser.add_option("--move", action="append", type="string", dest="move",
                       default=[])
+    parser.add_option("--file-limit", action="store", type="int",
+                      dest="file_limit", default=0)
+    parser.add_option("--no-archive", action="store_true", dest="no_archvie",
+                      default=False)
     parser.add_option("--basedir", action="store", type="string",
                       dest="basedir")
     parser.add_option("--daemon-timeout", action="store", type="int",
@@ -91,8 +95,11 @@ def main():
              '--no-daemon',
              '--root-directory', dirobj.dirname['root'],
              '--incoming-directory', dirobj.dirname['incoming'],
-             '--archive-directory', dirobj.dirname['archive'],
              '--error-directory', dirobj.dirname['error']]
+
+    if not options.no_archvie:
+        args += ['--archive-directory', dirobj.dirname['archive']]
+
 
     progname = os.environ.get("RWFLOWAPPEND",
                               os.path.join('.', 'rwflowappend'))
@@ -103,9 +110,14 @@ def main():
     clean = False
     term = False
     send_list = None
-    limit = len(options.copy) + len(options.move)
+    limit = len(options.copy) + len(options.move) + options.file_limit
     regexp = re.compile("APPEND OK")
     closing = re.compile("Stopped logging")
+
+    if 0 == limit:
+        print("ERROR: File limit is zero")
+        base_log("ERROR: File limit is zero")
+        sys.exit(1)
 
     # Copy or move data
     copy_files(dirobj, options.copy)

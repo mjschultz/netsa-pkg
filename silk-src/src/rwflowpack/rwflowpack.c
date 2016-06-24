@@ -81,7 +81,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwflowpack.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwflowpack.c d49b1e47d2e3 2016-06-15 20:31:17Z mthomas $");
 
 #include <dlfcn.h>
 
@@ -215,31 +215,6 @@ typedef enum {
     _INPUT_MODE_TYPE_MAX_
 } input_mode_type_id_t;
 
-/*
- *    Structure used to map from {flowtype,sensor,start-time} to a
- *    file name when the output_mode is incremental-files.  These
- *    entries are stored in the red-black tree 'incr_path_map'.
- *
- *    The purpose is to allow rwflowpack to append the mkstemp()
- *    extension on the name returned by the sksiteGeneratePathname()
- *    function at the time the file is created instead of waiting
- *    until the file is moved.
- *
- *    This also save us from having to use opendir() to process the
- *    incremental files.
- */
-typedef struct incr_path_entry_st {
-    /* The 'key' MUST be first so we can search for items in the
-     * red-black tree using just a key. */
-    cache_key_t     key;
-    /* This a pointer into 'dotpath' that points to the basename of
-     * the dotfile (without the leading dot). */
-    char           *filename;
-    /* This is a variable-sized copy of the complete path to the dot
-     * file in the incremental directory. */
-    char            dotpath[1];
-} incr_path_entry_t;
-
 
 /* LOCAL VARIABLES */
 
@@ -367,13 +342,6 @@ static const char *incremental_directory = NULL;
  * this destination directory, and removes the placeholder files.
  * This is set by the --sender-dir switch. */
 static const char *sender_directory = NULL;
-
-/* When the output_mode is "sending" or "incremental-files", this
- * red-black tree contains all files we have seen since the last
- * flush.  It maps from a {flowtype,sensor,start-time} triple to a
- * file name in the incremental directory.  It stores pointers to
- * incr_path_entry_t. */
-static struct rbtree *incr_path_map = NULL;
 
 /* This structure holds the user's options related to the type of
  * flow-reader being used. */
@@ -590,7 +558,7 @@ static int  createFlowProcessorsPduFile(void);
 static int  createFlowProcessorsStream(void);
 static void nullSigHandler(int sig);
 static void flushAndMoveFiles(void);
-static void moveFiles(struct rbtree  *map);
+static void moveFiles(cache_file_iter_t *file_list);
 static int  defineRunModeOptions(void);
 static int  verifySensorConfig(const char *sensor_conf, int verbose);
 static int  initPackingLogic(const char *user_path);
@@ -811,30 +779,30 @@ appTeardown(
     stopAllProcessors();
 
     if (stream_cache) {
+        cache_file_iter_t *iter;
+        const char *path;
+        uint64_t count;
+
         /* Destroy the cache, flushing, closing and freeing all the
          * open streams.  We're in shutdown, so ignore the return
          * code. */
-        INFOMSG("Closing all files.");
-        (void)skCacheDestroy(stream_cache);
+        INFOMSG("Closing all files...");
+        skCacheCloseAll(stream_cache, &iter);
+        skCacheDestroy(stream_cache);
         stream_cache = NULL;
-    }
 
-    if (incr_path_map) {
-        /* In incremental-files mode, go ahead and move the files
-         * since it should be a quick operation.  In sending mode we
-         * leave the files where they are since we do not know how
-         * long the move may take (it may cross file systems). */
         if (OUTPUT_INCREMENTAL_FILES == output_mode) {
-            moveFiles(incr_path_map);
+            /* In incremental-files mode, go ahead and move the files
+             * since it should be a quick operation. */
+            moveFiles(iter);
         } else {
-            incr_path_entry_t *entry;
-            RBLIST *iter;
-            iter = rbopenlist(incr_path_map);
-            while ((entry = (incr_path_entry_t*)rbreadlist(iter)) != NULL) {
-                free(entry);
+            /* Report the files that were closed.  We do not move the
+             * files in sending mode since the move may be slow if it
+             * crosses file systems. */
+            while (skCacheFileIterNext(iter, &path, &count) == SK_ITERATOR_OK){
+                INFOMSG(("%s: %" PRIu64 " recs"), path, count);
             }
-            rbcloselist(iter);
-            rbdestroy(incr_path_map);
+            skCacheFileIterDestroy(iter);
         }
     }
 
@@ -2076,13 +2044,21 @@ static skTimerRepeat_t
 timedFlush(
     void        UNUSED(*dummy))
 {
+    cache_file_iter_t *iter;
+    const char *path;
+    uint64_t count;
+
     /* Flush the stream cache */
     NOTICEMSG("Flushing files after %" PRIu32 " seconds.", flush_timeout);
-    if (skCacheFlush(stream_cache)) {
+    printReaderStats();
+    if (skCacheFlush(stream_cache, &iter)) {
         CRITMSG("Error flushing files -- shutting down");
         exit(EXIT_FAILURE);
     }
-    printReaderStats();
+    while (skCacheFileIterNext(iter, &path, &count) == SK_ITERATOR_OK) {
+        INFOMSG(("%s: %" PRIu64 " recs"), path, count);
+    }
+    skCacheFileIterDestroy(iter);
 
     return SK_TIMER_REPEAT;
 }
@@ -2767,45 +2743,7 @@ determineFileFormatPackInterfaces(
 
 
 /*
- *  direction = cacheKeyCompare(a, b, config);
- *
- *    The comparison function used by the redblack tree.  The tree
- *    contains pointers to incr_path_entry_t; since the cache_key_t is
- *    first, we can cast directly to that type.
- */
-static int
-cacheKeyCompare(
-    const void         *v_key1,
-    const void         *v_key2,
-    const void  UNUSED(*config))
-{
-    cache_key_t *key1 = (cache_key_t*)v_key1;
-    cache_key_t *key2 = (cache_key_t*)v_key2;
-
-    if (key1->sensor_id < key2->sensor_id) {
-        return -1;
-    }
-    if (key1->sensor_id > key2->sensor_id) {
-        return 1;
-    }
-    if (key1->flowtype_id < key2->flowtype_id) {
-        return -1;
-    }
-    if (key1->flowtype_id > key2->flowtype_id) {
-        return 1;
-    }
-    if (key1->time_stamp < key2->time_stamp) {
-        return -1;
-    }
-    if (key1->time_stamp > key2->time_stamp) {
-        return 1;
-    }
-    return 0;
-}
-
-
-/*
- *  stream = openOutputStreamIncr(key, probe);
+ *  stream = openOutputStreamIncr(key, probe, pathname);
  *
  *    Create an open stream in the incremental-directory to store flow
  *    records for the 'flowtype', hourly 'timestamp', and 'sensor_id'
@@ -2826,13 +2764,12 @@ cacheKeyCompare(
 static skstream_t *
 openOutputStreamIncr(
     const cache_key_t  *key,
-    void               *v_probe)
+    void               *v_probe,
+    const char         *pathname)
 {
     const skpc_probe_t *probe = (skpc_probe_t*)v_probe;
     char dotpath[PATH_MAX];
     char placepath[PATH_MAX];
-    incr_path_entry_t *entry;
-    const void *node;
     char *fname;
     skstream_t *stream = NULL;
     sk_file_header_t *hdr;
@@ -2848,15 +2785,13 @@ openOutputStreamIncr(
                   " {flowtype = %u, sensor = %u, time = %" PRId64 "}"),
                  key->flowtype_id, key->sensor_id, (int64_t)key->time_stamp));
 
-    /* Have we seen the file before? */
-    entry = (incr_path_entry_t*)rbfind(key, incr_path_map);
-    if (entry) {
+    if (pathname) {
         /* Open existing file for append, and read its header */
-        DEBUGMSG("Opening existing incremental working file '.%s'",
-                 entry->filename);
+        DEBUGMSG("Opening existing incremental working file '%s'",
+                 pathname);
 
         if ((rv = skStreamCreate(&stream, SK_IO_APPEND, SK_CONTENT_SILK_FLOW))
-            || (rv = skStreamBind(stream, entry->dotpath))
+            || (rv = skStreamBind(stream, pathname))
             || (rv = skStreamOpen(stream))
             || (rv = skStreamReadSilkHeader(stream, NULL)))
         {
@@ -2864,9 +2799,7 @@ openOutputStreamIncr(
             skStreamDestroy(&stream);
             WARNINGMSG(("Failed to open existing incremental file '%s'."
                         " Creating new incremental file..."),
-                       entry->dotpath);
-            rbdelete(key, incr_path_map);
-            free(entry);
+                       pathname);
             /* Drop into the code below. */
         } else {
             /* Successful */
@@ -2881,7 +2814,6 @@ openOutputStreamIncr(
     placepath[0] = '\0';
     dotpath[0] = '\0';
     fd = -1;
-    entry = NULL;
 
     /* Call the determineFileFormat function to get the file
      * output format---HOW the records will be written to disk. */
@@ -3008,36 +2940,9 @@ openOutputStreamIncr(
 
     TRACEMSG(2, ("Wrote header for working file '.%s'", fname));
 
-    /* Create a red-black entry for this file.  Allocate the struct
-     * and the variable-length path in a single malloc; add 1 for
-     * terminating NUL. */
-    entry = (incr_path_entry_t*)malloc(offsetof(incr_path_entry_t, dotpath)
-                                       + sz + 1u);
-    if (NULL == entry) {
-        skAppPrintOutOfMemory(NULL);
-        goto ERROR;
-    }
-    entry->key = *key;
-    strncpy(entry->dotpath, dotpath, sz + 1u);
-    entry->filename = entry->dotpath + (sz - strlen(fname));
-
-    /* Add entry to the red-black tree */
-    node = rbsearch(entry, incr_path_map);
-    if (node != entry) {
-        assert(NULL == node);
-        skAppPrintOutOfMemory(NULL);
-        goto ERROR;
-    }
-
-    TRACEMSG(2, ("Created working file entry '.%s'", fname));
-
     return stream;
 
   ERROR:
-    if (entry) {
-        TRACEMSG(2, ("Freeing entry"));
-        free(entry);
-    }
     if (stream) {
         TRACEMSG(2, ("Destroying stream"));
         skStreamDestroy(&stream);
@@ -3059,7 +2964,7 @@ openOutputStreamIncr(
 
 
 /*
- *  stream = openOutputStreamRepo(key, probe);
+ *  stream = openOutputStreamRepo(key, probe, pathname);
  *
  *    Create an open stream in the local data repository to store
  *    flow records for the 'flowtype', hourly 'timestamp', and
@@ -3084,7 +2989,8 @@ openOutputStreamIncr(
 static skstream_t *
 openOutputStreamRepo(
     const cache_key_t  *key,
-    void               *v_probe)
+    void               *v_probe,
+    const char         *pathname)
 {
     const skpc_probe_t *probe = (skpc_probe_t*)v_probe;
     char repo_file[PATH_MAX];
@@ -3100,19 +3006,22 @@ openOutputStreamRepo(
                   " {flowtype = %u, sensor = %u, time = %" PRId64 "}"),
                  key->flowtype_id, key->sensor_id, (int64_t)key->time_stamp));
 
-    /* Build the file name--WHERE the records will be written onto
-     * disk. */
-    if (!sksiteGeneratePathname(repo_file, sizeof(repo_file),
-                                key->flowtype_id, key->sensor_id,
-                                key->time_stamp, "", NULL, NULL))
-    {
-        CRITMSG(("Unable to generate pathname to file"
-                 " {flowtype = %u, sensor = %u, time = %" PRId64 "}"),
-                key->flowtype_id, key->sensor_id, (int64_t)key->time_stamp);
-        return NULL;
+    if (NULL == pathname) {
+        /* Build the file name--WHERE the records will be written onto
+         * disk. */
+        if (!sksiteGeneratePathname(repo_file, sizeof(repo_file),
+                                    key->flowtype_id, key->sensor_id,
+                                    key->time_stamp, "", NULL, NULL))
+        {
+            CRITMSG(("Unable to generate pathname to file"
+                     " {flowtype = %u, sensor = %u, time = %" PRId64 "}"),
+                    key->flowtype_id, key->sensor_id, (int64_t)key->time_stamp);
+            return NULL;
+        }
+        pathname = repo_file;
     }
 
-    stream = openRepoStream(repo_file, &mode, no_file_locking, &shuttingDown);
+    stream = openRepoStream(pathname, &mode, no_file_locking, &shuttingDown);
     if (NULL == stream) {
         return NULL;
     }
@@ -3142,7 +3051,7 @@ openOutputStreamRepo(
     if (rv) {
         skStreamPrintLastErr(stream, rv, &WARNINGMSG);
         NOTICEMSG("Error creating repository file; truncating size to 0: '%s'",
-                  repo_file);
+                  pathname);
         /* On error, truncate file to 0 bytes so it does not contain a
          * partially written header.  Do not unlink it, since another
          * rwflowpack process may have opened the file and be waiting
@@ -3179,6 +3088,7 @@ packRecord(
     cache_key_t key;
     sk_flowtype_id_t ftypes[MAX_SPLIT_FLOWTYPES];
     sk_sensor_id_t sensorids[MAX_SPLIT_FLOWTYPES];
+    skstream_t *stream;
     int count;
     int rec_is_bad;
     int i;
@@ -3196,6 +3106,7 @@ packRecord(
                   rwRecGetOutput(rwrec));
         return 1;
     }
+
 
     /* clear the memo field */
     rwRecSetMemo(rwrec, 0);
@@ -3241,17 +3152,18 @@ packRecord(
         }
 
         /* Write record */
-        rv = skStreamWriteRecord(skCacheEntryGetStream(entry), rwrec);
+        stream = skCacheEntryGetStream(entry);
+        rv = skStreamWriteRecord(stream, rwrec);
         if (SKSTREAM_OK != rv) {
             if (SKSTREAM_ERROR_IS_FATAL(rv)) {
-                skStreamPrintLastErr(skCacheEntryGetStream(entry), rv, &ERRMSG);
+                skStreamPrintLastErr(stream, rv, &ERRMSG);
                 CRITMSG(("Error writing record for probe '%s' -- "
                          " shutting down"),
                         skpcProbeGetName(probe));
                 skCacheEntryRelease(entry);
                 return -1;
             }
-            skStreamPrintLastErr(skCacheEntryGetStream(entry), rv, &WARNINGMSG);
+            skStreamPrintLastErr(stream, rv, &WARNINGMSG);
             rec_is_bad = 1;
         }
 
@@ -3606,9 +3518,8 @@ moveToSenderDir(
  *  flushAndMoveFiles();
  *
  *    When in incremental-files or sending output-mode, closes all the
- *    open files in the stream cache, stores a copy of the current
- *    incr_path_map, creates an empty incr_path_map, and calls
- *    moveFiles() with the previous incr_path_map.
+ *    open files in the stream cache and calls moveFiles() with the
+ *    list of closed incremental files.
  *
  *    Called repeatedly by the timedFlushAndMove() function every
  *    flush_timeout seconds.  (In the pdufile input-mode, called after
@@ -3618,7 +3529,7 @@ static void
 flushAndMoveFiles(
     void)
 {
-    struct rbtree *old_incr_path_map = NULL;
+    cache_file_iter_t *incr_files;
 
     /* Return if incremental-files or sending mode not specified */
     if (OUTPUT_INCREMENTAL_FILES != output_mode
@@ -3627,39 +3538,23 @@ flushAndMoveFiles(
         return;
     }
 
-    NOTICEMSG("Preparing to move incremental files...");
+    NOTICEMSG("Closing and moving incremental files...");
 
     /* Close all the output files. */
-    INFOMSG("Closing incremental files...");
-    if (skCacheLockAndCloseAll(stream_cache)) {
-        skCacheUnlock(stream_cache);
+    if (skCacheCloseAll(stream_cache, &incr_files)) {
         CRITMSG("Error closing incremental files -- shutting down");
         exit(EXIT_FAILURE);
     }
 
-    /* Create a new red-black tree */
-    old_incr_path_map = incr_path_map;
-    incr_path_map = rbinit(&cacheKeyCompare, NULL);
-    if (NULL == incr_path_map) {
-        CRITMSG("Unable to create new red black tree;"
-                " moving files and shutting down");
-        moveFiles(old_incr_path_map);
-        skCacheUnlock(stream_cache);
-        exit(EXIT_FAILURE);
-    }
-
-    skCacheUnlock(stream_cache);
-
-    moveFiles(old_incr_path_map);
+    moveFiles(incr_files);
 }
 
 
 /*
- *  moveFiles(incr_path_map);
+ *  moveFiles(incr_files);
  *
  *    Processes the files that were created since the previous flush
- *    timeout that are contained in 'incr_path_map' and then destroys
- *    the red-black-tree.
+ *    timeout that are contained in 'incr_files'.
  *
  *    In incremental-files mode, copies the dot-file over the
  *    placeholder-file in the incremental-directory.
@@ -3670,63 +3565,70 @@ flushAndMoveFiles(
  */
 static void
 moveFiles(
-    struct rbtree      *old_incr_path_map)
+    cache_file_iter_t  *incr_files)
 {
     char placepath[PATH_MAX];
-    RBLIST *iter;
-    incr_path_entry_t *entry;
-    size_t file_count = 0;
-    size_t moved_count = 0;
+    const char *dotpath;
+    const char *dot_basename;
+    size_t file_count;
+    size_t moved_count;
+    uint64_t count;
 
-    INFOMSG("Moving incremental files...");
+    file_count = skCacheFileIterCountEntries(incr_files);
+    if (0 == file_count) {
+        NOTICEMSG("No incremental files to move.");
+        skCacheFileIterDestroy(incr_files);
+        return;
+    }
 
-    /* Visit all files in the red-black tree; delete the entries as we
-     * process each one. */
-    iter = rbopenlist(old_incr_path_map);
-    while ((entry = (incr_path_entry_t*)rbreadlist(iter)) != NULL) {
-        ++file_count;
-        TRACEMSG(1, ("flushAndMoveFiles(): Processing '%s'", entry->dotpath));
+    INFOMSG("Moving %" SK_PRIuZ " incremental files...", file_count);
+    moved_count = 0;
+
+    /* Visit all files in incr_files */
+    while (skCacheFileIterNext(incr_files, &dotpath, &count) == SK_ITERATOR_OK)
+    {
+        dot_basename = strrchr(dotpath, '/');
+        if (!dot_basename) {
+            dot_basename = dotpath;
+        } else {
+            ++dot_basename;
+        }
+        INFOMSG("%s: %" PRIu64 " recs", dotpath, count);
+        assert(strlen(dot_basename) >= 2);
+        assert('.' == *dot_basename);
+        TRACEMSG(1, ("moveFiles(): Processing '%s'", dot_basename));
         if ((size_t)snprintf(placepath, sizeof(placepath), "%s/%s",
-                             incremental_directory, entry->filename)
+                             incremental_directory, dot_basename + 1)
             >= sizeof(placepath))
         {
             ERRMSG("Pathname exceeds maximum size for '%s'",
-                   entry->filename);
-            goto NEXT;
+                   dot_basename);
+            continue;
         }
 
         if (OUTPUT_SENDING == output_mode) {
-            if (moveToSenderDir(entry->filename, entry->dotpath, placepath)
+            if (moveToSenderDir(dot_basename + 1, dotpath, placepath)
                 == 0)
             {
                 ++moved_count;
             }
         } else {
             /* Move the dot-file over the placeholder file. */
-            if (-1 == rename(entry->dotpath, placepath)) {
+            if (-1 == rename(dotpath, placepath)) {
                 ERRMSG("Could not move '%s' to '%s': %s",
-                       entry->dotpath, placepath, strerror(errno));
-                goto NEXT;
+                       dotpath, placepath, strerror(errno));
+            } else {
+                /* Moved the file. */
+                ++moved_count;
+                INFOMSG("%s", placepath);
             }
-
-            /* Moved the file. */
-            ++moved_count;
-            INFOMSG("%s", placepath);
         }
-
-      NEXT:
-        free(entry);
     }
-    rbcloselist(iter);
-    rbdestroy(old_incr_path_map);
+    skCacheFileIterDestroy(incr_files);
 
     /* Print status message */
-    if (file_count == 0) {
-        NOTICEMSG("No incremental files to move.");
-    } else {
-        NOTICEMSG(("Successfully moved %" SK_PRIuZ "/%" SK_PRIuZ " file%s."),
-                  moved_count, file_count, CHECK_PLURAL(file_count));
-    }
+    NOTICEMSG(("Successfully moved %" SK_PRIuZ "/%" SK_PRIuZ " file%s."),
+              moved_count, file_count, CHECK_PLURAL(file_count));
 }
 
 
@@ -3906,14 +3808,6 @@ int main(int argc, char **argv)
         stream_cache = skCacheCreate(stream_cache_size, &openOutputStreamIncr);
         if (NULL == stream_cache) {
             CRITMSG("Unable to create stream cache.");
-            exit(EXIT_FAILURE);
-        }
-
-        /* Create a red-black tree to keep track of file names in the
-         * incremental directory */
-        incr_path_map = rbinit(cacheKeyCompare, NULL);
-        if (NULL == incr_path_map) {
-            CRITMSG("Unable to create red black tree.");
             exit(EXIT_FAILURE);
         }
 

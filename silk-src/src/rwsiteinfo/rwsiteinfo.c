@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsiteinfo.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwsiteinfo.c 692731fe85c5 2016-06-03 17:28:17Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/skmempool.h>
@@ -726,7 +726,7 @@ helpFields(
 {
 #define HELP_FIELDS                                                     \
     ("The following names may be used in the --%s switch. Names are\n"  \
-     "case-insensitive and may be abbreviated to the shortest unique prefix.")
+     "case-insensitive and may be abbreviated to the shortest unique prefix.\n")
 
     sk_stringmap_t *map;
 

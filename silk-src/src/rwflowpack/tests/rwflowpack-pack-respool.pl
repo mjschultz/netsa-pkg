@@ -1,7 +1,7 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: rwflowpack-pack-respool.pl 40a363507ed0 2014-04-01 14:09:52Z mthomas $")
+# RCSIDENT("$SiLK: rwflowpack-pack-respool.pl 8b44d08476b6 2016-06-03 22:17:44Z mthomas $")
 
 use strict;
 use SiLKTests;
@@ -28,19 +28,25 @@ add_plugin_dirs('/site/twoway');
 # create our tempdir
 my $tmpdir = make_tempdir();
 
+# create the incoming directory
+my $incoming_dir = "$tmpdir/incoming";
+mkdir $incoming_dir
+    or die "ERROR: Cannot create directory $incoming_dir: $!\n";
+
 # Generate the data files
-my $cmd = ("$rwsplit --basename=$tmpdir/rwsplit-out --byte-limit=1200000000 "
-           .$file{data});
+my $cmd = join " ", ($rwsplit,
+                     "--basename=$incoming_dir/rwsplit-out",
+                     "--byte-limit=1200000000",
+                     $file{data});
 unless (check_exit_status($cmd)) {
     die "ERROR: $rwsplit exited with error\n";
 }
-my @input_files = glob("$tmpdir/rwsplit-out.*");
+my @input_files = glob("$incoming_dir/rwsplit-out.*");
 
 # the command that wraps rwflowpack
 $cmd = join " ", ("$SiLKTests::PYTHON $srcdir/tests/rwflowpack-daemon.py",
                   ($ENV{SK_TESTS_VERBOSE} ? "--verbose" : ()),
                   ($ENV{SK_TESTS_LOG_DEBUG} ? "--log-level=debug" : ()),
-                  (map {"--move $_:incoming"} @input_files),
                   "--limit=501876",
                   "--basedir=$tmpdir",
                   "--",

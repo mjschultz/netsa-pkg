@@ -25,12 +25,12 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfileinfo.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwfileinfo.c caef286c367c 2016-06-03 19:23:54Z mthomas $");
 
 #include <silk/sksite.h>
-#include <silk/utils.h>
 #include <silk/skstream.h>
 #include <silk/skstringmap.h>
+#include <silk/utils.h>
 
 
 /* LOCAL DEFINES AND TYPEDEFS */
@@ -48,9 +48,9 @@ RCSIDENT("$SiLK: rwfileinfo.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 /* format for a label that is a number, such as when printing command lines */
 #define LABEL_NUM_FMT "%20d  "
 
-/* A list of the properties that can be printed; keep in sync with the
- * info_props[] array below */
-enum info_fileinfo_id {
+/* A list of the fields that may be printed; keep in sync with the
+ * rwinfo_entry[] array below */
+enum rwinfo_id {
     RWINFO_FORMAT,
     RWINFO_VERSION,
     RWINFO_BYTE_ORDER,
@@ -64,45 +64,145 @@ enum info_fileinfo_id {
     RWINFO_SILK_VERSION,
     RWINFO_PACKED_FILE_INFO,
     RWINFO_PROBE_NAME,
-    RWINFO_ANNOTIONS,
+    RWINFO_ANNOTATIONS,
     RWINFO_PREFIX_MAP,
     RWINFO_IPSET,
-    RWINFO_BAG,
-    /* Last item is used to get a count of the above; it must be last */
-    RWINFO_PROPERTY_COUNT
+    RWINFO_BAG
 };
 
-/* A property */
-typedef struct info_property_st {
-    /* property's label */
-    const char   *label;
-    /* nonzero if printed */
-    unsigned      will_print :1;
-} info_property_t;
+/*
+ *    Fields names, IDs, descriptions, and optional titles (name is
+ *    used when title is NULL), followed by the numeric alias for the
+ *    field.  We explicitly provide the alias so we can change the
+ *    order of the fields in the future.
+ */
+static const sk_stringmap_entry_t rwinfo_entry[] = {
+    {"format",
+     RWINFO_FORMAT,
+     ("The type of data the file contains,"
+      " includes the name and its numeric ID (hexadecimal)"),
+     "format(id)"},
+    {"1",   RWINFO_FORMAT, NULL, NULL},
+
+    {"version",
+     RWINFO_VERSION,
+     ("The general structure (or layout) of the file"),
+     NULL},
+    {"2",   RWINFO_VERSION, NULL, NULL},
+
+    {"byte-order",
+     RWINFO_BYTE_ORDER,
+     ("The byte-order used to represent integers:"
+      " BigEndian (network byte-order) or littleEndian)"),
+     NULL},
+    {"3",   RWINFO_BYTE_ORDER, NULL, NULL},
+
+    {"compression",
+     RWINFO_COMPRESSION,
+     ("The compression library used to compress the data-section of"
+      " the file; includes the name and its numeric ID (decimal)"),
+     NULL},
+    {"4",   RWINFO_COMPRESSION, NULL, NULL},
+
+    {"header-length",
+     RWINFO_HEADER_LENGTH,
+     ("The length of the file's header (in octets)"),
+     NULL},
+    {"5",   RWINFO_HEADER_LENGTH, NULL, NULL},
+
+    {"record-length",
+     RWINFO_RECORD_LENGTH,
+     ("The length of a single record (in octets), or 1 if the records"
+      " do not have a fixed size"),
+     NULL},
+    {"6",   RWINFO_RECORD_LENGTH, NULL, NULL},
+
+    {"count-records",
+     RWINFO_COUNT_RECORDS,
+     ("The number of records in the file, computed by dividing the length"
+      " of the file's (uncompressed) data section by the record-length"),
+     NULL},
+    {"7",   RWINFO_COUNT_RECORDS, NULL, NULL},
+
+    {"file-size",
+     RWINFO_FILE_SIZE,
+     ("The size of the file on disk as reported by the operating system"),
+     NULL},
+    {"8",   RWINFO_FILE_SIZE, NULL, NULL},
+
+    {"command-lines",
+     RWINFO_COMMAND_LINES,
+     ("The command (or command history) used to generate this file."
+      " Most recent command last"),
+     NULL},
+    {"9",   RWINFO_COMMAND_LINES, NULL, NULL},
+
+    {"record-version",
+     RWINFO_RECORD_VERSION,
+     ("The version of the particular content type specified in format"),
+     NULL},
+    {"10",  RWINFO_RECORD_VERSION, NULL, NULL},
+
+    {"silk-version",
+     RWINFO_SILK_VERSION,
+     ("The release of SiLK that wrote this file"),
+     NULL},
+    {"11",  RWINFO_SILK_VERSION, NULL, NULL},
+
+    {"packed-file-info",
+     RWINFO_PACKED_FILE_INFO,
+     ("For a repository file created by rwflowpack, the starting hour,"
+      " the flowtype, and the sensor for each record in the file"),
+     NULL},
+    {"12",  RWINFO_PACKED_FILE_INFO, NULL, NULL},
+
+    {"probe-name",
+     RWINFO_PROBE_NAME,
+     ("For a file created by flowcap, the name of the probe"
+      " from which the data was collected"),
+     NULL},
+    {"13",  RWINFO_PROBE_NAME, NULL, NULL},
+
+    {"annotations",
+     RWINFO_ANNOTATIONS,
+     "The notes (annotations) that users have added to the file",
+     NULL},
+    {"14",  RWINFO_ANNOTATIONS, NULL, NULL},
+
+    {"prefix-map",
+     RWINFO_PREFIX_MAP,
+     ("For a prefix map, the mapname stored in the header if one was set"
+      " when the file was generated"),
+     NULL},
+    {"15",  RWINFO_PREFIX_MAP, NULL, NULL},
+
+    {"ipset",
+     RWINFO_IPSET,
+     ("For an IPset file whose record-version is 3:"
+      " a description of the tree data structure."
+      " For an IPset file whose record-version is 4:"
+      " whether the IPs are IPv4 or IPv6"),
+     NULL},
+    {"16",  RWINFO_IPSET, NULL, NULL},
+
+    {"bag",
+     RWINFO_BAG,
+     ("For a bag file, the type and size of the key and of the counter"),
+     NULL},
+    {"17",  RWINFO_BAG, NULL, NULL},
+
+    SK_STRINGMAP_SENTINEL
+};
+
 
 
 /* LOCAL VARIABLES */
 
-/* keep in sync with the info_fileinfo_id enum above */
-static info_property_t info_props[RWINFO_PROPERTY_COUNT] = {
-    {"format(id)",          1},
-    {"version",             1},
-    {"byte-order",          1},
-    {"compression(id)",     1},
-    {"header-length",       1},
-    {"record-length",       1},
-    {"count-records",       1},
-    {"file-size",           1},
-    {"command-lines",       1},
-    {"record-version",      1},
-    {"silk-version",        1},
-    {"packed-file-info",    1},
-    {"probe-name",          1},
-    {"annotations",         1},
-    {"prefix-map",          1},
-    {"ipset",               1},
-    {"bag",                 1}
-};
+/* string map used to parse the list of fields */
+static sk_stringmap_t *avail_fields = NULL;
+
+/* fields to print */
+static sk_bitmap_t *print_fields = NULL;
 
 /* whether to print the summary */
 static int print_summary = 0;
@@ -118,12 +218,14 @@ static sk_options_ctx_t *optctx = NULL;
 
 /* Create constants for the option processor */
 typedef enum rwinfoOptionIds {
+    OPT_HELP_FIELDS,
     OPT_FIELDS,
     OPT_SUMMARY,
     OPT_NO_TITLES
 } appOptionsEnum;
 
 static struct option appOptions[] = {
+    {"help-fields",     NO_ARG,       0, OPT_HELP_FIELDS},
     {"fields",          REQUIRED_ARG, 0, OPT_FIELDS},
     {"summary",         NO_ARG,       0, OPT_SUMMARY},
     {"no-titles",       NO_ARG,       0, OPT_NO_TITLES},
@@ -131,7 +233,8 @@ static struct option appOptions[] = {
 };
 
 static const char *appHelp[] = {
-    NULL, /* built dynamically */
+    "Describe each field and exit. Def. no",
+    ("Print only these fields. Def. All fields. Available fields:"),
     "Print a summary of total files, file sizes, and records",
     ("Do not print file names or field names; only print the\n"
      "\tvalues, one per line"),
@@ -142,6 +245,7 @@ static const char *appHelp[] = {
 /* LOCAL FUNCTION PROTOTYPES */
 
 static int  appOptionsHandler(clientData cData, int opt_index, char *opt_arg);
+static void helpFields(FILE *fh);
 static int  parseFields(const char *field_str);
 static int
 printFileInfo(
@@ -171,7 +275,7 @@ appUsageLong(
      "\tinformation is printed.\n")
 
     FILE *fh = USAGE_FH;
-    int i, j;
+    unsigned int i;
 
     fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
     fprintf(fh, "\nSWITCHES:\n");
@@ -181,19 +285,14 @@ appUsageLong(
                 SK_OPTION_HAS_ARG(appOptions[i]));
         switch (appOptions[i].val) {
           case OPT_FIELDS:
-            fprintf(fh,
-                    ("List of fields to print; specify by name or by value.\n"
-                     "\tDef. All fields.  Available fields:"));
-            for (j = 0; j < RWINFO_PROPERTY_COUNT; ++j) {
-                fprintf(fh, "\n\t  %3d %s", 1+j, info_props[j].label);
-            }
+            fprintf(fh, "%s\n", appHelp[i]);
+            skStringMapPrintUsage(avail_fields, fh, 8);
             break;
 
           default:
-            fprintf(fh, "%s", appHelp[i]);
+            fprintf(fh, "%s\n", appHelp[i]);
             break;
         }
-        fprintf(fh, "\n");
     }
     skOptionsCtxOptionsUsage(optctx, fh);
     sksiteOptionsUsage(fh);
@@ -219,6 +318,8 @@ appTeardown(
     }
     teardownFlag = 1;
 
+    skBitmapDestroy(&print_fields);
+    skStringMapDestroy(avail_fields);
     skOptionsCtxDestroy(&optctx);
     skAppUnregister();
 }
@@ -241,6 +342,7 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
+    sk_stringmap_status_t err;
     int optctx_flags;
     int rv;
 
@@ -271,6 +373,20 @@ appSetup(
         appTeardown();
         exit(EXIT_FAILURE);
     }
+
+    /* create the stringmap of the available fields */
+    if ((err = skStringMapCreate(&avail_fields))
+        || (err = skStringMapAddEntries(avail_fields, -1, rwinfo_entry)))
+    {
+        skAppPrintErr("Unable to create stringmap: %s",
+                      skStringMapStrerror(err));
+        exit(EXIT_FAILURE);
+    }
+
+    /* create a bitmap of fields to print; this is double the size we
+     * need, but the size is small so ignore it */
+    skBitmapCreate(&print_fields, sizeof(rwinfo_entry)/sizeof(rwinfo_entry[0]));
+    skBitmapSetAllBits(print_fields);
 
     /* parse options */
     rv = skOptionsCtxOptionsParse(optctx, argc, argv);
@@ -307,6 +423,10 @@ appOptionsHandler(
     char               *opt_arg)
 {
     switch ((appOptionsEnum)opt_index) {
+      case OPT_HELP_FIELDS:
+        helpFields(USAGE_FH);
+        exit(EXIT_SUCCESS);
+
       case OPT_FIELDS:
         if (parseFields(opt_arg)) {
             return 1;
@@ -327,93 +447,60 @@ appOptionsHandler(
 
 
 /*
+ *  helpFields(fh);
+ *
+ *    Print a description of each field to the 'fh' file pointer
+ */
+static void
+helpFields(
+    FILE               *fh)
+{
+#define HELP_FIELDS                                                     \
+    ("The following names may be used in the --%s switch. Names are\n"  \
+     "case-insensitive and may be abbreviated"                          \
+     " to the shortest unique prefix.\n"                                \
+     "The output fields are always printed in the order they appear here.\n")
+
+    fprintf(fh, HELP_FIELDS, appOptions[OPT_FIELDS].name);
+
+    skStringMapPrintDetailedUsage(avail_fields, fh);
+}
+
+
+/*
  *  ok = parseFields(field_list);
  *
- *    Parse the user's field list, setting the appropriate flags in
- *    the info_props[] vector.
+ *    Parse the user's field list, setting the appropriate bits in
+ *    the print_fields bitmap.
  */
 static int
 parseFields(
     const char         *field_str)
 {
-    sk_stringmap_t *str_map = NULL;
-    sk_stringmap_status_t rv_map;
+    sk_stringmap_status_t err;
     sk_stringmap_entry_t *map_entry;
-    sk_stringmap_entry_t insert_entry[2];
     sk_stringmap_iter_t *iter = NULL;
-    char *fieldnum_string = NULL;
-    char *cp;
-    size_t len;
-    int sz;
-    uint32_t i;
-    int rv = -1;
-
-    /* create a char array to hold the field values as strings */
-    len = 11 * RWINFO_PROPERTY_COUNT;
-    fieldnum_string = (char*)calloc(len, sizeof(char));
-    if (fieldnum_string == NULL) {
-        skAppPrintErr("Unable to create string");
-        goto END;
-    }
-
-    /* create a stringmap of the available entries */
-    if (SKSTRINGMAP_OK != skStringMapCreate(&str_map)) {
-        skAppPrintErr("Unable to create stringmap");
-        goto END;
-    }
-
-    cp = fieldnum_string;
-    for (i = 0; i < RWINFO_PROPERTY_COUNT; ++i) {
-        sz = snprintf(cp, len, ("%" PRIu32), (uint32_t)(i+1));
-        if ((size_t)sz > len) {
-            skAppPrintErr("Internal buffer too small");
-            skAbort();
-        }
-        memset(insert_entry, 0, sizeof(insert_entry));
-        insert_entry[0].name = info_props[i].label;
-        insert_entry[0].id = i;
-        insert_entry[1].name = cp;
-        insert_entry[1].id = i;
-        if (skStringMapAddEntries(str_map, 2, insert_entry)
-            != SKSTRINGMAP_OK)
-        {
-            goto END;
-        }
-        cp += sz + 1;
-        len -= sz + 1;
-    }
+    char *err_msg;
 
     /* attempt to match */
-    rv_map = skStringMapParse(str_map, field_str, SKSTRINGMAP_DUPES_KEEP,
-                              &iter, &cp);
-    if (rv_map) {
-        skAppPrintErr("Invalid %s: %s", appOptions[OPT_FIELDS].name, cp);
-        goto END;
+    err = skStringMapParse(avail_fields, field_str, SKSTRINGMAP_DUPES_KEEP,
+                           &iter, &err_msg);
+    if (err) {
+        skAppPrintErr("Invalid %s '%s': %s",
+                      appOptions[OPT_FIELDS].name, field_str, err_msg);
+        return -1;
     }
 
     /* turn off printing for all fields */
-    for (i = 0; i < RWINFO_PROPERTY_COUNT; ++i) {
-        info_props[i].will_print = 0;
-    }
+    skBitmapClearAllBits(print_fields);
 
     /* enable fields user listed */
     while (skStringMapIterNext(iter, &map_entry, NULL) == SK_ITERATOR_OK) {
-        info_props[map_entry->id].will_print = 1;
+        skBitmapSetBit(print_fields, map_entry->id);
     }
 
-    rv = 0;
-
-  END:
-    if (str_map) {
-        skStringMapDestroy(str_map);
-    }
-    if (iter) {
-        skStringMapIterDestroy(iter);
-    }
-    if (fieldnum_string) {
-        free(fieldnum_string);
-    }
-    return rv;
+    skStringMapIterDestroy(iter);
+    return 0;
 }
 
 
@@ -470,10 +557,46 @@ getNumberRecs(
 
 
 /*
+ *    If 'count' is 0, print the title for the 'id' entry unless
+ *    no-titles was requested.
+ *
+ *    If 'count' is non-0 and no-titles was not requested, print
+ *    spaces so multiple-header entries are aligned.
+ */
+static void
+printLabel(
+    sk_stringmap_id_t   id,
+    int64_t             count)
+{
+    sk_stringmap_iter_t *iter;
+    sk_stringmap_entry_t *entry;
+
+    if (!no_titles) {
+        if (0 != count) {
+            printf(LABEL_FMT, "");
+        } else {
+            /* it seems like iterating over the rwinfo_entry[] array
+             * to find the entry would be easier.... */
+            skStringMapGetByID(avail_fields, id, &iter);
+            assert(iter);
+            skStringMapIterNext(iter, &entry, NULL);
+            assert(entry);
+            if (entry->userdata) {
+                printf(LABEL_FMT, (const char *)entry->userdata);
+            } else {
+                printf(LABEL_FMT, entry->name);
+            }
+            skStringMapIterDestroy(iter);
+        }
+    }
+}
+
+
+/*
  *  status = printFileInfo(info, &total_recs, &total_bytes);
  *
  *    Given the file information in the 'info' structure, print the
- *    fields requested by the user---given in the 'info_props'
+ *    fields requested by the user---given in the 'print_fields'
  *    global---to the standard output.  Update the values pointed at
  *    by 'total_recs' and 'total_bytes' with the number of records and
  *    bytes in this file.  Return -1 if there is a problem opening or
@@ -528,11 +651,11 @@ printFileInfo(
       case SKHEADER_ERR_LEGACY:
         /* unrecognized file format.  disable printing of record
          * version and record size */
-        info_props[RWINFO_HEADER_LENGTH].will_print = 0;
-        info_props[RWINFO_RECORD_LENGTH].will_print = 0;
-        info_props[RWINFO_RECORD_VERSION].will_print = 0;
-        info_props[RWINFO_SILK_VERSION].will_print = 0;
-        info_props[RWINFO_COUNT_RECORDS].will_print = 0;
+        skBitmapClearBit(print_fields, RWINFO_HEADER_LENGTH);
+        skBitmapClearBit(print_fields, RWINFO_RECORD_LENGTH);
+        skBitmapClearBit(print_fields, RWINFO_RECORD_VERSION);
+        skBitmapClearBit(print_fields, RWINFO_SILK_VERSION);
+        skBitmapClearBit(print_fields, RWINFO_COUNT_RECORDS);
         break;
       default:
         /* print an error but continue */
@@ -541,66 +664,50 @@ printFileInfo(
         break;
     }
 
-    if (info_props[RWINFO_FORMAT].will_print) {
+    if (skBitmapGetBit(print_fields, RWINFO_FORMAT)) {
         sksiteFileformatGetName(buf, sizeof(buf),
                                 skHeaderGetFileFormat(hdr));
-        if (!no_titles) {
-            printf(LABEL_FMT, info_props[RWINFO_FORMAT].label);
-        }
+        printLabel(RWINFO_FORMAT, 0);
         printf("%s(0x%02x)\n", buf, skHeaderGetFileFormat(hdr));
     }
 
-    if (info_props[RWINFO_VERSION].will_print) {
-        if (!no_titles) {
-            printf(LABEL_FMT, info_props[RWINFO_VERSION].label);
-        }
+    if (skBitmapGetBit(print_fields, RWINFO_VERSION)) {
+        printLabel(RWINFO_VERSION, 0);
         printf("%u\n", skHeaderGetFileVersion(hdr));
     }
 
-    if (info_props[RWINFO_BYTE_ORDER].will_print) {
-        if (!no_titles) {
-            printf(LABEL_FMT, info_props[RWINFO_BYTE_ORDER].label);
-        }
+    if (skBitmapGetBit(print_fields, RWINFO_BYTE_ORDER)) {
+        printLabel(RWINFO_BYTE_ORDER, 0);
         printf("%s\n", ((skHeaderGetByteOrder(hdr) == SILK_ENDIAN_BIG)
                         ? "BigEndian"
                         : "littleEndian"));
     }
 
-    if (info_props[RWINFO_COMPRESSION].will_print) {
+    if (skBitmapGetBit(print_fields, RWINFO_COMPRESSION)) {
         sksiteCompmethodGetName(buf, sizeof(buf),
                                 skHeaderGetCompressionMethod(hdr));
-        if (!no_titles) {
-            printf(LABEL_FMT, info_props[RWINFO_COMPRESSION].label);
-        }
+        printLabel(RWINFO_COMPRESSION, 0);
         printf("%s(%u)\n", buf, skHeaderGetCompressionMethod(hdr));
     }
 
-    if (info_props[RWINFO_HEADER_LENGTH].will_print) {
-        if (!no_titles) {
-            printf(LABEL_FMT, info_props[RWINFO_HEADER_LENGTH].label);
-        }
+    if (skBitmapGetBit(print_fields, RWINFO_HEADER_LENGTH)) {
+        printLabel(RWINFO_HEADER_LENGTH, 0);
         printf("%u\n", (unsigned int)skHeaderGetLength(hdr));
     }
 
-    if (info_props[RWINFO_RECORD_LENGTH].will_print) {
-        if (!no_titles) {
-            printf(LABEL_FMT, info_props[RWINFO_RECORD_LENGTH].label);
-        }
+    if (skBitmapGetBit(print_fields, RWINFO_RECORD_LENGTH)) {
+        printLabel(RWINFO_RECORD_LENGTH, 0);
         printf("%u\n", (unsigned int)skHeaderGetRecordLength(hdr));
     }
 
-    if (info_props[RWINFO_RECORD_VERSION].will_print) {
-        if (!no_titles) {
-            printf(LABEL_FMT, info_props[RWINFO_RECORD_VERSION].label);
-        }
+    if (skBitmapGetBit(print_fields, RWINFO_RECORD_VERSION)) {
+        printLabel(RWINFO_RECORD_VERSION, 0);
         printf("%d\n", skHeaderGetRecordVersion(hdr));
     }
 
-    if (info_props[RWINFO_SILK_VERSION].will_print) {
+    if (skBitmapGetBit(print_fields, RWINFO_SILK_VERSION)) {
         uint32_t vers = skHeaderGetSilkVersion(hdr);
-        if (!no_titles) {
-            printf(LABEL_FMT, info_props[RWINFO_SILK_VERSION].label);
-        }
+        printLabel(RWINFO_SILK_VERSION, 0);
         if (vers == 0) {
             printf("0\n");
         } else {
@@ -609,120 +716,85 @@ printFileInfo(
         }
     }
 
-    if (info_props[RWINFO_COUNT_RECORDS].will_print) {
+    if (skBitmapGetBit(print_fields, RWINFO_COUNT_RECORDS)) {
         rv = getNumberRecs(stream, skHeaderGetRecordLength(hdr), &rec_count);
         if (rv) {
             retval = -1;
         }
-        if (!no_titles) {
-            printf(LABEL_FMT, info_props[RWINFO_COUNT_RECORDS].label);
-        }
+        printLabel(RWINFO_COUNT_RECORDS, 0);
         printf(("%" PRId64 "\n"), rec_count);
         *recs += rec_count;
     }
 
-    if (info_props[RWINFO_FILE_SIZE].will_print) {
+    if (skBitmapGetBit(print_fields, RWINFO_FILE_SIZE)) {
         int64_t sz = (int64_t)skFileSize(path);
-        if (!no_titles) {
-            printf(LABEL_FMT, info_props[RWINFO_FILE_SIZE].label);
-        }
+        printLabel(RWINFO_FILE_SIZE, 0);
         printf(("%" PRId64 "\n"), sz);
         *bytes += sz;
     }
 
-    if (info_props[RWINFO_PACKED_FILE_INFO].will_print) {
+    if (skBitmapGetBit(print_fields, RWINFO_PACKED_FILE_INFO)) {
         count = 0;
         skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_PACKEDFILE_ID);
         while ((he = skHeaderIteratorNext(&iter)) != NULL) {
-            if (!no_titles) {
-                if (count == 0) {
-                    printf(LABEL_FMT,
-                           info_props[RWINFO_PACKED_FILE_INFO].label);
-                } else {
-                    printf(LABEL_FMT, "");
-                }
-            }
-            ++count;
+            printLabel(RWINFO_PACKED_FILE_INFO, count);
             skHentryPackedfilePrint(he, stdout);
             printf("\n");
+            ++count;
         }
     }
 
-    if (info_props[RWINFO_PROBE_NAME].will_print) {
+    if (skBitmapGetBit(print_fields, RWINFO_PROBE_NAME)) {
         count = 0;
         skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_PROBENAME_ID);
         while ((he = skHeaderIteratorNext(&iter)) != NULL) {
-            if (!no_titles) {
-                if (count == 0) {
-                    printf(LABEL_FMT, info_props[RWINFO_PROBE_NAME].label);
-                } else {
-                    printf(LABEL_FMT, "");
-                }
-            }
-            ++count;
+            printLabel(RWINFO_PROBE_NAME, count);
             skHentryProbenamePrint(he, stdout);
             printf("\n");
+            ++count;
         }
     }
 
-    if (info_props[RWINFO_PREFIX_MAP].will_print) {
+    if (skBitmapGetBit(print_fields, RWINFO_PREFIX_MAP)) {
         count = 0;
         skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_PREFIXMAP_ID);
         while ((he = skHeaderIteratorNext(&iter)) != NULL) {
-            if (!no_titles) {
-                if (count == 0) {
-                    printf(LABEL_FMT, info_props[RWINFO_PREFIX_MAP].label);
-                } else {
-                    printf(LABEL_FMT, "");
-                }
-            }
-            ++count;
+            printLabel(RWINFO_PREFIX_MAP, count);
             skHentryPrefixmapPrint(he, stdout);
             printf("\n");
+            ++count;
         }
     }
 
-    if (info_props[RWINFO_IPSET].will_print) {
+    if (skBitmapGetBit(print_fields, RWINFO_IPSET)) {
         count = 0;
         skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_IPSET_ID);
         while ((he = skHeaderIteratorNext(&iter)) != NULL) {
-            if (!no_titles) {
-                if (count == 0) {
-                    printf(LABEL_FMT, info_props[RWINFO_IPSET].label);
-                } else {
-                    printf(LABEL_FMT, "");
-                }
-            }
-            ++count;
+            printLabel(RWINFO_IPSET, count);
             skHentryIPSetPrint(he, stdout);
             printf("\n");
+            ++count;
         }
     }
 
-    if (info_props[RWINFO_BAG].will_print) {
+    if (skBitmapGetBit(print_fields, RWINFO_BAG)) {
         count = 0;
         skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_BAG_ID);
         while ((he = skHeaderIteratorNext(&iter)) != NULL) {
-            if (!no_titles) {
-                if (count == 0) {
-                    printf(LABEL_FMT, info_props[RWINFO_BAG].label);
-                } else {
-                    printf(LABEL_FMT, "");
-                }
-            }
-            ++count;
+            printLabel(RWINFO_BAG, 0);
             skHentryBagPrint(he, stdout);
             printf("\n");
+            ++count;
         }
     }
 
-    if (info_props[RWINFO_COMMAND_LINES].will_print) {
+    if (skBitmapGetBit(print_fields, RWINFO_COMMAND_LINES)) {
         count = 0;
         skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_INVOCATION_ID);
         while ((he = skHeaderIteratorNext(&iter)) != NULL) {
             if (count == 0 && !no_titles) {
-                printf((LABEL_FMT "\n"),
-                       info_props[RWINFO_COMMAND_LINES].label);
+                printLabel(RWINFO_COMMAND_LINES, count);
+                printf("\n");
             }
             ++count;
             if (!no_titles) {
@@ -733,12 +805,13 @@ printFileInfo(
         }
     }
 
-    if (info_props[RWINFO_ANNOTIONS].will_print) {
+    if (skBitmapGetBit(print_fields, RWINFO_ANNOTATIONS)) {
         count = 0;
         skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_ANNOTATION_ID);
         while ((he = skHeaderIteratorNext(&iter)) != NULL) {
             if (count == 0 && !no_titles) {
-                printf((LABEL_FMT "\n"), info_props[RWINFO_ANNOTIONS].label);
+                printLabel(RWINFO_ANNOTATIONS, count);
+                printf("\n");
             }
             ++count;
             if (!no_titles) {
@@ -780,13 +853,13 @@ int main(int argc, char **argv)
             printf(LABEL_FMT, "number-files");
         }
             printf(("%" PRId64 "\n"), total_files);
-        if (info_props[RWINFO_COUNT_RECORDS].will_print) {
+        if (skBitmapGetBit(print_fields, RWINFO_COUNT_RECORDS)) {
             if (!no_titles) {
                 printf(LABEL_FMT, "total-records");
             }
             printf(("%" PRId64 "\n"), total_recs);
         }
-        if (info_props[RWINFO_FILE_SIZE].will_print) {
+        if (skBitmapGetBit(print_fields, RWINFO_FILE_SIZE)) {
             if (!no_titles) {
                 printf(LABEL_FMT, "all-file-sizes");
             }

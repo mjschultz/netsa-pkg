@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwflowappend.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwflowappend.c ec5c9528ed87 2016-05-27 21:40:26Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/rwrec.h>
@@ -46,11 +46,23 @@ RCSIDENT("$SiLK: rwflowappend.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 /*
  *  The appender_status_t indicates an appender thread's status.
  */
-typedef enum appender_status_en {
+enum appender_status_en {
     APPENDER_STOPPED = 0,
     APPENDER_STARTING,
     APPENDER_STARTED
-} appender_status_t;
+};
+typedef enum appender_status_en appender_status_t;
+
+/*
+ *  appender_disposal_t indicates how to dispose of an incremental
+ *  file.
+ */
+enum appender_disposal_en {
+    APPENDER_FILE_IGNORE = 0,
+    APPENDER_FILE_ARCHIVE = 1,
+    APPENDER_FILE_ERROR = 2
+};
+typedef enum appender_disposal_en appender_disposal_t;
 
 /*
  *  The appender_state_t contains thread information for each appender
@@ -65,10 +77,17 @@ struct appender_state_st {
     skstream_t         *out_stream;
     /* position in the 'out_stream' when the file was opened */
     int64_t             pos;
+    /* the full path to the input file */
+    char                in_path[PATH_MAX];
     /* the full path to the output file */
     char                out_path[PATH_MAX];
+    /* the location in 'in_path' where the basename begins */
+    char               *in_basename;
     /* the location in 'out_path' where the basename begins */
     char               *out_basename;
+    /* the location in 'out_path' where the relative directory path
+     * begins (just after the root_directory ends) */
+    char               *relative_dir;
     /* the name of this thread, for log messages */
     char                name[16];
     /* current status of this thread */
@@ -931,6 +950,158 @@ openOutputStream(
 
 
 /*
+ *    Dispose of the incremental file in the 'in_path' member of
+ *    'state' according to the value of 'disposal' and the
+ *    command-line options.
+ *
+ *    This function may move the file to the error directory, delete
+ *    the file, move the file to the archive directory, run a
+ *    post-command on the file, or ignore it.
+ *
+ *    If a stream exists for that file, the stream is closed and
+ *    destroyed.  The file is closed after the file has been moved or
+ *    deleted to ensure no other process may access the file.
+ */
+static void
+destroyInputStream(
+    appender_state_t   *state,
+    appender_disposal_t disposal)
+{
+    ssize_t rv;
+
+    assert(state);
+    switch (disposal) {
+      case APPENDER_FILE_IGNORE:
+        break;
+      case APPENDER_FILE_ERROR:
+        INFOMSG("Moving incremental file '%s' to the error directory",
+                state->in_basename);
+        errorDirectoryInsertFile(state->in_path);
+        break;
+      case APPENDER_FILE_ARCHIVE:
+        assert(state->relative_dir);
+        assert(state->out_basename);
+        /* we need to pass the relative-directory to the archive
+         * function.  Modify out_path so it terminates just before the
+         * basename which is just after the relative directory. */
+        *(state->out_basename - 1) = '\0';
+        /* archive or remove the incremental file.  this also
+         * invokes the post-command if that was specified. */
+        archiveDirectoryInsertOrRemove(state->in_path, state->relative_dir);
+        break;
+    }
+
+    /* close input */
+    if (state->in_stream) {
+        rv = skStreamClose(state->in_stream);
+        if (rv) {
+            skStreamPrintLastErr(state->in_stream, rv, &NOTICEMSG);
+        }
+        skStreamDestroy(&state->in_stream);
+    }
+}
+
+
+/*
+ *    Open the incremental file specified in the 'in_path' member of
+ *    'state' and get an exclusive lock on the file.  Return the
+ *    stream.  On error, move the file to the error directory and
+ *    return NULL.
+ *
+ *    If the file is removed while before it can be opened or locked,
+ *    return NULL.
+ *
+ *    The incremental file is not locked in 'no_file_locking' is true.
+ */
+static skstream_t *
+openInputStream(
+    appender_state_t   *state)
+{
+    char errbuf[2 * PATH_MAX];
+    skstream_t *stream = NULL;
+    ssize_t rv = SKSTREAM_OK;
+    int fd = -1;
+
+    TRACEMSG(3, ("Opening incremental file '%s'", state->in_path));
+
+    /* note: must open file for reading/writing to be able to get an
+     * exclusive lock */
+    fd = open(state->in_path, O_RDWR);
+    if (-1 == fd) {
+        TRACEMSG(3, ("Error opening incremental file '%s': %d",
+                     state->in_basename, errno));
+        if (ENOENT == errno) {
+            DEBUGMSG(("Ignoring incremental file '%s': File was removed"
+                      " before it could be opened"), state->in_basename);
+        } else {
+            WARNINGMSG("Error initializing initializing file '%s': %s",
+                       state->in_path, strerror(errno));
+            destroyInputStream(state, APPENDER_FILE_ERROR);
+        }
+        return NULL;
+    }
+
+    if (!no_file_locking) {
+        TRACEMSG(3, ("Locking incremental file %d '%s'", fd, state->in_path));
+        /* F_SETLK returns EAGAIN immediately if the lock cannot be
+         * obtained; change to F_SETLKW if we want to wait. */
+        while (skFileSetLock(fd, F_WRLCK, F_SETLK) != 0) {
+            TRACEMSG(3, ("Error locking incremental file '%s': %d",
+                         state->in_basename, errno));
+            if (shuttingdown) {
+                TRACEMSG(3,("Shutdown while locking '%s'",state->in_basename));
+                goto ERROR;
+            }
+            if (EAGAIN == errno) {
+                DEBUGMSG(("Ignoring incremental file '%s': File is locked"
+                          " by another process"), state->in_basename);
+                goto ERROR;
+            }
+            if (EINTR != errno) {
+                INFOMSG(("Ignoring incremental file '%s': Error getting an"
+                         " exclusive lock: %s"),
+                        state->in_basename, strerror(errno));
+                goto ERROR;
+            }
+        }
+
+        /* check to see whether the file was removed while we were
+         * waiting for the lock */
+        if (!skFileExists(state->in_path)) {
+            DEBUGMSG(("Ignoring incremental file '%s': File was removed"
+                      " before it could be locked"), state->in_basename);
+            goto ERROR;
+        }
+    }
+
+    /* wrap the descriptor in a stream */
+    TRACEMSG(3, ("Creating skstream for '%s'", state->in_path));
+    if ((rv = skStreamCreate(&stream, SK_IO_READ, SK_CONTENT_SILK_FLOW))
+        || (rv = skStreamBind(stream, state->in_path))
+        || (rv = skStreamFDOpen(stream, fd)))
+    {
+        skStreamLastErrMessage(stream, rv, errbuf, sizeof(errbuf));
+        WARNINGMSG("Error initializing initializing file: %s", errbuf);
+        /* NOTE: it is possible for skStreamFDOpen() to have stored
+         * the value of 'fd' but return an error. */
+        if (stream && skStreamGetDescriptor(stream) == fd) {
+            fd = -1;
+        }
+        destroyInputStream(state, APPENDER_FILE_ERROR);
+        goto ERROR;
+    }
+    return stream;
+
+  ERROR:
+    skStreamDestroy(&stream);
+    if (-1 != fd) {
+        close(fd);
+    }
+    return NULL;
+}
+
+
+/*
  *  THREAD ENTRY POINT
  *
  *    This is the entry point for each of the appender_state[].thread.
@@ -950,9 +1121,6 @@ appender_main(
         sk_header_entry_t          *he;
         sk_hentry_packedfile_t     *pf;
     } h;
-    char in_path[PATH_MAX];
-    char *in_basename;
-    char *relative_dir;
     skPollDirErr_t pderr;
     int64_t close_pos;
     int rv;
@@ -978,10 +1146,12 @@ appender_main(
         /* file handles */
         state->in_stream = NULL;
         state->out_stream = NULL;
+        state->relative_dir = NULL;
+        state->in_path[0] = '\0';
 
-        /* Get the next incremental file name from the polling
-         * directory. */
-        pderr = skPollDirGetNextFile(polldir, in_path, &in_basename);
+        /* Get the name of the next incremental file */
+        pderr = skPollDirGetNextFile(polldir, state->in_path,
+                                     &state->in_basename);
         if (pderr != PDERR_NONE) {
             if (pderr == PDERR_STOPPED) {
                 assert(shuttingdown);
@@ -994,21 +1164,18 @@ appender_main(
             exit(EXIT_FAILURE);
         }
 
-        /* Open the incremental file as the input */
-        if ((rv = skStreamCreate(&state->in_stream, SK_IO_READ,
-                                 SK_CONTENT_SILK_FLOW))
-            || (rv = skStreamBind(state->in_stream, in_path))
-            || (rv = skStreamOpen(state->in_stream))
-            || (rv = skStreamReadSilkHeader(state->in_stream, &in_hdr)))
-        {
-            /* Problem with input file.  Move to error directory. */
+        /* Open the incremental file and read its header */
+        DEBUGMSG("Processing incremental file '%s'...", state->in_basename);
+        state->in_stream = openInputStream(state);
+        if (NULL == state->in_stream) {
+            continue;
+        }
+        rv = skStreamReadSilkHeader(state->in_stream, &in_hdr);
+        if (SKSTREAM_OK != rv) {
             skStreamLastErrMessage(state->in_stream,rv,errbuf,sizeof(errbuf));
-            WARNINGMSG(("Error initializing incremental file: %s."
+            WARNINGMSG(("Error reading header from incremental file: %s."
                         " Repository unchanged"), errbuf);
-            skStreamDestroy(&state->in_stream);
-            INFOMSG("Moving incremental file '%s' to the error directory",
-                    in_basename);
-            errorDirectoryInsertFile(in_path);
+            destroyInputStream(state, APPENDER_FILE_ERROR);
             continue;
         }
 
@@ -1019,36 +1186,33 @@ appender_main(
          * set here is used when archiving the file. */
         h.he = skHeaderGetFirstMatch(in_hdr, SK_HENTRY_PACKEDFILE_ID);
         if (!(h.he
-              && sksiteGeneratePathname(state->out_path,
-                                        sizeof(state->out_path),
-                                        skHentryPackedfileGetFlowtypeID(h.pf),
-                                        skHentryPackedfileGetSensorID(h.pf),
-                                        skHentryPackedfileGetStartTime(h.pf),
-                                        "", /* no suffix */
-                                        &relative_dir, &state->out_basename)))
+              && sksiteGeneratePathname(
+                  state->out_path, sizeof(state->out_path),
+                  skHentryPackedfileGetFlowtypeID(h.pf),
+                  skHentryPackedfileGetSensorID(h.pf),
+                  skHentryPackedfileGetStartTime(h.pf),
+                  "", /* no suffix */
+                  &state->relative_dir, &state->out_basename)))
         {
             if (h.he) {
                 DEBUGMSG(("Falling back to file naming convention for '%s':"
                           " Unable to generate path from packed-file header"),
-                         in_basename);
+                         state->in_basename);
             } else {
                 DEBUGMSG(("Falling back to file naming convention for '%s':"
                           " File does not have a packed-file header"),
-                         in_basename);
+                         state->in_basename);
             }
-            if ( !sksiteParseGeneratePath(state->out_path,
-                                          sizeof(state->out_path),
-                                          in_basename, "", /* no suffix */
-                                          &relative_dir, &state->out_basename))
+            if (!sksiteParseGeneratePath(
+                    state->out_path, sizeof(state->out_path),
+                    state->in_basename, "", /* no suffix */
+                    &state->relative_dir, &state->out_basename))
             {
                 WARNINGMSG(("Error initializing incremental file:"
                             " File does not have the necessary header and"
                             " does not match SiLK naming convention: '%s'."
-                            " Repository unchanged"), in_path);
-                skStreamDestroy(&state->in_stream);
-                INFOMSG("Moving incremental file '%s' to the error directory",
-                        in_basename);
-                errorDirectoryInsertFile(in_path);
+                            " Repository unchanged"), state->in_path);
+                destroyInputStream(state, APPENDER_FILE_ERROR);
                 continue;
             }
         }
@@ -1058,26 +1222,20 @@ appender_main(
         if (SKSTREAM_OK != rv) {
             if (SKSTREAM_ERR_EOF == rv) {
                 INFOMSG(("No records found in incremental file '%s'."
-                         " Repository unchanged"), in_basename);
+                         " Repository unchanged"), state->in_basename);
                 /* the next message is here for consistency, but it is
                  * misleading since the output file was never opened
                  * and may not even exist */
                 INFOMSG(("APPEND OK '%s' to '%s' @ %" PRId64),
-                        in_basename, state->out_path, state->pos);
-                skStreamDestroy(&state->in_stream);
-                /* archive or remove the incremental file.  this also
-                 * invokes the post-command if that was specified. */
-                *(state->out_basename - 1) = '\0';
-                archiveDirectoryInsertOrRemove(in_path, relative_dir);
-                continue;
+                        state->in_basename, state->out_path, state->pos);
+                destroyInputStream(state, APPENDER_FILE_ARCHIVE);
+            } else {
+                skStreamLastErrMessage(state->in_stream, rv, errbuf,
+                                       sizeof(errbuf));
+                WARNINGMSG(("Error reading first record from incremental"
+                            " file: %s. Repository unchanged"), errbuf);
+                destroyInputStream(state, APPENDER_FILE_ERROR);
             }
-            skStreamLastErrMessage(state->in_stream,rv,errbuf,sizeof(errbuf));
-            WARNINGMSG(("Error reading first record from incremental file: %s."
-                        " Repository unchanged"), errbuf);
-            skStreamDestroy(&state->in_stream);
-            INFOMSG("Moving incremental file '%s' to the error directory",
-                    in_basename);
-            errorDirectoryInsertFile(in_path);
             continue;
         }
 
@@ -1091,22 +1249,16 @@ appender_main(
                 NOTICEMSG(("Skipping incremental file: First record's"
                            " timestamp occurs %" PRId64 " hours in the"
                            " past: '%s'. Repository unchanged"),
-                           diff, in_path);
-                skStreamDestroy(&state->in_stream);
-                INFOMSG("Moving incremental file '%s' to the error directory",
-                        in_basename);
-                errorDirectoryInsertFile(in_path);
+                           diff, state->in_path);
+                destroyInputStream(state, APPENDER_FILE_ERROR);
                 continue;
             }
             if (-diff > reject_hours_future) {
                 NOTICEMSG(("Skipping incremental file: First record's"
                            " timestamp occurs %" PRId64 " hours in the"
                            " future: '%s'. Repository unchanged"),
-                          -diff, in_path);
-                skStreamDestroy(&state->in_stream);
-                INFOMSG("Moving incremental file '%s' to the error directory",
-                        in_basename);
-                errorDirectoryInsertFile(in_path);
+                          -diff, state->in_path);
+                destroyInputStream(state, APPENDER_FILE_ERROR);
                 continue;
             }
         }
@@ -1115,13 +1267,14 @@ appender_main(
         rv = openOutputStream(state, in_hdr);
         if (1 == rv) {
             /* shutting down */
-            skStreamDestroy(&state->in_stream);
+            destroyInputStream(state, APPENDER_FILE_IGNORE);
             continue;
-        } else if (rv) {
+        }
+        if (rv) {
             /* Error opening output file. */
             ERRMSG("APPEND FAILED '%s' to '%s' -- nothing written",
-                   in_basename, state->out_path);
-            skStreamDestroy(&state->in_stream);
+                   state->in_basename, state->out_path);
+            destroyInputStream(state, APPENDER_FILE_IGNORE);
             CRITMSG("Aborting due to append error");
             exit(EXIT_FAILURE);
         }
@@ -1160,7 +1313,7 @@ appender_main(
         DEBUGMSG(("Read %" PRIu64 " recs from '%s';"
                   " wrote %" PRIu64 " recs to '%s';"
                   " old size %" PRId64 "; new size %" PRId64),
-                 skStreamGetRecordCount(state->in_stream), in_basename,
+                 skStreamGetRecordCount(state->in_stream), state->in_basename,
                  skStreamGetRecordCount(state->out_stream),state->out_basename,
                  state->pos, close_pos);
 
@@ -1175,29 +1328,15 @@ appender_main(
                        " treating file as successful: %s"), errbuf);
         }
 
-        /* close input */
-        rv = skStreamClose(state->in_stream);
-        if (rv) {
-            skStreamPrintLastErr(state->in_stream, rv, &NOTICEMSG);
-        }
-        skStreamDestroy(&state->in_stream);
-
         INFOMSG(("APPEND OK '%s' to '%s' @ %" PRId64),
-                in_basename, state->out_path, state->pos);
+                state->in_basename, state->out_path, state->pos);
 
         /* Run command if this is a new hourly file */
         if (state->pos == 0 && hour_file_command) {
             runCommand(hour_file_command, state->out_path);
         }
 
-        /* we need to pass the relative-directory to the archive
-         * function.  Modify out_path so it terminates just before the
-         * basename which is just after the relative directory. */
-        *(state->out_basename - 1) = '\0';
-
-        /* archive or remove the incremental file.  this also invokes
-         * the post-command if that was specified. */
-        archiveDirectoryInsertOrRemove(in_path, relative_dir);
+        destroyInputStream(state, APPENDER_FILE_ARCHIVE);
 
     } /* while (!shuttingdown) */
 
@@ -1212,7 +1351,7 @@ appender_main(
     skStreamLastErrMessage(state->out_stream, out_rv, errbuf, sizeof(errbuf));
     ERRMSG("Fatal error writing to hourly file: %s", errbuf);
     ERRMSG(("APPEND FAILED '%s' to '%s' @ %" PRId64),
-           in_basename, state->out_path, state->pos);
+           state->in_basename, state->out_path, state->pos);
     if (close_pos) {
         /* flush was okay but close failed. */
         ERRMSG(("Repository file '%s' in unknown state since flush"
@@ -1222,12 +1361,9 @@ appender_main(
         /* error truncating file */
         close_pos = -1;
     }
-    if (close_pos) {
-        INFOMSG("Moving incremental file '%s' to error directory",
-                in_basename);
-        errorDirectoryInsertFile(in_path);
-    }
-    skStreamDestroy(&state->in_stream);
+    destroyInputStream(state, ((close_pos)
+                               ? APPENDER_FILE_ERROR
+                               : APPENDER_FILE_IGNORE));
     CRITMSG("Aborting due to append error");
     exit(EXIT_FAILURE);
 }

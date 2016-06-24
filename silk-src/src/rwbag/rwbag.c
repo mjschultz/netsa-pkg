@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbag.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwbag.c 510966e810f2 2016-06-03 17:16:33Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skbag.h>
@@ -141,6 +141,10 @@ static int stdout_used = 0;
 /* do not record the command line invocation in the generated bag
  * file(s). set by --invocation-strip */
 static int invocation_strip = 0;
+
+/* do not copy notes (annoations) from the source files to the
+ * generated bag file(s). set by --notes-strip */
+static int notes_strip = 0;
 
 /* print help and include legacy bag creation switches */
 static int legacy_help = 0;
@@ -379,6 +383,7 @@ appTeardown(
     /* close the copy stream */
     skOptionsCtxCopyStreamClose(optctx, &skAppPrintErr);
 
+    skOptionsNotesTeardown();
     skOptionsCtxDestroy(&optctx);
     skAppUnregister();
 }
@@ -428,7 +433,7 @@ appSetup(
         || skOptionsRegister(appOptions, &appOptionsHandler, NULL)
         || skOptionsRegister(
             legacy_bag_creation_option, &legacyOptionsHandler, NULL)
-        || skOptionsNotesRegister(NULL)
+        || skOptionsNotesRegister(&notes_strip)
         || sksiteCompmethodOptionsRegister(&comp_method)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE)
         || skIPv6PolicyOptionsRegister(&ipv6_policy))
@@ -467,24 +472,10 @@ appSetup(
         exit(EXIT_FAILURE);
     }
 
-    /* For each output file, set the compression method, add the
-     * invocation, add the notes (if given), and open the file */
+    /* For each output file, set the compression method and open the file */
     for (i = 0; (bag = (bagfile_t*)skVectorGetValuePointer(bag_vec, i)); ++i) {
         if (bag->stream) {
             rv = skStreamSetCompressionMethod(bag->stream, comp_method);
-            if (rv) {
-                skStreamPrintLastErr(bag->stream, rv, &skAppPrintErr);
-                exit(EXIT_FAILURE);
-            }
-            if (!invocation_strip) {
-                rv = skHeaderAddInvocation(skStreamGetSilkHeader(bag->stream),
-                                           1, argc, argv);
-                if (rv) {
-                    skStreamPrintLastErr(bag->stream, rv, &skAppPrintErr);
-                    exit(EXIT_FAILURE);
-                }
-            }
-            rv = skOptionsNotesAddToStream(bag->stream);
             if (rv) {
                 skStreamPrintLastErr(bag->stream, rv, &skAppPrintErr);
                 exit(EXIT_FAILURE);
@@ -496,9 +487,6 @@ appSetup(
             }
         }
     }
-
-    /* No longer need the notes. */
-    skOptionsNotesTeardown();
 
     /* open the --copy-input stream */
     if (skOptionsCtxOpenStreams(optctx, &skAppPrintErr)) {
@@ -1142,6 +1130,26 @@ processFile(
     ssize_t rv;
     size_t i;
 
+    /* copy header entries from the source file */
+    for (i = 0; (bag = (bagfile_t*)skVectorGetValuePointer(bag_vec, i)); ++i) {
+        if (!invocation_strip) {
+            rv = skHeaderCopyEntries(skStreamGetSilkHeader(bag->stream),
+                                     skStreamGetSilkHeader(stream),
+                                     SK_HENTRY_INVOCATION_ID);
+            if (rv) {
+                skStreamPrintLastErr(bag->stream, rv, &skAppPrintErr);
+            }
+        }
+        if (!notes_strip) {
+            rv = skHeaderCopyEntries(skStreamGetSilkHeader(bag->stream),
+                                     skStreamGetSilkHeader(stream),
+                                     SK_HENTRY_ANNOTATION_ID);
+            if (rv) {
+                skStreamPrintLastErr(bag->stream, rv, &skAppPrintErr);
+            }
+        }
+    }
+
     counter.type = SKBAG_COUNTER_U64;
 
     while ((rv = skStreamReadRecord(stream, &rwrec)) == SKSTREAM_OK) {
@@ -1353,7 +1361,23 @@ int main(int argc, char **argv)
 
     /* write the bags */
     for (i = 0; (bag = (bagfile_t*)skVectorGetValuePointer(bag_vec, i)); ++i) {
-        if (bag->bag) {
+        assert(bag->bag);
+        assert(bag->stream);
+
+        /* add the invocation and notes */
+        if (!invocation_strip) {
+            rv = skHeaderAddInvocation(skStreamGetSilkHeader(bag->stream),
+                                       1, argc, argv);
+            if (rv) {
+                skStreamPrintLastErr(bag->stream, rv, &skAppPrintErr);
+            }
+        }
+        rv = skOptionsNotesAddToStream(bag->stream);
+        if (rv) {
+            skStreamPrintLastErr(bag->stream, rv, &skAppPrintErr);
+        }
+
+        {
             err = skBagWrite(bag->bag, bag->stream);
             if (SKBAG_OK == err) {
                 rv = skStreamClose(bag->stream);

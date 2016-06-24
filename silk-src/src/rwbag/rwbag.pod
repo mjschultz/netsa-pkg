@@ -9,7 +9,7 @@ B<rwbag> - Build a binary Bag from SiLK Flow records.
   rwbag --bag-file=KEY,COUNTER,OUTPUTFILE
         [--bag-file=KEY,COUNTER,OUTPUTFILE ...]
         [{ --pmap-file=PATH | --pmap-file=MAPNAME:PATH }]
-        [--note-add=TEXT] [--note-file-add=FILE]
+        [--note-strip] [--note-add=TEXT] [--note-file-add=FILE]
         [--invocation-strip] [--print-filenames] [--copy-input=PATH]
         [--compression-method=COMP_METHOD]
         [--ipv6-policy={ignore,asv4,mix,force,only}]
@@ -295,6 +295,12 @@ The switch may be repeated to load multiple prefix map files; each
 file must have a unique map-name.  To create a prefix map file, use
 B<rwpmapbuild(1)>.  I<Since SiLK 3.12.0.>
 
+=item B<--note-strip>
+
+Do not copy the notes (annotations) from the input files to the output
+file(s).  When this switch is not specified, notes from the input
+files are copied to the output.  I<Since SiLK 3.12.2.>
+
 =item B<--note-add>=I<TEXT>
 
 Add the specified I<TEXT> to the header of every output file as an
@@ -311,10 +317,10 @@ attempt to add a SiLK data file as an annotation.
 
 =item B<--invocation-strip>
 
-Do not record the command used to create the Bag file in the output.
-When this switch is not given, the invocation is written to the file's
-header, and the invocation may be viewed with B<rwfileinfo(1)>.
-I<Since SiLK 3.12.0.>
+Do not record any command line history: do not copy the invocation
+history from the input files to the output file(s), and do not record
+the current command line invocation in the output.  The invocation may
+be viewed with B<rwfileinfo(1)>.  I<Since SiLK 3.12.0.>
 
 =item B<--print-filenames>
 
@@ -817,7 +823,7 @@ B<ccfilter(3)>, B<sensor.conf(5)>, B<silk(7)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwbag.pod f0408b1cf446 2016-04-01 20:51:57Z mthomas $
+$SiLK: rwbag.pod 510966e810f2 2016-06-03 17:16:33Z mthomas $
 
 Local Variables:
 mode:text

@@ -128,7 +128,7 @@ appTeardown(
 
 #error "Anything you put in setup should now be torn down"
     /* for example, close sample output file */
-    skStreamDestroy(&out_ios);
+    skStreamDestroy(&out_stream);
 
     skAppUnregister();
 }
@@ -165,7 +165,7 @@ appSetup(
     /* initialize globals */
 #error "Initialize any global variables here"
     /* for example: set global output to NULL */
-    out_ios = NULL;
+    out_stream = NULL;
 
     /* register the options */
     if (skOptionsRegister(appOptions, &appOptionsHandler, NULL)
@@ -217,11 +217,11 @@ appSetup(
 
 #error "Once all options are set, open input and output"
     /* for example, open a SiLK flow file as an output file */
-    rv = skStreamOpenSilkFlow(&out_ios, output_path, SK_IO_WRITE);
+    rv = skStreamOpenSilkFlow(&out_stream, output_path, SK_IO_WRITE);
     if (rv) {
-        skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
         skAppPrintErr("Unable to open output file. Exiting");
-        skStreamDestroy(&out_ios);
+        skStreamDestroy(&out_stream);
         exit(EXIT_FAILURE);
     }
 
@@ -326,7 +326,7 @@ appNextInput(
 
 int main(int argc, char **argv)
 {
-    skstream_t *in_ios;
+    skstream_t *in_stream;
     int in_rv = SKSTREAM_OK;
     int rv = SKSTREAM_OK;
 
@@ -335,25 +335,25 @@ int main(int argc, char **argv)
 #error "Loop over files on command line or read from stdin."
 #error "Process each file, preferably in a separate function."
     /* For each input, process each record */
-    while (NULL != (in_ios = appNextInput(argc, argv))) {
-        while ((in_rv = skStreamReadRecord(in_ios, &rwrec)) == SKSTREAM_OK) {
+    while (NULL != (in_stream = appNextInput(argc, argv))) {
+        while ((in_rv = skStreamReadRecord(in_stream, &rwrec))==SKSTREAM_OK) {
             /* process record */
-            rv = skStreamWriteRecord(out_ios, &rwrec);
+            rv = skStreamWriteRecord(out_stream, &rwrec);
             if (SKSTREAM_OK != rv) {
-                skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
-                skStreamDestroy(&in_ios);
+                skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+                skStreamDestroy(&in_stream);
                 goto END;
             }
         }
         if (SKSTREAM_ERR_EOF != in_rv) {
-            skStreamPrintLastErr(in_ios, in_rv, &skAppPrintErr);
+            skStreamPrintLastErr(in_stream, in_rv, &skAppPrintErr);
         }
-        skStreamDestroy(&in_ios);
+        skStreamDestroy(&in_stream);
     }
 
-    rv = skStreamClose(out_ios);
+    rv = skStreamClose(out_stream);
     if (SKSTREAM_OK != rv) {
-        skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
     }
 
   END:

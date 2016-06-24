@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_STREAM_CACHE_H, "$SiLK: stream-cache.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_STREAM_CACHE_H, "$SiLK: stream-cache.h 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
 
 #include <silk/skstream.h>
 
@@ -80,7 +80,7 @@ typedef struct cache_entry_st {
 
 
 /*
- *  rwio = cache_open_fn_t(key, caller_data);
+ *  stream = cache_open_fn_t(key, caller_data);
  *
  *    This function is used by skCacheLookupOrOpenAdd() when the
  *    stream associated with 'key' is not in the cache.  This function
