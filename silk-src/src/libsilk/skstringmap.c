@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skstringmap.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: skstringmap.c 8b0fd8a0d083 2016-06-16 18:49:42Z mthomas $");
 
 #include <silk/skdllist.h>
 #include <silk/skstringmap.h>
@@ -1325,7 +1325,7 @@ skStringMapPrintUsage(
             /* 'entry' is an alias for 'old_entry' */
             len = snprintf(&(line_buf[total_len]), avail_len, "%c",
                            alias_sep);
-            assert(len < avail_len);
+            assert(len <= avail_len);
             total_len += len;
             avail_len -= len;
             entry_len += len;
@@ -1333,7 +1333,7 @@ skStringMapPrintUsage(
             /* start of a new field */
             len = snprintf(&(line_buf[total_len]), avail_len, "%c ",
                            column_sep);
-            assert(len < avail_len);
+            assert(len <= avail_len);
             total_len += len;
             avail_len -= len;
             entry_len += len;
@@ -1362,7 +1362,7 @@ skStringMapPrintUsage(
 
         old_entry = entry;
         len = snprintf(&(line_buf[total_len]), avail_len, "%s", entry->name);
-        assert(len < avail_len);
+        assert(len <= avail_len);
         total_len += len;
         avail_len -= len;
     }

@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconf.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: probeconf.c d49b1e47d2e3 2016-06-15 20:31:17Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/probeconf.h>
@@ -821,7 +821,7 @@ skpcProbeGetInterfaceValueType(
     const skpc_probe_t *probe)
 {
     assert(probe);
-    return ((probe->ifvalue_vlan) ? SKPC_IFVALUE_VLAN : SKPC_IFVALUE_SNMP);
+    return probe->ifvaluetype;
 }
 #endif  /* skpcProbeGetInterfaceValueType */
 
@@ -833,10 +833,8 @@ skpcProbeSetInterfaceValueType(
     assert(probe);
     switch (interface_value_type) {
       case SKPC_IFVALUE_SNMP:
-        probe->ifvalue_vlan = 0;
-        break;
       case SKPC_IFVALUE_VLAN:
-        probe->ifvalue_vlan = 1;
+        probe->ifvaluetype = interface_value_type;
         break;
       default:
         return -1;              /* NOTREACHED */
@@ -1259,7 +1257,7 @@ skpcProbeVerifyNetflowV5(
     }
 
     /* NetFlow v5 does not support VLAN interfaces */
-    if (probe->ifvalue_vlan) {
+    if (probe->ifvaluetype != SKPC_IFVALUE_SNMP) {
         skAppPrintErr(("Error verifying probe '%s':\n"
                        "\tType '%s' probes do not have access"
                        " to vlan information"),

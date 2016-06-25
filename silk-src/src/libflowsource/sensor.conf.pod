@@ -363,6 +363,11 @@ Store the VLAN identifier for the source and destination networks,
 respectively.  If only one VLAN ID is available, C<input> is set to
 that value and C<output> is set to 0.
 
+=cut
+
+
+=pod
+
 =back
 
 This setting does not affect whether B<rwflowpack(8)> stores the
@@ -1393,7 +1398,7 @@ The B<quirks> command was introduced in SiLK 3.8.0.
 
 =cut
 
-$SiLK: sensor.conf.pod 6e3a55f460e1 2015-09-28 19:56:21Z mthomas $
+$SiLK: sensor.conf.pod aa5ea4e7484b 2016-06-22 18:48:18Z mthomas $
 
 Local Variables:
 mode:text

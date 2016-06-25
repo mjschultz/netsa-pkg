@@ -29,7 +29,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwrandomizeip.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwrandomizeip.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
 
 #include "rwrandomizeip.h"
 #include <silk/rwrec.h>
@@ -726,8 +726,8 @@ randomizeFile(
     const char         *input_path,
     const char         *output_path)
 {
-    skstream_t *in_ios = NULL;
-    skstream_t *out_ios = NULL;
+    skstream_t *in_stream = NULL;
+    skstream_t *out_stream = NULL;
     rwRec rwrec;
     randomizer_modifyip_fn_t rand_ip_fn;
     int in_rv = SKSTREAM_OK;
@@ -748,37 +748,37 @@ randomizeFile(
     }
 
     /* Open input file */
-    rv = skStreamOpenSilkFlow(&in_ios, input_path, SK_IO_READ);
+    rv = skStreamOpenSilkFlow(&in_stream, input_path, SK_IO_READ);
     if (rv) {
-        skStreamPrintLastErr(in_ios, rv, &skAppPrintErr);
-        skStreamDestroy(&in_ios);
+        skStreamPrintLastErr(in_stream, rv, &skAppPrintErr);
+        skStreamDestroy(&in_stream);
         return 1;
     }
-    skStreamSetIPv6Policy(in_ios, SK_IPV6POLICY_ASV4);
+    skStreamSetIPv6Policy(in_stream, SK_IPV6POLICY_ASV4);
 
     /* Create the output file, copy the headers from the source file,
      * open it, and write the header */
-    rv = skStreamCreate(&out_ios, SK_IO_WRITE, SK_CONTENT_SILK_FLOW);
+    rv = skStreamCreate(&out_stream, SK_IO_WRITE, SK_CONTENT_SILK_FLOW);
     if (rv == SKSTREAM_OK) {
-        rv = skStreamBind(out_ios, output_path);
+        rv = skStreamBind(out_stream, output_path);
     }
     if (rv == SKSTREAM_OK) {
-        rv = skHeaderCopy(skStreamGetSilkHeader(out_ios),
-                          skStreamGetSilkHeader(in_ios),
+        rv = skHeaderCopy(skStreamGetSilkHeader(out_stream),
+                          skStreamGetSilkHeader(in_stream),
                           SKHDR_CP_ALL);
     }
     if (rv == SKSTREAM_OK) {
-        rv = skStreamOpen(out_ios);
+        rv = skStreamOpen(out_stream);
     }
     if (rv == SKSTREAM_OK) {
-        rv = skStreamWriteSilkHeader(out_ios);
+        rv = skStreamWriteSilkHeader(out_stream);
     }
     if (rv != SKSTREAM_OK) {
         goto END;
     }
 
     /* read the records and randomize the IP addresses */
-    while ((in_rv = skStreamReadRecord(in_ios, &rwrec)) == SKSTREAM_OK) {
+    while ((in_rv = skStreamReadRecord(in_stream, &rwrec)) == SKSTREAM_OK) {
         if ((!dont_change_set
              || !skIPSetCheckRecordSIP(dont_change_set, &rwrec))
             && (!only_change_set
@@ -799,18 +799,18 @@ randomizeFile(
             rwRecSetDIPv4(&rwrec, ipv4);
         }
 
-        rv = skStreamWriteRecord(out_ios, &rwrec);
+        rv = skStreamWriteRecord(out_stream, &rwrec);
         if (SKSTREAM_ERROR_IS_FATAL(rv)) {
             goto END;
         }
     }
     if (SKSTREAM_ERR_EOF != in_rv) {
-        skStreamPrintLastErr(in_ios, in_rv, &skAppPrintErr);
+        skStreamPrintLastErr(in_stream, in_rv, &skAppPrintErr);
     }
 
   END:
     if (rv) {
-        skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
     }
     /* call the back-end's activate function */
     if (g_randomizer && g_randomizer->deactivate_fn) {
@@ -818,18 +818,18 @@ randomizeFile(
             rv = -1;
         }
     }
-    if (out_ios) {
+    if (out_stream) {
         /* Close output; if there is an error on close, print it
          * unless we've already encountered an error. */
-        int tmp_rv = skStreamClose(out_ios);
+        int tmp_rv = skStreamClose(out_stream);
         if ((tmp_rv != 0) && (rv == 0)) {
-            skStreamPrintLastErr(out_ios, tmp_rv, &skAppPrintErr);
+            skStreamPrintLastErr(out_stream, tmp_rv, &skAppPrintErr);
             rv = tmp_rv;
         }
-        skStreamDestroy(&out_ios);
+        skStreamDestroy(&out_stream);
     }
-    if (in_ios) {
-        skStreamDestroy(&in_ios);
+    if (in_stream) {
+        skStreamDestroy(&in_stream);
     }
 
     return rv;

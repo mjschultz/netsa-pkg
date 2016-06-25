@@ -23,7 +23,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: fcfilesreader.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: fcfilesreader.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
 
 #include <silk/skpolldir.h>
 #include <silk/skstream.h>
@@ -76,7 +76,7 @@ static uint32_t         polling_interval;
 static int
 flowcapSourceCreateFromFile(
     const char         *path,
-    skstream_t        **rwio,
+    skstream_t        **stream,
     skpc_probe_t      **probe)
 {
     sk_file_header_t *hdr;
@@ -91,10 +91,10 @@ flowcapSourceCreateFromFile(
     }
 
     /* Valid file checking */
-    rv = skStreamOpenSilkFlow(rwio, path, SK_IO_READ);
+    rv = skStreamOpenSilkFlow(stream, path, SK_IO_READ);
     if (rv) {
         CRITMSG("Unable to open '%s' for reading.", path);
-        skStreamPrintLastErr(*rwio, rv, &ERRMSG);
+        skStreamPrintLastErr(*stream, rv, &ERRMSG);
         goto error;
     }
 
@@ -110,7 +110,7 @@ flowcapSourceCreateFromFile(
      * Flowcap Files V1 have no probe information and are not
      * supported.
      */
-    hdr = skStreamGetSilkHeader(*rwio);
+    hdr = skStreamGetSilkHeader(*stream);
     sp_hdr = ((sk_hentry_probename_t*)
               skHeaderGetFirstMatch(hdr, SK_HENTRY_PROBENAME_ID));
     if (sp_hdr == NULL) {
@@ -143,7 +143,7 @@ flowcapSourceCreateFromFile(
     return 0;
 
   error:
-    skStreamDestroy(rwio);
+    skStreamDestroy(stream);
     return -1;
 }
 

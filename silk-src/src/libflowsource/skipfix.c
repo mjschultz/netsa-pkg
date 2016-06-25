@@ -22,7 +22,7 @@
 #define SKIPFIX_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipfix.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: skipfix.c 64a8297d18a0 2016-06-17 21:18:23Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/skipaddr.h>
@@ -847,9 +847,9 @@ typedef struct ski_tcp_stml_st {
 
 /*
  *    There are several templates defined here.  The following macros
- *    determine which elements in the ski_yafrec_spec[] are used.  For
+ *    determine which elements in the ski_nf9rec_spec[] are used.  For
  *    the template that uses the elements, the correspong bits are set
- *    to high in the SKI_YAFREC_TID below.
+ *    to high in the SKI_NF9REC_TID below.
  */
 #define NF9REC_DELTA        (1 <<  2)
 #define NF9REC_TOTAL        (1 <<  3)
@@ -863,7 +863,7 @@ typedef struct ski_tcp_stml_st {
 
 #define SKI_NF9REC_TID      0x6002
 #if (SKI_NF9REC_TID & BMAP_RECTYPE_MASK) != BMAP_RECTYPE_NF9REC
-#error "bad SKI_YAFREC_TID value"
+#error "bad SKI_NF9REC_TID value"
 #endif
 
 static fbInfoElementSpec_t ski_nf9rec_spec[] = {
@@ -1076,7 +1076,6 @@ typedef enum ski_rectype_en {
     SKI_RECTYPE_ERROR
 } ski_rectype_t;
 
-#if defined(SKIPFIXSOURCE_TRACE_LEVEL) || defined(GLOBAL_TRACE_LEVEL)
 #if TRACEMSG_LEVEL >= 2
 static const char *ski_rectype_name[] = {
     "SKI_RECTYPE_FIXREC",
@@ -1087,7 +1086,6 @@ static const char *ski_rectype_name[] = {
     "SKI_RECTYPE_IGNORE",
     "SKI_RECTYPE_ERROR"
 };
-#endif
 #endif
 
 struct ski_record_st {
@@ -1232,6 +1230,22 @@ skiTemplateCallbackCtx(
             out = (BMAP_TYPE)bmap;
             BMAP_TMPL_CTX_SET(ctx, ctx_free_fn, out);
         }
+        if (bmap & (TMPL_BIT_flowTableFlushEventCount
+                    | TMPL_BIT_flowTablePeakCount))
+        {
+            DEBUGMSG(("Will process options template 0x%04x with the"
+                      " YAFstats template"),
+                     tid);
+        } else if (bmap & (TMPL_BIT_samplingAlgorithm | TMPL_BIT_samplerMode)){
+            DEBUGMSG(("Will process options template 0x%04x with the"
+                      " sampling template"),
+                     tid);
+        } else {
+            DEBUGMSG(("Will process options template 0x%04x with the"
+                      " ignore template"),
+                     tid);
+        }
+
     } else {
         /* do not define any template pairs for this template */
         fbSessionAddTemplatePair(session, tid, 0);
@@ -1468,6 +1482,8 @@ skiTemplateCallbackCtx(
                                    TMPL_BIT_reverseInitialTCPFlags |
                                    TMPL_BIT_icmpTypeCodeIPv4)));
                 BMAP_TMPL_CTX_SET(ctx, ctx_free_fn, out);
+                DEBUGMSG("Will process template 0x%04x with the YAF template",
+                         tid);
             } while (0);
         }
 
@@ -1537,12 +1553,16 @@ skiTemplateCallbackCtx(
                                    TMPL_BIT_NF_F_FW_EVENT |
                                    TMPL_BIT_NF_F_FW_EXT_EVENT)));
                 BMAP_TMPL_CTX_SET(ctx, ctx_free_fn, out);
+                DEBUGMSG("Will process template 0x%04x with the NFv9 template",
+                         tid);
             } while (0);
         }
 
         if (*ctx == NULL && bmap) {
             out = 1 | (BMAP_TYPE)bmap;
             BMAP_TMPL_CTX_SET(ctx, ctx_free_fn, out);
+            DEBUGMSG("Will process template 0x%04x with the generic template",
+                     tid);
         }
     }
 
@@ -3073,12 +3093,12 @@ ski_fixrec_next(
         }
 
         /* Handle the SNMP or VLAN interfaces */
-        if (SKPC_IFVALUE_VLAN == skpcProbeGetInterfaceValueType(probe)) {
-            rwRecSetInput(fwd_rec, fixrec->vlanId);
-            rwRecSetOutput(fwd_rec, fixrec->postVlanId);
-        } else {
+        if (SKPC_IFVALUE_SNMP == skpcProbeGetInterfaceValueType(probe)) {
             rwRecSetInput(fwd_rec, CLAMP_VAL16(fixrec->ingressInterface));
             rwRecSetOutput(fwd_rec, CLAMP_VAL16(fixrec->egressInterface));
+        } else {
+            rwRecSetInput(fwd_rec, fixrec->vlanId);
+            rwRecSetOutput(fwd_rec, fixrec->postVlanId);
         }
 
         /* Store volume, clamping counts to 32 bits. */
@@ -3160,7 +3180,10 @@ ski_fixrec_next(
         }
 
         /* Handle the SNMP or VLAN interfaces */
-        if (SKPC_IFVALUE_VLAN == skpcProbeGetInterfaceValueType(probe)) {
+        if (SKPC_IFVALUE_SNMP == skpcProbeGetInterfaceValueType(probe)) {
+            rwRecSetInput(fwd_rec, CLAMP_VAL16(fixrec->egressInterface));
+            rwRecSetOutput(fwd_rec, CLAMP_VAL16(fixrec->ingressInterface));
+        } else {
             if (record->bmap & TMPL_BIT_reverseVlanId) {
                 /* If we have the reverse elements, use them */
                 rwRecSetInput(fwd_rec, fixrec->reverseVlanId);
@@ -3175,9 +3198,6 @@ ski_fixrec_next(
                 /* we have a single vlanId, so don't swap the values */
                 rwRecSetInput(fwd_rec, fixrec->vlanId);
             }
-        } else {
-            rwRecSetInput(fwd_rec, CLAMP_VAL16(fixrec->egressInterface));
-            rwRecSetOutput(fwd_rec, CLAMP_VAL16(fixrec->ingressInterface));
         }
 
     } else {
@@ -3295,20 +3315,20 @@ ski_fixrec_next(
         }
 
         /* Reverse the SNMP or VLAN interfaces */
-        if (SKPC_IFVALUE_VLAN != skpcProbeGetInterfaceValueType(probe)) {
+        if (SKPC_IFVALUE_SNMP == skpcProbeGetInterfaceValueType(probe)) {
             rwRecSetInput(rev_rec, rwRecGetOutput(fwd_rec));
             rwRecSetOutput(rev_rec, rwRecGetInput(fwd_rec));
         } else if (record->bmap & TMPL_BIT_reverseVlanId) {
             /* Reverse VLAN values exist.  Use them */
-            rwRecSetInput(fwd_rec, fixrec->reverseVlanId);
-            rwRecSetOutput(fwd_rec, fixrec->reversePostVlanId);
+            rwRecSetInput(rev_rec, fixrec->reverseVlanId);
+            rwRecSetOutput(rev_rec, fixrec->reversePostVlanId);
         } else if (record->bmap & TMPL_BIT_postVlanId) {
             /* Reverse the forward values */
-            rwRecSetInput(fwd_rec, fixrec->postVlanId);
-            rwRecSetOutput(fwd_rec, fixrec->vlanId);
+            rwRecSetInput(rev_rec, fixrec->postVlanId);
+            rwRecSetOutput(rev_rec, fixrec->vlanId);
         } else {
             /* we have a single vlanId, so don't swap the values */
-            rwRecSetInput(fwd_rec, fixrec->vlanId);
+            rwRecSetInput(rev_rec, fixrec->vlanId);
         }
 
         /* Set volume.  We retrieved them above */
@@ -3573,7 +3593,7 @@ ski_yafrec_next(
 
     /* Time stamp */
     rwRecSetStartTime(fwd_rec, (sktime_t)yafrec->flowStartMilliseconds);
-    if (yafrec->flowEndMilliseconds < yafrec->flowEndMilliseconds) {
+    if (yafrec->flowEndMilliseconds < yafrec->flowStartMilliseconds) {
         rwRecSetElapsed(fwd_rec, 0);
     } else if ((yafrec->flowEndMilliseconds - yafrec->flowStartMilliseconds)
                > UINT32_MAX)
@@ -3644,12 +3664,12 @@ ski_yafrec_next(
     }
 
     /* SNMP or VLAN interfaces */
-    if (SKPC_IFVALUE_VLAN != skpcProbeGetInterfaceValueType(probe)) {
+    if (SKPC_IFVALUE_SNMP == skpcProbeGetInterfaceValueType(probe)) {
         rwRecSetInput(fwd_rec, CLAMP_VAL16(yafrec->ingressInterface));
         rwRecSetOutput(fwd_rec, CLAMP_VAL16(yafrec->egressInterface));
         if (rev_rec) {
             rwRecSetInput(rev_rec, CLAMP_VAL16(yafrec->egressInterface));
-            rwRecSetOutput(rev_rec, CLAMP_VAL16(yafrec->egressInterface));
+            rwRecSetOutput(rev_rec, CLAMP_VAL16(yafrec->ingressInterface));
         }
     } else {
         rwRecSetInput(fwd_rec, yafrec->vlanId);
@@ -4259,7 +4279,7 @@ ski_nf9rec_next(
     }
 
     /* SNMP or VLAN interfaces */
-    if (SKPC_IFVALUE_VLAN != skpcProbeGetInterfaceValueType(probe)) {
+    if (SKPC_IFVALUE_SNMP == skpcProbeGetInterfaceValueType(probe)) {
         rwRecSetInput(fwd_rec, CLAMP_VAL16(nf9rec->ingressInterface));
         rwRecSetOutput(fwd_rec, CLAMP_VAL16(nf9rec->egressInterface));
     } else {

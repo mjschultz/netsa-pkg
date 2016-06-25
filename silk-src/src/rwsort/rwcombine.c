@@ -52,7 +52,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcombine.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwcombine.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
 
 #include "rwcombine.h"
 #include <silk/skheap.h>
@@ -531,7 +531,7 @@ compHeapNodes(
  *  mergeFiles(temp_file_idx)
  *
  *    Merge the temporary files numbered from 0 to 'temp_file_idx'
- *    inclusive into the output file 'out_ios', maintaining sorted
+ *    inclusive into the output file 'out_stream', maintaining sorted
  *    order.  Exits the application if an error occurs.
  */
 static void

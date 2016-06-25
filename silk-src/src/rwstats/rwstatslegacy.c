@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwstatslegacy.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwstatslegacy.c 558ff1948cad 2016-06-16 18:41:50Z mthomas $");
 
 #include "rwstats.h"
 
@@ -151,7 +151,7 @@ legacyOptionsHandler(
             if (rv) {
                 goto PARSE_ERROR;
             }
-            cidr_sip = ~0 << (32 - val);
+            cidr_sip = UINT32_MAX << (32 - val);
         }
         break;
 
@@ -161,7 +161,7 @@ legacyOptionsHandler(
             if (rv) {
                 goto PARSE_ERROR;
             }
-            cidr_dip = ~0 << (32 - val);
+            cidr_dip = UINT32_MAX << (32 - val);
         }
         break;
 

@@ -18,7 +18,7 @@ B<rwpdedupe> - Eliminate duplicate packets collected by several sensors
 Detects and eliminates duplicate records from B<tcpdump(1)> capture
 files.  Duplicate records are defined as having timestamps within a
 user-configurable time of each other.  In addition, their Ethernet
-(OSI layer 3) headers must match.  If they are not IP packets, then
+(OSI layer 2) headers must match.  If they are not IP packets, then
 their entire Ethernet payload must match.  If they are IP packets,
 then their source and destination addresses, protocol, and IP payload
 must match.
@@ -96,7 +96,7 @@ without eliminating duplicate packets.
 
 =cut
 
-$SiLK: rwpdedupe.pod cd09f0a5fcc6 2014-06-14 15:43:33Z mthomas $
+$SiLK: rwpdedupe.pod f1a2c940be02 2016-06-10 18:28:08Z mthomas $
 
 Local Variables:
 mode:text

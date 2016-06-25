@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwswapbytes.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwswapbytes.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -292,8 +292,8 @@ rwswap_file(
     rwswapOptions_t     endian)
 {
     silk_endian_t byte_order;
-    skstream_t *in_ios;
-    skstream_t *out_ios;
+    skstream_t *in_stream;
+    skstream_t *out_stream;
     sk_file_header_t *in_hdr;
     sk_file_header_t *out_hdr;
     rwRec rwrec;
@@ -301,14 +301,14 @@ rwswap_file(
     int rv = 0;
 
     /* Open input file */
-    in_rv = skStreamOpenSilkFlow(&in_ios, in_file, SK_IO_READ);
+    in_rv = skStreamOpenSilkFlow(&in_stream, in_file, SK_IO_READ);
     if (in_rv) {
-        skStreamPrintLastErr(in_ios, in_rv, &skAppPrintErr);
-        skStreamDestroy(&in_ios);
+        skStreamPrintLastErr(in_stream, in_rv, &skAppPrintErr);
+        skStreamDestroy(&in_stream);
         return 1;
     }
 
-    in_hdr = skStreamGetSilkHeader(in_ios);
+    in_hdr = skStreamGetSilkHeader(in_stream);
 
     switch (endian) {
       case RWSW_BIG:
@@ -338,10 +338,10 @@ rwswap_file(
 
     /* Open the output file and copy the headers from the source file,
      * but modify the byte order */
-    rv = skStreamCreate(&out_ios, SK_IO_WRITE, SK_CONTENT_SILK_FLOW);
+    rv = skStreamCreate(&out_stream, SK_IO_WRITE, SK_CONTENT_SILK_FLOW);
     if (rv == SKSTREAM_OK) {
-        rv = skStreamBind(out_ios, out_file);
-        out_hdr = skStreamGetSilkHeader(out_ios);
+        rv = skStreamBind(out_stream, out_file);
+        out_hdr = skStreamGetSilkHeader(out_stream);
     }
     if (rv == SKSTREAM_OK) {
         rv = skHeaderCopy(out_hdr, in_hdr,
@@ -351,21 +351,21 @@ rwswap_file(
         rv = skHeaderSetByteOrder(out_hdr, byte_order);
     }
     if (rv == SKSTREAM_OK) {
-        rv = skOptionsNotesAddToStream(out_ios);
+        rv = skOptionsNotesAddToStream(out_stream);
     }
     if (rv == SKSTREAM_OK) {
-        rv = skStreamOpen(out_ios);
+        rv = skStreamOpen(out_stream);
     }
     if (rv == SKSTREAM_OK) {
-        rv = skStreamWriteSilkHeader(out_ios);
+        rv = skStreamWriteSilkHeader(out_stream);
     }
     if (rv != SKSTREAM_OK) {
         goto END;
     }
 
     /* read and write the data until we encounter an error */
-    while ((in_rv = skStreamReadRecord(in_ios, &rwrec)) == SKSTREAM_OK) {
-        rv = skStreamWriteRecord(out_ios, &rwrec);
+    while ((in_rv = skStreamReadRecord(in_stream, &rwrec)) == SKSTREAM_OK) {
+        rv = skStreamWriteRecord(out_stream, &rwrec);
         if (SKSTREAM_ERROR_IS_FATAL(rv)) {
             goto END;
         }
@@ -373,22 +373,22 @@ rwswap_file(
 
     /* input error */
     if (in_rv != SKSTREAM_ERR_EOF) {
-        skStreamPrintLastErr(in_ios, in_rv, &skAppPrintErr);
+        skStreamPrintLastErr(in_stream, in_rv, &skAppPrintErr);
     }
 
     if (rv == SKSTREAM_OK) {
-        rv = skStreamClose(out_ios);
+        rv = skStreamClose(out_stream);
     }
 
   END:
     if (rv) {
-        skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
     }
-    if (out_ios) {
-        skStreamDestroy(&out_ios);
+    if (out_stream) {
+        skStreamDestroy(&out_stream);
     }
-    if (in_ios) {
-        skStreamDestroy(&in_ios);
+    if (in_stream) {
+        skStreamDestroy(&in_stream);
     }
 
     return rv;

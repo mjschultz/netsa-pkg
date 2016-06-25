@@ -26,7 +26,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfilter.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwfilter.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
 
 #include "rwfilter.h"
 
@@ -89,16 +89,16 @@ static char **pargv;
 /* FUNCTION DEFINITIONS */
 
 /*
- *  status = writeHeaders(in_ios);
+ *  status = writeHeaders(in_stream);
  *
  *    Create and print the header to each output file; include the
- *    current command line invocation in the header.  If 'in_ios' is
+ *    current command line invocation in the header.  If 'in_stream' is
  *    non-null, the file history from that file is also included in
  *    the header.
  */
 static int
 writeHeaders(
-    const skstream_t   *in_ios)
+    const skstream_t   *in_stream)
 {
     static int did_headers = 0;
     sk_file_header_t *in_hdr = NULL;
@@ -118,15 +118,15 @@ writeHeaders(
         return rv;
     }
 
-    if (in_ios) {
-        in_hdr = skStreamGetSilkHeader(in_ios);
+    if (in_stream) {
+        in_hdr = skStreamGetSilkHeader(in_stream);
     }
 
     for (i = 0; i < DESTINATION_TYPES; ++i) {
         for (dest = dest_type[i].dest_list; dest != NULL; dest = dest->next) {
             out_hdr = skStreamGetSilkHeader(dest->stream);
 
-            /* if 'in_ios' is provided, add its command invocation
+            /* if 'in_stream' is provided, add its command invocation
              * history to each output file's headers */
             if (in_hdr) {
                 rv = skHeaderCopyEntries(out_hdr, in_hdr,

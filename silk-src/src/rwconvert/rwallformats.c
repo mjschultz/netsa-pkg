@@ -7,15 +7,15 @@
 */
 
 /*
-**  Read rwrec input and write the output to every known rwio file
-**  format.
-**
-*/
+ *  Read rwrec input and write the output to every known SiLK Flow
+ *  record file format.
+ *
+ */
 
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwallformats.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwallformats.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -550,19 +550,19 @@ writeOutputs(
  */
 static int
 readFileToTemp(
-    skstream_t         *rwio_in)
+    skstream_t         *in_stream)
 {
     rwRec rwrec;
     int rv;
 
-    while ((rv = skStreamReadRecord(rwio_in, &rwrec)) == SKSTREAM_OK) {
+    while ((rv = skStreamReadRecord(in_stream, &rwrec)) == SKSTREAM_OK) {
         if (!fwrite(&rwrec, sizeof(rwRec), 1, tmpf)) {
             skAppPrintSyserror("Cannot write to temp file");
             return -1;
         }
     }
     if (SKSTREAM_ERR_EOF != rv) {
-        skStreamPrintLastErr(rwio_in, rv, &skAppPrintErr);
+        skStreamPrintLastErr(in_stream, rv, &skAppPrintErr);
     }
 
     return 0;

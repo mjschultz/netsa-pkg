@@ -22,7 +22,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKHEAP_H, "$SiLK: skheap.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_SKHEAP_H, "$SiLK: skheap.h 68ea5b7d2498 2016-06-16 18:35:16Z mthomas $");
 
 /**
  *  @file
@@ -79,7 +79,11 @@ typedef struct skheapiterator_st skheapiterator_t;
  *        of the heap than node2
  *     -- an integer value < 0 if node2 should be a closer to the root
  *        of the heap than node1
-
+ *
+ *    To use a comparison function that takes a context value, create
+ *    the heap with skHeapCreate2() which uses a comparator that
+ *    matches the signature of skheapcmp2fn_t below.
+ *
  *    For example: a heap with the lowest value at the root could
  *    return 1 if node1<node2.  If an implementation of this function
  *    wraps memcmp(), the function should
@@ -91,6 +95,9 @@ typedef struct skheapiterator_st skheapiterator_t;
  *        return memcmp(node1,node2,...)
  *
  *    to order the values from high to low.
+ *
+ *    (When computing a Top-N, the lowest value should be at the root
+ *    of the heap.)
  */
 typedef int (*skheapcmpfn_t)(
     const skheapnode_t  node1,
@@ -99,9 +106,12 @@ typedef int (*skheapcmpfn_t)(
 /**
  *    The signature of the comparator function that the caller must
  *    pass to the skHeapCreate2() function.  This function is similar
- *    to skheapcmp2fn_t, except it takes a third argument that is the
+ *    to skheapcmpfn_t, except it takes a third argument that is the
  *    pointer the caller supplied as the 'cmpfun_data' argument to
  *    skHeapCreate2().
+ *
+ *    If the comparator does not take a third argument, create the
+ *    heap using skHeapCreate().
  */
 typedef int (*skheapcmp2fn_t)(
     const skheapnode_t  node1,
@@ -121,7 +131,6 @@ skHeapCreate(
     skheapnode_t       *memory_buf);
 
 
-
 /**
  *    Creates a heap that is initially capable of holding 'init_count'
  *    entries (skheapnode_t's) each of size 'entry_size'.  The
@@ -129,15 +138,15 @@ skHeapCreate(
  *    'cmpfun_data' is passed as the third argument to
  *    'cmpfun'.
  *
- *    If the 'memory_buf' is NULL, the heap will manage the memory for
+ *    If the 'memory_buf' is NULL, the heap manages the memory for
  *    entries itself.  An attempt to insert more than 'init_count'
- *    entries into the heap will cause the heap to reallocate memory
+ *    entries into the heap causes the heap to reallocate memory
  *    for the entries.
  *
  *    If 'memory_buf' is non-NULL, it must be a block of memory whose
- *    size is at least init_count * entry_size bytes.  The heap will
- *    use 'memory_buf' to store the entries, and the 'init_count'
- *    value will represent the maximum size of the heap.
+ *    size is at least init_count * entry_size bytes.  The heap
+ *    uses 'memory_buf' to store the entries, and the 'init_count'
+ *    value represents the maximum size of the heap.
  */
 skheap_t *
 skHeapCreate2(
@@ -161,7 +170,7 @@ skHeapEmpty(
 /**
  *    Remove the entry at the top of the heap.  If 'top_node' is
  *    non-NULL, the removed entry is copied there---that is,
- *    'entry_size' bytes of data will be written to the location
+ *    'entry_size' bytes of data is written to the location
  *    pointed to by 'top_node'.  Return SKHEAP_ERR_EMPTY if the heap
  *    is empty.
  *
@@ -214,7 +223,7 @@ skHeapGetNumberEntries(
 
 /**
  *    Add the entry at 'new_node' to the heap.  Return SKHEAP_ERR_FULL
- *    if the heap is full.  This function will read 'entry_size' bytes
+ *    if the heap is full.  This function reads 'entry_size' bytes
  *    of data from the location pointed to by 'new_node'.
  */
 int
@@ -230,7 +239,7 @@ skHeapInsert(
  *    and works toward the leaves; otherwise, the iterator works from
  *    the leaves to the root.  The iterator visits all nodes on one
  *    level before moving to the next.  By calling skHeapSortEntries()
- *    before creating the iterator, the nodes will be traversed in the
+ *    before creating the iterator, the nodes are traversed in the
  *    order determined by the 'cmpfun' that was specified when the
  *    heap was created.
  */
@@ -277,9 +286,9 @@ skHeapPeekTop(
 /**
  *    Remove the entry at the top of the heap and insert a new entry
  *    into the heap.  If 'top_node' is non-NULL, the removed entry is
- *    copied there---that is, 'entry_size' bytes of data will be
+ *    copied there---that is, 'entry_size' bytes of data is
  *    written to the location pointed to by 'top_node'.  This function
- *    will read 'entry_size' bytes of data from the location pointed
+ *    reads 'entry_size' bytes of data from the location pointed
  *    to by 'new_node'.  Return SKHEAP_ERR_EMPTY if the heap is empty
  *    and do NOT add 'new_node' to the heap.
  *

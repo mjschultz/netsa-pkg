@@ -21,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcs_CHECK_STRUCT_C, "$SiLK: check-struct.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcs_CHECK_STRUCT_C, "$SiLK: check-struct.c 73c4e79b709d 2016-06-16 13:59:02Z mthomas $");
 
 
 /*
@@ -123,7 +123,7 @@ checkDataStructDoElement(
     }
     end = elem_off + elem_size - 1;
 
-    fprintf(fh, "%5"SK_PRIuZ"|%5"SK_PRIuZ"|%5"SK_PRIuZ"|%5s|%5s|%6s|%s\n",
+    fprintf(fh, "%5" SK_PRIuZ "|%5" SK_PRIuZ "|%5" SK_PRIuZ "|%5s|%5s|%6s|%s\n",
             elem_off, end, elem_size, alerr, hole, ie_ok, elem_name);
 }
 

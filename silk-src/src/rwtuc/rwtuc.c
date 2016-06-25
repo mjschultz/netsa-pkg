@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwtuc.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwtuc.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
 
 #include <silk/rwascii.h>
 #include <silk/rwrec.h>
@@ -98,7 +98,7 @@ typedef struct current_line_st {
         if (verbose || stop_on_error) {                                 \
             skAppPrintErr bl_printerr_args ;                            \
             if (stop_on_error) {                                        \
-                skStreamWriteSilkHeader(out_ios);                       \
+                skStreamWriteSilkHeader(out_stream);                    \
                 exit(EXIT_FAILURE);                                     \
             }                                                           \
         }                                                               \
@@ -119,7 +119,7 @@ static sk_stringmap_entry_t tuc_fields[] = {
 };
 
 /* where to send output, set by --output-path */
-static skstream_t *out_ios = NULL;
+static skstream_t *out_stream = NULL;
 
 /* where to copy bad input lines, set by --bad-output-lines */
 static skstream_t *bad_stream = NULL;
@@ -342,12 +342,12 @@ appTeardown(
     }
     teardownFlag = 1;
 
-    if (out_ios) {
-        rv = skStreamClose(out_ios);
+    if (out_stream) {
+        rv = skStreamClose(out_stream);
         if (rv && rv != SKSTREAM_ERR_NOT_OPEN) {
-            skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
         }
-        skStreamDestroy(&out_ios);
+        skStreamDestroy(&out_stream);
     }
 
     if (bad_stream) {
@@ -468,11 +468,11 @@ appSetup(
     }
 
     /* use "stdout" as default output path */
-    if (NULL == out_ios) {
-        if ((rv = skStreamCreate(&out_ios, SK_IO_WRITE, SK_CONTENT_SILK_FLOW))
-            || (rv = skStreamBind(out_ios, "stdout")))
+    if (NULL == out_stream) {
+        if ((rv = skStreamCreate(&out_stream,SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+            || (rv = skStreamBind(out_stream, "stdout")))
         {
-            skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
             skAppPrintErr("Could not create output stream");
             exit(EXIT_FAILURE);
         }
@@ -481,7 +481,7 @@ appSetup(
     /* open bad output, but first ensure it is not the same as the
      * record output */
     if (bad_stream) {
-        if (0 == strcmp(skStreamGetPathname(out_ios),
+        if (0 == strcmp(skStreamGetPathname(out_stream),
                         skStreamGetPathname(bad_stream)))
         {
             skAppPrintErr("Cannot use same stream for bad input and records");
@@ -495,13 +495,13 @@ appSetup(
     }
 
     /* open output */
-    if ((rv = skStreamSetCompressionMethod(out_ios, comp_method))
-        || (rv = skOptionsNotesAddToStream(out_ios))
-        || (rv = skHeaderAddInvocation(skStreamGetSilkHeader(out_ios),
+    if ((rv = skStreamSetCompressionMethod(out_stream, comp_method))
+        || (rv = skOptionsNotesAddToStream(out_stream))
+        || (rv = skHeaderAddInvocation(skStreamGetSilkHeader(out_stream),
                                        1, argc, argv))
-        || (rv = skStreamOpen(out_ios)))
+        || (rv = skStreamOpen(out_stream)))
     {
-        skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
         skAppPrintErr("Could not open output file");
         exit(EXIT_FAILURE);
     }
@@ -550,15 +550,15 @@ appOptionsHandler(
         break;
 
       case OPT_OUTPUT_PATH:
-        if (out_ios) {
+        if (out_stream) {
             skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
             return 1;
         }
-        if ((rv = skStreamCreate(&out_ios, SK_IO_WRITE, SK_CONTENT_SILK_FLOW))
-            || (rv = skStreamBind(out_ios, opt_arg)))
+        if ((rv = skStreamCreate(&out_stream,SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+            || (rv = skStreamBind(out_stream, opt_arg)))
         {
-            skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
             return 1;
         }
         break;
@@ -1326,7 +1326,7 @@ processFields(
  *
  *    Read each line of text from the stream in the 'curline'
  *    structure, create an rwRec from the fields on the line, and
- *    write the records to the global out_ios stream.
+ *    write the records to the global out_stream stream.
  *
  *    Return 0 on success, non-zero on failure.
  */
@@ -1462,9 +1462,9 @@ processFile(
         }
 
         /* output binary rwrec */
-        rv = skStreamWriteRecord(out_ios, &currents.rec);
+        rv = skStreamWriteRecord(out_stream, &currents.rec);
         if (rv) {
-            skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
             if (SKSTREAM_ERROR_IS_FATAL(rv)) {
                 return -1;
             }
@@ -1551,13 +1551,13 @@ int main(int argc, char **argv)
     /* if everything went well, make certain there are headers in our
      * output */
     if (rv == 1) {
-        rv = skStreamWriteSilkHeader(out_ios);
+        rv = skStreamWriteSilkHeader(out_stream);
         if (rv) {
             if (rv == SKSTREAM_ERR_PREV_DATA) {
                 /* headers already printed */
                 rv = 0;
             } else {
-                skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+                skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
             }
         }
     }

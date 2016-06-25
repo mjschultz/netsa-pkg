@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 5bfcfa2ae79d 2016-03-31 18:03:11Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 638dc247c4f7 2016-06-13 19:13:09Z mthomas $");
 
 # Installed Targets
 
@@ -113,6 +113,9 @@ TESTS = \
 	tests/rwbagcat-bin-ips-linear-v6.pl \
 	tests/rwbagcat-bin-ips-binary-v6.pl \
 	tests/rwbagcat-bin-ips-decimal-v6.pl \
+	tests/rwbagcat-sort-count-sip-byt.pl \
+	tests/rwbagcat-sort-count-pro-pkt-inc.pl \
+	tests/rwbagcat-sort-count-pro-pkt-dec.pl \
 	tests/rwbagtool-null-input.pl \
 	tests/rwbagtool-bad-range-key.pl \
 	tests/rwbagtool-bad-range-counter.pl \

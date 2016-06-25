@@ -1,12 +1,12 @@
 #! /usr/bin/perl -w
 # STATUS: ERR
-# TEST: ./rwgeoip2ccmap
+# TEST: ./rwpmapbuild
 
 use strict;
 use SiLKTests;
 
-my $rwgeoip2ccmap = check_silk_app('rwgeoip2ccmap');
+my $rwpmapbuild = check_silk_app('rwpmapbuild');
 check_features(qw(stdin_tty));
-my $cmd = "$rwgeoip2ccmap";
+my $cmd = "$rwpmapbuild";
 
 exit (check_exit_status($cmd) ? 1 : 0);

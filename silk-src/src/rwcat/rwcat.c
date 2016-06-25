@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcat.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwcat.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -42,7 +42,7 @@ RCSIDENT("$SiLK: rwcat.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 static sk_options_ctx_t *optctx = NULL;
 
 /* output stream */
-static skstream_t *out_ios = NULL;
+static skstream_t *out_stream = NULL;
 
 /* the compression method to use when writing the file.
  * sksiteCompmethodOptionsRegister() will set this to the default or
@@ -139,12 +139,12 @@ appTeardown(
     teardownFlag = 1;
 
     /* close output file */
-    if (out_ios) {
-        rv = skStreamClose(out_ios);
+    if (out_stream) {
+        rv = skStreamClose(out_stream);
         if (rv && rv != SKSTREAM_ERR_NOT_OPEN) {
-            skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
         }
-        skStreamDestroy(&out_ios);
+        skStreamDestroy(&out_stream);
     }
 
     skOptionsNotesTeardown();
@@ -216,26 +216,26 @@ appSetup(
     sksiteConfigure(0);
 
     /* create output stream to stdout if no --output-path was given */
-    if (out_ios == NULL) {
-        if ((rv = skStreamCreate(&out_ios, SK_IO_WRITE, SK_CONTENT_SILK_FLOW))
-            || (rv = skStreamBind(out_ios, "-")))
+    if (out_stream == NULL) {
+        if ((rv = skStreamCreate(&out_stream,SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+            || (rv = skStreamBind(out_stream, "-")))
         {
-            skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
-            skStreamDestroy(&out_ios);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+            skStreamDestroy(&out_stream);
             exit(EXIT_FAILURE);
         }
     }
 
     /* get the output file's header */
-    out_hdr = skStreamGetSilkHeader(out_ios);
+    out_hdr = skStreamGetSilkHeader(out_stream);
 
 #if SK_ENABLE_IPV6
     /* write an RWGENERIC file if we know there will be no IPv6 flows */
     if (ipv6_policy < SK_IPV6POLICY_MIX) {
         rv = skHeaderSetFileFormat(out_hdr, FT_RWGENERIC);
         if (rv) {
-            skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
-            skStreamDestroy(&out_ios);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+            skStreamDestroy(&out_stream);
             exit(EXIT_FAILURE);
         }
     }
@@ -245,12 +245,12 @@ appSetup(
      * write header */
     if ((rv = skHeaderSetCompressionMethod(out_hdr, comp_method))
         || (rv = skHeaderSetByteOrder(out_hdr, byte_order))
-        || (rv = skOptionsNotesAddToStream(out_ios))
-        || (rv = skStreamOpen(out_ios))
-        || (rv = skStreamWriteSilkHeader(out_ios)))
+        || (rv = skOptionsNotesAddToStream(out_stream))
+        || (rv = skStreamOpen(out_stream))
+        || (rv = skStreamWriteSilkHeader(out_stream)))
     {
-        skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
-        skStreamDestroy(&out_ios);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+        skStreamDestroy(&out_stream);
         exit(EXIT_FAILURE);
     }
 
@@ -285,16 +285,16 @@ appOptionsHandler(
 
     switch ((appOptionsEnum)opt_index) {
       case OPT_OUTPUT_PATH:
-        if (out_ios != NULL) {
+        if (out_stream != NULL) {
             skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
             return 1;
         }
-        if ((rv = skStreamCreate(&out_ios, SK_IO_WRITE, SK_CONTENT_SILK_FLOW))
-            || (rv = skStreamBind(out_ios, opt_arg)))
+        if ((rv = skStreamCreate(&out_stream,SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+            || (rv = skStreamBind(out_stream, opt_arg)))
         {
-            skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
-            skStreamDestroy(&out_ios);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+            skStreamDestroy(&out_stream);
             return 1;
         }
         break;
@@ -383,13 +383,13 @@ byteOrderParse(
 
 
 /*
- *  catFile(in_ios);
+ *  catFile(in_stream);
  *
- *    Write all the records from 'in_ios' to out_ios.
+ *    Write all the records from 'in_stream' to out_stream.
  */
 static void
 catFile(
-    skstream_t         *in_ios)
+    skstream_t         *in_stream)
 {
     rwRec rwrec;
     uint64_t in_count = 0;
@@ -398,13 +398,13 @@ catFile(
     int in_rv;
     int rv = SKSTREAM_OK;
 
-    skStreamSetIPv6Policy(in_ios, ipv6_policy);
+    skStreamSetIPv6Policy(in_stream, ipv6_policy);
 
-    while ((in_rv = skStreamReadRecord(in_ios, &rwrec)) == SKSTREAM_OK) {
+    while ((in_rv = skStreamReadRecord(in_stream, &rwrec)) == SKSTREAM_OK) {
         in_count++;
-        rv = skStreamWriteRecord(out_ios, &rwrec);
+        rv = skStreamWriteRecord(out_stream, &rwrec);
         if (SKSTREAM_OK != rv) {
-            skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
             if (SKSTREAM_ERROR_IS_FATAL(rv)) {
                 break;
             }
@@ -412,7 +412,7 @@ catFile(
         out_count++;
     }
     if ((in_rv != SKSTREAM_ERR_EOF) && (in_rv != SKSTREAM_OK)) {
-        skStreamPrintLastErr(in_ios, in_rv, &skAppPrintErr);
+        skStreamPrintLastErr(in_stream, in_rv, &skAppPrintErr);
     }
 
     print_filenames = skOptionsCtxGetPrintFilenames(optctx);

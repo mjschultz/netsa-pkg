@@ -22,7 +22,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_PROBECONF_H, "$SiLK: probeconf.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_PROBECONF_H, "$SiLK: probeconf.h d49b1e47d2e3 2016-06-15 20:31:17Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -178,9 +178,9 @@ typedef enum {
  *    to that value and the 'output' is set to 0.
  */
 typedef enum {
-    SKPC_IFVALUE_SNMP = 0, SKPC_IFVALUE_VLAN = 1
+    SKPC_IFVALUE_SNMP = 0,
+    SKPC_IFVALUE_VLAN = 1
 } skpc_ifvaluetype_t;
-
 
 
 /*  Forward declaration */
@@ -240,20 +240,20 @@ typedef struct skpc_probe_st {
     /** Probe quirks */
     uint8_t                 quirks;
 
-    /** Probe type */
-    skpc_probetype_t        probe_type;
+    /** Probe logging flags */
+    uint8_t                 log_flags;
 
     /** Probe protocol */
     skpc_proto_t            protocol;
 
-    /** Probe logging flags */
-    uint8_t                 log_flags;
+    /** Probe type */
+    skpc_probetype_t        probe_type;
+
+    /** Type of the interface value */
+    skpc_ifvaluetype_t      ifvaluetype;
 
     /** Has probe been verified */
     unsigned                verified :1;
-
-    /** Are we storing the vlanId (1) or SNMP (0) */
-    unsigned                ifvalue_vlan :1;
 
 } skpc_probe_t;
 
@@ -800,8 +800,8 @@ skpcProbeClearLogFlags(
  *    Determine whether the probe is currently configured to store
  *    SNMP interfaces or VLAN tags.
  */
-#define skpcProbeGetInterfaceValueType(m_probe)                         \
-    (((m_probe)->ifvalue_vlan) ? SKPC_IFVALUE_VLAN : SKPC_IFVALUE_SNMP)
+#define skpcProbeGetInterfaceValueType(m_probe) \
+    ((m_probe)->ifvaluetype)
 #ifndef skpcProbeGetInterfaceValueType
 skpc_ifvaluetype_t
 skpcProbeGetInterfaceValueType(

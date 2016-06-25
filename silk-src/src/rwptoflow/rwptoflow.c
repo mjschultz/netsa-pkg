@@ -26,7 +26,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwptoflow.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwptoflow.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
@@ -685,7 +685,7 @@ appOptionsHandler(
  *
  *    For every packet in the global 'packet_input' file, try to
  *    produce a SiLK flow record, and write that record to the
- *    'flow_output' rwio-stream.  In addition, print the packets to
+ *    'flow_output' stream.  In addition, print the packets to
  *    the 'packet_pass' and/or 'packet_fail' dump files if requested.
  *    Update the global 'statistics' struct.  Return 0 on success, or
  *    -1 if writing a flow to the 'flow_output' stream fails.

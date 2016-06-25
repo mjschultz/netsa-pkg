@@ -9,12 +9,13 @@
 /* #define SKTHREAD_DEBUG_MUTEX */
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: stream-cache.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: stream-cache.c 44ea9b8a3a43 2016-06-16 18:36:27Z mthomas $");
 
-#include <silk/utils.h>
+#include <silk/redblack.h>
 #include <silk/sklog.h>
 #include <silk/sksite.h>
-#include <silk/redblack.h>
+#include <silk/skvector.h>
+#include <silk/utils.h>
 #include "stream-cache.h"
 
 /* use TRACEMSG_LEVEL as our tracing variable */
@@ -24,155 +25,147 @@ RCSIDENT("$SiLK: stream-cache.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 /* DEFINES AND TYPEDEFS */
 
+/*
+ *    Maximum value for the time stamp
+ */
+#define MAX_TIME  (sktime_t)INT64_MAX
+
+
 /* Message to print when fail to initialize mutex */
 #define FMT_MUTEX_FAILURE \
     "Could not initialize a mutex at %s:%d", __FILE__, __LINE__
 
-/*
- *  The stream_cache_t contains an array of cache_entry_t objects.
- *  The array is allocated with 'max_size' entries when the cache is
- *  created.  The number of valid entries in the array is specified by
- *  'size'.  The cache also contains a redblack tree that is used to
- *  index the entries.  Finally, there is a mutex on the cache; the
- *  mutex will be a pthread_rwlock_t mutex if read/write locks are
- *  supported on this system.
+
+/**
+ *    stream_cache_t contains a red-black tree of cache_entry_t objects.
+ *    The number of valid entries in the array is specified by
+ *    'size'.  The cache also contains a redblack tree that is used to
+ *    index the entries.  Finally, there is a mutex on the cache; the
+ *    mutex will be a pthread_rwlock_t mutex if read/write locks are
+ *    supported on this system.
  */
 struct stream_cache_st {
-    /* Array of cache entries */
-    cache_entry_t      *entries;
     /* the redblack tree used for searching */
     struct rbtree      *rbtree;
-    /* function called by skCacheLookupOrOpenAdd() to open a file */
+    /* function called by skCacheLookupOrOpenAdd() to open a file that
+     * is not currently in the cache */
     cache_open_fn_t     open_callback;
-    /* current number of valid entries */
-    int                 size;
-    /* maximum number of valid entries */
-    int                 max_size;
+    /* current number of open entries */
+    unsigned int        open_count;
+    /* maximum number of open entries the user specified */
+    unsigned int        max_open_count;
+    /* total number of entries (open and closed) */
+    unsigned int        total_count;
     /* mutex for the cache */
     RWMUTEX             mutex;
 };
+/* typedef struct stream_cache_st stream_cache_t; // stream-cache.h */
 
 
-/* LOCAL FUNCTION DECLARATIONS */
+/**
+ *    The cache_entry_t contains information about an active file in
+ *    the stream cache.  The structure contains the file key, the
+ *    number of records in the file, and the open file handle.
+ *
+ *    Users of the stream-cache should view the cache_entry_t as
+ *    opaque.  Use the macros and functions to access its members.
+ */
+struct cache_entry_st {
+    /** the key */
+    cache_key_t         key;
+    /** The mutex associated with this entry */
+    pthread_mutex_t     mutex;
+    /** the number of records written to the file since it was added
+     * to the cache */
+    uint64_t            total_rec_count;
+    /** the number of records in the file when it was opened */
+    uint64_t            opened_rec_count;
+    /** when this entry was last accessed */
+    sktime_t            last_accessed;
+    /** the name of the file */
+    const char         *filename;
+    /** the open file handle */
+    skstream_t         *stream;
+    /** the more recently accessed entry */
+    cache_entry_t      *more_recent;
+    /** the less recently accessed entry */
+    cache_entry_t      *less_recent;
+};
+/* typedef struct cache_entry_st cache_entry_t; // stream-cache.h */
 
-static int
-cacheEntryAdd(
-    stream_cache_t     *cache,
-    skstream_t         *stream,
-    const cache_key_t  *key,
-    cache_entry_t     **new_entry);
-static int
-cacheEntryCompare(
-    const void         *entry1_v,
-    const void         *entry2_v,
-    const void  UNUSED(*config));
-static int
-cacheEntryDestroyFile(
-    stream_cache_t     *cache,
-    cache_entry_t      *entry,
-    int                 entry_is_locked);
-static void
-cacheEntryLogRecordCount(
-    cache_entry_t      *entry);
-static cache_entry_t *
-cacheEntryLookup(
-    stream_cache_t     *cache,
-    const cache_key_t  *key);
+
+/**
+ *    cache_file_iter_t is returned by skCacheFlush() and
+ *    skCacheCloseAll().
+ */
+struct cache_file_iter_st {
+    sk_vector_t        *vector;
+    size_t              pos;
+};
+/* typedef struct cache_file_iter_st cache_file_iter_t; // stream-cache.h */
+
+
+/**
+ *    cache_file_t contains information about a file that exists in
+ *    the stream cache.  The structure contains the file's key, name,
+ *    and the number of records written to the file since it was added
+ *    to the cache or since the most recent call to skCacheFlush().
+ *
+ *    A vector of these structures may be returned by skCacheFlush()
+ *    or skCacheCloseAll().
+ */
+struct cache_file_st {
+    /* the key for this closed file */
+    cache_key_t         key;
+    /* the number of records in the file as of opening or the most
+     * recent flush, used for log messages */
+    uint64_t            rec_count;
+    /* the name of the file */
+    const char         *filename;
+};
+typedef struct cache_file_st cache_file_t;
 
 
 /* FUNCTION DEFINITIONS */
 
-/*
- *  status = cacheEntryAdd(cache, stream, key, &entry);
+/**
+ *    Close the stream that 'entry' wraps and destroy the stream.  In
+ *    addition, update the entry's 'total_rec_count'.
  *
- *    Add 'stream' to the stream cache 'cache' using 'key' as the key,
- *    and put the entry into the value pointed at by 'entry'.  The
- *    cache must be locked for writing.  The entry's last_accessed
- *    time is set to the current time and the entry is returned in a
- *    locked state.
+ *    This function expects the caller to have the entry's mutex.
  *
- *    Return 0 on success.  Return -1 if there is a problem
- *    initializing the entry.  If adding an entry causes an existing
- *    stream to be closed and there is a problem closing the stream,
- *    the new entry is still added and 1 is returned.
+ *    The entry's stream must be open.
+ *
+ *    Return the result of calling skStreamClose().  Log an error
+ *    message if skStreamClose() fails.
  */
 static int
-cacheEntryAdd(
-    stream_cache_t     *cache,
-    skstream_t         *stream,
-    const cache_key_t  *key,
-    cache_entry_t     **new_entry)
+cacheEntryClose(
+    cache_entry_t      *entry)
 {
-    cache_entry_t *entry;
-    const void *node;
-    int retval = 0;
+    uint64_t new_count;
+    int rv;
 
-    ASSERT_RW_MUTEX_LOCKED(&cache->mutex);
-    assert(stream);
-    assert(new_entry);
+    assert(entry);
+    assert(entry->stream);
+    ASSERT_MUTEX_LOCKED(&entry->mutex);
 
-    TRACEMSG(2, ("Adding new entry to cache with %d/%d entries",
-                 cache->size, cache->max_size));
+    TRACEMSG(2, ("cache: Closing file '%s'", entry->filename));
 
-    if (cache->size < cache->max_size) {
-        /* We're not to the max size yet, so use the next entry in the
-         * array */
-        entry = &cache->entries[cache->size];
-        if (MUTEX_INIT(&entry->mutex)) {
-            CRITMSG(FMT_MUTEX_FAILURE);
-            *new_entry = NULL;
-            return -1;
-        }
-        ++cache->size;
-    } else {
-        /* The cache is full: flush, close and free the least recently
-         * used stream */
-        cache_entry_t *e;
-        sktime_t min;
-        int i;
+    /* update the record count */
+    new_count = skStreamGetRecordCount(entry->stream);
+    assert(entry->opened_rec_count <= new_count);
+    entry->total_rec_count += new_count - entry->opened_rec_count;
 
-        e = &cache->entries[0];
-        min = e->last_accessed;
-        entry = e;
-
-        for (i = 1; i < cache->size; ++i, ++e) {
-            if (e->last_accessed < min) {
-                min = e->last_accessed;
-                entry = e;
-            }
-        }
-        if (cacheEntryDestroyFile(cache, entry, 0)) {
-            retval = 1;
-        }
+    /* close the stream */
+    rv = skStreamClose(entry->stream);
+    if (rv) {
+        skStreamPrintLastErr(entry->stream, rv, &NOTICEMSG);
     }
+    skStreamDestroy(&entry->stream);
 
-    /* fill the new entry */
-    entry->key.time_stamp = key->time_stamp;
-    entry->key.sensor_id = key->sensor_id;
-    entry->key.flowtype_id = key->flowtype_id;
-    entry->stream = stream;
-    entry->rec_count = skStreamGetRecordCount(stream);
-    entry->last_accessed = sktimeNow();
-
-    /* add the entry to the redblack tree */
-    node = rbsearch(entry, cache->rbtree);
-    if (node != entry) {
-        if (node == NULL) {
-            skAppPrintOutOfMemory(NULL);
-            exit(EXIT_FAILURE);
-        }
-        CRITMSG(("Duplicate entries in stream cache "
-                 "for time=%" PRId64 " sensor=%d flowtype=%d"),
-                key->time_stamp, key->sensor_id, key->flowtype_id);
-        skAbort();
-    }
-
-    /* lock the entry */
-    MUTEX_LOCK(&entry->mutex);
-    *new_entry = entry;
-    return retval;
+    return rv;
 }
-
 
 /*
  *  direction = cacheEntryCompare(a, b, config);
@@ -185,235 +178,179 @@ cacheEntryCompare(
     const void         *entry2_v,
     const void  UNUSED(*config))
 {
-    cache_key_t key1 = ((cache_entry_t*)entry1_v)->key;
-    cache_key_t key2 = ((cache_entry_t*)entry2_v)->key;
+    cache_key_t *key1 = &((cache_entry_t *)entry1_v)->key;
+    cache_key_t *key2 = &((cache_entry_t *)entry2_v)->key;
 
-    if (key1.sensor_id < key2.sensor_id) {
+    if (key1->sensor_id != key2->sensor_id) {
+        return ((key1->sensor_id < key2->sensor_id) ? -1 : 1);
+    }
+    if (key1->flowtype_id != key2->flowtype_id) {
+        return ((key1->flowtype_id < key2->flowtype_id) ? -1 : 1);
+    }
+    if (key1->time_stamp < key2->time_stamp) {
         return -1;
     }
-    if (key1.sensor_id > key2.sensor_id) {
-        return 1;
-    }
-    if (key1.flowtype_id < key2.flowtype_id) {
-        return -1;
-    }
-    if (key1.flowtype_id > key2.flowtype_id) {
-        return 1;
-    }
-    if (key1.time_stamp < key2.time_stamp) {
-        return -1;
-    }
-    if (key1.time_stamp > key2.time_stamp) {
-        return 1;
-    }
-    return 0;
+    return (key1->time_stamp > key2->time_stamp);
 }
 
 
-/*
- *  cacheEntryMove(cache, dst, src);
+/**
+ *    Close the stream associated with the cache_entry_t 'entry' if it
+ *    is open and destroy the 'entry'.  Does not remove 'entry' from
+ *    the red-black tree.  This function assumes the caller holds the
+ *    entry's mutex.  This is a no-op if 'entry' is NULL.
  *
- *    Move an entry from 'dst' to 'src'.  The entry must be unlocked,
- *    and the cache must have a write lock.
- */
-static void
-cacheEntryMove(
-    stream_cache_t     *cache,
-    cache_entry_t      *dst_entry,
-    cache_entry_t      *src_entry)
-{
-    const cache_entry_t *node;
-    const cache_key_t *key;
-
-    ASSERT_RW_MUTEX_LOCKED(&cache->mutex);
-
-    /* remove from tree and destroy the mutex */
-    rbdelete(src_entry, cache->rbtree);
-    MUTEX_DESTROY(&src_entry->mutex);
-
-    /* copy the entry and initialize the mutex */
-    memcpy(dst_entry, src_entry, sizeof(cache_entry_t));
-    MUTEX_INIT(&dst_entry->mutex);
-
-    /* insert entry back into tree */
-    node = (const cache_entry_t*)rbsearch(dst_entry, cache->rbtree);
-    if (node != dst_entry) {
-        if (node == NULL) {
-            skAppPrintOutOfMemory(NULL);
-            exit(EXIT_FAILURE);
-        }
-        key = &dst_entry->key;
-        CRITMSG(("Duplicate entries in stream cache during move "
-                 "for time=%" PRId64 " sensor=%d flowtype=%d"),
-                key->time_stamp, key->sensor_id, key->flowtype_id);
-        skAbort();
-    }
-}
-
-
-/*
- *  status = cacheEntryDestroyFile(cache, entry, entry_is_locked);
- *
- *    Close the stream that 'entry' wraps, destroy the stream, and
- *    remove the entry from the redblack tree.  In addition, log the
- *    number of records written.  Does not destroy the entry's mutex.
- *
- *    This function expects the caller to have a write lock on the
- *    cache.
- *
- *    If 'entry_is_locked' is non-zero, the function assumes the
- *    caller already has the entry's mutex; otherwise the function
- *    grab's the entry's mutex.  In either case, the function unlocks
- *    the mutex after deleting the entry.
- *
- *    Returns 0 if the entry's stream was successfully closed;
- *    non-zero otherwise.
+ *    Return the result of skStreamClose() or 0 if stream was already
+ *    closed.
  */
 static int
-cacheEntryDestroyFile(
-    stream_cache_t     *cache,
-    cache_entry_t      *entry,
-    int                 entry_is_locked)
+cacheEntryDestroy(
+    cache_entry_t      *entry)
 {
-    int rv;
+    int rv = 0;
 
-    ASSERT_RW_MUTEX_LOCKED(&cache->mutex);
+    if (entry) {
+        ASSERT_MUTEX_LOCKED(&entry->mutex);
 
-    TRACEMSG(2, ("Stream cache closing file %s",
-                 skStreamGetPathname(entry->stream)));
-
-    if (!entry_is_locked) {
-        MUTEX_LOCK(&entry->mutex);
+        if (entry->stream) {
+            rv = cacheEntryClose(entry);
+        }
+        free((void*)entry->filename);
+        MUTEX_UNLOCK(&entry->mutex);
+        MUTEX_DESTROY(&entry->mutex);
+        free(entry);
     }
-
-    cacheEntryLogRecordCount(entry);
-    rv = skStreamClose(entry->stream);
-    if (rv) {
-        skStreamPrintLastErr(entry->stream, rv, &NOTICEMSG);
-    }
-    skStreamDestroy(&entry->stream);
-    rbdelete(entry, cache->rbtree);
-
-    MUTEX_UNLOCK(&entry->mutex);
-
     return rv;
 }
 
 
-/*
- *  cacheEntryLogRecordCount(entry);
- *
- *    Write a message to the log giving the name of the file that
- *    'entry' wraps and the number of records written to that file
- *    since it was opened or last flushed.
- *
- *    The 'entry' will be updated with the new record count.
+/**
+ *    Return the interator entry at 'pos' or return NULL if 'pos' is
+ *    out of range.
  */
-static void
-cacheEntryLogRecordCount(
-    cache_entry_t      *entry)
+static cache_file_t *
+cacheFileIterAt(
+    cache_file_iter_t  *iter,
+    size_t              pos)
 {
-    uint64_t new_count;
-
-    new_count = skStreamGetRecordCount(entry->stream);
-
-    if (entry->rec_count == new_count) {
-        return;
-    }
-    assert(entry->rec_count < new_count);
-
-    INFOMSG(("%s: %" PRIu64 " recs"),
-            skStreamGetPathname(entry->stream),(new_count - entry->rec_count));
-    entry->rec_count = new_count;
-}
-
-
-/*
- *  entry = skCacheLookup(cache, key);
- *
- *    Return the stream entry for the specified key.  Return NULL if
- *    no stream entry for the specified values is found.  The cache
- *    should be locked for reading or writing.  The entry's
- *    last_accessed time is updated and the entry is returned in a
- *    locked state.
- */
-static cache_entry_t *
-cacheEntryLookup(
-    stream_cache_t     *cache,
-    const cache_key_t  *key)
-{
-    cache_entry_t *entry;
-    cache_entry_t search_key;
-
-    ASSERT_RW_MUTEX_LOCKED(&cache->mutex);
-
-    /* fill the search key */
-    search_key.key.time_stamp = key->time_stamp;
-    search_key.key.sensor_id = key->sensor_id;
-    search_key.key.flowtype_id = key->flowtype_id;
-
-    /* try to find the entry */
-    entry = (cache_entry_t*)rbfind(&search_key, cache->rbtree);
-#if TRACEMSG_LEVEL >= 3
-    {
-        char tstamp[SKTIMESTAMP_STRLEN];
-        char sensor[SK_MAX_STRLEN_SENSOR+1];
-        char flowtype[SK_MAX_STRLEN_FLOWTYPE+1];
-
-        sktimestamp_r(tstamp, key->time_stamp, SKTIMESTAMP_NOMSEC),
-        sksiteSensorGetName(sensor, sizeof(sensor), key->sensor_id);
-        sksiteFlowtypeGetName(flowtype, sizeof(flowtype), key->flowtype_id);
-
-        TRACEMSG(3, ("Cache %s for stream %s %s %s",
-                     ((entry == NULL) ? "miss" : "hit"),
-                     tstamp, sensor, flowtype));
-    }
-#endif /* TRACEMSG_LEVEL */
-
-    /* found it, lock it and update its last_accessed timestamp */
-    if (entry) {
-        MUTEX_LOCK(&entry->mutex);
-        entry->last_accessed = sktimeNow();
-    }
-
-    return entry;
-}
-
-
-/* add an entry to the cache.  return entry in locked state. */
-int
-skCacheAdd(
-    stream_cache_t     *cache,
-    skstream_t         *stream,
-    const cache_key_t  *key,
-    cache_entry_t     **entry)
-{
-    int retval;
-
-    WRITE_LOCK(&cache->mutex);
-
-    retval = cacheEntryAdd(cache, stream, key, entry);
-
-    RW_MUTEX_UNLOCK(&cache->mutex);
-
-    return retval;
+    assert(iter);
+    assert(iter->vector);
+    return (cache_file_t *)skVectorGetValuePointer(iter->vector, pos);
 }
 
 
 /* lock cache, then close and destroy all streams.  unlock cache. */
 int
 skCacheCloseAll(
-    stream_cache_t     *cache)
+    stream_cache_t     *cache,
+    cache_file_iter_t **file_iter)
 {
-    int retval;
+    sk_vector_t *vector;
+    struct rbtree *closed_tree;
+    RBLIST *iter;
+    cache_file_t closed;
+    cache_entry_t *entry;
+    int retval = 0;
+    int rv;
 
-    if (NULL == cache) {
+    assert(cache);
+
+    if (NULL == file_iter) {
+        vector = NULL;
+    } else {
+        *file_iter = (cache_file_iter_t *)calloc(1, sizeof(cache_file_iter_t));
+        vector = skVectorNew(sizeof(cache_file_t));
+        if (*file_iter && vector) {
+            (*file_iter)->vector = vector;
+        } else {
+            skAppPrintOutOfMemory(NULL);
+            skVectorDestroy(vector);
+            free(*file_iter);
+            *file_iter = NULL;
+            vector = NULL;
+        }
+    }
+
+    TRACEMSG(1, ("cache: Closing cache: %u total, %u open, %u closed...",
+                 cache->total_count, cache->open_count,
+                 cache->total_count - cache->open_count));
+
+    WRITE_LOCK(&cache->mutex);
+    if (0 == cache->total_count) {
+        RW_MUTEX_UNLOCK(&cache->mutex);
         return 0;
     }
 
-    retval = skCacheLockAndCloseAll(cache);
+    TRACEMSG(2, ("cache: Closing cache: Closing files..."));
 
+    /* close all open streams */
+    iter = rbopenlist(cache->rbtree);
+    while ((entry = (cache_entry_t *)rbreadlist(iter)) != NULL) {
+        MUTEX_LOCK(&entry->mutex);
+        if (entry->stream) {
+            rv = cacheEntryClose(entry);
+            if (rv) {
+                retval = -1;
+            }
+        }
+        MUTEX_UNLOCK(&entry->mutex);
+    }
+    rbcloselist(iter);
+
+    TRACEMSG(2, ("cache: Closing cache: Creating new rbtree..."));
+
+    /* get a handle to the existing red-black tree and create a new
+     * one on the cache. */
+    closed_tree = cache->rbtree;
+    cache->rbtree = rbinit(&cacheEntryCompare, NULL);
+    if (cache->rbtree == NULL) {
+        skAppPrintOutOfMemory(NULL);
+        RW_MUTEX_UNLOCK(&cache->mutex);
+        skAbort();
+    }
+    cache->open_count = 0;
+    cache->total_count = 0;
+
+    /* release the mutex */
     RW_MUTEX_UNLOCK(&cache->mutex);
+
+    if (NULL == vector) {
+        /* destroy all the entries */
+        TRACEMSG(2, ("cache: Closing cache: Destroying entries..."));
+        iter = rbopenlist(closed_tree);
+        while ((entry = (cache_entry_t *)rbreadlist(iter)) != NULL) {
+            MUTEX_LOCK(&entry->mutex);
+            assert(NULL == entry->stream);
+            cacheEntryDestroy(entry);
+        }
+        rbcloselist(iter);
+    } else {
+        /* move all entries that have a record count from the rbtree
+         * into the vector */
+        TRACEMSG(2, ("cache: Closing cache: Filling iterator..."));
+        iter = rbopenlist(closed_tree);
+        while ((entry = (cache_entry_t *)rbreadlist(iter)) != NULL) {
+            MUTEX_LOCK(&entry->mutex);
+            assert(NULL == entry->stream);
+            if (entry->total_rec_count) {
+                closed.key = entry->key;
+                closed.rec_count = entry->total_rec_count;
+                closed.filename = entry->filename;
+                entry->filename = NULL;
+                if (skVectorAppendValue(vector, &closed)) {
+                    skAppPrintOutOfMemory(NULL);
+                    free((void *)closed.filename);
+                }
+            }
+            cacheEntryDestroy(entry);
+        }
+        rbcloselist(iter);
+    }
+
+    /* done with the tree */
+    rbdestroy(closed_tree);
+
+    TRACEMSG(1, ("cache: Closing cache: Done."));
 
     return retval;
 }
@@ -422,20 +359,24 @@ skCacheCloseAll(
 /* create a cache with the specified size and open callback function */
 stream_cache_t *
 skCacheCreate(
-    int                 max_size,
+    size_t              max_size,
     cache_open_fn_t     open_fn)
 {
     stream_cache_t *cache = NULL;
 
     /* verify input */
     if (max_size < STREAM_CACHE_MINIMUM_SIZE) {
-        CRITMSG(("Illegal maximum size (%d) for stream cache;"
+        CRITMSG(("Illegal maximum size (%" SK_PRIuZ ") for stream cache;"
                  " must use value >= %u"),
                 max_size, STREAM_CACHE_MINIMUM_SIZE);
         return NULL;
     }
+    if (NULL == open_fn) {
+        CRITMSG("No open function provided to stream cache");
+        return NULL;
+    }
 
-    cache = (stream_cache_t*)calloc(1, sizeof(stream_cache_t));
+    cache = (stream_cache_t *)calloc(1, sizeof(stream_cache_t));
     if (cache == NULL) {
         skAppPrintOutOfMemory(NULL);
         return NULL;
@@ -447,24 +388,15 @@ skCacheCreate(
         return NULL;
     }
 
-    cache->entries = (cache_entry_t *)calloc(max_size, sizeof(cache_entry_t));
-    if (cache->entries == NULL) {
-        skAppPrintOutOfMemory(NULL);
-        RW_MUTEX_DESTROY(&cache->mutex);
-        free(cache);
-        return NULL;
-    }
-
     cache->rbtree = rbinit(&cacheEntryCompare, NULL);
     if (cache->rbtree == NULL) {
         skAppPrintOutOfMemory(NULL);
         RW_MUTEX_DESTROY(&cache->mutex);
-        free(cache->entries);
         free(cache);
         return NULL;
     }
 
-    cache->max_size = max_size;
+    cache->max_open_count = max_size;
     cache->open_callback = open_fn;
 
     return cache;
@@ -479,20 +411,19 @@ skCacheDestroy(
     int retval;
 
     if (NULL == cache) {
-        INFOMSG("Tried to destroy unitialized stream cache.");
+        TRACEMSG(1, ("cache: Tried to destroy unitialized stream cache"));
         return 0;
     }
 
-    TRACEMSG(1, ("Destroying cache with %d entries", cache->size));
+    TRACEMSG(1, ("cache: Destroying cache: %u total, %u open, %u closed...",
+                 cache->total_count, cache->open_count,
+                 cache->total_count - cache->open_count));
 
     /* close any open files */
-    retval = skCacheLockAndCloseAll(cache);
+    retval = skCacheCloseAll(cache, NULL);
 
     /* destroy the redblack tree */
     rbdestroy(cache->rbtree);
-
-    /* Destroy the entries array */
-    free(cache->entries);
 
     RW_MUTEX_UNLOCK(&cache->mutex);
     RW_MUTEX_DESTROY(&cache->mutex);
@@ -500,26 +431,122 @@ skCacheDestroy(
     /* Free the structure itself */
     free(cache);
 
+    TRACEMSG(1, ("cache: Destroying cache: Done."));
+
     return retval;
 }
+
+
+/* return the stream member of an entry */
+skstream_t *
+skCacheEntryGetStream(
+    const cache_entry_t    *entry)
+{
+    assert(entry);
+    ASSERT_MUTEX_LOCKED(&((cache_entry_t *)entry)->mutex);
+    return entry->stream;
+}
+
+
+/* unlock the entry */
+void
+skCacheEntryRelease(
+    cache_entry_t  *entry)
+{
+    assert(entry);
+    ASSERT_MUTEX_LOCKED(&entry->mutex);
+    MUTEX_UNLOCK(&entry->mutex);
+}
+
+
+/* return the number of files in the iterator */
+size_t
+skCacheFileIterCountEntries(
+    const cache_file_iter_t    *iter)
+{
+    assert(iter);
+    return skVectorGetCount(iter->vector);
+}
+
+/* destory the iterator and all the files it contains */
+void
+skCacheFileIterDestroy(
+    cache_file_iter_t  *iter)
+{
+    cache_file_t *file;
+    size_t i;
+
+    if (iter) {
+        for (i = 0; (file = (cache_file_t *)cacheFileIterAt(iter, i)); ++i) {
+            free((void *)file->filename);
+        }
+        skVectorDestroy(iter->vector);
+        free(iter);
+    }
+}
+
+
+/* get the next filename and record-count from the iterator */
+int
+skCacheFileIterNext(
+    cache_file_iter_t  *iter,
+    const char        **filename,
+    uint64_t           *record_count)
+{
+    cache_file_t *file;
+
+    assert(iter);
+    assert(filename);
+    assert(record_count);
+
+    file = cacheFileIterAt(iter, iter->pos);
+    if (NULL == file) {
+        assert(skVectorGetCount(iter->vector) == iter->pos);
+        return SK_ITERATOR_NO_MORE_ENTRIES;
+    }
+    ++iter->pos;
+    *filename = file->filename;
+    *record_count = file->rec_count;
+    return SK_ITERATOR_OK;
+}
+
 
 
 /* flush all streams in the cache */
 int
 skCacheFlush(
-    stream_cache_t     *cache)
+    stream_cache_t     *cache,
+    cache_file_iter_t **file_iter)
 {
 #if TRACEMSG_LEVEL >= 3
     char tstamp[SKTIMESTAMP_STRLEN];
 #endif
     sktime_t inactive_time;
     cache_entry_t *entry;
-    int i;
-    int j;
-    int rv;
+    cache_entry_t *del_entry;
+    uint64_t old_count;
+    sk_vector_t *vector;
+    RBLIST *iter;
+    cache_file_t flushed;
     int retval = 0;
+    int rv;
+
+    assert(cache);
+    assert(file_iter);
+
+    *file_iter = (cache_file_iter_t *)calloc(1, sizeof(cache_file_iter_t));
+    vector = skVectorNew(sizeof(cache_file_t));
+    if (NULL == *file_iter || NULL == vector) {
+        skAppPrintOutOfMemory(NULL);
+        skVectorDestroy(vector);
+        free(*file_iter);
+        *file_iter = NULL;
+        return -1;
+    }
+    (*file_iter)->vector = vector;
 
     if (NULL == cache) {
+        TRACEMSG(1, ("cache: Tried to flush unitialized stream cache."));
         return 0;
     }
 
@@ -528,98 +555,94 @@ skCacheFlush(
     /* compute the time for determining the inactive files */
     inactive_time = sktimeNow() - STREAM_CACHE_INACTIVE_TIMEOUT;
 
-    TRACEMSG(1, ("Flushing cache with %d entries...", cache->size));
-    TRACEMSG(3, ("Will close files inactive since %s",
+    TRACEMSG(1, ("cache: Flushing cache: %u total, %u open, %u closed...",
+                 cache->total_count, cache->open_count,
+                 cache->total_count - cache->open_count));
+    TRACEMSG(3, ("cache: Flushing cache: Closing files inactive since %s...",
                  sktimestamp_r(tstamp, inactive_time, 0)));
 
-    for (i = 0, j = 0, entry = cache->entries; i < cache->size; ++i, ++entry) {
+    /* entry to delete from rbtree; delete it after moving to the next
+     * entry in the tree */
+    del_entry = NULL;
 
+    iter = rbopenlist(cache->rbtree);
+    while ((entry = (cache_entry_t *)rbreadlist(iter)) != NULL) {
+        if (del_entry) {
+            rbdelete(del_entry, cache->rbtree);
+            cacheEntryDestroy(del_entry);
+            --cache->total_count;
+            del_entry = NULL;
+        }
         MUTEX_LOCK(&entry->mutex);
-
-        if (entry->last_accessed > inactive_time) {
-            /* file is still active; flush it and go to next file */
+        if (entry->stream && (entry->last_accessed > inactive_time)) {
+            /* file is still active; flush it */
             rv = skStreamFlush(entry->stream);
             if (rv) {
                 skStreamPrintLastErr(entry->stream, rv, &NOTICEMSG);
                 retval = -1;
             }
-            cacheEntryLogRecordCount(entry);
+            old_count = entry->opened_rec_count;
+            entry->opened_rec_count = skStreamGetRecordCount(entry->stream);
+            assert(old_count <= entry->opened_rec_count);
+            entry->total_rec_count += entry->opened_rec_count - old_count;
+            if (entry->total_rec_count) {
+                /* append an entry to vector; copy the filename */
+                flushed.filename = strdup(entry->filename);
+                if (!flushed.filename) {
+                    skAppPrintOutOfMemory(NULL);
+                } else {
+                    flushed.key = entry->key;
+                    flushed.rec_count = entry->total_rec_count;
+                    entry->total_rec_count = 0;
+                    if (skVectorAppendValue(vector, &flushed)) {
+                        skAppPrintOutOfMemory(NULL);
+                        free((void *)flushed.filename);
+                    }
+                }
+            }
             MUTEX_UNLOCK(&entry->mutex);
-
-            if (j != i) {
-                TRACEMSG(4, ("Moving entry from %d to %d", i, j));
-                cacheEntryMove(cache, &cache->entries[j], entry);
-            }
-            ++j;
-
         } else {
-            /* file is inactive; remove it from the cache */
-            TRACEMSG(3, ("Closing inactive file %s; last_accessed %s",
-                         skStreamGetPathname(entry->stream),
-                         sktimestamp_r(tstamp, entry->last_accessed, 0)));
-
-            rv = cacheEntryDestroyFile(cache, entry, 1);
-            if (rv) {
-                retval = -1;
+            /* stream is inactive or closed; delete the entry */
+            del_entry = entry;
+            if (entry->stream) {
+                TRACEMSG(3, ("cache: Flushing cache:"
+                             " Closing inactive file %s; last_accessed %s",
+                             entry->filename,
+                             sktimestamp_r(tstamp, entry->last_accessed, 0)));
+                rv = cacheEntryClose(entry);
+                if (rv) {
+                    retval = -1;
+                }
+                --cache->open_count;
             }
-            MUTEX_DESTROY(&entry->mutex);
+            if (entry->total_rec_count) {
+                /* append an entry to the vector; steal the filename
+                 * since the entry is being destroyed */
+                flushed.key = entry->key;
+                flushed.rec_count = entry->total_rec_count;
+                flushed.filename = entry->filename;
+                entry->filename = NULL;
+                if (skVectorAppendValue(vector, &flushed)) {
+                    skAppPrintOutOfMemory(NULL);
+                    free((void *)flushed.filename);
+                }
+            }
         }
     }
-    cache->size = j;
+    rbcloselist(iter);
 
-    TRACEMSG(1, ("Flush finished.  Cache size is %d entries.", cache->size));
+    if (del_entry) {
+        rbdelete(del_entry, cache->rbtree);
+        cacheEntryDestroy(del_entry);
+        --cache->total_count;
+    }
+
+    TRACEMSG(1, ("cache: Flushing cache. %u total, %u open. Done.",
+                 cache->total_count, cache->open_count));
 
     RW_MUTEX_UNLOCK(&cache->mutex);
 
     return retval;
-}
-
-
-/* lock cache, then close and destroy all streams. do not unlock cache */
-int
-skCacheLockAndCloseAll(
-    stream_cache_t     *cache)
-{
-    cache_entry_t *entry;
-    int i;
-    int retval = 0;
-
-    if (NULL == cache) {
-        return 0;
-    }
-
-    WRITE_LOCK(&cache->mutex);
-
-    TRACEMSG(1, ("Closing all files in cache with %d entries", cache->size));
-
-    for (i = 0, entry = cache->entries; i < cache->size; ++i, ++entry) {
-        if (cacheEntryDestroyFile(cache, entry, 0)) {
-            retval = -1;
-        }
-        MUTEX_DESTROY(&entry->mutex);
-    }
-
-    cache->size = 0;
-
-    return retval;
-}
-
-
-/* find an entry in the cache.  return entry in locked state. */
-cache_entry_t *
-skCacheLookup(
-    stream_cache_t     *cache,
-    const cache_key_t  *key)
-{
-    cache_entry_t *entry;
-
-    READ_LOCK(&cache->mutex);
-
-    entry = cacheEntryLookup(cache, key);
-
-    RW_MUTEX_UNLOCK(&cache->mutex);
-
-    return entry;
 }
 
 
@@ -630,63 +653,207 @@ skCacheLookupOrOpenAdd(
     stream_cache_t     *cache,
     const cache_key_t  *key,
     void               *caller_data,
-    cache_entry_t     **entry)
+    cache_entry_t     **out_entry)
 {
-    skstream_t *rwio;
+#ifdef SK_HAVE_PTHREAD_RWLOCK
+    int have_writelock = 0;
+#endif
+    cache_entry_t search_key;
+    cache_entry_t *e;
+    cache_entry_t *entry;
     int retval = 0;
+    int rv;
+#if TRACEMSG_LEVEL >= 3
+    char tstamp[SKTIMESTAMP_STRLEN];
+    char sensor[SK_MAX_STRLEN_SENSOR+1];
+    char flowtype[SK_MAX_STRLEN_FLOWTYPE+1];
 
-    /* do a standard lookup */
+    sktimestamp_r(tstamp, key->time_stamp, SKTIMESTAMP_NOMSEC);
+    sksiteSensorGetName(sensor, sizeof(sensor), key->sensor_id);
+    sksiteFlowtypeGetName(flowtype, sizeof(flowtype), key->flowtype_id);
+#endif /* TRACEMSG_LEVEL */
+
+    search_key.key.time_stamp = key->time_stamp;
+    search_key.key.sensor_id = key->sensor_id;
+    search_key.key.flowtype_id = key->flowtype_id;
+
+    /* do a lookup holding only the read lock; if there is no support
+     * for read-write locks, the entire cache is locked. */
     READ_LOCK(&cache->mutex);
-    *entry = cacheEntryLookup(cache, key);
 
-    /* found it; we can return */
-    if (*entry) {
+  LOOKUP:
+    /* try to find the entry */
+    entry = (cache_entry_t *)rbfind(&search_key, cache->rbtree);
+    TRACEMSG(3, ("cache: Lookup: %s for stream %s %s %s",
+                 ((entry) ? "hit" : "miss"), tstamp, sensor, flowtype));
+
+    /* if we find it and the stream is open, return it */
+    if (entry && entry->stream) {
+        MUTEX_LOCK(&entry->mutex);
+        TRACEMSG(2, ("cache: Lookup: found open stream '%s'",entry->filename));
+        entry->last_accessed = sktimeNow();
+        *out_entry = entry;
+        retval = 0;
         goto END;
     }
 
 #ifdef SK_HAVE_PTHREAD_RWLOCK
-    /* need to add the stream.  Get a write lock, but first we must
-     * release the read lock.  No need to change the type of lock and
-     * re-do the search if we aren't using read/write locks. */
-    RW_MUTEX_UNLOCK(&cache->mutex);
-    WRITE_LOCK(&cache->mutex);
+    if (!have_writelock) {
+        have_writelock = 1;
+        /*
+         *  we need to either add or reopen the stream.  We want to get a
+         *  write lock on the cache, but first we must release the read
+         *  lock on the cache.
+         *
+         *  skip all of these steps if there is no support for read-write
+         *  locks, since the entire cache is already locked.
+         */
+        RW_MUTEX_UNLOCK(&cache->mutex);
+        WRITE_LOCK(&cache->mutex);
 
-    /* search for the entry again, in case it was added between
-     * releasing the read lock and getting the write lock */
-    *entry = cacheEntryLookup(cache, key);
-    if (*entry) {
-        /* found it.  we can return */
-        goto END;
+        /* search for the entry again, in case it was added or opened
+         * between releasing the read lock on the cache and getting
+         * the write lock on the cache */
+        goto LOOKUP;
     }
-#endif  /* SK_HAVE_PTHREAD_RWLOCK */
+#endif /* SK_HAVE_PTHREAD_RWLOCK */
 
-    /* use the callback to open the file */
-    rwio = cache->open_callback(key, caller_data);
-    if (NULL == rwio) {
-        retval = -1;
-        goto END;
+    *out_entry = NULL;
+    retval = -1;
+
+    if (entry) {
+        MUTEX_LOCK(&entry->mutex);
+        /* use the callback to open the file */
+        entry->stream = cache->open_callback(key, caller_data, entry->filename);
+        if (NULL == entry->stream) {
+            MUTEX_UNLOCK(&entry->mutex);
+            goto END;
+        }
+        if (strcmp(entry->filename, skStreamGetPathname(entry->stream))) {
+            DEBUGMSG("Pathname changed");
+            free((void *)entry->filename);
+            entry->filename = strdup(skStreamGetPathname(entry->stream));
+            if (NULL == entry->filename) {
+                skAppPrintOutOfMemory(NULL);
+                MUTEX_UNLOCK(&entry->mutex);
+                goto END;
+            }
+        }
+        ++cache->open_count;
+        TRACEMSG(1, ("cache: Lookup: Opened known file '%s'", entry->filename));
+
+    } else {
+        /* create a new entry */
+        entry = (cache_entry_t *)calloc(1, sizeof(cache_entry_t));
+        if (NULL == entry) {
+            skAppPrintOutOfMemory(NULL);
+            goto END;
+        }
+        if (MUTEX_INIT(&entry->mutex)) {
+            CRITMSG(FMT_MUTEX_FAILURE);
+            free(entry);
+            goto END;
+        }
+        MUTEX_LOCK(&entry->mutex);
+        /* use the callback to open the file */
+        entry->stream = cache->open_callback(key, caller_data, NULL);
+        if (NULL == entry->stream) {
+            cacheEntryDestroy(entry);
+            goto END;
+        }
+        entry->filename = strdup(skStreamGetPathname(entry->stream));
+        if (NULL == entry->filename) {
+            skAppPrintOutOfMemory(NULL);
+            cacheEntryDestroy(entry);
+            goto END;
+        }
+
+        entry->key.time_stamp = key->time_stamp;
+        entry->key.sensor_id = key->sensor_id;
+        entry->key.flowtype_id = key->flowtype_id;
+        entry->total_rec_count = 0;
+        entry->last_accessed = MAX_TIME;
+
+        /* add the entry to the redblack tree */
+        e = (cache_entry_t *)rbsearch(entry, cache->rbtree);
+        if (e != entry) {
+            if (e == NULL) {
+                skAppPrintOutOfMemory(NULL);
+                cacheEntryDestroy(entry);
+                goto END;
+            }
+            CRITMSG(("Duplicate entries in stream cache "
+                     "for time=%" PRId64 " sensor=%d flowtype=%d"),
+                    key->time_stamp, key->sensor_id, key->flowtype_id);
+            skAbort();
+        }
+
+        ++cache->total_count;
+        ++cache->open_count;
+
+        TRACEMSG(1, ("cache: Lookup: Opened new file '%s'", entry->filename));
     }
 
-    /* add the newly opened file to the cache */
-    retval = cacheEntryAdd(cache, rwio, key, entry);
-    if (-1 == retval) {
-        skStreamDestroy(&rwio);
+    retval = 0;
+
+    TRACEMSG(2, ("cache: Lookup: %u total, %u open, %u max, %u closed",
+                 cache->total_count, cache->open_count, cache->max_open_count,
+                 cache->total_count - cache->open_count));
+
+    if (cache->open_count > cache->max_open_count) {
+        /* The cache is full: close the least recently used stream.
+         * This uses a linear search over all entries. */
+        RBLIST *iter;
+        cache_entry_t *min_entry;
+        sktime_t min_time;
+
+        min_entry = NULL;
+        min_time = MAX_TIME;
+
+        /* unlock the entry's mutex to avoid a deadlock */
+        MUTEX_UNLOCK(&entry->mutex);
+
+        /* visit entries in the red-black tree; this only finds open
+         * entries since closed entries have their time set to
+         * MAX_TIME. */
+        iter = rbopenlist(cache->rbtree);
+        while ((e = (cache_entry_t *)rbreadlist(iter)) != NULL) {
+            MUTEX_LOCK(&e->mutex);
+            if (e->last_accessed < min_time) {
+                min_time = e->last_accessed;
+                min_entry = e;
+            }
+            MUTEX_UNLOCK(&e->mutex);
+        }
+        rbcloselist(iter);
+
+        assert(min_time < MAX_TIME);
+        assert(min_entry != NULL);
+        assert(min_entry != entry);
+        assert(min_entry->stream != NULL);
+
+        MUTEX_LOCK(&min_entry->mutex);
+        rv = cacheEntryClose(min_entry);
+        if (rv) {
+            retval = -1;
+        }
+        min_entry->last_accessed = MAX_TIME;
+        MUTEX_UNLOCK(&min_entry->mutex);
+
+        --cache->open_count;
+
+        /* re-lock the entry's mutex */
+        MUTEX_LOCK(&entry->mutex);
     }
+
+    /* update access time and record count */
+    entry->last_accessed = sktimeNow();
+    entry->opened_rec_count = skStreamGetRecordCount(entry->stream);
+    *out_entry = entry;
 
   END:
     RW_MUTEX_UNLOCK(&cache->mutex);
     return retval;
-}
-
-
-/* unlocks a cache locked by skCacheLockAndCloseAll(). */
-void
-skCacheUnlock(
-    stream_cache_t     *cache)
-{
-    assert(cache);
-
-    RW_MUTEX_UNLOCK(&cache->mutex);
 }
 
 

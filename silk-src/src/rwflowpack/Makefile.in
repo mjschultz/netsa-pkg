@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-# RCSIDENT("$SiLK: Makefile.am 3c4d6696a20e 2014-10-15 19:18:45Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 8b44d08476b6 2016-06-03 22:17:44Z mthomas $");
 
 # Installed Targets
 
@@ -922,7 +922,8 @@ TESTS = tests/rwflowappend-help.pl tests/rwflowappend-version.pl \
 	tests/rwflowappend-append-ipv6.pl \
 	tests/rwflowappend-append-cmd.pl \
 	tests/rwflowappend-append-hours.pl \
-	tests/rwflowappend-append-bad.pl
+	tests/rwflowappend-append-bad.pl \
+	tests/rwflowpack-split-rwflowappend.pl
 all: all-am
 
 .SUFFIXES:
@@ -1977,6 +1978,13 @@ tests/rwflowappend-append-hours.pl.log: tests/rwflowappend-append-hours.pl
 tests/rwflowappend-append-bad.pl.log: tests/rwflowappend-append-bad.pl
 	@p='tests/rwflowappend-append-bad.pl'; \
 	b='tests/rwflowappend-append-bad.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwflowpack-split-rwflowappend.pl.log: tests/rwflowpack-split-rwflowappend.pl
+	@p='tests/rwflowpack-split-rwflowappend.pl'; \
+	b='tests/rwflowpack-split-rwflowappend.pl'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \

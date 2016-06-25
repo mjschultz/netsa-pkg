@@ -4,7 +4,7 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in ../LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: silkconfig.m4 85572f89ddf9 2016-05-05 20:07:39Z mthomas $")
+dnl RCSIDENT("$SiLK: silkconfig.m4 d49b1e47d2e3 2016-06-15 20:31:17Z mthomas $")
 
 # ---------------------------------------------------------------------------
 # SILK_AC_COMPILER
@@ -714,6 +714,8 @@ AC_DEFUN([SILK_AC_ARG_ENABLE_EXTRA_CHECKS],[
 
     AM_CONDITIONAL(RUN_EXTRA_CHECKS,[test "x$silk_enable_extra_checks" = "x1"])
 ])# SILK_AC_ARG_ENABLE_EXTRA_CHECKS
+
+
 
 
 

@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwreadonly.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwreadonly.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skstream.h>
@@ -33,7 +33,7 @@ int main(int argc, char **argv)
     int64_t ticks = 0;
     rwRec rwrec;
     uint64_t rec_count = 0;
-    skstream_t *rwio;
+    skstream_t *stream;
     int exit_val = 0;
     int rv;
     unsigned int i;
@@ -42,29 +42,29 @@ int main(int argc, char **argv)
     skAppVerifyFeatures(&features, NULL);
 
     for (i = 1; i < (unsigned int)argc; ++i) {
-        rwio = NULL;
-        if ((rv = skStreamCreate(&rwio, SK_IO_READ, SK_CONTENT_SILK_FLOW))
-            || (rv = skStreamBind(rwio, argv[i]))
-            || (rv = skStreamOpen(rwio))
-            || (rv = skStreamReadSilkHeader(rwio, NULL)))
+        stream = NULL;
+        if ((rv = skStreamCreate(&stream, SK_IO_READ, SK_CONTENT_SILK_FLOW))
+            || (rv = skStreamBind(stream, argv[i]))
+            || (rv = skStreamOpen(stream))
+            || (rv = skStreamReadSilkHeader(stream, NULL)))
         {
-            skStreamPrintLastErr(rwio, rv, &skAppPrintErr);
-            skStreamDestroy(&rwio);
+            skStreamPrintLastErr(stream, rv, &skAppPrintErr);
+            skStreamDestroy(&stream);
             exit_val = 1;
             break;
         }
         ticks -= clock();
-        while ((rv = skStreamReadRecord(rwio, &rwrec)) == SKSTREAM_OK) {
+        while ((rv = skStreamReadRecord(stream, &rwrec)) == SKSTREAM_OK) {
             ++rec_count;
         }
         ticks += clock();
         if (rv != SKSTREAM_ERR_EOF) {
-            skStreamPrintLastErr(rwio, rv, &skAppPrintErr);
-            skStreamDestroy(&rwio);
+            skStreamPrintLastErr(stream, rv, &skAppPrintErr);
+            skStreamDestroy(&stream);
             exit_val = 1;
             break;
         }
-        skStreamDestroy(&rwio);
+        skStreamDestroy(&stream);
     }
 
     fprintf(stderr, ("%s: Read %" PRIu64 " record%s from %d file%s"

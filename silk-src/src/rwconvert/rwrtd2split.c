@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwrtd2split.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwrtd2split.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
 
 #include <silk/skstream.h>
 #include <silk/rwrec.h>
@@ -33,8 +33,8 @@ RCSIDENT("$SiLK: rwrtd2split.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 static char *in_fpath;
 static char *out_fpath;
-static skstream_t *in_ios;
-static skstream_t *out_ios;
+static skstream_t *in_stream;
+static skstream_t *out_stream;
 
 static int64_t hdr_len = 0;
 static int64_t rec_len;
@@ -106,11 +106,11 @@ appTeardown(
     }
     teardownFlag = 1;
 
-    if (in_ios) {
-        skStreamDestroy(&in_ios);
+    if (in_stream) {
+        skStreamDestroy(&in_stream);
     }
-    if (out_ios) {
-        skStreamDestroy(&out_ios);
+    if (out_stream) {
+        skStreamDestroy(&out_stream);
     }
 
     skAppUnregister();
@@ -198,31 +198,31 @@ appSetup(
     }
 
     /* Open input file */
-    rv = skStreamOpenSilkFlow(&in_ios, in_fpath, SK_IO_READ);
+    rv = skStreamOpenSilkFlow(&in_stream, in_fpath, SK_IO_READ);
     if (rv) {
-        skStreamPrintLastErr(in_ios, rv, &skAppPrintErr);
-        skStreamDestroy(&in_ios);
+        skStreamPrintLastErr(in_stream, rv, &skAppPrintErr);
+        skStreamDestroy(&in_stream);
         exit(EXIT_FAILURE);
     }
 
     /* Get input file's header */
-    in_hdr = skStreamGetSilkHeader(in_ios);
+    in_hdr = skStreamGetSilkHeader(in_stream);
 
     /* Check input version */
     if (skHeaderGetFileFormat(in_hdr) != FT_RWROUTED) {
         skAppPrintErr("Input file '%s' not in RWROUTED format",
                       in_fpath);
-        skStreamDestroy(&in_ios);
+        skStreamDestroy(&in_stream);
         exit(EXIT_FAILURE);
     }
 
     /* Create and open output file */
-    rv = skStreamCreate(&out_ios, SK_IO_WRITE, SK_CONTENT_SILK_FLOW);
+    rv = skStreamCreate(&out_stream, SK_IO_WRITE, SK_CONTENT_SILK_FLOW);
     if (rv == SKSTREAM_OK) {
-        rv = skStreamBind(out_ios, out_fpath);
+        rv = skStreamBind(out_stream, out_fpath);
     }
     if (rv == SKSTREAM_OK) {
-        out_hdr = skStreamGetSilkHeader(out_ios);
+        out_hdr = skStreamGetSilkHeader(out_stream);
         rv = skHeaderCopy(out_hdr, in_hdr,
                           (SKHDR_CP_ALL & ~SKHDR_CP_FORMAT));
     }
@@ -230,15 +230,15 @@ appSetup(
         rv = skHeaderSetFileFormat(out_hdr, FT_RWSPLIT);
     }
     if (rv == SKSTREAM_OK) {
-        rv = skStreamOpen(out_ios);
+        rv = skStreamOpen(out_stream);
     }
     if (rv == SKSTREAM_OK) {
-        rv = skStreamWriteSilkHeader(out_ios);
+        rv = skStreamWriteSilkHeader(out_stream);
     }
     if (rv != SKSTREAM_OK) {
-        skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
         skAppPrintErr("Unable to open output file '%s'.", out_fpath);
-        skStreamDestroy(&out_ios);
+        skStreamDestroy(&out_stream);
         exit(EXIT_FAILURE);
     }
 
@@ -287,11 +287,11 @@ int main(int argc, char **argv)
     appSetup(argc, argv);
 
     /* Process body */
-    while (SKSTREAM_OK == (in_rv = skStreamReadRecord(in_ios, &rwrec))) {
+    while (SKSTREAM_OK == (in_rv = skStreamReadRecord(in_stream, &rwrec))) {
         rec_count++;
-        rv = skStreamWriteRecord(out_ios, &rwrec);
+        rv = skStreamWriteRecord(out_stream, &rwrec);
         if (rv != SKSTREAM_OK) {
-            skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
             if (SKSTREAM_ERROR_IS_FATAL(rv)) {
                 skAppPrintErr("Error writing to '%s'.  Stopping copy.",
                               out_fpath);
@@ -300,15 +300,15 @@ int main(int argc, char **argv)
         }
     }
     if ((SKSTREAM_OK != in_rv) && (SKSTREAM_ERR_EOF != in_rv)) {
-        skStreamPrintLastErr(in_ios, in_rv, &skAppPrintErr);
+        skStreamPrintLastErr(in_stream, in_rv, &skAppPrintErr);
     }
 
-    skStreamDestroy(&in_ios);
-    rv = skStreamClose(out_ios);
+    skStreamDestroy(&in_stream);
+    rv = skStreamClose(out_stream);
     if (rv) {
-        skStreamPrintLastErr(out_ios, rv, &skAppPrintErr);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
     }
-    skStreamDestroy(&out_ios);
+    skStreamDestroy(&out_stream);
 
     file_size_real = skFileSize(out_fpath);
     file_size_calc = hdr_len + rec_len * rec_count;

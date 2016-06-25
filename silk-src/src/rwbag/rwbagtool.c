@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagtool.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwbagtool.c cfc5c10253d8 2016-06-15 21:53:33Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skipaddr.h>
@@ -1262,7 +1262,7 @@ bagtoolInvert(
 
     /* The output bag is empty; modify it to hold integer keys and
      * counters */
-    rv_bag = skBagModify(bag, SKBAG_FIELD_CUSTOM, SKBAG_FIELD_CUSTOM,
+    rv_bag = skBagModify(bag, skBagCounterFieldType(bag), SKBAG_FIELD_CUSTOM,
                          sizeof(uint32_t), SKBAG_OCTETS_NO_CHANGE);
     if (SKBAG_OK != rv_bag) {
         skAppPrintErr("Error when modifying bag: %s",

@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-B<rwgeoip2ccmap> - Create a country code prefix map from a GeoIP CSV file
+B<rwgeoip2ccmap> - Create a country code prefix map from a GeoIP Legacy file
 
 =head1 SYNOPSIS
 
@@ -10,11 +10,17 @@ B<rwgeoip2ccmap> - Create a country code prefix map from a GeoIP CSV file
         [--input-file=FILENAME] [--output-file=FILENAME] [--dry-run]
         [--note-add=TEXT] [--note-file-add=FILENAME]
         [--invocation-strip]
-        [--csv-input] [--v6-csv-input]
 
   rwgeoip2ccmap --help
 
   rwgeoip2ccmap --version
+
+Legacy Synopsis
+
+  rwgeoip2ccmap {--csv-input | --v6-csv-input | --encoded-input}
+        [--input-file=FILENAME] [--output-file=FILENAME] [--dry-run]
+        [--note-add=TEXT] [--note-file-add=FILENAME]
+        [--invocation-strip]
 
 =head1 DESCRIPTION
 
@@ -28,12 +34,11 @@ codes defined by the Internet Assigned Numbers Authority
 The country code prefix map is based on the GeoIP Legacy Country(R) or
 free GeoLite Legacy database created by MaxMind(R) and available from
 L<http://www.maxmind.com/>.  (B<Note:> You must use the MaxMind
-I<legacy> comma separated value (CSV) database format.
-B<rwgeoip2ccmap> does not support the GeoIP2 and GeoLite2 databases,
-and the binary forms of the database are no longer supported as of
-SiLK 3.12.0.)
+I<legacy> database format.
+B<rwgeoip2ccmap> does not support the GeoIP2 and GeoLite2 databases.)
 
-The database is available in two supported formats:
+The database is available several formats, and B<rwgeoip2ccmap>
+supports the following formats:
 
 =over 4
 
@@ -49,6 +54,16 @@ country name, and county code in a CSV format.  This file only
 contains IPv6 data.  If you use this file to create your country code
 prefix map, any IPv4 addresses will have the unknown value C<-->.  See
 L</EXAMPLES> for a way to merge the IPv6 and IPv4 files.
+
+=item GeoIP.dat.gz
+
+a compressed (B<gzip(1)>) binary file containing specially encoded
+data for IPv4 address ranges.
+
+=item GeoIPv6.dat.gz
+
+a compressed (B<gzip(1)>) binary file containing specially encoded
+data for both IPv4 and IPv6 address ranges.
 
 =back
 
@@ -88,11 +103,12 @@ required for options that take optional parameters.
 
 =over 4
 
-=item B<--mode=>{B<auto>|B<ipv4>|B<ipv6>}
+=item B<--mode=>{B<auto>|B<ipv4>|B<ipv6>|B<binary>}
 
-Specify the type of prefix map file to create.  When not specified,
-B<rwgeoip2ccmap> determines the type of prefix map to create based on
-the first line of input.  The modes are:
+Specify the type of the input which determines type of prefix map
+B<rwgeoip2ccmap> creates.  When not specified, B<rwgeoip2ccmap>
+determines the type of prefix map to create based on the first line of
+input.  The modes are:
 
 =over 4
 
@@ -103,20 +119,28 @@ appear on the first line of input.  This is the default mode.
 
 =item B<ipv4>
 
-Create an IPv4 prefix map.  Any IPv6 addresses in the ::ffff:0:0/96
-netblock are mapped to an IPv4 address, and all other IPv6 addresses
-are ignored.
+Read textual input containing IPv4 addresses in a comma separated
+value format and create an IPv4 prefix map.  Any IPv6 addresses in the
+::ffff:0:0/96 netblock are mapped to an IPv4 address and all other
+IPv6 addresses are ignored.
 
 =item B<ipv6>
 
-Create an IPv6 prefix map.  Any IPv4 addresses are mapped into the
-::ffff:0:0/96 netblock.
+Read textual input containing IPv6 addresses in a comma separated
+value format and create an IPv6 prefix map.  Any IPv4 addresses are
+mapped into the ::ffff:0:0/96 netblock.
+
+=item B<binary>
+
+Read specially-encoded binary input containing either IPv4 or IPv6
+addresses and create the appropriate type of prefix map.  I<Since SiLK
+3.12.2.>
 
 =back
 
 =item B<--input-file>=I<FILENAME>
 
-Read the CSV form of the GeoIP Legacy country code database from
+Read the CSV or binary forms of the GeoIP Legacy country code database from
 I<FILENAME>.  You may use C<stdin> or C<-> to represent the standard
 input.  When this switch is not provided, the input is read from the
 standard input unless the standard input is a terminal.
@@ -174,9 +198,9 @@ B<--mode=ipv6>.
 
 =item B<--encoded-input>
 
-Print an error message and exit.  The binary form of the database is
-no longer supported as of SiLK 3.12.0, and the CSV form of the GeoIP
-Legacy database must be used instead.
+Assume the input is the specially-encoded binary form of the GeoIP
+Legacy country code data for either IPv4 or IPv6.  This switch is
+deprecated, and it should be replaced with B<--mode=binary>.
 
 =item B<--help>
 
@@ -205,7 +229,7 @@ lines.
 
 =head2 IPv4 Comma Separated Values File
 
-Download CSV version of the MaxMind GeoIP I<Legacy> Country database
+Download the CSV version of the MaxMind GeoIP I<Legacy> Country database
 for IPv4, F<GeoIPCountryCSV.zip>.  (Use the Legacy form of the GeoIP
 or GeoLite database since the GeoIP2 and GeoLite2 databases are not
 supported.)  Running B<unzip> B<-l> on the zip file should show a
@@ -258,9 +282,14 @@ B<rwsort(1)>, B<rwstats(1)>, B<rwuniq(1)>, B<rwgroup(1)>,
 B<rwpmapbuild(1)>, B<silk(7)>, B<gzip(1)>, B<zip(1)>, B<unzip(1)>,
 L<http://dev.maxmind.com/geoip/legacy/geolite/>
 
+=head1 NOTES
+
+Support for the binary form of the GeoIP Legacy format was removed in
+SiLK 3.12.0 and restored in SiLK 3.12.2.
+
 =cut
 
-$SiLK: rwgeoip2ccmap.pod c24c943e8d9f 2016-04-01 20:55:25Z mthomas $
+$SiLK: rwgeoip2ccmap.pod a67233a9fda8 2016-06-13 19:04:29Z mthomas $
 
 Local Variables:
 mode:text

@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: stream-cache.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: stream-cache.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sklog.h>
@@ -567,7 +567,7 @@ skCacheLookupOrOpenAdd(
     void               *caller_data,
     cache_entry_t     **entry)
 {
-    skstream_t *rwio;
+    skstream_t *stream;
     int retval = 0;
 
     /* do a standard lookup */
@@ -579,16 +579,16 @@ skCacheLookupOrOpenAdd(
     }
 
     /* use the callback to open the file */
-    rwio = cache->open_callback(key, caller_data);
-    if (NULL == rwio) {
+    stream = cache->open_callback(key, caller_data);
+    if (NULL == stream) {
         retval = -1;
         goto END;
     }
 
     /* add the newly opened file to the cache */
-    retval = cacheEntryAdd(cache, rwio, key, entry);
+    retval = cacheEntryAdd(cache, stream, key, entry);
     if (-1 == retval) {
-        skStreamDestroy(&rwio);
+        skStreamDestroy(&stream);
     }
 
   END:

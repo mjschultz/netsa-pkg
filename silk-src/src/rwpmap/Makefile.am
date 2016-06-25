@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 9dcc642f0092 2016-03-24 15:26:17Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am e460180628b1 2016-06-13 20:58:23Z mthomas $");
 
 # Installed Targets
 
@@ -58,6 +58,7 @@ TESTS = \
 	tests/rwgeoip2ccmap-null-input.pl \
 	tests/rwpmapbuild-help.pl \
 	tests/rwpmapbuild-version.pl \
+	tests/rwpmapbuild-lone-command.pl \
 	tests/rwpmapbuild-null-input.pl \
 	tests/rwpmapcat-help.pl \
 	tests/rwpmapcat-version.pl \

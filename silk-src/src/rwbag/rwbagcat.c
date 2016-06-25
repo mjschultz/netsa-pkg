@@ -16,10 +16,11 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagcat.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwbagcat.c 12f1471c7423 2016-06-13 19:27:15Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skcountry.h>
+#include <silk/skheap.h>
 #include <silk/skipaddr.h>
 #include <silk/skipset.h>
 #include <silk/skprefixmap.h>
@@ -53,6 +54,9 @@ RCSIDENT("$SiLK: rwbagcat.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 /* for the --key-format, value to indicate a timestamp */
 #define KEY_FORMAT_TIME     UINT32_C(0x40000000)
+
+/* for --sort-counter, the initial size of the heap */
+#define BAGCAT_HEAP_INITIAL_SIZE  (1u << 20)
 
 
 /* return a non-zero value if a record's 'key' and 'counter' values
@@ -120,6 +124,15 @@ struct state_st {
 };
 typedef struct state_st state_t;
 
+/* bagcat_heapnode_t is how key/counter pairs are stored in the heap
+ * that is used to implement the --sort-counter switch */
+struct bagcat_heapnode_st {
+    uint64_t            counter;
+    skBagTypedKey_t     key;
+};
+typedef struct bagcat_heapnode_st bagcat_heapnode_t;
+
+
 
 /* LOCAL VARIABLES */
 
@@ -129,6 +142,7 @@ static skstream_t *output = NULL;
 static skstream_t *stats_stream = NULL;
 static int print_statistics = 0;
 static int print_network = 0;
+static int sort_counters = 0;
 static bin_scheme_t bin_scheme = BINSCHEME_NONE;
 static const char *net_structure = NULL;
 
@@ -234,6 +248,7 @@ static int stdin_used = 0;
 typedef enum {
     OPT_NETWORK_STRUCTURE,
     OPT_BIN_IPS,
+    OPT_SORT_COUNTERS,
     OPT_PRINT_STATISTICS,
     OPT_MASK_SET,
     OPT_MINKEY,
@@ -257,6 +272,7 @@ typedef enum {
 static struct option appOptions[] = {
     {"network-structure",   OPTIONAL_ARG, 0, OPT_NETWORK_STRUCTURE},
     {"bin-ips",             OPTIONAL_ARG, 0, OPT_BIN_IPS},
+    {"sort-counters" ,      OPTIONAL_ARG, 0, OPT_SORT_COUNTERS},
     {"print-statistics",    OPTIONAL_ARG, 0, OPT_PRINT_STATISTICS},
     {"mask-set",            REQUIRED_ARG, 0, OPT_MASK_SET},
     {"minkey",              REQUIRED_ARG, 0, OPT_MINKEY},
@@ -280,11 +296,15 @@ static struct option appOptions[] = {
 
 static const char *appHelp[] = {
     NULL,
-    ("Invert the bag and count by distinct volume values.  May\n"
-     "\tnot be combined with --network-structure. Choices:\n"
+    ("Invert the bag and count by distinct volume values.  May not\n"
+     "\tbe combined with --network-structure or --sort-counters. Choices:\n"
      "\tlinear   - volume => count(KEYS) [default when no argument]\n"
      "\tbinary   - log2(volume) => count(KEYS)\n"
      "\tdecimal  - variation on log10(volume) => count(KEYS)"),
+    ("Sort the output by counters instead of by keys.  May\n"
+     "\tnot be combined with --network-structure or --bin-ips. Choices:\n"
+     "\tdecreasing - print highest counter first [default when no argument]\n"
+     "\tincreasing - print lowest counter first"),
     ("Print statistics about the bag.  Def. no. Write\n"
      "\toutput to the standard output unless an argument is given.\n"
      "\tUse 'stderr' to send the output to the standard error"),
@@ -352,7 +372,7 @@ appUsageLong(
      "\tspecified by listing them after the '/'. Def. v4:TS/8,16,24,27.\n"   \
      "\tA leading 'v6:' treats Bag's keys as IPv6, allows range 0--128,\n"   \
      "\tdisallows A,B,C,X, sets H to 128, and sets default to TS/48,64.\n"   \
-     "\tMay not be combined with --bin-ips")
+     "\tMay not be combined with --bin-ips or --sort-counters")
 
     FILE *fh = USAGE_FH;
     unsigned int i;
@@ -619,6 +639,7 @@ appOptionsHandler(
 {
     skstream_t *stream = NULL;
     uint64_t val64;
+    size_t len;
     int rv;
 
     switch ((appOptionsEnum)opt_index) {
@@ -642,26 +663,42 @@ appOptionsHandler(
         break;
 
       case OPT_BIN_IPS:
-        if (opt_arg == NULL) {
+        if (NULL == opt_arg) {
             bin_scheme = BINSCHEME_LINEAR;
+        } else if (0 == (len = strlen(opt_arg))) {
+            skAppPrintErr("Invalid %s: Switch requires an argument",
+                          appOptions[opt_index].name);
+            return 1;
+        } else if (strncmp(opt_arg, "linear", len) == 0) {
+            bin_scheme = BINSCHEME_LINEAR;
+        } else if (strncmp(opt_arg, "binary", len) == 0) {
+            bin_scheme = BINSCHEME_BINARY;
+        } else if (strncmp(opt_arg, "decimal", len) == 0) {
+            bin_scheme = BINSCHEME_DECIMAL;
         } else {
-            size_t len = strlen(opt_arg);
-            if (len == 0) {
-                skAppPrintErr("Invalid %s: Switch requires an argument",
-                              appOptions[opt_index].name);
-                return 1;
-            }
-            if (strncmp(opt_arg, "linear", len) == 0) {
-                bin_scheme = BINSCHEME_LINEAR;
-            } else if (strncmp(opt_arg, "binary", len) == 0) {
-                bin_scheme = BINSCHEME_BINARY;
-            } else if (strncmp(opt_arg, "decimal", len) == 0) {
-                bin_scheme = BINSCHEME_DECIMAL;
-            } else {
-                skAppPrintErr("Illegal bin scheme. "
-                              "Should be one of: linear, binary, decimal.");
-                return 1;
-            }
+            skAppPrintErr(
+                "Illegal %s '%s'. Valid schemes: linear, binary, decimal",
+                appOptions[opt_index].name, opt_arg);
+            return 1;
+        }
+        break;
+
+      case OPT_SORT_COUNTERS:
+        if (NULL == opt_arg) {
+            sort_counters = 1;
+        } else if (0 == (len = strlen(opt_arg))) {
+            skAppPrintErr("Invalid %s: Switch requires an argument",
+                          appOptions[opt_index].name);
+            return 1;
+        } else if (0 == strncmp("decreasing", opt_arg, len)) {
+            sort_counters = 1;
+        } else if (0 == strncmp("increasing", opt_arg, len)) {
+            sort_counters = -1;
+        } else {
+            skAppPrintErr(
+                "Invalid %s '%s': Valid values: decreasing, increasing",
+                appOptions[opt_index].name, opt_arg);
+            return 1;
         }
         break;
 
@@ -1244,7 +1281,12 @@ bagcatPrintBagRow(
         break;
 
       case BAGCAT_FMT_IPADDR:
-        skAbortBadCase(state->bc_key->formatter);
+        skipaddrString(state->buf, &key->val.addr,
+                       state->bc_key->formatter_flags);
+        skStreamPrint(output, "%*s%c%*" PRIu64 "%s\n",
+                      state->width[0], state->buf, output_delimiter,
+                      state->width[1], counter->val.u64, state->end_of_line);
+        break;
 
       case BAGCAT_FMT_PMAP:
         skPrefixMapDictionaryGetEntry(prefix_map, key->val.u32, state->buf,
@@ -1280,8 +1322,8 @@ bagcatPrintBagRow(
 }
 
 /*
- *    Print the contents of a bag file when the key is not be shown as
- *    an IP or as a number.
+ *    Print the contents of a bag file when the key is being displayed
+ *    as something other than an IP address or a number.
  */
 static int
 bagcatPrintBag(
@@ -1379,7 +1421,7 @@ bagcatPrintNetwork(
     counter.type = SKBAG_COUNTER_U64;
 
     if (!limits.active) {
-        /* print contents of the bag */
+        /* print all entries in the bag */
         skBagIterator_t *b_iter;
 
         if (skBagIteratorCreate(bag, &b_iter) != SKBAG_OK) {
@@ -1391,7 +1433,7 @@ bagcatPrintNetwork(
         skBagIteratorDestroy(b_iter);
 
     } else if (0 == print_zero_counts) {
-        /* print contents of the bag, subject to limits */
+        /* print entries in the bag that meet the limits */
         skBagIterator_t *b_iter;
 
         if (skBagIteratorCreate(bag, &b_iter) != SKBAG_OK) {
@@ -1405,8 +1447,8 @@ bagcatPrintNetwork(
         skBagIteratorDestroy(b_iter);
 
     } else if (NULL == limits.mask_set) {
-        /* print keys between two key values, subject to maximum
-         * counter limit */
+        /* print entries whose keys are between two key values,
+         * subject to maximum counter limit */
 
         /* handle first key */
         skipaddrCopy(&key.val.addr, &limits.minkey_ip);
@@ -1425,8 +1467,8 @@ bagcatPrintNetwork(
         }
 
     } else if (0 == limits.key_is_min && 0 == limits.key_is_max) {
-        /* print keys that appear in the IPset, subject to the maximum
-         * counter limit */
+        /* print entries whose keys appear in the IPset, subject to
+         * the maximum counter limit */
         skipset_iterator_t s_iter;
         uint32_t cidr;
 
@@ -1441,27 +1483,334 @@ bagcatPrintNetwork(
         }
 
     } else {
-        /* print keys that appear in the IPset, subject to limits */
+        /* print entries whose keys appear in the IPset and are within
+         * the --minkey and --maxkey range, subject to the maximum
+         * counter limit */
         skipset_iterator_t s_iter;
         uint32_t cidr;
-
-        /* ensure minimum counter is 0*/
-        limits.mincounter = SKBAG_COUNTER_MIN;
+        int s_rv;
 
         skIPSetIteratorBind(&s_iter, limits.mask_set, 0, SK_IPV6POLICY_MIX);
-        while (skIPSetIteratorNext(&s_iter, &key.val.addr, &cidr)
-               == SK_ITERATOR_OK)
-        {
-            skBagCounterGet(bag, &key, &counter);
-            if (CHECK_LIMITS_IPADDR(&key, &counter)) {
-                bagcatPrintNetworkRow(ns, &key, &counter);
-            }
+        /* ignore IPs less then --minkey */
+        while (((s_rv = skIPSetIteratorNext(&s_iter, &key.val.addr, &cidr))
+                == SK_ITERATOR_OK)
+               && (skipaddrCompare(&key.val.addr, &limits.minkey_ip) < 0))
+            ;                   /* empty */
+        if (SK_ITERATOR_OK == s_rv) {
+            do {
+                skBagCounterGet(bag, &key, &counter);
+                if (counter.val.u64 <= limits.maxcounter) {
+                    bagcatPrintNetworkRow(ns, &key, &counter);
+                }
+            } while ((skIPSetIteratorNext(&s_iter, &key.val.addr, &cidr)
+                      == SK_ITERATOR_OK)
+                     && (skipaddrCompare(&key.val.addr, &limits.maxkey_ip)
+                         < 0));
         }
     }
 
     skNetStructurePrintFinalize(ns);
 
     return 0;
+}
+
+
+/*
+ *    Comparison function used by the heap that is used to implement
+ *    the --sort-counters switch.  Return a positive value if 'a'
+ *    should be closer to the root of the tree.
+ *
+ *    To have a decreasing sort order, the root of the tree should
+ *    contain the smallest value.  'sort_counters' is 1 for decreasing
+ *    sort order and -1 for increasing order.
+ */
+static int
+bagcatHeapCompare(
+    const skheapnode_t  a,
+    const skheapnode_t  b)
+{
+    const bagcat_heapnode_t *a_node = (bagcat_heapnode_t *)a;
+    const bagcat_heapnode_t *b_node = (bagcat_heapnode_t *)b;
+
+    if (a_node->counter != b_node->counter) {
+        return ((a_node->counter < b_node->counter)
+                ? sort_counters
+                : -sort_counters);
+    }
+    if (SKBAG_KEY_IPADDR == a_node->key.type) {
+        return (skipaddrCompare(&a_node->key.val.addr, &b_node->key.val.addr));
+    }
+    return ((b_node->key.val.u32 < a_node->key.val.u32)
+            ? -1
+            : (b_node->key.val.u32 > a_node->key.val.u32));
+}
+
+
+/*
+ *    Add a 'key' and 'counter' pair to 'heap'.
+ */
+static void
+bagcatHeapAdd(
+    skheap_t                   *heap,
+    const skBagTypedKey_t      *key,
+    const skBagTypedCounter_t  *counter)
+{
+    static int not_full = 1;
+    static bagcat_heapnode_t *top_heap;
+    bagcat_heapnode_t heap_entry;
+
+    /* the new entry */
+    heap_entry.counter = counter->val.u64;
+    memcpy(&heap_entry.key, key, sizeof(*key));
+
+    if (not_full) {
+        if (skHeapInsert(heap, &heap_entry) == SKHEAP_OK) {
+            return;
+        }
+        not_full = 0;
+
+        /* Cannot grow the heap any more; process remaining
+         * records using this fixed heap size */
+        skAppPrintErr("Cannot grow heap; limiting to %u entries",
+                      skHeapGetNumberEntries(heap));
+
+        /* Get the node at the top of heap and its value.  For
+         * decreasing sort order, this is the smallest value. */
+        skHeapPeekTop(heap, (skheapnode_t *)&top_heap);
+    }
+
+    if (bagcatHeapCompare(top_heap, &heap_entry) > 0) {
+        /* The element we just read is "better" */
+        skHeapReplaceTop(heap, &heap_entry, NULL);
+
+        /* the top may have changed; get the new top */
+        skHeapPeekTop(heap, (skheapnode_t*)&top_heap);
+    }
+}
+
+
+/*
+ *    Provide implementation of --sort-counters.
+ *
+ *    Process the entries in 'bag', adding each key/value pair that
+ *    meets the limits to a heap data structure.  Once all entries are
+ *    process, sort the heap and print the results.
+ */
+static int
+bagcatSortCounters(
+    const skBag_t      *bag,
+    const bagcat_key_t *bc_key)
+{
+    uint32_t count;
+    state_t state;
+    skBagFieldType_t key_field;
+    skBagTypedKey_t key;
+    skBagTypedCounter_t counter;
+    skheap_t *heap;
+    skheapiterator_t *itheap;
+    bagcat_heapnode_t *heap_entry;
+    int rv = 1;
+
+    heap = NULL;
+    itheap = NULL;
+
+    memset(&key, 0, sizeof(key));
+
+    memset(&state, 0, sizeof(state));
+    state.bc_key = bc_key;
+    if (!no_final_delimiter) {
+        state.end_of_line[0] = output_delimiter;
+    }
+    if (!no_columns) {
+        state.width[0] = bc_key->width;
+        state.width[1] = COUNT_WIDTH;
+    }
+    state.buflen = bc_key->buflen;
+    state.buf = (char *)malloc(state.buflen);
+    state.buf[0] = '\0';
+
+    switch (skBagKeyFieldLength(bag)) {
+      case 1:
+        count = (1u << 8);
+        break;
+      case 2:
+        count = (1u << 16);
+        break;
+      default:
+        count = BAGCAT_HEAP_INITIAL_SIZE;
+        break;
+    }
+
+    /* create the heap */
+    while (NULL == (heap = skHeapCreate(bagcatHeapCompare, count,
+                                        sizeof(bagcat_heapnode_t), NULL)))
+    {
+        count >>= 1;
+        if (count < UINT8_MAX) {
+            skAppPrintOutOfMemory("creating heap");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    key_field = skBagKeyFieldType(bag);
+
+    /* set type for key and counter */
+    counter.type = SKBAG_COUNTER_U64;
+    switch (key_field) {
+      case SKBAG_FIELD_CUSTOM:
+      case SKBAG_FIELD_SIPv4:
+      case SKBAG_FIELD_DIPv4:
+      case SKBAG_FIELD_NHIPv4:
+      case SKBAG_FIELD_ANY_IPv4:
+      case SKBAG_FIELD_SIPv6:
+      case SKBAG_FIELD_DIPv6:
+      case SKBAG_FIELD_NHIPv6:
+      case SKBAG_FIELD_ANY_IPv6:
+        key.type = SKBAG_KEY_IPADDR;
+        break;
+      default:
+        key.type = SKBAG_KEY_U32;
+        break;
+    }
+
+    /* Process the bag */
+    if (!limits.active) {
+        /* handle all entries in the bag */
+        skBagIterator_t *b_iter;
+
+        if (skBagIteratorCreate(bag, &b_iter) != SKBAG_OK) {
+            goto END;
+        }
+        while (skBagIteratorNextTyped(b_iter, &key, &counter) == SKBAG_OK) {
+            bagcatHeapAdd(heap, &key, &counter);
+        }
+        skBagIteratorDestroy(b_iter);
+
+    } else if (0 == print_zero_counts) {
+        /* handle entries in the bag that meet the limits */
+        skBagIterator_t *b_iter;
+
+        if (skBagIteratorCreate(bag, &b_iter) != SKBAG_OK) {
+            goto END;
+        }
+        if (SKBAG_KEY_U32 == key.type) {
+            while (skBagIteratorNextTyped(b_iter, &key, &counter) == SKBAG_OK){
+                if (CHECK_LIMITS_UINT32(&key, &counter)) {
+                    bagcatHeapAdd(heap, &key, &counter);
+                }
+            }
+        } else {
+            while (skBagIteratorNextTyped(b_iter, &key, &counter) == SKBAG_OK){
+                if (CHECK_LIMITS_IPADDR(&key, &counter)) {
+                    bagcatHeapAdd(heap, &key, &counter);
+                }
+            }
+        }
+        skBagIteratorDestroy(b_iter);
+
+    } else if (SKBAG_KEY_U32 == key.type) {
+        /* handle entries whose (numeric) keys are between two values,
+         * subject to maximum counter limit */
+
+        /* handle first key */
+        key.val.u32 = limits.minkey_u32;
+        skBagCounterGet(bag, &key, &counter);
+        if (counter.val.u64 <= limits.maxcounter) {
+            bagcatHeapAdd(heap, &key, &counter);
+        }
+        /* handle remaining keys */
+        while (key.val.u32 < limits.maxkey_u32) {
+            ++key.val.u32;
+            skBagCounterGet(bag, &key, &counter);
+            if (counter.val.u64 <= limits.maxcounter) {
+                bagcatHeapAdd(heap, &key, &counter);
+            }
+        }
+
+    } else if (NULL == limits.mask_set) {
+        /* handle entries whose (IP) keys are between two values,
+         * subject to maximum counter limit */
+
+        /* handle first key */
+        skipaddrCopy(&key.val.addr, &limits.minkey_ip);
+        skBagCounterGet(bag, &key, &counter);
+        if (counter.val.u64 <= limits.maxcounter) {
+            bagcatHeapAdd(heap, &key, &counter);
+        }
+        /* handle remaining keys */
+        while (skipaddrCompare(&key.val.addr, &limits.maxkey_ip) < 0) {
+            skipaddrIncrement(&key.val.addr);
+            skBagCounterGet(bag, &key, &counter);
+            if (counter.val.u64 <= limits.maxcounter) {
+                bagcatHeapAdd(heap, &key, &counter);
+            }
+        }
+
+    } else if (0 == limits.key_is_min && 0 == limits.key_is_max) {
+        /* handle entries whose keys appear in the IPset, subject to
+         * the maximum counter limit */
+        skipset_iterator_t s_iter;
+        uint32_t cidr;
+
+        skIPSetIteratorBind(&s_iter, limits.mask_set, 0, SK_IPV6POLICY_MIX);
+        while (skIPSetIteratorNext(&s_iter, &key.val.addr, &cidr)
+               == SK_ITERATOR_OK)
+        {
+            skBagCounterGet(bag, &key, &counter);
+            if (counter.val.u64 <= limits.maxcounter) {
+                bagcatHeapAdd(heap, &key, &counter);
+            }
+        }
+
+    } else {
+        /* handle entries whose keys appear in the IPset and are
+         * within the --minkey and --maxkey range, subject to the
+         * maximum counter limit */
+        skipset_iterator_t s_iter;
+        uint32_t cidr;
+        int s_rv;
+
+        /* ensure minimum counter is 0*/
+        limits.mincounter = SKBAG_COUNTER_MIN;
+
+        skIPSetIteratorBind(&s_iter, limits.mask_set, 0, SK_IPV6POLICY_MIX);
+        while (((s_rv = skIPSetIteratorNext(&s_iter, &key.val.addr, &cidr))
+                == SK_ITERATOR_OK)
+               && (skipaddrCompare(&key.val.addr, &limits.minkey_ip) < 0))
+            ;                   /* empty */
+        if (SK_ITERATOR_OK == s_rv) {
+            do {
+                skBagCounterGet(bag, &key, &counter);
+                if (counter.val.u64 <= limits.maxcounter) {
+                    bagcatHeapAdd(heap, &key, &counter);
+                }
+            } while ((skIPSetIteratorNext(&s_iter, &key.val.addr, &cidr)
+                      == SK_ITERATOR_OK)
+                     && (skipaddrCompare(&key.val.addr, &limits.maxkey_ip)< 0));
+        }
+    }
+
+    INVOKE_PAGER();
+
+    /* output the values in the heap */
+    skHeapSortEntries(heap);
+
+    itheap = skHeapIteratorCreate(heap, -1);
+    while (skHeapIteratorNext(itheap, (skheapnode_t *)&heap_entry)
+           == SKHEAP_OK)
+    {
+        counter.val.u64 = heap_entry->counter;
+        bagcatPrintBagRow(&state, &heap_entry->key, &counter);
+    }
+
+    rv = 0;
+
+  END:
+    skHeapIteratorFree(itheap);
+    skHeapFree(heap);
+    free(state.buf);
+
+    return rv;
 }
 
 
@@ -1817,52 +2166,31 @@ bagcatCheckKeyFormat(
     skBagFieldType_t key_field;
     int bad_format = 0;
     int as_integer = 0;
+    int as_ipv6 = 0;
+    int as_ipv4 = 0;
+    int as_time = 0;
 
     memset(bc_key, 0, sizeof(*bc_key));
-
     key_field = skBagKeyFieldName(bag, field_name, sizeof(field_name));
-
-    /* handle the case for a bag containing IPs */
     switch (key_field) {
-      case SKBAG_FIELD_SIPv4:
-      case SKBAG_FIELD_DIPv4:
-      case SKBAG_FIELD_NHIPv4:
-      case SKBAG_FIELD_ANY_IPv4:
       case SKBAG_FIELD_SIPv6:
       case SKBAG_FIELD_DIPv6:
       case SKBAG_FIELD_NHIPv6:
       case SKBAG_FIELD_ANY_IPv6:
-        bc_key->key_type = SKBAG_KEY_IPADDR;
-        bc_key->buflen = 1 + SK_NUM2DOT_STRLEN;
-        bc_key->formatter = BAGCAT_FMT_IPADDR;
-        if (0 == key_format) {
-            bc_key->formatter_flags = SKIPADDR_CANONICAL;
-        } else if (key_format & KEY_FORMAT_IP) {
-            bc_key->formatter_flags = key_format & ~KEY_FORMAT_MASK;
-        } else {
-            bad_format = 1;
-        }
+        as_ipv6 = 1;
+        break;
+
+      case SKBAG_FIELD_SIPv4:
+      case SKBAG_FIELD_DIPv4:
+      case SKBAG_FIELD_NHIPv4:
+      case SKBAG_FIELD_ANY_IPv4:
+        as_ipv4 = 1;
         break;
 
       case SKBAG_FIELD_STARTTIME:
       case SKBAG_FIELD_ENDTIME:
       case SKBAG_FIELD_ANY_TIME:
-        bc_key->key_type = SKBAG_KEY_U32;
-        bc_key->buflen = 1 + SKTIMESTAMP_STRLEN;
-        bc_key->formatter = BAGCAT_FMT_TIME;
-        if (0 == key_format) {
-            bc_key->formatter_flags = SKTIMESTAMP_NOMSEC;
-        } else if (key_format & KEY_FORMAT_TIME) {
-            bc_key->formatter_flags
-                = (SKTIMESTAMP_NOMSEC | (key_format & ~KEY_FORMAT_MASK));
-            if (SKTIMESTAMP_EPOCH & bc_key->formatter_flags) {
-                bc_key->width = 10;
-            } else {
-                bc_key->width = 19;
-            }
-        } else {
-            bad_format = 1;
-        }
+        as_time = 1;
         break;
 
       case SKBAG_FIELD_FLAGS:
@@ -1938,12 +2266,11 @@ bagcatCheckKeyFormat(
 
       case SKBAG_FIELD_CUSTOM:
         if ((0 == key_format) || (key_format & KEY_FORMAT_IP)) {
-            bc_key->key_type = SKBAG_KEY_IPADDR;
-            bc_key->buflen = 1 + SK_NUM2DOT_STRLEN;
-            bc_key->formatter = BAGCAT_FMT_IPADDR;
-            bc_key->formatter_flags = ((0 == key_format)
-                                       ? (int)SKIPADDR_CANONICAL
-                                       : (key_format & ~KEY_FORMAT_IP));
+            if (16 == skBagKeyFieldLength(bag)) {
+                as_ipv6 = 1;
+            } else {
+                as_ipv4 = 1;
+            }
         } else if (16 == skBagKeyFieldLength(bag)) {
             skAppPrintErr(("Invalid %s '%s':"
                            " Bag's key length is too long for format"),
@@ -1951,21 +2278,63 @@ bagcatCheckKeyFormat(
             return -1;
         } else {
             assert(key_format & KEY_FORMAT_TIME);
-            bc_key->key_type = SKBAG_KEY_U32;
-            bc_key->buflen = 1 + SKTIMESTAMP_STRLEN;
-            bc_key->formatter = BAGCAT_FMT_TIME;
-            bc_key->formatter_flags
-                = (SKTIMESTAMP_NOMSEC | (key_format & ~KEY_FORMAT_MASK));
-            if (SKTIMESTAMP_EPOCH & bc_key->formatter_flags) {
-                bc_key->width = 10;
-            } else {
-                bc_key->width = 19;
-            }
+            as_time = 1;
         }
         break;
 
       default:
         as_integer = 1;
+    }
+
+    if (as_ipv4 || as_ipv6) {
+        bc_key->key_type = SKBAG_KEY_IPADDR;
+        bc_key->buflen = 1 + SK_NUM2DOT_STRLEN;
+        bc_key->formatter = BAGCAT_FMT_IPADDR;
+        if (0 != key_format && !(key_format & KEY_FORMAT_IP)) {
+            bad_format = 1;
+        } else {
+            if (0 == key_format) {
+                bc_key->formatter_flags = SKIPADDR_CANONICAL;
+            } else {
+                bc_key->formatter_flags = key_format & ~KEY_FORMAT_MASK;
+            }
+            switch (bc_key->formatter_flags) {
+              case SKIPADDR_DECIMAL:
+                bc_key->width = (as_ipv6) ? 39 : 10;
+                break;
+              case SKIPADDR_HEXADECIMAL:
+                bc_key->width = (as_ipv6) ? 32 : 8;
+                break;
+              case SKIPADDR_FORCE_IPV6:
+                bc_key->width = (as_ipv6) ? 39 : 16;
+                break;
+              case SKIPADDR_CANONICAL:
+              case SKIPADDR_ZEROPAD:
+                bc_key->width = (as_ipv6) ? 39 : 15;
+                break;
+              default:
+                skAbortBadCase(bc_key->formatter_flags);
+            }
+        }
+    }
+
+    if (as_time) {
+        bc_key->key_type = SKBAG_KEY_U32;
+        bc_key->buflen = 1 + SKTIMESTAMP_STRLEN;
+        bc_key->formatter = BAGCAT_FMT_TIME;
+        if (0 != key_format && !(key_format & KEY_FORMAT_TIME)) {
+            bad_format = 1;
+        } else {
+            if (0 == key_format) {
+                assert(SKBAG_FIELD_CUSTOM != key_format);
+                bc_key->formatter_flags = SKTIMESTAMP_NOMSEC;
+            } else {
+                bc_key->formatter_flags
+                    = (SKTIMESTAMP_NOMSEC | (key_format & ~KEY_FORMAT_MASK));
+            }
+            bc_key->width
+                = ((SKTIMESTAMP_EPOCH & bc_key->formatter_flags) ? 10 : 19);
+        }
     }
 
     if (as_integer) {
@@ -1998,7 +2367,6 @@ bagcatCheckKeyFormat(
                       field_name);
         return -1;
     }
-
     return 0;
 }
 
@@ -2117,9 +2485,9 @@ int main(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
-        /* check featuers needed when producing output other than
+        /* check features needed when producing output other than
          * inverting the bag. */
-        if (print_statistics || bin_scheme == BINSCHEME_NONE) {
+        if (sort_counters || print_statistics || bin_scheme == BINSCHEME_NONE){
             /* check for a valid prefix map if needed */
             if (bagcatCheckPrefixMap(bag)) {
                 skBagDestroy(&bag);
@@ -2140,6 +2508,8 @@ int main(int argc, char **argv)
                 skBagDestroy(&bag);
                 exit(EXIT_FAILURE);
             }
+        } else if (sort_counters) {
+            bagcatSortCounters(bag, &bagcat_key);
         } else if (print_network || !print_statistics) {
             /* either --network-structure explicitly given or there
              * was no other output selected */

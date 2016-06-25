@@ -1,3 +1,45 @@
+SiLK-3.12.2 Release, 2016-Jun-23
+
+* rwgeoip2ccmap
+  -- Restore support for binary input that was removed in SiLK 3.12.0.
+* rwbagcat
+  -- Sort the output using the value of each key's counter when the
+     --sort-counters switch is given.
+* rwbag
+  -- Copy the invocation history and the notes from the source files to
+     the output file(s).
+* rwbagtool
+  -- When inverting a bag, set the key-type of the output to the
+     counter-type of the input.  Previously it was set to custom.
+* rwfileinfo
+  -- Add a --help-fields switch.
+  -- Expand the description of rwfileinfo's output on the manual page.
+* rwfilter, rwfglob, rwsiteinfo
+  -- Fix an unexpected fatal error that would occur when the silk.conf
+     file contained a class that did not contain any types.  Check the
+     validity of the silk.conf file and report such errors.
+* rwipfix2silk
+  -- Write additional log messages when --log-destination is specified.
+* rwpdu2silk
+  -- Write additional log messages when --log-destination is specified.
+* rwflowpack
+  -- Change when record counts are reported in the log file: Report
+     the number of records written to each output file only when the
+     files are flushed.
+  -- Fix a bug processing the reverse side a YAF bi-flow that stored
+     the egressInterface in both the input and output fields.
+  -- Fix a bug processing a bi-flow record that reversed the vlan
+     interfaces on the forward record.
+* flowcap
+  -- Fix a bug when processing the reverse side a YAF bi-flow that
+     stored the egressInterface in both the input and output fields.
+  -- Fix a bug processing a bi-flow record that reversed the vlan
+     interfaces on the forward record.
+* rwflowappend
+  -- Add locking of incremental files to prevent multiple rwflowappend
+     invocations from processing the same file.
+
+
 SiLK-3.12.1 Release, 2016-May-05
 
 * rwbagcat

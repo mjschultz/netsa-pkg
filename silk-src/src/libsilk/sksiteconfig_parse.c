@@ -135,7 +135,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sksiteconfig_parse.y 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: sksiteconfig_parse.y 7453ca1c1838 2016-06-01 19:09:09Z mthomas $");
 
 #include "sksiteconfig.h"
 #include <silk/sksite.h>
@@ -2601,6 +2601,8 @@ do_default_class(
     char               *name)
 {
     sk_class_id_t class_id;
+    sk_flowtype_iter_t ft_iter;
+    sk_flowtype_id_t ft_id;
 
     if ( sksiteconfig_testing ) {
         fprintf(stderr, "default-class \"%s\"\n", name);
@@ -2610,7 +2612,12 @@ do_default_class(
         sksiteconfigErr("Cannot set default class: class '%s' is not defined",
                         name);
     } else {
-        if ( sksiteClassSetDefault(class_id) ) {
+        sksiteClassFlowtypeIterator(class_id, &ft_iter);
+        if (!sksiteFlowtypeIteratorNext(&ft_iter, &ft_id)) {
+            sksiteconfigErr(
+                "Cannot set default class: class '%s' contains no types",
+                name);
+        } else if (sksiteClassSetDefault(class_id)) {
             sksiteconfigErr("Failed to set default class");
         }
     }

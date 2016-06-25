@@ -18,7 +18,7 @@ RUN yum install -y \
     rubygems \
     zlib-devel
 
-RUN gem install fpm
+RUN gem install fpm -v 1.4.0
 
 ADD ["./libfixbuf-src/", "/netsa-pkg/libfixbuf-src/"]
 ADD ["./yaf-src/", "/netsa-pkg/yaf-src/"]

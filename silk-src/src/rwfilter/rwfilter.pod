@@ -54,7 +54,8 @@ One or more partitioning switches are required:
         [--flags-session=HIGH_MASK_FLAGS_LIST]
         [--icmp-code=INTEGER_LIST] [--icmp-type=INTEGER_LIST]
         [--input-index=INTEGER_LIST] [--ip-version=INTEGER_LIST]
-        [--ippair-any=FILENAME] [--ipport-any=FILENAME]
+        [--ipa-src-expr=IPA_EXPR] [--ipa-dst-expr=IPA_EXPR]
+        [--ipa-any-expr=IPA_EXPR]
         [{--next-hop-id=IP_WILDCARD | --not-next-hop-id=IP_WILDCARD}]
         [{--nhcidr=IP_OR_CIDR_LIST | --not-nhcidr=IP_OR_CIDR_LIST}]
         [{--nhipset=IP_SET_FILENAME | --not-nhipset=IP_SET_FILENAME}]
@@ -487,10 +488,15 @@ C<FF01::/16>, or a comma separated list of IPs and/or CIDR blocks
 C<10.0.1.0/24,10.0.2.3,10.0.4.0/24>.  The I<IP_OR_CIDR_LIST> supports
 IPv4 and IPv6 addresses.
 
+The B<--*set>-family requires that you store the IPs in a binary IPset
+file and pass the name of the file to the switch.  IPset files are
+created from SiLK Flow records with B<rwset(1)>, or from textual input
+with B<rwsetbuild(1)>.
+
 The B<--*address>-family (which includes B<--next-hop-id>) takes as
-its argument an I<IP_WILDCARD>.  An I<IP_WILDCARD> is a single IP
-address, a single CIDR block, or a single SiLK IP Wildcard.  A SiLK IP
-Wildcard can represent multiple IPv4 or IPv6 addresses.  An IP
+its argument a single IP address, a single CIDR block, or a single
+SiLK IP Wildcard.  A SiLK IP
+Wildcard may represent multiple, disjointed IPv4 or IPv6 addresses.  An IP
 Wildcard contains an IP in its canonical form, except each part of the
 IP (where I<part> is an octet for IPv4 or a hexadectet for IPv6) may
 be a single value, a range, a comma separated list of values and
@@ -505,14 +511,15 @@ all represent the same value:
  ::ffff:0.0.0.0/112
  ::ffff:0.0.128-254,0-126,255,127.x
 
-The B<--*set>-family requires that you store the IPs in a binary IPset
-file and pass the name of the file to the switch.  IPset files are
-created from SiLK Flow records with B<rwset(1)>, or from textual input
-with B<rwsetbuild(1)>.  Currently, IPsets only support IPv4 addresses.
-
 The next hop address often has a value of 0.0.0.0 since the default
 configuration of SiLK does not store the next hop address in the data
 repository.
+
+With one restriction, any combination of IP partitioning switches is
+allowed in a single B<rwfilter> invocation: A positive and negative
+version of the same switch (e.g., B<--sipset> and B<--not-sipset>) is
+not allowed.  (B<--sipset> and B<--not-scidr> may be used together, as
+can B<--sipset> and B<--not-dipset>.)
 
 The address-partitioning switches are:
 
@@ -794,10 +801,10 @@ is in this I<DECIMAL_RANGE>.
 B<Partitioning Switches for TCP Flags>
 
 When a flow generator creates a flow record from TCP packets, it
-creates a field that is the bitwise OR of the TCP flags from all
+creates a field that is the bit-wise OR of the TCP flags from all
 packets that comprise that flow record.  Some flow generators, such as
 B<yaf(1)>, can export two TCP flag fields: one contains the flags on
-the first packet in the flow, and the second contains the bitwise OR
+the first packet in the flow, and the second contains the bit-wise OR
 of the remaining packets.
 
 To partition records based on their TCP flags values, there is a
@@ -826,7 +833,7 @@ The recommended switches for TCP flag partitioning are:
 =item B<--flags-all>=I<HIGH_MASK_FLAGS_LIST>
 
 Pass the record if any of the I<HIGH_SET>/I<MASK_SET> pairs is true
-when looking at the bitwise OR of the TCP flags across B<all> packets
+when looking at the bit-wise OR of the TCP flags across B<all> packets
 in the flow.
 
 =item B<--flags-initial>=I<HIGH_MASK_FLAGS_LIST>
@@ -836,7 +843,7 @@ packet in the flow, for flow generators that can generate that field.
 
 =item B<--flags-session>=I<HIGH_MASK_FLAGS_LIST>
 
-As B<--flags-all>, except this switch considers the bitwise OR of the
+As B<--flags-all>, except this switch considers the bit-wise OR of the
 TCP flags across the second through the final packet in the flow; that
 is, ignoring the flags on the first packet.
 
@@ -1991,7 +1998,7 @@ I<Analysts' Handbook: Using SiLK for Network Traffic Analysis>
 
 =cut
 
-$SiLK: rwfilter.pod 4dba2416c3d6 2015-09-10 19:03:20Z mthomas $
+$SiLK: rwfilter.pod 6fd07070d1e2 2016-06-14 15:27:22Z mthomas $
 
 Local Variables:
 mode:text
