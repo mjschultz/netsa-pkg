@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y \
     zlib1g \
     zlib1g-dev
 
-RUN gem install fpm
+RUN gem install fpm -v 1.4.0
 
 ADD ["./libfixbuf-src/", "/netsa-pkg/libfixbuf-src/"]
 ADD ["./yaf-src/", "/netsa-pkg/yaf-src/"]
