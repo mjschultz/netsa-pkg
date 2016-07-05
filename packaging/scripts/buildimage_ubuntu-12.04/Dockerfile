@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y \
     zlib1g \
     zlib1g-dev
 
+RUN gem install json -v 1.8.3
 RUN gem install fpm -v 1.4.0
 
 ADD ["./libfixbuf-src/", "/netsa-pkg/libfixbuf-src/"]
