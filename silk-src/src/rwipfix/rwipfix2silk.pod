@@ -9,7 +9,7 @@ B<rwipfix2silk> - Convert IPFIX records to SiLK Flow records
   rwipfix2silk [--silk-output=FILE] [--print-statistics]
         [--interface-values={snmp | vlan}]
         [--log-destination={stdout | stderr | none | PATH}]
-        [--note-add=TEXT] [--note-file-add=FILE]
+        [--log-flags=FLAGS] [--note-add=TEXT] [--note-file-add=FILE]
         [--compression-method=COMP_METHOD]
         {[--xargs] | [--xargs=FILENAME] | [IPFIXFILE [IPFIXFILE...]]}
 
@@ -167,7 +167,10 @@ attempt to add a SiLK data file as an annotation.
 
 =item B<--compression-method>=I<COMP_METHOD>
 
-Specify how to compress the output.  When this switch is not given,
+Specify the compression library to use when writing output files.  If
+this switch is not given, the value in the SILK_COMPRESSION_METHOD
+environment variable is used if the value names an available
+compression method.  When no compression method is specified,
 output to the standard output or to named pipes is not compressed, and
 output to files is compressed using the default chosen when SiLK was
 compiled.  The valid values for I<COMP_METHOD> are determined by which
@@ -195,10 +198,17 @@ for compression, and always compress the output regardless of the
 destination.  This compression provides good compression with less
 memory and CPU overhead.
 
+=item snappy
+
+Use the I<snappy> library for compression, and always compress the
+output regardless of the destination.  This compression provides good
+compression with less memory and CPU overhead.  I<Since SiLK 3.13.0.>
+
 =item best
 
-Use lzo1x if available, otherwise use zlib.  Only compress the output
-when writing to a file.
+Use lzo1x if available, otherwise use snappy if available, otherwise
+use zlib if available.  Only compress the output when writing to a
+file.
 
 =back
 
@@ -299,6 +309,12 @@ discrepancies, and issues decoding list elements.  I<Since SiLK
 The SiLK tools normally refuse to overwrite existing files.  Setting
 SILK_CLOBBER to a non-empty value removes this restriction.
 
+=item SILK_COMPRESSION_METHOD
+
+This environment variable is used as the value for
+B<--compression-method> when that switch is not provided.  I<Since
+SiLK 3.13.0.>
+
 =back
 
 =head1 SEE ALSO
@@ -309,7 +325,7 @@ B<tcpdump(1)>, B<pcap(3)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwipfix2silk.pod 6795935dfc68 2015-05-15 14:50:32Z mthomas $
+$SiLK: rwipfix2silk.pod 7c452d1f409f 2016-09-23 21:00:08Z mthomas $
 
 Local Variables:
 mode:text

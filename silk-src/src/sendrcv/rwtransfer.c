@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwtransfer.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwtransfer.c 64e4a4352023 2016-09-08 18:51:21Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sklog.h>
@@ -223,21 +223,21 @@ static const char *appServerHelp[] = {
  *  Length of -1 indicates a variable length message (use of
  *  sendString() implies variable length).
  */
-static connection_msg_data_t conn_msg_data[CONN_NUMBER_OF_CONNECTION_MESSAGES]=
-    {
-        {"CONN_SENDER_VERSION",    sizeof(uint32_t)},
-        {"CONN_RECEIVER_VERSION",  sizeof(uint32_t)},
-        {"CONN_IDENT",            -1},
-        {"CONN_READY",             0},
-        {"CONN_DISCONNECT_RETRY", -1},
-        {"CONN_DISCONNECT",       -1},
-        {"CONN_NEW_FILE",         -1},
-        {"CONN_NEW_FILE_READY",    0},
-        {"CONN_FILE_BLOCK",       -1},
-        {"CONN_FILE_COMPLETE",     0},
-        {"CONN_DUPLICATE_FILE",   -1},
-        {"CONN_REJECT_FILE",      -1}
-    };
+static connection_msg_data_t
+conn_msg_data[CONN_NUMBER_OF_CONNECTION_MESSAGES] = {
+    {"CONN_SENDER_VERSION",    sizeof(uint32_t)},
+    {"CONN_RECEIVER_VERSION",  sizeof(uint32_t)},
+    {"CONN_IDENT",            -1},
+    {"CONN_READY",             0},
+    {"CONN_DISCONNECT_RETRY", -1},
+    {"CONN_DISCONNECT",       -1},
+    {"CONN_NEW_FILE",         -1},
+    {"CONN_NEW_FILE_READY",    0},
+    {"CONN_FILE_BLOCK",       -1},
+    {"CONN_FILE_COMPLETE",     0},
+    {"CONN_DUPLICATE_FILE",   -1},
+    {"CONN_REJECT_FILE",      -1}
+};
 
 
 /* LOCAL FUNCTION PROTOTYPES */

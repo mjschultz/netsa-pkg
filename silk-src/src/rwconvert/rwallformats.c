@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwallformats.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
+RCSIDENT("$SiLK: rwallformats.c 89a0d024f7f6 2016-09-20 20:13:27Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -176,7 +176,7 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
-    int optctx_flags;
+    unsigned int optctx_flags;
     int rv;
 
     /* verify same number of options and help strings */
@@ -348,7 +348,7 @@ openOutput(
 
         /* find the number of compression methods */
         for (num_compmethod = 0;
-             sksiteCompmethodCheck(num_compmethod);
+             skCompMethodCheck(num_compmethod);
              ++num_compmethod)
             ; /* no-op */
 
@@ -360,7 +360,7 @@ openOutput(
 
     /* loop over compression methods */
     for ( ; c < num_compmethod; ++c) {
-        if (SK_COMPMETHOD_IS_AVAIL != sksiteCompmethodCheck(c)) {
+        if (SK_COMPMETHOD_IS_AVAIL != skCompMethodCheck(c)) {
             continue;
         }
 
@@ -382,8 +382,8 @@ openOutput(
                 while (e < 2) {
                     byte_order = endians[e];
 
-                    sksiteFileformatGetName(format_name, sizeof(format_name),
-                                            stream_format[f]);
+                    skFileFormatGetName(format_name, sizeof(format_name),
+                                        stream_format[f]);
                     if ((size_t)snprintf(path, sizeof(path),
                                          "%s%s%s-v%d-c%u-%s.dat",
                                          ((base_name != NULL) ? base_name :""),

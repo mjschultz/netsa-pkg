@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 # MD5: d5f3472e21a885bf5919ffd12c6fd267
-# TEST: ../rwfilter/rwfilter --type=in,inweb --pass=stdout ../../tests/data.rwf | ./rwsort --pmap-file=../../tests/proto-port-map.pmap --fields=sval | ../rwuniq/rwuniq --pmap-file=../../tests/proto-port-map.pmap --fields=sval --presorted-input
+# TEST: ../rwfilter/rwfilter --type=in,inweb --pass=stdout ../../tests/data.rwf | ./rwsort --pmap-file=../../tests/proto-port-map.pmap --fields=sval | ../rwstats/rwuniq --pmap-file=../../tests/proto-port-map.pmap --fields=sval --presorted-input
 
 use strict;
 use SiLKTests;

@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-# RCSIDENT("$SiLK: Makefile.am 329106c5d390 2015-10-08 15:38:45Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $");
 
 # Installed Targets
 
@@ -100,7 +100,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-bin_PROGRAMS = rwstats$(EXEEXT)
+bin_PROGRAMS = rwstats$(EXEEXT) rwuniq$(EXEEXT)
 @RUN_EXTRA_CHECKS_TRUE@am__append_1 = $(EXTRA_TESTS)
 subdir = src/rwstats
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -108,6 +108,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_libadns.m4 \
 	$(top_srcdir)/m4/ax_check_libcares.m4 \
 	$(top_srcdir)/m4/ax_check_liblzo.m4 \
 	$(top_srcdir)/m4/ax_check_libpcap.m4 \
+	$(top_srcdir)/m4/ax_check_libsnappy.m4 \
 	$(top_srcdir)/m4/ax_check_libz.m4 \
 	$(top_srcdir)/m4/ax_check_printf_z.m4 \
 	$(top_srcdir)/m4/ax_check_pthread.m4 \
@@ -129,9 +130,10 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(man1dir)"
 PROGRAMS = $(bin_PROGRAMS)
+am__objects_1 = skunique.$(OBJEXT)
 am_rwstats_OBJECTS = rwstats.$(OBJEXT) rwstatssetup.$(OBJEXT) \
-	intervalstats.$(OBJEXT) rwstatslegacy.$(OBJEXT) \
-	rwstatsproto.$(OBJEXT)
+	$(am__objects_1) intervalstats.$(OBJEXT) \
+	rwstatslegacy.$(OBJEXT) rwstatsproto.$(OBJEXT)
 rwstats_OBJECTS = $(am_rwstats_OBJECTS)
 rwstats_LDADD = $(LDADD)
 am__DEPENDENCIES_1 =
@@ -141,6 +143,12 @@ AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+am_rwuniq_OBJECTS = rwuniq.$(OBJEXT) rwuniqsetup.$(OBJEXT) \
+	$(am__objects_1)
+rwuniq_OBJECTS = $(am_rwuniq_OBJECTS)
+rwuniq_LDADD = $(LDADD)
+rwuniq_DEPENDENCIES = $(silkpython) ../libsilk/libsilk.la \
+	$(am__DEPENDENCIES_1)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -175,8 +183,8 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(rwstats_SOURCES)
-DIST_SOURCES = $(rwstats_SOURCES)
+SOURCES = $(rwstats_SOURCES) $(rwuniq_SOURCES)
+DIST_SOURCES = $(rwstats_SOURCES) $(rwuniq_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -533,6 +541,7 @@ SK_ENABLE_IPFIX = @SK_ENABLE_IPFIX@
 SK_ENABLE_IPV6 = @SK_ENABLE_IPV6@
 SK_ENABLE_LZO = @SK_ENABLE_LZO@
 SK_ENABLE_OUTPUT_COMPRESSION = @SK_ENABLE_OUTPUT_COMPRESSION@
+SK_ENABLE_SNAPPY = @SK_ENABLE_SNAPPY@
 SK_ENABLE_ZLIB = @SK_ENABLE_ZLIB@
 SK_LDFLAGS = @SK_LDFLAGS@
 SK_SRC_INCLUDES = @SK_SRC_INCLUDES@
@@ -597,8 +606,8 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-EXTRA_DIST = rwstats.pod $(TESTS) $(EXTRA_TESTS)
-@HAVE_POD2MAN_TRUE@man1_MANS = rwstats.1
+EXTRA_DIST = rwstats.pod rwuniq.pod $(TESTS) $(EXTRA_TESTS)
+@HAVE_POD2MAN_TRUE@man1_MANS = rwstats.1 rwuniq.1
 
 # Build Rules
 AM_CPPFLAGS = $(SK_SRC_INCLUDES) $(PYTHON_CPPFLAGS) $(SK_CPPFLAGS)
@@ -606,9 +615,11 @@ AM_CFLAGS = $(WARN_CFLAGS) $(SK_CFLAGS)
 AM_LDFLAGS = $(SK_LDFLAGS) $(STATIC_APPLICATIONS)
 @HAVE_PYTHON_TRUE@silkpython = ../pysilk/libsilkpython.la
 LDADD = $(silkpython) ../libsilk/libsilk.la $(PYTHON_LDFLAGS_EMBEDDED)
-rwstats_SOURCES = rwstats.c rwstats.h rwstatssetup.c \
+STATSUNIQ = skunique.c skunique.h
+rwstats_SOURCES = rwstats.c rwstats.h rwstatssetup.c $(STATSUNIQ) \
 	interval.h intervalstats.c rwstatslegacy.c rwstatsproto.c
 
+rwuniq_SOURCES = rwuniq.c rwuniq.h rwuniqsetup.c $(STATSUNIQ)
 
 ########  MANUAL PAGE SUPPORT
 #
@@ -773,6 +784,7 @@ LOG_COMPILER = $(PL_LOG_COMPILER)
 AM_LOG_FLAGS = $(AM_PL_LOG_FLAGS)
 
 #include rwstats-old.mk
+#include rwuniq-old.mk
 
 # Global Rules
 
@@ -845,10 +857,68 @@ TESTS = tests/rwstats-help.pl tests/rwstats-legacy-help.pl \
 	tests/rwstats-skplugin-test.pl tests/rwstats-pysilk-key.pl \
 	tests/rwstats-pysilk-value.pl \
 	tests/rwstats-pysilk-key-value.pl \
-	tests/rwstats-pysilk-simple-agg.pl $(am__append_1)
+	tests/rwstats-pysilk-simple-agg.pl tests/rwuniq-help.pl \
+	tests/rwuniq-version.pl tests/rwuniq-lone-command.pl \
+	tests/rwuniq-no-switches.pl tests/rwuniq-null-input.pl \
+	tests/rwuniq-no-files.pl tests/rwuniq-ports-proto-unix-sort.pl \
+	tests/rwuniq-ports-proto-sorted.pl \
+	tests/rwuniq-ports-proto-sorted-v6.pl \
+	tests/rwuniq-ports-proto-presorted.pl \
+	tests/rwuniq-ports-proto-multi-pre.pl \
+	tests/rwuniq-sip-bytes.pl tests/rwuniq-dip-bytes.pl \
+	tests/rwuniq-dip-packets.pl tests/rwuniq-sip-bytes-v6.pl \
+	tests/rwuniq-dip-packets-v6.pl tests/rwuniq-dport-all.pl \
+	tests/rwuniq-stime-packets-flows.pl \
+	tests/rwuniq-bin-time-stime.pl tests/rwuniq-bin-time-etime.pl \
+	tests/rwuniq-bin-time-stime-etime.pl \
+	tests/rwuniq-bin-time-stime-etime-dur.pl \
+	tests/rwuniq-elapsed-bytes.pl tests/rwuniq-etime.pl \
+	tests/rwuniq-stime-proto-sorted.pl \
+	tests/rwuniq-collection-point.pl tests/rwuniq-proto.pl \
+	tests/rwuniq-sport-mn-rec.pl tests/rwuniq-sport-mn-pkt.pl \
+	tests/rwuniq-sport-mn-byt.pl tests/rwuniq-sport-mx-rec.pl \
+	tests/rwuniq-sport-mx-pkt.pl tests/rwuniq-sport-mx-byt.pl \
+	tests/rwuniq-sport-count-sip.pl \
+	tests/rwuniq-sport-count-sip-v6.pl \
+	tests/rwuniq-sport-count-sip-dip.pl \
+	tests/rwuniq-sport-count-sip-pre.pl \
+	tests/rwuniq-sport-count-sip-dip-pre.pl \
+	tests/rwuniq-sport-count-sip-dip-v6.pl \
+	tests/rwuniq-sport-count2-sip-dip-v6.pl \
+	tests/rwuniq-sport-count-sip-pre-v6.pl \
+	tests/rwuniq-no-title.pl tests/rwuniq-no-column.pl \
+	tests/rwuniq-delimited.pl tests/rwuniq-legacytime-0.pl \
+	tests/rwuniq-legacytime-1.pl tests/rwuniq-empty-input.pl \
+	tests/rwuniq-empty-input-presorted.pl \
+	tests/rwuniq-empty-input-presorted-xargs.pl \
+	tests/rwuniq-many-presorted.pl tests/rwuniq-multiple-inputs.pl \
+	tests/rwuniq-copy-input.pl tests/rwuniq-stdin.pl \
+	tests/rwuniq-icmpTypeCode.pl tests/rwuniq-dport-icmp.pl \
+	tests/rwuniq-icmp-dport.pl tests/rwuniq-country-code-sip.pl \
+	tests/rwuniq-country-code-dip.pl \
+	tests/rwuniq-country-code-sip-v6.pl \
+	tests/rwuniq-country-code-dip-v6.pl \
+	tests/rwuniq-address-types-sip.pl \
+	tests/rwuniq-address-types-dip.pl \
+	tests/rwuniq-address-stype-proto-sorted.pl \
+	tests/rwuniq-pmap-proto-port.pl \
+	tests/rwuniq-pmap-src-service-host.pl \
+	tests/rwuniq-pmap-dst-servhost.pl \
+	tests/rwuniq-pmap-multiple.pl \
+	tests/rwuniq-pmap-src-service-host-v6.pl \
+	tests/rwuniq-pmap-dst-servhost-v6.pl \
+	tests/rwuniq-pmap-multiple-v6.pl \
+	tests/rwuniq-int-ext-fields-ext.pl \
+	tests/rwuniq-int-ext-fields-int-v6.pl \
+	tests/rwuniq-flowrate-payload.pl tests/rwuniq-skplugin-test.pl \
+	tests/rwuniq-pysilk-key.pl tests/rwuniq-pysilk-value.pl \
+	tests/rwuniq-pysilk-key-value.pl \
+	tests/rwuniq-pysilk-simple-agg.pl $(am__append_1)
 EXTRA_TESTS = \
 	tests/rwstats-flowrate-pps.pl \
-	tests/rwstats-flowrate-bps.pl
+	tests/rwstats-flowrate-bps.pl \
+	tests/rwuniq-flowrate-pps.pl \
+	tests/rwuniq-flowrate-bps.pl
 
 all: all-am
 
@@ -954,6 +1024,10 @@ rwstats$(EXEEXT): $(rwstats_OBJECTS) $(rwstats_DEPENDENCIES) $(EXTRA_rwstats_DEP
 	@rm -f rwstats$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(rwstats_OBJECTS) $(rwstats_LDADD) $(LIBS)
 
+rwuniq$(EXEEXT): $(rwuniq_OBJECTS) $(rwuniq_DEPENDENCIES) $(EXTRA_rwuniq_DEPENDENCIES) 
+	@rm -f rwuniq$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(rwuniq_OBJECTS) $(rwuniq_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
@@ -965,6 +1039,9 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rwstatslegacy.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rwstatsproto.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rwstatssetup.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rwuniq.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rwuniqsetup.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skunique.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -1762,6 +1839,552 @@ tests/rwstats-pysilk-simple-agg.pl.log: tests/rwstats-pysilk-simple-agg.pl
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-help.pl.log: tests/rwuniq-help.pl
+	@p='tests/rwuniq-help.pl'; \
+	b='tests/rwuniq-help.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-version.pl.log: tests/rwuniq-version.pl
+	@p='tests/rwuniq-version.pl'; \
+	b='tests/rwuniq-version.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-lone-command.pl.log: tests/rwuniq-lone-command.pl
+	@p='tests/rwuniq-lone-command.pl'; \
+	b='tests/rwuniq-lone-command.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-no-switches.pl.log: tests/rwuniq-no-switches.pl
+	@p='tests/rwuniq-no-switches.pl'; \
+	b='tests/rwuniq-no-switches.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-null-input.pl.log: tests/rwuniq-null-input.pl
+	@p='tests/rwuniq-null-input.pl'; \
+	b='tests/rwuniq-null-input.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-no-files.pl.log: tests/rwuniq-no-files.pl
+	@p='tests/rwuniq-no-files.pl'; \
+	b='tests/rwuniq-no-files.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-ports-proto-unix-sort.pl.log: tests/rwuniq-ports-proto-unix-sort.pl
+	@p='tests/rwuniq-ports-proto-unix-sort.pl'; \
+	b='tests/rwuniq-ports-proto-unix-sort.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-ports-proto-sorted.pl.log: tests/rwuniq-ports-proto-sorted.pl
+	@p='tests/rwuniq-ports-proto-sorted.pl'; \
+	b='tests/rwuniq-ports-proto-sorted.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-ports-proto-sorted-v6.pl.log: tests/rwuniq-ports-proto-sorted-v6.pl
+	@p='tests/rwuniq-ports-proto-sorted-v6.pl'; \
+	b='tests/rwuniq-ports-proto-sorted-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-ports-proto-presorted.pl.log: tests/rwuniq-ports-proto-presorted.pl
+	@p='tests/rwuniq-ports-proto-presorted.pl'; \
+	b='tests/rwuniq-ports-proto-presorted.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-ports-proto-multi-pre.pl.log: tests/rwuniq-ports-proto-multi-pre.pl
+	@p='tests/rwuniq-ports-proto-multi-pre.pl'; \
+	b='tests/rwuniq-ports-proto-multi-pre.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-sip-bytes.pl.log: tests/rwuniq-sip-bytes.pl
+	@p='tests/rwuniq-sip-bytes.pl'; \
+	b='tests/rwuniq-sip-bytes.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-dip-bytes.pl.log: tests/rwuniq-dip-bytes.pl
+	@p='tests/rwuniq-dip-bytes.pl'; \
+	b='tests/rwuniq-dip-bytes.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-dip-packets.pl.log: tests/rwuniq-dip-packets.pl
+	@p='tests/rwuniq-dip-packets.pl'; \
+	b='tests/rwuniq-dip-packets.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-sip-bytes-v6.pl.log: tests/rwuniq-sip-bytes-v6.pl
+	@p='tests/rwuniq-sip-bytes-v6.pl'; \
+	b='tests/rwuniq-sip-bytes-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-dip-packets-v6.pl.log: tests/rwuniq-dip-packets-v6.pl
+	@p='tests/rwuniq-dip-packets-v6.pl'; \
+	b='tests/rwuniq-dip-packets-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-dport-all.pl.log: tests/rwuniq-dport-all.pl
+	@p='tests/rwuniq-dport-all.pl'; \
+	b='tests/rwuniq-dport-all.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-stime-packets-flows.pl.log: tests/rwuniq-stime-packets-flows.pl
+	@p='tests/rwuniq-stime-packets-flows.pl'; \
+	b='tests/rwuniq-stime-packets-flows.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-bin-time-stime.pl.log: tests/rwuniq-bin-time-stime.pl
+	@p='tests/rwuniq-bin-time-stime.pl'; \
+	b='tests/rwuniq-bin-time-stime.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-bin-time-etime.pl.log: tests/rwuniq-bin-time-etime.pl
+	@p='tests/rwuniq-bin-time-etime.pl'; \
+	b='tests/rwuniq-bin-time-etime.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-bin-time-stime-etime.pl.log: tests/rwuniq-bin-time-stime-etime.pl
+	@p='tests/rwuniq-bin-time-stime-etime.pl'; \
+	b='tests/rwuniq-bin-time-stime-etime.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-bin-time-stime-etime-dur.pl.log: tests/rwuniq-bin-time-stime-etime-dur.pl
+	@p='tests/rwuniq-bin-time-stime-etime-dur.pl'; \
+	b='tests/rwuniq-bin-time-stime-etime-dur.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-elapsed-bytes.pl.log: tests/rwuniq-elapsed-bytes.pl
+	@p='tests/rwuniq-elapsed-bytes.pl'; \
+	b='tests/rwuniq-elapsed-bytes.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-etime.pl.log: tests/rwuniq-etime.pl
+	@p='tests/rwuniq-etime.pl'; \
+	b='tests/rwuniq-etime.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-stime-proto-sorted.pl.log: tests/rwuniq-stime-proto-sorted.pl
+	@p='tests/rwuniq-stime-proto-sorted.pl'; \
+	b='tests/rwuniq-stime-proto-sorted.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-collection-point.pl.log: tests/rwuniq-collection-point.pl
+	@p='tests/rwuniq-collection-point.pl'; \
+	b='tests/rwuniq-collection-point.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-proto.pl.log: tests/rwuniq-proto.pl
+	@p='tests/rwuniq-proto.pl'; \
+	b='tests/rwuniq-proto.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-sport-mn-rec.pl.log: tests/rwuniq-sport-mn-rec.pl
+	@p='tests/rwuniq-sport-mn-rec.pl'; \
+	b='tests/rwuniq-sport-mn-rec.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-sport-mn-pkt.pl.log: tests/rwuniq-sport-mn-pkt.pl
+	@p='tests/rwuniq-sport-mn-pkt.pl'; \
+	b='tests/rwuniq-sport-mn-pkt.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-sport-mn-byt.pl.log: tests/rwuniq-sport-mn-byt.pl
+	@p='tests/rwuniq-sport-mn-byt.pl'; \
+	b='tests/rwuniq-sport-mn-byt.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-sport-mx-rec.pl.log: tests/rwuniq-sport-mx-rec.pl
+	@p='tests/rwuniq-sport-mx-rec.pl'; \
+	b='tests/rwuniq-sport-mx-rec.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-sport-mx-pkt.pl.log: tests/rwuniq-sport-mx-pkt.pl
+	@p='tests/rwuniq-sport-mx-pkt.pl'; \
+	b='tests/rwuniq-sport-mx-pkt.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-sport-mx-byt.pl.log: tests/rwuniq-sport-mx-byt.pl
+	@p='tests/rwuniq-sport-mx-byt.pl'; \
+	b='tests/rwuniq-sport-mx-byt.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-sport-count-sip.pl.log: tests/rwuniq-sport-count-sip.pl
+	@p='tests/rwuniq-sport-count-sip.pl'; \
+	b='tests/rwuniq-sport-count-sip.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-sport-count-sip-v6.pl.log: tests/rwuniq-sport-count-sip-v6.pl
+	@p='tests/rwuniq-sport-count-sip-v6.pl'; \
+	b='tests/rwuniq-sport-count-sip-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-sport-count-sip-dip.pl.log: tests/rwuniq-sport-count-sip-dip.pl
+	@p='tests/rwuniq-sport-count-sip-dip.pl'; \
+	b='tests/rwuniq-sport-count-sip-dip.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-sport-count-sip-pre.pl.log: tests/rwuniq-sport-count-sip-pre.pl
+	@p='tests/rwuniq-sport-count-sip-pre.pl'; \
+	b='tests/rwuniq-sport-count-sip-pre.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-sport-count-sip-dip-pre.pl.log: tests/rwuniq-sport-count-sip-dip-pre.pl
+	@p='tests/rwuniq-sport-count-sip-dip-pre.pl'; \
+	b='tests/rwuniq-sport-count-sip-dip-pre.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-sport-count-sip-dip-v6.pl.log: tests/rwuniq-sport-count-sip-dip-v6.pl
+	@p='tests/rwuniq-sport-count-sip-dip-v6.pl'; \
+	b='tests/rwuniq-sport-count-sip-dip-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-sport-count2-sip-dip-v6.pl.log: tests/rwuniq-sport-count2-sip-dip-v6.pl
+	@p='tests/rwuniq-sport-count2-sip-dip-v6.pl'; \
+	b='tests/rwuniq-sport-count2-sip-dip-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-sport-count-sip-pre-v6.pl.log: tests/rwuniq-sport-count-sip-pre-v6.pl
+	@p='tests/rwuniq-sport-count-sip-pre-v6.pl'; \
+	b='tests/rwuniq-sport-count-sip-pre-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-no-title.pl.log: tests/rwuniq-no-title.pl
+	@p='tests/rwuniq-no-title.pl'; \
+	b='tests/rwuniq-no-title.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-no-column.pl.log: tests/rwuniq-no-column.pl
+	@p='tests/rwuniq-no-column.pl'; \
+	b='tests/rwuniq-no-column.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-delimited.pl.log: tests/rwuniq-delimited.pl
+	@p='tests/rwuniq-delimited.pl'; \
+	b='tests/rwuniq-delimited.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-legacytime-0.pl.log: tests/rwuniq-legacytime-0.pl
+	@p='tests/rwuniq-legacytime-0.pl'; \
+	b='tests/rwuniq-legacytime-0.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-legacytime-1.pl.log: tests/rwuniq-legacytime-1.pl
+	@p='tests/rwuniq-legacytime-1.pl'; \
+	b='tests/rwuniq-legacytime-1.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-empty-input.pl.log: tests/rwuniq-empty-input.pl
+	@p='tests/rwuniq-empty-input.pl'; \
+	b='tests/rwuniq-empty-input.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-empty-input-presorted.pl.log: tests/rwuniq-empty-input-presorted.pl
+	@p='tests/rwuniq-empty-input-presorted.pl'; \
+	b='tests/rwuniq-empty-input-presorted.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-empty-input-presorted-xargs.pl.log: tests/rwuniq-empty-input-presorted-xargs.pl
+	@p='tests/rwuniq-empty-input-presorted-xargs.pl'; \
+	b='tests/rwuniq-empty-input-presorted-xargs.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-many-presorted.pl.log: tests/rwuniq-many-presorted.pl
+	@p='tests/rwuniq-many-presorted.pl'; \
+	b='tests/rwuniq-many-presorted.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-multiple-inputs.pl.log: tests/rwuniq-multiple-inputs.pl
+	@p='tests/rwuniq-multiple-inputs.pl'; \
+	b='tests/rwuniq-multiple-inputs.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-copy-input.pl.log: tests/rwuniq-copy-input.pl
+	@p='tests/rwuniq-copy-input.pl'; \
+	b='tests/rwuniq-copy-input.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-stdin.pl.log: tests/rwuniq-stdin.pl
+	@p='tests/rwuniq-stdin.pl'; \
+	b='tests/rwuniq-stdin.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-icmpTypeCode.pl.log: tests/rwuniq-icmpTypeCode.pl
+	@p='tests/rwuniq-icmpTypeCode.pl'; \
+	b='tests/rwuniq-icmpTypeCode.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-dport-icmp.pl.log: tests/rwuniq-dport-icmp.pl
+	@p='tests/rwuniq-dport-icmp.pl'; \
+	b='tests/rwuniq-dport-icmp.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-icmp-dport.pl.log: tests/rwuniq-icmp-dport.pl
+	@p='tests/rwuniq-icmp-dport.pl'; \
+	b='tests/rwuniq-icmp-dport.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-country-code-sip.pl.log: tests/rwuniq-country-code-sip.pl
+	@p='tests/rwuniq-country-code-sip.pl'; \
+	b='tests/rwuniq-country-code-sip.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-country-code-dip.pl.log: tests/rwuniq-country-code-dip.pl
+	@p='tests/rwuniq-country-code-dip.pl'; \
+	b='tests/rwuniq-country-code-dip.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-country-code-sip-v6.pl.log: tests/rwuniq-country-code-sip-v6.pl
+	@p='tests/rwuniq-country-code-sip-v6.pl'; \
+	b='tests/rwuniq-country-code-sip-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-country-code-dip-v6.pl.log: tests/rwuniq-country-code-dip-v6.pl
+	@p='tests/rwuniq-country-code-dip-v6.pl'; \
+	b='tests/rwuniq-country-code-dip-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-address-types-sip.pl.log: tests/rwuniq-address-types-sip.pl
+	@p='tests/rwuniq-address-types-sip.pl'; \
+	b='tests/rwuniq-address-types-sip.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-address-types-dip.pl.log: tests/rwuniq-address-types-dip.pl
+	@p='tests/rwuniq-address-types-dip.pl'; \
+	b='tests/rwuniq-address-types-dip.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-address-stype-proto-sorted.pl.log: tests/rwuniq-address-stype-proto-sorted.pl
+	@p='tests/rwuniq-address-stype-proto-sorted.pl'; \
+	b='tests/rwuniq-address-stype-proto-sorted.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-pmap-proto-port.pl.log: tests/rwuniq-pmap-proto-port.pl
+	@p='tests/rwuniq-pmap-proto-port.pl'; \
+	b='tests/rwuniq-pmap-proto-port.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-pmap-src-service-host.pl.log: tests/rwuniq-pmap-src-service-host.pl
+	@p='tests/rwuniq-pmap-src-service-host.pl'; \
+	b='tests/rwuniq-pmap-src-service-host.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-pmap-dst-servhost.pl.log: tests/rwuniq-pmap-dst-servhost.pl
+	@p='tests/rwuniq-pmap-dst-servhost.pl'; \
+	b='tests/rwuniq-pmap-dst-servhost.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-pmap-multiple.pl.log: tests/rwuniq-pmap-multiple.pl
+	@p='tests/rwuniq-pmap-multiple.pl'; \
+	b='tests/rwuniq-pmap-multiple.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-pmap-src-service-host-v6.pl.log: tests/rwuniq-pmap-src-service-host-v6.pl
+	@p='tests/rwuniq-pmap-src-service-host-v6.pl'; \
+	b='tests/rwuniq-pmap-src-service-host-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-pmap-dst-servhost-v6.pl.log: tests/rwuniq-pmap-dst-servhost-v6.pl
+	@p='tests/rwuniq-pmap-dst-servhost-v6.pl'; \
+	b='tests/rwuniq-pmap-dst-servhost-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-pmap-multiple-v6.pl.log: tests/rwuniq-pmap-multiple-v6.pl
+	@p='tests/rwuniq-pmap-multiple-v6.pl'; \
+	b='tests/rwuniq-pmap-multiple-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-int-ext-fields-ext.pl.log: tests/rwuniq-int-ext-fields-ext.pl
+	@p='tests/rwuniq-int-ext-fields-ext.pl'; \
+	b='tests/rwuniq-int-ext-fields-ext.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-int-ext-fields-int-v6.pl.log: tests/rwuniq-int-ext-fields-int-v6.pl
+	@p='tests/rwuniq-int-ext-fields-int-v6.pl'; \
+	b='tests/rwuniq-int-ext-fields-int-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-flowrate-payload.pl.log: tests/rwuniq-flowrate-payload.pl
+	@p='tests/rwuniq-flowrate-payload.pl'; \
+	b='tests/rwuniq-flowrate-payload.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-skplugin-test.pl.log: tests/rwuniq-skplugin-test.pl
+	@p='tests/rwuniq-skplugin-test.pl'; \
+	b='tests/rwuniq-skplugin-test.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-pysilk-key.pl.log: tests/rwuniq-pysilk-key.pl
+	@p='tests/rwuniq-pysilk-key.pl'; \
+	b='tests/rwuniq-pysilk-key.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-pysilk-value.pl.log: tests/rwuniq-pysilk-value.pl
+	@p='tests/rwuniq-pysilk-value.pl'; \
+	b='tests/rwuniq-pysilk-value.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-pysilk-key-value.pl.log: tests/rwuniq-pysilk-key-value.pl
+	@p='tests/rwuniq-pysilk-key-value.pl'; \
+	b='tests/rwuniq-pysilk-key-value.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-pysilk-simple-agg.pl.log: tests/rwuniq-pysilk-simple-agg.pl
+	@p='tests/rwuniq-pysilk-simple-agg.pl'; \
+	b='tests/rwuniq-pysilk-simple-agg.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 tests/rwstats-flowrate-pps.pl.log: tests/rwstats-flowrate-pps.pl
 	@p='tests/rwstats-flowrate-pps.pl'; \
 	b='tests/rwstats-flowrate-pps.pl'; \
@@ -1772,6 +2395,20 @@ tests/rwstats-flowrate-pps.pl.log: tests/rwstats-flowrate-pps.pl
 tests/rwstats-flowrate-bps.pl.log: tests/rwstats-flowrate-bps.pl
 	@p='tests/rwstats-flowrate-bps.pl'; \
 	b='tests/rwstats-flowrate-bps.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-flowrate-pps.pl.log: tests/rwuniq-flowrate-pps.pl
+	@p='tests/rwuniq-flowrate-pps.pl'; \
+	b='tests/rwuniq-flowrate-pps.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwuniq-flowrate-bps.pl.log: tests/rwuniq-flowrate-bps.pl
+	@p='tests/rwuniq-flowrate-bps.pl'; \
+	b='tests/rwuniq-flowrate-bps.pl'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \

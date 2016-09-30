@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagtool.c cfc5c10253d8 2016-06-15 21:53:33Z mthomas $");
+RCSIDENT("$SiLK: rwbagtool.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skipaddr.h>
@@ -150,7 +150,7 @@ static const struct bag_compare_map_st {
 static int arg_index = 0;
 
 /* the compression method to use when writing the file.
- * sksiteCompmethodOptionsRegister() will set this to the default or
+ * skCompMethodOptionsRegister() will set this to the default or
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
@@ -321,7 +321,7 @@ appUsageLong(
         }
     }
     skOptionsNotesUsage(fh);
-    sksiteCompmethodOptionsUsage(fh);
+    skCompMethodOptionsUsage(fh);
 }
 
 
@@ -391,7 +391,7 @@ appSetup(
         || skIPSetOptionsRegisterRecordVersion(&ipset_options,
                                                "ipset-record-version")
         || skOptionsNotesRegister(&note_strip)
-        || sksiteCompmethodOptionsRegister(&comp_method))
+        || skCompMethodOptionsRegister(&comp_method))
     {
         skAppPrintErr("Unable to register options");
         exit(EXIT_FAILURE);

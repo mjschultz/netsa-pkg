@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwipaimport.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwipaimport.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include "rwipa.h"
 
@@ -481,8 +481,8 @@ int main(int argc, char **argv)
         break;
 
       default:
-        sksiteFileformatGetName(format_name, sizeof(format_name),
-                                skHeaderGetFileFormat(hdr));
+        skFileFormatGetName(format_name, sizeof(format_name),
+                            skHeaderGetFileFormat(hdr));
         skAppPrintErr("Files in the %s format are not supported",
                       format_name);
         rv = -1;

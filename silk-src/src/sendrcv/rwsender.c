@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsender.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwsender.c e01b3bf70e8f 2016-08-09 21:14:22Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skdaemon.h>
@@ -34,6 +34,8 @@ RCSIDENT("$SiLK: rwsender.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
  *    or low, with values above this threashold considered high */
 #define HIGH_PRIORITY_THRESHOLD 50
 #define IS_HIGH_PRIORITY(x) ((x) > (HIGH_PRIORITY_THRESHOLD))
+
+#define PRIORITY_NAME(x)    (IS_HIGH_PRIORITY(x) ? "high" : "low")
 
 #define RWSENDER_PASSWORD_ENV ("RWSENDER" PASSWORD_ENV_POSTFIX)
 
@@ -66,7 +68,7 @@ typedef struct file_path_count_st {
 
 typedef enum transfer_rv {
     /* file was transferred */
-    TR_SUCCEEEDED,
+    TR_SUCCEEDED,
     /* file was not transferred and should be retried */
     TR_FAILED,
     /* file was explicitly rejected by the remote side */
@@ -960,6 +962,7 @@ read_processing_directory(
         DIR *dir;
         struct dirent *entry;
         char path_buffer[PATH_MAX];
+        unsigned int count;
         int rv;
 
         rv = snprintf(path_buffer, sizeof(path_buffer), "%s/%s",
@@ -968,7 +971,6 @@ read_processing_directory(
             CRITMSG("Path too long: '%s/%s'", incoming_dir, rcvr->ident);
             exit(EXIT_FAILURE);
         }
-
         if (!skDirExists(path_buffer)) {
             rv = skMakeDir(path_buffer);
             if (rv != 0) {
@@ -979,11 +981,12 @@ read_processing_directory(
         }
 
         dir = opendir(path_buffer);
-
         if (dir == NULL) {
             CRITMSG("Could not open processing-directory");
             exit(EXIT_FAILURE);
         }
+
+        count = 0;
 
         while ((entry = readdir(dir)) != NULL) {
             file_path_count_t *filename;
@@ -997,9 +1000,6 @@ read_processing_directory(
             if ('.' == entry->d_name[0]) {
                 continue;
             }
-
-            INFOMSG("Adding %s to the %s queue",
-                    entry->d_name, rcvr->ident);
 
             rv = snprintf(filename_buffer, sizeof(filename_buffer), "%s/%s/%s",
                           processing_dir, rcvr->ident, entry->d_name);
@@ -1015,6 +1015,8 @@ read_processing_directory(
                     break;
                 }
             }
+            DEBUGMSG("Adding '%s' to the %s-priority queue for %s",
+                     entry->d_name, PRIORITY_NAME(priority), rcvr->ident);
 
             err = mqQueueAdd(IS_HIGH_PRIORITY(priority) ?
                              rcvr->app.r.high : rcvr->app.r.low,
@@ -1026,8 +1028,14 @@ read_processing_directory(
                 break;
             }
             assert(err == MQ_NOERROR);
+            ++count;
         }
         closedir(dir);
+
+        if (count) {
+            INFOMSG("Added %u file%s to the queue for %s",
+                    count, ((1 == count) ? "" : "s"), rcvr->ident);
+        }
     }
     rbcloselist(list);
 }
@@ -1061,19 +1069,6 @@ handle_new_file(
     sk_dllist_t *high, *low;
     sk_dll_iter_t local_iter;
     const local_dest_t *local;
-
-    iter = rbopenlist(transfers);
-    CHECK_ALLOC(iter);
-
-    /* high and low are temporary queues.  while looping over the
-     * rwreceivers, files are queued here.  once we finish looping,
-     * the files are moved to the actual rwreceivers' queues. this
-     * prevents the first receiver from removing a file before the
-     * file is linked to the other rwreceivers. */
-    high = skDLListCreate(NULL);
-    CHECK_ALLOC(high);
-    low = skDLListCreate(NULL);
-    CHECK_ALLOC(low);
 
     /* loop over the local destinations */
     skDLLAssignIter(&local_iter, local_dests);
@@ -1119,6 +1114,19 @@ handle_new_file(
     /* the 'source' variable is used so we can attempt to hard-link
      * files among the subdirectories of the processing-directory */
     source = path;
+
+    iter = rbopenlist(transfers);
+    CHECK_ALLOC(iter);
+
+    /* high and low are temporary queues.  while looping over the
+     * rwreceivers, files are queued here.  once we finish looping,
+     * the files are moved to the actual rwreceivers' queues. this
+     * prevents the first receiver from removing a file before the
+     * file is linked to the other rwreceivers. */
+    high = skDLListCreate(NULL);
+    CHECK_ALLOC(high);
+    low = skDLListCreate(NULL);
+    CHECK_ALLOC(low);
 
     /* loop over the list of rwreceivers */
     while ((rcvr = (transfer_t *)rbreadlist(iter)) != NULL) {
@@ -1179,6 +1187,8 @@ handle_new_file(
             rv = skDLListPushTail(low, rcvr);
             CHECK_ALLOC(rv == 0);
         }
+        DEBUGMSG("Adding '%s' to the %s-priority queue for %s",
+                 name, PRIORITY_NAME(priority), rcvr->ident);
 
         handled = 1;
     }
@@ -1688,7 +1698,7 @@ transferFile(
                     difftime(send_time, dropoff_time),
                     difftime(finished_time, send_time),
                     (uint64_t)st.st_size);
-            retval = TR_SUCCEEEDED;
+            retval = TR_SUCCEEDED;
             state = Done;
             break;
 
@@ -1778,7 +1788,7 @@ transferFiles(
 
         rv = transferFile(q, channel, rcvr, path);
         switch (rv) {
-          case TR_SUCCEEEDED:
+          case TR_SUCCEEDED:
             transferred_file = 1;
             INFOMSG("Succeeded sending %s to %s", path->path, rcvr->ident);
             free(path);
@@ -1843,6 +1853,8 @@ int main(int argc, char **argv)
     daemonized = 1;
 
     /* Add outstanding files to queues */
+    NOTICEMSG("Populating queues with unsent files"
+              " in the processing directory");
     read_processing_directory();
 
     /* Set up directory polling */
@@ -1858,6 +1870,7 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+    NOTICEMSG("Starting thread to handle incoming files...");
     rv = skthread_create("incoming", &incoming_dir_thread,
                          handle_incoming_directory, NULL);
     if (rv != 0) {

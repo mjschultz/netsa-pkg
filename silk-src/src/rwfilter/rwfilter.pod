@@ -12,7 +12,7 @@ Selection switches, input switches, or input files are required:
 
   rwfilter ...
         {{ [--class=CLASS] [--type={all | TYPE[,TYPE ...]}]
-           | [--flowtype=CLASS/TYPE[,CLASS/TYPE ...]] }
+           | [--flowtypes=CLASS/TYPE[,CLASS/TYPE ...]] }
          [--sensors=SENSOR[,SENSOR ...]]
          [--start-date=YYYY/MM/DD[:HH] [--end-date=YYYY/MM/DD[:HH]]]
          [--data-rootdir=ROOT_DIRECTORY] [--print-missing-files] }
@@ -217,7 +217,7 @@ B<rwsiteinfo> with B<--fields=class,type,default-type>.
 
 =item B<--flowtypes>=I<CLASS>/I<TYPE>[,I<CLASS>/I<TYPE> ...]
 
-The B<--flowtype> predicate provides an alternate way to specify
+The B<--flowtypes> predicate provides an alternate way to specify
 class/type pairs.  The B<--flowtypes> switch allows a single
 B<rwfilter> invocation to process data from multiple classes.  The
 keyword C<all> may be used for the I<CLASS> and/or I<TYPE> to select
@@ -1370,7 +1370,10 @@ destination IP of the flow matching the I<IPA_EXPR> expression.
 
 =item B<--compression-method>=I<COMP_METHOD>
 
-Specify how to compress the output.  When this switch is not given,
+Specify the compression library to use when writing output files.  If
+this switch is not given, the value in the SILK_COMPRESSION_METHOD
+environment variable is used if the value names an available
+compression method.  When no compression method is specified,
 output to the standard output or to named pipes is not compressed, and
 output to files is compressed using the default chosen when SiLK was
 compiled.  The valid values for I<COMP_METHOD> are determined by which
@@ -1398,10 +1401,17 @@ for compression, and always compress the output regardless of the
 destination.  This compression provides good compression with less
 memory and CPU overhead.
 
+=item snappy
+
+Use the I<snappy> library for compression, and always compress the
+output regardless of the destination.  This compression provides good
+compression with less memory and CPU overhead.  I<Since SiLK 3.13.0.>
+
 =item best
 
-Use lzo1x if available, otherwise use zlib.  Only compress the output
-when writing to a file.
+Use lzo1x if available, otherwise use snappy if available, otherwise
+use zlib if available.  Only compress the output when writing to a
+file.
 
 =back
 
@@ -1781,6 +1791,12 @@ the L</FILES> section for standard locations of this file.
 The SiLK tools normally refuse to overwrite existing files.  Setting
 SILK_CLOBBER to a non-empty value removes this restriction.
 
+=item SILK_COMPRESSION_METHOD
+
+This environment variable is used as the value for
+B<--compression-method> when that switch is not provided.  I<Since
+SiLK 3.13.0.>
+
 =item SILK_CONFIG_FILE
 
 This environment variable is used as the value for the
@@ -1998,7 +2014,7 @@ I<Analysts' Handbook: Using SiLK for Network Traffic Analysis>
 
 =cut
 
-$SiLK: rwfilter.pod 6fd07070d1e2 2016-06-14 15:27:22Z mthomas $
+$SiLK: rwfilter.pod 7c452d1f409f 2016-09-23 21:00:08Z mthomas $
 
 Local Variables:
 mode:text

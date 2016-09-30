@@ -1,7 +1,19 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: rwflowpack-split-rwflowappend.pl 8c371b8abe4a 2016-06-17 20:59:25Z mthomas $")
+# RCSIDENT("$SiLK: rwflowpack-split-rwflowappend.pl 622e2f0a4dd8 2016-09-22 13:47:50Z mthomas $")
+#
+# PURPOSE: Check whether rwflowappend properly handles combining about
+# 16,925 incremental files into 432 hourly files.  The incremental
+# files exist in rwflowappend's incoming directory when it is invoked.
+# To create an each hourly file, rwflowappend will combine
+# approximately 39 incrementail files.  The input files will be
+# deleted.  When rwflowappend receives a signal, it should shut down
+# cleanly.  To create the incremental files, the test runs rwflowpack
+# in sending mode which creates 432 incremental files, and then the
+# test runs rwsplit on each of those files.  This test uses input
+# files that contain only IPv4 data.
+#
 
 use strict;
 use SiLKTests;

@@ -48,10 +48,11 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-options.c d49b1e47d2e3 2016-06-15 20:31:17Z mthomas $");
+RCSIDENT("$SiLK: sku-options.c 35360d98d580 2016-09-22 18:30:40Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sksite.h>
+#include <silk/silk_files.h>
 #include <silk/skstringmap.h>
 
 
@@ -217,21 +218,20 @@ printVersion(
 #endif
             );
 
-    default_compmethod = sksiteCompmethodGetDefault();
-    sksiteCompmethodGetName(comp_name, sizeof(comp_name),
-                            default_compmethod);
+    default_compmethod = skCompMethodGetDefault();
+    skCompMethodGetName(comp_name, sizeof(comp_name), default_compmethod);
     fprintf(VERS_FH, "    * %-32s  %s [default]",
             "Available compression methods:", comp_name);
 
-    for (i = 0; sksiteCompmethodCheck(i); ++i) {
+    for (i = 0; skCompMethodCheck(i); ++i) {
         if (i == default_compmethod) {
             continue;
         }
-        if (SK_COMPMETHOD_IS_AVAIL != sksiteCompmethodCheck(i)) {
+        if (SK_COMPMETHOD_IS_AVAIL != skCompMethodCheck(i)) {
             /* not available */
             continue;
         }
-        sksiteCompmethodGetName(comp_name, sizeof(comp_name), i);
+        skCompMethodGetName(comp_name, sizeof(comp_name), i);
         fprintf(VERS_FH, ", %s", comp_name);
     }
     fprintf(VERS_FH, "\n");
@@ -942,8 +942,8 @@ skOptionsIPFormatUsage(
 {
     const sk_stringmap_entry_t *e;
 
-    fprintf(fh,
-            "--%s %s. Print IPs in specified format. Def. %s\n",
+    fprintf(fh, ("--%s %s. Print each IP address in the specified format.\n"
+                 "\tDef. $" SK_IP_FORMAT_ENVAR " or %s.  Choices:\n"),
             ipformat_option[OPT_VAL_IP_FORMAT].name,
             SK_OPTION_HAS_ARG(ipformat_option[OPT_VAL_IP_FORMAT]),
             ipformat_names[0].name);
@@ -1287,7 +1287,9 @@ skOptionsTimestampFormatUsage(
         switch ((enum time_format_option_en)tfo->val) {
           case OPT_VAL_TIMESTAMP_FORMAT:
             fprintf(
-                fh, "--%s %s. Print times in specified format: Def. %s,%s\n",
+                fh,
+                ("--%s %s. Print each timestamp in this format and timezone.\n"
+                 "\tDef. $" SK_TIMESTAMP_FORMAT_ENVAR " or %s,%s.  Choices:\n"),
                 tfo->name, SK_OPTION_HAS_ARG(*tfo),
                 time_format_names[0].name,
                 time_format_zones[(SK_ENABLE_LOCALTIME != 0)].name);

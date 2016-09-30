@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SILK_TYPES_H, "$SiLK: silk_types.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_SILK_TYPES_H, "$SiLK: silk_types.h 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 /**
  *  @file
@@ -218,6 +218,13 @@ typedef struct skstream_st skstream_t;
  */
 typedef uint8_t  sk_file_format_t;
 typedef sk_file_format_t fileFormat_t       SK_GCC_DEPRECATED;
+
+/**
+ *    The value for an invalid or unrecognized file format.
+ *
+ *    Since SiLK 3.13.0.
+ */
+#define SK_INVALID_FILE_FORMAT      ((sk_file_format_t)0xFF)
 
 /**
  *    The strlen() of the names of file formats will be this size or

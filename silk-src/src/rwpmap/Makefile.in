@@ -109,6 +109,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_libadns.m4 \
 	$(top_srcdir)/m4/ax_check_libcares.m4 \
 	$(top_srcdir)/m4/ax_check_liblzo.m4 \
 	$(top_srcdir)/m4/ax_check_libpcap.m4 \
+	$(top_srcdir)/m4/ax_check_libsnappy.m4 \
 	$(top_srcdir)/m4/ax_check_libz.m4 \
 	$(top_srcdir)/m4/ax_check_printf_z.m4 \
 	$(top_srcdir)/m4/ax_check_pthread.m4 \
@@ -564,6 +565,7 @@ SK_ENABLE_IPFIX = @SK_ENABLE_IPFIX@
 SK_ENABLE_IPV6 = @SK_ENABLE_IPV6@
 SK_ENABLE_LZO = @SK_ENABLE_LZO@
 SK_ENABLE_OUTPUT_COMPRESSION = @SK_ENABLE_OUTPUT_COMPRESSION@
+SK_ENABLE_SNAPPY = @SK_ENABLE_SNAPPY@
 SK_ENABLE_ZLIB = @SK_ENABLE_ZLIB@
 SK_LDFLAGS = @SK_LDFLAGS@
 SK_SRC_INCLUDES = @SK_SRC_INCLUDES@

@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 # MD5: 06898de2a61b8470ffb9267e5231e19a
-# TEST: ../rwuniq/rwuniq --fields=sport --flows --no-title --delimited=, ../../tests/data.rwf | ./rwbagbuild --bag-input=stdin --delimiter=, | ./rwbagcat --key-format=decimal
+# TEST: ../rwstats/rwuniq --fields=sport --flows --no-title --delimited=, ../../tests/data.rwf | ./rwbagbuild --bag-input=stdin --delimiter=, | ./rwbagcat --key-format=decimal
 
 use strict;
 use SiLKTests;

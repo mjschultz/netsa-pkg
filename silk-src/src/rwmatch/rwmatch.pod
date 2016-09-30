@@ -18,6 +18,8 @@ B<rwmatch> - Match SiLK records from two streams into a common stream
 
   rwmatch --help
 
+  rwmatch --help-relate
+
   rwmatch --version
 
 =head1 DESCRIPTION
@@ -459,7 +461,10 @@ records in the input.
 
 =item B<--compression-method>=I<COMP_METHOD>
 
-Specify how to compress the output.  When this switch is not given,
+Specify the compression library to use when writing output files.  If
+this switch is not given, the value in the SILK_COMPRESSION_METHOD
+environment variable is used if the value names an available
+compression method.  When no compression method is specified,
 output to the standard output or to named pipes is not compressed, and
 output to files is compressed using the default chosen when SiLK was
 compiled.  The valid values for I<COMP_METHOD> are determined by which
@@ -487,10 +492,17 @@ for compression, and always compress the output regardless of the
 destination.  This compression provides good compression with less
 memory and CPU overhead.
 
+=item snappy
+
+Use the I<snappy> library for compression, and always compress the
+output regardless of the destination.  This compression provides good
+compression with less memory and CPU overhead.  I<Since SiLK 3.13.0.>
+
 =item best
 
-Use lzo1x if available, otherwise use zlib.  Only compress the output
-when writing to a file.
+Use lzo1x if available, otherwise use snappy if available, otherwise
+use zlib if available.  Only compress the output when writing to a
+file.
 
 =back
 
@@ -504,6 +516,11 @@ section.
 =item B<--help>
 
 Print the available options and exit.
+
+=item B<--help-relate>
+
+Print the description and aliases of each field that may be used as
+arguments to the B<--relate> switch and exit.
 
 =item B<--version>
 
@@ -678,6 +695,12 @@ when that switch is not provided.
 The SiLK tools normally refuse to overwrite existing files.  Setting
 SILK_CLOBBER to a non-empty value removes this restriction.
 
+=item SILK_COMPRESSION_METHOD
+
+This environment variable is used as the value for
+B<--compression-method> when that switch is not provided.  I<Since
+SiLK 3.13.0.>
+
 =item SILK_CONFIG_FILE
 
 This environment variable is used as the value for the
@@ -734,7 +757,7 @@ switch and added support for IPv6 flow records.
 
 =cut
 
-$SiLK: rwmatch.pod 093f18894c79 2015-09-08 20:02:01Z mthomas $
+$SiLK: rwmatch.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
 
 Local Variables:
 mode:text

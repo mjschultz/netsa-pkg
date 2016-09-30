@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-# RCSIDENT("$SiLK: Makefile.am 006bf6dc14e3 2013-01-22 20:56:29Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 2d7b43e7a886 2016-09-23 14:04:15Z mthomas $");
 
 # Installed Targets
 
@@ -107,6 +107,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_libadns.m4 \
 	$(top_srcdir)/m4/ax_check_libcares.m4 \
 	$(top_srcdir)/m4/ax_check_liblzo.m4 \
 	$(top_srcdir)/m4/ax_check_libpcap.m4 \
+	$(top_srcdir)/m4/ax_check_libsnappy.m4 \
 	$(top_srcdir)/m4/ax_check_libz.m4 \
 	$(top_srcdir)/m4/ax_check_printf_z.m4 \
 	$(top_srcdir)/m4/ax_check_pthread.m4 \
@@ -528,6 +529,7 @@ SK_ENABLE_IPFIX = @SK_ENABLE_IPFIX@
 SK_ENABLE_IPV6 = @SK_ENABLE_IPV6@
 SK_ENABLE_LZO = @SK_ENABLE_LZO@
 SK_ENABLE_OUTPUT_COMPRESSION = @SK_ENABLE_OUTPUT_COMPRESSION@
+SK_ENABLE_SNAPPY = @SK_ENABLE_SNAPPY@
 SK_ENABLE_ZLIB = @SK_ENABLE_ZLIB@
 SK_LDFLAGS = @SK_LDFLAGS@
 SK_SRC_INCLUDES = @SK_SRC_INCLUDES@
@@ -770,18 +772,14 @@ AM_LOG_FLAGS = $(AM_PL_LOG_FLAGS)
 
 # Required files; variables defined in ../../build.mk
 check_DATA = $(SILK_TESTSDIR) $(SILK_TESTDATA)
-TESTS = \
-	tests/rwfileinfo-help.pl \
-	tests/rwfileinfo-version.pl \
-	tests/rwfileinfo-lone-command.pl \
-	tests/rwfileinfo-recs-data.pl \
-	tests/rwfileinfo-recs-empty.pl \
-	tests/rwfileinfo-recs-stdin.pl \
-	tests/rwfileinfo-vers-cmd-lines.pl \
-	tests/rwfileinfo-length.pl \
-	tests/rwfileinfo-byte-order.pl \
-	tests/rwfileinfo-compression.pl
 
+# above tests are automatically generated;
+# those below are written by hand
+TESTS = tests/rwfileinfo-help.pl tests/rwfileinfo-version.pl \
+	tests/rwfileinfo-lone-command.pl tests/rwfileinfo-recs-data.pl \
+	tests/rwfileinfo-recs-empty.pl tests/rwfileinfo-recs-stdin.pl \
+	tests/rwfileinfo-vers-cmd-lines.pl tests/rwfileinfo-length.pl \
+	tests/rwfileinfo-byte-order.pl tests/rwfileinfo-compression.pl
 all: all-am
 
 .SUFFIXES:

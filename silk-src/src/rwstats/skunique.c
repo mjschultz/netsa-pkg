@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skunique.c 558ff1948cad 2016-06-16 18:41:50Z mthomas $");
+RCSIDENT("$SiLK: skunique.c 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/rwascii.h>
@@ -23,9 +23,9 @@ RCSIDENT("$SiLK: skunique.c 558ff1948cad 2016-06-16 18:41:50Z mthomas $");
 #include <silk/skheap.h>
 #include <silk/skstream.h>
 #include <silk/sktempfile.h>
-#include <silk/skunique.h>
 #include <silk/skvector.h>
 #include <silk/utils.h>
+#include "skunique.h"
 
 #ifdef SKUNIQUE_TRACE_LEVEL
 #define TRACEMSG_LEVEL 1

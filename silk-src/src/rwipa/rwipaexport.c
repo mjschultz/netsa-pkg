@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwipaexport.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwipaexport.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/skstringmap.h>
 #include "rwipa.h"
@@ -32,7 +32,7 @@ static char *export_time_str = NULL;
 static int arg_index = 0;
 
 /* the compression method to use when writing the file.
- * sksiteCompmethodOptionsRegister() will set this to the default or
+ * skCompMethodOptionsRegister() will set this to the default or
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
@@ -108,7 +108,7 @@ appUsageLong(
 
     skAppStandardUsage(fh, USAGE_MSG, appOptions, appHelp);
     skOptionsNotesUsage(fh);
-    sksiteCompmethodOptionsUsage(fh);
+    skCompMethodOptionsUsage(fh);
 }
 
 
@@ -166,7 +166,7 @@ appSetup(
     /* register the options */
     if (skOptionsRegister(appOptions, & appOptionsHandler, NULL)
         || skOptionsNotesRegister(NULL)
-        || sksiteCompmethodOptionsRegister(&comp_method))
+        || skCompMethodOptionsRegister(&comp_method))
     {
         skAppPrintErr("Unable to register options");
         exit(EXIT_FAILURE);

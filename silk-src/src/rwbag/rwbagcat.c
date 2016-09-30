@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagcat.c 12f1471c7423 2016-06-13 19:27:15Z mthomas $");
+RCSIDENT("$SiLK: rwbagcat.c 0432f6547214 2016-09-19 19:08:31Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skcountry.h>
@@ -483,7 +483,7 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
-    int optctx_flags;
+    unsigned int optctx_flags;
     int rv;
 
     /* verify same number of options and help strings */

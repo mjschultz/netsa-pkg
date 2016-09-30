@@ -7,7 +7,7 @@ B<rwfglob> - Print files that B<rwfilter>'s File Selection switches will access
 =head1 SYNOPSIS
 
   rwfglob { [--class=CLASS] [--type={all | TYPE[,TYPE ...]}]
-            | [--flowtype=CLASS/TYPE[,CLASS/TYPE ...]] }
+            | [--flowtypes=CLASS/TYPE[,CLASS/TYPE ...]] }
         [--sensors=SENSOR[,SENSOR ...]]
         [--start-date=YYYY/MM/DD[:HH] [--end-date=YYYY/MM/DD[:HH]]]
         [--data-rootdir=ROOT_DIRECTORY] [--site-config-file=FILENAME]
@@ -86,7 +86,7 @@ B<rwsiteinfo> with B<--fields=class,type,default-type>.
 
 =item B<--flowtypes>=I<CLASS>/I<TYPE>[,I<CLASS>/I<TYPE> ...]
 
-The B<--flowtype> predicate provides an alternate way to specify
+The B<--flowtypes> predicate provides an alternate way to specify
 class/type pairs.  The B<--flowtypes> switch allows a single
 B<rwfglob> invocation to print data from multiple classes.  The
 keyword C<all> may be used for the I<CLASS> and/or I<TYPE> to select
@@ -379,7 +379,7 @@ tape-farm systems.
 
 =cut
 
-$SiLK: rwfglob.pod c068e77432c6 2015-09-08 15:40:30Z mthomas $
+$SiLK: rwfglob.pod 7c452d1f409f 2016-09-23 21:00:08Z mthomas $
 
 Local Variables:
 mode:text

@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwflow_utils.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwflow_utils.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/sklog.h>
 #include <silk/utils.h>
@@ -22,6 +22,16 @@ RCSIDENT("$SiLK: rwflow_utils.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 /* use TRACEMSG_LEVEL as our tracing variable */
 #define TRACEMSG(lvl, msg) TRACEMSG_TO_TRACEMSGLVL(lvl, msg)
 #include <silk/sktracemsg.h>
+
+
+/* LOCAL DEFINES AND TYPEDEFS */
+
+/*
+ *    When rwflowpack or rwflowappend opens a file for writing, it
+ *    first reads this number of bytes to determine whether the file
+ *    is an existing SiLK file or an empty file.
+ */
+#define RWFLOWPACK_OPEN_EXIST_READLEN   8
 
 
 /* LOCAL VARIABLES */
@@ -171,8 +181,8 @@ openRepoStream(
     /* Can we read the number of bytes in a SiLK file header?  The
      * header will be read and verified when the descriptor is bound
      * to an skstream. */
-    rv = read(fd, buf, sizeof(sk_header_start_t));
-    if (rv == (int)sizeof(sk_header_start_t)) {
+    rv = read(fd, buf, RWFLOWPACK_OPEN_EXIST_READLEN);
+    if (rv == RWFLOWPACK_OPEN_EXIST_READLEN) {
         TRACEMSG(1, ("Read all header bytes from file '%s'", repo_file));
         /* file has enough bytes to contain a silk header; will treat
          * it as SK_IO_APPEND */
@@ -225,8 +235,8 @@ openRepoStream(
         goto ERROR;
     } else {
         /* short read */
-        WARNINGMSG("Read %" SK_PRIdZ "/%" SK_PRIuZ " bytes from '%s'",
-                   rv, sizeof(sk_header_start_t), repo_file);
+        WARNINGMSG("Read %" SK_PRIdZ "/%d bytes from '%s'",
+                   rv, RWFLOWPACK_OPEN_EXIST_READLEN, repo_file);
         goto ERROR;
     }
 

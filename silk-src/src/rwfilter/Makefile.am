@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 329106c5d390 2015-10-08 15:38:45Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 1936829ad370 2016-08-24 18:29:37Z mthomas $");
 
 # Installed Targets
 
@@ -161,6 +161,11 @@ EXTRA_TESTS = \
 	tests/rwfilter-flowrate-pps.pl \
 	tests/rwfilter-payload-rate.pl
 EXTRA_DIST += $(EXTRA_TESTS)
+
+# above tests are automatically generated;
+# those below are written by hand
+TESTS += \
+	tests/rwfglob-times.pl
 
 if RUN_EXTRA_CHECKS
 TESTS += $(EXTRA_TESTS)

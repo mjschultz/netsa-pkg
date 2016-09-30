@@ -1,4 +1,4 @@
-# RCSIDENT($SiLK: Makefile.am 4dba2416c3d6 2015-09-10 19:03:20Z mthomas $)
+# RCSIDENT($SiLK: Makefile.am 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $)
 
 SILK_SRC_MAKE_BASE_LIBS = \
 	 libsilk
@@ -45,8 +45,7 @@ SILK_SRC_MAKE_ANALYSIS_TOOLS = \
          rwstats \
          rwswapbytes \
          rwtotal \
-         rwtuc \
-         rwuniq
+         rwtuc
 
 # Conditional analysis tools
 SILK_SRC_MAKE_ANALYSIS_FIXBUF = rwipfix

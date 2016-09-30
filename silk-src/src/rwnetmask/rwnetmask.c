@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwnetmask.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
+RCSIDENT("$SiLK: rwnetmask.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -58,7 +58,7 @@ static sk_options_ctx_t *optctx = NULL;
 static const char *output_path = NULL;
 
 /* the compression method to use when writing the file.
- * sksiteCompmethodOptionsRegister() will set this to the default or
+ * skCompMethodOptionsRegister() will set this to the default or
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
@@ -174,7 +174,7 @@ appUsageLong(
 
     skOptionsCtxOptionsUsage(optctx, fh);
     skIPv6PolicyUsage(fh);
-    sksiteCompmethodOptionsUsage(fh);
+    skCompMethodOptionsUsage(fh);
     skOptionsNotesUsage(fh);
     sksiteOptionsUsage(fh);
 }
@@ -222,7 +222,7 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
-    int optctx_flags;
+    unsigned int optctx_flags;
     int rv;
     int i;
 
@@ -250,7 +250,7 @@ appSetup(
         || skOptionsRegister(legacyOptions, &appOptionsHandler, NULL)
         || skIPv6PolicyOptionsRegister(&ipv6_policy)
         || skOptionsNotesRegister(NULL)
-        || sksiteCompmethodOptionsRegister(&comp_method)
+        || skCompMethodOptionsRegister(&comp_method)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE))
     {
         skAppPrintErr("Unable to register options");

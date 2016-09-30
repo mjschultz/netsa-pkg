@@ -16,7 +16,7 @@
                                    headers */
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pysilk.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: pysilk.c 22da9b03c74d 2016-09-19 18:28:03Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skbag.h>
@@ -1133,6 +1133,7 @@ silkPyIPv6Addr_init(
             next = PyNumber_Rshift(tmp, shift);
             Py_DECREF(tmp);
         }
+        Py_DECREF(next);
         Py_DECREF(shift);
         skipaddrSetV6(&self->addr, v6);
 
@@ -3168,6 +3169,7 @@ silkPyBagIter_iternext(
 {
     skBagErr_t           rv;
     PyObject            *retkey;
+    PyObject            *retval;
     skBagTypedKey_t      key;
     skBagTypedCounter_t  counter;
 
@@ -3199,7 +3201,9 @@ silkPyBagIter_iternext(
         }
     }
 
-    return Py_BuildValue("OK", retkey, counter.val.u64);
+    retval = Py_BuildValue("OK", retkey, counter.val.u64);
+    Py_DECREF(retkey);
+    return retval;
 }
 
 static PyObject *
@@ -5458,6 +5462,7 @@ silkPyRWRec_etime_get(
     retval = PyNumber_Add(s_time, dur);
 
     Py_DECREF(s_time);
+    Py_DECREF(dur);
 
     return retval;
 }
@@ -7226,7 +7231,7 @@ silkPyRepoIter_init(
 
     } else if ((SK_PARSED_DATETIME_GET_PRECISION(start_precision)
                    >= SK_PARSED_DATETIME_HOUR)
-               || (1 == (start_precision & SK_PARSED_DATETIME_EPOCH)))
+               || (start_precision & SK_PARSED_DATETIME_EPOCH))
     {
         /* no ending time was given and the starting time contains an
          * hour or the starting time was expressed as epoch seconds;
@@ -7726,6 +7731,9 @@ silk_get_compression_methods(
 #endif
 #if SK_ENABLE_LZO
         "LZO1X",
+#endif
+#if SK_ENABLE_SNAPPY
+        "SNAPPY",
 #endif
         NULL
     };
@@ -8236,6 +8244,7 @@ init_silkfile_module(
     PyModule_AddIntConstant(mod, "NO_COMPRESSION", SK_COMPMETHOD_NONE);
     PyModule_AddIntConstant(mod, "ZLIB", SK_COMPMETHOD_ZLIB);
     PyModule_AddIntConstant(mod, "LZO1X", SK_COMPMETHOD_LZO1X);
+    PyModule_AddIntConstant(mod, "SNAPPY", SK_COMPMETHOD_SNAPPY);
 
     PyModule_AddObject(mod, "BAG_COUNTER_MAX",
                        PyLong_FromUnsignedLongLong(SKBAG_COUNTER_MAX));

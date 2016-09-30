@@ -37,9 +37,9 @@ By default, B<rwfileinfo> prints the following information for each
 file argument.  Use the B<--fields> switch to modify which pieces of
 information are printed.
 
-(B<rwfileinfo> prints a field in order in which support for that field
-was added to SiLK.  The field descriptions are presented here in a
-more logical order.)
+(B<rwfileinfo> prints each field in the order in which support for
+that field was added to SiLK.  The field descriptions are presented
+here in a more logical order.)
 
 =over 4
 
@@ -90,8 +90,9 @@ header-section of a file is always written in network byte order.
 
 =item B<compression>
 
-SiLK tools may use the zlib library (L<http://zlib.net/>) or the LZO
-library (L<http://www.oberhumer.com/opensource/lzo/>) to compress the
+SiLK tools may use the zlib library (L<http://zlib.net/>), the LZO
+library (L<http://www.oberhumer.com/opensource/lzo/>), or the snappy
+library (L<http://google.github.io/snappy/>) to compress the
 data section of a file.  The compression field specifies which library
 (if any) was used to compress the data section.  If a file is
 compressed with a library that was not included in an installation
@@ -515,7 +516,7 @@ B<rwflowpack(8)>, B<silk(7)>, B<gzip(1)>
 
 =cut
 
-$SiLK: rwfileinfo.pod caef286c367c 2016-06-03 19:23:54Z mthomas $
+$SiLK: rwfileinfo.pod 22da9b03c74d 2016-09-19 18:28:03Z mthomas $
 
 Local Variables:
 mode:text

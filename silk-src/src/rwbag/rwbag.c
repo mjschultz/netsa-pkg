@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbag.c 510966e810f2 2016-06-03 17:16:33Z mthomas $");
+RCSIDENT("$SiLK: rwbag.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skbag.h>
@@ -122,7 +122,7 @@ static sk_vector_t *bag_vec = NULL;
 static sk_vector_t *pmap_vec = NULL;
 
 /* the compression method to use when writing the files.
- * sksiteCompmethodOptionsRegister() will set this to the default or
+ * skCompMethodOptionsRegister() will set this to the default or
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
@@ -322,7 +322,7 @@ appUsageLong(
 
     skOptionsCtxOptionsUsage(optctx, fh);
     skIPv6PolicyUsage(fh);
-    sksiteCompmethodOptionsUsage(fh);
+    skCompMethodOptionsUsage(fh);
     sksiteOptionsUsage(fh);
 
     if (legacy_help) {
@@ -406,7 +406,7 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
-    int optctx_flags;
+    unsigned int optctx_flags;
     bagfile_t *bag;
     ssize_t rv;
     size_t i;
@@ -434,7 +434,7 @@ appSetup(
         || skOptionsRegister(
             legacy_bag_creation_option, &legacyOptionsHandler, NULL)
         || skOptionsNotesRegister(&notes_strip)
-        || sksiteCompmethodOptionsRegister(&comp_method)
+        || skCompMethodOptionsRegister(&comp_method)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE)
         || skIPv6PolicyOptionsRegister(&ipv6_policy))
     {

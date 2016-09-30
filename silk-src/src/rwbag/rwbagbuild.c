@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagbuild.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwbagbuild.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skcountry.h>
@@ -62,7 +62,7 @@ typedef struct bag_key_counter_st bag_key_counter_t;
 static skstream_t *out_stream = NULL;
 
 /* the compression method to use when writing the file.
- * sksiteCompmethodOptionsRegister() will set this to the default or
+ * skCompMethodOptionsRegister() will set this to the default or
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
@@ -236,7 +236,7 @@ appUsageLong(
         }
     }
 
-    sksiteCompmethodOptionsUsage(fh);
+    skCompMethodOptionsUsage(fh);
 }
 
 
@@ -324,7 +324,7 @@ appSetup(
     /* register the options */
     if (skOptionsRegister(appOptions, &appOptionsHandler, NULL)
         || skOptionsNotesRegister(NULL)
-        || sksiteCompmethodOptionsRegister(&comp_method))
+        || skCompMethodOptionsRegister(&comp_method))
     {
         skAppPrintErr("Unable to register options");
         exit(EXIT_FAILURE);

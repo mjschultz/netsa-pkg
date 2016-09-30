@@ -6,7 +6,7 @@ B<rwcompare> - Compare the records in two SiLK Flow files
 
 =head1 SYNOPSIS
 
-  rwcompare [--quiet] FILE1 FILE2
+  rwcompare [--quiet] [--site-config-file] FILE1 FILE2
 
   rwcompare --help
 
@@ -36,6 +36,13 @@ required for options that take optional parameters.
 
 Do not print a message if the files differ, and do not an print error
 message if a file cannot be opened or read.
+
+=item B<--site-config-file>=I<FILENAME>
+
+Read the SiLK site configuration from the named file I<FILENAME>.
+When this switch is not provided, B<rwcombine> searches for the site
+configuration file in the locations specified in the L</FILES>
+section.
 
 =item B<--help>
 
@@ -108,13 +115,60 @@ B<rwsort> command so that the records are in the same order.
  /tmp/sorted-data.rw - differ: record 103363
 
 
+=head1 ENVIRONMENT
+
+=over 4
+
+=item SILK_CONFIG_FILE
+
+This environment variable is used as the value for the
+B<--site-config-file> when that switch is not provided.
+
+=item SILK_DATA_ROOTDIR
+
+This environment variable specifies the root directory of data
+repository.  As described in the L</FILES> section, B<rwcombine> may
+use this environment variable when searching for the SiLK site
+configuration file.
+
+=item SILK_PATH
+
+This environment variable gives the root of the install tree.  When
+searching for configuration files, B<rwcombine> may use this
+environment variable.  See the L</FILES> section for details.
+
+=back
+
+=head1 FILES
+
+=over 4
+
+=item F<${SILK_CONFIG_FILE}>
+
+=item F<${SILK_DATA_ROOTDIR}/silk.conf>
+
+=item F<@SILK_DATA_ROOTDIR@/silk.conf>
+
+=item F<${SILK_PATH}/share/silk/silk.conf>
+
+=item F<${SILK_PATH}/share/silk.conf>
+
+=item F<@prefix@/share/silk/silk.conf>
+
+=item F<@prefix@/share/silk.conf>
+
+Possible locations for the SiLK site configuration file which are
+checked when the B<--site-config-file> switch is not provided.
+
+=back
+
 =head1 SEE ALSO
 
 B<rwfileinfo(1)>, B<rwcat(1)>, B<rwsort(1)>, B<silk(7)>
 
 =cut
 
-$SiLK: rwcompare.pod cd09f0a5fcc6 2014-06-14 15:43:33Z mthomas $
+$SiLK: rwcompare.pod 9dd9f9b1d75b 2016-06-22 22:00:34Z mthomas $
 
 Local Variables:
 mode:text

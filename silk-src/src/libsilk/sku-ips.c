@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-ips.c ff321d7bd08d 2016-05-05 21:18:46Z mthomas $");
+RCSIDENT("$SiLK: sku-ips.c 35360d98d580 2016-09-22 18:30:40Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/utils.h>
@@ -958,12 +958,13 @@ skIPv6PolicyUsage(
                  "\tregardless of the value passed to this switch."
                  " Legal values:\n"));
 #else
-    fprintf(fh, "Set policy for IPv4/IPv6 flows. ");
+    fprintf(fh, "Set policy for handling IPv4 and IPv6 flows.");
     for (i = 0; i < sizeof(policies)/sizeof(struct policies_st); ++i) {
         if (ipv6_default != policies[i].policy) {
             continue;
         }
-        fprintf(fh, "Def. %s. ", policies[i].name);
+        fprintf(fh, "\n\tDef. $" SILK_IPV6_POLICY_ENVAR " or %s. ",
+                policies[i].name);
         break;
     }
     fprintf(fh, "Choices:\n");
@@ -1679,7 +1680,7 @@ int
 skSockaddrCompare(
     const sk_sockaddr_t    *a,
     const sk_sockaddr_t    *b,
-    int                     flags)
+    unsigned int            flags)
 {
     uint16_t pa, pb;
     sk_sockaddr_t temp;
@@ -1838,7 +1839,7 @@ int
 skSockaddrArrayContains(
     const sk_sockaddr_array_t  *array,
     const sk_sockaddr_t        *addr,
-    int                         flags)
+    unsigned int                flags)
 {
     uint32_t i;
 
@@ -1860,7 +1861,7 @@ int
 skSockaddrArrayEqual(
     const sk_sockaddr_array_t  *a,
     const sk_sockaddr_array_t  *b,
-    int                         flags)
+    unsigned int                flags)
 {
     uint32_t i;
 
@@ -1885,7 +1886,7 @@ int
 skSockaddrArrayMatches(
     const sk_sockaddr_array_t  *a,
     const sk_sockaddr_array_t  *b,
-    int                         flags)
+    unsigned int                flags)
 {
     uint32_t i, j;
 

@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwgroupsetup.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwgroupsetup.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/sksite.h>
@@ -40,7 +40,7 @@ static const char *id_fields_arg = NULL;
 static const char *delta_field_arg = NULL;
 
 /* the compression method to use when writing the file.
- * sksiteCompmethodOptionsRegister() will set this to the default or
+ * skCompMethodOptionsRegister() will set this to the default or
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
@@ -184,7 +184,7 @@ appUsageLong(
     }
 
     skOptionsNotesUsage(fh);
-    sksiteCompmethodOptionsUsage(fh);
+    skCompMethodOptionsUsage(fh);
     sksiteOptionsUsage(fh);
     skPluginOptionsUsage(fh);
 }
@@ -293,7 +293,7 @@ appSetup(
     /* register the options */
     if (skOptionsRegister(appOptions, &appOptionsHandler, NULL)
         || skOptionsNotesRegister(NULL)
-        || sksiteCompmethodOptionsRegister(&comp_method)
+        || skCompMethodOptionsRegister(&comp_method)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE))
     {
         skAppPrintErr("Unable to register options");

@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsortsetup.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwsortsetup.c b87f61575a2a 2016-09-22 18:42:02Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skcountry.h>
@@ -54,7 +54,7 @@ static int print_filenames = 0;
 static int caught_signal = 0;
 
 /* the compression method to use when writing the file.
- * sksiteCompmethodOptionsRegister() will set this to the default or
+ * skCompMethodOptionsRegister() will set this to the default or
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
@@ -117,8 +117,7 @@ static const char *appHelp[] = {
      "\tcomma-separated list of names, IDs, and/or ID-ranges"),
     "Reverse the sort order. Def. No",
     "Print names of input files as they are opened. Def. No",
-    ("Destination for sorted output (stdout|pipe).\n"
-     "\tDefault is stdout if stdout is not a terminal"),
+    ("Write sorted output to this file path. Def. stdout"),
     ("Load given plug-in to add fields. Switch may be repeated to\n"
      "\tload multiple plug-ins. Def. None"),
     ("Assume input has been presorted using\n"
@@ -199,7 +198,7 @@ appUsageLong(
     skOptionsCtxOptionsUsage(optctx, fh);
     skOptionsTempDirUsage(fh);
     skOptionsNotesUsage(fh);
-    sksiteCompmethodOptionsUsage(fh);
+    skCompMethodOptionsUsage(fh);
     sksiteOptionsUsage(fh);
     skPluginOptionsUsage(fh);
 }
@@ -288,7 +287,7 @@ appSetup(
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
     uint64_t tmp64;
-    int optctx_flags;
+    unsigned int optctx_flags;
     int rv;
     int j;
 
@@ -324,7 +323,7 @@ appSetup(
         || skOptionsRegister(appOptions, &appOptionsHandler, NULL)
         || skOptionsTempDirRegister(&temp_directory)
         || skOptionsNotesRegister(NULL)
-        || sksiteCompmethodOptionsRegister(&comp_method)
+        || skCompMethodOptionsRegister(&comp_method)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE))
     {
         skAppPrintErr("Unable to register options");

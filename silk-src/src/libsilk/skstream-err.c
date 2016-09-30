@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skstream-err.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: skstream-err.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include "skstream_priv.h"
 
@@ -193,8 +193,8 @@ streamLastErrFunc(
             ERR_FN(("%s", msg),
                    (ef2_ctx, "%s", msg));
         } else {
-            sksiteFileformatGetName(format_name, sizeof(format_name),
-                                    skHeaderGetFileFormat(stream->silk_hdr));
+            skFileFormatGetName(format_name, sizeof(format_name),
+                                skHeaderGetFileFormat(stream->silk_hdr));
             ERR_FN(("%s: '%s' has format %s (0x%02x)", msg,
                     stream->pathname, format_name,
                     skHeaderGetFileFormat(stream->silk_hdr)),
@@ -210,8 +210,8 @@ streamLastErrFunc(
             ERR_FN(("%s", msg),
                    (ef2_ctx, "%s", msg));
         } else {
-            sksiteFileformatGetName(format_name, sizeof(format_name),
-                                    skHeaderGetFileFormat(stream->silk_hdr));
+            skFileFormatGetName(format_name, sizeof(format_name),
+                                skHeaderGetFileFormat(stream->silk_hdr));
             ERR_FN(("%s: '%s' has format %s (0x%02x)", msg,
                     stream->pathname, format_name,
                     skHeaderGetFileFormat(stream->silk_hdr)),
@@ -228,8 +228,8 @@ streamLastErrFunc(
                    (ef2_ctx, "%s the format and version of the file", msg));
         } else {
             sk_file_header_t *hdr = stream->silk_hdr;
-            sksiteFileformatGetName(format_name, sizeof(format_name),
-                                    skHeaderGetFileFormat(hdr));
+            skFileFormatGetName(format_name, sizeof(format_name),
+                                skHeaderGetFileFormat(hdr));
             ERR_FN(("%s %s(0x%02x) v%u records in the v%u file '%s'", msg,
                     format_name, skHeaderGetFileFormat(hdr),
                     skHeaderGetRecordVersion(hdr), skHeaderGetFileVersion(hdr),
@@ -589,7 +589,7 @@ streamLastErrFunc(
             ERR_FN(("%s", msg),
                    (ef2_ctx, "%s", msg));
         } else {
-            sksiteCompmethodGetName(
+            skCompMethodGetName(
                 format_name, sizeof(format_name),
                 skHeaderGetCompressionMethod(stream->silk_hdr));
             ERR_FN(("%s '%s' uses %s",

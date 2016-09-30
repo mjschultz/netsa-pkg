@@ -395,13 +395,16 @@ one time to I<SIZE>.  If not specified, the default is 32 files.
 
 =item B<--compression-method>=I<COMP_METHOD>
 
-Set the compression method of the binary SiLK flow files to
-I<COMP_METHOD>.  B<rwrecgenerator> can use an external library to
-compress its binary output.  The list of available compression methods
-and the default method are set when SiLK is compiled (the B<--help>
-and B<--version> switches print the available and default compression
-methods) and depend on which supported libraries are found.  SiLK can
-support:
+Specify the compression library to use when writing binary output files.  If
+this switch is not given, the value in the SILK_COMPRESSION_METHOD
+environment variable is used if the value names an available
+compression method.  When no compression method is specified, binary
+output is compressed using the default chosen when SiLK was
+compiled.  The valid values for I<COMP_METHOD> are determined by which
+external libraries were found when SiLK was compiled.  To see the
+available compression methods and the default method, use the
+B<--help> or B<--version> switch.  SiLK can support the following
+I<COMP_METHOD> values when the required libraries are available.
 
 =over 4
 
@@ -418,11 +421,15 @@ Use the B<zlib(3)> library for compressing the flow records.
 Use the I<lzo1x> algorithm from the LZO real-time compression library
 for compressing the flow records.
 
+=item snappy
+
+Use the I<snappy> library for compressing the flow records.  I<Since
+SiLK 3.13.0.>
+
 =item best
 
-Use whichever available method gives the C<best> compression in
-general, though not necessarily the C<best> for this particular
-file.
+Use lzo1x if available, otherwise use snappy if available, otherwise
+use zlib if available.
 
 =back
 
@@ -685,6 +692,12 @@ This environment variable is used as the value for
 B<--timestamp-format> when that switch is not provided.  I<Since SiLK
 3.11.0.>
 
+=item SILK_COMPRESSION_METHOD
+
+This environment variable is used as the value for
+B<--compression-method> when that switch is not provided.  I<Since
+SiLK 3.13.0.>
+
 =item SILK_CONFIG_FILE
 
 This environment variable is used as the value for the
@@ -752,7 +765,7 @@ B<syslog(3)>, B<zlib(3)>, B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwrecgenerator.pod 093f18894c79 2015-09-08 20:02:01Z mthomas $
+$SiLK: rwrecgenerator.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
 
 Local Variables:
 mode:text

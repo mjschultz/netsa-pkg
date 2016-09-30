@@ -7,16 +7,16 @@
 */
 
 /*
-**  rwcount.c
-**
-**  This is a counting application; given the records read from stdin
-**  or named files, it generates counting results for the time period
-**  covered.
-*/
+ *  rwcount.c
+ *
+ *    This is a counting application; given the records read from
+ *    stdin or named files, it generates counting results for the time
+ *    period covered.
+ */
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcount.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwcount.c 274b023fde5c 2016-09-22 14:44:25Z mthomas $");
 
 #include "rwcount.h"
 
@@ -37,20 +37,22 @@ RCSIDENT("$SiLK: rwcount.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 #define BIN_COUNT_STD (1 << 21)
 
 /* Maximum possible number of bins */
-#define BIN_COUNT_MAX ((uint32_t)(UINT32_MAX / sizeof(count_bin_t)))
+#define BIN_COUNT_MAX ((uint64_t)(SIZE_MAX / sizeof(count_bin_t)))
 
-/* note that the variables are defined below */
+/* Convert the sktime_t 'gb_t' to an array index; does not check array
+ * bounds; uses the global 'bins' variable. */
 #define GET_BIN(gb_t)                                           \
-    ((uint32_t)(((gb_t) - bins.window_min) / bins.size))
+    ((size_t)(((gb_t) - bins.window_min) / bins.size))
 
-/* This macro is TRUE if the time '_t' is too large (or too small) to
- * fit into the current countFile 'data' */
+/* This macro is TRUE if the time 'toor_t' is too large (or too small)
+ * to fit into the current time window; uses the global 'bins' */
 #define TIME_OUT_OF_RANGE(toor_t)               \
     (((toor_t) < bins.window_min)               \
      || ((toor_t) >= bins.window_max))
 
-/* This macro is true if the flow whose start time is '_s' and end
- * time is '_e' is outside the range the user is interested in */
+/* This macro is true if the flow whose start time is 'ign_s' and end
+ * time is 'ign_e' is outside the range the user is interested in;
+ * uses the global 'bins' variable */
 #define IGNORE_FLOW(ign_s, ign_e)               \
     (((ign_e) < (bins.start_time))              \
      || ((ign_s) >= (bins.end_time)))
@@ -63,11 +65,6 @@ count_data_t bins;
 count_flags_t flags;
 
 sk_options_ctx_t *optctx;
-
-
-/* OPTIONS SETUP */
-
-/* options defined in rwcountutils.c */
 
 
 /* FUNCTION DEFINITIONS */
@@ -84,7 +81,7 @@ initBins(
     sktime_t            start_time)
 {
     sktime_t end_time;
-    int64_t bin_count;
+    uint64_t bin_count;
 
     /* do not call twice */
     if (bins.data) {
@@ -96,10 +93,13 @@ initBins(
     if ((bins.start_time != RWCO_UNINIT_START)
         && (bins.end_time != RWCO_UNINIT_END))
     {
+        assert(bins.end_time >= bins.start_time + bins.size);
         bin_count = ((bins.end_time - bins.start_time) / bins.size);
         /* We should have made end_time fall on a bin boundary when we
-         * read the values */
-        assert(bins.end_time == (bins.start_time + bins.size * bin_count));
+         * parsed the user's values */
+        assert(bin_count > 0);
+        assert((bins.start_time + (sktime_t)(bins.size * bin_count))
+               == bins.end_time);
         if (bin_count > BIN_COUNT_MAX) {
             return -1;
         }
@@ -149,13 +149,13 @@ initBins(
         bin_count = BIN_COUNT_STD;
     }
 
-    /* do not allocate more bins than will fit into 4GB of RAM */
+    /* do not allocate more bins than the maximum */
     if (bin_count > BIN_COUNT_MAX) {
         bin_count = BIN_COUNT_MAX;
     }
 
     /* Allocate */
-    while (NULL == (bins.data = (count_bin_t*)calloc((uint32_t)bin_count,
+    while (NULL == (bins.data = (count_bin_t*)calloc((size_t)bin_count,
                                                      sizeof(count_bin_t))))
     {
         if (bin_count <= BIN_COUNT_MIN) {
@@ -184,8 +184,8 @@ reallocBins(
     sktime_t            t)
 {
     count_bin_t *new_ptr;
-    int64_t extension_bins;
-    int64_t new_count;
+    uint64_t extension_bins;
+    uint64_t new_count;
     sktime_t new_window_min;
 
     assert(TIME_OUT_OF_RANGE(t));
@@ -222,7 +222,7 @@ reallocBins(
     /* When end_time is set, adjust the bin count so it doesn't go
      * beyond the end_time */
     if ((bins.end_time != RWCO_UNINIT_END)
-        && (new_window_min + bins.size * new_count) > bins.end_time)
+        && (new_window_min + (sktime_t)(bins.size * new_count)) >bins.end_time)
     {
         new_count = 1 + (bins.end_time - new_window_min) / bins.size;
     }
@@ -236,7 +236,7 @@ reallocBins(
 
     /* Allocate */
     while (NULL == (new_ptr = (count_bin_t*)realloc(
-                        bins.data, (new_count *sizeof(count_bin_t)))))
+                        bins.data, (new_count * sizeof(count_bin_t)))))
     {
         if (new_count == bins.count + extension_bins) {
             goto MEM_FAILURE;
@@ -320,7 +320,7 @@ static void
 startAdd(
     const rwRec        *rwrec)
 {
-    uint32_t bin;
+    uint64_t bin;
     sktime_t t = rwRecGetStartTime(rwrec);
 
     if (IGNORE_FLOW(t, t)) {
@@ -348,7 +348,7 @@ static void
 endAdd(
     const rwRec        *rwrec)
 {
-    uint32_t bin;
+    uint64_t bin;
     sktime_t t = rwRecGetEndTime(rwrec);
 
     if (IGNORE_FLOW(t, t)) {
@@ -376,7 +376,7 @@ static void
 middleAdd(
     const rwRec        *rwrec)
 {
-    uint32_t bin;
+    uint64_t bin;
     sktime_t t = rwRecGetStartTime(rwrec) + (rwRecGetElapsed(rwrec) / 2);
 
     if (IGNORE_FLOW(t, t)) {
@@ -406,8 +406,8 @@ static void
 meanAdd(
     const rwRec        *rwrec)
 {
-    uint32_t start_bin, end_bin, i;
-    uint32_t extra_bins = 0;
+    uint64_t start_bin, end_bin, i;
+    uint64_t extra_bins = 0;
     sktime_t sTime = rwRecGetStartTime(rwrec);
     sktime_t eTime = rwRecGetEndTime(rwrec);
     double flows, bytes, pkts;
@@ -486,7 +486,7 @@ static void
 durationAdd(
     const rwRec        *rwrec)
 {
-    uint32_t start_bin, end_bin, i;
+    uint64_t start_bin, end_bin, i;
     sktime_t sTime = rwRecGetStartTime(rwrec);
     sktime_t eTime = rwRecGetEndTime(rwrec);
     double flows, bytes, pkts;
@@ -596,7 +596,7 @@ static void
 maximumAdd(
     const rwRec        *rwrec)
 {
-    uint32_t start_bin, end_bin, i;
+    uint64_t start_bin, end_bin, i;
     sktime_t sTime = rwRecGetStartTime(rwrec);
     sktime_t eTime = rwRecGetEndTime(rwrec);
 
@@ -652,7 +652,7 @@ static void
 minimumAdd(
     const rwRec        *rwrec)
 {
-    uint32_t start_bin, end_bin, i;
+    uint64_t start_bin, end_bin, i;
     sktime_t sTime = rwRecGetStartTime(rwrec);
     sktime_t eTime = rwRecGetEndTime(rwrec);
 
@@ -819,9 +819,9 @@ printBins(
 #define FMT_WIDTH {23, 15, 20, 17}
 
     int w[] = FMT_WIDTH;
-    uint32_t i;
-    uint32_t start_bin = 0;
-    uint32_t end_bin = 0;
+    uint64_t i;
+    uint64_t start_bin = 0;
+    uint64_t end_bin = 0;
     char buffer[128];
     sktime_t cur_time = 0;
     char final_delim[] = {'\0', '\0'};
@@ -881,10 +881,10 @@ printBins(
          * set the window_min to the start_time, but leave this here
          * in case we ever decide to change that behavior. */
     } else if (bins.start_time < bins.window_min) {
-        /* Users wants to start the data before the first bin.  If
+        /* User wants to start the data before the first bin.  If
          * skip-zeroes is not active, print zero's until we get to the
          * first bin. */
-        uint32_t negative_bins;
+        uint64_t negative_bins;
 
         start_bin = 0;
 
@@ -908,7 +908,9 @@ printBins(
             }
         }
 #endif /* 0 */
-    } else if (bins.start_time >= bins.window_min + (bins.size * bins.count)){
+    } else if (bins.start_time
+               >= bins.window_min + (sktime_t)(bins.size * bins.count))
+    {
         /* User's starting time is greater than the times for which we
          * have data. */
         skAppPrintErr("Epoch start time > time on final record.");
@@ -943,7 +945,7 @@ printBins(
         {
             /* figure out the row label */
             if (flags.label_index) {
-                snprintf(buffer, sizeof(buffer), ("%" PRIu32), i);
+                snprintf(buffer, sizeof(buffer), ("%" PRIu64), i);
             } else {
                 sktimestamp_r(buffer, cur_time, flags.timeflags);
             }
@@ -961,7 +963,7 @@ printBins(
         for ( ; cur_time < bins.end_time; ++i, cur_time += bins.size) {
             /* figure out the row label */
             if (flags.label_index) {
-                snprintf(buffer, sizeof(buffer), ("%" PRIu32), i);
+                snprintf(buffer, sizeof(buffer), ("%" PRIu64), i);
             } else {
                 sktimestamp_r(buffer, cur_time, flags.timeflags);
             }

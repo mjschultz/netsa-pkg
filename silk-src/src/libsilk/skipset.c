@@ -24,7 +24,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipset.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: skipset.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
@@ -11582,7 +11582,7 @@ skIPSetOptionsRegister(
         || skOptionsNotesRegister(ipset_opts->existing_silk_files
                                   ? &ipset_opts->note_strip
                                   : NULL)
-        || sksiteCompmethodOptionsRegister(&ipset_opts->comp_method))
+        || skCompMethodOptionsRegister(&ipset_opts->comp_method))
     {
         return -1;
     }
@@ -11670,7 +11670,7 @@ skIPSetOptionsUsage(
                 ipset_options_help[i]);
     }
     skOptionsNotesUsage(fh);
-    sksiteCompmethodOptionsUsage(fh);
+    skCompMethodOptionsUsage(fh);
 }
 
 void

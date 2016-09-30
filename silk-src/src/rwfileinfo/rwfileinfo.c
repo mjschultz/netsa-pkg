@@ -25,7 +25,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfileinfo.c caef286c367c 2016-06-03 19:23:54Z mthomas $");
+RCSIDENT("$SiLK: rwfileinfo.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstream.h>
@@ -343,7 +343,7 @@ appSetup(
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
     sk_stringmap_status_t err;
-    int optctx_flags;
+    unsigned int optctx_flags;
     int rv;
 
     /* verify same number of options and help strings */
@@ -657,6 +657,14 @@ printFileInfo(
         skBitmapClearBit(print_fields, RWINFO_SILK_VERSION);
         skBitmapClearBit(print_fields, RWINFO_COUNT_RECORDS);
         break;
+      case SKSTREAM_ERR_COMPRESS_UNAVAILABLE:
+      case SKSTREAM_ERR_COMPRESS_INVALID:
+        /* unknown or unavailable compression-method.  disable
+         * printing of record count */
+        skStreamPrintLastErr(stream, rv, &skAppPrintErr);
+        retval = -1;
+        skBitmapClearBit(print_fields, RWINFO_COUNT_RECORDS);
+        break;
       default:
         /* print an error but continue */
         skStreamPrintLastErr(stream, rv, &skAppPrintErr);
@@ -665,8 +673,7 @@ printFileInfo(
     }
 
     if (skBitmapGetBit(print_fields, RWINFO_FORMAT)) {
-        sksiteFileformatGetName(buf, sizeof(buf),
-                                skHeaderGetFileFormat(hdr));
+        skFileFormatGetName(buf, sizeof(buf), skHeaderGetFileFormat(hdr));
         printLabel(RWINFO_FORMAT, 0);
         printf("%s(0x%02x)\n", buf, skHeaderGetFileFormat(hdr));
     }
@@ -684,8 +691,8 @@ printFileInfo(
     }
 
     if (skBitmapGetBit(print_fields, RWINFO_COMPRESSION)) {
-        sksiteCompmethodGetName(buf, sizeof(buf),
-                                skHeaderGetCompressionMethod(hdr));
+        skCompMethodGetName(buf, sizeof(buf),
+                            skHeaderGetCompressionMethod(hdr));
         printLabel(RWINFO_COMPRESSION, 0);
         printf("%s(%u)\n", buf, skHeaderGetCompressionMethod(hdr));
     }

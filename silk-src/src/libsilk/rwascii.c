@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwascii.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwascii.c 0432f6547214 2016-09-19 19:08:31Z mthomas $");
 
 #include <silk/rwascii.h>
 #include <silk/skipaddr.h>
@@ -880,7 +880,7 @@ rwAsciiPrintRecExtra(
     static char buffer[RWASCII_BUF_SIZE];
     const rwascii_field_t *field;
     skipaddr_t ip;
-    int flags_flags;
+    unsigned int flags_flags;
     imaxdiv_t idiv;
     uint32_t i;
 

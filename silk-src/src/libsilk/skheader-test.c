@@ -18,11 +18,12 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skheader-test.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: skheader-test.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstream.h>
 #include <silk/utils.h>
+#include "skheader_priv.h"
 
 
 /* LOCAL DEFINES AND TYPEDEFS */

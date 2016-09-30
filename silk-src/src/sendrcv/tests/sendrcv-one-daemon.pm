@@ -55,29 +55,4 @@ my $cmd = join " ", ("$SiLKTests::PYTHON $srcdir/tests/sendrcv_tests.py",
                      $test,
                      );
 
-# determine where the output should go
-if ($ENV{SK_TESTS_SAVEOUTPUT}) {
-    my $NAME = $0;
-    $NAME =~ s,^.+/,,;
-    my $output = "tests-$NAME.txt";
-    unlink $output;
-    $cmd .= " >>$output 2>&1";
-}
-elsif (!$ENV{SK_TESTS_VERBOSE}) {
-    $cmd .= " >/dev/null 2>&1";
-}
-
-# show the user what is about to happen
-if ($ENV{SK_TESTS_VERBOSE}) {
-    print STDERR "RUNNING: $env $cmd\n";
-}
-system $cmd;
-if (-1 == $?) {
-    print STDERR "Failed to execute command: $!\n";
-    exit 1;
-}
-if ($? & 127) {
-    print STDERR "Child died on signal #", ($? & 127), "\n";
-    exit 1;
-}
-exit ($? >> 8);
+exit(check_exit_status($cmd, 'no_redirect') ? 0 : 1);

@@ -13,27 +13,272 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SILK_FILES_H, "$SiLK: silk_files.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_SILK_FILES_H, "$SiLK: silk_files.h b05e4158b14b 2016-09-23 19:45:57Z mthomas $");
+
+#include <silk/silk_types.h>
 
 
-/* Special compression method values */
-#define SK_COMPMETHOD_DEFAULT 255
-#define SK_COMPMETHOD_BEST    254
+/*** Compression Methods ***********************************************/
 
-/* The available compression methods */
+/*
+ *    The compression method (compmethod) is used to compress the data
+ *    section of a SiLK binary file.
+ *
+ *    SiLK is able to support the following compmethods.  In order for
+ *    a compression method to be supported, the library and header
+ *    file must have been available at the time SiLK was compiled.
+ *
+ *    SiLK cannot read a file if the file uses a compression method
+ *    that is not available in this build of SiLK.
+ *
+ *    The --version switch on most SiLK applications shows what set of
+ *    compression methods are available in this SiLK installation.
+ *
+ *    Keep the following set of constants in sync with the
+ *    sk_compmethod_names[] array defined below.
+ */
+
+/**
+ *    Do not use any compression.
+ */
 #define SK_COMPMETHOD_NONE      0
-#define SK_COMPMETHOD_ZLIB      1
-#define SK_COMPMETHOD_LZO1X     2
-/* when you add a compression method, add it to the following array */
 
-#ifdef SKSITE_SOURCE
-static const char *skCompressionMethods[] = {
+/**
+ *    Use zlib compression (like that used by gzip).
+ */
+#define SK_COMPMETHOD_ZLIB      1
+
+/**
+ *    Use the lzo1x algorithm from LZO real-time compression library.
+ */
+#define SK_COMPMETHOD_LZO1X     2
+
+/**
+ *    Use Snappy compression.  Since SiLK 3.13.0..
+ */
+#define SK_COMPMETHOD_SNAPPY    3
+
+#ifdef SKCOMPMETHOD_SOURCE
+static const char *sk_compmethod_names[] = {
     "none",
     "zlib",
     "lzo1x",
+    "snappy",
     ""
 };
-#endif /* SKSITE_SOURCE */
+#endif /* SKCOMPMETHOD_SOURCE */
+
+/*
+ *    Special compression method values also exit.
+ */
+
+/**
+ *    Use the default compression method that was specified when SiLK
+ *    was compiled.
+ */
+#define SK_COMPMETHOD_DEFAULT 255
+
+/**
+ *    Use the "best" compression method.  This is lzo1x if available,
+ *    else snappy if available, else zlib if available, else none.
+ */
+#define SK_COMPMETHOD_BEST    254
+
+
+/*
+ *    Values returned by skCompMethodCheck()
+ */
+
+/**
+ *    skCompMethodCheck() returns this value when the compression
+ *    method is a known value and the method's library is available.
+ */
+#define SK_COMPMETHOD_IS_AVAIL  6
+
+/**
+ *    skCompMethodCheck() returns this value when the compression
+ *    method is a known value but the method relies on an external
+ *    library that is not part of this build of SiLK.
+ */
+#define SK_COMPMETHOD_IS_VALID  2
+
+/**
+ *    skCompMethodCheck() returns this value when the compression
+ *    method is either SK_COMPMETHOD_DEFAULT or SK_COMPMETHOD_BEST.
+ */
+#define SK_COMPMETHOD_IS_KNOWN  1
+
+/**
+ *    Check whether a compression method is valid and/or available.
+ *
+ *    If the compression method 'comp_method' is completely
+ *    unrecognized, return 0.
+ *
+ *    Return SK_COMPMETHOD_IS_KNOWN when 'comp_method' is an
+ *    "undecided" value (i.e., SK_COMPMETHOD_DEFAULT or
+ *    SK_COMPMETHOD_BEST).  These compression methods should be
+ *    considered valid for writing, as they will be converted to an
+ *    appropriate type once the stream they are connected to is
+ *    opened.
+ *
+ *    Return SK_COMPMETHOD_IS_VALID when 'comp_method' contains a
+ *    known value other than an "undecided" value, but the compression
+ *    method relies on an external library that is not part of this
+ *    build of SiLK.
+ *
+ *    Return SK_COMPMETHOD_IS_AVAIL when 'comp_method' is a known
+ *    value whose library is available.  These compression methods are
+ *    valid for reading or for writing.
+ *
+ *    To determine whether 'comp_method' is valid for read, mask the
+ *    output by 4.  To determine whether 'comp_method' is valid for
+ *    write, mask the output of this function by 5. To determine
+ *    whether 'comp_method' is an actual compression method (that is,
+ *    not an "undecided" value), mask the output by 2.
+ *
+ *    Replaces sksiteCompmethodCheck().  Since SiLK 3.13.0.
+ */
+int
+skCompMethodCheck(
+    sk_compmethod_t     comp_method);
+
+/**
+ *    Return the generically "best" compression method from all those
+ *    that are available.
+ *
+ *    Replaces sksiteCompmethodGetBest().  Since SiLK 3.13.0.
+ */
+sk_compmethod_t
+skCompMethodGetBest(
+    void);
+
+/**
+ *    Return the default compression method.
+ *
+ *    Replaces sksiteCompmethodGetDefault().  Since SiLK 3.13.0.
+ */
+sk_compmethod_t
+skCompMethodGetDefault(
+    void);
+
+/**
+ *    Given the compress method 'comp_method', write the name of that
+ *    method into 'out_buffer' whose length is 'bufsize'.  The
+ *    function returns a pointer to 'out_buffer', or NULL for an
+ *    invalid compression method.
+ *
+ *    Replaces sksiteCompmethodGetName().  Since SiLK 3.13.0.
+ */
+int
+skCompMethodGetName(
+    char               *buffer,
+    size_t              buffer_size,
+    sk_compmethod_t     comp_method);
+
+/**
+ *    Set the default compression method to 'comp_method', overriding
+ *    the default value specified when SiLK was compiled.  Return 0 on
+ *    success, -1 if the method is not available.
+ *
+ *    To change the default returned by the --compression-method
+ *    switch, call this function prior to calling
+ *    skCompMethodOptionsRegister().
+ *
+ *    Replaces sksiteCompmethodSetDefault().  Since SiLK 3.13.0.
+ */
+int
+skCompMethodSetDefault(
+    sk_compmethod_t     comp_method);
+
+/**
+ *    Do not check the SILK_COMPRESSION_METHOD environment variable
+ *    when initializing the compression method variable passed into
+ *    skCompMethodOptionsRegister().
+ *
+ *    Since SiLK 3.13.0.
+ */
+void
+skCompMethodOptionsNoEnviron(
+    void);
+
+/**
+ *    Add a command-line switch that allows the user to set the
+ *    compression method of binary output files.  After
+ *    skOptionsParse() sucessfully returns, the referent of
+ *    'compression_method' contains the compression method to use.
+ *
+ *    When this function is called, the SILK_COMPRESSION_METHOD
+ *    environment variable is normally checked for a compression
+ *    method, and if the variable specifies an available method, the
+ *    referent of 'compression_method' is set to that value.  To
+ *    suppress this check of the environment, call
+ *    skCompMethodOptionsNoEnviron() prior to calling this function.
+ *
+ *    This function initializes the referent of 'compression_method'
+ *    to the compression method in SILK_COMPRESSION_METHOD envar or
+ *    the default compression method specified when SiLK was compiled.
+ *    To modify the default value used by an application, call
+ *    skCompMethodSetDefault() prior to calling this function.
+ *
+ *    Replaces sksiteCompmethodOptionsRegister().  Since SiLK 3.13.0.
+ */
+int
+skCompMethodOptionsRegister(
+    sk_compmethod_t    *compression_method);
+
+/**
+ *    Print the usage for the compression-method option to the file
+ *    handle 'fh'.
+ *
+ *    Replaces sksiteCompmethodOptionsUsage().  Since SiLK 3.13.0.
+ */
+void
+skCompMethodOptionsUsage(
+    FILE               *fh);
+
+
+
+/** File Formats ******************************************************/
+
+/**
+ *    Copy the name of the file format with the ID 'format_id' into
+ *    'buffer' whose size is 'buffer_size'.
+ *
+ *    If the name is longer than buffer_size, the value returned is
+ *    truncated with a '\0' in the final position.
+ *
+ *    Return the number of characters that would have been written if
+ *    the buffer had been long enough.  This length does not include
+ *    the trailing '\0'.
+ *
+ *    Replaces sksiteFileformatGetName().  Since SiLK 3.13.0.
+ */
+int
+skFileFormatGetName(
+    char               *buffer,
+    size_t              buffer_size,
+    sk_file_format_t    format_id);
+
+/**
+ *    Return 1 if 'format_id' is a valid file output format or 0 if
+ *    it is not.
+ *
+ *    Replaces sksiteFileformatIsValid().  Since SiLK 3.13.0.
+ */
+int
+skFileFormatIsValid(
+    sk_file_format_t    format_id);
+
+/**
+ *    Return the file output format associated with the name.  If the
+ *    name is unknown, return SK_INVALID_FILE_FORMAT (whose value is
+ *    defined in silk_types.h).
+ *
+ *    Replaces sksiteFileformatFromName().  Since SiLK 3.13.0.
+ */
+sk_file_format_t
+skFileFormatFromName(
+    const char         *name);
 
 
 /* define various output file formats here that we write to disk */
@@ -54,10 +299,10 @@ static const char *skCompressionMethods[] = {
 #define FT_RWAUGSNMPOUT     0x0D
 #define FT_RWAUGROUTING     0x0E
 #define FT_RESERVED_0F      0x0F
-#define FT_RWROUTED         0X10    /* raw routed */
-#define FT_RWNOTROUTED      0X11    /* raw not routed */
-#define FT_RWSPLIT          0X12    /* raw split after r/nr */
-#define FT_RWFILTER         0X13    /* raw split after r/nr */
+#define FT_RWROUTED         0X10
+#define FT_RWNOTROUTED      0X11
+#define FT_RWSPLIT          0X12
+#define FT_RWFILTER         0X13
 #define FT_RWAUGMENTED      0X14
 #define FT_RWAUGWEB         0X15
 #define FT_RWGENERIC        0x16
@@ -84,13 +329,13 @@ static const char *skCompressionMethods[] = {
 
 
 /*
- *   This header is included by sksite.c after declaring
- *   SKSITE_SOURCE.  Users should use the function
- *   calls from sksite.h to access these strings values.
+ *   This header is included by skfileformat.c after declaring
+ *   SKFILEFORMAT_SOURCE.  Users should use the functions defined
+ *   above to access these strings values.
  */
 
-#ifdef SKSITE_SOURCE
-static const char *fileOutputFormats[] = {
+#ifdef SKFILEFORMAT_SOURCE
+static const char *sk_file_format_names[] = {
     /* 0x00 */  "FT_TCPDUMP",
     /* 0x01 */  "FT_GRAPH",
     /* 0x02 */  "FT_ADDRESSES",
@@ -131,7 +376,7 @@ static const char *fileOutputFormats[] = {
     /* 0x25 */  "FT_PREFIXMAP",
     ""
 };
-#endif /* SKSITE_SOURCE */
+#endif /* SKFILEFORMAT_SOURCE */
 
 #ifdef __cplusplus
 }

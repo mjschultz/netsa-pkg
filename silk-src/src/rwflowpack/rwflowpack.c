@@ -81,7 +81,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwflowpack.c d49b1e47d2e3 2016-06-15 20:31:17Z mthomas $");
+RCSIDENT("$SiLK: rwflowpack.c b87f61575a2a 2016-09-22 18:42:02Z mthomas $");
 
 #include <dlfcn.h>
 
@@ -266,7 +266,7 @@ static sk_file_format_t (*determine_fileformat_fn)(
     sk_flowtype_id_t    ftype);
 
 /* the compression method to use when writing the file.
- * sksiteCompmethodOptionsRegister() will set this to the default or
+ * skCompMethodOptionsRegister() will set this to the default or
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
@@ -664,7 +664,7 @@ appUsageLong(
         fprintf(fh, "\n");
     }
 
-    sksiteCompmethodOptionsUsage(fh);
+    skCompMethodOptionsUsage(fh);
     sksiteOptionsUsage(fh);
 
     fprintf(fh, "\nSwitches for disposal of input flow files:\n");
@@ -916,9 +916,12 @@ appSetup(
         exit(EXIT_FAILURE);
     }
 
+    /* do not set the comp_method from the environment */
+    skCompMethodOptionsNoEnviron();
+
     /* register the options */
     if (skOptionsRegister(appOptions, &appOptionsHandler,(clientData)opt_cache)
-        || sksiteCompmethodOptionsRegister(&comp_method)
+        || skCompMethodOptionsRegister(&comp_method)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE))
     {
         skAppPrintErr("Unable to register options");

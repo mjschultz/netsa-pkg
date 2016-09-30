@@ -25,7 +25,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKPLUGIN_H, "$SiLK: skplugin.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_SKPLUGIN_H, "$SiLK: skplugin.h c59a52ca2878 2016-09-07 14:22:52Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/utils.h>         /* need "struct option" */
@@ -222,25 +222,28 @@ skpinSimpleCheckVersion(
  *    skpinRegIntAggregator, skpinRegIntSumAggregator,
  *    skpinRegIntMinAggregator, and skpinRegIntMaxAggregator.
  */
-typedef uint64_t (*skplugin_int_field_fn_t)(
-    const rwRec *rec);
+typedef uint64_t
+(*skplugin_int_field_fn_t)(
+    const rwRec        *rec);
 
 /**
  *    IPv4 address field callback.  Given an rwRec, should return an
  *    IPv4 address as a uint32_t (in host byte order) to associate
  *    with that record.  Used in skpinRegIPv4Field.
  */
-typedef uint32_t (*skplugin_ipv4_field_fn_t)(
-    const rwRec *rec);
+typedef uint32_t
+(*skplugin_ipv4_field_fn_t)(
+    const rwRec        *rec);
 
 /**
  *    IP address field callback.  Given an rwRec, should fill in the
  *    given skipaddr_t with an IP address to associate with that
  *    record.  Used in skpinRegIPAddressField.
  */
-typedef void (*skplugin_ip_field_fn_t)(
-    skipaddr_t  *dest,
-    const rwRec *rec);
+typedef void
+(*skplugin_ip_field_fn_t)(
+    skipaddr_t         *dest,
+    const rwRec        *rec);
 
 /**
  *    Text field callback.  Converts a uint64_t value to a text value
@@ -248,19 +251,21 @@ typedef void (*skplugin_ip_field_fn_t)(
  *    The text value must be null-terminated.  Used in
  *    skpinRegTextField.
  */
-typedef void (*skplugin_text_field_fn_t)(
-    char     *dest,
-    size_t    width,
-    uint64_t  val);
+typedef void
+(*skplugin_text_field_fn_t)(
+    char               *dest,
+    size_t              width,
+    uint64_t            val);
 
 /**
  *    Integer aggregation function callback.  Given a 'current' value,
  *    "adds" or "merges" the 'operand', and returns the new value.
  *    Used in skpinRegIntAggregator.
  */
-typedef uint64_t (*skplugin_int_agg_fn_t)(
-    uint64_t current,
-    uint64_t operand);
+typedef uint64_t
+(*skplugin_int_agg_fn_t)(
+    uint64_t            current,
+    uint64_t            operand);
 
 
 /*******************************************/
@@ -462,7 +467,9 @@ skpinRegIntAggregator(
  *    functions.  Registered by skpinRegCleanup().  Called by
  *    skPluginRunCleanup().
  */
-typedef void (*skplugin_cleanup_fn_t)(void);
+typedef void
+(*skplugin_cleanup_fn_t)(
+    void);
 
 
 /**
@@ -474,9 +481,10 @@ typedef void (*skplugin_cleanup_fn_t)(void);
  *    argument is present, part of this function's duties will be to
  *    call skpinRegFilter() or skpinRegTransformer().
  */
-typedef skplugin_err_t (*skplugin_option_fn_t)(
-    const char *opt_arg,
-    void       *opt_cbdata);
+typedef skplugin_err_t
+(*skplugin_option_fn_t)(
+    const char         *opt_arg,
+    void               *opt_cbdata);
 
 
 /**
@@ -488,10 +496,11 @@ typedef skplugin_err_t (*skplugin_option_fn_t)(
  *    'name' contains the 'option_name' used when the function was
  *    registered, and 'has_arg' contains the 'mode' that was used.
  */
-typedef void (*skplugin_help_fn_t)(
-    FILE                *fh,
-    const struct option *option,
-    void                *opt_cbdata);
+typedef void
+(*skplugin_help_fn_t)(
+    FILE                   *fh,
+    const struct option    *option,
+    void                   *opt_cbdata);
 
 
 /**
@@ -501,8 +510,9 @@ typedef void (*skplugin_help_fn_t)(
  *    skplugin_callbacks_t.init
  *    skplugin_callbacks_t.cleanup
  */
-typedef skplugin_err_t (*skplugin_callback_fn_t)(
-    void *cbdata);
+typedef skplugin_err_t
+(*skplugin_callback_fn_t)(
+    void               *cbdata);
 
 /**
  *    Filter callback to filter a record 'rec'.  If the function
@@ -512,10 +522,11 @@ typedef skplugin_err_t (*skplugin_callback_fn_t)(
  *
  *    skplugin_callbacks_t.filter
  */
-typedef skplugin_err_t (*skplugin_filter_fn_t)(
-    const rwRec  *rec,
-    void         *cbdata,
-    void        **extra);
+typedef skplugin_err_t
+(*skplugin_filter_fn_t)(
+    const rwRec        *rec,
+    void               *cbdata,
+    void              **extra);
 
 /**
  *    Transform callback.  Modifies 'rec' in place.  Registered by
@@ -523,10 +534,11 @@ typedef skplugin_err_t (*skplugin_filter_fn_t)(
  *
  *    skplugin_callbacks_t.transform
  */
-typedef skplugin_err_t (*skplugin_transform_fn_t)(
-    rwRec  *rec,
-    void   *cbdata,
-    void  **extra);
+typedef skplugin_err_t
+(*skplugin_transform_fn_t)(
+    rwRec              *rec,
+    void               *cbdata,
+    void              **extra);
 
 /**
  *    Record to text callback.  Fills in 'dest' given 'rec'.  The
@@ -536,12 +548,13 @@ typedef skplugin_err_t (*skplugin_transform_fn_t)(
  *
  *    skplugin_callbacks_t.rec_to_text
  */
-typedef skplugin_err_t (*skplugin_text_fn_t)(
-    const rwRec  *rec,
-    char         *dest,
-    size_t        width,
-    void         *cbdata,
-    void        **extra);
+typedef skplugin_err_t
+(*skplugin_text_fn_t)(
+    const rwRec        *rec,
+    char               *dest,
+    size_t              width,
+    void               *cbdata,
+    void              **extra);
 
 /**
  *    Record to binary callback.  Fills in 'dest' given 'rec'.
@@ -554,11 +567,12 @@ typedef skplugin_err_t (*skplugin_text_fn_t)(
  *    skplugin_callbacks_t.rec_to_bin
  *    skplugin_callbacks_t.add_rec_to_bin
  */
-typedef skplugin_err_t (*skplugin_bin_fn_t)(
-    const rwRec  *rec,
-    uint8_t      *dest,
-    void         *cbdata,
-    void        **extra);
+typedef skplugin_err_t
+(*skplugin_bin_fn_t)(
+    const rwRec        *rec,
+    uint8_t            *dest,
+    void               *cbdata,
+    void              **extra);
 
 /**
  *    Binary to text callback.  Just like record to text callback, but
@@ -567,11 +581,12 @@ typedef skplugin_err_t (*skplugin_bin_fn_t)(
  *
  *    skplugin_callbacks_t.bin_to_text
  */
-typedef skplugin_err_t (*skplugin_bin_to_text_fn_t)(
-    const uint8_t *bin,
-    char          *dest,
-    size_t         width,
-    void          *cbdata);
+typedef skplugin_err_t
+(*skplugin_bin_to_text_fn_t)(
+    const uint8_t      *bin,
+    char               *dest,
+    size_t              width,
+    void               *cbdata);
 
 /**
  *    Binary value merge callback.  This function takes two binary
@@ -580,10 +595,11 @@ typedef skplugin_err_t (*skplugin_bin_to_text_fn_t)(
  *
  *    skplugin_callbacks_t.bin_merge
  */
-typedef skplugin_err_t (*skplugin_bin_merge_fn_t)(
-    uint8_t        *dest,
-    const uint8_t  *src,
-    void           *cbdata);
+typedef skplugin_err_t
+(*skplugin_bin_merge_fn_t)(
+    uint8_t            *dest,
+    const uint8_t      *src,
+    void               *cbdata);
 
 /**
  *    Binary value comparison function.  Compares two binary values
@@ -594,22 +610,25 @@ typedef skplugin_err_t (*skplugin_bin_merge_fn_t)(
  *
  *    skplugin_callbacks_t.bin_compare
  */
-typedef skplugin_err_t (*skplugin_bin_cmp_fn_t)(
-    int            *cmp,
-    const uint8_t  *value_a,
-    const uint8_t  *value_b,
-    void           *cbdata);
+typedef skplugin_err_t
+(*skplugin_bin_cmp_fn_t)(
+    int                *cmp,
+    const uint8_t      *value_a,
+    const uint8_t      *value_b,
+    void               *cbdata);
+
 
 /******************************************/
 /*** Struct for registration functions  ***/
 /******************************************/
 
 /**
- *    Used as the 'regdata' argument to the skpinRegFilter(),
- *    skpinRegTransformer(), and skpinRegField() functions.  It's members
- *    are described in detail in the description of those functions.
+ *    skplugin_callbacks_t is used as the 'regdata' argument to the
+ *    skpinRegFilter(), skpinRegTransformer(), and skpinRegField()
+ *    functions.  Its members are described in detail in the
+ *    description of those functions.
  */
-typedef struct skplugin_callbacks_st {
+struct skplugin_callbacks_st {
     skplugin_callback_fn_t     init;
     skplugin_callback_fn_t     cleanup;
     size_t                     column_width;
@@ -624,7 +643,8 @@ typedef struct skplugin_callbacks_st {
     skplugin_transform_fn_t    transform;
     const uint8_t             *initial;
     const char               **extra;
-} skplugin_callbacks_t;
+};
+typedef struct skplugin_callbacks_st skplugin_callbacks_t;
 
 
 /************************/
@@ -686,6 +706,8 @@ skpinRegOption2(
  *
  *    skpinRegOption2(option_name, mode, option_help, NULL, opt, data,
  *                    1, fn_mask);
+ *
+ *    To be removed in SiLK 4.
  */
 skplugin_err_t
 skpinRegOption(
@@ -701,6 +723,8 @@ skpinRegOption(
  *
  *    skpinRegOption2(option_name, mode, NULL, option_help_fn, opt, data,
  *                    1, fn_mask);
+ *
+ *    To be removed in SiLK 4.
  */
 skplugin_err_t
 skpinRegOptionWithHelpFn(
@@ -1171,7 +1195,7 @@ skPluginFieldFnMask(
 /**
  *    Activate the field 'field'.  All fields start deactivated.
  *    Activating a field allows its 'init' and 'cleanup' functions to
- *    run.
+ *    run.  Return SKPLUGIN_OK.  Exit on memory allocation error.
  */
 skplugin_err_t
 skPluginFieldActivate(
@@ -1179,6 +1203,7 @@ skPluginFieldActivate(
 
 /**
  *    Deactivate the field 'field'.  All fields start deactivated.
+ *    Return SKPLUGIN_OK (always).
  */
 skplugin_err_t
 skPluginFieldDeactivate(

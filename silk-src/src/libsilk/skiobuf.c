@@ -12,7 +12,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skiobuf.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: skiobuf.c 22da9b03c74d 2016-09-19 18:28:03Z mthomas $");
 
 #include <silk/utils.h>
 #include "skiobuf.h"
@@ -20,6 +20,9 @@ RCSIDENT("$SiLK: skiobuf.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 
 SK_DIAGNOSTIC_IGNORE_PUSH("-Wundef")
 
+#if SK_ENABLE_SNAPPY
+#include <snappy-c.h>
+#endif
 #if SK_ENABLE_LZO
 #include SK_LZO_HEADER_NAME
 #endif
@@ -393,6 +396,41 @@ lzo_uncompr_method(
 #endif  /* SK_ENABLE_LZO */
 
 
+#if !SK_ENABLE_SNAPPY
+#define SNAPPY_METHODS   SKIOBUF_METHOD_PLACEHOLDER
+#else
+#define SNAPPY_METHODS                          \
+    {                                           \
+        NULL,                                   \
+        NULL,                                   \
+        snappy_compr_size_method,               \
+        snappy_compr_method,                    \
+        snappy_uncompr_method,                  \
+        1                                       \
+    }
+
+/* Forward declarations for snappy methods */
+static uint32_t
+snappy_compr_size_method(
+    uint32_t            compr_size,
+    const iobuf_opts_t *opts);
+static int
+snappy_compr_method(
+    void               *dest,
+    uint32_t           *destlen,
+    const void         *source,
+    uint32_t            sourcelen,
+    const iobuf_opts_t *opts);
+static int
+snappy_uncompr_method(
+    void               *dest,
+    uint32_t           *destlen,
+    const void         *source,
+    uint32_t            sourcelen,
+    const iobuf_opts_t *opts);
+#endif  /* SK_ENABLE_SNAPPY */
+
+
 /*
  *    Variable to hold the methods for each type of compression that
  *    SiLK supports.
@@ -401,7 +439,8 @@ static const iobuf_methods_t methods[] = {
     /* NONE */
     { NULL, NULL, NULL, NULL, NULL, 0 },
     ZLIB_METHODS,
-    LZO_METHODS
+    LZO_METHODS,
+    SNAPPY_METHODS
 };
 
 
@@ -540,6 +579,9 @@ skIOBufBindAbstract(
 #endif
 #if SK_ENABLE_LZO
       case SK_COMPMETHOD_LZO1X:
+#endif
+#if SK_ENABLE_SNAPPY
+      case SK_COMPMETHOD_SNAPPY:
 #endif
         break;
 
@@ -1733,6 +1775,80 @@ lzo_uncompr_method(
 }
 
 #endif  /* SK_ENABLE_LZO */
+
+
+#if SK_ENABLE_SNAPPY
+
+/* SNAPPY methods */
+
+/* iobuf_methods_t.init_method */
+
+/* iobuf_methods_t.uninit_method */
+
+/* iobuf_methods_t.compr_size_method */
+static uint32_t
+snappy_compr_size_method(
+    uint32_t            compr_size,
+    const iobuf_opts_t *opts)
+{
+    (void)opts;                 /* UNUSED */
+
+    return (uint32_t)snappy_max_compressed_length(compr_size);
+}
+
+
+/* iobuf_methods_t.compr_method */
+static int
+snappy_compr_method(
+    void               *dest,
+    uint32_t           *destlen,
+    const void         *source,
+    uint32_t            sourcelen,
+    const iobuf_opts_t *opts)
+{
+    size_t sl, dl;
+    snappy_status rv;
+
+    (void)opts;                 /* UNUSED */
+
+    assert(sizeof(sl) >= sizeof(sourcelen));
+    assert(sizeof(dl) >= sizeof(*destlen));
+
+    dl = *destlen;
+    sl = sourcelen;
+    rv = snappy_compress((const char*)source, sl, (char*)dest, &dl);
+    *destlen = dl;
+
+    return rv;
+}
+
+
+/* iobuf_methods_t.uncompr_method */
+static int
+snappy_uncompr_method(
+    void               *dest,
+    uint32_t           *destlen,
+    const void         *source,
+    uint32_t            sourcelen,
+    const iobuf_opts_t *opts)
+{
+    size_t sl, dl;
+    snappy_status rv;
+
+    (void)opts;                 /* UNUSED */
+
+    assert(sizeof(sl) >= sizeof(sourcelen));
+    assert(sizeof(dl) >= sizeof(*destlen));
+
+    dl = *destlen;
+    sl = sourcelen;
+    rv = snappy_uncompress((const char*)source, sl, (char*)dest, &dl);
+    *destlen = dl;
+
+    return rv;
+}
+
+#endif  /* SK_ENABLE_SNAPPY */
 
 
 /*

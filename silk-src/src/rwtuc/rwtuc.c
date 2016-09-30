@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwtuc.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
+RCSIDENT("$SiLK: rwtuc.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/rwascii.h>
 #include <silk/rwrec.h>
@@ -159,7 +159,7 @@ static regex_t time_regex;
 static char global_class_name[SK_MAX_STRLEN_FLOWTYPE];
 
 /* the compression method to use when writing the file.
- * sksiteCompmethodOptionsRegister() will set this to the default or
+ * skCompMethodOptionsRegister() will set this to the default or
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
@@ -309,7 +309,7 @@ appUsageLong(
     }
 
     skOptionsNotesUsage(fh);
-    sksiteCompmethodOptionsUsage(fh);
+    skCompMethodOptionsUsage(fh);
     sksiteOptionsUsage(fh);
 
     for (i = 0; defaultValueOptions[i].name; ++i) {
@@ -409,7 +409,7 @@ appSetup(
     if (skOptionsRegister(appOptions, &appOptionsHandler, NULL)
         || skOptionsRegister(defaultValueOptions, &defaultValueHandler, NULL)
         || skOptionsNotesRegister(NULL)
-        || sksiteCompmethodOptionsRegister(&comp_method)
+        || skCompMethodOptionsRegister(&comp_method)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE))
     {
         skAppPrintErr("Unable to register options");

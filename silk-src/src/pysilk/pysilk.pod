@@ -93,7 +93,7 @@ unknown key.  The dictionary's keys and their meanings are:
 
 A list of strings specifying the compression methods that were
 compiled into this build of SiLK.  The list will contain one or more
-of C<NO_COMPRESSION>, C<ZLIB>, and/or C<LZO1X>.
+of C<NO_COMPRESSION>, C<ZLIB>, C<LZO1X>, and/or C<SNAPPY>.
 
 =item INITIAL_TCPFLAGS_ENABLED
 
@@ -809,7 +809,8 @@ L<I<rec>.duration_secs|/rec.duration_secs>.
 
 =item I<rec>.duration_secs
 
-The duration of the flow I<rec> in seconds, a float.  The default
+The duration of the flow I<rec> in seconds, a float that includes
+fractional seconds.  The default
 duration_secs value is 0.  Changing the I<rec>.duration_secs attribute
 will modify the I<rec>.etime attribute in the same way as changing
 I<rec>.duration.  The maximum possible duration_secs value is
@@ -828,8 +829,9 @@ L<I<rec>.etime_epoch_secs|/rec.etime_epoch_secs>.
 =item I<rec>.etime_epoch_secs
 
 The end time of the flow I<rec> as a number of seconds since the epoch
-time, a float.  Epoch time is 1970-01-01 00:00:00.  The default
-etime_epoch_secs value 0.  Changing the I<rec>.etime_epoch_secs
+time, a float that includes fractional seconds.  Epoch time is
+1970-01-01 00:00:00 UTC.  The default
+etime_epoch_secs value is 0.  Changing the I<rec>.etime_epoch_secs
 attribute modifies the flow record's duration.  If the new duration
 would become negative or would become larger than B<RWRec> supports, a
 B<ValueError> will be raised.
@@ -958,8 +960,9 @@ L<I<rec>.etime_epoch_secs|/rec.etime_epoch_secs>.
 =item I<rec>.stime_epoch_secs
 
 The start time of the flow I<rec> as a number of seconds since the
-epoch time, a float.  Epoch time is 1970-01-01 00:00:00.  The default
-stime_epoch_secs value 0.  Changing the I<rec>.stime_epoch_secs
+epoch time, a float that includes fractional seconds.  Epoch time is
+1970-01-01 00:00:00 UTC.  The default
+stime_epoch_secs value is 0.  Changing the I<rec>.stime_epoch_secs
 attribute will modify the flow's end time such that I<rec>.duration is
 constant.  The maximum possible stime_epoch_secs is 2147483647
 (2^31-1).
@@ -1166,6 +1169,10 @@ Use zlib block compression (as used by B<gzip(1)>).
 =item silk.B<LZO1X>
 
 Use lzo1x block compression.
+
+=item silk.B<SNAPPY>
+
+Use snappy block compression.
 
 =back
 
@@ -2787,7 +2794,7 @@ B<python(1)>, B<gzip(1)>, B<yaf(1)>, L<http://docs.python.org/>
 
 =cut
 
-$SiLK: pysilk.pod 0c4ff2945183 2016-03-07 17:23:02Z mthomas $
+$SiLK: pysilk.pod 22da9b03c74d 2016-09-19 18:28:03Z mthomas $
 
 Local Variables:
 mode:text

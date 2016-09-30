@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwuniqsetup.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwuniqsetup.c 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skcountry.h>
@@ -338,7 +338,7 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
-    int optctx_flags;
+    unsigned int optctx_flags;
     char *path;
     int rv;
     int j;

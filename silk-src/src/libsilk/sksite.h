@@ -20,7 +20,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKSITE_H, "$SiLK: sksite.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_SKSITE_H, "$SiLK: sksite.h 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -156,22 +156,46 @@ sksiteTeardown(
 /** Iterators *********************************************************/
 
 /**
- *    Iterators for sensors
+ *    Iterator to visit sensors
+ *
+ *    sksiteSensorIterator() creates an iterator over all sensors.
+ *
+ *    sksiteClassSensorIterator() creates an iterator over all
+ *    sensors in a class.
+ *
+ *    sksiteSensorgroupSensorIterator() creates an iterator over all
+ *    sensors in a sensorgroup.
  */
 typedef struct sk_sensor_iter_st        sk_sensor_iter_t;
 
 /**
- *    Iterators for classes
+ *    Iterator to visit classes
+ *
+ *    sksiteClassIterator() creates an iterator over all classes.
+ *
+ *    sksiteSensorClassIterator() creates an iterator over all
+ *    classes that a sensor belongs to.
  */
 typedef struct sk_class_iter_st         sk_class_iter_t;
 
 /**
- *    Iterators for sensor groups
+ *    Iterator to visit sensor groups
+ *
+ *    sksiteSensorgroupIterator() creates an iterator over all
+ *    sensor groups.
  */
 typedef struct sk_sensorgroup_iter_st   sk_sensorgroup_iter_t;
 
 /**
- *    Iterators for flowtypes
+ *    Iterator to visit flowtypes
+ *
+ *    sksiteFlowtypeIterator() creates an iterator over all flowtypes.
+ *
+ *    sksiteClassFlowtypeIterator() creates an iterator over all
+ *    flowtypes in a class.
+ *
+ *    sksiteClassDefaultFlowtypeIterator() creates an iterator over
+ *    the default flowtypes in a class.
  */
 typedef struct sk_flowtype_iter_st      sk_flowtype_iter_t;
 
@@ -181,7 +205,7 @@ typedef sk_sensor_iter_t        sensor_iter_t       SK_GCC_DEPRECATED;
 typedef sk_sensorgroup_iter_t   sensorgroup_iter_t  SK_GCC_DEPRECATED;
 
 
-/**
+/*
  *  more_data = sksite<THING>InteratorNext(iter, &out_<THING>_id);
  *
  *    These take a pointer to an iterator and a pointer to the type
@@ -189,21 +213,46 @@ typedef sk_sensorgroup_iter_t   sensorgroup_iter_t  SK_GCC_DEPRECATED;
  *    Otherwise, out_<THING>_id is set to the next valid ID and 1 is
  *    returned.
  */
+
+/**
+ *  more_data = sksiteSensorInteratorNext(iter, &out_sensor_id);
+ *
+ *    Fill 'out_sensor_id' with the next sensor ID and return 1, or
+ *    return 0 if no more sensors exist on the iterator.
+ */
 int
 sksiteSensorIteratorNext(
     sk_sensor_iter_t   *iter,
     sk_sensor_id_t     *out_sensor_id);
 
+/**
+ *  more_data = sksiteClassInteratorNext(iter, &out_class_id);
+ *
+ *    Fill 'out_class_id' with the next class ID and return 1, or
+ *    return 0 if no more classs exist on the iterator.
+ */
 int
 sksiteClassIteratorNext(
     sk_class_iter_t    *iter,
     sk_class_id_t      *out_class_id);
 
+/**
+ *  more_data = sksiteSensorgroupInteratorNext(iter, &out_sensorgroup_id);
+ *
+ *    Fill 'out_sensorgroup_id' with the next sensorgroup ID and return 1, or
+ *    return 0 if no more sensorgroups exist on the iterator.
+ */
 int
 sksiteSensorgroupIteratorNext(
     sk_sensorgroup_iter_t  *iter,
     sk_sensorgroup_id_t    *out_sensorgroup_id);
 
+/**
+ *  more_data = sksiteFlowtypeInteratorNext(iter, &out_flowtype_id);
+ *
+ *    Fill 'out_flowtype_id' with the next flowtype ID and return 1, or
+ *    return 0 if no more flowtypes exist on the iterator.
+ */
 int
 sksiteFlowtypeIteratorNext(
     sk_flowtype_iter_t *iter,
@@ -258,9 +307,18 @@ struct sk_flowtype_iter_st {
 /**
  *    Create the sensor 'sensor_name' with id 'sensor_id'.  It is an
  *    error to create a sensor with an ID that is already allocated.
- *    If any error occurs (sensor ID already in use, illegal sensor
- *    name, out of memory), returns -1.  Otherwise returns 0 on
- *    success.
+ *
+ *    Return 0 on success.  Return -1 if an error occurs; error
+ *    conditions include sensor ID already in use, sensor name already
+ *    in use, illegal sensor name, out of memory.
+ *
+ *    To check whether a string is legal as a sensor name, use
+ *    sksiteSensorNameIsLegal().
+ *
+ *    Use sksiteSensorLookup() to get a sensor ID given the name, and
+ *    use sksiteSensorGetName() to get a sensor name given the ID.
+ *
+ *    Use sksiteSensorIterator() to view all created sensors.
  */
 int
 sksiteSensorCreate(
@@ -268,8 +326,12 @@ sksiteSensorCreate(
     const char         *sensor_name);
 
 /**
- *    Find the sensor ID for a sensor given its name.  Returns
+ *    Find the sensor ID for a sensor given its name.  Return
  *    SK_INVALID_SENSOR if no sensor is found with the given name.
+ *
+ *    Use sksiteSensorGetName() to get a sensor's name given its ID.
+ *
+ *    Use sksiteSensorExists() to check whether a sensor ID is known.
  */
 sk_sensor_id_t
 sksiteSensorLookup(
@@ -278,47 +340,67 @@ sksiteSensorLookup(
 /**
  *    Return 1 if a sensor with the given sensor ID exists, 0 if no
  *    such sensor has been defined.
+ *
+ *    Use sksiteSensorIterator() to visit all known sensor IDs.
  */
 int
 sksiteSensorExists(
     sk_sensor_id_t      sensor_id);
 
 /**
- *    Returns the minimum sensor ID that has been allocated to a
- *    sensor.  Returns (sk_sensor_id_t)(-1) if no sensors yet exist.
+ *    Return the minimum sensor ID that has been allocated to a
+ *    sensor.  Return (sk_sensor_id_t)(-1) if no sensors yet exist.
  */
 sk_sensor_id_t
 sksiteSensorGetMinID(
     void);
 
 /**
- *    Returns the maximum sensor ID that has been allocated to a
- *    sensor.  Add one to this value to get the lowest ID that is
- *    certain not to have been allocated.  (Note that not all IDs up
- *    to the maximum may have been allocated.)  Returns
- *    (sk_sensor_id_t)(-1) if no sensors yet exist.
+ *    Return the maximum sensor ID that has been allocated to a
+ *    sensor.  Return (sk_sensor_id_t)(-1) if no sensors yet exist.
+ *
+ *    The caller may add one to this value to get the lowest ID that
+ *    is guaranteed not to have been allocated.
+ *
+ *    There is no guarantee that every sensor ID between
+ *    sksiteSensorGetMinID() and sksiteSensorGetMaxID() is in use.
  */
 sk_sensor_id_t
 sksiteSensorGetMaxID(
     void);
 
 /**
- *    Returns the length of the longest currently known sensor name,
+ *    Return the length of the longest currently known sensor name,
  *    or a minimum value.  This result is suitable for choosing the
  *    size of a display column for sensor names and/or IDs.
+ *
+ *    The return value does not include the trailing '\0'.  See also
+ *    SK_MAX_STRLEN_SENSOR in silk_types.h.
  */
 size_t
 sksiteSensorGetMaxNameStrLen(
     void);
 
 /**
- *    Get the name of the sensor with the given sensor ID into the
+ *    Copy the name of the sensor with the given sensor ID into the
  *    given buffer of size buffer_size.  If the name is longer than
- *    buffer_size, the value returns is truncated with a '\0' in the
+ *    buffer_size, the value returned is truncated with a '\0' in the
  *    final position.
  *
- *    Returns the number of characters that would have been written if
- *    the buffer had been long enough.
+ *    Return the number of characters that would have been written if
+ *    the buffer had been long enough.  This length does not include
+ *    the trailing '\0'.
+ *
+ *    A buffer one character longer than SK_MAX_STRLEN_SENSOR is
+ *    capable of holding all valid sensor names.
+ *
+ *    If 'sensor_id' is SK_INVALID_SENSOR, the string "?" is copied
+ *    into 'buffer'.  If 'sensor_id' is not known to the configuration
+ *    file (that is, it does not have a name), put the numeric ID into
+ *    'buffer'.  Use sksiteSensorExists() to determine if a sensor ID
+ *    is known.
+ *
+ *    Use sksiteSensorLookup() to get a sensor ID given a sensor name.
  */
 int
 sksiteSensorGetName(
@@ -327,8 +409,11 @@ sksiteSensorGetName(
     sk_sensor_id_t      sensor_id);
 
 /**
- *    Returns 1 if the sensor with ID sensor_id is defined to be in
- *    the class with ID class_id.  Returns 0 otherwise.
+ *    Return 1 if the sensor with ID sensor_id is defined to be in
+ *    the class with ID class_id.  Return 0 otherwise.
+ *
+ *    Use sksiteClassAddSensor() to add a sensor to a class.  Use
+ *    sksiteClassAddSensorgroup() to add multiple sensors to a class.
  */
 int
 sksiteIsSensorInClass(
@@ -336,15 +421,24 @@ sksiteIsSensorInClass(
     sk_class_id_t       class_id);
 
 /**
- *    Sets iter to be an iterator that loops over all defined sensors.
+ *    Set iter to be an iterator that loops over all defined sensors.
+ *    Use sksiteSensorIteratorNext() to visit each sensor ID.
  */
 void
 sksiteSensorIterator(
     sk_sensor_iter_t   *iter);
 
 /**
- *    Sets iter to be an iterator that loops over all of the classes
- *    that are possessed by the given sensor.
+ *    Set iter to be an iterator that loops over all of the classes
+ *    that possess the given sensor.  Use sksiteClassIteratorNext() to
+ *    visit each class ID.  The iterator is valid even when
+ *    'sensor_id' is not a known sensor ID.
+ *
+ *    Use sksiteSensorGetClassCount() to get the number of classes
+ *    that a sensor belongs to.
+ *
+ *    Use sksiteIsSensorInClass() to determine whether a sensor is in
+ *    a specific class.
  */
 void
 sksiteSensorClassIterator(
@@ -352,39 +446,48 @@ sksiteSensorClassIterator(
     sk_class_iter_t    *iter);
 
 /**
- *    Returns 0 if the given name is a legal sensor name containing
- *    no illegal characters and of the proper length.  Returns -1 if
- *    the name does not begin with an alpha character, -2 if the name
- *    is too short, -3 if it is too long.  A positive return value
- *    indicates that the character at position n is invalid.
+ *    Check whether 'name' is a valid sensor name.
+ *
+ *    Return 0 if the given string is a legal sensor name containing
+ *    no illegal characters and having a length (as returned by
+ *    strlen()) between 1 and SK_MAX_STRLEN_SENSOR inclusive.
+ *
+ *    Return -1 if the name does not begin with an alpha character, -2
+ *    if the name is too short, -3 if it is too long.  A positive
+ *    return value indicates that the character at that position is
+ *    invalid.
  */
 int
 sksiteSensorNameIsLegal(
     const char         *name);
 
 /**
- *    Returns the number of classes that the given sensor belongs to.
+ *    Return the number of classes that the given sensor belongs to.
+ *    Return 0 if 'sensor_id' is not a known sensor ID.
+ *
+ *    Use sksiteSensorClassIterator() to iterate over those classes.
  */
 int
 sksiteSensorGetClassCount(
     sk_sensor_id_t      sensor_id);
 
 /**
- *    Returns the description of the sensor.  These are specified in
- *    the silk.conf file and are solely for use by the end-user; the
- *    description can be printed with rwsiteinfo.  Returns NULL if no
- *    sensor has the ID 'sensor_id' or if the description has not been
- *    set.
+ *    Return the description of the sensor.
+ *
+ *    A sensor's description is specified in the silk.conf file and
+ *    are solely for use by the end-user; the description can be
+ *    printed with rwsiteinfo.  Return NULL if no sensor has the ID
+ *    'sensor_id' or if the description has not been set.
  */
 const char *
 sksiteSensorGetDescription(
     sk_sensor_id_t      sensor_id);
 
 /**
- *    Sets the description of the given sensor, removing any previous
- *    description.  Returns -1 if 'sensor_id' is not a valid sensor or
- *    on memory allocation errror.  Specify 'sensor_description' as
- *    NULL to clear the current description.
+ *    Set the description of the given sensor, removing any previous
+ *    description.  Return 0 on success.  Return -1 if 'sensor_id' is
+ *    not a valid sensor or on memory allocation errror.  Specify
+ *    'sensor_description' as NULL to clear the current description.
  */
 int
 sksiteSensorSetDescription(
@@ -396,8 +499,15 @@ sksiteSensorSetDescription(
 /**
  *    Create the class 'class_name' with id 'class_id'.  It is an
  *    error to create a class with an ID that is already allocated.
- *    If any error occurs (class ID already in use, out of memory),
- *    returns -1.  Otherwise returns 0 on success.
+ *
+ *    Return 0 on success.  Return -1 if an error occurs; error
+ *    conditions include class ID already in use, class name already
+ *    in use, class name is illegal, out of memory.
+ *
+ *    Use sksiteClassLookup() to get a class ID given the name, and
+ *    use sksiteClassGetName() to get a class name given the ID.
+ *
+ *    Use sksiteClassIterator() to view all created classes.
  */
 int
 sksiteClassCreate(
@@ -405,23 +515,29 @@ sksiteClassCreate(
     const char         *class_name);
 
 /**
- *    Sets the default class for fglobbing.  Returns 0 on success, or
- *    -1 if 'class_id' is not a valid class.
+ *    Set the default class for fglobbing.  Return 0 on success, or -1
+ *    if 'class_id' is not a valid class.  Use sksiteClassGetDefault()
+ *    to get the default class.
  */
 int
 sksiteClassSetDefault(
     sk_class_id_t       class_id);
 
 /**
- *    Returns the default class for fglobbing.
+ *    Return the default class for fglobbing.  Use
+ *    sksiteClassSetDefault() to set the default class.
  */
 sk_class_id_t
 sksiteClassGetDefault(
     void);
 
 /**
- *    Find the class ID for a class given its name.  Returns
+ *    Find the class ID for a class given its name.  Return
  *    SK_INVALID_CLASS if no class is found with the given name.
+ *
+ *    Use sksiteClassGetName() to get a class's name given its ID.
+ *
+ *    Use sksiteClassExists() to check whether a class ID is known.
  */
 sk_class_id_t
 sksiteClassLookup(
@@ -430,39 +546,58 @@ sksiteClassLookup(
 /**
  *    Return 1 if a class with the given class ID exists, 0 if no
  *    such class has been defined.
+ *
+ *    Use sksiteClassIterator() to visit all known class IDs.
  */
 int
 sksiteClassExists(
     sk_class_id_t       class_id);
 
 /**
- *    Returns the maximum class ID that has been allocated to a class.
- *    Add one to this value to get the lowest ID that is certain not
- *    to have been allocated.  (Note that not all IDs up to the
- *    maximum may have been allocated.)  Returns (sk_class_id_t)(-1)
- *    if no classes yet exist.
+ *    Return the maximum class ID that has been allocated to a class.
+ *    Return (sk_class_id_t)(-1) if no classes yet exist.
+ *
+ *    The caller may add one to this value to get the lowest ID that
+ *    is certain not to have been allocated.
+ *
+ *    Note that not all IDs up to the maximum may have been allocated.
  */
 sk_class_id_t
 sksiteClassGetMaxID(
     void);
 
 /**
- *    Returns the length of the longest currently known class name, or
+ *    Return the length of the longest currently known class name, or
  *    a minimum value.  This result is suitable for choosing the size
  *    of a display column for class names and/or IDs.
+ *
+ *    The return value does not include the trailing '\0'.  See also
+ *    SK_MAX_STRLEN_FLOWTYPE in silk_types.h.
  */
 size_t
 sksiteClassGetMaxNameStrLen(
     void);
 
 /**
- *    Get the name of the class with the given class ID into the
+ *    Copy the name of the class with the given class ID into the
  *    given buffer of size buffer_size.  If the name is longer than
- *    buffer_size, the value returns is truncated with a '\0' in the
+ *    buffer_size, the value returned is truncated with a '\0' in the
  *    final position.
  *
- *    Returns the number of characters that would have been written if
- *    the buffer had been long enough.
+ *    A buffer one character longer than SK_MAX_STRLEN_FLOWTYPE is
+ *    capable of holding all valid class names.
+ *
+ *    Return the number of characters that would have been written if
+ *    the buffer had been long enough.  This length does not include
+ *    the trailing '\0'.
+ *
+ *    If 'class_id' is SK_INVALID_CLASS, the string "?" is copied into
+ *    'buffer'.  If 'class_id' is not known to the configuration file
+ *    (that is, it does not have a name), put the numeric ID into
+ *    'buffer'.  Use sksiteClassExists() to determine if a class ID is
+ *    known.
+ *
+ *    Use sksiteClassLookup() to get a class ID given a class name.
  */
 int
 sksiteClassGetName(
@@ -471,8 +606,23 @@ sksiteClassGetName(
     sk_class_id_t       class_id);
 
 /**
- *    Adds the given sensor to the given class.  Returns 0 on success,
- *    -1 if an error occurred.
+ *    Add the given sensor to the given class.  A sensor may belong to
+ *    multiple classes.  Both the sensor list of 'class_id' and the
+ *    class list of 'sensor_id' are updated.
+ *
+ *    Return 0 on success or if 'sensor_id' already exists on
+ *    'class_id'.  Return -1 if 'class_id' is not a known class, if
+ *    'sensor_id' is not a known sensor, or on memory allocation
+ *    error.
+ *
+ *    Use sksiteClassCreate() to create a class and
+ *    sksiteSensorCreate() to create a sensor.
+ *
+ *    Use sksiteSensorClassIterator() to visit the classes that own a
+ *    sensor; use sksiteClassSensorIterator() to visit the sensors
+ *    that a class owns.
+ *
+ *    See also sksiteClassAddSensorgroup().
  */
 int
 sksiteClassAddSensor(
@@ -480,8 +630,13 @@ sksiteClassAddSensor(
     sk_sensor_id_t      sensor_id);
 
 /**
- *    Adds every sensor in the given sensorgroup to the given class.
- *    Returns 0 on success, -1 if an error occurred.
+ *    Add every sensor in the given sensorgroup to the given class.
+ *
+ *    Return 0 on success.  Return -1 if 'class_id' is not a known
+ *    class, if 'sensorgroup_id' is not a known sensorgroup, or on
+ *    memory allocation error.
+ *
+ *    See also sksiteClassAddSensor().
  */
 int
 sksiteClassAddSensorgroup(
@@ -489,15 +644,30 @@ sksiteClassAddSensorgroup(
     sk_sensorgroup_id_t sensorgroup_id);
 
 /**
- *    Sets iter to be an iterator that loops over all defined classes.
+ *    Set iter to be an iterator that loops over all defined classes.
+ *    Use sksiteClassIteratorNext() to visit each class ID.
  */
 void
 sksiteClassIterator(
     sk_class_iter_t    *iter);
 
 /**
- *    Sets iter to be an iterator that loops over all sensors in the
- *    given class.
+ *    Set iter to be an iterator that loops over all sensors in the
+ *    given class.  Use sksiteSensorIteratorNext() to visit each
+ *    sensor ID.  The iterator is valid even when 'class_id' is not a
+ *    valid class ID.
+ *
+ *    Use sksiteClassGetSensorCount() to get the number of sensors in
+ *    a class.
+ *
+ *    Use sksiteSensorClassIterator() to iterate over all classes that
+ *    a sensor belongs to.
+ *
+ *    Use sksiteIsSensorInClass() to determine whether a class owns a
+ *    specific sensor.
+ *
+ *    Use sksiteClassAddSensor() and sksiteClassAddSensorgroup() to
+ *    add sensors to a class.
  */
 void
 sksiteClassSensorIterator(
@@ -505,8 +675,26 @@ sksiteClassSensorIterator(
     sk_sensor_iter_t   *iter);
 
 /**
- *    Sets iter to be an iterator that loops over all flowtypes in the
- *    given class.
+ *    Return the number of sensors in the given class.  Return 0 if
+ *    class_id is not known.
+ *
+ *    Use sksiteClassSensorIterator() to iterate over those sensors.
+ */
+int
+sksiteClassGetSensorCount(
+    sk_class_id_t       class_id);
+
+/**
+ *    Set iter to be an iterator that loops over all flowtypes in the
+ *    given class.  Use sksiteFlowtypeIteratorNext() to visit each
+ *    flowtype ID.  The iterator is valid even when 'class_id' is not
+ *    a valid class ID.
+ *
+ *    A flowtype is put into a class when the flowtype is created via
+ *    sksiteFlowtypeCreate().
+ *
+ *    Use sksiteClassDefaultFlowtypeIterator() to visit only the
+ *    default flowtypes for a class.
  */
 void
 sksiteClassFlowtypeIterator(
@@ -514,8 +702,17 @@ sksiteClassFlowtypeIterator(
     sk_flowtype_iter_t *iter);
 
 /**
- *    Sets iter to be an iterator that loops over all default
- *    flowtypes for the given class.
+ *    Set iter to be an iterator that loops over all default flowtypes
+ *    for the given class.  The default flowtypes are used when
+ *    fglobbing.  Use sksiteSensorIteratorNext() to visit each sensor
+ *    ID.  The iterator is valid even when 'class_id' is not a valid
+ *    class ID.
+ *
+ *    Use sksiteClassFlowtypeIterator() to visit all the flowtypes for
+ *    a class.
+ *
+ *    Use sksiteClassAddDefaultFlowtype() to mark a flowtype as being
+ *    a default flowtype within a class.
  */
 void
 sksiteClassDefaultFlowtypeIterator(
@@ -523,19 +720,21 @@ sksiteClassDefaultFlowtypeIterator(
     sk_flowtype_iter_t *iter);
 
 /**
- *    Returns the number of sensors in the given class.
- */
-int
-sksiteClassGetSensorCount(
-    sk_class_id_t       class_id);
-
-/**
- *    Adds the given flowtype to the list of default flowtypes for the
- *    given class.  The flowtype should be a part of this class
- *    already.  (i.e. it should have been created with class
- *    class_id.)
+ *    Add the given flowtype to the list of default flowtypes for the
+ *    given class.  The default flowtypes are used when
+ *    fglobbing.
  *
- *    Returns 0 on success, -1 on any error.
+ *    Return 0 on success or if the flowtype is already marked as
+ *    being a default type for the class.  Return -1 if 'class_id' is
+ *    not a known class, if 'flowtype_id' is not a known flowtype, if
+ *    the class of flowtype is not 'class_id', or on memory allocation
+ *    error.
+ *
+ *    Use sksiteClassCreate() to create a class and
+ *    sksiteFlowtypeCreate() to create a flowtype.
+ *
+ *    Use sksiteClassDefaultFlowtypeIterator() to visit the default
+ *    flowtypes for a class.
  */
 int
 sksiteClassAddDefaultFlowtype(
@@ -547,8 +746,15 @@ sksiteClassAddDefaultFlowtype(
 /**
  *    Create the group 'sensorgroup_name' with id 'sensorgroup_id'.
  *    It is an error to create a group with an ID that is already
- *    allocated.  If any error occurs (class ID already in use, out of
- *    memory), returns -1.  Otherwise returns 0 on success.
+ *    allocated.
+ *
+ *    Return 0 on success.  Return -1 if an error occurs; error
+ *    conditions include sensorgroup ID already in use, sensorgroup
+ *    name already in use, out of memory.
+ *
+ *    Use sksiteSensorgroupLookup() to get a sensorgroup ID given the
+ *    name, and use sksiteSensorgroupGetName() to get a sensorgroup
+ *    name given the ID.
  */
 int
 sksiteSensorgroupCreate(
@@ -558,6 +764,11 @@ sksiteSensorgroupCreate(
 /**
  *    Find the sensorgroup ID for a group given its name.  Returns
  *    SK_INVALID_SENSORGROUP if no group is found with the given name.
+ *
+ *    Use sksiteSensorgroupGetName() to get a group's name given its ID.
+ *
+ *    Use sksiteSensorgroupExists() to check whether a group ID is
+ *    known.
  */
 sk_sensorgroup_id_t
 sksiteSensorgroupLookup(
@@ -566,24 +777,28 @@ sksiteSensorgroupLookup(
 /**
  *    Return 1 if a sensorgroup with the given ID exists, 0 if no such
  *    group has been defined.
+ *
+ *    Use sksiteSensorgroupIterator() to visit all known group IDs.
  */
 int
 sksiteSensorgroupExists(
     sk_sensorgroup_id_t sensorgroup_id);
 
 /**
- *    Returns the maximum ID that has been allocated to a sensorgroup.
- *    Add one to this value to get the lowest ID that is certain not
- *    to have been allocated.  (Note that not all IDs up to the
- *    maximum may have been allocated.)  Returns
- *    (sk_sensorgroup_id_t)(-1) if no classes yet exist.
+ *    Return the maximum ID that has been allocated to a sensorgroup.
+ *    Return (sk_sensorgroup_id_t)(-1) if no groups yet exist.
+ *
+ *    The caller may add one to this value to get the lowest ID that
+ *    is certain not to have been allocated.
+ *
+ *    Note that not all IDs up to the maximum may have been allocated.
  */
 sk_sensorgroup_id_t
 sksiteSensorgroupGetMaxID(
     void);
 
 /**
- *    Returns the length of the longest currently known group name, or
+ *    Return the length of the longest currently known group name, or
  *    a minimum value.  This result is suitable for choosing the size
  *    of a display column for group names and/or IDs.
  */
@@ -592,13 +807,23 @@ sksiteSensorgroupGetMaxNameStrLen(
     void);
 
 /**
- *    Get the name of the group with the given ID into the given
+ *    Copy the name of the group with the given ID into the given
  *    buffer of size buffer_size.  If the name is longer than
- *    buffer_size, the value returns is truncated with a '\0' in the
+ *    buffer_size, the value returned is truncated with a '\0' in the
  *    final position.
  *
- *    Returns the number of characters that would have been written if
- *    the buffer had been long enough.
+ *    Return the number of characters that would have been written if
+ *    the buffer had been long enough.  This length does not include
+ *    the trailing '\0'.
+ *
+ *    If 'sensorgroup_id' is SK_INVALID_SENSORGROUP, the string "?" is
+ *    copied into 'buffer'.  If 'sensorgroup_id' is not known to the
+ *    configuration file (that is, it does not have a name), put the
+ *    numeric ID into 'buffer'.  Use sksiteSensorgroupExists() to
+ *    determine if a sensorgroup ID is known.
+ *
+ *    Use sksiteSensorgroupLookup() to get a sensorgroup ID given a
+ *    sensorgroup name.
  */
 int
 sksiteSensorgroupGetName(
@@ -607,8 +832,21 @@ sksiteSensorgroupGetName(
     sk_sensorgroup_id_t sensorgroup_id);
 
 /**
- *    Adds the given sensor to the given class.  Returns 0 on success,
- *    -1 if an error occurred.
+ *    Add the given sensor to the given sensorgroup.  A sensor may
+ *    belong to multiple sensorgroups.
+ *
+ *    Return 0 on success or if 'sensor_id' already exists on
+ *    'sensorgroup_id'.  Return -1 if 'sensorgroup_id' is not a known
+ *    sensorgroup, if 'sensor_id' is not a known sensor, or on memory
+ *    allocation error.
+ *
+ *    Use sksiteSensorgroupCreate() to create a sensorgroup and
+ *    sksiteSensorCreate() to create a sensor.
+ *
+ *    Use sksiteSensorgroupSensorIterator() to visit the sensors that
+ *    a sensorgroup owns.
+ *
+ *    See also sksiteSensorgroupAddSensorgroup().
  */
 int
 sksiteSensorgroupAddSensor(
@@ -616,25 +854,40 @@ sksiteSensorgroupAddSensor(
     sk_sensor_id_t      sensor_id);
 
 /**
- *    Adds every sensor in the sensorgroup 'src' to the sensorgroup
- *    'dest'.  Returns 0 on success, -1 if an error occurred.
+ *    Add every sensor in the sensorgroup 'src_sensorgroup' to the sensorgroup
+ *    'dest_sensorgroup'.
+ *
+ *    Return 0 on success.  Return -1 if 'src_sensorgroup' is not a
+ *    known sensorgroup, if 'dest_sensorgroup' is not a known
+ *    sensorgroup, or on memory allocation error.
+ *
+ *    See also sksiteSensorgroupAddSensor().
  */
 int
 sksiteSensorgroupAddSensorgroup(
-    sk_sensorgroup_id_t dest,
-    sk_sensorgroup_id_t src);
+    sk_sensorgroup_id_t dest_sensorgroup,
+    sk_sensorgroup_id_t src_sensorgroup);
 
 /**
- *    Sets iter to be an iterator that loops over all defined
- *    sensorgroups.
+ *    Set iter to be an iterator that loops over all defined
+ *    sensorgroups.  Use sksiteSensorgroupIteratorNext() to visit each
+ *    sensorgroup ID.
  */
 void
 sksiteSensorgroupIterator(
     sk_sensorgroup_iter_t  *iter);
 
 /**
- *    Sets iter to be an iterator that loops over all sensors in the
- *    given sensorgroup.
+ *    Set iter to be an iterator that loops over all sensors in the
+ *    given sensorgroup.  Use sksiteSensorIteratorNext() to visit each
+ *    sensor ID.  The iterator is valid even when 'sensorgroup_id' is
+ *    not a valid sensorgroup ID.
+ *
+ *    Use sksiteSensorgroupAddSensor() and
+ *    sksiteSensorgroupAddSensorgroup() to add sensors to a
+ *    sensorgroup.
+ *
+ *    FIXME: I think the iterator needs to be an sk_sensor_iter_t.
  */
 void
 sksiteSensorgroupSensorIterator(
@@ -653,8 +906,28 @@ sksiteSensorgroupSensorIterator(
  *    Create the flowtype 'flowtype_name' with id 'flowtype_id'.
  *    Associate it with the given class ID and type name.  It is an
  *    error to create a flowtype with an ID that is already allocated.
- *    If any error occurs (class ID already in use, out of memory),
- *    returns -1.  Otherwise returns 0 on success.
+ *
+ *    Return 0 on success.  Return -1 if an error occurs; error
+ *    conditions include flowtype ID already in use, flowtype name
+ *    already in use, unknown class id, illegal flowtype name, illegal
+ *    type name, type name not unique within class, out of memory.
+ *
+ *    Use sksiteFlowtypeLookup() to get a flowtype ID given the name,
+ *    and use sksiteFlowtypeGetName() to get a flowtype name given the
+ *    ID.
+ *
+ *    Use sksiteFlowtypeGetClassID() to get the class ID given a
+ *    flowtype ID, sksiteFlowtypeGetClass() to get the class name
+ *    given a flowtype ID, and sksiteFlowtypeGetType() to get the type
+ *    name given a flowtype ID.
+ *
+ *    Use sksiteFlowtypeIterator() to view all created flowtypes.
+ *
+ *    Use sksiteClassFlowtypeIterator() to view all flowtypes on a
+ *    specific class.
+ *
+ *    Use sksiteClassAddDefaultFlowtype() to mark a flowtype as a
+ *    default for a class when fglobbing.
  */
 int
 sksiteFlowtypeCreate(
@@ -664,17 +937,31 @@ sksiteFlowtypeCreate(
     const char         *type_name);
 
 /**
- *    Find the flowtype ID for a flowtype given its name.  Returns
+ *    Find the flowtype ID for a flowtype given its name.  Return
  *    SK_INVALID_FLOWTYPE if no flowtype is found with the given name.
+ *
+ *    Use sksiteFlowtypeLookupByClassType() to get a flowtype ID using
+ *    the class name and type name.
+ *
+ *    Use sksiteFlowtypeGetName() to get a flowtype's name given its
+ *    ID.
+ *
+ *    Use sksiteFlowtypeExists() to check whether a flowtype ID is
+ *    known.
  */
 sk_flowtype_id_t
 sksiteFlowtypeLookup(
     const char         *flowtype_name);
 
 /**
- *    Find the flowtype ID for a flowtype given its class and type.
- *    Returns SK_INVALID_FLOWTYPE if no flowtype is found with the
- *    given class and type.
+ *    Find the flowtype ID for a flowtype given its class name and
+ *    type name.  Return SK_INVALID_FLOWTYPE if no flowtype is found
+ *    with the given class and type.
+ *
+ *    Use sksiteFlowtypeLookup() to get a flowtype ID using the
+ *    flowtype name.
+ *
+ *    See also sksiteFlowtypeLookupByClassIDType().
  */
 sk_flowtype_id_t
 sksiteFlowtypeLookupByClassType(
@@ -682,9 +969,12 @@ sksiteFlowtypeLookupByClassType(
     const char         *type_name);
 
 /**
- *    Find the flowtype ID for a flowtype given its class and type.
- *    Returns SK_INVALID_FLOWTYPE if no flowtype is found with the
- *    given class and type.
+ *    Find the flowtype ID for a flowtype given its class ID and type
+ *    name.  Returns SK_INVALID_FLOWTYPE if no flowtype is found with
+ *    the given class and type or if class_id is not known.
+ *
+ *    See also sksiteFlowtypeLookupByClassType() and
+ *    sksiteFlowtypeLookup().
  */
 sk_flowtype_id_t
 sksiteFlowtypeLookupByClassIDType(
@@ -694,30 +984,46 @@ sksiteFlowtypeLookupByClassIDType(
 /**
  *    Return 1 if a flowtype with the given ID exists, 0 if no such
  *    flowtype has been defined.
+ *
+ *    Use sksiteFlowtypeIterator() to visit all known flowtype IDs.
  */
 int
 sksiteFlowtypeExists(
     sk_flowtype_id_t    flowtype_id);
 
 /**
- *    Returns the maximum flowtype ID that has been allocated.  Add
- *    one to this value to get the lowest ID that is certain not to
- *    have been allocated.  (Note that not all IDs up to the maximum
- *    may have been allocated.)  Returns (sk_flowtype_id_t)(-1) if no
- *    flowtypes yet exist.
+ *    Return the maximum flowtype ID that has been allocated.  Return
+ *    (sk_flowtype_id_t)(-1) if no flowtypes yet exist.
+ *
+ *    The caller may add one to this value to get the lowest ID that
+ *    is certain not to have been allocated.
+ *
+ *    Note that not all IDs up to the maximum may have been allocated.
  */
 sk_flowtype_id_t
 sksiteFlowtypeGetMaxID(
     void);
 
 /**
- *    Get the class name of the flowtype with the given ID into the
+ *    Copy the class name of the flowtype with the given ID into the
  *    given buffer of size buffer_size.  If the name is longer than
- *    buffer_size, the value returns is truncated with a '\0' in the
+ *    buffer_size, the value returned is truncated with a '\0' in the
  *    final position.
  *
- *    Returns the number of characters that would have been written if
- *    the buffer had been long enough.
+ *    Return the number of characters that would have been written if
+ *    the buffer had been long enough.  This length does not include
+ *    the trailing '\0'.
+ *
+ *    A buffer one character longer than SK_MAX_STRLEN_FLOWTYPE is
+ *    capable of holding all valid class names.
+ *
+ *    If 'flowtype_id' is SK_INVALID_FLOWTYPE or not known to the
+ *    configuration file, the string "?" is copied into 'buffer'.  Use
+ *    sksiteFlowtypeExists() to determine if a flowtype ID is known.
+ *
+ *    Use sksiteFlowtypeGetName() to get the name of the flowtype.
+ *
+ *    See also sksiteFlowtypeGetClassID() and sksiteFlowtypeGetType().
  */
 int
 sksiteFlowtypeGetClass(
@@ -726,30 +1032,56 @@ sksiteFlowtypeGetClass(
     sk_flowtype_id_t    flowtype_id);
 
 /**
- *    Returns the class ID of this flowtype's class.  Returns
+ *    Return the class ID of this flowtype's class.  Return
  *    SK_INVALID_CLASS if the flowtype does not exist.
+ *
+ *    Use sksiteFlowtypeGetClass() to get the class name for a
+ *    flowtype ID.
  */
 sk_class_id_t
 sksiteFlowtypeGetClassID(
     sk_flowtype_id_t    flowtype_id);
 
 /**
- *    Returns the length of the longest currently known flowtype name,
+ *    Return the length of the longest currently known flowtype name,
  *    or a minimum value.  This result is suitable for choosing the
  *    size of a display column for flowtype names and/or IDs.
+ *
+ *    NOTE: This returns the length of the flowtype name.  To get the
+ *    length of the longest type name, use
+ *    sksiteFlowtypeGetMaxTypeStrLen().
+ *
+ *    The return value does not include the trailing '\0'.  See also
+ *    SK_MAX_STRLEN_FLOWTYPE in silk_types.h.
  */
 size_t
 sksiteFlowtypeGetMaxNameStrLen(
     void);
 
 /**
- *    Get the name of the flowtype with the given ID into the given
+ *    Copy the name of the flowtype with the given ID into the given
  *    buffer of size buffer_size.  If the name is longer than
- *    buffer_size, the value returns is truncated with a '\0' in the
+ *    buffer_size, the value returned is truncated with a '\0' in the
  *    final position.
  *
- *    Returns the number of characters that would have been written if
- *    the buffer had been long enough.
+ *    Return the number of characters that would have been written if
+ *    the buffer had been long enough.  This length does not include
+ *    the trailing '\0'.
+ *
+ *    A buffer one character longer than SK_MAX_STRLEN_FLOWTYPE is
+ *    capable of holding all valid flowtype names.
+ *
+ *    If 'flowtype_id' is SK_INVALID_FLOWTYPE, the string "?" is
+ *    copied into 'buffer'.  If 'flowtype_id' is not known to the
+ *    configuration file (that is, it does not have a name), put the
+ *    numeric ID into 'buffer'.  Use sksiteFlowtypeExists() to
+ *    determine if a flowtype ID is known.
+ *
+ *    Use sksiteFlowtypeLookup() to get a flowtype ID given a flowtype
+ *    name.
+ *
+ *    Use sksiteFlowtypeGetClass() and sksiteFlowtypeGetType() to get
+ *    the class name and type name given a flowtype ID.
  */
 int
 sksiteFlowtypeGetName(
@@ -758,22 +1090,41 @@ sksiteFlowtypeGetName(
     sk_flowtype_id_t    flowtype_id);
 
 /**
- *    Returns the length of the longest currently known flowtype type,
+ *    Return the length of the longest currently known flowtype type,
  *    or a minimum value.  This result is suitable for choosing the
  *    size of a display column for flowtype types.
+ *
+ *    NOTE: This returns the length of the type name.  To get the
+ *    length of the longest flowtype name, use
+ *    sksiteFlowtypeGetMaxNameStrLen().
+ *
+ *    The return value does not include the trailing '\0'.  See also
+ *    SK_MAX_STRLEN_FLOWTYPE in silk_types.h.
  */
 size_t
 sksiteFlowtypeGetMaxTypeStrLen(
     void);
 
 /**
- *    Get the type of the flowtype with the given ID into the given
- *    buffer of size buffer_size.  If the name is longer than
- *    buffer_size, the value returns is truncated with a '\0' in the
+ *    Copy the type name of the flowtype with the given ID into the
+ *    given buffer of size buffer_size.  If the name is longer than
+ *    buffer_size, the value returned is truncated with a '\0' in the
  *    final position.
  *
- *    Returns the number of characters that would have been written if
- *    the buffer had been long enough.
+ *    Return the number of characters that would have been written if
+ *    the buffer had been long enough.  This length does not include
+ *    the trailing '\0'.
+ *
+ *    A buffer one character longer than SK_MAX_STRLEN_FLOWTYPE is
+ *    capable of holding all valid flowtype names.
+ *
+ *    If 'flowtype_id' is SK_INVALID_FLOWTYPE or not known to the
+ *    configuration file, put the numeric ID into 'buffer'.  Use
+ *    sksiteFlowtypeExists() to determine if a flowtype ID is known.
+ *
+ *    Use sksiteFlowtypeGetName() to get the name of the flowtype.
+ *
+ *    See also sksiteFlowtypeGetClass().
  */
 int
 sksiteFlowtypeGetType(
@@ -782,16 +1133,17 @@ sksiteFlowtypeGetType(
     sk_flowtype_id_t    flowtype_id);
 
 /**
- *    Sets iter to be an iterator that loops over all defined
- *    flowtypes.
+ *    Set iter to be an iterator that loops over all defined
+ *    flowtypes.  Use sksiteFlowtypeIteratorNext() to visit each
+ *    flowtype ID.
  */
 void
 sksiteFlowtypeIterator(
     sk_flowtype_iter_t *iter);
 
 /**
- *    Asserts that the given flowtype exists, and is associated with
- *    the given class name and class type.  If this is not the case,
+ *    Assert that the given flowtype exists and is associated with the
+ *    given class name and class type name.  If this is not the case,
  *    an error message is printed and the program abort()s.  The
  *    'pack_logic_file' is the path to the file doing the assertion.
  */
@@ -802,135 +1154,6 @@ sksiteFlowtypeAssert(
     const char         *class_name,
     const char         *type);
 
-/** File Formats ******************************************************/
-
-/**
- *    Get the name of the file format with the given ID into the given
- *    buffer of size buffer_size.  If the name is longer than
- *    buffer_size, the value returns is truncated with a '\0' in the
- *    final position.
- *
- *    Returns the number of characters that would have been written if
- *    the buffer had been long enough.
- */
-int
-sksiteFileformatGetName(
-    char               *buffer,
-    size_t              buffer_size,
-    sk_file_format_t    format_id);
-
-/**
- *    Return 1 if 'format_id' is a valid file output format, or 0 if
- *    it is not.
- */
-int
-sksiteFileformatIsValid(
-    sk_file_format_t    format_id);
-
-/**
- *    Returns the file output format associated with the name.  If the
- *    name is unknown, will return an invalid file format.
- */
-sk_file_format_t
-sksiteFileformatFromName(
-    const char         *name);
-
-
-/*** Compression Methods ***********************************************/
-
-/**    values returned by sksiteCompmethodCheck() */
-#define SK_COMPMETHOD_IS_AVAIL  6
-#define SK_COMPMETHOD_IS_VALID  2
-#define SK_COMPMETHOD_IS_KNOWN  1
-
-/**
- *    Check whether a compression method is valid and/or available.
- *
- *    If the compression method 'comp_method' is completely
- *    unrecognized, return 0.
- *
- *    Return SK_COMPMETHOD_IS_KNOWN when 'comp_method' is an
- *    "undecided" value (i.e., SK_COMPMETHOD_DEFAULT or
- *    SK_COMPMETHOD_BEST).  These compression methods should be
- *    considered valid for writing, as they will be converted to an
- *    appropriate type once the stream they are connected to is
- *    opened.
- *
- *    Return SK_COMPMETHOD_IS_VALID when 'comp_method' contains a
- *    known value other than an "undecided" value, but the compression
- *    method relies on an external library that is not part of this
- *    build of SiLK.
- *
- *    Return SK_COMPMETHOD_IS_AVAIL when 'comp_method' is a known
- *    value whose library is available.  These compression methods are
- *    valid for reading or for writing.
- *
- *    To determine whether 'comp_method' is valid for read, mask the
- *    output by 4.  To determine whether 'comp_method' is valid for
- *    write, mask the output of this function by 5. To determine
- *    whether 'comp_method' is an actual compression method (that is,
- *    not an "undecided" value), mask the output by 2.
- */
-int
-sksiteCompmethodCheck(
-    sk_compmethod_t     comp_method);
-
-/**
- *    Return the generically "best" compression method from all those
- *    that are available.
- */
-sk_compmethod_t
-sksiteCompmethodGetBest(
-    void);
-
-/**
- *    Return the default compression method.
- */
-sk_compmethod_t
-sksiteCompmethodGetDefault(
-    void);
-
-/**
- *    Given the compress method 'comp_method', write the name of that
- *    method into 'out_buffer' whose length is 'bufsize'.  The
- *    function returns a pointer to 'out_buffer', or NULL for an
- *    invalid compression method.
- */
-int
-sksiteCompmethodGetName(
-    char               *buffer,
-    size_t              buffer_size,
-    sk_compmethod_t     comp_method);
-
-/**
- *    Sets the default compression method.  Returns 0 on success, -1
- *    if the method is not available.
- */
-int
-sksiteCompmethodSetDefault(
-    sk_compmethod_t     compression_method);
-
-/**
- *    Add an option that will allow the user to set the compression
- *    method of binary output files.  After skOptionsParse()
- *    sucessfully returns, the variable pointed to by
- *    'compression_method' will contain the compression method to use.
- *
- *    If the user does not exercise the compression-method option,
- *    'compression_method' will be set to the default compression
- *    method.
- */
-int
-sksiteCompmethodOptionsRegister(
-    sk_compmethod_t    *compression_method);
-
-/**
- *    Include the compression method option in the list of options for
- *    --help output.
- */
-void
-sksiteCompmethodOptionsUsage(
-    FILE               *fh);
 
 /** Paths *************************************************************/
 
@@ -1788,6 +2011,65 @@ sksiteRepoIteratorRemainingFileattrs(
 void
 sksiteRepoIteratorReset(
     sksite_repo_iter_t *iter);
+
+
+/*
+ *    The following have been renamed and moved to silk_files.h.
+ */
+
+int
+sksiteCompmethodCheck(
+    sk_compmethod_t     comp_method)
+    SK_GCC_DEPRECATED;
+
+sk_compmethod_t
+sksiteCompmethodGetBest(
+    void)
+    SK_GCC_DEPRECATED;
+
+sk_compmethod_t
+sksiteCompmethodGetDefault(
+    void)
+    SK_GCC_DEPRECATED;
+
+int
+sksiteCompmethodGetName(
+    char               *buffer,
+    size_t              buffer_size,
+    sk_compmethod_t     comp_method)
+    SK_GCC_DEPRECATED;
+
+int
+sksiteCompmethodSetDefault(
+    sk_compmethod_t     compression_method)
+    SK_GCC_DEPRECATED;
+
+int
+sksiteCompmethodOptionsRegister(
+    sk_compmethod_t    *compression_method)
+    SK_GCC_DEPRECATED;
+
+void
+sksiteCompmethodOptionsUsage(
+    FILE               *fh)
+    SK_GCC_DEPRECATED;
+
+int
+sksiteFileformatGetName(
+    char               *buffer,
+    size_t              buffer_size,
+    sk_file_format_t    format_id)
+    SK_GCC_DEPRECATED;
+
+int
+sksiteFileformatIsValid(
+    sk_file_format_t    format_id)
+    SK_GCC_DEPRECATED;
+
+sk_file_format_t
+sksiteFileformatFromName(
+    const char         *name)
+    SK_GCC_DEPRECATED;
 
 
 #ifdef __cplusplus

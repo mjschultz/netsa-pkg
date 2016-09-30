@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKUNIQUE_H, "$SiLK: skunique.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_SKUNIQUE_H, "$SiLK: skunique.h 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $");
 
 #include <silk/silk_types.h>
 

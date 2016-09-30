@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 # MD5: 1298b3f0ab5316ced66ec23c98ef9f10
-# TEST: ./rwsort --plugin=int-ext-fields.so --fields=ext-ip,ext-port ../../tests/data.rwf | ../rwuniq/rwuniq --plugin=int-ext-fields.so --delimited --fields=ext-ip,ext-port --presorted-input
+# TEST: ./rwsort --plugin=int-ext-fields.so --fields=ext-ip,ext-port ../../tests/data.rwf | ../rwstats/rwuniq --plugin=int-ext-fields.so --delimited --fields=ext-ip,ext-port --presorted-input
 
 use strict;
 use SiLKTests;

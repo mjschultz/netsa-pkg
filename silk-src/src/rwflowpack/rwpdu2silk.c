@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpdu2silk.c e3a6acd5f250 2016-06-16 22:15:56Z mthomas $");
+RCSIDENT("$SiLK: rwpdu2silk.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/rwrec.h>
@@ -56,7 +56,7 @@ static int print_statistics = 0;
 static const char *log_flags = NULL;
 
 /* the compression method to use when writing the file.
- * sksiteCompmethodOptionsRegister() will set this to the default or
+ * skCompMethodOptionsRegister() will set this to the default or
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
@@ -125,7 +125,7 @@ appUsageLong(
     skAppStandardUsage(fh, USAGE_MSG, appOptions, appHelp);
     skOptionsCtxOptionsUsage(optctx, fh);
     skOptionsNotesUsage(fh);
-    sksiteCompmethodOptionsUsage(fh);
+    skCompMethodOptionsUsage(fh);
 }
 
 
@@ -187,7 +187,7 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
-    int optctx_flags;
+    unsigned int optctx_flags;
     sk_file_header_t *silk_hdr;
     int logmask;
     int rv;
@@ -208,7 +208,7 @@ appSetup(
         || skOptionsCtxOptionsRegister(optctx)
         || skOptionsRegister(appOptions, &appOptionsHandler, NULL)
         || skOptionsNotesRegister(NULL)
-        || sksiteCompmethodOptionsRegister(&comp_method))
+        || skCompMethodOptionsRegister(&comp_method))
     {
         skAppPrintErr("Unable to register options");
         exit(EXIT_FAILURE);

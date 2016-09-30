@@ -21,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwset.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwset.c 0432f6547214 2016-09-19 19:08:31Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
@@ -198,7 +198,7 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
-    int optctx_flags;
+    unsigned int optctx_flags;
     int i;
     int j;
     int rv;

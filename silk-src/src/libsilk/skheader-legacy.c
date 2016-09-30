@@ -18,9 +18,9 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skheader-legacy.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: skheader-legacy.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
-#include <silk/skheader.h>
+#include "skheader_priv.h"
 #include "skstream_priv.h"
 
 
