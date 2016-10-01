@@ -7,17 +7,17 @@
 */
 
 /*
-**  rwcountsetup.c
-**
-**    Routines for setting up rwcount
-**
-**    Michael P. Collins
-**
-*/
+ *  rwcountsetup.c
+ *
+ *    Routines for setting up rwcount
+ *
+ *    Michael P. Collins
+ *
+ */
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcountsetup.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwcountsetup.c 274b023fde5c 2016-09-22 14:44:25Z mthomas $");
 
 #include <silk/skstringmap.h>
 #include "rwcount.h"
@@ -252,7 +252,7 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
-    int optctx_flags;
+    unsigned int optctx_flags;
     sktime_t t;
     unsigned int end_precision;
     unsigned int is_epoch;

@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-# RCSIDENT("$SiLK: Makefile.am 329106c5d390 2015-10-08 15:38:45Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 1936829ad370 2016-08-24 18:29:37Z mthomas $");
 
 # Installed Targets
 
@@ -108,6 +108,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_libadns.m4 \
 	$(top_srcdir)/m4/ax_check_libcares.m4 \
 	$(top_srcdir)/m4/ax_check_liblzo.m4 \
 	$(top_srcdir)/m4/ax_check_libpcap.m4 \
+	$(top_srcdir)/m4/ax_check_libsnappy.m4 \
 	$(top_srcdir)/m4/ax_check_libz.m4 \
 	$(top_srcdir)/m4/ax_check_printf_z.m4 \
 	$(top_srcdir)/m4/ax_check_pthread.m4 \
@@ -538,6 +539,7 @@ SK_ENABLE_IPFIX = @SK_ENABLE_IPFIX@
 SK_ENABLE_IPV6 = @SK_ENABLE_IPV6@
 SK_ENABLE_LZO = @SK_ENABLE_LZO@
 SK_ENABLE_OUTPUT_COMPRESSION = @SK_ENABLE_OUTPUT_COMPRESSION@
+SK_ENABLE_SNAPPY = @SK_ENABLE_SNAPPY@
 SK_ENABLE_ZLIB = @SK_ENABLE_ZLIB@
 SK_LDFLAGS = @SK_LDFLAGS@
 SK_SRC_INCLUDES = @SK_SRC_INCLUDES@
@@ -795,6 +797,9 @@ AM_LOG_FLAGS = $(AM_PL_LOG_FLAGS)
 
 # Required files; variables defined in ../../build.mk
 check_DATA = $(SILK_TESTSDIR) $(SILK_TESTDATA)
+
+# above tests are automatically generated;
+# those below are written by hand
 TESTS = tests/rwfilter-help.pl tests/rwfilter-version.pl \
 	tests/rwfilter-lone-command.pl tests/rwfglob-help.pl \
 	tests/rwfglob-version.pl tests/rwfglob-lone-command.pl \
@@ -857,7 +862,7 @@ TESTS = tests/rwfilter-help.pl tests/rwfilter-version.pl \
 	tests/rwfilter-python-expr.pl tests/rwfilter-python-file.pl \
 	tests/rwfilter-multiple.pl tests/rwfilter-stdin.pl \
 	tests/rwfilter-xargs.pl tests/rwfilter-threads.pl \
-	$(am__append_1)
+	tests/rwfglob-times.pl $(am__append_1)
 EXTRA_TESTS = \
 	tests/rwfilter-flowrate-bps.pl \
 	tests/rwfilter-flowrate-pps.pl \
@@ -1973,6 +1978,13 @@ tests/rwfilter-xargs.pl.log: tests/rwfilter-xargs.pl
 tests/rwfilter-threads.pl.log: tests/rwfilter-threads.pl
 	@p='tests/rwfilter-threads.pl'; \
 	b='tests/rwfilter-threads.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwfglob-times.pl.log: tests/rwfglob-times.pl
+	@p='tests/rwfglob-times.pl'; \
+	b='tests/rwfglob-times.pl'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \

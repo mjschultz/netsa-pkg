@@ -11,7 +11,7 @@
 #  March 2009
 #
 #######################################################################
-#  RCSIDENT("$SiLK: SiLKTests.pm 85572f89ddf9 2016-05-05 20:07:39Z mthomas $")
+#  RCSIDENT("$SiLK: SiLKTests.pm 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $")
 #######################################################################
 #
 #    Perl module used by the scripts that "make check" runs.
@@ -729,6 +729,9 @@ sub check_silk_app
     my $path = "../$name/$name";
     if (-x $name) {
         $path = "./$name";
+    }
+    elsif ($name =~ /^rwuniq$/) {
+        $path = "../rwstats/$name";
     }
     elsif ($name =~ /^(rwset|rwbag|rwids|rwipa|rwpmap|rwscan)/) {
         $path = "../$1/$name";

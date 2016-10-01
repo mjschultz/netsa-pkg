@@ -66,6 +66,11 @@
 /* Define to 1 to build with support for Python. */
 #undef ENABLE_PYTHON
 
+/* Define to 1 build with support for snappy compression. Define to 0
+   otherwise. Requires the libsnappy library and the snappy-c.h header file.
+   */
+#undef ENABLE_SNAPPY
+
 /* Define to 1 build with support for zlib compression. Define to 0 otherwise.
    Requires the libz library and the <zlib.h> header file. */
 #undef ENABLE_ZLIB

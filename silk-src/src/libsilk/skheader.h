@@ -23,7 +23,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKHEADER_H, "$SiLK: skheader.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_SKHEADER_H, "$SiLK: skheader.h 4c36563f30bb 2016-09-28 22:00:57Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -95,7 +95,6 @@ typedef struct sk_header_entry_spec_st sk_header_entry_spec_t;
  *    the sk_header_entry_spec_t.
  */
 typedef uint32_t sk_hentry_type_id_t;
-typedef struct sk_hentry_type_st sk_hentry_type_t;
 
 /**
  *    The hentry-type-ID "\0\0\0\0" is used to mark the end of the
@@ -115,15 +114,23 @@ typedef struct sk_hentry_type_st sk_hentry_type_t;
  */
 
 /**
- *    Initial file version that had expanded headers
+ *    The minimum file version that may be specified to
+ *    skHeaderSetFileVersion().  A SiLK tool may accept a lower
+ *    version number when reading data, but the version number may not
+ *    be lower than this when creating a file.
  */
-#define SKHDR_EXPANDED_INIT_VERS 16
+#define SK_FILE_VERSION_MINIMUM 16
 
 /**
- *    file version to use as default
+ *    The maximum file version that may be specified to
+ *    skHeaderSetFileVersion().
  */
-#define SK_DEFAULT_FILE_VERSION 16
+#define SK_FILE_VERSION_MAXIMUM SK_FILE_VERSION_MINIMUM
 
+/**
+ *    The file version to use as the default.
+ */
+#define SK_FILE_VERSION_DEFAULT SK_FILE_VERSION_MINIMUM
 
 /**
  *    Values returned by the skHeader*() functions.
@@ -190,58 +197,6 @@ typedef enum sk_header_lock_en {
      * added. */
     SKHDR_LOCK_ENTRY_OK
 } sk_header_lock_t;
-
-
-/**
- *    sk_header_start_t: The first 16 bytes in any SiLK file whose
- *    version is not less then SKHDR_EXPANDED_INIT_VERS.
- */
-struct sk_header_start_st {
-    /** fixed byte order 4byte magic number: 0xdeadbeef */
-    uint8_t             magic1;
-    uint8_t             magic2;
-    uint8_t             magic3;
-    uint8_t             magic4;
-    /** binary flags for the file.  currently a single flag in least
-     * significant bit: 1==big endian, 0==little endian */
-    uint8_t             file_flags;
-    /** output file format; values defined in silk_files.h */
-    sk_file_format_t    file_format;
-    /** version of the file */
-    sk_file_version_t   file_version;
-    /** compression method */
-    sk_compmethod_t     comp_method;
-    /** the version of SiLK that wrote this file */
-    uint32_t            silk_version;
-    /** the size of each record in this file */
-    uint16_t            rec_size;
-    /** the version of the records in this file */
-    uint16_t            rec_version;
-};
-
-/**
- *    sk_file_header_t: The file header contains the header-start and
- *    a list of header-entry-nodes.
- */
-struct sk_file_header_st {
-    sk_header_start_t       fh_start;
-    sk_hentry_node_t       *fh_rootnode;
-    /** the following values are not stored in the file */
-    uint32_t                padding_modulus;
-    uint32_t                header_length;
-    sk_header_lock_t        header_lock;
-};
-
-/**
- *    sk_hentry_node_t: The nodes make a circular doubly-linked-list
- *    of header-entries.
- */
-struct sk_hentry_node_st {
-    sk_hentry_node_t       *hen_next;
-    sk_hentry_node_t       *hen_prev;
-    sk_hentry_type_t       *hen_type;
-    sk_header_entry_t      *hen_entry;
-};
 
 
 /**
@@ -346,20 +301,6 @@ typedef void
     sk_header_entry_t      *hentry);
 
 /**
- *    Every header-entry has a hentry-type associated with it
- */
-struct sk_hentry_type_st {
-    sk_hentry_pack_fn_t     het_packer;
-    sk_hentry_unpack_fn_t   het_unpacker;
-    sk_hentry_copy_fn_t     het_copy;
-    sk_hentry_callback_fn_t het_free;
-    sk_hentry_print_fn_t    het_print;
-    sk_hentry_type_t       *het_next;
-    sk_hentry_type_id_t     het_id;
-};
-
-
-/**
  *    When defined and set to a non-empty string, use 0 as the SiLK
  *    version number in the header of files we create.
  */
@@ -385,6 +326,7 @@ int
 skHeaderAddEntry(
     sk_file_header_t   *hdr,
     sk_header_entry_t  *hentry);
+
 
 /**
  *    Possible value for 'copy_flags' parameter of skHeaderCopy()
@@ -470,28 +412,6 @@ skHeaderCopyEntries(
 
 
 /**
- *    Create a new File Header at the location specified by '*hdr'.
- *    The header will be suitable for writing an FT_RWGENERIC file
- *    using the machine's native byte order.
- *
- *    Return 0 on success, or -1 on an allocation error.
- */
-int
-skHeaderCreate(
-    sk_file_header_t  **hdr);
-
-
-/**
- *    Destroy a File Header created by skHeaderCreate().  The value of
- *    'hdr' or '*hdr' may be null; the pointer '*hdr' will be set to
- *    NULL.
- */
-int
-skHeaderDestroy(
-    sk_file_header_t  **hdr);
-
-
-/**
  *    Create and return a new entry that is a (deep) copy of the
  *    header entry 'src_hentry'.  Return NULL on failure or if the
  *    'src_header' refers to the root node.
@@ -551,7 +471,8 @@ skHeaderGetFirstMatch(
 
 
 /**
- *    Return the SiLK file output format for the header.
+ *    Return the SiLK file output format for the header.  Return
+ *    SK_INVALID_FILE_FORMAT when header is NULL.
  */
 sk_file_format_t
 skHeaderGetFileFormat(
@@ -573,14 +494,6 @@ skHeaderGetFileVersion(
 size_t
 skHeaderGetLength(
     const sk_file_header_t *header);
-
-
-/**
- *    Return the header's current lock status.
- */
-sk_header_lock_t
-skHeaderGetLockStatus(
-    const sk_file_header_t *hdr);
 
 
 /**
@@ -649,40 +562,6 @@ skHeaderIteratorNext(
 
 
 /**
- *    Initialize the skheader library.  This will register the known
- *    Header Types.
- *
- *    Application writers do not need to call this function as it is
- *    called by skAppRegister().
- */
-int
-skHeaderInitialize(
-    void);
-
-
-/**
- *    Read, from the file descriptor 'stream', all the Header Entries that
- *    belong to the File Header 'hdr'.  This function assumes
- *    'skHeaderReadStart()' has been called.  Return 0 on success, or
- *    non-zero on read or memory allocation error.
- */
-int
-skHeaderReadEntries(
-    skstream_t         *stream,
-    sk_file_header_t   *hdr);
-
-
-/**
- *    Read into 'hdr' from the file descriptor 'stream' the first
- *    bytes of the SiLK file.
- */
-int
-skHeaderReadStart(
-    skstream_t         *stream,
-    sk_file_header_t   *hdr);
-
-
-/**
  *    On the File Header 'hdr', remove every Header Entry whose Header
  *    Entry Type is 'entry_id'.
  *
@@ -697,29 +576,6 @@ int
 skHeaderRemoveAllMatching(
     sk_file_header_t       *hdr,
     sk_hentry_type_id_t     entry_id);
-
-
-/**
- *    On the File Header 'hdr', replace the Header Entry 'old_entry'
- *    with the Entry 'new_entry'.
- *
- *    If 'new_entry' is NULL, 'old_entry' will be removed.
- *
- *    If 'hentry_cb' is specified, it will be called with value of
- *    'old_entry' so that any cleanup can be performed.
- *
- *    Returns SKHEADER_OK if 'old_entry' was found.  Return
- *    SKHEADER_ERR_ENTRY_NOTFOUND if 'old_entry' was not found.
- *    Return SKHEADER_ERR_INVALID_ID if 'old_entry' or 'new_entry'
- *    have a restricted ID.  Return SKHEADER_ERR_IS_LOCKED is 'hdr' is
- *    locked.
- */
-int
-skHeaderReplaceEntry(
-    sk_file_header_t           *hdr,
-    sk_header_entry_t          *old_entry,
-    sk_header_entry_t          *new_entry,
-    sk_hentry_callback_fn_t     hentry_cb);
 
 
 /**
@@ -753,24 +609,20 @@ skHeaderSetFileFormat(
 
 
 /**
- *    Set the header's lock status to 'lock'.
+ *    Set the file version.  The value must be between
+ *    SK_FILE_VERSION_MINIMUM and SK_FILE_VERSION_MAXIMUM inclusive.
+ *    When this function is not called, the file version is that
+ *    specified by SK_FILE_VERSION_DEFAULT.
+ *
+ *    Return SKHEADER_OK on success.  Return
+ *    SKHEADER_ERR_NULL_ARGUMENT if 'hdr' is NULL.  Return
+ *    SKHEADER_ERR_IS_LOCKED if the header is locked.  Return
+ *    SKHEADER_ERR_BAD_VERSION if 'file_version' is not legal.
  */
 int
-skHeaderSetLock(
+skHeaderSetFileVersion(
     sk_file_header_t   *hdr,
-    sk_header_lock_t    lock);
-
-
-/**
- *    Set the padding modulus of the File Header 'hdr' to 'mod'.  This
- *    will ensure that the header's length is always an even multiple
- *    of 'mod'.  If 'mod' is zero, the header is padded to a multiple
- *    of the reord length.
- */
-int
-skHeaderSetPaddingModulus(
-    sk_file_header_t   *hdr,
-    uint32_t            mod);
+    sk_file_version_t   file_version);
 
 
 /**
@@ -790,18 +642,7 @@ skHeaderSetRecordLength(
 int
 skHeaderSetRecordVersion(
     sk_file_header_t   *hdr,
-    sk_file_version_t   version);
-
-/**
- *    Read each hentry block until the end of the file header is
- *    reached, but do not populate the data structures to hold the
- *    header entries.
- */
-int
-skHeaderSkipEntries(
-    skstream_t         *stream,
-    sk_file_header_t   *hdr);
-
+    sk_file_version_t   record_version);
 
 /**
  *    Return a string explaining the error code 'err_code'.
@@ -811,27 +652,6 @@ skHeaderStrerror(
     ssize_t             err_code);
 
 
-/**
- *    Free all memory used internally by skheader.
- *
- *    Application writers do not need to call this function as it is
- *    called by skAppUnregister().
- */
-void
-skHeaderTeardown(
-    void);
-
-
-/**
- *    Write the complete File Header 'hdr' to the file descriptor
- *    'stream'.  Returns 0 on success, or -1 on write error.
- */
-int
-skHeaderWrite(
-    skstream_t         *stream,
-    sk_file_header_t   *hdr);
-
-
 /*
  *    **********************************************************************
  *
@@ -839,14 +659,6 @@ skHeaderWrite(
  *
  *    **********************************************************************
  */
-
-
-/**
- *    Lookup a Header Type given its ID.
- */
-sk_hentry_type_t *
-skHentryTypeLookup(
-    sk_hentry_type_id_t entry_id);
 
 
 /**
@@ -860,50 +672,6 @@ skHentryTypeRegister(
     sk_hentry_copy_fn_t     copy_fn,
     sk_hentry_callback_fn_t free_fn,
     sk_hentry_print_fn_t    print_fn);
-
-
-/*
- *    **********************************************************************
- *
- *    Legacy header support
- *
- *    **********************************************************************
- */
-
-
-typedef int
-(*sk_headlegacy_read_fn_t)(
-    skstream_t       *stream,
-    sk_file_header_t *hdr,
-    size_t           *byte_read);
-
-typedef uint16_t
-(*sk_headlegacy_recsize_fn_t)(
-    sk_file_version_t   vers);
-
-
-int
-skHeaderLegacyInitialize(
-    void);
-
-int
-skHeaderLegacyRegister(
-    sk_file_format_t            file_format,
-    sk_headlegacy_read_fn_t     read_fn,
-    sk_headlegacy_recsize_fn_t  reclen_fn,
-    uint8_t                     vers_padding,
-    uint8_t                     vers_compress);
-
-int
-skHeaderLegacyDispatch(
-    skstream_t         *stream,
-    sk_file_header_t   *hdr);
-
-
-void
-skHeaderLegacyTeardown(
-    void);
-
 
 
 /*

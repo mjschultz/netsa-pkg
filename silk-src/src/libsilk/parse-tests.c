@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: parse-tests.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: parse-tests.c 0432f6547214 2016-09-19 19:08:31Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/utils.h>
@@ -911,7 +911,7 @@ human_uint64_parser(
     static struct {
         int             exp_retval;
         uint64_t        exp_result;
-        int             flags;
+        unsigned int    flags;
         const char     *str;
     } input[] = {
         {SKUTILS_OK,           256, SK_HUMAN_NORMAL,    "256" },

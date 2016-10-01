@@ -4,7 +4,7 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in ../LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: silkconfig.m4 d49b1e47d2e3 2016-06-15 20:31:17Z mthomas $")
+dnl RCSIDENT("$SiLK: silkconfig.m4 befe26af8bf4 2016-09-20 19:21:19Z mthomas $")
 
 # ---------------------------------------------------------------------------
 # SILK_AC_COMPILER
@@ -222,6 +222,8 @@ AC_DEFUN([SILK_AC_COMPILER],[
 
     # Check whether the compiler understands C99'ism __func__
     AC_MSG_CHECKING([whether the compiler understands __func__])
+    sk_save_CFLAGS="${CFLAGS}"
+    CFLAGS="${sk_werror} ${CFLAGS}"
     AC_COMPILE_IFELSE(
         [AC_LANG_PROGRAM([
 #include <stdio.h>
@@ -237,6 +239,7 @@ int foo(void)
                 [Define to 1 if your compiler understands __func__.])
             AC_MSG_RESULT([yes])],
         [AC_MSG_RESULT([no])])
+    CFLAGS="${sk_save_CFLAGS}"
 
     # Check whether the compiler understands __attribute__((__used__))
     AC_MSG_CHECKING([whether the compiler understands __attribute__((__used__))])
@@ -510,10 +513,10 @@ AC_DEFUN([SILK_AC_COMP_SHARED_OBJECT],[
 #
 AC_DEFUN([SILK_AC_FINALIZE],[
     # Add libraries to the default list
-    LIBS=`echo "${LZO_LDFLAGS} ${ZLIB_LDFLAGS} ${LIBS}" | sed 's/   */ /g'`
+    LIBS=`echo "${SNAPPY_LDFLAGS} ${LZO_LDFLAGS} ${ZLIB_LDFLAGS} ${LIBS}" | sed 's/   */ /g'`
 
     # Add include flags
-    SK_CPPFLAGS=`echo "${SK_CPPFLAGS} ${ZLIB_CFLAGS} ${LZO_CFLAGS} ${PCAP_CFLAGS}" | sed 's/   */ /g'`
+    SK_CPPFLAGS=`echo "${SK_CPPFLAGS} ${ZLIB_CFLAGS} ${LZO_CFLAGS} ${SNAPPY_CFLAGS} ${PCAP_CFLAGS}" | sed 's/   */ /g'`
 
     # Define these after all tests have run; some system headers also
     # define these macros
@@ -813,7 +816,7 @@ AC_DEFUN([SILK_AC_ARG_ENABLE_OUTPUT_COMPRESSION],[
 
     AC_ARG_ENABLE([output-compression],
         [AS_HELP_STRING([--enable-output-compression],
-            [enable or set the default compression method for binary SiLK output files. Choices (subject to library availability): none, zlib, lzo1x. [none]])[]dnl
+            [enable or set the default compression method for binary SiLK output files. Choices (subject to library availability): none, zlib, lzo1x, snappy. [none]])[]dnl
         ],[[sk_output_comp="$enableval"]])
 
     case "$sk_output_comp" in
@@ -823,6 +826,10 @@ AC_DEFUN([SILK_AC_ARG_ENABLE_OUTPUT_COMPRESSION],[
             if test "x$ENABLE_ZLIB" = "x1"
             then
                 sk_output_comp=zlib
+            fi
+            if test "x$ENABLE_SNAPPY" = "x1"
+            then
+                sk_output_comp=snappy
             fi
             if test "x$ENABLE_LZO" = "x1"
             then
@@ -842,6 +849,12 @@ AC_DEFUN([SILK_AC_ARG_ENABLE_OUTPUT_COMPRESSION],[
             if test "x$ENABLE_LZO" != "x1"
             then
                 AC_MSG_ERROR([output-compression=$sk_output_comp is not available because LZO was not found])
+            fi
+            ;;
+        snappy)
+            if test "x$ENABLE_SNAPPY" != "x1"
+            then
+                AC_MSG_ERROR([output-compression=$sk_output_comp is not available because snappy was not found])
             fi
             ;;
         *)
@@ -1542,6 +1555,20 @@ AC_DEFUN([SILK_AC_WRITE_SUMMARY],[
     * LZO support:                  NO"
     fi
 
+    if test "x$ENABLE_SNAPPY" = "x1"
+    then
+        sk_msg_ldflags=`echo "$SNAPPY_LDFLAGS" | sed 's/^ *//' | sed 's/ *$//' | sed 's/  */ /g'`
+        if test -n "$sk_msg_ldflags"
+        then
+            sk_msg_ldflags=" ($sk_msg_ldflags)"
+        fi
+        SILK_FINAL_MSG="$SILK_FINAL_MSG
+    * SNAPPY support:               YES$sk_msg_ldflags"
+    else
+        SILK_FINAL_MSG="$SILK_FINAL_MSG
+    * SNAPPY support:               NO"
+    fi
+
     if test "x$ENABLE_PCAP" = "x1"
     then
         sk_msg_ldflags=`echo "$PCAP_LDFLAGS" | sed 's/^ *//' | sed 's/ *$//' | sed 's/  */ /g'`
@@ -1764,6 +1791,14 @@ AC_DEFUN([SILK_RPM_SPEC_SUBST],[
         RPM_SPEC_BUILDREQUIRES="$RPM_SPEC_BUILDREQUIRES lzo-devel,"
     else
         RPM_SPEC_CONFIGURE="$RPM_SPEC_CONFIGURE --without-lzo"
+    fi
+
+    if test "x$ENABLE_SNAPPY" = "x1"
+    then
+        RPM_SPEC_REQUIRES="$RPM_SPEC_REQUIRES snappy,"
+        RPM_SPEC_BUILDREQUIRES="$RPM_SPEC_BUILDREQUIRES snappy-devel,"
+    else
+        RPM_SPEC_CONFIGURE="$RPM_SPEC_CONFIGURE --without-snappy"
     fi
 
     if test "x$ENABLE_PCAP" = "x1"

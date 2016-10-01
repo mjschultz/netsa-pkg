@@ -12,10 +12,10 @@
 **    A testing application for the skmsg library.
 */
 
-
+#undef NDEBUG
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skmsg-test.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: skmsg-test.c 680dbfb90a50 2016-09-20 19:22:50Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sklog.h>

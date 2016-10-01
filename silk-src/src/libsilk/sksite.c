@@ -7,20 +7,19 @@
 */
 
 /*
-**  skite.c
-**
-**    Manages access to the classes, types, and sensors that are read
-**    from the silk.conf file, as well as to similar values (file
-**    formats and compression methods) that aren't strictly part of
-**    silk.conf.
-**
-*/
+ *  skite.c
+ *
+ *    Manages access to the classes, types, and sensors that are read
+ *    from the silk.conf file.
+ *
+ *    Maps class,type,sensor,time tuples to file names in the data
+ *    repository.
+ *
+ */
 
-/* use skCompressionMethods[] and fileOutputFormats[] from silk_files.h */
-#define SKSITE_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sksite.c 73c4e79b709d 2016-06-16 13:59:02Z mthomas $");
+RCSIDENT("$SiLK: sksite.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstream.h>
@@ -103,32 +102,6 @@ typedef struct flowtype_struct_st {
     sk_flowtype_id_t    ft_id;
 } flowtype_struct_t;
 
-typedef struct fileformat_struct_st {
-    /* the output format's id--must be its position in the array */
-    sk_file_format_t    ff_id;
-    /* unique name of this output format */
-    const char         *ff_name;
-} fileformat_struct_t;
-
-typedef struct compmethod_struct_st {
-    /* the compression method's id--must be its position in the array */
-    sk_compmethod_t     cm_id;
-    /* unique name of this compression method */
-    const char         *cm_name;
-} compmethod_struct_t;
-
-static struct fileformat_list_st {
-    fileformat_struct_t    *fl_list;
-    uint8_t                 fl_count;
-} fileformats;
-
-static struct compmethod_list_st {
-    compmethod_struct_t    *cml_list;
-    sk_compmethod_t         cml_count;
-} compmethods;
-
-static sk_compmethod_t default_compression = SK_ENABLE_OUTPUT_COMPRESSION;
-
 /* The %-conversion characters supported by the path-format; exported
  * so it can be checked during silk.conf parsing */
 const char path_format_conversions[] = "%CFHNTYdfmnx";
@@ -202,30 +175,6 @@ static int              flowtype_max_id = -1;
 
 static int siteOptionsHandler(clientData cData, int opt_index, char *opt_arg);
 
-static int siteInitializeFileformats(size_t sz);
-static sk_file_format_t siteFileformatAdd(const char *name, uint8_t id);
-
-#define siteGetFileformatCount()                \
-    (fileformats.fl_count)
-#define siteFileformatGetNameFast(ffid)         \
-    (fileformats.fl_list[(ffid)].ff_name)
-#define siteFileformatGetName(ffid)             \
-    (((ffid) >= siteGetFileformatCount())       \
-     ? NULL                                     \
-     : siteFileformatGetNameFast(ffid))
-
-static int siteInitializeCompmethods(size_t sz);
-static sk_compmethod_t siteCompmethodAdd(const char *name, uint8_t id);
-
-#define siteGetCompmethodCount()                \
-    (compmethods.cml_count)
-#define siteCompmethodGetNameFast(cmid)         \
-    (compmethods.cml_list[(cmid)].cm_name)
-#define siteCompmethodGetName(cmid)             \
-    (((cmid) >= siteGetCompmethodCount())       \
-     ? NULL                                     \
-     : siteCompmethodGetNameFast(cmid))
-
 static void
 siteSensorFree(
     sensor_struct_t    *sn);
@@ -247,10 +196,6 @@ sksiteInitialize(
     int          UNUSED(levels))
 {
     static int initialized = 0;
-    uint8_t i;
-    uint8_t j;
-    size_t numFormats;
-    size_t numCompr;
     const char *silk_data_rootdir_env;
     int silk_data_rootdir_set = 0;
 
@@ -282,51 +227,7 @@ sksiteInitialize(
         }
     }
 
-    /* compute number of file formats: FT_* macros; if the final entry
-     * in the array is the empty string; remove it from format
-     * count. */
-    numFormats = (sizeof(fileOutputFormats)/sizeof(char*));
-    if (fileOutputFormats[numFormats-1][0] == '\0') {
-        --numFormats;
-    }
-
-    siteInitializeFileformats(numFormats);
-
-    /* loop over fileOutputFormats[] and create the file formats */
-    for (i = 0; i < numFormats && fileOutputFormats[i][0]; ++i) {
-        siteFileformatAdd(fileOutputFormats[i], i);
-    }
-    if (siteGetFileformatCount() != numFormats) {
-        skAppPrintErr("Inconsistency in fileOutputFormats[] array.\n"
-                      "\tFix your site header and recompile.  Abort!");
-        assert(siteGetFileformatCount() == numFormats);
-        skAbort();
-    }
-
-
-    /* compute number of compression methods: SK_COMPMETHOD_* macros;
-     * if the final entry in the array is the empty string; remove it
-     * from method count. */
-    numCompr = (sizeof(skCompressionMethods)/sizeof(char*));
-    if (skCompressionMethods[numCompr-1][0] == '\0') {
-        --numCompr;
-    }
-
-    siteInitializeCompmethods(numCompr);
-
-    /* loop over skCompressionMethods[] to create the compr methods */
-    for (j = 0; j < numCompr && skCompressionMethods[j][0]; ++j) {
-        siteCompmethodAdd(skCompressionMethods[j], j);
-    }
-    if (siteGetCompmethodCount() != numCompr) {
-        skAppPrintErr("Inconsistency in skCompressionMethods[] array.\n"
-                      "\tFix your site header and recompile.  Abort!");
-        assert(siteGetCompmethodCount() == numCompr);
-        skAbort();
-    }
-
     /* Basic initialization of site config data structures */
-
     strncpy(path_format, SILK_DEFAULT_PATH_FORMAT, sizeof(path_format));
     sensor_list = skVectorNew(sizeof(sensor_struct_t *));
     class_list = skVectorNew(sizeof(class_struct_t *));
@@ -609,14 +510,6 @@ sksiteTeardown(
     }
     teardown = 1;
 
-    if (fileformats.fl_list) {
-        free(fileformats.fl_list);
-        fileformats.fl_list = NULL;
-    }
-    if (compmethods.cml_list) {
-        free(compmethods.cml_list);
-        compmethods.cml_list = NULL;
-    }
     if (class_list) {
         class_struct_t *cl;
         count = skVectorGetCount(class_list);
@@ -3279,7 +3172,7 @@ sksiteRepoIteratorParseTimes(
 
     } else if ((SK_PARSED_DATETIME_GET_PRECISION(start_precision)
                 >= SK_PARSED_DATETIME_HOUR)
-               || (1 == (start_precision & SK_PARSED_DATETIME_EPOCH)))
+               || (start_precision & SK_PARSED_DATETIME_EPOCH))
     {
         /* no ending time was given and the starting time contains an
          * hour or the starting time was expressed as epoch seconds;
@@ -3307,381 +3200,6 @@ sksiteRepoIteratorParseTimes(
     }
 
     return 0;
-}
-
-
-/** File Output Formats ***********************************************/
-
-static int
-siteInitializeFileformats(
-    size_t              sz)
-{
-    if (sz > UINT8_MAX) {
-        return -1;
-    }
-    fileformats.fl_list = ((fileformat_struct_t*)
-                           calloc(1+sz, sizeof(fileformat_struct_t)));
-    fileformats.fl_count = (uint8_t)sz;
-    if (fileformats.fl_list == NULL) {
-        return -1;
-    }
-    return 0;
-}
-
-
-static sk_file_format_t
-siteFileformatAdd(
-    const char         *name,
-    uint8_t             id)
-{
-    fileformat_struct_t *ffi;
-
-    assert(fileformats.fl_list);
-
-    /* check length of file format */
-    if (strlen(name) > SK_MAX_STRLEN_FILE_FORMAT) {
-        skAppPrintErr(("File format name '%s' is longer than allowed (%u)\n"
-                       "\tFix you site header and recompile.  Abort!"),
-                      name, SK_MAX_STRLEN_FILE_FORMAT);
-        assert(strlen(name) <= SK_MAX_STRLEN_FILE_FORMAT);
-        skAbort();
-    }
-
-    /* check id is o.k. */
-    if (id >= siteGetFileformatCount()) {
-        skAppPrintErr(("File format id '%u' is larger than allowed (%u)\n"
-                       "\tFix you site header and recompile.  Abort!"),
-                      id, siteGetFileformatCount());
-        assert(id < siteGetFileformatCount());
-        skAbort();
-    }
-
-    ffi = &fileformats.fl_list[id];
-    ffi->ff_id = (sk_file_format_t)id;
-    ffi->ff_name = name;
-
-    return ffi->ff_id;
-}
-
-
-int
-sksiteFileformatGetName(
-    char               *buffer,
-    size_t              buffer_size,
-    sk_file_format_t    id)
-{
-    const char *name = siteFileformatGetName(id);
-
-    if (name == NULL) {
-        /* Unknown file format, give integer */
-        return snprintf(buffer, buffer_size, "%s[%u]", INVALID_LABEL, id);
-    } else {
-        /* Known file format, give name */
-        return snprintf(buffer, buffer_size, "%s", name);
-    }
-}
-
-
-sk_file_format_t
-sksiteFileformatFromName(
-    const char         *name)
-{
-    uint8_t i;
-
-    for (i = 0; i < fileformats.fl_count; ++i) {
-        if (strcmp(name, fileformats.fl_list[i].ff_name) == 0) {
-            return fileformats.fl_list[i].ff_id;
-        }
-    }
-
-    return siteGetFileformatCount();
-}
-
-
-int
-sksiteFileformatIsValid(
-    sk_file_format_t    id)
-{
-    return (id < siteGetFileformatCount());
-}
-
-
-/** Compression Methods ***********************************************/
-
-
-#define COMPMETHOD_STRING_BEST "best"
-
-static int
-siteInitializeCompmethods(
-    size_t              sz)
-{
-    if (sz > UINT8_MAX) {
-        return -1;
-    }
-    compmethods.cml_list = ((compmethod_struct_t*)
-                            calloc(1+sz, sizeof(compmethod_struct_t)));
-    compmethods.cml_count = (uint8_t)sz;
-    if (compmethods.cml_list == NULL) {
-        return -1;
-    }
-    return 0;
-}
-
-
-static sk_compmethod_t
-siteCompmethodAdd(
-    const char         *name,
-    uint8_t             comp_method)
-{
-    compmethod_struct_t *cmi;
-
-    assert(compmethods.cml_list);
-
-#if 0
-    /* check length of compression method name */
-    if (strlen(name) > SK_MAX_STRLEN_FILE_FORMAT) {
-        skAppPrintErr(("Compression method name '%s'"
-                       " is longer than allowed (%u)\n"
-                       "\tFix you site header and recompile.  Abort!"),
-                      name, SK_MAX_STRLEN_FILE_FORMAT);
-        assert(strlen(cmi->cm_name) <= SK_MAX_STRLEN_FILE_FORMAT);
-        skAbort();
-    }
-#endif
-
-    /* check whether 'comp_method' is o.k. */
-    if (comp_method >= siteGetCompmethodCount()) {
-        skAppPrintErr(("Compression method id '%u'"
-                       " is larger than allowed (%u)\n"
-                       "\tFix your site header and recompile.  Abort!"),
-                      comp_method, siteGetCompmethodCount());
-        assert(comp_method < siteGetCompmethodCount());
-        skAbort();
-    }
-
-    cmi = &compmethods.cml_list[comp_method];
-    cmi->cm_id = (sk_compmethod_t)comp_method;
-    cmi->cm_name = name;
-
-    return cmi->cm_id;
-}
-
-
-int
-sksiteCompmethodGetName(
-    char               *buffer,
-    size_t              buffer_size,
-    sk_compmethod_t     comp_method)
-{
-    const char *name = siteCompmethodGetName(comp_method);
-
-    if (NULL == name) {
-        if (SK_COMPMETHOD_DEFAULT == comp_method) {
-            name = siteCompmethodGetName(sksiteCompmethodGetDefault());
-        } else if (SK_COMPMETHOD_BEST == comp_method) {
-            name = COMPMETHOD_STRING_BEST;
-        }
-    }
-
-    if (NULL == name) {
-        /* Unknown compression method, give integer */
-        return snprintf(buffer, buffer_size, "%u", comp_method);
-    }
-    /* Known compression method, give name */
-    return snprintf(buffer, buffer_size, "%s", name);
-}
-
-
-int
-sksiteCompmethodCheck(
-    sk_compmethod_t     comp_method)
-{
-    switch (comp_method) {
-      case SK_COMPMETHOD_DEFAULT:
-      case SK_COMPMETHOD_BEST:
-        return SK_COMPMETHOD_IS_KNOWN;
-
-      case SK_COMPMETHOD_NONE:
-#if SK_ENABLE_ZLIB
-      case SK_COMPMETHOD_ZLIB:
-#endif
-#if SK_ENABLE_LZO
-      case SK_COMPMETHOD_LZO1X:
-#endif
-        return SK_COMPMETHOD_IS_AVAIL;
-    }
-
-    if (((uint8_t)comp_method) < siteGetCompmethodCount()) {
-        return SK_COMPMETHOD_IS_VALID;
-    }
-    return 0;
-}
-
-
-sk_compmethod_t
-sksiteCompmethodGetBest(
-    void)
-{
-#if   SK_ENABLE_LZO
-    return SK_COMPMETHOD_LZO1X;
-#elif SK_ENABLE_ZLIB
-    return SK_COMPMETHOD_ZLIB;
-#else
-    return SK_COMPMETHOD_NONE;
-#endif
-}
-
-
-sk_compmethod_t
-sksiteCompmethodGetDefault(
-    void)
-{
-    /* return the value from configure */
-    return default_compression;
-}
-
-
-int
-sksiteCompmethodSetDefault(
-    sk_compmethod_t     comp_method)
-{
-    if (SK_COMPMETHOD_IS_AVAIL != sksiteCompmethodCheck(comp_method)) {
-        return -1;
-    }
-    default_compression = comp_method;
-    return 0;
-}
-
-
-/* ======================================================================== */
-
-
-typedef enum {
-    OPT_COMPRESSION_METHOD
-} site_compmethod_opts_enum_t;
-
-static struct option site_compmethod_opts[] = {
-    {"compression-method",  REQUIRED_ARG, 0, OPT_COMPRESSION_METHOD},
-    {0,0,0,0}               /* sentinel entry */
-};
-
-
-static int
-siteCompmethodOptionsHandler(
-    clientData          cData,
-    int                 opt_index,
-    char               *opt_arg)
-{
-    sk_compmethod_t *compression_method = (sk_compmethod_t*)cData;
-    sk_stringmap_t *str_map = NULL;
-    sk_stringmap_status_t rv_map;
-    sk_stringmap_entry_t *map_entry;
-    sk_stringmap_entry_t insert_entry;
-    sk_compmethod_t cm;
-    int rv = 1;
-
-    if (opt_index != OPT_COMPRESSION_METHOD) {
-        skAbort();
-    }
-
-    /* create a stringmap of the available entries */
-    if (SKSTRINGMAP_OK != skStringMapCreate(&str_map)) {
-        skAppPrintErr("Unable to create stringmap");
-        goto END;
-    }
-    memset(&insert_entry, 0, sizeof(insert_entry));
-    insert_entry.name = COMPMETHOD_STRING_BEST;
-    insert_entry.id = (sk_stringmap_id_t)SK_COMPMETHOD_BEST;
-    if (skStringMapAddEntries(str_map, 1, &insert_entry) != SKSTRINGMAP_OK) {
-        goto END;
-    }
-    for (cm = 0; cm < siteGetCompmethodCount(); ++cm) {
-        if (SK_COMPMETHOD_IS_AVAIL != sksiteCompmethodCheck(cm)) {
-            continue;
-        }
-        memset(&insert_entry, 0, sizeof(insert_entry));
-        insert_entry.name = siteCompmethodGetNameFast(cm);
-        insert_entry.id = (sk_stringmap_id_t)cm;
-        if (skStringMapAddEntries(str_map, 1, &insert_entry)
-            != SKSTRINGMAP_OK)
-        {
-            goto END;
-        }
-    }
-
-    /* attempt to match */
-    rv_map = skStringMapGetByName(str_map, opt_arg, &map_entry);
-    switch (rv_map) {
-      case SKSTRINGMAP_OK:
-        *compression_method = (uint8_t)map_entry->id;
-        rv = 0;
-        break;
-
-      case SKSTRINGMAP_PARSE_AMBIGUOUS:
-        skAppPrintErr("%s value '%s' is ambiguous",
-                      site_compmethod_opts[OPT_COMPRESSION_METHOD].name,
-                      opt_arg);
-        goto END;
-
-      case SKSTRINGMAP_PARSE_NO_MATCH:
-        skAppPrintErr("%s value '%s' does not match any known method",
-                      site_compmethod_opts[OPT_COMPRESSION_METHOD].name,
-                      opt_arg);
-        goto END;
-
-      default:
-        skAppPrintErr("Unexpected return value from string-map parser (%d)",
-                      rv_map);
-        goto END;
-    }
-
-  END:
-    if (str_map) {
-        skStringMapDestroy(str_map);
-    }
-    return rv;
-}
-
-
-int
-sksiteCompmethodOptionsRegister(
-    sk_compmethod_t    *compression_method)
-{
-    *compression_method = SK_COMPMETHOD_DEFAULT;
-
-    return skOptionsRegister(site_compmethod_opts,
-                             &siteCompmethodOptionsHandler,
-                             compression_method);
-}
-
-
-void
-sksiteCompmethodOptionsUsage(
-    FILE               *fh)
-{
-    int i;
-    sk_compmethod_t cm;
-
-    for (i = 0; site_compmethod_opts[i].name; ++i) {
-        fprintf(fh, "--%s %s. ", site_compmethod_opts[i].name,
-                SK_OPTION_HAS_ARG(site_compmethod_opts[i]));
-        switch ((site_compmethod_opts_enum_t)(site_compmethod_opts[i].val)) {
-          case OPT_COMPRESSION_METHOD:
-            fprintf(fh, ("Set compression for binary output file(s).\n"
-                         "\tDef. %s. Choices: %s [=%s]"),
-                    siteCompmethodGetNameFast(sksiteCompmethodGetDefault()),
-                    COMPMETHOD_STRING_BEST,
-                    siteCompmethodGetNameFast(sksiteCompmethodGetBest()));
-            for (cm = 0; cm < siteGetCompmethodCount(); ++cm) {
-                if (SK_COMPMETHOD_IS_AVAIL != sksiteCompmethodCheck(cm)) {
-                    continue;
-                }
-                fprintf(fh, ", %s", siteCompmethodGetNameFast(cm));
-            }
-            break;
-        }
-        fprintf(fh, "\n");
-    }
 }
 
 

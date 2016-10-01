@@ -4,14 +4,14 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: configure.ac 9666addd9610 2016-06-22 19:01:35Z mthomas $")
+dnl RCSIDENT("$SiLK: configure.ac 06565ffff2e4 2016-09-28 22:05:49Z mthomas $")
 
 AC_PREREQ(2.64)
-AC_INIT([SiLK],[3.12.2],[netsa-help@cert.org],[silk],[http://tools.netsa.cert.org/silk/])
+AC_INIT([SiLK],[3.13.0],[netsa-help@cert.org],[silk],[http://tools.netsa.cert.org/silk/])
 AC_COPYRIGHT([Copyright (C) 2001-2016 by Carnegie Mellon University
 GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
 Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013])
-AC_REVISION($SiLK: configure.ac 9666addd9610 2016-06-22 19:01:35Z mthomas $)
+AC_REVISION($SiLK: configure.ac 06565ffff2e4 2016-09-28 22:05:49Z mthomas $)
 AC_CONFIG_SRCDIR([src/libsilk/silk.h])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_CONFIG_MACRO_DIR([m4])
@@ -223,6 +223,7 @@ AC_SYS_LARGEFILE
 AX_CHECK_PTHREAD
 AX_CHECK_LIBZ
 AX_CHECK_LIBLZO
+AX_CHECK_LIBSNAPPY
 AX_CHECK_LIBPCAP
 AX_CHECK_LIBADNS
 AX_CHECK_LIBCARES
@@ -361,7 +362,6 @@ AC_CONFIG_FILES([
     src/rwswapbytes/Makefile
     src/rwtotal/Makefile
     src/rwtuc/Makefile
-    src/rwuniq/Makefile
     src/sendrcv/Makefile
     doc/Makefile
     tests/Makefile
@@ -441,7 +441,6 @@ AC_CONFIG_LINKS(sk_make_include_silk_list([
     src/libsilk/skthread.h
     src/libsilk/sktimer.h
     src/libsilk/sktracemsg.h
-    src/libsilk/skunique.h
     src/libsilk/skvector.h
     src/libsilk/utils.h
     src/pysilk/silkpython.h

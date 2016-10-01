@@ -19,7 +19,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skoptionsctx.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: skoptionsctx.c 0432f6547214 2016-09-19 19:08:31Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skstream.h>
@@ -32,7 +32,7 @@ RCSIDENT("$SiLK: skoptionsctx.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 #define PATH_IS_STDOUT(path)                                    \
     (0 == strcmp((path), "-") || 0 == strcmp((path), "stdout"))
 
-/* typedef struct sk_options_iter_st sk_options_iter_t; */
+/* typedef struct sk_options_ctx_st sk_options_ctx_t; */
 struct sk_options_ctx_st {
     sk_options_ctx_open_cb_t    open_cb_fn;
     FILE           *print_filenames;
@@ -42,7 +42,7 @@ struct sk_options_ctx_st {
     char          **argv;
     int             argc;
     int             arg_index;
-    int             flags;
+    unsigned int    flags;
     unsigned        stdin_used      :1;
     unsigned        stdout_used     :1;
     unsigned        parse_ok        :1;
@@ -243,7 +243,7 @@ skOptionsCtxCountArgs(
 int
 skOptionsCtxCreate(
     sk_options_ctx_t  **arg_ctx,
-    int                 flags)
+    unsigned int        flags)
 {
     *arg_ctx = (sk_options_ctx_t*)calloc(1, sizeof(sk_options_ctx_t));
     if (NULL == *arg_ctx) {

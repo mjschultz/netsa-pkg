@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-string.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: sku-string.c 0432f6547214 2016-09-19 19:08:31Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skipaddr.h>
@@ -416,7 +416,7 @@ char *
 skTCPFlagsString(
     uint8_t             flags,
     char               *outbuf,
-    int                 print_flags)
+    unsigned int        print_flags)
 {
     static const char characters[] = {'F', 'S', 'R', 'P', 'A', 'U', 'E', 'C'};
     static const uint8_t bits[] = {FIN_FLAG, SYN_FLAG, RST_FLAG, PSH_FLAG,
@@ -443,7 +443,7 @@ char *
 skTCPStateString(
     uint8_t             state,
     char               *outbuf,
-    int                 print_flags)
+    unsigned int        print_flags)
 {
 #define SKTCPSTATE_NUM_BITS 4
     static const char characters[] = {'T', 'C', 'F', 'S'};
@@ -3223,7 +3223,7 @@ int
 skStringParseHumanUint64(
     uint64_t           *result_val,
     const char         *int_string,
-    int                 parse_flags)
+    unsigned int        parse_flags)
 {
     const char *sp;             /* Current parse position */
     const char *tp;             /* Temporary pointer */
@@ -3374,7 +3374,7 @@ skStringParseRange32(
     const char         *range_string,
     uint32_t            min_val,
     uint32_t            max_val,
-    int                 flags)
+    unsigned int        flags)
 {
     uint64_t tmp_lower = 0;
     uint64_t tmp_upper = 0;
@@ -3407,7 +3407,7 @@ skStringParseRange64(
     const char         *range_string,
     uint64_t            min_val,
     uint64_t            max_val,
-    int                 flags)
+    unsigned int        flags)
 {
     const char *cp;
     int rv;
@@ -3582,7 +3582,7 @@ skStringParseDoubleRange(
     const char         *range_string,
     double              min_val,
     double              max_val,
-    int                 flags)
+    unsigned int        flags)
 {
     const char *cp;
     int rv;

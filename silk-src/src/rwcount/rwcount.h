@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWCOUNT_H, "$SiLK: rwcount.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_RWCOUNT_H, "$SiLK: rwcount.h 274b023fde5c 2016-09-22 14:44:25Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -61,7 +61,7 @@ typedef struct count_data_st {
     /* size of each bin, in milliseconds */
     int64_t     size;
     /* total number of bins that are allocated */
-    int64_t     count;
+    uint64_t    count;
     /* time on the first bin, in UNIX epoch milliseconds */
     sktime_t    window_min;
     /* one millisecond after the final bin, in UNIX epoch milliseconds */

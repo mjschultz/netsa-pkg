@@ -14,12 +14,12 @@
 
 @SET_MAKE@
 
-# RCSIDENT("$SiLK: Makefile.am 9666addd9610 2016-06-22 19:01:35Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 06565ffff2e4 2016-09-28 22:05:49Z mthomas $");
 
 # Installed Targets
 
 # -*- makefile -*-
-# RCSIDENT("$SiLK: Makefile-sources 242ba69cb734 2015-09-25 21:00:20Z mthomas $");
+# RCSIDENT("$SiLK: Makefile-sources 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $");
 
 # RCSIDENT("$SiLK: build.mk b4d1f1d9c507 2014-07-28 19:37:42Z mthomas $")
 #
@@ -120,6 +120,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_libadns.m4 \
 	$(top_srcdir)/m4/ax_check_libcares.m4 \
 	$(top_srcdir)/m4/ax_check_liblzo.m4 \
 	$(top_srcdir)/m4/ax_check_libpcap.m4 \
+	$(top_srcdir)/m4/ax_check_libsnappy.m4 \
 	$(top_srcdir)/m4/ax_check_libz.m4 \
 	$(top_srcdir)/m4/ax_check_printf_z.m4 \
 	$(top_srcdir)/m4/ax_check_pthread.m4 \
@@ -191,7 +192,8 @@ am__libsilk_la_SOURCES_DIST = addrtype.c flowcapio.c hashlib.c \
 	rwaugsnmpoutio.c rwaugwebio.c rwfilterio.c rwgenericio.c \
 	rwipv6io.c rwipv6routingio.c rwnotroutedio.c rwpack.c rwrec.c \
 	rwroutedio.c rwsplitio.c rwwwwio.c skbag.c skbitmap.c \
-	skcountry.c skdaemon.c skdllist.c skheader.c skheader-legacy.c \
+	skcompmethod.c skcountry.c skdaemon.c skdllist.c \
+	skfileformat.c skheader.c skheader-legacy.c skheader_priv.h \
 	skheap.c skiobuf.c skiobuf.h skipset.c sklog.c skmempool.c \
 	skoptionsctx.c skoptions-notes.c skplugin-simple.c skplugin.c \
 	skprefixmap.c skprintnets.c skqsort.c sksite.c sksiteconfig.h \
@@ -199,8 +201,8 @@ am__libsilk_la_SOURCES_DIST = addrtype.c flowcapio.c hashlib.c \
 	skstream-err.c skstream_priv.h skstringmap.c sktempfile.c \
 	sku-app.c sku-bigsockbuf.c sku-compat.c sku-filesys.c \
 	sku-ips.c sku-options.c sku-string.c sku-times.c \
-	sku-wrapgetopt.c skunique.c skvector.c redblack/redblack.c \
-	skcygwin.c skcygwin.h
+	sku-wrapgetopt.c skvector.c redblack/redblack.c skcygwin.c \
+	skcygwin.h
 am__dirstamp = $(am__leading_dot)dirstamp
 @HAVE_CYGWIN_TRUE@am__objects_2 = skcygwin.lo
 am__objects_3 = addrtype.lo flowcapio.lo hashlib.lo pmapfilter.lo \
@@ -208,16 +210,16 @@ am__objects_3 = addrtype.lo flowcapio.lo hashlib.lo pmapfilter.lo \
 	rwaugsnmpoutio.lo rwaugwebio.lo rwfilterio.lo rwgenericio.lo \
 	rwipv6io.lo rwipv6routingio.lo rwnotroutedio.lo rwpack.lo \
 	rwrec.lo rwroutedio.lo rwsplitio.lo rwwwwio.lo skbag.lo \
-	skbitmap.lo skcountry.lo skdaemon.lo skdllist.lo skheader.lo \
-	skheader-legacy.lo skheap.lo skiobuf.lo skipset.lo sklog.lo \
-	skmempool.lo skoptionsctx.lo skoptions-notes.lo \
-	skplugin-simple.lo skplugin.lo skprefixmap.lo skprintnets.lo \
-	skqsort.lo sksite.lo sksiteconfig_lex.lo sksiteconfig_parse.lo \
-	skstream.lo skstream-err.lo skstringmap.lo sktempfile.lo \
-	sku-app.lo sku-bigsockbuf.lo sku-compat.lo sku-filesys.lo \
-	sku-ips.lo sku-options.lo sku-string.lo sku-times.lo \
-	sku-wrapgetopt.lo skunique.lo skvector.lo redblack/redblack.lo \
-	$(am__objects_2)
+	skbitmap.lo skcompmethod.lo skcountry.lo skdaemon.lo \
+	skdllist.lo skfileformat.lo skheader.lo skheader-legacy.lo \
+	skheap.lo skiobuf.lo skipset.lo sklog.lo skmempool.lo \
+	skoptionsctx.lo skoptions-notes.lo skplugin-simple.lo \
+	skplugin.lo skprefixmap.lo skprintnets.lo skqsort.lo sksite.lo \
+	sksiteconfig_lex.lo sksiteconfig_parse.lo skstream.lo \
+	skstream-err.lo skstringmap.lo sktempfile.lo sku-app.lo \
+	sku-bigsockbuf.lo sku-compat.lo sku-filesys.lo sku-ips.lo \
+	sku-options.lo sku-string.lo sku-times.lo sku-wrapgetopt.lo \
+	skvector.lo redblack/redblack.lo $(am__objects_2)
 am_libsilk_la_OBJECTS = $(am__objects_3)
 libsilk_la_OBJECTS = $(am_libsilk_la_OBJECTS)
 libsilk_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
@@ -380,9 +382,8 @@ am__pkginclude_HEADERS_DIST = hashlib.h iptree.h rwascii.h rwrec.h \
 	skdaemon.h skdeque.h skdllist.h skheader.h skheap.h skipaddr.h \
 	skipset.h sklog.h skmempool.h skplugin.h skpolldir.h \
 	skprefixmap.h skprintnets.h sksite.h skstream.h skstringmap.h \
-	sktempfile.h skthread.h sktimer.h sktracemsg.h skunique.h \
-	skvector.h utils.h redblack/redblack.h bagtree.h rwpack.h \
-	gnu_getopt.h
+	sktempfile.h skthread.h sktimer.h sktracemsg.h skvector.h \
+	utils.h redblack/redblack.h bagtree.h rwpack.h gnu_getopt.h
 HEADERS = $(pkginclude_HEADERS)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) \
 	$(LISP)silk_config1.h.in silk_config2.h.in
@@ -595,7 +596,7 @@ am__DIST_COMMON = $(srcdir)/Makefile-sources $(srcdir)/Makefile.in \
 	$(srcdir)/skstream.h $(srcdir)/skstringmap.h \
 	$(srcdir)/sktempfile.h $(srcdir)/skthread.h \
 	$(srcdir)/sktimer.h $(srcdir)/sktracemsg.h \
-	$(srcdir)/skunique.h $(srcdir)/skvector.h $(srcdir)/utils.h \
+	$(srcdir)/skvector.h $(srcdir)/utils.h \
 	$(top_srcdir)/autoconf/depcomp \
 	$(top_srcdir)/autoconf/test-driver \
 	$(top_srcdir)/autoconf/ylwrap $(top_srcdir)/build.mk \
@@ -722,6 +723,7 @@ SK_ENABLE_IPFIX = @SK_ENABLE_IPFIX@
 SK_ENABLE_IPV6 = @SK_ENABLE_IPV6@
 SK_ENABLE_LZO = @SK_ENABLE_LZO@
 SK_ENABLE_OUTPUT_COMPRESSION = @SK_ENABLE_OUTPUT_COMPRESSION@
+SK_ENABLE_SNAPPY = @SK_ENABLE_SNAPPY@
 SK_ENABLE_ZLIB = @SK_ENABLE_ZLIB@
 SK_LDFLAGS = @SK_LDFLAGS@
 SK_SRC_INCLUDES = @SK_SRC_INCLUDES@
@@ -787,8 +789,8 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 lib_LTLIBRARIES = libsilk.la libsilk-thrd.la
-libsilk_version = 20:2:0
-# At previous release: libsilk_version = 20:2:0
+libsilk_version = 21:0:0
+# At previous release: libsilk_version = 21:0:0
 libsilk_thrd_version = 6:3:1
 # At previous release: libsilk_thrd_version = 6:3:1
 
@@ -806,8 +808,8 @@ pkginclude_HEADERS = hashlib.h iptree.h rwascii.h rwrec.h silk.h	\
 	 skdeque.h skdllist.h skheader.h skheap.h skipaddr.h skipset.h	\
 	 sklog.h skmempool.h skplugin.h	skpolldir.h skprefixmap.h	\
 	 skprintnets.h sksite.h skstream.h skstringmap.h sktempfile.h	\
-	 skthread.h sktimer.h sktracemsg.h skunique.h skvector.h	\
-	 utils.h redblack/redblack.h $(LEGACY_HDRS) $(EXTRA_HDRS)
+	 skthread.h sktimer.h sktracemsg.h skvector.h utils.h		\
+	 redblack/redblack.h $(LEGACY_HDRS) $(EXTRA_HDRS)
 
 LEGACY_HDRS = bagtree.h rwpack.h
 @NEED_GETOPT_LONG_ONLY_TRUE@EXTRA_HDRS = gnu_getopt.h
@@ -833,7 +835,8 @@ SOURCES_LIBSILK = addrtype.c flowcapio.c hashlib.c pmapfilter.c \
 	rwaugwebio.c rwfilterio.c rwgenericio.c rwipv6io.c \
 	rwipv6routingio.c rwnotroutedio.c rwpack.c rwrec.c \
 	rwroutedio.c rwsplitio.c rwwwwio.c skbag.c skbitmap.c \
-	skcountry.c skdaemon.c skdllist.c skheader.c skheader-legacy.c \
+	skcompmethod.c skcountry.c skdaemon.c skdllist.c \
+	skfileformat.c skheader.c skheader-legacy.c skheader_priv.h \
 	skheap.c skiobuf.c skiobuf.h skipset.c sklog.c skmempool.c \
 	skoptionsctx.c skoptions-notes.c skplugin-simple.c skplugin.c \
 	skprefixmap.c skprintnets.c skqsort.c sksite.c sksiteconfig.h \
@@ -841,7 +844,7 @@ SOURCES_LIBSILK = addrtype.c flowcapio.c hashlib.c pmapfilter.c \
 	skstream-err.c skstream_priv.h skstringmap.c sktempfile.c \
 	sku-app.c sku-bigsockbuf.c sku-compat.c sku-filesys.c \
 	sku-ips.c sku-options.c sku-string.c sku-times.c \
-	sku-wrapgetopt.c skunique.c skvector.c redblack/redblack.c \
+	sku-wrapgetopt.c skvector.c redblack/redblack.c \
 	$(am__append_1)
 
 # sources for libsilk-thrd
@@ -1366,12 +1369,14 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skbag.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skbitmap-test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skbitmap.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skcompmethod.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skcountry.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skcygwin.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skdaemon.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skdeque-test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skdeque.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skdllist.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skfileformat.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skheader-legacy.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skheader-test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skheader.Plo@am__quote@
@@ -1417,7 +1422,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sku-string.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sku-times.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sku-wrapgetopt.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skunique.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skvector-test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skvector.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@redblack/$(DEPDIR)/redblack.Plo@am__quote@

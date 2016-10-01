@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h 0432f6547214 2016-09-19 19:08:31Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -1559,7 +1559,7 @@ skOptionsCtxCountArgs(
 int
 skOptionsCtxCreate(
     sk_options_ctx_t  **arg_ctx,
-    int                 flags);
+    unsigned int        flags);
 
 /**
  *    Destroy the options context object.  If the copy-input stream
@@ -1752,17 +1752,17 @@ skOptionsNotesAddToStream(
  */
 typedef enum {
     /** Do not include fractional seconds when printing the time */
-    SKTIMESTAMP_NOMSEC   = (1 << 0),
+    SKTIMESTAMP_NOMSEC   = (1u << 0),
     /** Print as MM/DD/YYYY HH:MM:SS[.sss] */
-    SKTIMESTAMP_MMDDYYYY = (1 << 1),
+    SKTIMESTAMP_MMDDYYYY = (1u << 1),
     /** Print as seconds since the UNIX epoch */
-    SKTIMESTAMP_EPOCH    = (1 << 2),
+    SKTIMESTAMP_EPOCH    = (1u << 2),
     /** Print as YYYY-MM-DD HH:MM:SS[.sss] */
-    SKTIMESTAMP_ISO      = (1 << 3),
+    SKTIMESTAMP_ISO      = (1u << 3),
     /** Print the time as UTC (assuming TZ=0) */
-    SKTIMESTAMP_UTC      = (1 << 4),
+    SKTIMESTAMP_UTC      = (1u << 4),
     /** Print the time in the local timezone */
-    SKTIMESTAMP_LOCAL    = (1 << 5)
+    SKTIMESTAMP_LOCAL    = (1u << 5)
 } sktimestamp_flags_t;
 
 /**
@@ -1822,7 +1822,7 @@ char *
 sktimestamp_r(
     char               *outbuf,
     sktime_t            t,
-    int                 timestamp_flags);
+    unsigned int        timestamp_flags);
 
 
 /**
@@ -1832,7 +1832,7 @@ sktimestamp_r(
 char *
 sktimestamp(
     sktime_t            t,
-    int                 timestamp_flags);
+    unsigned int        timestamp_flags);
 
 
 /**
@@ -2829,7 +2829,7 @@ char *
 skTCPFlagsString(
     uint8_t             flags,
     char               *outbuf,
-    int                 print_flags);
+    unsigned int        print_flags);
 
 
 #define SK_TCP_STATE_STRLEN 9
@@ -2848,7 +2848,7 @@ char *
 skTCPStateString(
     uint8_t             state,
     char               *outbuf,
-    int                 print_flags);
+    unsigned int        print_flags);
 
 
 /**
@@ -3201,20 +3201,20 @@ skSockaddrArrayGet(
  *    Ignore the port value when comparing two sk_sockaddr_t objects
  *    with skSockaddrCompare() or skSockaddrArrayMatches().
  */
-#define SK_SOCKADDRCOMP_NOPORT       1
+#define SK_SOCKADDRCOMP_NOPORT       (1u << 0)
 
 /**
  *    Ignore the address when comparing two sk_sockaddr_t objects
  *    with skSockaddrCompare() or skSockaddrArrayMatches().
  */
-#define SK_SOCKADDRCOMP_NOADDR       2
+#define SK_SOCKADDRCOMP_NOADDR       (1u << 1)
 
 /**
  *    Treat IPv4 and IPv6 addresses as different when comparing two
  *    sk_sockaddr_t objects with skSockaddrCompare() or
  *    skSockaddrArrayMatches().
  */
-#define SK_SOCKADDRCOMP_NOT_V4_AS_V6 4
+#define SK_SOCKADDRCOMP_NOT_V4_AS_V6 (1u << 2)
 
 
 /**
@@ -3262,7 +3262,7 @@ int
 skSockaddrCompare(
     const sk_sockaddr_t    *a,
     const sk_sockaddr_t    *b,
-    int                     flags);
+    unsigned int            flags);
 
 /**
  *    Determines whether 'array' contains 'addr', according to
@@ -3277,7 +3277,7 @@ int
 skSockaddrArrayContains(
     const sk_sockaddr_array_t  *array,
     const sk_sockaddr_t        *addr,
-    int                         flags);
+    unsigned int                flags);
 
 /**
  *    Determines whether two sk_sockaddr_array_t objects are
@@ -3294,7 +3294,7 @@ int
 skSockaddrArrayEqual(
     const sk_sockaddr_array_t  *a,
     const sk_sockaddr_array_t  *b,
-    int                         flags);
+    unsigned int                flags);
 
 
 /**
@@ -3312,7 +3312,7 @@ int
 skSockaddrArrayMatches(
     const sk_sockaddr_array_t  *a,
     const sk_sockaddr_array_t  *b,
-    int                         flags);
+    unsigned int                flags);
 
 
 /* Flags which can be passed to skStringParseHostPortPair() */
@@ -3681,7 +3681,7 @@ int
 skStringParseHumanUint64(
     uint64_t           *result_val,
     const char         *int_string,
-    int                 parse_flags);
+    unsigned int        parse_flags);
 
 
 /* Following are used by skStringParseRange32() */
@@ -3690,11 +3690,11 @@ skStringParseHumanUint64(
 #define SKUTILS_RANGE_SINGLE_OPEN   0
 
 /** Force the value to be a range, but allow open-ended ranges */
-#define SKUTILS_RANGE_NO_SINGLE     (1<<0)
+#define SKUTILS_RANGE_NO_SINGLE     (1u << 0)
 
 /** Allow single values '3' or complete ranges '3-5'; i.e., force an
  * upper bound on any range */
-#define SKUTILS_RANGE_NO_OPEN       (1<<1)
+#define SKUTILS_RANGE_NO_OPEN       (1u << 1)
 
 /** Only support ranges, and force the range to have both bounds */
 #define SKUTILS_RANGE_ONLY_RANGE    (SKUTILS_RANGE_NO_SINGLE \
@@ -3739,7 +3739,7 @@ skStringParseRange32(
     const char         *range_string,
     uint32_t            min_val,
     uint32_t            max_val,
-    int                 flags);
+    unsigned int        flags);
 
 
 /**
@@ -3754,7 +3754,7 @@ skStringParseRange64(
     const char         *range_string,
     uint64_t            min_val,
     uint64_t            max_val,
-    int                 flags);
+    unsigned int        flags);
 
 
 /**
@@ -3798,7 +3798,7 @@ skStringParseDoubleRange(
     const char         *range_string,
     double              min_val,
     double              max_val,
-    int                 flags);
+    unsigned int        flags);
 
 
 

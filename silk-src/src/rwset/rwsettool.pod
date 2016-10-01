@@ -7,8 +7,9 @@ B<rwsettool> - Operate on IPset files to produce a new IPset
 =head1 SYNOPSIS
 
   rwsettool { --union | --intersect | --difference
-              | --mask=NET_BLOCK_SIZE | --fill-blocks=NET_BLOCK_SIZE
-              | --sample {--size=SIZE | --ratio=RATIO} [--seed=SEED] }
+              | --symmetric-difference
+              | --sample {--size=SIZE | --ratio=RATIO} [--seed=SEED]
+              | --mask=NET_BLOCK_SIZE | --fill-blocks=NET_BLOCK_SIZE }
         [--output-path=OUTPUT_PATH] [--record-version=VERSION]
         [--invocation-strip]
         [--note-strip] [--note-add=TEXT] [--note-file-add=FILE]
@@ -21,9 +22,59 @@ B<rwsettool> - Operate on IPset files to produce a new IPset
 =head1 DESCRIPTION
 
 B<rwsettool> performs a single operation on one or more IPset file(s)
-to produce a new IPset file.  The operations that B<rwsettool>
-provides are union, intersection, difference, masking, and sampling.
-Details are provided in the L</OPTIONS> section.
+to produce a new IPset file.
+
+The operations that B<rwsettool> provides are
+
+=over 4
+
+=item union
+
+The union (or addition) of two IPsets is the set of IP addresses that
+are members in either set.
+
+=item intersection
+
+The intersection of two IPsets is the set of IP addresses that are
+members of both sets.
+
+=item difference
+
+The difference (or relative complement) of two IPsets is the set of IP
+addresses that are members of the first set but not members of the
+second.
+
+=item symmetric-difference
+
+The symmetric difference (or disjunctive union) of two IPsets is the
+set of IP addresses that are members of either set but not members of
+both.  This is the equivalent to the intersection of the IPsets
+subtracted from the union of the IPsets.  It is also equivalent to
+computing the union of both relative complements (the first set from
+the second and the second set from the first).
+
+=item sample
+
+The set of IP addresses in an IPset is randomly selected to produce a
+subset.
+
+=item mask
+
+For each CIDR-block (or net-block) of a user-specified size in the
+IPset, the IP addresses that are members of that net-block are
+replaced by a single IP address at the start of the net-block.  Empty
+net-blocks are not changed.
+
+=item fill-blocks
+
+For each CIDR-block (or net-block) of a user-specified size in the
+IPset, the IP addresses that are members of that net-block are
+extended so that every IP address in that net-block is a member of the
+set.  Empty net-blocks are not changed.
+
+=back
+
+More details are provided in the L</OPTIONS> section.
 
 B<rwsettool> reads the IPsets specified on the command line; when no
 IPsets are listed, B<rwsettool> attempts to read an IPset from the
@@ -33,7 +84,7 @@ input.  The resulting IPset is written to the location specified by
 the B<--output-path> switch or to the standard output if that switch
 is not provided.  Using the strings C<stdout> or C<-> as the argument
 to B<--output-path> causes B<rwsettool> to write the IPset to the
-standard output.  B<rwsettool> will exit with an error if an attempt
+standard output.  B<rwsettool> exits with an error if an attempt
 is made to read an IPset from the terminal or write an IPset to the
 terminal.
 
@@ -46,79 +97,97 @@ required for options that take optional parameters.
 
 =head2 Operation Switches
 
-At least one of the following operation switches must be provided:
+Exactly one of the following operation switches must be provided:
 
 =over 4
 
 =item B<--union>
 
-Perform the set union operation: The resulting IPset will contain an
-IP if that IP was present in I<any> of the input IPsets.
+Perform the set union operation: The resulting IPset contains each
+IP address that is a member of I<any> of the input IPsets.
 
 =item B<--intersect>
 
-Perform the set intersection operation: The resulting IPset will
-contain an IP if that IP was present in I<all> of the input IPsets.
+Perform the set intersection operation: The resulting IPset contains
+each IP address that is a member of I<all> of the input IPsets.
 
 =item B<--difference>
 
-Perform the set difference (relative complement) operation: The
-resulting IPset will contain an IP if that IP was present in first
-IPset and not present in any of the subsequent IPsets.
+Perform the set difference operation: The resulting IPset contains
+each IP address that is a member of the first IPset and not a member
+of any subsequent IPsets.
 
-=item B<--mask>=I<NET_BLOCK_SIZE>
+=item B<--symmetric-difference>
 
-Perform a (sparse) masking operation: The least significant
-32-I<NET_BLOCK_SIZE> or 128-I<NET_BLOCK_SIZE> bits of each IP in every
-input IPset is set to zero, and the resulting IPset contains the union
-of these IPs.  That is, the result contains one IP for each CIDR block
-of size I<NET_BLOCK_SIZE>.  I<NET_BLOCK_SIZE> should be value between
-1 and 32 for IPv4 sets, and between 1 and 128 for IPv6 sets.  Contrast
-with B<--fill-blocks>.
-
-=item B<--fill-blocks>=I<NET_BLOCK_SIZE>
-
-Perform a masking operation that produces completely full blocks: The
-least significant 32-I<NET_BLOCK_SIZE> or 128-I<NET_BLOCK_SIZE> bits
-of each IP in every input IPset is set to zero.  To create the output,
-each IP is modified to be a completely full I<NET_BLOCK_SIZE> CIDR
-block.
+Perform the symmetric difference operation: For two input sets, the
+resulting IPset contains each IP address that is a member of one of
+the input IPsets but not both.  For each additional IPset,
+B<rwsettool> computes the symmetric difference of the current result
+with the additional IPset.  For three input sets, the output IPset
+contains each IP address that is a member of either one of the IPsets
+or of all three IPsets.  I<Since SiLK 3.13.0.>
 
 =item B<--sample>
 
 Select a random sample of IPs from the input IPsets.  The size of the
 subset must be specified by either the B<--size> or B<--ratio>
-switches described below.  In the case of multiple input IPsets, the
+switches described next.  In the case of multiple input IPsets, the
 resulting IPset is the union of all IP addresses sampled from B<each>
-of the input IPsets.
-
-=back
-
-=head2 Sampling Switches
-
-These switches control how records are sampled by the B<--sample>
-operation.
+of the input IPsets.  That is, each IPset is individually sampled, and
+the results are merged.
 
 =over 4
 
 =item B<--size>=I<SIZE>
 
-Select a random sample containing I<SIZE> randomly selected records
-from I<each> input IPset. If the input set is smaller than I<SIZE>,
-all input IPs will be selected from that IPset.
+Create an IPset containing the union of randomly selecting exactly
+I<SIZE> IP addresses from each input IPset. If the number of IP
+addresses in an input IPset is less than or equal to I<SIZE>, all
+members of that IPset are included in the result.  When the input sets
+are completely disjoint and each set has at least I<SIZE> members, the
+number of IP addresses in the result is the product of I<SIZE> and the
+number of inputs.
 
 =item B<--ratio>=I<RATIO>
 
-Select a random sample where the selection probability for each record
-of each input set is I<RATIO>, specified as a decimal number between
-0.0 and 1.0.  The exact size of the subset selected from each file will
-vary between different runs with the same data.
+Create an IPset where the probability of including each IP address of
+each input IPset in the result is I<RATIO>, specified as a floating
+point number between 0.0 and 1.0.  For each input IP address,
+B<rwsettool> computes a pseudo-random number between 0 and 1 and adds
+the IP address to the result when the number is less than I<RATIO>.
+The exact size of the subset may vary with each invocation.
 
 =item B<--seed>=I<SEED>
 
 Seed the pseudo-random number generator with value I<SEED>.  By
-default, the seed will vary between runs.  Seeding with specific
-values will produce repeatable results given the same input sets.
+default, the seed varies for each invocation.  Seeding with a specific
+value produces repeatable results given the same input sets.
+
+=back
+
+=item B<--mask>=I<NET_BLOCK_SIZE>
+
+Perform a (sparse) masking operation: The resulting IPset contains one
+IP address for each /I<NET_BLOCK_SIZE> CIDR block in the input
+IPset(s) that contains one or more IP addresses in that CIDR block.
+That is, B<rwsettool> visits each /I<NET_BLOCK_SIZE> CIDR block in the
+IPset.  If the block is empty, no change is made; otherwise the block
+is cleared (all IPs removed) and the lowest IP address in that block
+is made a member of the set.  I<NET_BLOCK_SIZE> should be value
+between 1 and 32 for IPv4 sets and between 1 and 128 for IPv6 sets.
+Contrast with B<--fill-blocks>.
+
+=item B<--fill-blocks>=I<NET_BLOCK_SIZE>
+
+Perform a (non-sparse) masking operation: The resulting IPset contains
+a completely full /I<NET_BLOCK_SIZE> block for each /I<NET_BLOCK_SIZE>
+CIDR block in the input IPset(s) that contain one or more IP addresses
+in that CIDR block.  That is, B<rwsettool> visits each
+/I<NET_BLOCK_SIZE> CIDR block in the IPset; if the block is empty, no
+change is made, otherwise all IP addresses in the block are made
+members of the set.  I<NET_BLOCK_SIZE> should be value between 1 and
+32 for IPv4 sets and between 1 and 128 for IPv6 sets.  Contrast with
+B<--mask>.
 
 =back
 
@@ -131,8 +200,8 @@ These switches control the output:
 =item B<--output-path>=I<OUTPUT_PATH>
 
 Write the resulting IPset to I<OUTPUT_PATH>.  If this switch is not
-provided, B<rwsettool> will attempt to write the IPset to the standard
-output, unless it is connected to a terminal.
+provided, B<rwsettool> attempts to write the IPset to the standard
+output when the standard output is not connected to a terminal.
 
 =item B<--record-version>=I<VERSION>
 
@@ -174,7 +243,10 @@ attempt to add a SiLK data file as an annotation.
 
 =item B<--compression-method>=I<COMP_METHOD>
 
-Specify how to compress the output.  When this switch is not given,
+Specify the compression library to use when writing output files.  If
+this switch is not given, the value in the SILK_COMPRESSION_METHOD
+environment variable is used if the value names an available
+compression method.  When no compression method is specified,
 output to the standard output or to named pipes is not compressed, and
 output to files is compressed using the default chosen when SiLK was
 compiled.  The valid values for I<COMP_METHOD> are determined by which
@@ -202,12 +274,27 @@ for compression, and always compress the output regardless of the
 destination.  This compression provides good compression with less
 memory and CPU overhead.
 
+=item snappy
+
+Use the I<snappy> library for compression, and always compress the
+output regardless of the destination.  This compression provides good
+compression with less memory and CPU overhead.  I<Since SiLK 3.13.0.>
+
 =item best
 
-Use lzo1x if available, otherwise use zlib.  Only compress the output
-when writing to a file.
+Use lzo1x if available, otherwise use snappy if available, otherwise
+use zlib if available.  Only compress the output when writing to a
+file.
 
 =back
+
+=back
+
+=head2 Additional Switches
+
+B<rwsettool> supports these additional switches:
+
+=over 4
 
 =item B<--help>
 
@@ -224,8 +311,6 @@ configured, then exit the application.
 
 In the following examples, the dollar sign (C<$>) represents the shell
 prompt.  The text after the dollar sign represents the command line.
-
-=for comment
 Lines have been wrapped for improved readability, and the back slash
 (C<\>) is used to indicate a wrapped line.
 
@@ -236,7 +321,14 @@ Assume the following IPsets:
  C.set = { 1, 3, 6, 8 }
  D.set = { } (empty set)
 
-Then the following commands will produce the following result IPsets:
+=head2 Set Union Examples
+
+The union of two IPsets contains the IP addresses that are members of
+either IPset.  The union of multiple IPsets contains the IP addresses
+that are members of any of the sets.  The resulting IPset does not
+depend on the order of the input IPsets.  The union of a single IPset,
+of an IPset with itself, and of an IPset with an empty IPset is the
+original IPset.
 
  +---------------------------------+----------------------------+
  | OPTIONS                         | RESULT                     |
@@ -245,72 +337,245 @@ Then the following commands will produce the following result IPsets:
  | --union A.set C.set             | { 1, 2, 3, 4, 6, 8 }       |
  | --union A.set B.set C.set       | { 1, 2, 3, 4, 5, 6, 7, 8 } |
  | --union C.set D.set             | { 1, 3, 6, 8 }             |
+ | --union A.set                   | { 1, 2, 4, 6 }             |
+ | --union A.set A.set             | { 1, 2, 4, 6 }             |
+ +---------------------------------+----------------------------+
+
+=head2 Set Intersection Examples
+
+The intersection of two IPsets contains the IP addresses that are
+members of both IPsets (that is, the IP addresses they have in
+common).  The intersection of multiple IPsets contains the IP
+addresses that are members of all of the sets.  The resulting IPset
+does not depend on the order of the input IPsets.  The intersection of
+a single IPset is the original IPset.  The intersection of an IPset
+with itself is the original IPset.  The intersection of an IPset with
+an empty IPset is an empty IPset.
+
+ +---------------------------------+----------------------------+
+ | OPTIONS                         | RESULT                     |
+ +---------------------------------+----------------------------+
  | --intersect A.set B.set         | { 1 }                      |
  | --intersect A.set C.set         | { 1, 6 }                   |
+ | --intersect B.set C.set         | { 1, 3 }                   |
  | --intersect A.set B.set C.set   | { 1 }                      |
  | --intersect A.set D.set         | { }                        |
+ | --intersect A.set               | { 1, 2, 4, 6 }             |
+ | --intersect A.set A.set         | { 1, 2, 4, 6 }             |
+ +---------------------------------+----------------------------+
+
+=head2 Set Difference Examples
+
+The difference of two IPsets contains the IP addresses that are
+members of the first set but not members of the second.  The
+difference of multiple IPsets contains the IP addresses in the first
+set that are not members of any other IPset.  The resulting IPset is
+dependent on the order of the input IPsets.  Using the difference
+operation on a single IPset gives that IPset.  The difference of an
+IPset with an empty IPset is the first IPset.  The difference of an
+IPset with itself is the empty IPset.
+
+ +---------------------------------+----------------------------+
+ | OPTIONS                         | RESULT                     |
+ +---------------------------------+----------------------------+
  | --difference A.set B.set        | { 2, 4, 6 }                |
  | --difference B.set A.set        | { 3, 5, 7 }                |
  | --difference A.set B.set C.set  | { 2, 4 }                   |
  | --difference C.set B.set A.set  | { 8 }                      |
  | --difference C.set D.set        | { 1, 3, 6, 8 }             |
  | --difference D.set C.set        | { }                        |
+ | --difference A.set              | { 1, 2, 4, 6 }             |
+ | --difference A.set A.set        | { }                        |
  +---------------------------------+----------------------------+
 
-Sampling yields variable results, but here some example runs:
+=head2 Set Symmetric Difference Examples
+
+The symmetric difference (or relative complement) of two IPsets
+contains the IP addresses that are members of either set but not
+members of both sets.  For each additional input IPset, B<rwsettool>
+computes the symmetric difference of the current result with the that
+IPset.  The resulting IPset contains the IP addresses that are members
+of an odd number of the input sets.  The resulting IPset does not
+depend on the order of the input IPsets.  Using the symmetric
+difference operation on a single IPset gives that IPset.  The
+symmetric difference of an IPset with an empty IPset is the first
+IPset.  The symmetric difference of an IPset with itself is the empty
+IPset.
 
  +---------------------------------+----------------------------+
- | COMMAND                         | RESULT                     |
+ | OPTIONS                         | RESULT                     |
  +---------------------------------+----------------------------+
- | --sample -size 2 A.set          | { 1, 4 }                   |
- | --sample -size 2 A.set          | { 1, 6 }                   |
- | --sample -size 3 A.set          | { 2, 4, 6 }                |
- | --sample -size 2 A.set B.set    | { 1, 2, 5, 7 }             |
- | --sample -size 2 A.set B.set    | { 3, 4, 5, 6 }             |
- | --sample -size 2 A.set B.set    | { 1, 4, 5 }                |
- | --sample -ratio 0.5 A.set       | { 2, 6 }                   |
- | --sample -ratio 0.5 A.set       | { 4 }                      |
- | --sample -ratio 0.5 A.set B.set | { 1 }                      |
- | --sample -ratio 0.5 A.set B.set | { 2, 3, 5, 6, 7 }          |
+ | --symmetric A.set B.set         | { 2, 3, 4, 5, 6, 7 }       |
+ | --symmetric A.set C.set         | { 2, 3, 4, 8 }             |
+ | --symmetric A.set D.set         | { 1, 2, 4, 6 }             |
+ | --symmetric C.set B.set         | { 5, 6, 7, 8 }             |
+ | --symmetric A.set B.set C.set   | { 1, 2, 4, 5, 7, 8 }       |
+ | --symmetric A.set               | { 1, 2, 4, 6 }             |
+ | --symmetric A.set A.set         | { }                        |
  +---------------------------------+----------------------------+
 
-These examples demonstrate some important points about sampling from IPsets:
+=head2 Finding IP Addresses Unique to an Input Set
+
+Using the symmetric difference on three or more IPsets B<does not>
+result in an IPset containing the IP addresses that are members of a
+single input set.  To compute that, use the Bag tools as follows.
 
 =over 4
 
-=item *
+=item 1
 
-When using B<--size>, an exact number of items is selected from each
-input set.
+First, use B<rwbagbuild(1)> to create an empty bag file F</tmp/b.bag>.
 
-=item *
+ $ echo "" | rwbagbuild --bag-input=stdin --output-path=/tmp/b.bag
 
-When using B<--size> with multiple input sets, the number of records
-in the output set may not be (num_input_sets*size) in all cases.
+=item 2
 
-=item *
+For each input IPset, F<i.set>, use B<rwbagbuild> to create a bag from
+the IPset, and use B<rwbagtool(1)> to add that bag to F<b.bag>.
 
-When using B<--ratio>, the number of items sampled is not stable
-between runs.
+ $ rwbagbuild --set-input=i.set   \
+         | rwbagtool --add - /tmp/b.bag --output-path=/tmp/b2.bag
+ $ mv /tmp/b2.bag /tmp/b.bag
+
+To do that in a loop, run
+
+ $ for i in *.set ; do \
+         rwbagbuild --set-input=$i  \
+         | rwbagtool --add - /tmp/b.bag --output-path=/tmp/b2.bag ; \
+         mv /tmp/b2.bag /tmp/b.bag ; \
+   done
+
+=item 3
+
+Use B<rwbagtool> to create a coverset named F<unique.set> that
+contains the IP addresses in F<b.bag> whose counter is 1.
+
+ $ rwbagtool --maxcounter=1 --coverset --output-path=unique.set \
+         /tmp/b.bag
 
 =back
 
-Given an IPset containing the three IPs
+A different approach may be used which does not require temporary
+files.  Use B<rwsetcat(1)> to convert the IPset files to text and feed
+that data to B<rwbagbuild>.  (When B<rwsetcat> is invoked on multiple
+IPset files, it prints the contents of each individual IPset file, and
+as B<rwbagbuild> processes the text, it increments an IP address's
+counter each time the IP appears in the input.)  Use B<rwbagtool> to
+create the IPset as shown in Step 3 above.
 
+ $ rwsetcat --cidr-blocks=1 *.set   \
+        | rwbagbuild --bag-input=-  \
+        | rwbagtool  --maxcounter=1 --coverset --output=unique.set
+
+=head2 Set Sampling Examples
+
+The B<--sample> switch creates a subset that contains IP addresses
+that have been randomly selected from the input IPset(s).
+
+The B<--size> switch selects exactly I<SIZE> IP addresses from each
+input set, but the number of IP addresses in the result may be less
+than the product of I<SIZE> and the number of inputs when the input
+sets have IPs in common or when an IPset has fewer than I<SIZE>
+members.
+
+When using the B<--size> switch, the probably of selecting an
+individual IP address varies with the number of IPs to be selected and
+the number of IPs remaining in the set.  If I<N> is the number of IPs
+in a set, the probability of selecting the first IP is I<SIZE>/I<N>.
+If that IP is selected, the probability of selecting the second is
+(I<SIZE>-1)/(I<N>-1), but if the first IP is not selected, the
+probability of selecting the second is I<SIZE>/(I<N>-1).
+
+ +----------------------------------+----------------------------+
+ | COMMAND                          | RESULT                     |
+ +----------------------------------+----------------------------+
+ | --sample --size 2 A.set          | { 1, 4 }                   |
+ | --sample --size 2 A.set          | { 1, 6 }                   |
+ | --sample --size 3 A.set          | { 2, 4, 6 }                |
+ | --sample --size 2 A.set B.set    | { 1, 2, 5, 7 }             |
+ | --sample --size 2 A.set B.set    | { 3, 4, 5, 6 }             |
+ | --sample --size 2 A.set B.set    | { 1, 4, 5 }                |
+ +----------------------------------+----------------------------+
+
+The argument to the B<--ratio> switch is the probability of choosing
+an individual IP address.  For each IP address in the input, the IP is
+added to the output when a pseudo-random number between 0 and 1 is
+less then the argument to B<--ratio>.  The number of IP addresses in
+the result varies with each invocation.
+
+ +----------------------------------+----------------------------+
+ | COMMAND                          | RESULT                     |
+ +----------------------------------+----------------------------+
+ | --sample --ratio 0.5 A.set       | { 2, 6 }                   |
+ | --sample --ratio 0.5 A.set       | { 4 }                      |
+ | --sample --ratio 0.5 A.set B.set | { 1, 3 }                   |
+ | --sample --ratio 0.5 A.set B.set | { 2, 3, 5, 6, 7 }          |
+ +----------------------------------+----------------------------+
+
+=head2 Set Masking and Block-Filling Examples
+
+The goal of the B<--mask> and B<--fill-blocks> switches is to produce
+an IPset whose members are on user-defined CIDR-block (or net-block)
+boundaries.  (In some ways, these switches produce output that is
+similar to the B<--network-structure> switch on B<rwsetcat(1)>.)
+
+The B<--mask> and B<--fill-blocks> switches require a decimal argument
+that is a CIDR-block network mask size.  For example, the argument 24
+represents 256 IPv4 addresses.  B<rwsettool> visits each block of that
+size in the input IPset.  If no IP addresses appear in that block, the
+result also has no IPs in the block.  If one or more IP addresses
+appear in that block, the output IPset has either the lowest address
+in that block as a member (for B<--mask>) or all IP addresses in that
+block as members (for B<--fill-blocks>.
+
+For example, consider the IPset F<s.set> containing the three IP
+addresses.
+
+ $ rwsetcat --cidr-blocks=1 s.set
  10.1.1.1
  10.1.1.2
  10.1.3.1
 
-specifying B<--mask=24> will produce an IPset containing two IPs:
+Specifying B<--mask=24> produces an IPset containing two IP addresses.
 
+ $ rwsettool --mask=24 s.set | rwsetcat --cidr-blocks=1
  10.1.1.0
  10.1.3.0
 
-while specifying B<--fill-blocks=24> will produce an IPset containing
-512 IPs:
+Specifying B<--fill-blocks=24> produces an IPset containing 512 IP
+addresses.
 
+ $ rwsettool --fill-block=24 s.set | rwsetcat --cidr-blocks=1
  10.1.1.0/24
  10.1.3.0/24
+
+Consider F<t.set> that contains four IP addresses.
+
+ $ rwsetcat --cidr-blocks=1 t.set
+ 10.1.1.1
+ 10.1.1.2
+ 10.1.2.5
+ 10.1.3.1
+
+Running B<--mask=24> and B<--fill-blocks=24> on that file produces the
+following.
+
+ $ rwsettool --mask=24 t.set | rwsetcat --cidr-blocks=1
+ 10.1.1.0
+ 10.1.2.0
+ 10.1.3.0
+
+ $ rwsettool --fill-block=24 t.set | rwsetcat --cidr-blocks=1
+ 10.1.1.0/24
+ 10.1.2.0/23
+
+B<rwsetcat> merges 10.1.2.0/24 and 10.1.3.0.24 into a single /23.
+
+When multiple IPsets are specified on the command line, the union of
+the IPsets is computed prior to performing the mask or fill-blocks
+operation.  The result is not dependent on the order of the IPsets.
+
+=head2 Mixed IPv4 and IPv6 Examples
 
 Suppose the IPset file F<mixed.set> contains IPv4 and IPv6 addresses.
 To create an IPset file that contains only the IPv4 addresses,
@@ -333,29 +598,38 @@ subtract an IPset that contains ::ffff:0:0 from F<mixed.set>:
 
 This environment variable is used as the value for the
 B<--record-version> when that switch is not provided.
+I<Since SiLK 3.7.0.>
 
 =item SILK_CLOBBER
 
 The SiLK tools normally refuse to overwrite existing files.  Setting
 SILK_CLOBBER to a non-empty value removes this restriction.
 
+=item SILK_COMPRESSION_METHOD
+
+This environment variable is used as the value for
+B<--compression-method> when that switch is not provided.  I<Since
+SiLK 3.13.0.>
+
 =back
 
 =head1 SEE ALSO
 
-B<rwset(1)>, B<rwsetbuild(1)>, B<rwsetcat(1)>, B<rwfileinfo(1)>,
-B<silk(7)>, B<zlib(3)>
+B<rwset(1)>, B<rwsetbuild(1)>, B<rwsetcat(1)>, B<rwbagbuild(1)>,
+B<rwbagtool(1)>, B<rwfileinfo(1)>, B<silk(7)>, B<zlib(3)>
 
 =head1 NOTES
 
-The B<--record-version> switch was added in S<SiLK 3.0>.  Prior to
-S<SiLK 3.6>, the only supported arguments for the switch were 2 and 3,
-with the default being 3.  As of S<SiLK 3.6>, the default is 0.
-Version 4 was added in S<SiLK 3.7>.
+Prior to S<SiLK 3.0>, an IPset file could not contain IPv6 addresses
+and the record version was 2.  The B<--record-version> switch was
+added in S<SiLK 3.0> and its default was 3.  In S<SiLK 3.6>, an
+argument of 0 was allowed and made the default.  Version 4 was added
+in S<SiLK 3.7> as was support for the SILK_IPSET_RECORD_VERSION
+environment variable.
 
 =cut
 
-$SiLK: rwsettool.pod c6826b896c9b 2014-09-10 15:39:02Z mthomas $
+$SiLK: rwsettool.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
 
 Local Variables:
 mode:text

@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpollexec.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwpollexec.c 23be8c7700ff 2016-09-08 18:48:13Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skthread.h>
@@ -736,7 +736,15 @@ verify_command_string(
 }
 
 
-/* Parse a --timeout option */
+/*
+ *  status = parse_timeout_option(timeout);
+ *
+ *    Verify that 'timeout' contains a "SIGNAL,DELAY" pair, where
+ *    SIGNAL is a signal name or number and DELAY is a number of
+ *    seconds.  If 'timeout' is valid, return 0.
+ *
+ *    If 'timeout' is not valid, print an error and return -1.
+ */
 static int
 parse_timeout_option(
     const char         *opt_arg)
@@ -747,25 +755,29 @@ parse_timeout_option(
 
     rv = skStringParseSignal(&sig_element.signal, opt_arg);
     if (rv < 0) {
-        skAppPrintErr("Error parsing signal '%s': %s", opt_arg,
+        skAppPrintErr("Invalid %s '%s': Error parsing signal: %s",
+                      appOptions[OPT_TIMEOUT].name, opt_arg,
                       skStringParseStrerror(rv));
         return -1;
     }
     if (rv == 0) {
-        skAppPrintErr("Timeout delay did not follow signal: %s", opt_arg);
+        skAppPrintErr("Invalid %s '%s': Timeout delay did not follow signal",
+                      appOptions[OPT_TIMEOUT].name, opt_arg);
         return -1;
     }
     c = &opt_arg[rv];
     if (*c != ',') {
-        skAppPrintErr("Expected a comma (,) after the signal, "
-                      "found a '%c' instead: %s", *c, opt_arg);
+        skAppPrintErr("Invalid %s '%s': Expected a comma after the signal, "
+                      "found a '%c' instead",
+                      appOptions[OPT_TIMEOUT].name, opt_arg, *c);
         return -1;
     }
-    c++;
+    ++c;
 
     rv = skStringParseUint32(&sig_element.delay, c, 1, 0);
     if (rv) {
-        skAppPrintErr("Invalid timeout delay: '%s': %s", c,
+        skAppPrintErr("Invalid %s '%s': Error parsing delay: %s",
+                      appOptions[OPT_TIMEOUT].name, opt_arg,
                       skStringParseStrerror(rv));
         return -1;
     }

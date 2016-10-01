@@ -1,10 +1,15 @@
-# RCSIDENT("$SiLK: Makefile.am 006bf6dc14e3 2013-01-22 20:56:29Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 33debcf4a95d 2016-09-20 20:19:03Z mthomas $");
 
 # Installed Targets
 
-bin_PROGRAMS = rwallformats rwrtd2split
+bin_PROGRAMS = rwallformats
 
 EXTRA_DIST =
+
+
+# Additional Targets
+
+noinst_PROGRAMS = rwrtd2split
 
 
 # Build Rules

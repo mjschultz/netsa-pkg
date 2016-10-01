@@ -21,15 +21,15 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWUNIQ_H, "$SiLK: rwuniq.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_RWUNIQ_H, "$SiLK: rwuniq.h 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/rwascii.h>
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
 #include <silk/skstream.h>
-#include <silk/skunique.h>
 #include <silk/utils.h>
+#include "skunique.h"
 
 
 /* TYPEDEFS AND DEFINES */

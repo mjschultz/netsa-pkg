@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcombinesetup.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwcombinesetup.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstringmap.h>
@@ -51,7 +51,7 @@ static sk_options_ctx_t *optctx = NULL;
 static int caught_signal = 0;
 
 /* the compression method to use when writing the file.
- * sksiteCompmethodOptionsRegister() will set this to the default or
+ * skCompMethodOptionsRegister() will set this to the default or
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
@@ -190,7 +190,7 @@ appUsageLong(
     skOptionsCtxOptionsUsage(optctx, fh);
     skOptionsTempDirUsage(fh);
     skOptionsNotesUsage(fh);
-    sksiteCompmethodOptionsUsage(fh);
+    skCompMethodOptionsUsage(fh);
     sksiteOptionsUsage(fh);
 }
 
@@ -275,7 +275,7 @@ appSetup(
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
     uint64_t tmp64;
-    int optctx_flags;
+    unsigned int optctx_flags;
     int rv;
 
     /* verify same number of options and help strings */
@@ -305,7 +305,7 @@ appSetup(
         || skOptionsRegister(appOptions, &appOptionsHandler, NULL)
         || skOptionsTempDirRegister(&temp_directory)
         || skOptionsNotesRegister(NULL)
-        || sksiteCompmethodOptionsRegister(&comp_method)
+        || skCompMethodOptionsRegister(&comp_method)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE))
     {
         skAppPrintErr("Unable to register options");

@@ -49,7 +49,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwuniq.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwuniq.c 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $");
 
 #include "rwuniq.h"
 

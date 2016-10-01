@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-times.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: sku-times.c 0432f6547214 2016-09-19 19:08:31Z mthomas $");
 
 #include <silk/utils.h>
 
@@ -28,7 +28,7 @@ char *
 sktimestamp_r(
     char               *outbuf,
     sktime_t            t,
-    int                 timestamp_flags)
+    unsigned int        timestamp_flags)
 {
     struct tm ts;
     struct tm *rv;
@@ -132,7 +132,7 @@ sktimestamp_r(
 char *
 sktimestamp(
     sktime_t            t,
-    int                 timestamp_flags)
+    unsigned int        timestamp_flags)
 {
     static char t_buf[SKTIMESTAMP_STRLEN];
     return sktimestamp_r(t_buf, t, timestamp_flags);

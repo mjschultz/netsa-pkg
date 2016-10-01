@@ -336,7 +336,7 @@ file I<PATH>.  (To build an IPset, use B<rwset(1)> or
 B<rwsetbuild(1)>.)  When used with B<--minkey> and/or B<--maxkey>,
 output records whose key is in the IPset and is also within when the
 specified range.  As of SiLK 3.12.0, B<rwbagcat> exits with an
-error if the B<--network-structure> switch is used on a Bag file whose
+error if the B<--mask-set> switch is used on a Bag file whose
 key-type is neither C<custom> nor an IP address type.
 
 =item B<--mincounter>=I<VALUE>
@@ -769,7 +769,7 @@ B<rwfileinfo(1)>, B<rwset(1)>, B<rwsetbuild(1)>, B<silk(7)>
 
 =cut
 
-$SiLK: rwbagcat.pod 638dc247c4f7 2016-06-13 19:13:09Z mthomas $
+$SiLK: rwbagcat.pod c24a31ef468d 2016-09-07 14:11:17Z mthomas $
 
 Local Variables:
 mode:text

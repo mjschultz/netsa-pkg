@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwflowappend.c ec5c9528ed87 2016-05-27 21:40:26Z mthomas $");
+RCSIDENT("$SiLK: rwflowappend.c b87f61575a2a 2016-09-22 18:42:02Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/rwrec.h>
@@ -291,7 +291,7 @@ appUsageLong(
         }
         fprintf(fh, "\n");
     }
-    sksiteCompmethodOptionsUsage(fh);
+    skCompMethodOptionsUsage(fh);
     sksiteOptionsUsage(fh);
 
     fprintf(fh, "\nLogging and daemon switches:\n");
@@ -411,12 +411,15 @@ appSetup(
         exit(EXIT_FAILURE);
     }
 
+    /* do not set the comp_method from the environment */
+    skCompMethodOptionsNoEnviron();
+
     /* Add the --compression-method switch.  This call will cause us
      * to use the compression method set at compile time if the user
      * doesn't provide the switch.  Since we want to default to using
      * the compression on the incremental files, reset the comp_method
      * variable to "invalid". */
-    if (sksiteCompmethodOptionsRegister(&(comp_method))) {
+    if (skCompMethodOptionsRegister(&comp_method)) {
         skAppPrintErr("Unable to register options");
         exit(EXIT_FAILURE);
     }

@@ -213,7 +213,8 @@ Write the flow files in little endian format.
 
 =item B<--compression-method>=I<COMP_METHOD>
 
-Specify how to compress newly created hourly files.  When this switch
+Specify the compression library to use when creating new hourly files.
+When this switch
 is not given, newly created hourly files maintain the compression
 method used by the incremental file (i.e., the compression method
 specified to B<rwflowpack>).  When appending to an existing hourly
@@ -241,9 +242,16 @@ Use the I<lzo1x> algorithm from the LZO real time compression library
 for compression.  This compression provides good compression with less
 memory and CPU overhead.
 
+=item snappy
+
+Use the I<snappy> library for compression, and always compress the
+output regardless of the destination.  This compression provides good
+compression with less memory and CPU overhead.  I<Since SiLK 3.13.0.>
+
 =item best
 
-Use lzo1x if available, otherwise use zlib.
+Use lzo1x if available, otherwise use snappy if available, otherwise
+use zlib if available.
 
 =back
 
@@ -467,7 +475,7 @@ simultaneously.
 
 =cut
 
-$SiLK: rwflowappend.pod 0942a344ff30 2014-04-01 19:46:23Z mthomas $
+$SiLK: rwflowappend.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
 
 Local Variables:
 mode:text

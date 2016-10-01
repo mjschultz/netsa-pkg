@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 # MD5: 0a86c69837180d18cdcb3f646dc2a709
-# TEST: ./rwsort --plugin=flowrate.so --fields=pckts/sec ../../tests/data.rwf | ../rwuniq/rwuniq --plugin=flowrate.so --fields=pckts/sec --values=packets --presorted-input
+# TEST: ./rwsort --plugin=flowrate.so --fields=pckts/sec ../../tests/data.rwf | ../rwstats/rwuniq --plugin=flowrate.so --fields=pckts/sec --values=packets --presorted-input
 
 use strict;
 use SiLKTests;

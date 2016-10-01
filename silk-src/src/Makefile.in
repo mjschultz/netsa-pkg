@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-# RCSIDENT($SiLK: Makefile.am 4dba2416c3d6 2015-09-10 19:03:20Z mthomas $)
+# RCSIDENT($SiLK: Makefile.am 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $)
 VPATH = @srcdir@
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
@@ -112,6 +112,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_libadns.m4 \
 	$(top_srcdir)/m4/ax_check_libcares.m4 \
 	$(top_srcdir)/m4/ax_check_liblzo.m4 \
 	$(top_srcdir)/m4/ax_check_libpcap.m4 \
+	$(top_srcdir)/m4/ax_check_libsnappy.m4 \
 	$(top_srcdir)/m4/ax_check_libz.m4 \
 	$(top_srcdir)/m4/ax_check_printf_z.m4 \
 	$(top_srcdir)/m4/ax_check_pthread.m4 \
@@ -333,6 +334,7 @@ SK_ENABLE_IPFIX = @SK_ENABLE_IPFIX@
 SK_ENABLE_IPV6 = @SK_ENABLE_IPV6@
 SK_ENABLE_LZO = @SK_ENABLE_LZO@
 SK_ENABLE_OUTPUT_COMPRESSION = @SK_ENABLE_OUTPUT_COMPRESSION@
+SK_ENABLE_SNAPPY = @SK_ENABLE_SNAPPY@
 SK_ENABLE_ZLIB = @SK_ENABLE_ZLIB@
 SK_LDFLAGS = @SK_LDFLAGS@
 SK_SRC_INCLUDES = @SK_SRC_INCLUDES@
@@ -442,8 +444,7 @@ SILK_SRC_MAKE_ANALYSIS_TOOLS = \
          rwstats \
          rwswapbytes \
          rwtotal \
-         rwtuc \
-         rwuniq
+         rwtuc
 
 
 # Conditional analysis tools

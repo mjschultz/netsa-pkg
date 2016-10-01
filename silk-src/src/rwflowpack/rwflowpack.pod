@@ -693,7 +693,8 @@ Write the flow files in little endian format.
 
 =item B<--compression-method>=I<COMP_METHOD>
 
-Specify how to compress newly created files.  When this switch is not
+Specify the compression library to use when creating new files.  When
+this switch is not
 given, newly created files are compressed using the default chosen
 when SiLK was compiled.  When appending records to an existing file,
 the compression method of the file is maintained.  The valid values
@@ -720,9 +721,16 @@ Use the I<lzo1x> algorithm from the LZO real time compression library
 for compression.  This compression provides good compression with less
 memory and CPU overhead.
 
+=item snappy
+
+Use the I<snappy> library for compression, and always compress the
+output regardless of the destination.  This compression provides good
+compression with less memory and CPU overhead.  I<Since SiLK 3.13.0.>
+
 =item best
 
-Use lzo1x if available, otherwise use zlib.
+Use lzo1x if available, otherwise use snappy if available, otherwise
+use zlib if available.
 
 =back
 
@@ -1107,7 +1115,7 @@ attempt to write to the same hourly file simultaneously.
 
 =cut
 
-$SiLK: rwflowpack.pod c24c943e8d9f 2016-04-01 20:55:25Z mthomas $
+$SiLK: rwflowpack.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
 
 Local variables:
 mode:text

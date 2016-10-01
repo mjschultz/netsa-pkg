@@ -440,12 +440,18 @@ not provided.  I<Since SiLK 3.11.0.>
 
 For the IPset family of tools, this environment variable is used as
 the default value for the B<--record-version> switch when the switch
-is not provided on the command line.
+is not provided on the command line.  I<Since SiLK 3.7.0.>
 
 =item SILK_CLOBBER
 
 The SiLK tools normally refuse to overwrite existing files.  Setting
 SILK_CLOBBER to a non-empty value removes this restriction.
+
+=item SILK_COMPRESSION_METHOD
+
+For most tools that implement the B<--compression-method> switch, this
+environment variable is used as the value for that switch when it is
+not provided.  I<Since SiLK 3.13.0.>
 
 =item SILK_PAGER
 
@@ -676,7 +682,7 @@ L<http://tools.netsa.cert.org/silk/>
 
 =cut
 
-$SiLK: silk.pod 093f18894c79 2015-09-08 20:02:01Z mthomas $
+$SiLK: silk.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
 
 Local Variables:
 mode:text

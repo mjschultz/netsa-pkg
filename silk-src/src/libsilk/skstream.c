@@ -17,10 +17,11 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skstream.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: skstream.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/skstream.h>
 #include <silk/sksite.h>
+#include "skheader_priv.h"
 #include "skiobuf.h"
 #include "skstream_priv.h"
 
@@ -382,7 +383,7 @@ streamIOBufCreate(
     /* make certain compression method is available */
     if (stream->is_silk) {
         compmethod = skHeaderGetCompressionMethod(stream->silk_hdr);
-        switch (sksiteCompmethodCheck(compmethod)) {
+        switch (skCompMethodCheck(compmethod)) {
           case SK_COMPMETHOD_IS_AVAIL:
             /* known, valid, and available */
             break;
@@ -1396,7 +1397,7 @@ skStreamCheckCompmethod(
     sk_compmethod_t compmethod;
 
     compmethod = skHeaderGetCompressionMethod(stream->silk_hdr);
-    switch (sksiteCompmethodCheck(compmethod)) {
+    switch (skCompMethodCheck(compmethod)) {
       case SK_COMPMETHOD_IS_AVAIL:
         /* known, valid, and available */
         return (stream->last_rv = SKSTREAM_OK);
@@ -1404,7 +1405,7 @@ skStreamCheckCompmethod(
         /* known and valid but not available */
         if (errfn) {
             char name[64];
-            sksiteCompmethodGetName(name, sizeof(name), compmethod);
+            skCompMethodGetName(name, sizeof(name), compmethod);
             P_ERR("The %s compression method used by '%s' is not available",
                   name, stream->pathname);
         }
@@ -1445,7 +1446,7 @@ skStreamCheckSilkHeader(
     char fmt_name[SK_MAX_STRLEN_FILE_FORMAT+1];
 
     /* get the name of the requested format */
-    sksiteFileformatGetName(fmt_name, sizeof(fmt_name), file_format);
+    skFileFormatGetName(fmt_name, sizeof(fmt_name), file_format);
 
     if (fmt != file_format) {
         P_ERR("File '%s' is not a %s file; format is 0x%02x",
@@ -3449,7 +3450,7 @@ skStreamWriteSilkHeader(
                                               SK_COMPMETHOD_NONE);
         } else {
             rv = skHeaderSetCompressionMethod(stream->silk_hdr,
-                                              sksiteCompmethodGetDefault());
+                                              skCompMethodGetDefault());
         }
         if (rv) { goto END; }
         break;
@@ -3459,7 +3460,7 @@ skStreamWriteSilkHeader(
                                               SK_COMPMETHOD_NONE);
         } else {
             rv = skHeaderSetCompressionMethod(stream->silk_hdr,
-                                              sksiteCompmethodGetBest());
+                                              skCompMethodGetBest());
         }
         if (rv) { goto END; }
         break;

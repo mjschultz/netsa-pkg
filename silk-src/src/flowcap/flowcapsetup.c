@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: flowcapsetup.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: flowcapsetup.c b87f61575a2a 2016-09-22 18:42:02Z mthomas $");
 
 #include <silk/sksite.h>
 #include "flowcap.h"
@@ -147,7 +147,7 @@ appUsageLong(
         }
         fprintf(fh, "\n");
     }
-    sksiteCompmethodOptionsUsage(fh);
+    skCompMethodOptionsUsage(fh);
 
     fprintf(fh, "\nLogging and daemonization switches:\n");
     skdaemonOptionsUsage(fh);
@@ -320,12 +320,14 @@ appSetup(
     skAppVerifyFeatures(&features, NULL);
     skOptionsSetUsageCallback(&appUsageLong);
 
-    /* Set the default compression level to "best" */
-    sksiteCompmethodSetDefault(sksiteCompmethodGetBest());
+    /* Set the default compression level to "best", and do not get the
+     * comp_method from the environment. */
+    skCompMethodSetDefault(skCompMethodGetBest());
+    skCompMethodOptionsNoEnviron();
 
     /* register the options */
     if (skOptionsRegister(appOptions, &appOptionsHandler, NULL)
-        || sksiteCompmethodOptionsRegister(&comp_method)
+        || skCompMethodOptionsRegister(&comp_method)
         || sksiteOptionsRegister(0))
     {
         skAppPrintErr("Unable to register options");

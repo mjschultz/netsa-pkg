@@ -16,12 +16,12 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-app.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: sku-app.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sksite.h>
 #include <silk/skstream.h>
-#include <silk/skheader.h>
+#include "skheader_priv.h"
 
 
 /* TYPEDEFS AND DEFINES */

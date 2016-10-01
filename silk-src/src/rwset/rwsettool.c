@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsettool.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwsettool.c 56e2ec1fb1aa 2016-07-15 17:25:38Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skipset.h>
@@ -90,10 +90,13 @@ static skipset_options_t set_options;
 
 /* OPTIONS SETUP */
 
+#define FINAL_OPERATION_OPT   (unsigned int)OPT_SAMPLE_RATIO
+
 typedef enum {
     OPT_UNION,
     OPT_INTERSECT,
     OPT_DIFFERENCE,
+    OPT_SYMMETRIC_DIFFERENCE,
     OPT_MASK,
     OPT_FILL_BLOCKS,
     OPT_SAMPLE,
@@ -107,6 +110,7 @@ static struct option appOptions[] = {
     {"union",           NO_ARG,       0, OPT_UNION},
     {"intersect",       NO_ARG,       0, OPT_INTERSECT},
     {"difference",      NO_ARG,       0, OPT_DIFFERENCE},
+    {"symmetric-difference",  NO_ARG, 0, OPT_SYMMETRIC_DIFFERENCE},
     {"mask",            REQUIRED_ARG, 0, OPT_MASK},
     {"fill-blocks",     REQUIRED_ARG, 0, OPT_FILL_BLOCKS},
     {"sample",          NO_ARG,       0, OPT_SAMPLE},
@@ -118,26 +122,35 @@ static struct option appOptions[] = {
 };
 
 static const char *appHelp[] = {
-    ("Create an IPset containing the IPs that exist in ANY of\n"
-     "\tthe input IPsets"),
-    ("Create an IPset containing the IPs that exist in ALL of\n"
-     "\tthe input IPsets"),
-    ("Create an IPset containing the IPs from the first IPset\n"
-     "\tthat do not exist any subsequent IPset"),
-    ("Create an IPset containing a single IP in each block of the\n"
-     "\tspecified bitmask length when ANY of the input IPsets have an\n"
-     "\tIP in that block"),
-    ("Create an IPset containing a completely full block of\n"
-     "\tthe specified bitmask length when ANY of the input IPsets have\n"
-     "\tan IP in that block"),
-    ("Create an IPset containing a random sample of IPs from\n"
-     "\tall input IPsets.  Requires the --size or --ratio switch."),
-    ("Specify the sample size (number of IPs sampled from each\n"
-     "\tinput IPset) for the --sample operation"),
-    ("Specify the probability, as a floating point value between\n"
-     "\t0.0 and 1.0, that an individual IP will be sampled"),
-    "Specify the random number seed for the --sample operation",
-    "Write the resulting IPset to this location. Def. stdout",
+    ("Create an IPset that contains the IP addresses that are members\n"
+     "\tof ANY of the input IPsets"),
+    ("Create an IPset that contains the IP addresses that are\n"
+     "\tmembers of ALL the input IPsets"),
+    ("Create an IPset that contains the IP addresses that are\n"
+     "\tmembers of the first IPset but not members of any subsequent IPset"),
+    ("Create an IPset that contains the IP addresses\n"
+     "\tthat are members of either the first or second IPset but not both"),
+    ("Create an IPset that contains, for each block of this network\n"
+     "\tmask length, a single IP address when any of the input IPsets have\n"
+     "\tone or more IP address members in the block"),
+    ("Create an IPset that contains, for each block of this\n"
+     "\tnetwork mask length, a completely filled block when any of the input\n"
+     "\tIPsets have one more more IP address members in the block"),
+    ("Create an IPset that contains the union of a random sample of\n"
+     "\tIP addresses from all input IPsets.  Requires --size or --ratio"),
+
+    ("Create an IPset that contains the union of randomly selecting\n"
+     "\texactly this number of IP addresses from each input IPset.\n"
+     "\tMay only be used with the --sample switch"),
+
+    ("Create an IPset where the probably of including each IP\n"
+     "\taddress of each input is given by this value, a floating point value\n"
+     "\tbetween 0.0 and 1.0.  May only be used with the --sample switch"),
+
+
+    ("Specify the seed for the pseudo-random number generator used by\n"
+     "\tthe --sample operation"),
+    ("Write the resulting IPset to this location. Def. stdout"),
     (char *) NULL
 };
 
@@ -162,14 +175,25 @@ appUsageLong(
     void)
 {
 #define USAGE_MSG                                                          \
-    ("<OPERATION> [SWITCHES] IPSET..\n"                                    \
+    ("<OPERATION> [SWITCHES] IPSET [IPSET...]\n"                           \
      "\tPerforms the specified OPERATION, one of --union, --intersect,\n"  \
-     "\t--difference, --mask, --fill-blocks, or --sample, on the input\n"  \
-     "\tIPset file(s) and generates a new IPset file.\n")
+     "\t--difference, --symmetric-difference, --mask, --fill-blocks, or\n" \
+     "\t--sample, on the input IPset file(s) and creates a new IPset file.\n")
 
     FILE *fh = USAGE_FH;
+    unsigned int i;
 
-    skAppStandardUsage(fh, USAGE_MSG, appOptions, appHelp);
+    fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
+    fprintf(fh, "\nOPERATION:\n");
+    for (i = 0; appOptions[i].name; ++i) {
+        fprintf(fh, "--%s %s. %s\n",
+                appOptions[i].name, SK_OPTION_HAS_ARG(appOptions[i]),
+                appHelp[i]);
+        if (FINAL_OPERATION_OPT == i) {
+            fprintf(fh, "\nSWITCHES:\n");
+            skOptionsDefaultUsage(fh);
+        }
+    }
     skIPSetOptionsUsage(fh);
 }
 
@@ -261,11 +285,12 @@ appSetup(
 
     /* verify that we have something to do */
     if (operation == -1) {
-        skAppPrintErr(("One of --%s, --%s, --%s,"
+        skAppPrintErr(("One of --%s, --%s, --%s, --%s,"
                        " --%s, --%s, or --%s is required"),
                       appOptions[OPT_UNION].name,
                       appOptions[OPT_INTERSECT].name,
                       appOptions[OPT_DIFFERENCE].name,
+                      appOptions[OPT_SYMMETRIC_DIFFERENCE].name,
                       appOptions[OPT_MASK].name,
                       appOptions[OPT_FILL_BLOCKS].name,
                       appOptions[OPT_SAMPLE].name);
@@ -349,6 +374,7 @@ appOptionsHandler(
     switch ((appOptionsEnum) opt_index) {
       case OPT_INTERSECT:
       case OPT_DIFFERENCE:
+      case OPT_SYMMETRIC_DIFFERENCE:
       case OPT_SAMPLE:
         if ((operation >= 0) && (operation != opt_index)) {
             skAppPrintErr("Switches --%s and --%s are incompatible",
@@ -837,6 +863,99 @@ intersectSets(
 }
 
 
+/*
+ *  out_set = symmetricDiffSets(argc, argv);
+ *
+ *    Create a new IPset that is the symmetic difference of all IPsets
+ *    specified on the command line---given by 'argc' and 'argv'.
+ *    Return the new IPset, or return NULL on error.
+ */
+static skipset_t *
+symmetricDiffSets(
+    int                 argc,
+    char              **argv)
+{
+    skstream_t *in_stream = NULL;
+    skipset_t *out_set = NULL;
+    skipset_t *set1 = NULL;
+    skipset_t *set2 = NULL;
+    int have_input;
+    int rv;
+
+    have_input = appNextInput(argc, argv, &in_stream);
+    if (1 != have_input) {
+        return NULL;
+    }
+    out_set = readSet(in_stream);
+    if (NULL == out_set) {
+        rv = 0;
+        goto ERROR;
+    }
+    skStreamDestroy(&in_stream);
+
+    /* create an IPset to use as a temporary copy */
+    rv = skIPSetCreate(&set1, skIPSetContainsV6(out_set));
+    if (rv) { goto ERROR; }
+
+    while (1 == (have_input = appNextInput(argc, argv, &in_stream))) {
+        set2 = readSet(in_stream);
+        if (NULL == set2) {
+            rv = 0;
+            goto ERROR;
+        }
+        skStreamDestroy(&in_stream);
+
+        /* compute set1 - set2, where out_set is the current set1, but
+         * we need to keep a copy of set1 */
+        assert(0 == skIPSetCountIPs(set1, NULL));
+        rv = skIPSetUnion(set1, out_set);
+        if (rv) { goto ERROR; }
+        rv = skIPSetClean(set1);
+        if (rv) { goto ERROR; }
+        rv = skIPSetSubtract(out_set, set2);
+        if (rv) { goto ERROR; }
+
+        /* compute set2 - set1, use the copy of set1 and we may
+         * overwrite set2 */
+        rv = skIPSetSubtract(set2, set1);
+        if (rv) { goto ERROR; }
+        rv = skIPSetClean(set2);
+        if (rv) { goto ERROR; }
+
+        /* we may empty set1 */
+        rv = skIPSetRemoveAll(set1);
+        if (rv) { goto ERROR; }
+
+        /* compute the union of the differences */
+        rv = skIPSetUnion(out_set, set2);
+        if (rv) { goto ERROR; }
+        rv = skIPSetClean(out_set);
+        if (rv) { goto ERROR; }
+
+        /* done with set2 */
+        skIPSetDestroy(&set2);
+    }
+    if (0 != have_input) {
+        goto ERROR;
+    }
+
+    skIPSetDestroy(&set1);
+
+    return out_set;
+
+  ERROR:
+    if (rv) {
+        skAppPrintErr("Error during %s operation: %s",
+                      appOptions[operation].name, skIPSetStrerror(rv));
+    }
+    skStreamDestroy(&in_stream);
+    skIPSetDestroy(&out_set);
+    skIPSetDestroy(&set1);
+    skIPSetDestroy(&set2);
+    return NULL;
+}
+
+
 #if SK_ENABLE_IPV6
 /*
  *    Callback invoked after opening a stream to performing the union
@@ -904,6 +1023,12 @@ int main(int argc, char **argv)
 
     } else if (OPT_INTERSECT == operation) {
         out_set = intersectSets(argc, argv);
+        if (NULL == out_set) {
+            return EXIT_FAILURE;
+        }
+
+    } else if (OPT_SYMMETRIC_DIFFERENCE == operation) {
+        out_set = symmetricDiffSets(argc, argv);
         if (NULL == out_set) {
             return EXIT_FAILURE;
         }

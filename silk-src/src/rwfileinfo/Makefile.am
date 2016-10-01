@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 006bf6dc14e3 2013-01-22 20:56:29Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 2d7b43e7a886 2016-09-23 14:04:15Z mthomas $");
 
 # Installed Targets
 
@@ -41,5 +41,9 @@ TESTS = \
 	tests/rwfileinfo-recs-stdin.pl \
 	tests/rwfileinfo-vers-cmd-lines.pl \
 	tests/rwfileinfo-length.pl \
-	tests/rwfileinfo-byte-order.pl \
+	tests/rwfileinfo-byte-order.pl
+
+# above tests are automatically generated;
+# those below are written by hand
+TESTS += \
 	tests/rwfileinfo-compression.pl

@@ -277,10 +277,10 @@ file in the processing-directory if possible, otherwise a complete
 copy is made.  (Note that any modification-in-place to a file
 reference affects all references to that file; use
 B<--unique-local-copies> to avoid this).  If I<IDENT> is specified,
-filters can be used to determine which files get copied to I<DIR>.
+filters may be used to determine which files get copied to I<DIR>.
 See L<--filter|/"B<--filter>=I<IDENT>:I<REGEXP>"> for filter details.
 When I<DIR> contains the colon character and no I<IDENT> is wanted, a
-single colon can precede I<DIR> to designate an empty I<IDENT>.
+single colon may precede I<DIR> to designate an empty I<IDENT>.
 
 =item B<--unique-local-copies>
 
@@ -308,6 +308,15 @@ regular expressions, roughly akin to those used by B<egrep(1)>.
 Documentation might be found in the B<regex(7)> or B<re_format(7)>
 manual pages on your system.
 
+The filter is only applied to files in the incoming-directory.  Once a
+file has been moved into an B<rwreceiver>-specific subdirectory of the
+processing-directory, restarting B<rwsender> with a different set of
+B<--filter> switches does not affect the files previously queued for
+each B<rwreceiver>.  To apply the filters to unsent files, you must
+stop the B<rwsender> process, move all files from the subdirectories
+of the processing-directory to the incoming-directory, and restart the
+B<rwsender> process.
+
 =item B<--priority>=I<NUM>:I<REGEXP>
 
 Set the priority of files that match I<REGEXP> to I<NUM>.  I<NUM> must
@@ -316,7 +325,7 @@ B<rwsender>, priorities 0 through 50 get grouped into a single I<low>
 priority bin, and priorities 51 through 100 get grouped into a single
 I<high> priority bin.  Files in the high priority bin are generally
 be sent before files in the low priority bin.  The default priority of
-a file is 50.  This switch can be repeated for multiple priorities.
+a file is 50.  This switch may be repeated for multiple priorities.
 
 =item B<--polling-interval>=I<NUM>
 
@@ -435,7 +444,7 @@ existing file in the processing directory.
 
 =cut
 
-$SiLK: rwsender.pod 94f573008393 2016-02-02 14:56:24Z mthomas $
+$SiLK: rwsender.pod e01b3bf70e8f 2016-08-09 21:14:22Z mthomas $
 
 Local Variables:
 mode:text

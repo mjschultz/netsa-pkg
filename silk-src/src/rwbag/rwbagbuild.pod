@@ -447,7 +447,10 @@ I<Since SiLK 3.12.0.>
 
 =item B<--compression-method>=I<COMP_METHOD>
 
-Specify how to compress the output.  When this switch is not given,
+Specify the compression library to use when writing output files.  If
+this switch is not given, the value in the SILK_COMPRESSION_METHOD
+environment variable is used if the value names an available
+compression method.  When no compression method is specified,
 output to the standard output or to named pipes is not compressed, and
 output to files is compressed using the default chosen when SiLK was
 compiled.  The valid values for I<COMP_METHOD> are determined by which
@@ -475,10 +478,17 @@ for compression, and always compress the output regardless of the
 destination.  This compression provides good compression with less
 memory and CPU overhead.
 
+=item snappy
+
+Use the I<snappy> library for compression, and always compress the
+output regardless of the destination.  This compression provides good
+compression with less memory and CPU overhead.  I<Since SiLK 3.13.0.>
+
 =item best
 
-Use lzo1x if available, otherwise use zlib.  Only compress the output
-when writing to a file.
+Use lzo1x if available, otherwise use snappy if available, otherwise
+use zlib if available.  Only compress the output when writing to a
+file.
 
 =back
 
@@ -752,6 +762,12 @@ the L</FILES> section for standard locations of this file.
 The SiLK tools normally refuse to overwrite existing files.  Setting
 SILK_CLOBBER to a non-empty value removes this restriction.
 
+=item SILK_COMPRESSION_METHOD
+
+This environment variable is used as the value for
+B<--compression-method> when that switch is not provided.  I<Since
+SiLK 3.13.0.>
+
 =item SILK_PATH
 
 This environment variable gives the root of the install tree.  When
@@ -791,7 +807,7 @@ The B<--default-count> switch is poorly named.
 
 =cut
 
-$SiLK: rwbagbuild.pod f0408b1cf446 2016-04-01 20:51:57Z mthomas $
+$SiLK: rwbagbuild.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
 
 Local Variables:
 mode:text

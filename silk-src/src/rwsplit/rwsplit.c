@@ -26,7 +26,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsplit.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwsplit.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipset.h>
@@ -98,7 +98,7 @@ static aggmode_t aggmode = AGGMODE_NONE;
 static int seed_specified = 0;
 
 /* the compression method to use when writing the file.
- * sksiteCompmethodOptionsRegister() will set this to the default or
+ * skCompMethodOptionsRegister() will set this to the default or
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
@@ -207,7 +207,7 @@ appUsageLong(
     }
     skOptionsCtxOptionsUsage(optctx, fh);
     skOptionsNotesUsage(fh);
-    sksiteCompmethodOptionsUsage(fh);
+    skCompMethodOptionsUsage(fh);
     sksiteOptionsUsage(fh);
 
     fprintf(fh, ("\nNote: The --basename and one of the --*-limit"
@@ -264,7 +264,7 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
-    int optctx_flags;
+    unsigned int optctx_flags;
     int rv;
 
     /* verify same number of options and help strings */
@@ -288,7 +288,7 @@ appSetup(
         || skOptionsCtxOptionsRegister(optctx)
         || skOptionsRegister(appOptions, &appOptionsHandler, NULL)
         || skOptionsNotesRegister(NULL)
-        || sksiteCompmethodOptionsRegister(&comp_method)
+        || skCompMethodOptionsRegister(&comp_method)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE))
     {
         skAppPrintErr("Unable to register options");

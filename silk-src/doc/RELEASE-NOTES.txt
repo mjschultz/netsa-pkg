@@ -1,3 +1,33 @@
+SiLK-3.13.0 Release, 2016-Sep-29
+
+* Change across all tools
+  -- Add support for compressing files with "Snappy" compression when
+     the Snappy library and header are found during configuration.
+  -- Add support for the SILK_COMPRESSION_METHOD environment variable
+     that provides a default value for the --compression-method switch.
+* rwcount
+  -- Do not limit the maximum array size to a 32-bit value on 64-bit
+     platforms.
+* rwsettool
+  -- Add a --symmetric-difference switch to compute the set of IP
+     addresses that occur in only one of two input IPsets.
+* rwfileinfo
+  -- Disable printing of the record count when the file's compression
+     method is not available.
+* rwfilter, rwfglob
+  -- Fix a file-selection bug where a --start-date specified in epoch
+     seconds that fell on a day boundary would return files for that
+     entire day instead of for that single hour.
+* PySiLK
+  -- Fix memory leaks.
+  -- Fix a bug in the silk.site.repository_iter() where an epoch-based
+     start-date value that fell on a day boundary would return files
+     for that entire day instead of for that single hour.
+* rwsender
+  -- Change the log messages that are written when scanning the
+     incoming and processing directories.
+
+
 SiLK-3.12.2 Release, 2016-Jun-23
 
 * rwgeoip2ccmap

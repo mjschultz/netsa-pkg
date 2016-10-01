@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 # MD5: 1c0632eb6be72e2a09447a7696795dd8
-# TEST: ./rwsort --python-file=../../tests/pysilk-plugin.py --fields=proto_name ../../tests/data.rwf | ../rwuniq/rwuniq --python-file=../../tests/pysilk-plugin.py --fields=proto_name --values=bytes --presorted-input
+# TEST: ./rwsort --python-file=../../tests/pysilk-plugin.py --fields=proto_name ../../tests/data.rwf | ../rwstats/rwuniq --python-file=../../tests/pysilk-plugin.py --fields=proto_name --values=bytes --presorted-input
 
 use strict;
 use SiLKTests;

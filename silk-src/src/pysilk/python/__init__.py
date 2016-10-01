@@ -8,7 +8,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: __init__.py 85572f89ddf9 2016-05-05 20:07:39Z mthomas $
+# $SiLK: __init__.py 22da9b03c74d 2016-09-19 18:28:03Z mthomas $
 #######################################################################
 
 import sys
@@ -72,7 +72,7 @@ __all__ = ['IPAddr', 'IPv4Addr', 'IPv6Addr',
            'BAG_COUNTER_MAX',
            'IGNORE', 'ASV4', 'MIX', 'FORCE', 'ONLY',
            'READ', 'WRITE', 'APPEND',
-           'DEFAULT', 'NO_COMPRESSION', 'ZLIB', 'LZO1X',
+           'DEFAULT', 'NO_COMPRESSION', 'ZLIB', 'LZO1X', 'SNAPPY',
            'FIN', 'SYN', 'RST', 'PSH', 'ACK', 'URG', 'ECE', 'CWR',
            'TCP_FIN', 'TCP_SYN', 'TCP_RST', 'TCP_PSH',
            'TCP_ACK', 'TCP_URG', 'TCP_ECE', 'TCP_CWR',
@@ -101,6 +101,7 @@ DEFAULT = pysilk.DEFAULT
 NO_COMPRESSION = pysilk.NO_COMPRESSION
 ZLIB = pysilk.ZLIB
 LZO1X = pysilk.LZO1X
+SNAPPY = pysilk.SNAPPY
 BAG_COUNTER_MAX = pysilk.BAG_COUNTER_MAX
 silk_version = pysilk.silk_version
 initial_tcpflags_enabled = pysilk.initial_tcpflags_enabled

@@ -26,7 +26,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwrecgenerator.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwrecgenerator.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/rwascii.h>
 #include <silk/rwrec.h>
@@ -514,7 +514,7 @@ appUsageLong(
             break;
 
           case OPT_TEXT_OUTPUT_PATH:
-            sksiteCompmethodOptionsUsage(fh);
+            skCompMethodOptionsUsage(fh);
             fprintf(fh, "\nSingle Text Output File Switches:\n");
             break;
 
@@ -676,7 +676,7 @@ appSetup(
 
     /* register the options */
     if (skOptionsRegister(appOptions, &appOptionsHandler, NULL)
-        || sksiteCompmethodOptionsRegister(&comp_method)
+        || skCompMethodOptionsRegister(&comp_method)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE)
         || skOptionsTimestampFormatRegister(&time_flags, time_register_flags)
         || skOptionsIPFormatRegister(&ip_format))

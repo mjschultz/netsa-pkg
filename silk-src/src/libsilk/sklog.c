@@ -20,11 +20,11 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sklog.c 558ff1948cad 2016-06-16 18:41:50Z mthomas $");
+RCSIDENT("$SiLK: sklog.c 4732ab1b2fad 2016-09-08 18:45:38Z mthomas $");
 
-#include <silk/utils.h>
 #include <silk/sklog.h>
 #include <silk/skstringmap.h>
+#include <silk/utils.h>
 #include <syslog.h>
 #include <sys/utsname.h>
 
@@ -57,6 +57,10 @@ RCSIDENT("$SiLK: sklog.c 558ff1948cad 2016-06-16 18:41:50Z mthomas $");
 
 /* default syslog options */
 #define SKLOG_SYSOPTIONS   LOG_PID
+
+/* number of command-line/config-file options; must agree with
+ * logOptions[] and other logOptions* constants. */
+#define NUM_OPTIONS        7
 
 /* invoke the proper logging function if the log has been setup and
  * the log is open */
@@ -143,6 +147,9 @@ typedef struct sklog_rotated_st {
 
 /* the actual logging context */
 typedef struct sklog_context_st {
+    /* holds the argument that the user provided to each option.
+     * Index is a value from logOptionsEnum */
+    const char     *l_opt_values[NUM_OPTIONS];
     /* holds all the syslog-specific info */
     sklog_system_t  l_sys;
     /* holds the info when logging to a single file */
@@ -223,10 +230,9 @@ static const sk_stringmap_entry_t log_facility[] = {
 
 /* OPTIONS SETUP */
 
-#define NUM_OPTIONS 7
-
-static const char *opt_values[NUM_OPTIONS];
-
+/*
+ *    Identifiers for each option.
+ */
 typedef enum {
     OPT_LOG_DIRECTORY,
     OPT_LOG_BASENAME,
@@ -237,6 +243,25 @@ typedef enum {
     OPT_LOG_SYSFACILITY
 } logOptionsEnum;
 
+/*
+ *    Whether the option is used/required by the file-based (legacy)
+ *    logging or syslog logging.  Order must be kept in sync with
+ *    logOptionsEnum.
+ */
+static const int logOptionsIsUsed[] = {
+    SKLOG_FEATURE_LEGACY,
+    SKLOG_FEATURE_LEGACY,
+    SKLOG_FEATURE_LEGACY,
+    SKLOG_FEATURE_LEGACY,
+    SKLOG_FEATURE_SYSLOG,
+    SKLOG_FEATURE_SYSLOG | SKLOG_FEATURE_LEGACY,
+    SKLOG_FEATURE_SYSLOG
+};
+
+/*
+ *    Array of options for command-line switches.  Must keep in sync
+ *    with logOptionsEnum and logOptionsIsUsed above.
+ */
 static struct option logOptions[] = {
     {"log-directory",   REQUIRED_ARG, 0, OPT_LOG_DIRECTORY},
     {"log-basename",    REQUIRED_ARG, 0, OPT_LOG_BASENAME},
@@ -246,16 +271,6 @@ static struct option logOptions[] = {
     {"log-level",       REQUIRED_ARG, 0, OPT_LOG_LEVEL},
     {"log-sysfacility", REQUIRED_ARG, 0, OPT_LOG_SYSFACILITY},
     {0,0,0,0}           /* sentinel entry */
-};
-
-static int logOptionsIsUsed[] = {
-    SKLOG_FEATURE_LEGACY,
-    SKLOG_FEATURE_LEGACY,
-    SKLOG_FEATURE_LEGACY,
-    SKLOG_FEATURE_LEGACY,
-    SKLOG_FEATURE_SYSLOG,
-    SKLOG_FEATURE_SYSLOG | SKLOG_FEATURE_LEGACY,
-    SKLOG_FEATURE_SYSLOG
 };
 
 
@@ -663,11 +678,55 @@ logOptionsHandler(
     int                 opt_index,
     char               *opt_arg)
 {
-    const char **args = (const char **)cData;
+    sklog_context_t *ctx = (sklog_context_t*)cData;
 
-    assert(opt_index < (int)(sizeof(opt_values)/sizeof(char*)));
+    assert(ctx);
+    assert(opt_index < (int)(sizeof(ctx->l_opt_values)/sizeof(char*)));
 
-    args[opt_index] = opt_arg;
+    ctx->l_opt_values[opt_index] = opt_arg;
+    return 0;
+}
+
+
+/*
+ *    Register the command-line switches depending on the type of log
+ *    feature requested.
+ */
+static int
+logOptionsSetup(
+    int                 feature_flags)
+{
+    static struct option options_used[NUM_OPTIONS+1];
+    unsigned int opt_count = 0;
+    unsigned int i;
+
+    assert(NUM_OPTIONS == (sizeof(logOptions)/sizeof(struct option) - 1));
+    assert(NUM_OPTIONS == (sizeof(logOptionsIsUsed)/sizeof(int)));
+
+    /* loop through the options, copying those that the caller needs
+     * into 'options_used'.  'opt_count' is the number of 'struct
+     * option' entries we have */
+    for (i = 0; logOptions[i].name; ++i) {
+        if (feature_flags & logOptionsIsUsed[i]) {
+            /* use this option */
+            memcpy(&(options_used[opt_count]), &(logOptions[i]),
+                   sizeof(struct option));
+            ++opt_count;
+        }
+    }
+
+    /* set sentinel */
+    memset(&(options_used[opt_count]), 0, sizeof(struct option));
+
+    /* register the options */
+    if (opt_count > 0) {
+        if (skOptionsRegister(options_used, &logOptionsHandler,
+                              (clientData)logctx))
+        {
+            return -1;
+        }
+    }
+
     return 0;
 }
 
@@ -809,7 +868,7 @@ logRotatedOpen(
              SKLOG_SUFFIX);
 
     /* if this is the initial open, use logOpenSimple() to set the
-     * applicataion and machine names.  otherwise, just fopen() the
+     * application and machine names.  otherwise, just fopen() the
      * new location */
     if (logctx->l_sim.fp == NULL) {
         rv = logSimpleOpen();
@@ -962,7 +1021,7 @@ SK_DIAGNOSTIC_FORMAT_NONLITERAL_POP
 static int
 logStringifyCommand(
     int                 argc,
-    char   * const     *argv)
+    char * const       *argv)
 {
     size_t cmd_len;
     size_t rem_len;
@@ -1449,105 +1508,108 @@ sklogOptionsVerify(
 
     /* only one of directory, pathname, or destination may be given,
      * and one must be given */
-    if (opt_values[OPT_LOG_DIRECTORY] != NULL) {
+    if (logctx->l_opt_values[OPT_LOG_DIRECTORY] != NULL) {
         ++dest_count;
     }
-    if (opt_values[OPT_LOG_PATHNAME] != NULL) {
+    if (logctx->l_opt_values[OPT_LOG_PATHNAME] != NULL) {
         ++dest_count;
     }
-    if (opt_values[OPT_LOG_DESTINATION] != NULL) {
+    if (logctx->l_opt_values[OPT_LOG_DESTINATION] != NULL) {
         ++dest_count;
     }
 
     if (dest_count == 0) {
+        ++err_count;
         if ((logctx->l_features & (SKLOG_FEATURE_LEGACY|SKLOG_FEATURE_SYSLOG))
             == (SKLOG_FEATURE_LEGACY|SKLOG_FEATURE_SYSLOG))
         {
-            skAppPrintErr("One of --%s, --%s, or\n\t--%s is required",
+            skAppPrintErr("One of --%s, --%s, or --%s is required",
                           logOptions[OPT_LOG_DIRECTORY].name,
                           logOptions[OPT_LOG_PATHNAME].name,
                           logOptions[OPT_LOG_DESTINATION].name);
-            ++err_count;
         } else if (logctx->l_features & SKLOG_FEATURE_LEGACY) {
             skAppPrintErr("Either --%s or --%s is required",
                           logOptions[OPT_LOG_DIRECTORY].name,
                           logOptions[OPT_LOG_PATHNAME].name);
-            ++err_count;
         } else if (logctx->l_features & SKLOG_FEATURE_SYSLOG) {
             skAppPrintErr("The --%s switch is required",
                           logOptions[OPT_LOG_DESTINATION].name);
-            ++err_count;
         }
     } else if (dest_count > 1) {
+        ++err_count;
         if ((logctx->l_features & (SKLOG_FEATURE_LEGACY|SKLOG_FEATURE_SYSLOG))
             == (SKLOG_FEATURE_LEGACY|SKLOG_FEATURE_SYSLOG))
         {
-            skAppPrintErr(("Only one of --%s, --%s, or\n"
-                           "\t--%s may be specified"),
+            skAppPrintErr("Only one of --%s, --%s, or --%s may be specified",
                           logOptions[OPT_LOG_DIRECTORY].name,
                           logOptions[OPT_LOG_PATHNAME].name,
                           logOptions[OPT_LOG_DESTINATION].name);
-            ++err_count;
         } else if (logctx->l_features & SKLOG_FEATURE_LEGACY) {
             skAppPrintErr("Only one of --%s or --%s may be specified",
                           logOptions[OPT_LOG_DIRECTORY].name,
                           logOptions[OPT_LOG_PATHNAME].name);
-            ++err_count;
         } else {
             skAbort();
         }
     }
 
-    if (opt_values[OPT_LOG_BASENAME] && !opt_values[OPT_LOG_DIRECTORY]) {
+    if (logctx->l_opt_values[OPT_LOG_BASENAME]
+        && !logctx->l_opt_values[OPT_LOG_DIRECTORY])
+    {
+        ++err_count;
         skAppPrintErr("May only use --%s when --%s is specified",
                       logOptions[OPT_LOG_BASENAME].name,
                       logOptions[OPT_LOG_DIRECTORY].name);
-        ++err_count;
     }
-    if (opt_values[OPT_LOG_POST_ROTATE] && !opt_values[OPT_LOG_DIRECTORY]) {
+    if (logctx->l_opt_values[OPT_LOG_POST_ROTATE]
+        && !logctx->l_opt_values[OPT_LOG_DIRECTORY])
+    {
+        ++err_count;
         skAppPrintErr("May only use --%s when --%s is specified",
                       logOptions[OPT_LOG_POST_ROTATE].name,
                       logOptions[OPT_LOG_DIRECTORY].name);
-        ++err_count;
     }
 
-    if (opt_values[OPT_LOG_DIRECTORY]) {
-        if (sklogSetDirectory(opt_values[OPT_LOG_DIRECTORY],
-                              opt_values[OPT_LOG_BASENAME]))
+    if (logctx->l_opt_values[OPT_LOG_DIRECTORY]) {
+        if (sklogSetDirectory(logctx->l_opt_values[OPT_LOG_DIRECTORY],
+                              logctx->l_opt_values[OPT_LOG_BASENAME]))
         {
             ++err_count;
         }
-        if (opt_values[OPT_LOG_POST_ROTATE]) {
-            if (sklogSetPostRotateCommand(opt_values[OPT_LOG_POST_ROTATE])) {
+        if (logctx->l_opt_values[OPT_LOG_POST_ROTATE]) {
+            if (sklogSetPostRotateCommand(
+                    logctx->l_opt_values[OPT_LOG_POST_ROTATE]))
+            {
                 ++err_count;
             }
         }
     }
-    if (opt_values[OPT_LOG_PATHNAME]) {
-        if (opt_values[OPT_LOG_PATHNAME][0] != '/') {
-            skAppPrintErr(("The --%s switch requires a complete path\n"
-                           "\t('%s' does not begin with a slash)"),
+    if (logctx->l_opt_values[OPT_LOG_PATHNAME]) {
+        if (logctx->l_opt_values[OPT_LOG_PATHNAME][0] != '/') {
+            ++err_count;
+            skAppPrintErr(("Invalid %s '%s': A complete path is required"
+                           " and value does not begin with a slash"),
                           logOptions[OPT_LOG_PATHNAME].name,
-                          opt_values[OPT_LOG_PATHNAME]);
-            ++err_count;
-        } else if (sklogSetDestination(opt_values[OPT_LOG_PATHNAME])) {
-            ++err_count;
-        }
-    }
-    if (opt_values[OPT_LOG_DESTINATION]) {
-        if (sklogSetDestination(opt_values[OPT_LOG_DESTINATION])) {
+                          logctx->l_opt_values[OPT_LOG_PATHNAME]);
+        } else if (sklogSetDestination(logctx->l_opt_values[OPT_LOG_PATHNAME]))
+        {
             ++err_count;
         }
     }
-
-    if (opt_values[OPT_LOG_LEVEL]) {
-        if (sklogSetLevel(opt_values[OPT_LOG_LEVEL])) {
+    if (logctx->l_opt_values[OPT_LOG_DESTINATION]) {
+        if (sklogSetDestination(logctx->l_opt_values[OPT_LOG_DESTINATION])) {
             ++err_count;
         }
     }
 
-    if (opt_values[OPT_LOG_SYSFACILITY]) {
-        if (sklogSetFacilityByName(opt_values[OPT_LOG_SYSFACILITY])) {
+    if (logctx->l_opt_values[OPT_LOG_LEVEL]) {
+        if (sklogSetLevel(logctx->l_opt_values[OPT_LOG_LEVEL])) {
+            ++err_count;
+        }
+    }
+
+    if (logctx->l_opt_values[OPT_LOG_SYSFACILITY]) {
+        if (sklogSetFacilityByName(logctx->l_opt_values[OPT_LOG_SYSFACILITY])){
             ++err_count;
         }
     }
@@ -1661,13 +1723,14 @@ sklogSetDestination(
         /* treat it as a pathname */
         logctx->l_dest = SKLOG_DEST_PATH;
         if (skDirExists(destination)) {
-            skAppPrintErr("The %s must name a file, not a directory",
-                          logOptions[OPT_LOG_DESTINATION].name);
+            skAppPrintErr(("Invalid %s '%s':"
+                           " Value must name a file, not a directory"),
+                          logOptions[OPT_LOG_DESTINATION].name, destination);
             return -1;
         }
         strncpy(logctx->l_sim.path, destination, sizeof(logctx->l_sim.path));
         if ('\0' != logctx->l_sim.path[sizeof(logctx->l_sim.path)-1]) {
-            skAppPrintErr("The %s path is too long",
+            skAppPrintErr("Invalid %s: The path is too long",
                           logOptions[OPT_LOG_DESTINATION].name);
             return -1;
         }
@@ -1693,18 +1756,20 @@ sklogSetDestination(
         break;
 
       case SKSTRINGMAP_PARSE_AMBIGUOUS:
-        skAppPrintErr("The %s value '%s' is ambiguous",
+        skAppPrintErr("Invalid %s '%s': Value is ambiguous",
                       logOptions[OPT_LOG_DESTINATION].name, destination);
         goto END;
 
       case SKSTRINGMAP_PARSE_NO_MATCH:
-        skAppPrintErr(("The %s value '%s' is not complete path and\n"
-                       "\tdoes not match known keys"),
+        skAppPrintErr(("Invalid %s '%s': Value is not a complete path and"
+                       " does not match known keys"),
                       logOptions[OPT_LOG_DESTINATION].name, destination);
         goto END;
 
       default:
-        skAppPrintErr("Unexpected return value from string-map parser (%d)",
+        skAppPrintErr(("Invalid %s '%s':"
+                       "Unexpected return value from string-map parser (%d)"),
+                      logOptions[OPT_LOG_DESTINATION].name, destination,
                       rv_map);
         goto END;
     }
@@ -1742,8 +1807,8 @@ sklogSetDirectory(
     if (base_name == NULL || base_name[0] == '\0') {
         base_name = skAppName();
     } else if (strchr(base_name, '/')) {
-        skAppPrintErr("The %s may not contain '/'",
-                      logOptions[OPT_LOG_BASENAME].name);
+        skAppPrintErr("Invalid %s '%s': Value may not contain '/'",
+                      logOptions[OPT_LOG_BASENAME].name, base_name);
         return -1;
     }
 
@@ -1755,7 +1820,7 @@ sklogSetDirectory(
     /* copy directory name */
     strncpy(logctx->l_rot.dir, dir_name, sizeof(logctx->l_rot.dir));
     if ('\0' != logctx->l_rot.dir[sizeof(logctx->l_rot.dir)-1]) {
-        skAppPrintErr("The %s is too long: '%s'",
+        skAppPrintErr("Invalid %s '%s': Value is too long",
                       logOptions[OPT_LOG_DIRECTORY].name, dir_name);
         return -1;
     }
@@ -1763,7 +1828,7 @@ sklogSetDirectory(
     /* copy base name */
     strncpy(logctx->l_rot.basename, base_name, sizeof(logctx->l_rot.basename));
     if ('\0' != logctx->l_rot.basename[sizeof(logctx->l_rot.basename)-1]) {
-        skAppPrintErr("The %s is too long: '%s'",
+        skAppPrintErr("Invalid %s '%s': Value is too long",
                       logOptions[OPT_LOG_BASENAME].name, base_name);
         return -1;
     }
@@ -1811,6 +1876,11 @@ sklogSetFacilityByName(
     uint32_t facility;
     int rv = -1;
 
+    if (!logctx) {
+        skAppPrintErr("Must setup the log before setting the facility");
+        return -1;
+    }
+
     /* try to parse the facility as a number */
     rv = skStringParseUint32(&facility, name_or_number, 0, INT32_MAX);
     if (rv == 0) {
@@ -1848,17 +1918,19 @@ sklogSetFacilityByName(
         break;
 
       case SKSTRINGMAP_PARSE_AMBIGUOUS:
-        skAppPrintErr("%s value '%s' is ambiguous",
+        skAppPrintErr("Invalid %s '%s': Value is ambiguous",
                       logOptions[OPT_LOG_SYSFACILITY].name, name_or_number);
         break;
 
       case SKSTRINGMAP_PARSE_NO_MATCH:
-        skAppPrintErr("%s value '%s' is not recognized",
+        skAppPrintErr("Invalid %s '%s': Value is not recognized",
                       logOptions[OPT_LOG_SYSFACILITY].name, name_or_number);
         break;
 
       default:
-        skAppPrintErr("Unexpected return value from string-map parser (%d)",
+        skAppPrintErr(("Invalid %s '%s':"
+                       " Unexpected return value from string-map parser (%d)"),
+                      logOptions[OPT_LOG_SYSFACILITY].name, name_or_number,
                       rv_map);
         break;
     }
@@ -1881,6 +1953,11 @@ sklogSetLevel(
     sk_stringmap_entry_t *found_entry;
     int rv = -1;
 
+    if (!logctx) {
+        skAppPrintErr("Must setup the log before setting the level");
+        return -1;
+    }
+
     /* create a stringmap of the available levels */
     if (SKSTRINGMAP_OK != skStringMapCreate(&str_map)) {
         skAppPrintErr("Unable to create stringmap");
@@ -1899,18 +1976,19 @@ sklogSetLevel(
         break;
 
       case SKSTRINGMAP_PARSE_AMBIGUOUS:
-        skAppPrintErr("%s value '%s' is ambiguous",
+        skAppPrintErr("Invalid %s '%s': Value is ambiguous",
                       logOptions[OPT_LOG_LEVEL].name, level);
         break;
 
       case SKSTRINGMAP_PARSE_NO_MATCH:
-        skAppPrintErr("%s value '%s' is not recognized",
+        skAppPrintErr("Invalid %s '%s': Value is not recognized",
                       logOptions[OPT_LOG_LEVEL].name, level);
         break;
 
       default:
-        skAppPrintErr("Unexpected return value from string-map parser (%d)",
-                      rv_map);
+        skAppPrintErr(("Invalid %s '%s':"
+                       " Unexpected return value from string-map parser (%d)"),
+                      logOptions[OPT_LOG_LEVEL].name, level, rv_map);
         break;
     }
 
@@ -2061,9 +2139,10 @@ int
 sklogSetup(
     int                 feature_flags)
 {
-    static struct option options_used[NUM_OPTIONS+1];
-    int opt_count = 0;
-    int i;
+    if (logctx) {
+        skAppPrintErr("Ignoring multiple calls to sklogSetup()");
+        return 0;
+    }
 
     /* initialize the logging context */
     logctx = &logger;
@@ -2074,31 +2153,8 @@ sklogSetup(
     logctx->l_sys.facility = SKLOG_SYSFACILITY;
     logctx->l_features = feature_flags;
 
-    assert(NUM_OPTIONS == (sizeof(logOptions)/sizeof(struct option) - 1));
-    assert(NUM_OPTIONS == (sizeof(logOptionsIsUsed)/sizeof(int)));
-
-    /* loop through the options, copying those that the caller needs
-     * into 'options_used'.  'opt_count' is the number of 'struct
-     * option' entries we have */
-    for (i = 0; logOptions[i].name; ++i) {
-        if (feature_flags & logOptionsIsUsed[i]) {
-            /* use this option */
-            memcpy(&(options_used[opt_count]), &(logOptions[i]),
-                   sizeof(struct option));
-            ++opt_count;
-        }
-    }
-
-    /* set sentinel */
-    memset(&(options_used[opt_count]), 0, sizeof(struct option));
-
-    /* register the options */
-    if (opt_count > 0) {
-        if (skOptionsRegister(options_used, &logOptionsHandler,
-                              (clientData)opt_values))
-        {
-            return -1;
-        }
+    if (logOptionsSetup(feature_flags)) {
+        return -1;
     }
 
     return 0;
@@ -2126,7 +2182,6 @@ sklogTeardown(
     memset(logctx, 0, sizeof(sklog_context_t));
     logctx = NULL;
 }
-
 
 
 /* write the log message */

@@ -6,7 +6,7 @@ B<rwpmapcat> - Print each range and label present in a prefix map file
 
 =head1 SYNOPSIS
 
-  rwpmapcat [--output-type={mapname | type | ranges | labels}]
+  rwpmapcat [--output-types={mapname | type | ranges | labels}]
         [--ignore-label=LABEL] [--ip-label-to-ignore=IP_ADDRESS]
         [--left-justify-labels] [--no-cidr-blocks]
         [--ip-format=FORMAT] [--integer-ips] [--zero-pad-ips]
@@ -27,7 +27,7 @@ B<rwpmapcat> reads a prefix map file created by B<rwpmapbuild(1)> or
 B<rwgeoip2ccmap(1)> and prints its contents.
 
 By default, B<rwpmapcat> prints the range/label pairs that exist in
-the prefix map.  Use the B<--output-type> switch to print additional
+the prefix map.  Use the B<--output-types> switch to print additional
 information or information other than the range/label pairs.
 
 When printing the range/label pairs of a prefix map file that contain
@@ -97,7 +97,7 @@ I<ADDRTYPE_FILE>.
 Print the contents of the country code mapping file (B<ccfilter(3)>)
 specified by the SILK_COUNTRY_CODES environment variable, or in the
 default country code mapping file if that environment variable is not
-set.  This switch may not be conbined with the B<--map-file> or
+set.  This switch may not be combined with the B<--map-file> or
 B<--address-types> switches.
 
 =item B<--country-codes>=I<COUNTRY_CODE_FILE>
@@ -105,7 +105,7 @@ B<--address-types> switches.
 Print the contents of the country code mapping file specified by
 I<COUNTRY_CODE_FILE>.
 
-=item B<--output-type>={B<type> | B<mapname> | B<label> | B<ranges>}
+=item B<--output-types>={B<type> | B<mapname> | B<label> | B<ranges>}
 
 Specify the type(s) of output to produce.  When this switch is not
 provided, the default is to print B<ranges>.  Specify multiple types
@@ -347,11 +347,11 @@ file.
      192.169.0.0|255.255.255.254|    external|
  255.255.255.255|255.255.255.255|non-routable|
 
-The B<--output-type> switch determines what output is produced.
+The B<--output-types> switch determines what output is produced.
 Specifying an argument of C<label> prints the labels that were
 specified when the file was built.
 
- $ rwpmapcat --map-file=sample.pmap --output-type=label
+ $ rwpmapcat --map-file=sample.pmap --output-types=label
  LABELS:
  non-routable
  internal
@@ -359,7 +359,7 @@ specified when the file was built.
 
 Multiple types of output may be requested
 
- $ rwpmapcat --map-file=sample.pmap --output-type=type,mapname
+ $ rwpmapcat --map-file=sample.pmap --output-types=type,mapname
  TYPE:  IPv4-address
  MAPNAME:  addrtype
 
@@ -489,7 +489,7 @@ SiLK 3.8.0.
 
 =cut
 
-$SiLK: rwpmapcat.pod 093f18894c79 2015-09-08 20:02:01Z mthomas $
+$SiLK: rwpmapcat.pod 9dd9f9b1d75b 2016-06-22 22:00:34Z mthomas $
 
 Local Variables:
 mode:text

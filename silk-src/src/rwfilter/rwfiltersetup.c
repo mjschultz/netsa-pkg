@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfiltersetup.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwfiltersetup.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skprefixmap.h>
@@ -30,7 +30,7 @@ RCSIDENT("$SiLK: rwfiltersetup.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 /* LOCAL VARIABLES */
 
 /* the compression method to use when writing the file.
- * sksiteCompmethodOptionsRegister() will set this to the default or
+ * skCompMethodOptionsRegister() will set this to the default or
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
@@ -173,7 +173,7 @@ appUsageLong(
     }
 
     skOptionsNotesUsage(fh);
-    sksiteCompmethodOptionsUsage(fh);
+    skCompMethodOptionsUsage(fh);
 
     /* print remaining options */
     fprintf(fh, ("\nINPUT/OUTPUT SWITCHES."
@@ -250,7 +250,7 @@ appSetup(
     /* register the options */
     if (skOptionsRegister(appOptions, &appOptionsHandler, NULL)
         || skOptionsNotesRegister(NULL)
-        || sksiteCompmethodOptionsRegister(&comp_method))
+        || skCompMethodOptionsRegister(&comp_method))
     {
         skAppPrintErr("Unable to register options");
         exit(EXIT_FAILURE);

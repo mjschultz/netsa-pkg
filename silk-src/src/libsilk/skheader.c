@@ -18,42 +18,36 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skheader.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: skheader.c 4c36563f30bb 2016-09-28 22:00:57Z mthomas $");
 
 #include <silk/skbag.h>
-#include <silk/skheader.h>
+#include "skheader_priv.h"
 #include "skstream_priv.h"
 
 /* TYPDEFS AND DEFINES */
 
-/* This struct is invariant over all Output File Formats that we write
- * to disk. */
-typedef struct genericHeader_st {
-    uint8_t magic1;       /* fixed byte order 4byte magic number: 0xdeadbeef */
-    uint8_t magic2;
-    uint8_t magic3;
-    uint8_t magic4;
-    uint8_t isBigEndian;  /* endian order on hw creating file 1/0 big/little */
-    uint8_t type;         /* output file format; values defined below */
-    uint8_t version;      /* version of above */
-    uint8_t compMethod;   /* compression method */
-} genericHeader;
+/*
+ *    The 0xdeadbeef magic number that appears at the start of all
+ *    binary SiLK files.  The number is defined as 4 single bytes.
+ */
+#define SKHDR_MAGIC1    0xDE
+#define SKHDR_MAGIC2    0xAD
+#define SKHDR_MAGIC3    0xBE
+#define SKHDR_MAGIC4    0xEF
 
-/* in order to be byte order independent, define 4 bytes size magic values */
-#define MAGIC1  0xDE
-#define MAGIC2  0xAD
-#define MAGIC3  0xBE
-#define MAGIC4  0xEF
+/*
+ *    Number of bytes of header to read initially to determine the
+ *    version of the file.
+ *
+ *    This value handles files that were created in the days when we
+ *    only had the "genericHeader".
+ */
+#define SKHDR_INITIAL_READLEN   8
 
-#define CHECKMAGIC(h)                           \
-    ( (h)->magic1 != MAGIC1                     \
-      ||  (h)->magic2 != MAGIC2                 \
-      ||  (h)->magic3 != MAGIC3                 \
-      ||  (h)->magic4 != MAGIC4 )
-
-
-/* Initial size to allocate for a header-entry; this can grow as
- * required */
+/*
+ *    Initial size to allocate for a header-entry; this can grow as
+ *    required.
+ */
 #define HENTRY_INIT_BUFSIZE 512
 
 
@@ -142,14 +136,12 @@ skHeaderAddEntry(
 {
     sk_hentry_node_t *new_node;
 
-    assert(hdr);
-    if (NULL == hentry) {
+    if (NULL == hdr || NULL == hentry) {
         return SKHEADER_ERR_NULL_ARGUMENT;
     }
     if (hdr->header_lock == SKHDR_LOCK_FIXED) {
         return SKHEADER_ERR_IS_LOCKED;
     }
-
     if (HENTRY_SPEC_EOH(hentry)) {
         return SKHEADER_ERR_INVALID_ID;
     }
@@ -187,7 +179,9 @@ skHeaderCopy(
     sk_header_entry_t *src_hentry;
     int rv = SKHEADER_OK;
 
-    /* do not overwrite a locked header */
+    if (NULL == dst_hdr || NULL == src_hdr) {
+        return SKHEADER_ERR_NULL_ARGUMENT;
+    }
     if (dst_hdr->header_lock == SKHDR_LOCK_FIXED) {
         return SKHEADER_ERR_IS_LOCKED;
     }
@@ -294,7 +288,9 @@ skHeaderCopyEntries(
     sk_hentry_copy_fn_t copy_fn;
     int rv = SKHEADER_OK;
 
-    /* do not overwrite a locked header */
+    if (NULL == dst_hdr || NULL == src_hdr) {
+        return SKHEADER_ERR_NULL_ARGUMENT;
+    }
     if (dst_hdr->header_lock == SKHDR_LOCK_FIXED) {
         return SKHEADER_ERR_IS_LOCKED;
     }
@@ -347,23 +343,27 @@ skHeaderCreate(
     char *envar;
     int rv = SKHEADER_ERR_ALLOC;
 
+    if (NULL == hdr) {
+        return SKHEADER_ERR_NULL_ARGUMENT;
+    }
+
     new_hdr = (sk_file_header_t*)calloc(1, sizeof(sk_file_header_t));
     if (NULL == new_hdr) {
         goto END;
     }
 
     /* fill out the sk_header_start_t */
-    new_hdr->fh_start.magic1 = MAGIC1;
-    new_hdr->fh_start.magic2 = MAGIC2;
-    new_hdr->fh_start.magic3 = MAGIC3;
-    new_hdr->fh_start.magic4 = MAGIC4;
+    new_hdr->fh_start.magic1 = SKHDR_MAGIC1;
+    new_hdr->fh_start.magic2 = SKHDR_MAGIC2;
+    new_hdr->fh_start.magic3 = SKHDR_MAGIC3;
+    new_hdr->fh_start.magic4 = SKHDR_MAGIC4;
 #if SK_LITTLE_ENDIAN
     new_hdr->fh_start.file_flags = 0;
 #else
     new_hdr->fh_start.file_flags = 1;
 #endif
     new_hdr->fh_start.file_format = UINT8_MAX;
-    new_hdr->fh_start.file_version = SK_DEFAULT_FILE_VERSION;
+    new_hdr->fh_start.file_version = SK_FILE_VERSION_DEFAULT;
     new_hdr->fh_start.comp_method = SK_COMPMETHOD_DEFAULT;
     new_hdr->fh_start.rec_size = 0;
     new_hdr->fh_start.rec_version = SK_RECORD_VERSION_ANY;
@@ -475,7 +475,7 @@ skHeaderEntryCopy(
     sk_hentry_type_t *htype;
     sk_header_entry_t *dst_hentry = NULL;
 
-    if (HENTRY_SPEC_EOH(src_hentry)) {
+    if (NULL == src_hentry || HENTRY_SPEC_EOH(src_hentry)) {
         return NULL;
     }
 
@@ -499,6 +499,10 @@ skHeaderEntryPrint(
 {
     sk_hentry_type_t *htype;
 
+    if (NULL == hentry || NULL == fp) {
+        return;
+    }
+
     fprintf(fp, ("HDR id = %" PRIu32 " / len = %" PRIu32 " / "),
             (uint32_t)skHeaderEntryGetTypeId(hentry),
             (uint32_t)hentry->he_spec.hes_len);
@@ -516,6 +520,9 @@ sk_compmethod_t
 skHeaderGetCompressionMethod(
     const sk_file_header_t *hdr)
 {
+    if (NULL == hdr) {
+        return SK_COMPMETHOD_DEFAULT;
+    }
     return hdr->fh_start.comp_method;
 }
 
@@ -524,6 +531,9 @@ silk_endian_t
 skHeaderGetByteOrder(
     const sk_file_header_t *hdr)
 {
+    if (NULL == hdr) {
+        return SILK_ENDIAN_ANY;
+    }
     return ((hdr->fh_start.file_flags & 0x01)
             ? SILK_ENDIAN_BIG
             : SILK_ENDIAN_LITTLE);
@@ -534,6 +544,9 @@ sk_file_format_t
 skHeaderGetFileFormat(
     const sk_file_header_t *hdr)
 {
+    if (NULL == hdr) {
+        return SK_INVALID_FILE_FORMAT;
+    }
     return hdr->fh_start.file_format;
 }
 
@@ -542,6 +555,9 @@ sk_file_version_t
 skHeaderGetFileVersion(
     const sk_file_header_t *hdr)
 {
+    if (NULL == hdr) {
+        return 0;
+    }
     return hdr->fh_start.file_version;
 }
 
@@ -554,7 +570,9 @@ skHeaderGetFirstMatch(
     sk_hentry_node_t *hnode;
     sk_header_entry_t *hentry;
 
-    assert(hdr);
+    if (NULL == hdr) {
+        return NULL;
+    }
 
     /* we have a circular linked list; where the rootnode always
      * exists---it is the end-of-header marker */
@@ -575,6 +593,9 @@ size_t
 skHeaderGetLength(
     const sk_file_header_t *hdr)
 {
+    if (NULL == hdr) {
+        return 0;
+    }
     return hdr->header_length;
 }
 
@@ -583,6 +604,9 @@ sk_header_lock_t
 skHeaderGetLockStatus(
     const sk_file_header_t *hdr)
 {
+    if (NULL == hdr) {
+        return SKHDR_LOCK_FIXED;
+    }
     return hdr->header_lock;
 }
 
@@ -591,6 +615,9 @@ size_t
 skHeaderGetRecordLength(
     const sk_file_header_t *hdr)
 {
+    if (NULL == hdr) {
+        return 0;
+    }
     return hdr->fh_start.rec_size;
 }
 
@@ -599,6 +626,9 @@ sk_file_version_t
 skHeaderGetRecordVersion(
     const sk_file_header_t *hdr)
 {
+    if (NULL == hdr) {
+        return 0;
+    }
     return hdr->fh_start.rec_version;
 }
 
@@ -607,6 +637,9 @@ uint32_t
 skHeaderGetSilkVersion(
     const sk_file_header_t *hdr)
 {
+    if (NULL == hdr) {
+        return 0;
+    }
     return hdr->fh_start.silk_version;
 }
 
@@ -615,6 +648,9 @@ int
 skHeaderIsNativeByteOrder(
     const sk_file_header_t *hdr)
 {
+    if (NULL == hdr) {
+        return 1;
+    }
     return ((hdr->fh_start.file_flags & 0x01) == (SK_BIG_ENDIAN));
 }
 
@@ -624,8 +660,9 @@ skHeaderIteratorBind(
     sk_hentry_iterator_t   *iter,
     const sk_file_header_t *hdr)
 {
-    assert(hdr);
-    assert(iter);
+    if (NULL == hdr || NULL == iter) {
+        return;
+    }
 
     iter->hdr = hdr;
     iter->node = hdr->fh_rootnode;
@@ -639,6 +676,10 @@ skHeaderIteratorBindType(
     const sk_file_header_t *hdr,
     sk_hentry_type_id_t     htype)
 {
+    if (NULL == hdr || NULL == iter) {
+        return;
+    }
+
     skHeaderIteratorBind(iter, hdr);
     iter->htype_filter = htype;
 }
@@ -648,6 +689,9 @@ sk_header_entry_t *
 skHeaderIteratorNext(
     sk_hentry_iterator_t   *iter)
 {
+    if (NULL == iter) {
+        return NULL;
+    }
     do {
         iter->node = iter->node->hen_next;
         if (HENTRY_SPEC_EOH(iter->node->hen_entry)) {
@@ -734,8 +778,9 @@ skHeaderReadEntries(
     size_t bufsize;
     sk_hentry_type_t *htype;
 
-    assert(hdr);
-
+    if (NULL == hdr || NULL == stream) {
+        return SKHEADER_ERR_NULL_ARGUMENT;
+    }
     if (hdr->fh_start.file_version < SKHDR_EXPANDED_INIT_VERS) {
         return skHeaderLegacyDispatch(stream, hdr);
     }
@@ -843,44 +888,62 @@ skHeaderReadStart(
     size_t len;
     ssize_t saw;
 
-    assert(stream);
-    assert(hdr);
-
-    /* set header length to 0 */
-    hdr->header_length = 0;
+    if (NULL == hdr || NULL == stream) {
+        return SKHEADER_ERR_NULL_ARGUMENT;
+    }
+    if (hdr->header_lock) {
+        return SKHEADER_ERR_IS_LOCKED;
+    }
 
     /* read the traditional "genericHeader" */
-    len = sizeof(genericHeader);
-    saw = skStreamRead(stream, &(hdr->fh_start), len);
-    if (saw != (ssize_t)len) {
+    if (hdr->header_length < SKHDR_INITIAL_READLEN) {
+        len = SKHDR_INITIAL_READLEN - hdr->header_length;
+        saw = skStreamRead(
+            stream, ((uint8_t*)&hdr->fh_start) + hdr->header_length, len);
         if (saw == -1) {
             return SKSTREAM_ERR_READ;
         }
-        return SKHEADER_ERR_SHORTREAD;
+        hdr->header_length += saw;
+        if (hdr->header_length < SKHDR_INITIAL_READLEN) {
+            return SKHEADER_ERR_SHORTREAD;
+        }
     }
-    hdr->header_length += saw;
 
-    /* verify is SiLK file */
-    if (CHECKMAGIC((genericHeader*)hdr)) {
+    /* verify this is a SiLK file */
+    if (hdr->fh_start.magic1 != SKHDR_MAGIC1
+        || hdr->fh_start.magic2 != SKHDR_MAGIC2
+        || hdr->fh_start.magic3 != SKHDR_MAGIC3
+        || hdr->fh_start.magic4 != SKHDR_MAGIC4)
+    {
         return SKSTREAM_ERR_BAD_MAGIC;
     }
 
     /* if this file's version indicates it was written when we only
      * had the generic header, return */
     if (hdr->fh_start.file_version < SKHDR_EXPANDED_INIT_VERS) {
+        if (hdr->header_length > SKHDR_INITIAL_READLEN) {
+            skAppPrintErr("Header length (%" PRIu32 ") is greater than"
+                          " genericHeader for old SiLK file",
+                          hdr->header_length);
+            skAbort();
+            /* return SKHEADER_ERR_TOOLONG; */
+        }
         return SKSTREAM_OK;
     }
 
     /* read the remainder of the sk_header_start_t */
-    len = sizeof(sk_header_start_t) - sizeof(genericHeader);
-    saw = skStreamRead(stream, &(hdr->fh_start.silk_version), len);
-    if (saw != (ssize_t)len) {
+    if (hdr->header_length < sizeof(sk_header_start_t)) {
+        len = sizeof(sk_header_start_t) - hdr->header_length;
+        saw = skStreamRead(
+            stream, ((uint8_t*)&hdr->fh_start) + hdr->header_length, len);
         if (saw == -1) {
             return SKSTREAM_ERR_READ;
         }
-        return SKHEADER_ERR_SHORTREAD;
+        hdr->header_length += saw;
+        if (hdr->header_length < sizeof(sk_header_start_t)) {
+            return SKHEADER_ERR_SHORTREAD;
+        }
     }
-    hdr->header_length += saw;
     hdr->fh_start.silk_version = ntohl(hdr->fh_start.silk_version);
     hdr->fh_start.rec_size = ntohs(hdr->fh_start.rec_size);
     hdr->fh_start.rec_version = ntohs(hdr->fh_start.rec_version);
@@ -899,9 +962,10 @@ skHeaderRemoveAllMatching(
     sk_header_entry_t *hentry;
     sk_hentry_type_t *htype;
 
-    assert(hdr);
-
-    if (entry_id == 0) {
+    if (NULL == hdr) {
+        return SKHEADER_ERR_NULL_ARGUMENT;
+    }
+    if (0 == entry_id) {
         return SKHEADER_ERR_INVALID_ID;
     }
 
@@ -939,6 +1003,29 @@ skHeaderRemoveAllMatching(
 }
 
 
+#if 0
+/**
+ *    On the File Header 'hdr', replace the Header Entry 'old_entry'
+ *    with the Entry 'new_entry'.
+ *
+ *    If 'new_entry' is NULL, 'old_entry' will be removed.
+ *
+ *    If 'hentry_cb' is specified, it will be called with value of
+ *    'old_entry' so that any cleanup can be performed.
+ *
+ *    Returns SKHEADER_OK if 'old_entry' was found.  Return
+ *    SKHEADER_ERR_ENTRY_NOTFOUND if 'old_entry' was not found.
+ *    Return SKHEADER_ERR_INVALID_ID if 'old_entry' or 'new_entry'
+ *    have a restricted ID.  Return SKHEADER_ERR_IS_LOCKED is 'hdr' is
+ *    locked.
+ */
+int
+skHeaderReplaceEntry(
+    sk_file_header_t           *hdr,
+    sk_header_entry_t          *old_entry,
+    sk_header_entry_t          *new_entry,
+    sk_hentry_callback_fn_t     hentry_cb);
+
 int
 skHeaderReplaceEntry(
     sk_file_header_t           *hdr,
@@ -950,7 +1037,9 @@ skHeaderReplaceEntry(
     sk_header_entry_t *hentry;
     int found = 0;
 
-    assert(hdr);
+    if (NULL == hdr) {
+        return SKHEADER_ERR_NULL_ARGUMENT;
+    }
     assert(old_entry);
 
     /* Cannot replace the end of header marker */
@@ -992,6 +1081,7 @@ skHeaderReplaceEntry(
 
     return SKHEADER_OK;
 }
+#endif  /* 0 */
 
 
 int
@@ -1043,7 +1133,7 @@ skHeaderSetCompressionMethod(
         return SKHEADER_ERR_IS_LOCKED;
     }
 
-    switch (sksiteCompmethodCheck(comp_method)) {
+    switch (skCompMethodCheck(comp_method)) {
       case SK_COMPMETHOD_IS_AVAIL:
       case SK_COMPMETHOD_IS_KNOWN:
         /* known, valid, and available, or undecided which will
@@ -1076,12 +1166,35 @@ skHeaderSetFileFormat(
         return SKHEADER_ERR_IS_LOCKED;
     }
 
-    if (sksiteFileformatIsValid(file_format)) {
+    if (skFileFormatIsValid(file_format)) {
         hdr->fh_start.file_format = file_format;
     } else {
         return SKSTREAM_ERR_INVALID_INPUT;
     }
 
+    return SKHEADER_OK;
+}
+
+
+int
+skHeaderSetFileVersion(
+    sk_file_header_t   *hdr,
+    sk_file_version_t   file_version)
+{
+    if (hdr == NULL) {
+        return SKHEADER_ERR_NULL_ARGUMENT;
+    }
+
+    /* Do not modify a locked header */
+    if (hdr->header_lock) {
+        return SKHEADER_ERR_IS_LOCKED;
+    }
+    if (file_version < SK_FILE_VERSION_MINIMUM
+        || file_version > SK_FILE_VERSION_MAXIMUM)
+    {
+        return SKHEADER_ERR_BAD_VERSION;
+    }
+    hdr->fh_start.file_version = file_version;
     return SKHEADER_OK;
 }
 
@@ -1157,6 +1270,17 @@ skHeaderSetRecordVersion(
 }
 
 
+#if 0
+/**
+ *    Read each hentry block until the end of the file header is
+ *    reached, but do not populate the data structures to hold the
+ *    header entries.
+ */
+int
+skHeaderSkipEntries(
+    skstream_t         *stream,
+    sk_file_header_t   *hdr);
+
 int
 skHeaderSkipEntries(
     skstream_t         *stream,
@@ -1211,6 +1335,7 @@ skHeaderSkipEntries(
 
     return SKHEADER_OK;
 }
+#endif  /* 0 */
 
 
 const char *
@@ -1310,7 +1435,9 @@ skHeaderWrite(
     uint32_t pad_len;
     uint8_t *pos;
 
-    assert(hdr);
+    if (NULL == hdr || NULL == stream) {
+        return SKHEADER_ERR_NULL_ARGUMENT;
+    }
 
     /* create a buffer that the header will be packed into */
     bufsize = HENTRY_INIT_BUFSIZE;
@@ -1325,21 +1452,24 @@ skHeaderWrite(
     hstart = &(hdr->fh_start);
 
     /* make certain file format is valid */
-    if (!sksiteFileformatIsValid(hstart->file_format)) {
+    if (!skFileFormatIsValid(hstart->file_format)) {
         rv = SKHEADER_ERR_BAD_FORMAT;
         goto END;
     }
     /* make certain compression is available */
-    if (SK_COMPMETHOD_IS_AVAIL != sksiteCompmethodCheck(hstart->comp_method)) {
+    if (SK_COMPMETHOD_IS_AVAIL != skCompMethodCheck(hstart->comp_method)) {
         rv = SKHEADER_ERR_BAD_COMPRESSION;
     }
 
     /* we cannot write old versions of the headers */
-    if (hstart->file_version != SKHDR_EXPANDED_INIT_VERS) {
+    if (hstart->file_version < SK_FILE_VERSION_MINIMUM) {
         rv = SKHEADER_ERR_BAD_VERSION;
-        skAppPrintErr("Cannont write header version %u",
+        skAppPrintErr("Cannot write header version %u",
                       (unsigned)hstart->file_version);
         goto END;
+    }
+    if (hstart->file_version > SK_FILE_VERSION_MAXIMUM) {
+        skAbort();
     }
 
     /* check for valid record size */
@@ -1517,6 +1647,10 @@ skHentryDefaultCopy(
 {
     sk_header_entry_t *new_hentry;
     uint32_t len;
+
+    if (NULL == hentry) {
+        return NULL;
+    }
 
     /* create space for new header */
     new_hentry = (sk_header_entry_t*)calloc(1, sizeof(sk_header_entry_t));
@@ -2875,7 +3009,7 @@ skHeaderAddIPSet(
     sk_header_entry_t *ipset_hdr = NULL;
 
     ipset_hdr = skHentryIPSetCreate(child_node, leaf_count, leaf_size,
-                                  node_count, node_size, root_idx);
+                                    node_count, node_size, root_idx);
     if (ipset_hdr == NULL) {
         return SKHEADER_ERR_ALLOC;
     }
@@ -2985,7 +3119,7 @@ skHentryIPSetPrint(
         fprintf(fh, ("%" PRIu32 "-way branch, root@%" PRIu32 ", "
                      "%" PRIu32 " x %" PRIu32 "b node%s, "
                      "%" PRIu32 " x %" PRIu32 "b leaves"),
-            ipset_hdr->child_node, ipset_hdr->root_idx,
+                ipset_hdr->child_node, ipset_hdr->root_idx,
                 ipset_hdr->node_count, ipset_hdr->node_size,
                 ((ipset_hdr->node_count > 1) ? "s" : ""),
                 ipset_hdr->leaf_count, ipset_hdr->leaf_size);
