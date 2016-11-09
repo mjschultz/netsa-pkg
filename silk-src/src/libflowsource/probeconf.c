@@ -883,6 +883,10 @@ skpcProbeAddQuirk(
         probe->quirks |= SKPC_QUIRK_ZERO_PACKETS;
         return 0;
     }
+    if (0 == strcmp(quirk, "nf9-sysuptime-seconds")) {
+        probe->quirks |= SKPC_QUIRK_NF9_SYSUPTIME_SECS;
+        return 0;
+    }
     /* unrecognized quirk */
     return -1;
 }

@@ -2230,6 +2230,16 @@ skiGauntletOfTime(
          * (msec), and libfixbuf sets it by subtracting the NFv9
          * uptime (msec) from the record's absolute export time
          * (sec). */
+        if (skpcProbeGetQuirks(probe) & SKPC_QUIRK_NF9_SYSUPTIME_SECS) {
+            /* uptime was reported in seconds, not msec */
+            uptime = 1000 * (export_msec
+                             - record->data.fixrec.systemInitTimeMilliseconds);
+            record->data.fixrec.systemInitTimeMilliseconds
+                = export_msec - uptime;
+        } else {
+            uptime = (export_msec
+                      - record->data.fixrec.systemInitTimeMilliseconds);
+        }
         uptime = export_msec - fixrec->systemInitTimeMilliseconds;
         difference = uptime - fixrec->flowStartSysUpTime;
         if (difference > MAXIMUM_FLOW_TIME_DEVIATION) {
@@ -2258,12 +2268,14 @@ skiGauntletOfTime(
                      " flowStartSysUpTime=%" PRIu32
                      ", flowEndSysUpTime=%" PRIu32
                      ", systemInitTimeMilliseconds=%" PRIu64
-                     ", exportTimeSeconds=%" PRIu32 "%s%s"),
+                     ", exportTimeSeconds=%" PRIu32
+                     ", calculated sysUpTime=%" PRIdMAX "%s%s"),
                     skpcProbeGetName(probe),
                     stime_buf, (double)rwRecGetElapsed(rec)/1000,
                     fixrec->flowStartSysUpTime, fixrec->flowEndSysUpTime,
                     fixrec->systemInitTimeMilliseconds,
-                    fBufGetExportTime(fbuf), rollover_first,rollover_last);
+                    fBufGetExportTime(fbuf), uptime,
+                    rollover_first, rollover_last);
         }
         return;
 
@@ -4236,7 +4248,14 @@ ski_nf9rec_next(
          * (msec), and libfixbuf sets it by subtracting the NFv9
          * uptime (msec) from the record's absolute export time
          * (sec). */
-        uptime = export_msec - nf9rec->t.sysup.systemInitTimeMilliseconds;
+        if (skpcProbeGetQuirks(probe) & SKPC_QUIRK_NF9_SYSUPTIME_SECS) {
+            /* uptime was reported in seconds, not msec */
+            uptime = 1000 * (export_msec
+                             - nf9rec->t.sysup.systemInitTimeMilliseconds);
+            nf9rec->t.sysup.systemInitTimeMilliseconds = export_msec - uptime;
+        } else {
+            uptime = export_msec - nf9rec->t.sysup.systemInitTimeMilliseconds;
+        }
         difference = uptime - nf9rec->t.sysup.flowStartSysUpTime;
         if (difference > MAXIMUM_FLOW_TIME_DEVIATION) {
             /* assume upTime is set before record is composed and
@@ -4268,13 +4287,15 @@ ski_nf9rec_next(
                      " flowStartSysUpTime=%" PRIu32
                      ", flowEndSysUpTime=%" PRIu32
                      ", systemInitTimeMilliseconds=%" PRIu64
-                     ", exportTimeSeconds=%" PRIu32 "%s%s"),
+                     ", exportTimeSeconds=%" PRIu32
+                     ", calculated sysUpTime=%" PRIdMAX "%s%s"),
                     skpcProbeGetName(probe),
                     stime_buf, (double)rwRecGetElapsed(fwd_rec)/1000,
                     nf9rec->t.sysup.flowStartSysUpTime,
                     nf9rec->t.sysup.flowEndSysUpTime,
                     nf9rec->t.sysup.systemInitTimeMilliseconds,
-                    fBufGetExportTime(fbuf), rollover_first,rollover_last);
+                    fBufGetExportTime(fbuf), uptime,
+                    rollover_first, rollover_last);
         }
     }
 
