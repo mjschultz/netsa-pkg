@@ -11,7 +11,7 @@
 #  March 2009
 #
 #######################################################################
-#  RCSIDENT("$SiLK: SiLKTests.pm 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $")
+#  RCSIDENT("$SiLK: SiLKTests.pm 2b970e551829 2016-10-31 20:50:52Z mthomas $")
 #######################################################################
 #
 #    Perl module used by the scripts that "make check" runs.
@@ -314,8 +314,9 @@ our @DUMP_ENVVARS = qw(top_srcdir top_builddir srcdir
                        TZ LANG LC_ALL SILK_HEADER_NOVERSION
                        SILK_DATA_ROOTDIR SILK_CONFIG_FILE
                        SILK_COUNTRY_CODES SILK_ADDRESS_TYPES
-                       PYTHONPATH
+                       SILK_COMPRESSION_METHOD
                        SILK_IPSET_RECORD_VERSION SKIPSET_INCORE_FORMAT
+                       PYTHONPATH
                        LD_LIBRARY_PATH DYLD_LIBRARY_PATH LIBPATH SHLIB_PATH
                        G_SLICE G_DEBUG);
 

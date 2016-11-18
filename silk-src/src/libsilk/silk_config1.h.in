@@ -331,6 +331,9 @@
 /* Define to 1 if the system has the type `unsigned long long int'. */
 #undef HAVE_UNSIGNED_LONG_LONG_INT
 
+/* Set to the default IPset record version to use when writing to disk. */
+#undef IPSET_DEFAULT_VERSION
+
 /* Define to 1 if your processor stores words with the least significant byte
    first (like Intel, unlike Motorola and SPARC). Define to 0 otherwise. See
    also SK_BIG_ENDIAN. */

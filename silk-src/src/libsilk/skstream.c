@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skstream.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: skstream.c 4e2a40cdd3a4 2016-10-31 14:43:21Z mthomas $");
 
 #include <silk/skstream.h>
 #include <silk/sksite.h>
@@ -3531,7 +3531,7 @@ skreadn(
     size_t  left = count;
 
     while (left) {
-        rv = read(fd, buf, left);
+        rv = read(fd, buf, ((left < INT32_MAX) ? left : INT32_MAX));
         if (rv == -1) {
             if (errno == EINTR) {
                 continue;
@@ -3558,7 +3558,7 @@ skwriten(
     size_t  left = count;
 
     while (left) {
-        rv = write(fd, buf, left);
+        rv = write(fd, buf, ((left < INT32_MAX) ? left : INT32_MAX));
         if (rv == -1) {
             if (errno == EINTR) {
                 continue;

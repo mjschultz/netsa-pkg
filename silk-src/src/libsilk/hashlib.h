@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_HASHLIB_H, "$SiLK: hashlib.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_HASHLIB_H, "$SiLK: hashlib.h 5f941b5d4c17 2016-11-11 18:02:26Z mthomas $");
 
 /**
  *  @file
@@ -93,10 +93,10 @@ RCSIDENTVAR(rcsID_HASHLIB_H, "$SiLK: hashlib.h 85572f89ddf9 2016-05-05 20:07:39Z
 #define HTT_ALLOWDELETION 0
 
 /**
- *    Default load is 208 (81.25%). Generally, this is the value that
+ *    Default load is 185 (72.27%). Generally, this is the value that
  *    should be passed to hashlib_create_table for the load factor.
  */
-#define DEFAULT_LOAD_FACTOR 208
+#define DEFAULT_LOAD_FACTOR 185
 
 /**
  *    Maximum number of block-indexes allowed by the hash iterator.
@@ -480,23 +480,39 @@ hashlib_dump_table(
 
 /* Statistics */
 #ifdef HASHLIB_RECORD_STATS
-extern void
-hashlib_clear_stats(
-    void);
-extern void
-hashlib_dump_stats(
-    FILE               *fp);
 struct hashlib_stats_st {
-    uint64_t rehashes;
-    uint64_t rehash_inserts;
-    uint64_t inserts;
-    uint64_t lookups;
-    uint64_t find_entries;
-    uint64_t find_collisions;
+    /* number of allocations */
     uint32_t blocks_allocated;
+    /* number of times table rehashed */
+    uint32_t rehashes;
+    /* number of inserts due to rehash */
+    uint64_t rehash_inserts;
+    /* number of inserts */
+    uint64_t inserts;
+    /* number of lookups */
+    uint64_t lookups;
+    /* number of finds (due to insert & lookup) */
+    uint64_t find_entries;
+    /* number of collisions */
+    uint64_t find_collisions;
+    /* number of steps required to resolve collisions */
+    uint64_t collision_hops;
 };
 typedef struct hashlib_stats_st hashlib_stats_t;
-extern hashlib_stats_t hashlib_stats;
+
+void
+hashlib_clear_stats(
+    HashTable          *table_ptr);
+
+void
+hashlib_get_stats(
+    const HashTable    *table_ptr,
+    hashlib_stats_t    *hash_stats);
+
+void
+hashlib_print_stats(
+    FILE               *fp,
+    const HashTable    *table_ptr);
 #endif /* HASHLIB_RECORD_STATS */
 
 #ifdef __cplusplus

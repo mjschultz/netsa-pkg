@@ -4,14 +4,14 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: configure.ac 06565ffff2e4 2016-09-28 22:05:49Z mthomas $")
+dnl RCSIDENT("$SiLK: configure.ac 9d844f629b99 2016-11-16 20:29:28Z mthomas $")
 
 AC_PREREQ(2.64)
-AC_INIT([SiLK],[3.13.0],[netsa-help@cert.org],[silk],[http://tools.netsa.cert.org/silk/])
+AC_INIT([SiLK],[3.14.0],[netsa-help@cert.org],[silk],[http://tools.netsa.cert.org/silk/])
 AC_COPYRIGHT([Copyright (C) 2001-2016 by Carnegie Mellon University
 GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
 Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013])
-AC_REVISION($SiLK: configure.ac 06565ffff2e4 2016-09-28 22:05:49Z mthomas $)
+AC_REVISION($SiLK: configure.ac 9d844f629b99 2016-11-16 20:29:28Z mthomas $)
 AC_CONFIG_SRCDIR([src/libsilk/silk.h])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_CONFIG_MACRO_DIR([m4])
@@ -297,6 +297,7 @@ SILK_AC_ARG_ENABLE_EXTRA_CHECKS
 SILK_AC_ARG_ENABLE_IPV6
 SILK_AC_ARG_ENABLE_INET6_NETWORKING
 SILK_AC_ARG_ENABLE_LOCALTIME
+SILK_AC_ARG_ENABLE_IPSET_COMPATIBILITY
 SILK_AC_ARG_DISABLE_ANALYSIS_TOOLS
 SILK_AC_ARG_DISABLE_PACKING_TOOLS
 SILK_AC_ARG_ENABLE_OUTPUT_COMPRESSION

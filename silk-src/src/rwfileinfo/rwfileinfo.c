@@ -25,7 +25,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfileinfo.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: rwfileinfo.c 92e40ed6709b 2016-10-12 17:53:53Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstream.h>
@@ -101,7 +101,7 @@ static const sk_stringmap_entry_t rwinfo_entry[] = {
      RWINFO_COMPRESSION,
      ("The compression library used to compress the data-section of"
       " the file; includes the name and its numeric ID (decimal)"),
-     NULL},
+     "compression(id)"},
     {"4",   RWINFO_COMPRESSION, NULL, NULL},
 
     {"header-length",

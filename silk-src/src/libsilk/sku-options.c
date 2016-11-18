@@ -48,7 +48,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-options.c 35360d98d580 2016-09-22 18:30:40Z mthomas $");
+RCSIDENT("$SiLK: sku-options.c 77a7d16206f7 2016-11-02 13:49:55Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sksite.h>
@@ -251,6 +251,19 @@ printVersion(
             "yes"
 #else
             "no"
+#endif
+            );
+
+    fprintf(VERS_FH, "    * %-32s  %s\n",
+            "IPset record compatibility:",
+#if !defined(SK_IPSET_DEFAULT_VERSION)
+            "1.0.0"
+#elif SK_IPSET_DEFAULT_VERSION == 5
+            "3.14.0"
+#elif SK_IPSET_DEFAULT_VERSION == 4
+            "3.7.0"
+#else
+            "1.0.0"
 #endif
             );
 

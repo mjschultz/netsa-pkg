@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsetcat.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwsetcat.c 88cee5c95d36 2016-10-31 16:57:21Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skipset.h>
@@ -1170,7 +1170,12 @@ setcatProcessFile(
     }
 
     /* Read the IPset into memory if we must */
-    if (opt_flags.statistics || opt_flags.count_ips) {
+    if (opt_flags.statistics
+        || (opt_flags.count_ips
+            && (opt_flags.print_ips
+                || opt_flags.network_structure
+                || opt_flags.ip_ranges)))
+    {
         rv = skIPSetRead(&ipset, stream);
         if (rv) {
             if (SKIPSET_ERR_FILEIO == rv) {
@@ -1191,12 +1196,31 @@ setcatProcessFile(
 
     /* Print count and/or print file name if requested */
     if (opt_flags.count_ips) {
-        assert(ipset);
         if (opt_flags.print_filenames) {
             skStreamPrint(outstream, "%s:", filename);
         }
-        skStreamPrint(outstream, "%s\n",
-                      skIPSetCountIPsString(ipset, count, sizeof(count)));
+        if (ipset) {
+            skStreamPrint(outstream, "%s\n",
+                          skIPSetCountIPsString(ipset, count, sizeof(count)));
+        } else {
+            rv = skIPSetProcessStreamCountIPs(stream, count, sizeof(count));
+            if (SKIPSET_OK == rv) {
+                skStreamPrint(outstream, "%s\n", count);
+            } else {
+                if (SKIPSET_ERR_FILEIO == rv) {
+                    skStreamLastErrMessage(stream,
+                                           skStreamGetLastReturnValue(stream),
+                                           errbuf, sizeof(errbuf));
+                    skAppPrintErr("Unable to read IPset from '%s': %s",
+                                  filename, errbuf);
+                } else {
+                    strncpy(errbuf, skIPSetStrerror(rv), sizeof(errbuf));
+                    skAppPrintErr("Unable to count IPs in IPset from '%s': %s",
+                                  filename, errbuf);
+                }
+                goto END;
+            }
+        }
     } else if (opt_flags.print_filenames) {
         skStreamPrint(outstream, "%s:\n", filename);
     }

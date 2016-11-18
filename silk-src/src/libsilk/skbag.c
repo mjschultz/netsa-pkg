@@ -15,9 +15,8 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skbag.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: skbag.c aefb6d38d9a6 2016-10-18 19:20:00Z mthomas $");
 
-#include <silk/hashlib.h>
 #include <silk/redblack.h>
 #include <silk/skbag.h>
 #include <silk/skipaddr.h>
@@ -46,16 +45,6 @@ RCSIDENT("$SiLK: skbag.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
 #endif
 #endif
 
-
-/*    For IPv6, whether the store the keys and values in the
- *    hashlib(1) or the redblack tree(0). */
-#ifndef SKBAG_USE_HASHLIB
-#define SKBAG_USE_HASHLIB 0
-#endif
-
-
-/*    Initializer for libhash hash table creation */
-#define HASH_INITIAL_SIZE           500000
 
 /*    Maximum number of octets allowed for keys and counters */
 #define BAG_KEY_MAX_OCTETS          16
@@ -278,8 +267,7 @@ typedef struct bagtree_st {
 /*
  *    Red Black Tree
  *
- *    For IPv6 entries, the data is stored in a red-black tree (unless
- *    the SKBAG_USE_HASHLIB macro is non-zero).
+ *    For IPv6 entries, the data is stored in a red-black tree.
  *
  *    The data element of each node of the red-black tree is a
  *    bag_keycount128_t object that holds the IPv6 address and the
@@ -348,15 +336,9 @@ struct skBag_st {
         bagtree_t              *b_tree;
 
 #if SK_ENABLE_IPV6
-#if SKBAG_USE_HASHLIB
-        /* a hash-table of counters is used for keys larger than 4
-         * octets */
-        HashTable              *b_hash;
-#else  /* SKBAG_USE_HASHLIB */
         /* a struct holding a red-black tree of key/counter pairs and
          * a memory pool for the key/counter pairs */
         bag_redblack_t         *b_rbt;
-#endif  /* SKBAG_USE_HASHLIB */
 #endif  /* SK_ENABLE_IPV6 */
     }                       d;
 
@@ -390,21 +372,12 @@ struct skBagIterator_st {
 
     union iter_body_un {
 #if SK_ENABLE_IPV6
-#if SKBAG_USE_HASHLIB
-        struct iter_body_hash_st {
-            /* array of keys that existed when the iterator was Reset */
-            uint8_t            *keys;
-
-            HASH_ITER           h_iter;
-        }                   i_hash;
-#else
         struct iter_body_redblack_st {
             /* read one element ahead so we can delete the current
              * node */
             RBLIST                     *rb_iter;
             const bag_keycount128_t    *next;
         }                   i_rbt;
-#endif  /* SKBAG_USE_HASHLIB */
 #endif  /* SK_ENABLE_IPV6 */
         struct iter_body_bagtree_st {
             /* start searching for next entry using this key value */
@@ -543,15 +516,6 @@ bagtreeIterNext(
     uint32_t           *key,
     uint64_t           *counter);
 #if SK_ENABLE_IPV6
-#if SKBAG_USE_HASHLIB
-static skBagErr_t
-bagOperationHash(
-    skBag_t                *bag,
-    const uint8_t           ipv6[16],
-    const uint64_t          change_value,
-    skBagTypedCounter_t    *result_value,
-    bag_operation_t         op);
-#else  /* SKBAG_USE_HASHLIB */
 static skBagErr_t
 bagOperationRedblack(
     skBag_t                *bag,
@@ -559,7 +523,6 @@ bagOperationRedblack(
     const uint64_t          change_value,
     skBagTypedCounter_t    *result_value,
     bag_operation_t         op);
-#endif  /* SKBAG_USE_HASHLIB */
 #endif  /* SK_ENABLE_IPV6 */
 
 
@@ -748,15 +711,6 @@ bagCompareKeys64(
 #endif  /* 0 */
 
 #if SK_ENABLE_IPV6
-#if SKBAG_USE_HASHLIB
-static int
-bagCompareKeys128(
-    const void         *v_key_a,
-    const void         *v_key_b)
-{
-    return memcmp(v_key_a, v_key_b, sizeof(bag_v4inv6));
-}
-#else  /* SKBAG_USE_HASHLIB */
 static int
 bagCompareKeys128(
     const void         *v_key_a,
@@ -765,12 +719,10 @@ bagCompareKeys128(
 {
     return memcmp(v_key_a, v_key_b, sizeof(bag_v4inv6));
 }
-#endif  /* SKBAG_USE_HASHLIB */
 #endif  /* SK_ENABLE_IPV6 */
 
 
 /*
- *  bagComputeStatsHash(bag, stats);
  *  bagComputeStatsRedblack(bag, stats);
  *  bagComputeStatsTree(bag, stats);
  *  bagComputeStats(bag, stats);
@@ -779,52 +731,6 @@ bagCompareKeys128(
  *    statistics about the bag.
  */
 #if SK_ENABLE_IPV6
-#if SKBAG_USE_HASHLIB
-static void
-bagComputeStatsHash(
-    const skBag_t      *bag,
-    bagstats_t         *stats)
-{
-#if BAG_STATS_FIND_MIN_MAX
-    skipaddr_t key;
-#endif
-    HASH_ITER h_iter;
-    uint8_t *key_ptr;
-    uint8_t *val_ptr;
-    uint64_t counter;
-
-    stats->nodes = hashlib_count_buckets(bag->d.b_hash);
-    stats->nodes_size = (stats->nodes
-                         * (bag->key_octets + sizeof(uint64_t)));
-
-    h_iter = hashlib_create_iterator(bag->d.b_hash);
-
-    while (hashlib_iterate(bag->d.b_hash, &h_iter, &key_ptr, &val_ptr)
-           == OK)
-    {
-        BAG_MEMCPY_COUNTER(&counter, val_ptr);
-        if (!BAG_COUNTER_IS_ZERO(counter)) {
-            ++stats->unique_keys;
-#if BAG_STATS_FIND_MIN_MAX
-            skipaddrSetV6(&key, key_ptr);
-            if (skipaddrCompare(&key, &stats->min_ipkey) < 0) {
-                skipaddrCopy(&stats->min_ipkey, &key);
-            }
-            if (skipaddrCopy(&key, &stats->max_ipkey) > 0) {
-                skipaddrCopy(&stats->max_ipkey, &key);
-            }
-            if (counter < stats->min_counter) {
-                stats->min_counter = counter;
-            }
-            if (counter > stats->max_counter) {
-                stats->max_counter = counter;
-            }
-#endif  /* BAG_STATS_FIND_MIN_MAX */
-        }
-    }
-}
-#else  /* SKBAG_USE_HASHLIB */
-
 static void
 bagComputeStatsRedblack(
     const skBag_t      *bag,
@@ -860,7 +766,6 @@ bagComputeStatsRedblack(
     stats->nodes = stats->unique_keys;
     stats->nodes_size = (stats->nodes * sizeof(bag_keycount128_t));
 }
-#endif  /* SKBAG_USE_HASHLIB */
 #endif  /* SK_ENABLE_IPV6 */
 
 static void
@@ -905,55 +810,6 @@ bagComputeStatsTree(
 #endif
 }
 
-#if 0
-static void
-bagComputeStats64(
-    const skBag_t      *bag,
-    bagstats_t         *stats)
-{
-#if BAG_STATS_FIND_MIN_MAX
-    uint64_t key;
-#endif
-    HASH_ITER h_iter;
-    uint8_t *key_ptr;
-    uint8_t *val_ptr;
-    uint64_t counter;
-
-    stats->nodes = hashlib_count_buckets(bag->d.b_hash);
-    stats->nodes_size = (stats->nodes
-                         * (bag->key_octets + sizeof(uint64_t)));
-
-    h_iter = hashlib_create_iterator(bag->d.b_hash);
-    while (hashlib_iterate(bag->d.b_hash, &h_iter, &key_ptr, &val_ptr)
-           == OK)
-    {
-        BAG_MEMCPY_COUNTER(&counter, val_ptr);
-        if (!BAG_COUNTER_IS_ZERO(counter)) {
-            ++stats->unique_keys;
-#if BAG_STATS_FIND_MIN_MAX
-#if SKBAG_USE_MEMCPY
-            mempcy(&key, key_ptr, sizeof(key));
-#else
-            key = *(uint64_t*)key_ptr;
-#endif
-            if (key < stats->min_key) {
-                stats->min_key = key;
-            }
-            if (key > stats->max_key) {
-                stats->max_key = key;
-            }
-            if (counter < stats->min_counter) {
-                stats->min_counter = counter;
-            }
-            if (counter > stats->max_counter) {
-                stats->max_counter = counter;
-            }
-#endif  /* BAG_STATS_FIND_MIN_MAX */
-        }
-    }
-}
-#endif  /* 0 */
-
 static void
 bagComputeStats(
     const skBag_t      *bag,
@@ -976,11 +832,7 @@ bagComputeStats(
         break;
 #if SK_ENABLE_IPV6
       case 16:
-#if SKBAG_USE_HASHLIB
-        bagComputeStatsHash(bag, stats);
-#else
         bagComputeStatsRedblack(bag, stats);
-#endif  /* SKBAG_USE_HASHLIB */
         break;
 #endif  /* SK_ENABLE_IPV6 */
       case 8:
@@ -1028,7 +880,6 @@ bagIterCreate(
 
 
 /*
- *  err = bagIterNextHash(iter, key, counter)
  *  err = bagIterNextRedblack(iter, key, counter)
  *  err = bagIterNextTree(iter, key, counter)
  *
@@ -1040,169 +891,6 @@ bagIterCreate(
  *    visited all entries.
  */
 #if SK_ENABLE_IPV6
-#if SKBAG_USE_HASHLIB
-static skBagErr_t
-bagIterNextHash(
-    skBagIterator_t        *iter,
-    skBagTypedKey_t        *key,
-    skBagTypedCounter_t    *counter)
-{
-    uint8_t *key_ptr;
-    uint8_t *val_ptr;
-    skBagTypedCounter_t tmp_counter;
-
-    if (0 == iter->sorted) {
-        /* data is unsorted */
-        while (hashlib_iterate(iter->bag->d.b_hash, &iter->d.i_hash.h_iter,
-                               &key_ptr, &val_ptr) == OK)
-        {
-#if SKBAG_USE_MEMCPY
-            uint64_t val;
-            BAG_MEMCPY_COUNTER(&val, val_ptr);
-            if (BAG_COUNTER_IS_ZERO(val)) {
-                continue;
-            }
-#else
-            if (BAG_COUNTER_IS_ZERO(*(uint64_t*)val_ptr)) {
-                continue;
-            }
-#endif  /* SKBAG_USE_MEMCPY */
-
-            /* found an entry to return to user---assuming the key can
-             * hold an ipaddr */
-            switch (key->type) {
-              case SKBAG_KEY_ANY:
-                key->type = SKBAG_KEY_IPADDR;
-                /* FALLTHROUGH */
-
-              case SKBAG_KEY_IPADDR:
-                skipaddrSetV6(&key->val.addr, key_ptr);
-#if SKBAG_USE_MEMCPY
-                BAG_COUNTER_SET(counter, val);
-#else
-                BAG_COUNTER_SET(counter, *(uint64_t*)val_ptr);
-#endif
-                return SKBAG_OK;
-
-              case SKBAG_KEY_U8:
-                if (0 == memcmp(key_ptr, bag_v4inv6, 15)) {
-                    key->val.u8 = key_ptr[15];
-#if SKBAG_USE_MEMCPY
-                    BAG_COUNTER_SET(counter, val);
-#else
-                    BAG_COUNTER_SET(counter, *(uint64_t*)val_ptr);
-#endif
-                    return SKBAG_OK;
-                }
-                break;
-
-              case SKBAG_KEY_U16:
-                if (0 == memcmp(key_ptr, bag_v4inv6, 14)) {
-#if SKBAG_USE_MEMCPY
-                    memcpy(&key->val.u16, &key_ptr[14], sizeof(uint16_t));
-                    key->val.u16 = ntohs(key->val.u16);
-                    BAG_COUNTER_SET(counter, val);
-#else
-                    key->val.u16 = ntohs(*(uint16_t*)&key_ptr[14]);
-                    BAG_COUNTER_SET(counter, *(uint64_t*)val_ptr);
-#endif
-                    return SKBAG_OK;
-                }
-                break;
-
-              case SKBAG_KEY_U32:
-                if (0 == memcmp(key_ptr, bag_v4inv6, 12)) {
-#if SKBAG_USE_MEMCPY
-                    memcpy(&key->val.u32, &key_ptr[12], sizeof(uint32_t));
-                    key->val.u32 = ntohl(key->val.u32);
-                    BAG_COUNTER_SET(counter, val);
-#else
-                    key->val.u32 = ntohl(*(uint32_t*)&key_ptr[12]);
-                    BAG_COUNTER_SET(counter, *(uint64_t*)val_ptr);
-#endif
-                    return SKBAG_OK;
-                }
-                break;
-            }
-        }
-
-    } else {
-        /* working with sorted entries */
-        while (iter->pos < iter->num_entries) {
-            key_ptr = iter->d.i_hash.keys+(iter->pos * iter->bag->key_octets);
-            ++iter->pos;
-
-            switch (key->type) {
-              case SKBAG_KEY_ANY:
-                key->type = SKBAG_KEY_IPADDR;
-                /* FALLTHROUGH */
-
-              case SKBAG_KEY_IPADDR:
-                bagOperationHash((skBag_t*)iter->bag, key_ptr, 0,
-                                 &tmp_counter, BAG_OP_GET);
-                if (!BAG_COUNTER_IS_ZERO(tmp_counter.val.u64)) {
-                    memcpy(counter, &tmp_counter, sizeof(tmp_counter));
-                    skipaddrSetV6(&key->val.addr, key_ptr);
-                    return SKBAG_OK;
-                }
-                break;
-
-              case SKBAG_KEY_U8:
-                if (0 != memcmp(key_ptr, bag_v4inv6, 15)) {
-                    return SKBAG_ERR_KEY_NOT_FOUND;
-                }
-                bagOperationHash((skBag_t*)iter->bag, key_ptr, 0,
-                                 &tmp_counter, BAG_OP_GET);
-                if (!BAG_COUNTER_IS_ZERO(tmp_counter.val.u64)) {
-                    memcpy(counter, &tmp_counter, sizeof(tmp_counter));
-                    key->val.u8 = key_ptr[15];
-                    return SKBAG_OK;
-                }
-                break;
-
-              case SKBAG_KEY_U16:
-                if (0 != memcmp(key_ptr, bag_v4inv6, 14)) {
-                    return SKBAG_ERR_KEY_NOT_FOUND;
-                }
-                bagOperationHash((skBag_t*)iter->bag, key_ptr, 0,
-                                 &tmp_counter, BAG_OP_GET);
-                if (!BAG_COUNTER_IS_ZERO(tmp_counter.val.u64)) {
-                    memcpy(counter, &tmp_counter, sizeof(tmp_counter));
-#if SKBAG_USE_MEMCPY
-                    memcpy(&key->val.u16, &key_ptr[14], sizeof(uint16_t));
-                    key->val.u16 = ntohs(key->val.u16);
-#else
-                    key->val.u16 = ntohs(*(uint16_t*)&key_ptr[14]);
-#endif
-                    return SKBAG_OK;
-                }
-                break;
-
-              case SKBAG_KEY_U32:
-                if (0 != memcmp(key_ptr, bag_v4inv6, 12)) {
-                    return SKBAG_ERR_KEY_NOT_FOUND;
-                }
-                bagOperationHash((skBag_t*)iter->bag, key_ptr, 0,
-                                 &tmp_counter, BAG_OP_GET);
-                if (!BAG_COUNTER_IS_ZERO(tmp_counter.val.u64)) {
-                    memcpy(counter, &tmp_counter, sizeof(tmp_counter));
-#if SKBAG_USE_MEMCPY
-                    memcpy(&key->val.u32, &key_ptr[12], sizeof(uint32_t));
-                    key->val.u32 = ntohl(key->val.u32);
-#else
-                    key->val.u32 = ntohl(*(uint32_t*)&key_ptr[12]);
-#endif
-                    return SKBAG_OK;
-                }
-                break;
-            }
-        }
-    }
-
-    return SKBAG_ERR_KEY_NOT_FOUND;
-}
-#else  /* SKBAG_USE_HASHLIB */
-
 static skBagErr_t
 bagIterNextRedblack(
     skBagIterator_t        *iter,
@@ -1267,7 +955,6 @@ bagIterNextRedblack(
 
     return SKBAG_ERR_KEY_NOT_FOUND;
 }
-#endif  /* SKBAG_USE_HASHLIB */
 #endif  /* SK_ENABLE_IPV6 */
 
 static skBagErr_t
@@ -1320,7 +1007,6 @@ bagIterNextTree(
 
 
 /*
- *  err = bagIterResetHash(iter)
  *  err = bagIterResetRedblack(iter)
  *  err = bagIterResetTree(iter)
  *
@@ -1328,78 +1014,6 @@ bagIterNextTree(
  *    bag contains.
  */
 #if SK_ENABLE_IPV6
-#if SKBAG_USE_HASHLIB
-static skBagErr_t
-bagIterResetHash(
-    skBagIterator_t    *iter)
-{
-    HASH_ITER h_iter;
-    uint8_t *key_ptr;
-    uint8_t *val_ptr;
-    uint8_t *key;
-    uint32_t num_entries;
-    int (*compare_fn)(const void *, const void*);
-
-    if (0 == iter->sorted) {
-        /* unsorted iterator */
-        iter->d.i_hash.h_iter = hashlib_create_iterator(iter->bag->d.b_hash);
-        return SKBAG_OK;
-    }
-
-    switch (iter->bag->key_octets) {
-      case 16:
-        compare_fn = bagCompareKeys128;
-        break;
-      case 8:
-      default:
-        skAbortBadCase(iter->bag->key_octets);
-    }
-
-    num_entries = hashlib_count_entries(iter->bag->d.b_hash);
-    if (0 == num_entries) {
-        iter->num_entries = 0;
-        return SKBAG_OK;
-    }
-    if (iter->d.i_hash.keys) {
-        /* reset an existing iterator */
-        if (num_entries > iter->num_entries) {
-            /* need to realloc the array */
-            key = (uint8_t*)realloc(iter->d.i_hash.keys,
-                                    (num_entries * iter->bag->key_octets));
-            if (NULL == key) {
-                return SKBAG_ERR_MEMORY;
-            }
-            iter->d.i_hash.keys = key;
-        }
-    } else {
-        /* Allocate space for keys */
-        iter->d.i_hash.keys
-            = (uint8_t*)malloc(num_entries * iter->bag->key_octets);
-        if (NULL == iter->d.i_hash.keys) {
-            return SKBAG_ERR_MEMORY;
-        }
-    }
-    iter->num_entries = num_entries;
-
-    /* copy keys into an array */
-    key = iter->d.i_hash.keys;
-    h_iter = hashlib_create_iterator(iter->bag->d.b_hash);
-    while (OK == hashlib_iterate(iter->bag->d.b_hash, &h_iter,
-                                 &key_ptr, &val_ptr))
-    {
-        assert(key < (iter->d.i_hash.keys
-                      + (iter->num_entries * iter->bag->key_octets)));
-        memcpy(key, key_ptr, iter->bag->key_octets);
-        key += iter->bag->key_octets;
-    }
-
-    skQSort(iter->d.i_hash.keys, iter->num_entries, iter->bag->key_octets,
-            compare_fn);
-
-    return SKBAG_OK;
-}
-#else  /* SKBAG_USE_HASHLIB */
-
 static skBagErr_t
 bagIterResetRedblack(
     skBagIterator_t    *iter)
@@ -1412,7 +1026,6 @@ bagIterResetRedblack(
         = (const bag_keycount128_t*)rbreadlist(iter->d.i_rbt.rb_iter);
     return SKBAG_OK;
 }
-#endif  /* SKBAG_USE_HASHLIB */
 #endif  /* SK_ENABLE_IPV6 */
 
 static skBagErr_t
@@ -1429,169 +1042,22 @@ bagIterResetTree(
 
 
 /*
- *  err = bagOperationHash(bag, key, counter, result, op)
  *  err = bagOperationRedblack(bag, key, counter, result, op)
  *  err = bagOperationTree(bag, key, counter, result, op)
  *
  *    Perform the operation 'op' on the counter at 'key' in 'bag'.
  *
- *    If 'op' is GET, 'result' is set to the current counter.
+ *    If 'op' is GET, 'result' is set to the current counter.  The
+ *    parameter 'counter' is ignored.
  *
- *    If 'op' is SET, the counter is set to the value 'counter'.
+ *    If 'op' is SET, the counter is set to the value 'counter'.  The
+ *    parameter 'result' is ignored.
  *
  *    If 'op' is ADD or SUBTRACT, 'counter' is the value by which to
  *    modify the current counter.  In addition, if 'result' is
  *    specified, it is set to the new value.
  */
 #if SK_ENABLE_IPV6
-#if SKBAG_USE_HASHLIB
-static skBagErr_t
-bagOperationHash(
-    skBag_t                *bag,
-    const uint8_t           ipv6[16],
-    const uint64_t          change_value,
-    skBagTypedCounter_t    *result_value,
-    bag_operation_t         op)
-{
-    uint8_t *val_ptr;
-    int rv;
-
-    if (BAG_OP_ADD != op) {
-        /* check whether the value exists */
-        if (hashlib_lookup(bag->d.b_hash, ipv6, &val_ptr) == OK) {
-            /* found it in the hash */
-            switch (op) {
-              case BAG_OP_GET:
-#if SKBAG_USE_MEMCPY
-                result_value->type = SKBAG_COUNTER_U64;
-                BAG_MEMCPY_COUNTER(&result_value->val.u64, val_ptr);
-#else
-                BAG_COUNTER_SET(result_value, *(uint64_t*)val_ptr);
-#endif
-                return SKBAG_OK;
-
-              case BAG_OP_SET:
-#if SKBAG_USE_MEMCPY
-                BAG_MEMCPY_COUNTER(val_ptr, &change_value);
-#else
-                *(uint64_t*)val_ptr = change_value;
-#endif
-                return SKBAG_OK;
-
-              case BAG_OP_SUBTRACT:
-#if SKBAG_USE_MEMCPY
-                {
-                    uint64_t counter;
-                    BAG_MEMCPY_COUNTER(&counter, val_ptr);
-                    if (counter < change_value) {
-                        /* would underflow; return error */
-                        return SKBAG_ERR_OP_BOUNDS;
-                    }
-                    counter -= change_value;
-                    BAG_MEMCPY_COUNTER(val_ptr, &counter);
-                    if (result_value) {
-                        BAG_COUNTER_SET(result_value, counter);
-                    }
-                }
-#else
-                if (*(uint64_t*)val_ptr < change_value) {
-                    /* would underflow; return error */
-                    return SKBAG_ERR_OP_BOUNDS;
-                }
-                *(uint64_t*)val_ptr -= change_value;
-                if (result_value) {
-                    BAG_COUNTER_SET(result_value, *(uint64_t*)val_ptr);
-                }
-#endif  /* SKBAG_USE_MEMCPY */
-                return SKBAG_OK;
-
-              case BAG_OP_ADD:
-                skAbortBadCase(op);
-            }
-        } else {
-            /* key was not found in the hash */
-            switch (op) {
-              case BAG_OP_GET:
-                BAG_COUNTER_SET_ZERO(result_value);
-                return SKBAG_OK;
-
-              case BAG_OP_SET:
-                if (BAG_COUNTER_IS_ZERO(change_value)) {
-                    /* do not modify the hash table */
-                    return SKBAG_OK;
-                }
-                /* else go into the add code below */
-                break;
-
-              case BAG_OP_SUBTRACT:
-                if (!BAG_COUNTER_IS_ZERO(change_value)) {
-                    /* would underflow; return error */
-                    return SKBAG_ERR_OP_BOUNDS;
-                }
-                if (result_value) {
-                    BAG_COUNTER_SET_ZERO(result_value);
-                }
-                return SKBAG_OK;
-
-              case BAG_OP_ADD:
-                skAbortBadCase(op);
-            }
-        }
-    }
-
-    /* this is either an add operation, or a set operation where the
-     * value is not in the hash */
-
-    /* get existing counter or allocate it */
-    rv = hashlib_insert(bag->d.b_hash, ipv6, &val_ptr);
-    switch (rv) {
-      case ERR_OUTOFMEMORY:
-      case ERR_NOMOREBLOCKS:
-        return SKBAG_ERR_MEMORY;
-
-      case OK:
-        /* new value */
-        BAG_MEMCPY_COUNTER(val_ptr, &change_value);
-        if (result_value) {
-            BAG_COUNTER_SET(result_value, change_value);
-        }
-        break;
-
-      case OK_DUPLICATE:
-        assert(BAG_OP_SET != op);
-#if SKBAG_USE_MEMCPY
-        {
-            /* check whether (*counter + change_value > SKBAG_COUNTER_MAX) */
-            uint64_t counter;
-            BAG_MEMCPY_COUNTER(&counter, val_ptr);
-            if (counter > (SKBAG_COUNTER_MAX - change_value)) {
-                /* would overflow, return error */
-                return SKBAG_ERR_OP_BOUNDS;
-            }
-            counter += change_value;
-            BAG_MEMCPY_COUNTER(val_ptr, &counter);
-            if (result_value) {
-                BAG_COUNTER_SET(result_value, counter);
-            }
-        }
-#else
-        /* check whether (*counter + change_value > SKBAG_COUNTER_MAX) */
-        if (*(uint64_t*)val_ptr > (SKBAG_COUNTER_MAX - change_value)) {
-            /* would overflow, return error */
-            return SKBAG_ERR_OP_BOUNDS;
-        }
-        *(uint64_t*)val_ptr += change_value;
-        if (result_value) {
-            BAG_COUNTER_SET(result_value, *(uint64_t*)val_ptr);
-        }
-#endif  /* SKBAG_USE_MEMCPY */
-        break;
-    }
-
-    return SKBAG_OK;
-}
-#else  /* SKBAG_USE_HASHLIB */
-
 static skBagErr_t
 bagOperationRedblack(
     skBag_t                *bag,
@@ -1701,7 +1167,6 @@ bagOperationRedblack(
 
     return SKBAG_OK;
 }
-#endif  /* SKBAG_USE_HASHLIB */
 #endif  /* SK_ENABLE_IPV6 */
 
 static skBagErr_t
@@ -2155,37 +1620,6 @@ skBagCopy(
 
 #if SK_ENABLE_IPV6
       case 16:
-#if SKBAG_USE_HASHLIB
-        {
-            HASH_ITER h_iter;
-            uint8_t *key_ptr;
-            uint8_t *src_val_ptr;
-            uint8_t *dest_val_ptr;
-            int h_err;
-
-            h_iter = hashlib_create_iterator(src->d.b_hash);
-            while (hashlib_iterate(src->d.b_hash, &h_iter,
-                                   &key_ptr, &src_val_ptr) == OK)
-            {
-                if (BAG_COUNTER_IS_ZERO(src_val_ptr)) {
-                    continue;
-                }
-                h_err = hashlib_insert(bag->d.b_hash, key_ptr, &dest_val_ptr);
-                switch (h_err) {
-                  case ERR_OUTOFMEMORY:
-                  case ERR_NOMOREBLOCKS:
-                    rv = SKBAG_ERR_MEMORY;
-                    goto END;
-                  case OK:
-                    BAG_MEMCPY_COUNTER(dest_val_ptr, src_val_ptr);
-                    break;
-                  case OK_DUPLICATE:
-                  default:
-                    skAbortBadCase(h_err);
-                }
-            }
-        }
-#else  /* SKBAG_USE_HASHLIB */
         {
             RBLIST *rb_iter;
             const bag_keycount128_t *srcnode;
@@ -2215,7 +1649,6 @@ skBagCopy(
             }
             rbcloselist(rb_iter);
         }
-#endif  /* SKBAG_USE_HASHLIB */
         break;
 #endif  /* SK_ENABLE_IPV6 */
 
@@ -2273,13 +1706,8 @@ skBagCounterAdd(
         if (16 == bag->key_octets) {
             /* bag is ipv6, so convert key to ipv6 */
             BAG_KEY_TO_IPV6(key, ipv6);
-#if SKBAG_USE_HASHLIB
-            return bagOperationHash(bag, ipv6, counter_add->val.u64,
-                                    out_counter, BAG_OP_ADD);
-#else
             return bagOperationRedblack(bag, ipv6, counter_add->val.u64,
                                         out_counter, BAG_OP_ADD);
-#endif  /* SKBAG_USE_HASHLIB */
         }
 
         BAG_KEY_TO_U32_V6(key, u32, is_v6);
@@ -2318,13 +1746,8 @@ skBagCounterAdd(
                 return rv;
             }
             BAG_KEY_TO_IPV6(key, ipv6);
-#if SKBAG_USE_HASHLIB
-            return bagOperationHash(bag, ipv6, counter_add->val.u64,
-                                    out_counter, BAG_OP_ADD);
-#else
             return bagOperationRedblack(bag, ipv6, counter_add->val.u64,
                                         out_counter, BAG_OP_ADD);
-#endif  /* SKBAG_USE_HASHLIB */
         }
     }
 #endif  /* #else of #if !SK_ENABLE_IPV6 */
@@ -2416,13 +1839,8 @@ skBagCounterGet(
         if (16 == bag->key_octets) {
             /* bag is ipv6, so convert key to ipv6 */
             BAG_KEY_TO_IPV6(key, ipv6);
-#if SKBAG_USE_HASHLIB
-            return bagOperationHash((skBag_t*)bag, ipv6, 0,
-                                    out_counter, BAG_OP_GET);
-#else
             return bagOperationRedblack((skBag_t*)bag, ipv6, 0,
                                         out_counter, BAG_OP_GET);
-#endif  /* SKBAG_USE_HASHLIB */
         }
 
         BAG_KEY_TO_U32_V6(key, u32, is_v6);
@@ -2472,13 +1890,8 @@ skBagCounterSet(
         if (16 == bag->key_octets) {
             /* bag is ipv6, so convert key to ipv6 */
             BAG_KEY_TO_IPV6(key, ipv6);
-#if SKBAG_USE_HASHLIB
-            return bagOperationHash(bag, ipv6, counter->val.u64,
-                                    NULL, BAG_OP_SET);
-#else
             return bagOperationRedblack(bag, ipv6, counter->val.u64,
                                         NULL, BAG_OP_SET);
-#endif  /* SKBAG_USE_HASHLIB */
         }
 
         BAG_KEY_TO_U32_V6(key, u32, is_v6);
@@ -2514,13 +1927,8 @@ skBagCounterSet(
                 return rv;
             }
             BAG_KEY_TO_IPV6(key, ipv6);
-#if SKBAG_USE_HASHLIB
-            return bagOperationHash(bag, ipv6, counter->val.u64,
-                                    NULL, BAG_OP_SET);
-#else
             return bagOperationRedblack(bag, ipv6, counter->val.u64,
                                         NULL, BAG_OP_SET);
-#endif  /* SKBAG_USE_HASHLIB */
         }
     }
 #endif  /* #else of #if !SK_ENABLE_IPV6 */
@@ -2571,13 +1979,8 @@ skBagCounterSubtract(
         if (16 == bag->key_octets) {
             /* bag is ipv6, so convert key to ipv6 */
             BAG_KEY_TO_IPV6(key, ipv6);
-#if SKBAG_USE_HASHLIB
-            return bagOperationHash(bag, ipv6, counter_sub->val.u64,
-                                    out_counter, BAG_OP_SUBTRACT);
-#else
             return bagOperationRedblack(bag, ipv6, counter_sub->val.u64,
                                         out_counter, BAG_OP_SUBTRACT);
-#endif  /* SKBAG_USE_HASHLIB */
         }
 
         BAG_KEY_TO_U32_V6(key, u32, is_v6);
@@ -2684,20 +2087,6 @@ skBagCreateTyped(
 
 #if SK_ENABLE_IPV6
       case 16:
-#if SKBAG_USE_HASHLIB
-        new_bag->d.b_hash
-            = hashlib_create_table(new_bag->key_octets,
-                                   sizeof(uint64_t),
-                                   HTT_INPLACE,
-                                   (uint8_t*)&bag_counter_invalid,
-                                   NULL,
-                                   0,
-                                   HASH_INITIAL_SIZE,
-                                   DEFAULT_LOAD_FACTOR);
-        if (NULL == new_bag->d.b_hash) {
-            goto ERROR;
-        }
-#else  /* SKBAG_USE_HASHLIB */
         {
             bag_redblack_t *brb;
             brb = (bag_redblack_t*)calloc(1, sizeof(bag_redblack_t));
@@ -2719,7 +2108,6 @@ skBagCreateTyped(
             }
             new_bag->d.b_rbt = brb;
         }
-#endif  /* SKBAG_USE_HASHLIB */
         break;
 #endif  /* SK_ENABLE_IPV6 */
 
@@ -2764,11 +2152,6 @@ skBagDestroy(
             break;
 #if SK_ENABLE_IPV6
           case 16:
-#if SKBAG_USE_HASHLIB
-            if (bag->d.b_hash) {
-                hashlib_free_table(bag->d.b_hash);
-            }
-#else
             if (bag->d.b_rbt) {
                 bag_redblack_t *brb = bag->d.b_rbt;
                 if (brb->datum) {
@@ -2779,7 +2162,6 @@ skBagDestroy(
                 }
                 free(brb);
             }
-#endif  /* SKBAG_USE_HASHLIB */
             break;
 #endif  /* SK_ENABLE_IPV6 */
           case 8:
@@ -3159,15 +2541,9 @@ skBagIteratorDestroy(
       case 8:
       case 16:
 #if SK_ENABLE_IPV6
-#if SKBAG_USE_HASHLIB
-        if (iter->d.i_hash.keys) {
-            free(iter->d.i_hash.keys);
-        }
-#else
         if (iter->d.i_rbt.rb_iter) {
             rbcloselist(iter->d.i_rbt.rb_iter);
         }
-#endif  /* SKBAG_USE_HASHLIB */
 #endif  /* SK_ENABLE_IPV6 */
         break;
     }
@@ -3208,11 +2584,7 @@ skBagIteratorNextTyped(
         return bagIterNextTree(iter, key, counter);
 #if SK_ENABLE_IPV6
       case 16:
-#if SKBAG_USE_HASHLIB
-        return bagIterNextHash(iter, key, counter);
-#else
         return bagIterNextRedblack(iter, key, counter);
-#endif  /* SKBAG_USE_HASHLIB */
 #endif  /* SK_ENABLE_IPV6 */
       case 8:
       default:
@@ -3242,17 +2614,11 @@ skBagIteratorReset(
             break;
 #if SK_ENABLE_IPV6
           case 16:
-#if SKBAG_USE_HASHLIB
-            if (iter->d.i_hash.keys) {
-                free(iter->d.i_hash.keys);
-            }
-#else
             iter->d.i_rbt.next = NULL;
             if (iter->d.i_rbt.rb_iter) {
                 rbcloselist(iter->d.i_rbt.rb_iter);
                 iter->d.i_rbt.rb_iter = NULL;
             }
-#endif  /* SKBAG_USE_HASHLIB */
             break;
 #endif  /* SK_ENABLE_IPV6 */
           case 8:
@@ -3274,11 +2640,7 @@ skBagIteratorReset(
         return bagIterResetTree(iter);
 #if SK_ENABLE_IPV6
       case 16:
-#if SKBAG_USE_HASHLIB
-        return bagIterResetHash(iter);
-#else
         return bagIterResetRedblack(iter);
-#endif  /* SKBAG_USE_HASHLIB */
 #endif  /* SK_ENABLE_IPV6 */
       case 8:
       default:
@@ -3928,35 +3290,6 @@ skBagWrite(
 
 #if SK_ENABLE_IPV6
       case 16:
-#if SKBAG_USE_HASHLIB
-        {
-            HASH_ITER h_iter;
-            uint8_t *key_ptr;
-            uint8_t *val_ptr;
-
-            h_iter = hashlib_create_iterator(bag->d.b_hash);
-            while (hashlib_iterate(bag->d.b_hash, &h_iter, &key_ptr, &val_ptr)
-                   == OK)
-            {
-#if SKBAG_USE_MEMCPY
-                BAG_MEMCPY_COUNTER(&counter, val_ptr);
-                if (BAG_COUNTER_IS_ZERO(counter)) {
-                    continue;
-                }
-#else
-                if (BAG_COUNTER_IS_ZERO(val_ptr)) {
-                    continue;
-                }
-#endif  /* SKBAG_USE_MEMCPY */
-
-                rv = skStreamWrite(stream_out, key_ptr, bag->key_octets);
-                rv += skStreamWrite(stream_out, val_ptr, sizeof(uint64_t));
-                if (rv != (int)(bag->key_octets + sizeof(uint64_t))) {
-                    return SKBAG_ERR_OUTPUT;
-                }
-            }
-        }
-#else  /* SKBAG_USE_HASHLIB */
         {
             RBLIST *rb_iter;
             const bag_keycount128_t *node;
@@ -3977,7 +3310,6 @@ skBagWrite(
             }
             rbcloselist(rb_iter);
         }
-#endif  /* SKBAG_USE_HASHLIB */
         break;
 #endif  /* SK_ENABLE_IPV6 */
 

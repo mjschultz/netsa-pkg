@@ -206,15 +206,41 @@ output when the standard output is not connected to a terminal.
 =item B<--record-version>=I<VERSION>
 
 Specify the format of the IPset records that are written to the
-output.  Valid values are 0, 2, 3, and 4.  When the switch is not
-provided, the SILK_IPSET_RECORD_VERSION environment variable is
-checked for a version.  A I<VERSION> of 2 creates a file compatible
-with S<SiLK 2.x>, and it can only be used for IPsets containing IPv4
-addresses.  A I<VERSION> of 3 creates a file that can only be read by
-S<SiLK 3.0> or later.  A I<VERSION> of 4 creates a file that can only
-be read by S<SiLK 3.7> or later.  Version 4 files are smaller than
-version 3 files.  The default I<VERSION> is 0, which uses version 2
-for IPv4 IPsets and version 3 for IPv6 IPsets.
+output.  I<VERSION> may be 2, 3, 4, 5 or the special value 0.  When
+the switch is not provided, the SILK_IPSET_RECORD_VERSION environment
+variable is checked for a version.  The default version is 0.
+
+=over 4
+
+=item S< 0 >
+
+Use the default version for an IPv4 IPset and an IPv6 IPset, currently
+2 and 3, respectively.
+
+=item S< 2 >
+
+Create a file that may hold only IPv4 adresses and is readable by all
+versions of SiLK.
+
+=item S< 3 >
+
+Create a file that may hold IPv4 or IPv6 adresses and is readable by
+S<SiLK 3.0> and later.
+
+=item S< 4 >
+
+Create a file that may hold IPv4 or IPv6 adresses and is readable by
+S<SiLK 3.7> and later.  These files are more compact that version 3
+and often more compact than version 2.
+
+=item S< 5 >
+
+Create a file that may hold only IPv6 adresses and is readable by
+S<SiLK 3.14> and later.  When this version is specified, IPsets
+containing only IPv4 addresses are written in version 4.  These files
+are usually more compact that version 4.
+
+=back
 
 =item B<--invocation-strip>
 
@@ -434,7 +460,7 @@ For each input IPset, F<i.set>, use B<rwbagbuild> to create a bag from
 the IPset, and use B<rwbagtool(1)> to add that bag to F<b.bag>.
 
  $ rwbagbuild --set-input=i.set   \
-         | rwbagtool --add - /tmp/b.bag --output-path=/tmp/b2.bag
+   | rwbagtool --add - /tmp/b.bag --output-path=/tmp/b2.bag
  $ mv /tmp/b2.bag /tmp/b.bag
 
 To do that in a loop, run
@@ -464,8 +490,8 @@ counter each time the IP appears in the input.)  Use B<rwbagtool> to
 create the IPset as shown in Step 3 above.
 
  $ rwsetcat --cidr-blocks=1 *.set   \
-        | rwbagbuild --bag-input=-  \
-        | rwbagtool  --maxcounter=1 --coverset --output=unique.set
+   | rwbagbuild --bag-input=-       \
+   | rwbagtool  --maxcounter=1 --coverset --output=unique.set
 
 =head2 Set Sampling Examples
 
@@ -579,16 +605,26 @@ operation.  The result is not dependent on the order of the IPsets.
 
 Suppose the IPset file F<mixed.set> contains IPv4 and IPv6 addresses.
 To create an IPset file that contains only the IPv4 addresses,
-intersect F<mixed.set> with an IPset that contains ::ffff:0:0/96.
+intersect F<mixed.set> with the IPset F<all-v4.set>, which is an IPset
+that contains all of IPv4 space (::ffff:0:0/96).
 
  $ echo '::ffff:0:0/96' | rwsetbuild - all-v4.set
 
  $ rwsettool --intersect mixed.set all-v4.set > subset-v4.set
 
 To create an IPset file that contains only the IPv6 addresses,
-subtract an IPset that contains ::ffff:0:0 from F<mixed.set>:
+subtract F<all-v4.set> from F<mixed.set>:
 
  $ rwsettool --difference mixed.set all-v4.set > subset-v6.set
+
+The previous two commands may also be performed without having to
+write create the F<all-v4.set> IPset file.
+
+ $ echo '::ffff:0:0/96'   \
+   | rwsettool --intersect mixed.set - > subset-v4.set
+
+ $ echo '::ffff:0:0/96'   \
+   | rwsettool --difference mixed.set - > subset-v6.set
 
 =head1 ENVIRONMENT
 
@@ -625,11 +661,11 @@ and the record version was 2.  The B<--record-version> switch was
 added in S<SiLK 3.0> and its default was 3.  In S<SiLK 3.6>, an
 argument of 0 was allowed and made the default.  Version 4 was added
 in S<SiLK 3.7> as was support for the SILK_IPSET_RECORD_VERSION
-environment variable.
+environment variable.  Version 5 was added in S<SiLK 3.14>.
 
 =cut
 
-$SiLK: rwsettool.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
+$SiLK: rwsettool.pod 88cee5c95d36 2016-10-31 16:57:21Z mthomas $
 
 Local Variables:
 mode:text

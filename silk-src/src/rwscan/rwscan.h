@@ -13,9 +13,8 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWSCAN_H, "$SiLK: rwscan.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_RWSCAN_H, "$SiLK: rwscan.h 3c62c66b302e 2016-11-16 19:41:29Z mthomas $");
 
-#include <silk/hashlib.h>
 #include <silk/iptree.h>
 #include <silk/rwrec.h>
 #include <silk/skipset.h>

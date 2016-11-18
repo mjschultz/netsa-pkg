@@ -202,16 +202,42 @@ contains the keys contained in the intermediate Bag.
 =item B<--ipset-record-version>=I<VERSION>
 
 Specify the format of the IPset records that are written to the output
-when the B<--coverset> switch is used.  Valid values are 0, 2, 3, and
-4.  When the switch is not provided, the SILK_IPSET_RECORD_VERSION
-environment variable is checked for a version.  A I<VERSION> of 2
-creates a file compatible with S<SiLK 2.x>, and it can only be used
-for IPsets containing IPv4 addresses.  A I<VERSION> of 3 creates a
-file that can only be read by S<SiLK 3.0> or later.  A I<VERSION> of 4
-creates a file that can only be read by S<SiLK 3.7> or later.  Version
-4 files are smaller than version 3 files.  The default I<VERSION> is
-0, which uses version 2 for IPv4 IPsets and version 3 for IPv6
-IPsets. I<Since SiLK 3.11.0>.
+when the B<--coverset> switch is used.  I<VERSION> may be 2, 3, 4, 5
+or the special value 0.  When the switch is not provided, the
+SILK_IPSET_RECORD_VERSION environment variable is checked for a
+version.  The default version is 0.  I<Since SiLK 3.11.0>.
+
+=over 4
+
+=item S< 0 >
+
+Use the default version for an IPv4 IPset and an IPv6 IPset, currently
+2 and 3, respectively.
+
+=item S< 2 >
+
+Create a file that may hold only IPv4 adresses and is readable by all
+versions of SiLK.
+
+=item S< 3 >
+
+Create a file that may hold IPv4 or IPv6 adresses and is readable by
+S<SiLK 3.0> and later.
+
+=item S< 4 >
+
+Create a file that may hold IPv4 or IPv6 adresses and is readable by
+S<SiLK 3.7> and later.  These files are more compact that version 3
+and often more compact than version 2.
+
+=item S< 5 >
+
+Create a file that may hold only IPv6 adresses and is readable by
+S<SiLK 3.14> and later.  When this version is specified, IPsets
+containing only IPv4 addresses are written in version 4.  These files
+are usually more compact that version 4.
+
+=back
 
 =item B<--output-path>=I<OUTPUTFILE>
 
@@ -536,7 +562,7 @@ B<rwset(1)>, B<rwsetbuild(1)>, B<rwsetcat(1)>, B<silk(7)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwbagtool.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
+$SiLK: rwbagtool.pod 88cee5c95d36 2016-10-31 16:57:21Z mthomas $
 
 Local Variables:
 mode:text

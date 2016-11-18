@@ -22,7 +22,7 @@
 #define SKIPFIX_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipfix.c 64a8297d18a0 2016-06-17 21:18:23Z mthomas $");
+RCSIDENT("$SiLK: skipfix.c 301c05a106b7 2016-11-15 18:04:23Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/skipaddr.h>
@@ -2215,6 +2215,36 @@ skiGauntletOfTime(
 
       case (TMPL_BIT_flowStartSysUpTime | TMPL_BIT_systemInitTimeMilliseconds):
         /* Times based on flow generator system uptimes (Netflow v9) */
+
+        /* Compute the uptime: systemInitTimeMilliseconds is the
+         * absolute router boot time (msec), and libfixbuf sets it by
+         * subtracting the NFv9 uptime (msec) from the record's
+         * absolute export time (sec). */
+        export_msec = sktimeCreate(fBufGetExportTime(fbuf), 0);
+        uptime = export_msec - fixrec->systemInitTimeMilliseconds;
+        if (skpcProbeGetQuirks(probe) & SKPC_QUIRK_NF9_SYSUPTIME_SECS) {
+            /* uptime was reported in seconds, not msec */
+            TRACEMSG(3, (("Before adjustment: exportTimeMillisec %" PRIu64
+                          ", initTimeMillisec %" PRIu64 ", upTime %" PRIdMAX
+                          ", startUpTime %" PRIu32 ", endUpTime %" PRIu32
+                          ", packets %" PRIu32),
+                         export_msec, fixrec->systemInitTimeMilliseconds,
+                         uptime, fixrec->flowStartSysUpTime,
+                         fixrec->flowEndSysUpTime, rwRecGetPkts(rec)));
+            uptime *= 1000;
+            record->data.fixrec.systemInitTimeMilliseconds
+                = export_msec - uptime;
+            if (rwRecGetPkts(rec) == 1
+                && (fixrec->flowEndSysUpTime < fixrec->flowStartSysUpTime))
+            {
+                /* sometimes the end time for single packet flows is
+                 * very different than the start time. */
+                record->data.fixrec.flowEndSysUpTime
+                    = record->data.fixrec.flowStartSysUpTime;
+            }
+        }
+
+        /* Set the duration. */
         if (fixrec->flowStartSysUpTime <= fixrec->flowEndSysUpTime) {
             rwRecSetElapsed(rec, (fixrec->flowEndSysUpTime
                                   - fixrec->flowStartSysUpTime));
@@ -2225,12 +2255,6 @@ skiGauntletOfTime(
             rollover_last = ", assume flowEndSysUpTime rollover";
         }
         /* Set start time. */
-        export_msec = sktimeCreate(fBufGetExportTime(fbuf), 0);
-        /* systemInitTimeMilliseconds is the absolute router boot time
-         * (msec), and libfixbuf sets it by subtracting the NFv9
-         * uptime (msec) from the record's absolute export time
-         * (sec). */
-        uptime = export_msec - fixrec->systemInitTimeMilliseconds;
         difference = uptime - fixrec->flowStartSysUpTime;
         if (difference > MAXIMUM_FLOW_TIME_DEVIATION) {
             /* assume upTime is set before record is composed and
@@ -2258,12 +2282,14 @@ skiGauntletOfTime(
                      " flowStartSysUpTime=%" PRIu32
                      ", flowEndSysUpTime=%" PRIu32
                      ", systemInitTimeMilliseconds=%" PRIu64
-                     ", exportTimeSeconds=%" PRIu32 "%s%s"),
+                     ", exportTimeSeconds=%" PRIu32
+                     ", calculated sysUpTime=%" PRIdMAX "%s%s"),
                     skpcProbeGetName(probe),
                     stime_buf, (double)rwRecGetElapsed(rec)/1000,
                     fixrec->flowStartSysUpTime, fixrec->flowEndSysUpTime,
                     fixrec->systemInitTimeMilliseconds,
-                    fBufGetExportTime(fbuf), rollover_first,rollover_last);
+                    fBufGetExportTime(fbuf), uptime,
+                    rollover_first, rollover_last);
         }
         return;
 
@@ -4218,6 +4244,37 @@ ski_nf9rec_next(
 
         assert(record->bmap & NF9REC_SYSUP);
 
+        /* Compute the uptime: systemInitTimeMilliseconds is the
+         * absolute router boot time (msec), and libfixbuf sets it by
+         * subtracting the NFv9 uptime (msec) from the record's
+         * absolute export time (sec). */
+        export_msec = sktimeCreate(fBufGetExportTime(fbuf), 0);
+        uptime = export_msec - nf9rec->t.sysup.systemInitTimeMilliseconds;
+        if (skpcProbeGetQuirks(probe) & SKPC_QUIRK_NF9_SYSUPTIME_SECS) {
+            /* uptime was reported in seconds, not msec */
+            TRACEMSG(2, (("Before adjustment: exportTimeMillisec %" PRIu64
+                          ", initTimeMillisec %" PRIu64 ", uptime %" PRIdMAX
+                          ", startUpTime %" PRIu32 ", endUpTime %" PRIu32
+                          ", packets %" PRIu32),
+                         export_msec,
+                         nf9rec->t.sysup.systemInitTimeMilliseconds,
+                         uptime, nf9rec->t.sysup.flowStartSysUpTime,
+                         nf9rec->t.sysup.flowEndSysUpTime,
+                         rwRecGetPkts(fwd_rec)));
+            uptime *= 1000;
+            nf9rec->t.sysup.systemInitTimeMilliseconds = export_msec - uptime;
+            if (rwRecGetPkts(fwd_rec) == 1
+                && (nf9rec->t.sysup.flowEndSysUpTime
+                    < nf9rec->t.sysup.flowStartSysUpTime))
+            {
+                /* sometimes the end time for single packet flows is
+                 * very different than the start time. */
+                nf9rec->t.sysup.flowEndSysUpTime
+                    = nf9rec->t.sysup.flowStartSysUpTime;
+            }
+        }
+
+        /* Compute duration */
         if (nf9rec->t.sysup.flowStartSysUpTime
             <= nf9rec->t.sysup.flowEndSysUpTime)
         {
@@ -4230,13 +4287,7 @@ ski_nf9rec_next(
                           - nf9rec->t.sysup.flowStartSysUpTime));
             rollover_last = ", assume flowEndSysUpTime rollover";
         }
-        /* Set start time. */
-        export_msec = sktimeCreate(fBufGetExportTime(fbuf), 0);
-        /* systemInitTimeMilliseconds is the absolute router boot time
-         * (msec), and libfixbuf sets it by subtracting the NFv9
-         * uptime (msec) from the record's absolute export time
-         * (sec). */
-        uptime = export_msec - nf9rec->t.sysup.systemInitTimeMilliseconds;
+        /* Compute uptime, checking for rollover */
         difference = uptime - nf9rec->t.sysup.flowStartSysUpTime;
         if (difference > MAXIMUM_FLOW_TIME_DEVIATION) {
             /* assume upTime is set before record is composed and
@@ -4268,13 +4319,15 @@ ski_nf9rec_next(
                      " flowStartSysUpTime=%" PRIu32
                      ", flowEndSysUpTime=%" PRIu32
                      ", systemInitTimeMilliseconds=%" PRIu64
-                     ", exportTimeSeconds=%" PRIu32 "%s%s"),
+                     ", exportTimeSeconds=%" PRIu32
+                     ", calculated sysUpTime=%" PRIdMAX "%s%s"),
                     skpcProbeGetName(probe),
                     stime_buf, (double)rwRecGetElapsed(fwd_rec)/1000,
                     nf9rec->t.sysup.flowStartSysUpTime,
                     nf9rec->t.sysup.flowEndSysUpTime,
                     nf9rec->t.sysup.systemInitTimeMilliseconds,
-                    fBufGetExportTime(fbuf), rollover_first,rollover_last);
+                    fBufGetExportTime(fbuf), uptime,
+                    rollover_first, rollover_last);
         }
     }
 
