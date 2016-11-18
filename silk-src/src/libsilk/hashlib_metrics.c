@@ -10,7 +10,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: hashlib_metrics.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: hashlib_metrics.c 5f941b5d4c17 2016-11-11 18:02:26Z mthomas $");
 
 #include <silk/hashlib.h>
 
@@ -59,9 +59,6 @@ do_test(
     fprintf(stderr, "frac = %f, num=%u, estimate=%u\n",
             test_ptr->estimate_ratio, test_ptr->num_entries, estimate);
 
-#ifdef HASHLIB_RECORD_STATS
-    hashlib_clear_stats();
-#endif
     /* Reconfigure the library */
     SECONDARY_BLOCK_FRACTION = test_ptr->secondary_block_fraction;
     REHASH_BLOCK_COUNT = test_ptr->rehash_block_count;
@@ -98,6 +95,9 @@ run_test(
     FILE               *out_fp,
     TestDesc           *test_ptr)
 {
+#ifdef HASHLIB_RECORD_STATS
+    hashlib_stats_t hashlib_stats;
+#endif
     struct timeval start_time, end_time;
     double elapsed_time;
     HashTable *table_ptr;
@@ -117,6 +117,11 @@ run_test(
     gettimeofday(&end_time, NULL);
     elapsed_time = get_elapsed_secs(&start_time, &end_time);
 
+#ifdef HASHLIB_RECORD_STATS
+    /* Get the statistics */
+    hashlib_get_stats(table_ptr, &hashlib_stats);
+#endif
+
     /* Clean up after the test */
     hashlib_free_table(table_ptr);
     fprintf(stderr, "Run complete: %f seconds elapsed.\n", elapsed_time);
@@ -125,7 +130,7 @@ run_test(
     fprintf(out_fp,
             ("%u\t%3.3f\t%" PRIu64 "\t%u\t%d\t%u\t%3.3f"
 #ifdef HASHLIB_RECORD_STATS
-             "\t%" PRIu64 "\t%" PRIu64 "\t%" PRIu64
+             "\t%" PRIu64 "\t%" PRIu32 "\t%" PRIu64
              "\t%u\t%" PRIu64 "\t%" PRIu64
 #endif
              "\n"),

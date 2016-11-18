@@ -22,7 +22,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_PROBECONF_H, "$SiLK: probeconf.h d49b1e47d2e3 2016-06-15 20:31:17Z mthomas $");
+RCSIDENTVAR(rcsID_PROBECONF_H, "$SiLK: probeconf.h 301c05a106b7 2016-11-15 18:04:23Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -103,28 +103,34 @@ typedef enum {
  *    Value returned by skpcProbeGetQuirks() to denote that no quirks
  *    are set.
  */
-#define SKPC_QUIRK_NONE             0x00
+#define SKPC_QUIRK_NONE                 0x00
 
 /**
  *    Quirks flag to support checking for firewall event codes, such
  *    as those returned by the Cisco ASA series of routers.
  */
-#define SKPC_QUIRK_FW_EVENT         0x01
+#define SKPC_QUIRK_FW_EVENT             0x01
 
 /**
  *    Quirks flag to support flow records that do not contain a valid
  *    packets field, such as those from the Cisco ASA series of
  *    routers.
  */
-#define SKPC_QUIRK_ZERO_PACKETS     0x02
+#define SKPC_QUIRK_ZERO_PACKETS         0x02
 
 /**
  *    Quirks flag to force processing of NetFlow v9/IPFIX records
  *    whose templates do not contain any IP addresses.
  */
-#define SKPC_QUIRK_MISSING_IPS      0x04
+#define SKPC_QUIRK_MISSING_IPS          0x04
 
-/*#define SKPC_QUIRK_     0x08*/
+/**
+ *    Quirks flag to handle NetFlow v9 from a SonicWall appliance
+ *    where the sysUpTime field in the header is reported in seconds
+ *    instead of in milliseconds.  Since SiLK 3.14.0.
+ */
+#define SKPC_QUIRK_NF9_SYSUPTIME_SECS   0x08
+
 /*#define SKPC_QUIRK_     0x10*/
 /*#define SKPC_QUIRK_     0x20*/
 /*#define SKPC_QUIRK_     0x40*/

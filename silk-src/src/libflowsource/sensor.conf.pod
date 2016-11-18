@@ -374,7 +374,7 @@ This setting does not affect whether B<rwflowpack(8)> stores the
 C<input> and C<output> fields to its output files.  Storage of those
 fields is controlled by B<rwflowpack>'s B<--pack-interfaces> switch.
 
-=item B<quirks> { B<none> | { B<firewall-event> | B<zero-packets> | B<missing-ips> ... } }
+=item B<quirks> { B<none> | { B<firewall-event> | B<zero-packets> | B<missing-ips> | B<nf9-sysuptime-seconds> ... } }
 
 This optional command is used to indicate that special (or quirky)
 handling of the incoming data is desired.  The value B<none> disables
@@ -419,6 +419,14 @@ does not contain IP addresses.  One change in SiLK 3.8.0 was to ignore
 flow records that do not have a source and/or destination IP address;
 this quirk allows one to undo the effect of that change.  I<Since SiLK
 3.8.1>.
+
+=item I<nf9-sysuptime-seconds>
+
+Work around an issue with NetFlow v9 records from a SonicWall
+appliance where the sysUpTime field in the packet header is reported
+in seconds instead of in milliseconds.  The incorrect units cause the
+time stamps on flow records to future dated.  In addition, adjust the
+time fields on single packet flow records.  I<Since SiLK 3.14.0.>
 
 =back
 
@@ -1398,7 +1406,7 @@ The B<quirks> command was introduced in SiLK 3.8.0.
 
 =cut
 
-$SiLK: sensor.conf.pod aa5ea4e7484b 2016-06-22 18:48:18Z mthomas $
+$SiLK: sensor.conf.pod 301c05a106b7 2016-11-15 18:04:23Z mthomas $
 
 Local Variables:
 mode:text

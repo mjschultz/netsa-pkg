@@ -1,10 +1,10 @@
-# RCSIDENT("$SiLK: Makefile.am 9666addd9610 2016-06-22 19:01:35Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 9d844f629b99 2016-11-16 20:29:28Z mthomas $");
 
 # Installed Targets
 
 lib_LTLIBRARIES = libflowsource.la
-libflowsource_version = 14:1:0
-# At previous release: libflowsource_version = 14:1:0
+libflowsource_version = 15:0:1
+# At previous release: libflowsource_version = 15:0:1
 
 EXTRA_DIST = sensor.conf.pod
 if HAVE_POD2MAN

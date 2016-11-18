@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbag.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: rwbag.c 614ba66c35e8 2016-10-12 21:12:16Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skbag.h>
@@ -1243,7 +1243,8 @@ processFile(
                 break;
               case SKBAG_FIELD_TCP_STATE:
                 key.type = SKBAG_KEY_U32;
-                key.val.u32 = rwRecGetTcpState(&rwrec);
+                key.val.u32
+                    = rwRecGetTcpState(&rwrec) & SK_TCPSTATE_ATTRIBUTE_MASK;
                 break;
               case SKBAG_FIELD_APPLICATION:
                 key.type = SKBAG_KEY_U32;

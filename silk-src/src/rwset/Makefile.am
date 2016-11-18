@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 98337e8a2cb7 2015-09-09 13:53:56Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am f879a436e5b1 2016-11-03 19:16:05Z mthomas $");
 
 # Installed Targets
 
@@ -267,4 +267,5 @@ TESTS += \
 	tests/rwsettool-sample-ratio.pl \
 	tests/rwsettool-sample-size.pl \
 	tests/rwsettool-sample-ratio-v6.pl \
-	tests/rwsettool-sample-size-v6.pl
+	tests/rwsettool-sample-size-v6.pl \
+	tests/rwsettool-difference-ipv6.pl

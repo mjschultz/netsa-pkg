@@ -18,7 +18,7 @@
 #define SKCOMPMETHOD_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skcompmethod.c b87f61575a2a 2016-09-22 18:42:02Z mthomas $");
+RCSIDENT("$SiLK: skcompmethod.c 70ca79fdf390 2016-10-31 16:58:12Z mthomas $");
 
 #include <silk/silk_files.h>
 #include <silk/skstringmap.h>
@@ -131,6 +131,8 @@ compMethodGetCount(
 }
 
 
+/* Fill 'buffer' (of size 'buffer_size') with name of compression
+ * method in 'cm'. */
 int
 skCompMethodGetName(
     char               *buffer,
@@ -149,6 +151,10 @@ skCompMethodGetName(
 }
 
 
+/* Check whether the value in 'comp_method' is AVAILABLE (an explicit
+ * comp-method that is compiled into SiLK), VALID (an explicit
+ * comp-method that is not available), or KNOWN (the "best" or
+ * "default" pseudo-values). */
 int
 skCompMethodCheck(
     sk_compmethod_t     comp_method)
@@ -178,6 +184,7 @@ skCompMethodCheck(
 }
 
 
+/* Return the "best" compression method. */
 sk_compmethod_t
 skCompMethodGetBest(
     void)
@@ -194,6 +201,7 @@ skCompMethodGetBest(
 }
 
 
+/* Return the default compression method. */
 sk_compmethod_t
 skCompMethodGetDefault(
     void)
@@ -203,6 +211,7 @@ skCompMethodGetDefault(
 }
 
 
+/* Set the default compression method to 'comp_method.' */
 int
 skCompMethodSetDefault(
     sk_compmethod_t     comp_method)

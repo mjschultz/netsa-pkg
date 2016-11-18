@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-# RCSIDENT("$SiLK: Makefile.am 98337e8a2cb7 2015-09-09 13:53:56Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am f879a436e5b1 2016-11-03 19:16:05Z mthomas $");
 
 # Installed Targets
 
@@ -995,7 +995,8 @@ TESTS = tests/rwset-help.pl tests/rwset-version.pl \
 	tests/rwsettool-union-data-v4v6.pl \
 	tests/rwsettool-sample-ratio.pl tests/rwsettool-sample-size.pl \
 	tests/rwsettool-sample-ratio-v6.pl \
-	tests/rwsettool-sample-size-v6.pl
+	tests/rwsettool-sample-size-v6.pl \
+	tests/rwsettool-difference-ipv6.pl
 all: all-am
 
 .SUFFIXES:
@@ -2928,6 +2929,13 @@ tests/rwsettool-sample-ratio-v6.pl.log: tests/rwsettool-sample-ratio-v6.pl
 tests/rwsettool-sample-size-v6.pl.log: tests/rwsettool-sample-size-v6.pl
 	@p='tests/rwsettool-sample-size-v6.pl'; \
 	b='tests/rwsettool-sample-size-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwsettool-difference-ipv6.pl.log: tests/rwsettool-difference-ipv6.pl
+	@p='tests/rwsettool-difference-ipv6.pl'; \
+	b='tests/rwsettool-difference-ipv6.pl'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \

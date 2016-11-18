@@ -4,7 +4,7 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in ../LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: silkconfig.m4 befe26af8bf4 2016-09-20 19:21:19Z mthomas $")
+dnl RCSIDENT("$SiLK: silkconfig.m4 77a7d16206f7 2016-11-02 13:49:55Z mthomas $")
 
 # ---------------------------------------------------------------------------
 # SILK_AC_COMPILER
@@ -724,6 +724,67 @@ AC_DEFUN([SILK_AC_ARG_ENABLE_EXTRA_CHECKS],[
 
 
 # ---------------------------------------------------------------------------
+# SILK_AC_ARG_ENABLE_IPSET_COMPATIBILITY
+#
+#    Select the release of SiLK that the default output from the IPset
+#    tools is compatible with.
+#
+#    An argument of 3.14.0 or later makes the default IPset version 5
+#    for IPv6 IPsets and 4 for IPv4 IPsets.
+#
+#    An argument of 3.7.0 or later makes the default IPset version 4
+#    for both IPv6 and IPv4 IPsets.
+#
+#    Any other argument causes IPset files to be fully backwards
+#    compatible, as does not specifying the argument or specifying an
+#    invalid argument.
+#
+#    Output variable: IPSET_DEFAULT_VERSION
+#
+AC_DEFUN([SILK_AC_ARG_ENABLE_IPSET_COMPATIBILITY],[
+    SK_IPSET_COMPATIBILITY=1.0.0
+    SK_IPSET_DEFAULT_VERSION=2
+
+    AC_ARG_ENABLE([ipset-compatibility],
+        [AS_HELP_STRING([--enable-ipset-compatibilty],
+            [select release of SiLK that the default output from IPset tools is compatible with (changes at 3.7.0, 3.14.0) [1.0.0]])[]dnl
+        ],[],[
+            enableval="yes"
+        ])
+
+    if test "x${enableval}" = "xno" || test "x${enableval}" = "xyes"
+    then
+        :
+    else
+        # Double the square brackets since m4 removes outer set
+        sk_expr=`expr "X${enableval}" : 'X[[0-9]][[0-9.]]*$'`
+        if test "${sk_expr}" -gt 0
+        then
+            # Use $[]1 so $\1 is not taken as argument to m4 function
+            SK_IPSET_COMPATIBILITY=`echo "0.${enableval}" | awk -F. '{a = $[]2 % 1000; b = $[]3 % 1000; c = $[]4 % 1000; vers = a * 1000000 + b * 1000 + c; if (vers >= 3014000) { print "3.14.0"; } else if (vers >= 3007000) { print "3.7.0"; } else { print "1.0.0"; } }'`
+            AC_MSG_NOTICE([(${PACKAGE}) Setting default IPset compatibility to SiLK-${SK_IPSET_COMPATIBILITY} (SiLK-${enableval} requested)])
+        else
+            AC_MSG_WARN([[(${PACKAGE}) Unable to parse --enable-ipset-compatibilty argument '${enableval}' as a version number]])
+        fi
+    fi
+
+    if test "x${SK_IPSET_COMPATIBILITY}" = "x3.14.0"
+    then
+        SK_IPSET_DEFAULT_VERSION=5
+    elif test "x${SK_IPSET_COMPATIBILITY}" = "x3.7.0"
+    then
+        SK_IPSET_DEFAULT_VERSION=4
+    elif test "x${SK_IPSET_COMPATIBILITY}" != "x1.0.0"
+    then
+        SK_IPSET_COMPATIBILITY=1.0.0
+    fi
+
+    AC_DEFINE_UNQUOTED([IPSET_DEFAULT_VERSION], [${SK_IPSET_DEFAULT_VERSION}],
+        [Set to the default IPset record version to use when writing to disk.])
+])# SILK_AC_ARG_ENABLE_IPSET_COMPATIBILITY
+
+
+# ---------------------------------------------------------------------------
 # SILK_AC_ARG_ENABLE_IPV6
 #
 #    Enable support for IPv6 addresses in SiLK Flow records.
@@ -775,7 +836,7 @@ AC_DEFUN([SILK_AC_ARG_ENABLE_INET6_NETWORKING],[
 
     AC_DEFINE_UNQUOTED([ENABLE_INET6_NETWORKING], [$ENABLE_INET6_NETWORKING],
         [Define to 1 to build with listening-on/connecting-to IPv6 network sockets.  Requires getaddrinfo() function.])
-])# SILK_AC_ARG_ENABLE_IPV6
+])# SILK_AC_ARG_ENABLE_INET6_NETWORKING
 
 
 # ---------------------------------------------------------------------------
@@ -1478,6 +1539,9 @@ AC_DEFUN([SILK_AC_WRITE_SUMMARY],[
     * IPv6 flow record support:     NO"
     fi
 
+    SILK_FINAL_MSG="$SILK_FINAL_MSG
+    * IPset file compatibility:     SiLK ${SK_IPSET_COMPATIBILITY} (record-version=${SK_IPSET_DEFAULT_VERSION})"
+
     if test "x$ENABLE_IPFIX" = "x1"
     then
         sk_msg_ldflags=`echo " $FIXBUF_LDFLAGS" | sed 's/^ *//' | sed 's/ *$//' | sed 's/  */ /g'`
@@ -1736,6 +1800,11 @@ AC_DEFUN([SILK_RPM_SPEC_SUBST],[
     if test "x$ENABLE_INET6_NETWORKING" = "x0"
     then
         RPM_SPEC_CONFIGURE="$RPM_SPEC_CONFIGURE --disable-inet6-networking"
+    fi
+
+    if test "x${SK_IPSET_DEFAULT_VERSION}" != "x2"
+    then
+        RPM_SPEC_CONFIGURE="${RPM_SPEC_CONFIGURE} --enable-ipset-compatibilty=${SK_IPSET_COMPATIBILITY}"
     fi
 
     if test "x$ENABLE_LOCALTIME" = "x1"

@@ -24,7 +24,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipset.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: skipset.c f879a436e5b1 2016-11-03 19:16:05Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
@@ -36,180 +36,264 @@ RCSIDENT("$SiLK: skipset.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 
 
 /*
-**  IMPLEMENTATION
-**
-**    The IPset code is implemented as a type of Radix Tree, where
-**    internal members of the tree are "nodes" and the terminal
-**    members are "leaves".  Within an IPset instance, all nodes are
-**    allocated in one array, and all leaves are allocated in another
-**    array.  The Radix Tree is not binary; each node points to
-**    IPSET_NUM_CHILDREN other nodes or leaves, and NUM_BITS is the
-**    number of bits of an IP address that must be examined to
-**    determine which branch to follow from a node.
-**
-**    The IPv4 node structure is given here and described below:
-**
-**    struct ipset_node_v4_st {
-**        uint32_t        child[IPSET_NUM_CHILDREN];
-**
-**        SET_BMAP_DECLARE(child_is_leaf, IPSET_NUM_CHILDREN);
-**
-**        SET_BMAP_DECLARE(child_repeated, IPSET_NUM_CHILDREN);
-**
-**        uint8_t         prefix;
-**
-**        // reserved/unsed bytes
-**        uint8_t         reserved3;
-**        uint8_t         reserved2;
-**        uint8_t         reserved1;
-**
-**        uint32_t        ip;
-**    };
-**
-**    Each node has an 'ip' member to hold a complete IP address; a
-**    'prefix' value in the node says how many of the bits in that IP
-**    address are valid.  The IP/prefix on a node provides the lower
-**    and upper bounds for the CIDR blocks of the children of the
-**    node.  The prefix of a node will always be an even multiple of
-**    the NUM_BITS value of the IPset.
-**
-**    IPv4 addresses are stored as uint32_t's in native byte order.
-**    IPv6 addresses are stored as an ipset_ipv6_t, which contains 2
-**    uint64_t's in native byte order.  The 'ip' value appears at the
-**    bottom of the node, so that the layout of IPv4 nodes and IPv6
-**    nodes (ipset_node_v6_st) are identical except for the IP.
-**
-**    Instead of nodes having pointers to other nodes or leaves, nodes
-**    contain the 'child[]' array of integer values that are indexes
-**    into either the array of nodes or the array of leaves.  Since a
-**    given index may refer to either the node array or the leaf
-**    array, nodes also contain the 'child_is_leaf' bitmap that says
-**    which array the index references.
-**
-**    If a node points to a leaf where the leaf's prefix is
-**    numerically less than (node->prefix + NUM_BITS), then more than
-**    one child[] entry will point to the same leaf index.  When this
-**    occurs, the lowest entry in the child[] array that points to
-**    this leaf is considered the "real" entry, and the other indexes
-**    to this leaf in child[] will also have their bit set within the
-**    'child_repeated' bitmap on the node.
-**
-**    Assume an IPset where NUM_BITS is set to 4, so that each node
-**    points to 16 children.  Also assume a node that contains
-**    2.0.0.0/8.  If the child[] array points to any nodes, the prefix
-**    on those nodes must not be larger than a /12 (that is, the value
-**    of the prefix must be 12 or numerically greater).  Suppose the
-**    IPset contains the value 2.32.0.0/11.  child[2] and child[3]
-**    will both contain the index of the leaf; bits 2 and 3 of the
-**    'child_is_leaf' bitmap will be set, and bit 3 of the
-**    'child_repeated' bitmap will be set.
-**
-**    When a node is removed from the IPset such that it is no longer
-**    needed, the node is added to a 'free_list' of nodes, which is
-**    maintained by the IPset.  The list is implemented as a stack,
-**    where child[0] of each node contains the index of the previous
-**    node in the stack.  The index zero is reserved to mean the
-**    free_list is empty.
-**
-**    The structure of the leaf for IPv4 is given here:
-**
-**    struct ipset_leaf_v4_st {
-**        uint8_t         prefix;
-**
-**        // reserved/unsed bytes
-**        uint8_t         reserved3;
-**        uint8_t         reserved2;
-**        uint8_t         reserved1;
-**
-**        uint32_t        ip;
-**    };
-**
-**    The leaf contains only the IP and the prefix.
-**
-**    The IPset also maintains a 'free_list' of leaves that is
-**    maintained as a stack.  For leaves, the 'ip' member is used as
-**    the index to the previous leaf in the stack.
-**
-**    If an IPset is marked as 'clean', the array of leaves contains
-**    the leaves in sorted order.  This allows for fast iteration over
-**    the leaves of the IPset and allows streaming of the IPset.
-**    Additional properties of a 'clean' IPset are (a)Contiguous
-**    leaves have been combined to contain the largest possible CIDR
-**    block, (b)The leaves array contains no holes (that is, the
-**    'free_list' of leaves is empty), and (c)The nodes array contains
-**    no holes.
-**
-**    An IPset can be made clean by calling skIPSetClean(); some
-**    operations on the IPset require that the set be clean before it
-**    can be operated on.
-**
-**    The root of the tree can be any node or leaf.  The index of the
-**    root is specified in the skipset_t structure.  The skipset_t
-**    structure also contains a flag denoting whether the index is a
-**    node or a leaf.
-**
-**    The on-disk storage matches the in-core storage.  This allows us
-**    to mmap() the data section of the file when reading a set---as
-**    long as the set is in native byte order and the data section is
-**    not compressed.
-**
-**
-**    The IPset structure is currently optimized to hold large CIDR
-**    blocks.  When a large number of widely spaced individual IPs are
-**    given, the size of the IPset will explode, since each IP is
-**    represented by an ipset_leaf_vX_t structure that is twice as
-**    large as the individual IP address.  We need to allow some way
-**    for the leaves of the IPset to hold multiple IPs.  For example,
-**    if the leaves held a bitmap of which IPs were set.
-**
-**
-*/
+ *  IMPLEMENTATION
+ *
+ *    The IPset code for to represent an IPv6 IPset in memory is
+ *    implemented as a type of Radix Tree (aka Patricia Tree), where
+ *    internal members of the tree are "nodes" and the terminal
+ *    members are "leaves".  Within an IPset instance, all nodes are
+ *    allocated in one array, and all leaves are allocated in another
+ *    array.  The Radix Tree is not binary; each node points to
+ *    IPSET_NUM_CHILDREN other nodes or leaves, and NUM_BITS is the
+ *    number of bits of an IP address that must be examined to
+ *    determine which branch to follow from a node.
+ *
+ *    There is both an IPv4 and IPv6 version of the Radix Tree.  The
+ *    IPv4 Radix tree was used until SiLK 3.6.0; at that point the
+ *    in-core IPv4 tree reverted the IPTree format.  Using the IPv4
+ *    Radix tree internally may be requested via an envvar.
+ *
+ *    The IPv4 node structure is given here and described below:
+ *
+ *    struct ipset_node_v4_st {
+ *        uint32_t        child[IPSET_NUM_CHILDREN];
+ *
+ *        SET_BMAP_DECLARE(child_is_leaf, IPSET_NUM_CHILDREN);
+ *
+ *        SET_BMAP_DECLARE(child_repeated, IPSET_NUM_CHILDREN);
+ *
+ *        uint8_t         prefix;
+ *
+ *        // reserved/unsed bytes
+ *        uint8_t         reserved3;
+ *        uint8_t         reserved2;
+ *        uint8_t         reserved1;
+ *
+ *        uint32_t        ip;
+ *    };
+ *
+ *    Each node has an 'ip' member to hold a complete IP address; a
+ *    'prefix' value in the node says how many of the bits in that IP
+ *    address are valid.  The IP/prefix on a node provides the lower
+ *    and upper bounds for the CIDR blocks of the children of the
+ *    node.  The prefix of a node will always be an even multiple of
+ *    the NUM_BITS value of the IPset.
+ *
+ *    IPv4 addresses are stored as uint32_t's in native byte order.
+ *    IPv6 addresses are stored as an ipset_ipv6_t, which contains 2
+ *    uint64_t's in native byte order.  The 'ip' value appears at the
+ *    bottom of the node, so that the layout of IPv4 nodes and IPv6
+ *    nodes (ipset_node_v6_st) are identical except for the IP.
+ *
+ *    Instead of nodes having pointers to other nodes or leaves, nodes
+ *    contain the 'child[]' array of integer values that are indexes
+ *    into either the array of nodes or the array of leaves.  Since a
+ *    given index may refer to either the node array or the leaf
+ *    array, nodes also contain the 'child_is_leaf' bitmap that says
+ *    which array the index references.
+ *
+ *    If a node points to a leaf where the leaf's prefix is
+ *    numerically less than (node->prefix + NUM_BITS), then more than
+ *    one child[] entry will point to the same leaf index.  When this
+ *    occurs, the lowest entry in the child[] array that points to
+ *    this leaf is considered the "real" entry, and the other indexes
+ *    to this leaf in child[] will also have their bit set within the
+ *    'child_repeated' bitmap on the node.
+ *
+ *    Assume an IPset where NUM_BITS is set to 4, so that each node
+ *    points to 16 children.  Also assume a node that contains
+ *    2.0.0.0/8.  If the child[] array points to any nodes, the prefix
+ *    on those nodes must not be larger than a /12 (that is, the value
+ *    of the prefix must be 12 or numerically greater).  Suppose the
+ *    IPset contains the value 2.32.0.0/11.  child[2] and child[3]
+ *    will both contain the index of the leaf; bits 2 and 3 of the
+ *    'child_is_leaf' bitmap will be set, and bit 3 of the
+ *    'child_repeated' bitmap will be set.
+ *
+ *    When a node is removed from the IPset such that it is no longer
+ *    needed, the node is added to a 'free_list' of nodes, which is
+ *    maintained by the IPset.  The list is implemented as a stack,
+ *    where child[0] of each node contains the index of the previous
+ *    node in the stack.  The index zero is reserved to mean the
+ *    free_list is empty.
+ *
+ *    The structure of the leaf for IPv4 is given here:
+ *
+ *    struct ipset_leaf_v4_st {
+ *        uint8_t         prefix;
+ *
+ *        // reserved/unsed bytes
+ *        uint8_t         reserved3;
+ *        uint8_t         reserved2;
+ *        uint8_t         reserved1;
+ *
+ *        uint32_t        ip;
+ *    };
+ *
+ *    The leaf contains only the IP and the prefix.
+ *
+ *    The IPset also maintains a 'free_list' of leaves that is
+ *    maintained as a stack.  For leaves, the 'ip' member is used as
+ *    the index to the previous leaf in the stack.
+ *
+ *    If an IPset is marked as 'clean', the array of leaves contains
+ *    the leaves in sorted order.  This allows for fast iteration over
+ *    the leaves of the IPset and allows streaming of the IPset.
+ *    Additional properties of a 'clean' IPset are (a)Contiguous
+ *    leaves have been combined to contain the largest possible CIDR
+ *    block, (b)The leaves array contains no holes (that is, the
+ *    'free_list' of leaves is empty), and (c)The nodes array contains
+ *    no holes.
+ *
+ *    An IPset can be made clean by calling skIPSetClean(); some
+ *    operations on the IPset require that the set be clean before it
+ *    can be operated on.
+ *
+ *    The root of the tree can be any node or leaf.  The index of the
+ *    root is specified in the skipset_t structure.  The skipset_t
+ *    structure also contains a flag denoting whether the index is a
+ *    node or a leaf.
+ *
+ *    The on-disk storage may match the in-core storage.  This would
+ *    allow us to mmap() the data section of the file when reading a
+ *    set---as long as the set is in native byte order and the data
+ *    section is not compressed.
+ *
+ *
+ *    The IPset structure is currently optimized to hold large CIDR
+ *    blocks.  When a large number of widely spaced individual IPs are
+ *    given, the size of the IPset will explode, since each IP is
+ *    represented by an ipset_leaf_vX_t structure that is twice as
+ *    large as the individual IP address.  We need to allow some way
+ *    for the leaves of the IPset to hold multiple IPs.  For example,
+ *    if the leaves held a bitmap of which IPs were set.
+ *
+ *
+ */
 
 
 /* LOCAL DEFINES AND TYPEDEFS */
 
 /*
- *    IPset file format version that contains a dump of the radix-tree
- *    data strucutre.  This format can be mmap()ed so that the data
- *    does not need to be read into RAM.  Can store either IPv4 or
- *    IPv6 addresses.  Introduced in SiLK-3.0.
+ *    Set to non-zero to print a message to stderr whenever the
+ *    radix-tree buffer is (re-)allocated.
+ */
+/* #define TRACE_ALLOC 1 */
+#ifndef TRACE_ALLOC
+#define TRACE_ALLOC 0
+#endif
+
+/*
+ *    The numeric id of the initial format of an IPset file.  This
+ *    format is only capable of holding IPv4 addresses.
+ *
+ *    IPs are stored on disk in blocks of nine 32-bit words which
+ *    represent a /24.  The first uint32_t (position [0]) is the base
+ *    IP of the /24 (a.b.c.0); the remaining eight uint32_t's are a
+ *    256-bit bitmap that represents the IPs in that /24.  Each
+ *    uint32_t is a /27.  A high bit indicates the address is present.
+ *    The least significant bit in position [1] is a.b.c.0, and the
+ *    most significant bit in position [8] is a.b.c.255.
+ *
+ *    The /24s in the file appear in sorted order.  All values are
+ *    written to the file in native byte order.
+ *
+ *    No header entry is associated with this format.
+ *
+ *    Note: Very early IPset files did not properly set the version,
+ *    and pre-SiLK 1.0 files that have a version number of 0 or 1 are
+ *    identical to version 2.
+ */
+#define IPSET_REC_VERSION_CLASSC            2
+
+/*
+ *    The numeric id of the IPset file format introduced in SiLK-3.0.
+ *    Files in this format may store either IPv4 or IPv6 addresses (a
+ *    header entry specifies which).
+ *
+ *    This version contains a dump of the radix-tree data structure
+ *    that is used in-memory.  If the file's data is not compressed
+ *    and the byte-order is correct, this format can be mmap()ed so
+ *    that the data does not need to be read from disk.
+ *
+ *    Data is written to the file in an arbitrary (non-sorted) order,
+ *    though all nodes appear before all leaves.
+ *
+ *    The file has a header entry that indictates whether the file
+ *    contains IPv4 or IPv6 addresses.  The contents of the header are
+ *    the number of children per node, the number of leaves, the size
+ *    of a leaf, the number of (interior) nodes, the size of a node,
+ *    and the location of the root node.
+ *
+ *    All IPv4 IPsets were written in this format between SiLK 3.0.0
+ *    and SiLK 3.5.1.  SiLK 3.6.0 reverted to using
+ *    IPSET_REC_VERSION_CLASSC files for IPv4 IPsets.
  */
 #define IPSET_REC_VERSION_RADIX             3
 
 /*
- *    Version of the IPset file compatible with SiLK versions prior to
- *    SiLK 3.0.
+ *    The numeric id of the IPset file format introduced in SiLK-3.7.
+ *    The file may contain either IPv4 or IPv6 addresses (a header
+ *    entry specifies which).
  *
- *    IPs are stored on disk in blocks of nine 32-bit words which
- *    represent a /24.  All values are in native byte order.  The
- *    first uint32_t (position [0]) is the base IP of the /24
- *    (a.b.c.0); the remaining eight uint32_t's are a 256-bit bitmap
- *    that represents the IPs in that /24.  Each uint32_t is a /27.  A
- *    high bit indicates the address is present.  The least
- *    significant bit in position [1] is a.b.c.0, and the most
- *    significant bit in position [8] is a.b.c.255.
- */
-#define IPSET_REC_VERSION_LEGACY            2
-
-/*
- *    IPset file format version introduced in SiLK-3.7, but it is not
- *    the default to maintain backwards compatibility.
+ *    This format is not the default in order that previous releases
+ *    of the SiLK 3.x series may read IPsets created by the default
+ *    configuration of this release.
  *
- *    File contains either only IPv4 or only IPv6 addresses.  Each
- *    "block" starts with an IP address and a single byte value.  If
- *    the byte less than or equal to 0x80, the address is the base
- *    address of a netblock and the next single octet is the CIDR mask
- *    for the netblock.
+ *    IP addresses are stored as "blocks".  Each block starts with an
+ *    IP address and a single octet value.  If the single octet is
+ *    less than or equal to 0x80, that is the end of the block.  The
+ *    IP address is the base address of a netblock and the single
+ *    octet is the CIDR mask for the netblock.
  *
- *    If the byte is strictly greater than 0x80, the address is the
+ *    If the octet is strictly greater than 0x80, the address is the
  *    base address for a bitmap.  The value of 0x81 means the bitmap
  *    has 256 bits containing a /24 in IPv4 or a /120 in IPv6.  These
- *    bitmaps are similar to those in IPSET_REC_VERSION_LEGACY.
+ *    bitmaps are similar to those in IPSET_REC_VERSION_CLASSC.
  *
- *    IPv4 addresses and values in the bitmap are in native byte
- *    order.  IPv6 addresses are stored in network byte order.
+ *    The IPs in the file appear in sorted order.  IPv4 addresses and
+ *    values in the bitmap are written in native byte order.  IPv6
+ *    addresses are stored in network byte order.
+ *
+ *    The file has a header entry that indicates whether the file
+ *    contains IPv4 or IPv6 addresses.  The header entry is identical
+ *    with that used by IPSET_REC_VERSION_RADIX.  The leaf length
+ *    field is used to determine the type of the contents; all other
+ *    fields are 0.
  */
-#define IPSET_REC_VERSION_CIDR_BMAP         4
+#define IPSET_REC_VERSION_CIDRBMAP          4
+
+/*
+ *    The numeric id of the IPset file format introduced in SiLK-3.14.
+ *    The file may contain only IPv6 addresses.
+ *
+ *    This format is not the default in order that previous releases
+ *    of the SiLK 3.x series may read IPsets created by the default
+ *    configuration of this release.
+ *
+ *    IP addresses are split into two 64 bit values, and they may be
+ *    viewed as being on a two level tree, where the upper 64 bits
+ *    appear on one level and the lower 64 bits on the other.  Each 64
+ *    bit value is followed by a single byte.  When the IP represents
+ *    a /64 or larger (more IPs), the block is represented by a single
+ *    64 bit value and the prefix; all other IPs are represenetd by
+ *    two 64 bit values.  For IPs in the same /64, the upper 64 bit
+ *    value appears once followed by 0x82.  Next are the lower 64 bits
+ *    of all the IPs in that /64.  Each lower IP is followed either by
+ *    a value between 0 and 0x80 indicating the prefix of the netblock
+ *    or the value 0x81 indicating that a 256-bit bitmap follows for
+ *    the IPs in that /120, similar to IPSET_REC_VERSION_CIDRBMAP and
+ *    IPSET_REC_VERSION_CLASSC.
+ *
+ *    The IPs appear in sorted order.  All values are written in
+ *    native byte order.
+ *
+ *    Although the file contains only IPv6 addresses, there is a
+ *    header entry that confirms this.  The header entry is compatible
+ *    with that used by IPSET_REC_VERSION_RADIX.  The leaf length
+ *    field specifies the contents; all other fields are 0.
+ */
+#define IPSET_REC_VERSION_SLASH64           5
 
 /*
  *    Ideas for the IPset file formats of the future:
@@ -224,30 +308,52 @@ RCSIDENT("$SiLK: skipset.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
  *
  *    Disadvantage of both of these changes is that the addresses in
  *    the file are no longer sorted.
- *
- *    For sparse IPv6 ranges, split IPv6 addresses so that the first
- *    64 bits is specified once, then the lower 64 bits for IPs in
- *    that /64 are given.  This could be done by giving a full 128 bit
- *    IPv6 address, a one byte value that is a special constant, a
- *    number of entries, the lower 64 bits of those entries.
  */
 
 /*
- *    Number to tell writer to use the default IPset file version,
- *    which is LEGACY for IPv4 and RADIX for IPv6.
+ *    This record version tells the writer to
+ *    IPSET_REC_VERSION_DEFAULT_IPV4 for IPv4 IPsets and
+ *    IPSET_REC_VERSION_DEFAULT_IPV6 for IPv6 IPsets.
  */
 #define IPSET_REC_VERSION_DEFAULT           0
+
+/*
+ *    When writing a IPset that contains IPv4 addresses, this is the
+ *    default version file format to use.
+ */
+#if     !defined(SK_IPSET_DEFAULT_VERSION)
+#define IPSET_REC_VERSION_DEFAULT_IPV4      IPSET_REC_VERSION_CLASSC
+#elif   SK_IPSET_DEFAULT_VERSION == 5
+#define IPSET_REC_VERSION_DEFAULT_IPV4      IPSET_REC_VERSION_CIDRBMAP
+#elif   SK_IPSET_DEFAULT_VERSION == 4
+#define IPSET_REC_VERSION_DEFAULT_IPV4      IPSET_REC_VERSION_CIDRBMAP
+#else
+#define IPSET_REC_VERSION_DEFAULT_IPV4      IPSET_REC_VERSION_CLASSC
+#endif
 
 /*
  *    When writing a IPset that contains IPv6 addresses, this is the
  *    default version file format to use.
  */
-#define IPSET_REC_VERSION_IPV6_DEFAULT      IPSET_REC_VERSION_RADIX
+#if     !defined(SK_IPSET_DEFAULT_VERSION)
+#define IPSET_REC_VERSION_DEFAULT_IPV6      IPSET_REC_VERSION_RADIX
+#elif   SK_IPSET_DEFAULT_VERSION == 5
+#define IPSET_REC_VERSION_DEFAULT_IPV6      IPSET_REC_VERSION_SLASH64
+#elif   SK_IPSET_DEFAULT_VERSION == 4
+#define IPSET_REC_VERSION_DEFAULT_IPV6      IPSET_REC_VERSION_CIDRBMAP
+#else
+#define IPSET_REC_VERSION_DEFAULT_IPV6      IPSET_REC_VERSION_RADIX
+#endif
+
+/*
+ *    Minimum file version available
+ */
+#define IPSET_REC_VERSION_MIN               IPSET_REC_VERSION_DEFAULT
 
 /*
  *    Maximum file version available
  */
-#define IPSET_REC_VERSION_MAX               IPSET_REC_VERSION_CIDR_BMAP
+#define IPSET_REC_VERSION_MAX               IPSET_REC_VERSION_SLASH64
 
 /*
  *    Name of an environment variable that, when set, is used in place
@@ -286,8 +392,12 @@ RCSIDENT("$SiLK: skipset.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
  */
 #define IPSET_USE_IPTREE_DEFAULT           1
 
-/* Number of nodes to create initially */
+/* Number of nodes/leaves to create initially in the radix tree */
 #define  IPSET_INITIAL_ENTRY_COUNT       2048
+
+/* After the radix tree array contains this number of nodes/leaves,
+ * grow by adding this many more nodes/leaves to the current size. */
+#define  IPSET_GROW_LINEARLY         0x100000
 
 /* Number of bits if IP to examine when branching at a node */
 #define  NUM_BITS  4
@@ -721,9 +831,13 @@ RCSIDENT("$SiLK: skipset.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
     }
 
 
-/* In IPSET_REC_VERSION_CIDR_BMAP files, mapping from the 'prefix'
- * byte to size of the bitmap */
-#define SET_CIDR_BMAP_256   0x81
+/* In IPSET_REC_VERSION_CIDRBMAP and IPSET_REC_VERSION_SLASH64 files,
+ * mapping from the 'prefix' byte to size of the bitmap */
+#define SET_CIDRBMAP_MAP256     0x81
+
+/* In IPSET_REC_VERSION_SLASH64, value that indicates this 64bit value
+ * starts a new /64. */
+#define SET_SLASH64_IS_SLASH64  0x82
 
 
 #if   !defined(NUM_BITS)
@@ -787,7 +901,7 @@ typedef union ipset_leaf_un ipset_leaf_t;
 typedef struct ipset_buffer_st {
     uint8_t        *buf;
     /* the size of an entry in the array */
-    uint32_t        entry_size;
+    size_t          entry_size;
     /* the number of nodes in the array of entries. bytes allocated is
      * given by (entry_capacity * entry_size). */
     uint32_t        entry_capacity;
@@ -944,8 +1058,9 @@ union ipset_leaf_un {
 /* Support structure for counting the IPs in an IPset, used by
  * skIPSetCount() and ipsetCountCallbackV*() */
 typedef struct ipset_count_st {
-    uint64_t    upper;
     uint64_t    lower;
+    uint64_t    upper;
+    uint64_t    full;
 } ipset_count_t;
 
 /* Support structure for ipsetFind() */
@@ -999,8 +1114,8 @@ typedef struct ipset_walk_st {
 } ipset_walk_t;
 
 /* Support strucuture for writing a SiLK-3 IPset in the SiLK-2 file
- * format; used by ipsetWriteLegacyFromRadix() and
- * ipsetWriteLegacyFromRadixCallback(). */
+ * format; used by ipsetWriteClasscFromRadix() and
+ * ipsetWriteClasscFromRadixCallback(). */
 typedef struct ipset_write_silk2_st {
     /* the stream to write to */
     skstream_t *stream;
@@ -1172,6 +1287,12 @@ ipsetProcessStreamCallback(
     const uint32_t     *v4_start,
     uint32_t            prefix,
     ipset_walk_t       *proc_stream_state);
+static void
+ipsetReadStrerrror(
+    skstream_t         *stream,
+    const char         *format,
+    ...)
+    SK_CHECK_PRINTF(2, 3);
 static uint32_t
 ipsetReplaceNodeWithLeaf(
     skipset_t          *ipset,
@@ -1189,7 +1310,9 @@ ipsetVerify(
  *
  *    Grow or shink the entries list in 'ibuf' to hold 'new_cap'
  *    nodes.  If 'new_cap' is 0, the size of the current array is
- *    doubled.  If no memory is currently allocated, an array of
+ *    doubled unless the current array size is IPSET_GROW_LINEARLY or
+ *    greater in which case an additional IPSET_GROW_LINEARLY elements
+ *    are added.  If no memory is currently allocated, an array of
  *    IPSET_INITIAL_ENTRY_COUNT nodes is allocated.
  *
  *    Return 0 on success, or SKIPSET_ERR_ALLOC if memory cannot be
@@ -1203,6 +1326,15 @@ ipsetAllocEntries(
     size_t old_cap;
     uint8_t *old_entries;
 
+#if     !defined(TRACE_ALLOC) || !TRACE_ALLOC
+#define ALLOC_TRACEMSG(old_size, new_size)
+#else
+#define ALLOC_TRACEMSG(old_size, new_size)                      \
+    fprintf(stderr, ("%s:%d: growing memory capacity from"      \
+                     " %" SK_PRIuZ " to %" SK_PRIuZ "\n"),      \
+            __FILE__, __LINE__, (old_size), (new_size))
+#endif
+
     assert(ibuf);
 
     /* the current capacity of the tree */
@@ -1214,6 +1346,7 @@ ipsetAllocEntries(
             new_cap = IPSET_INITIAL_ENTRY_COUNT;
         }
         /* allocate new memory */
+        ALLOC_TRACEMSG((size_t)0, new_cap);
         ibuf->buf = (uint8_t*)calloc(new_cap, ibuf->entry_size);
         if (NULL == ibuf->buf) {
             return SKIPSET_ERR_ALLOC;
@@ -1223,11 +1356,23 @@ ipsetAllocEntries(
     }
 
     /* handle case where no new capacity is specified */
-    if (0 == new_cap) {
-        new_cap = 2 * old_cap;
-        if (new_cap < IPSET_INITIAL_ENTRY_COUNT) {
+    if (new_cap) {
+        ALLOC_TRACEMSG(old_cap, new_cap);
+    } else {
+        if (old_cap >= IPSET_GROW_LINEARLY) {
+            new_cap = old_cap + IPSET_GROW_LINEARLY;
+            ALLOC_TRACEMSG(old_cap, new_cap);
+        } else if (old_cap < (IPSET_INITIAL_ENTRY_COUNT >> 1)) {
             new_cap = IPSET_INITIAL_ENTRY_COUNT;
+            ALLOC_TRACEMSG(old_cap, new_cap);
+        } else {
+            new_cap = 2 * old_cap;
+            ALLOC_TRACEMSG(old_cap, new_cap);
         }
+    }
+
+    if (new_cap > SIZE_MAX / ibuf->entry_size) {
+        return SKIPSET_ERR_ALLOC;
     }
 
     /* realloc */
@@ -1476,6 +1621,16 @@ ipsetCombineSubtreeV4(
     uint32_t i;
     uint32_t j;
 
+#ifndef NDEBUG
+    assert(node_idx < ipset->s.v3->nodes.entry_count);
+    if (parent_idx != IPSET_NO_PARENT) {
+        node = NODE_PTR_V4(ipset, parent_idx);
+        assert(which_child < IPSET_NUM_CHILDREN);
+        assert(node->child[which_child] == node_idx);
+        assert(!NODEPTR_CHILD_IS_LEAF(node, which_child));
+    }
+#endif  /* NDEBUG */
+
     /* note the position of the first and last child on the node so we
      * can later determine whether all children on this node point to
      * the same leaf. */
@@ -1503,6 +1658,7 @@ ipsetCombineSubtreeV4(
         if (IPSET_NO_PARENT == parent_idx) {
             skIPSetRemoveAll(ipset);
         } else {
+            assert(which_child < IPSET_NUM_CHILDREN);
             parent = NODE_PTR_V4(ipset, parent_idx);
             parent->child[which_child] = 0;
         }
@@ -1511,9 +1667,13 @@ ipsetCombineSubtreeV4(
 
     do {
         if (0 == node->child[i]) {
+            /* not contiguous */
             depth = 0;
             continue;
         }
+        assert(NODEPTR_CHILD_IS_LEAF(node, i)
+               ? (node->child[i] < ipset->s.v3->leaves.entry_count)
+               : (node->child[i] < ipset->s.v3->nodes.entry_count));
         if (NODEPTR_CHILD_IS_REPEAT(node, i)) {
             continue;
         }
@@ -1536,6 +1696,8 @@ ipsetCombineSubtreeV4(
              * one less than the current prefix. */
             leaf1 = LEAF_PTR_V4(ipset, node->child[i]);
             leaf2 = LEAF_PTR_V4(ipset, node->child[child[depth-1]]);
+            assert(leaf1->prefix > 0);
+            assert(leaf1->prefix <= 32);
             if (leaf1->prefix != leaf2->prefix
                 || ((leaf1->ip ^ leaf2->ip) >= (1u << (33 - leaf1->prefix))))
             {
@@ -1571,6 +1733,7 @@ ipsetCombineSubtreeV4(
     if (IPSET_NO_PARENT == parent_idx) {
         IPSET_ROOT_INDEX_SET(ipset, node->child[first_child], 1);
     } else {
+        assert(which_child < IPSET_NUM_CHILDREN);
         parent = NODE_PTR_V4(ipset, parent_idx);
         parent->child[which_child] = node->child[first_child];
         SET_BMAP_SET(parent->child_is_leaf, which_child);
@@ -1596,6 +1759,16 @@ ipsetCombineSubtreeV6(
     uint32_t depth;
     uint32_t i;
     uint32_t j;
+
+#ifndef NDEBUG
+    assert(node_idx < ipset->s.v3->nodes.entry_count);
+    if (parent_idx != IPSET_NO_PARENT) {
+        node = NODE_PTR_V6(ipset, parent_idx);
+        assert(which_child < IPSET_NUM_CHILDREN);
+        assert(node->child[which_child] == node_idx);
+        assert(!NODEPTR_CHILD_IS_LEAF(node, which_child));
+    }
+#endif  /* NDEBUG */
 
     /* note the position of the first and last child on the node so we
      * can later determine whether all children on this node point to
@@ -1624,6 +1797,7 @@ ipsetCombineSubtreeV6(
         if (IPSET_NO_PARENT == parent_idx) {
             skIPSetRemoveAll(ipset);
         } else {
+            assert(which_child < IPSET_NUM_CHILDREN);
             parent = NODE_PTR_V6(ipset, parent_idx);
             parent->child[which_child] = 0;
         }
@@ -1635,6 +1809,9 @@ ipsetCombineSubtreeV6(
             depth = 0;
             continue;
         }
+        assert(NODEPTR_CHILD_IS_LEAF(node, i)
+               ? (node->child[i] < ipset->s.v3->leaves.entry_count)
+               : (node->child[i] < ipset->s.v3->nodes.entry_count));
         if (NODEPTR_CHILD_IS_REPEAT(node, i)) {
             continue;
         }
@@ -1661,6 +1838,8 @@ ipsetCombineSubtreeV6(
             if (leaf1->prefix != leaf2->prefix) {
                 break;
             }
+            assert(leaf1->prefix > 0);
+            assert(leaf1->prefix <= 128);
             if (leaf1->prefix <= 64) {
                 /* this change affects the most significant 64 bits */
                 if ((leaf1->ip.ip[0] ^ leaf2->ip.ip[0])
@@ -1720,6 +1899,7 @@ ipsetCombineSubtreeV6(
     if (IPSET_NO_PARENT == parent_idx) {
         IPSET_ROOT_INDEX_SET(ipset, node->child[first_child], 1);
     } else {
+        assert(which_child < IPSET_NUM_CHILDREN);
         parent = NODE_PTR_V6(ipset, parent_idx);
         parent->child[which_child] = node->child[first_child];
         NODEPTR_CHILD_SET_LEAF(parent, which_child);
@@ -1814,7 +1994,6 @@ ipsetCompact(
         --nodes_in_use;
         node = NODE_PTR(ipset, nodes_free_idx);
     }
-
     if (ipset->s.v3->nodes.entry_count < nodes_in_use) {
         /* the only way for this to happen is for the nodes_in_use
          * value to underflow 0 */
@@ -1831,7 +2010,6 @@ ipsetCompact(
         --leaves_in_use;
         leaf = LEAF_PTR(ipset, leaves_free_idx);
     }
-
     if (ipset->s.v3->leaves.entry_count < leaves_in_use) {
         skAbort();
     }
@@ -1894,6 +2072,7 @@ ipsetCompact(
                         node->v4.child[i] = nodes_free_idx;
                     }
                     /* we must visit this child */
+                    assert(depth < IPSET_MAX_DEPTH - 1);
                     to_visit[depth++] = node->v4.child[i];
 
                 } else {
@@ -2323,7 +2502,11 @@ ipsetCountCallbackV4(
 {
     ipset_count_t *count_state = (ipset_count_t*)v_count_state;
 
-    count_state->lower += ((uint64_t)1) << (32 - prefix);
+    if (prefix > 32) {
+        skAppPrintErr("Invalid prefix %u\n", prefix);
+        skAbort();
+    }
+    count_state->lower += UINT64_C(1) << (32 - prefix);
     return 0;
 }
 
@@ -2337,18 +2520,28 @@ ipsetCountCallbackV6(
     ipset_count_t *count_state = (ipset_count_t*)v_count_state;
     uint64_t tmp;
 
-    if (prefix <= 64) {
-        count_state->upper += (((uint64_t)1) << (64 - prefix));
-    } else {
-        tmp = (((uint64_t)1) << (128 - prefix));
-        if ((UINT64_MAX - count_state->lower) > tmp) {
+    if (prefix == 0) {
+        ++count_state->full;
+    } else if (prefix <= 64) {
+        tmp = UINT64_C(1) << (64 - prefix);
+        if ((UINT64_MAX - count_state->upper) >= tmp) {
+            count_state->upper += tmp;
+        } else {
+            ++count_state->full;
+            count_state->upper -= ((UINT64_MAX - tmp) + 1);
+        }
+    } else if (prefix <= 128) {
+        tmp = UINT64_C(1) << (128 - prefix);
+        if ((UINT64_MAX - count_state->lower) >= tmp) {
             count_state->lower += tmp;
         } else {
             ++count_state->upper;
             count_state->lower -= ((UINT64_MAX - tmp) + 1);
         }
+    } else {
+        skAppPrintErr("Invalid prefix %u\n", prefix);
+        skAbort();
     }
-
     return 0;
 }
 #endif  /* SK_ENABLE_IPV6 */
@@ -2418,6 +2611,140 @@ ipsetCountOccupiedLeaves(
     }
 
     return leaves_in_use;
+}
+
+
+/*
+ *  status = ipsetCountStreamCallbackV4(ipaddr, prefix, count_state);
+ *  status = ipsetCountStreamCallbackV6(ipaddr, prefix, count_state);
+ *
+ *    Helper functions for skIPSetProcessStreamCountIPs().
+ *
+ *    Compute (1 << 'prefix') to get the number of IPs in this block
+ *    and update the count in 'count_state'.
+ */
+static int
+ipsetCountStreamCallbackV4(
+    skipaddr_t  UNUSED(*ipaddr),
+    uint32_t            prefix,
+    void               *v_count_state)
+{
+    return ipsetCountCallbackV4(0, prefix, v_count_state);
+}
+
+#if SK_ENABLE_IPV6
+static int
+ipsetCountStreamCallbackV6(
+    skipaddr_t  UNUSED(*ipaddr),
+    uint32_t            prefix,
+    void               *v_count_state)
+{
+    return ipsetCountCallbackV6(NULL, prefix, v_count_state);
+}
+#endif  /* SK_ENABLE_IPV6 */
+
+
+/*
+ *    Convert the value in 'count_state' to a decimal number.
+ *
+ *    Helper function for skIPSetCountIPsString() and
+ *    skIPSetProcessStreamCountIPs().
+ */
+static char *
+ipsetCountToString(
+    const ipset_count_t    *count_state,
+    char                   *buf,
+    size_t                  buflen)
+{
+    const uint64_t lim = UINT64_C(10000000000);
+    const uint64_t map_ipv6_to_dec[][4] = {
+        {          UINT64_C(1),                   0,  0, 0}, /* 1 <<  0 */
+        { UINT64_C(4294967296),                   0,  0, 0}, /* 1 << 32 */
+        { UINT64_C(3709551616), UINT64_C(1844674407), 0, 0}, /* 1 << 64 */
+        { UINT64_C(3543950336), UINT64_C(1426433759), UINT64_C(792281625),
+          0}, /* 1 << 96 */
+    };
+    /* the decimal value being calculated */
+    uint64_t decimal[5] = {0, 0, 0, 0, 0};
+    uint64_t tmp;
+    uint64_t tmp2 = 0;
+    ssize_t sz;
+    int i, j;
+
+    if (count_state->full) {
+        sz = snprintf(buf, buflen, "340282366920938463463374607431768211456");
+        goto END;
+    }
+    if (0 == count_state->upper) {
+        sz = snprintf(buf, buflen, ("%" PRIu64), count_state->lower);
+        goto END;
+    }
+    for (i = 0; i < 4; ++i) {
+        switch (i) {
+          case 0: tmp2 = (count_state->lower & UINT32_MAX);         break;
+          case 1: tmp2 = ((count_state->lower >> 32) & UINT32_MAX); break;
+          case 2: tmp2 = (count_state->upper & UINT32_MAX);         break;
+          case 3: tmp2 = ((count_state->upper >> 32) & UINT32_MAX); break;
+        }
+        if (tmp2) {
+            for (j = 0; j < 4 && map_ipv6_to_dec[i][j] > 0; ++j) {
+                tmp = tmp2 * map_ipv6_to_dec[i][j];
+                if (tmp < lim) {
+                    decimal[j] += tmp;
+                } else {
+                    /* handle overflow */
+                    decimal[j] += tmp % lim;
+                    decimal[j+1] += tmp / lim;
+                }
+            }
+        }
+    }
+    /* Final check for overflow and determine number of 'decimal'
+     * elements that have a value */
+    i = 0;
+    for (j = 0; j < 4; ++j) {
+        if (decimal[j] >= lim) {
+            i = j;
+            tmp = decimal[j];
+            decimal[j] %= lim;
+            decimal[j+1] += tmp / lim;
+        } else if (decimal[j] > 0) {
+            i = j;
+        }
+    }
+    switch (i) {
+      case 0:
+        sz = snprintf(buf, buflen, "%" PRIu64, decimal[0]);
+        break;
+      case 1:
+        sz = snprintf(buf, buflen, "%" PRIu64 "%010" PRIu64,
+                      decimal[1], decimal[0]);
+        break;
+      case 2:
+        sz = snprintf(buf, buflen, "%" PRIu64 "%010" PRIu64 "%010" PRIu64,
+                      decimal[2], decimal[1], decimal[0]);
+        break;
+      case 3:
+        sz = snprintf(buf, buflen,
+                      "%" PRIu64 "%010" PRIu64 "%010" PRIu64 "%010" PRIu64,
+                      decimal[3], decimal[2], decimal[1], decimal[0]);
+        break;
+      case 4:
+        sz = snprintf(buf, buflen,
+                      ("%" PRIu64 "%010" PRIu64 "%010" PRIu64
+                       "%010" PRIu64 "%010" PRIu64),
+                      decimal[4], decimal[3], decimal[2],
+                      decimal[1], decimal[0]);
+        break;
+      default:
+        skAbortBadCase(i);
+    }
+
+  END:
+    if ((size_t)sz >= buflen) {
+        return NULL;
+    }
+    return buf;
 }
 
 
@@ -2574,7 +2901,7 @@ ipsetDestroySubtree(
         to_visit[depth++] = node_idx;
     } else {
         /* destroy any leaves off of this node; add this node's child
-         * nodes to the list list of nodes to destroy */
+         * nodes to the list of nodes to destroy */
         node = NODE_PTR(ipset, node_idx);
         for (i = 0; i < IPSET_NUM_CHILDREN; ++i) {
             if (node->v4.child[i]
@@ -5925,6 +6252,9 @@ ipsetNewEntries(
                 ipset->s.v3->realloc_leaves = 1;
             }
             new_size = ipset->s.v3->leaves.entry_capacity + num_leaves;
+            if (new_size > SIZE_MAX / ipset->s.v3->leaves.entry_size) {
+                return SKIPSET_ERR_ALLOC;
+            }
             new_mem = malloc(new_size * ipset->s.v3->leaves.entry_size);
             if (!new_mem) {
                 return SKIPSET_ERR_ALLOC;
@@ -5962,6 +6292,9 @@ ipsetNewEntries(
         }
         if (num_nodes) {
             new_size = ipset->s.v3->nodes.entry_capacity + num_nodes;
+            if (new_size > SIZE_MAX / ipset->s.v3->nodes.entry_size) {
+                return SKIPSET_ERR_ALLOC;
+            }
             new_mem = malloc(new_size * ipset->s.v3->nodes.entry_size);
             if (!new_mem) {
                 return SKIPSET_ERR_ALLOC;
@@ -6012,7 +6345,7 @@ ipsetOptionsHandler(
 
     switch (opt_index) {
       case OPT_IPSET_RECORD_VERSION:
-        rv = skStringParseUint32(&tmp32, opt_arg, IPSET_REC_VERSION_DEFAULT,
+        rv = skStringParseUint32(&tmp32, opt_arg, IPSET_REC_VERSION_MIN,
                                  IPSET_REC_VERSION_MAX);
         if (rv) {
             skAppPrintErr("Invalid %s '%s': %s",
@@ -6079,28 +6412,30 @@ ipsetPrintCallback(
 
 
 /*
- *  status = ipsetProcessStreamBitmap256(slash24, bmap, swap_flag, proc_state);
+ *  status = ipsetProcessStreamBmapSlash24(baseip, bmap, swap_flag,proc_state);
+ *  status = ipsetProcessStreamBmapSlash120(baseip, bmap,swap_flag,proc_state);
  *
- *    Helper function for ipsetProcessStreamLegacy() and
- *    ipsetProcessStreamCidrbmapV4().
+ *    Helper function for ipsetProcessStreamClassc(),
+ *    ipsetProcessStreamCidrbmapV4(), ipsetProcessStreamCidrbmapV6(),
+ *    and ipsetProcessStreamSlash64().
  *
  *    Process the bitmap of 256 bits in 'bmap' that represents the
- *    IPv4 /24 in 'slash24'.  For each address or CIDR block in the
- *    bitmap, use ipsetProcessStreamCallbackV4() to invoke the
- *    callback function specified in 'proc_state'.  When the
+ *    IPv4 /24 or the IPv6 /120 in 'baseip'.  For each address or CIDR
+ *    block in the bitmap, use ipsetProcessStreamCallback() to invoke
+ *    the callback function specified in 'proc_state'.  When the
  *    'swap_flag' parameter is true, the values in 'bmap' are not in
  *    native byte order.
  */
 static int
-ipsetProcessStreamBitmap256(
+ipsetProcessStreamBmapSlash24(
     uint32_t            slash24,
     uint32_t            bmap[8],
     int                 swap_flag,
     ipset_walk_t       *proc_stream_state)
 {
-    uint32_t i;
     uint32_t ipv4;
     uint32_t trail_zero;
+    uint32_t i;
     int rv = SKIPSET_OK;
 
     /* loop over the uint32_t in this block */
@@ -6196,11 +6531,114 @@ ipsetProcessStreamBitmap256(
     return rv;
 }
 
+#if SK_ENABLE_IPV6
+/* an IPv6 version of previous function */
+static int
+ipsetProcessStreamBmapSlash120(
+    const ipset_ipv6_t *slash120,
+    uint32_t            bmap[8],
+    int                 swap_flag,
+    ipset_walk_t       *proc_stream_state)
+{
+    ipset_ipv6_t ipv6;
+    uint32_t trail_zero;
+    uint32_t i;
+    int rv = SKIPSET_OK;
+
+    ipv6.ip[0] = slash120->ip[0];
+
+    i = 0;
+    while (i < 8) {
+        if (0 == bmap[i]) {
+            ++i;
+            continue;
+        }
+        ipv6.ip[1] = slash120->ip[1] | (i << 5);
+        if (UINT32_MAX == bmap[i]) {
+            if ((i & 0x1) || (UINT32_MAX != bmap[i+1])) {
+                rv = (ipsetProcessStreamCallback(
+                          &ipv6, NULL, 123, proc_stream_state));
+                ++i;
+            } else if ((i & 0x3)
+                       || memcmp(&bmap[i+2], bmap256_full,
+                                 sizeof(uint32_t)*2))
+            {
+                rv = (ipsetProcessStreamCallback(
+                          &ipv6, NULL, 122, proc_stream_state));
+                i += 2;
+            } else {
+                rv = (ipsetProcessStreamCallback(
+                          &ipv6, NULL, 121, proc_stream_state));
+                i += 4;
+            }
+            if (rv) { goto END; }
+        } else {
+            if (swap_flag) {
+                bmap[i] = BSWAP32(bmap[i]);
+            }
+            while (bmap[i]) {
+                trail_zero = ipsetCountTrailingZeros(bmap[i]);
+                ipv6.ip[1] += trail_zero;
+                bmap[i] >>= trail_zero;
+                switch (ipv6.ip[1] & 0x1F) {
+                  case 0: case 16:
+                    if ((bmap[i] & 0xFFFF) == 0xFFFF) {
+                        rv = (ipsetProcessStreamCallback(
+                                  &ipv6, NULL, 124, proc_stream_state));
+                        bmap[i] >>= 16;
+                        ipv6.ip[1] += 16;
+                        break;
+                    }
+                    /* FALLTHROUGH */
+                  case 8: case 24:
+                    if ((bmap[i] & 0xFF) == 0xFF) {
+                        rv = (ipsetProcessStreamCallback(
+                                  &ipv6, NULL, 125, proc_stream_state));
+                        bmap[i] >>= 8;
+                        ipv6.ip[1] += 8;
+                        break;
+                    }
+                    /* FALLTHROUGH */
+                  case 4: case 12: case 20: case 28:
+                    if ((bmap[i] & 0xF) == 0xF) {
+                        rv = (ipsetProcessStreamCallback(
+                                  &ipv6, NULL, 126, proc_stream_state));
+                        bmap[i] >>= 4;
+                        ipv6.ip[1] += 4;
+                        break;
+                    }
+                    /* FALLTHROUGH */
+                  case  2: case  6: case 10: case 14:
+                  case 18: case 22: case 26: case 30:
+                    if ((bmap[i] & 0x3) == 0x3) {
+                        rv = (ipsetProcessStreamCallback(
+                                  &ipv6, NULL, 127, proc_stream_state));
+                        bmap[i] >>= 2;
+                        ipv6.ip[1] += 2;
+                        break;
+                    }
+                    /* FALLTHROUGH */
+                  default:
+                    rv = (ipsetProcessStreamCallback(
+                              &ipv6, NULL, 128, proc_stream_state));
+                    bmap[i] >>= 1;
+                    ++ipv6.ip[1];
+                    break;
+                }
+                if (rv) { goto END; }
+            }
+        }
+    }
+  END:
+    return rv;
+}
+#endif  /* SK_ENABLE_IPV6 */
+
 
 /*
  *  status = ipsetProcessStreamCallback(ipv6, ipv4, prefix, proc_stream_state);
  *
- *    Helper function for ipsetProcessStreamLegacy(),
+ *    Helper function for ipsetProcessStreamClassc(),
  *    ipsetProcessStreamRadix(), ipsetProcessStreamCallbackV4(), and
  *    ipsetProcessStreamCidrbmapV6().
  *
@@ -6228,6 +6666,10 @@ ipsetProcessStreamCallback(
 #endif
     skipaddr_t ipaddr;
     int rv;
+
+    assert((v6_start && !v4_start)
+           || (!v6_start && v4_start));
+    assert(proc_stream_state);
 
     if ((proc_stream_state->cidr_blocks)
         || (v4_start &&  32 == prefix)
@@ -6385,13 +6827,13 @@ ipsetProcessStreamCallback(
  *    Helper function for skIPSetProcessStream() and
  *    ipsetReadCidrbmapInto...().
  *
- *    Treat 'stream' as an IPset in the IPSET_REC_VERSION_CIDR_BMAP
+ *    Treat 'stream' as an IPset in the IPSET_REC_VERSION_CIDRBMAP
  *    format and process all the IPs and CIDR blocks it contains
  *    without reading the entire IPset into memory.  The header of the
  *    stream is in 'hdr'.  The callback to invoke is available in
  *    'proc_stream_state'.
  *
- *    See '#define IPSET_REC_VERSION_CIDR_BMAP' for description of the
+ *    See '#define IPSET_REC_VERSION_CIDRBMAP' for description of the
  *    file format.
  */
 static int
@@ -6412,8 +6854,8 @@ ipsetProcessStreamCidrbmapV4(
     assert(stream);
     assert(hdr);
     assert(proc_stream_state);
-    if (skStreamCheckSilkHeader(stream, FT_IPSET, IPSET_REC_VERSION_CIDR_BMAP,
-                                IPSET_REC_VERSION_CIDR_BMAP, NULL))
+    if (skStreamCheckSilkHeader(stream, FT_IPSET, IPSET_REC_VERSION_CIDRBMAP,
+                                IPSET_REC_VERSION_CIDRBMAP, NULL))
     {
         skAbort();
     }
@@ -6445,25 +6887,33 @@ ipsetProcessStreamCidrbmapV4(
                                             read_buf[sizeof(uint32_t)],
                                             proc_stream_state);
             if (rv) { goto END; }
-        } else if (read_buf[sizeof(uint32_t)] != SET_CIDR_BMAP_256) {
-            skAppPrintErr("Unexpected value for prefix %u",
-                          read_buf[sizeof(uint32_t)]);
-            skAbort();
+        } else if (read_buf[sizeof(uint32_t)] != SET_CIDRBMAP_MAP256) {
+            ipsetReadStrerrror(stream, "Unexpected value for prefix %u",
+                               read_buf[sizeof(uint32_t)]);
+            rv = SKIPSET_ERR_FILEIO;
+            goto END;
         } else {
             /* IPv4 base address and 256-bit bitmap */
             if ((b = skStreamRead(stream, bmap, sizeof(bmap)))
                 != sizeof(bmap))
             {
+                ipsetReadStrerrror(stream, ("Attempting to read %" SK_PRIuZ
+                                            " bytes returned %" SK_PRIdZ),
+                                   sizeof(bmap), b);
                 rv = SKIPSET_ERR_FILEIO;
                 goto END;
             }
             /* handle the block */
-            rv = ipsetProcessStreamBitmap256(slash24, bmap, swap_flag,
-                                             proc_stream_state);
+            rv = ipsetProcessStreamBmapSlash24(slash24, bmap, swap_flag,
+                                               proc_stream_state);
+            if (rv) { goto END; }
         }
     }
     if (b != 0) {
         /* read error */
+        ipsetReadStrerrror(stream, ("Attempting to read %" SK_PRIuZ
+                                    " bytes returned %" SK_PRIdZ),
+                           sizeof(read_buf), b);
         rv = SKIPSET_ERR_FILEIO;
         goto END;
     }
@@ -6485,21 +6935,18 @@ ipsetProcessStreamCidrbmapV6(
     sk_header_entry_t *hentry;
     uint8_t read_buf[IPSET_LEN_V6 + sizeof(uint8_t)];
     uint32_t bmap[IPTREE_WORDS_PER_SLASH24];
-    uint32_t trail_zero;
     int swap_flag;
     ipset_ipv6_t slash120;
-    ipset_ipv6_t ipv6;
     ssize_t b;
     int no_more_ipv4 = 0;
-    int i;
     int rv;
 
     /* sanity check input */
     assert(stream);
     assert(hdr);
     assert(proc_stream_state);
-    if (skStreamCheckSilkHeader(stream, FT_IPSET, IPSET_REC_VERSION_CIDR_BMAP,
-                                IPSET_REC_VERSION_CIDR_BMAP, NULL))
+    if (skStreamCheckSilkHeader(stream, FT_IPSET, IPSET_REC_VERSION_CIDRBMAP,
+                                IPSET_REC_VERSION_CIDRBMAP, NULL))
     {
         skAbort();
     }
@@ -6522,6 +6969,14 @@ ipsetProcessStreamCidrbmapV6(
         IPSET_IPV6_FROM_ARRAY(&slash120, read_buf);
 
         if (SK_IPV6POLICY_ASV4 == proc_stream_state->v6policy) {
+            if (0 == read_buf[IPSET_LEN_V6]
+                || read_buf[IPSET_LEN_V6] > SET_CIDRBMAP_MAP256)
+            {
+                ipsetReadStrerrror(stream, "Unexpected value for prefix %u",
+                                   read_buf[IPSET_LEN_V6]);
+                rv = SKIPSET_ERR_FILEIO;
+                goto END;
+            }
             if (slash120.ip[0] > 0
                 || slash120.ip[1] > UINT64_C(0x0000ffffffffffff))
             {
@@ -6529,117 +6984,56 @@ ipsetProcessStreamCidrbmapV6(
                 break;
             }
             if (slash120.ip[1] < UINT64_C(0x0000ffff00000000)) {
+                /* IP is below ::ffff:0:0 */
+                if (read_buf[IPSET_LEN_V6] == SET_CIDRBMAP_MAP256) {
+                    /* Read and skip the 256-bit bitmap */
+                    if ((b = skStreamRead(stream, bmap, sizeof(bmap)))
+                        != sizeof(bmap))
+                    {
+                        ipsetReadStrerrror(stream,
+                                           ("Attempting to read %" SK_PRIuZ
+                                            " bytes returned %" SK_PRIdZ),
+                                           sizeof(bmap), b);
+                        rv = SKIPSET_ERR_FILEIO;
+                        goto END;
+                    }
+                }
                 continue;
             }
         }
         /* handle the prefix bit */
         if (read_buf[IPSET_LEN_V6] <= 128) {
+            if (0 == read_buf[IPSET_LEN_V6]) {
+                ipsetReadStrerrror(stream, "Unexpected value for prefix %u",
+                                   read_buf[IPSET_LEN_V6]);
+                rv = SKIPSET_ERR_FILEIO;
+                goto END;
+            }
             /* IPv6 and one byte CIDR prefix */
             rv = ipsetProcessStreamCallback(&slash120, NULL,
                                             read_buf[IPSET_LEN_V6],
                                             proc_stream_state);
             if (rv) { goto END; }
-        } else if (read_buf[IPSET_LEN_V6] != SET_CIDR_BMAP_256) {
-            skAppPrintErr("Unexpected value for prefix %u",
-                          read_buf[sizeof(uint32_t)]);
-            skAbort();
+        } else if (read_buf[IPSET_LEN_V6] != SET_CIDRBMAP_MAP256) {
+            ipsetReadStrerrror(stream, "Unexpected value for prefix %u",
+                               read_buf[IPSET_LEN_V6]);
+            rv = SKIPSET_ERR_FILEIO;
+            goto END;
         } else {
             /* IPv6 base address and 256-bit bitmap */
             if ((b = skStreamRead(stream, bmap, sizeof(bmap)))
                 != sizeof(bmap))
             {
+                ipsetReadStrerrror(stream, ("Attempting to read %" SK_PRIuZ
+                                            " bytes returned %" SK_PRIdZ),
+                                   sizeof(bmap), b);
                 rv = SKIPSET_ERR_FILEIO;
                 goto END;
             }
-
-            ipv6.ip[0] = slash120.ip[0];
-
-            /* loop over the uint32_t in this block */
-            i = 0;
-            while (i < 8) {
-                if (0 == bmap[i]) {
-                    ++i;
-                    continue;
-                }
-                ipv6.ip[1] = slash120.ip[1] | (i << 5);
-                if (UINT32_MAX == bmap[i]) {
-                    if ((i & 0x1) || (UINT32_MAX != bmap[i+1])) {
-                        rv = (ipsetProcessStreamCallback(
-                                  &ipv6, NULL, 123, proc_stream_state));
-                        ++i;
-                    } else if ((i & 0x3)
-                               || memcmp(&bmap[i+2], bmap256_full,
-                                         sizeof(uint32_t)*2))
-                    {
-                        rv = (ipsetProcessStreamCallback(
-                                  &ipv6, NULL, 122, proc_stream_state));
-                        i += 2;
-                    } else {
-                        rv = (ipsetProcessStreamCallback(
-                                  &ipv6, NULL, 121, proc_stream_state));
-                        i += 4;
-                    }
-                    if (rv) { goto END; }
-                } else {
-                    if (swap_flag) {
-                        bmap[i] = BSWAP32(bmap[i]);
-                    }
-                    while (bmap[i]) {
-                        /* find position of least significant bit */
-                        trail_zero = ipsetCountTrailingZeros(bmap[i]);
-                        ipv6.ip[1] += trail_zero;
-                        bmap[i] >>= trail_zero;
-                        /* find number of consecutive high bits that
-                         * map into a CIDR block */
-                        switch (ipv6.ip[1] & 0x1F) {
-                          case 0: case 16:
-                            if ((bmap[i] & 0xFFFF) == 0xFFFF) {
-                                rv = (ipsetProcessStreamCallback(
-                                          &ipv6, NULL, 124, proc_stream_state));
-                                bmap[i] >>= 16;
-                                ipv6.ip[1] += 16;
-                                break;
-                            }
-                            /* FALLTHROUGH */
-                          case 8: case 24:
-                            if ((bmap[i] & 0xFF) == 0xFF) {
-                                rv = (ipsetProcessStreamCallback(
-                                          &ipv6, NULL, 125, proc_stream_state));
-                                bmap[i] >>= 8;
-                                ipv6.ip[1] += 8;
-                                break;
-                            }
-                            /* FALLTHROUGH */
-                          case 4: case 12: case 20: case 28:
-                            if ((bmap[i] & 0xF) == 0xF) {
-                                rv = (ipsetProcessStreamCallback(
-                                          &ipv6, NULL, 126, proc_stream_state));
-                                bmap[i] >>= 4;
-                                ipv6.ip[1] += 4;
-                                break;
-                            }
-                            /* FALLTHROUGH */
-                          case  2: case  6: case 10: case 14:
-                          case 18: case 22: case 26: case 30:
-                            if ((bmap[i] & 0x3) == 0x3) {
-                                rv = (ipsetProcessStreamCallback(
-                                          &ipv6, NULL, 127, proc_stream_state));
-                                bmap[i] >>= 2;
-                                ipv6.ip[1] += 2;
-                                break;
-                            }
-                            /* FALLTHROUGH */
-                          default:
-                            rv = (ipsetProcessStreamCallback(
-                                      &ipv6, NULL, 128, proc_stream_state));
-                            bmap[i] >>= 1;
-                            ++ipv6.ip[1];
-                            break;
-                        }
-                        if (rv) { goto END; }
-                    }
-                }
-            }
+            /* handle the block */
+            rv = ipsetProcessStreamBmapSlash120(&slash120, bmap, swap_flag,
+                                                proc_stream_state);
+            if (rv) { goto END; }
         }
     }
     if (b != 0) {
@@ -6647,6 +7041,9 @@ ipsetProcessStreamCidrbmapV6(
             /* not an error;  we exited the loop via a break; */
         } else {
             /* read error */
+            ipsetReadStrerrror(stream, ("Attempting to read %" SK_PRIuZ
+                                        " bytes returned %" SK_PRIdZ),
+                               sizeof(read_buf), b);
             rv = SKIPSET_ERR_FILEIO;
             goto END;
         }
@@ -6666,13 +7063,13 @@ ipsetProcessStreamCidrbmapV6(
  *
  *    Helper function for skIPSetProcessStream().
  *
- *    Treat 'stream' as an IPset in the IPSET_REC_VERSION_CIDR_BMAP
+ *    Treat 'stream' as an IPset in the IPSET_REC_VERSION_CIDRBMAP
  *    format and process all the IPs and CIDR blocks it contains
  *    without reading the entire IPset into memory.  The header of the
  *    stream is in 'hdr'.  The callback to invoke is available in
  *    'proc_stream_state'.
  *
- *    See '#define IPSET_REC_VERSION_CIDR_BMAP' for description of the
+ *    See '#define IPSET_REC_VERSION_CIDRBMAP' for description of the
  *    file format.
  */
 static int
@@ -6687,8 +7084,8 @@ ipsetProcessStreamCidrbmap(
     assert(stream);
     assert(hdr);
     assert(proc_stream_state);
-    if (skStreamCheckSilkHeader(stream, FT_IPSET, IPSET_REC_VERSION_CIDR_BMAP,
-                                IPSET_REC_VERSION_CIDR_BMAP, NULL))
+    if (skStreamCheckSilkHeader(stream, FT_IPSET, IPSET_REC_VERSION_CIDRBMAP,
+                                IPSET_REC_VERSION_CIDRBMAP, NULL))
     {
         skAbort();
     }
@@ -6725,22 +7122,22 @@ ipsetProcessStreamCidrbmap(
 
 
 /*
- *  status = ipsetProcessStreamLegacy(stream, hdr, proc_stream_state);
+ *  status = ipsetProcessStreamClassc(stream, hdr, proc_stream_state);
  *
  *    Helper function for skIPSetProcessStream() and
- *    ipsetReadLegacyIntoRadix()
+ *    ipsetReadClasscIntoRadix()
  *
- *    Treat 'stream' as an IPset in the IPSET_REC_VERSION_LEGACY
+ *    Treat 'stream' as an IPset in the IPSET_REC_VERSION_CLASSC
  *    format and process all the IPs and CIDR blocks it contains
  *    without reading the entire IPset into memory.  The header of the
  *    stream is in 'hdr'.  The callback to invoke is available in
  *    'proc_stream_state'.
  *
- *    See '#define IPSET_REC_VERSION_LEGACY' for description of the
+ *    See '#define IPSET_REC_VERSION_CLASSC' for description of the
  *    file format.
  */
 static int
-ipsetProcessStreamLegacy(
+ipsetProcessStreamClassc(
     skstream_t                 *stream,
     sk_file_header_t           *hdr,
     ipset_walk_t               *proc_stream_state)
@@ -6763,7 +7160,7 @@ ipsetProcessStreamLegacy(
     assert(hdr);
     assert(proc_stream_state);
     if (skStreamCheckSilkHeader(stream, FT_IPSET, 0,
-                                IPSET_REC_VERSION_LEGACY, NULL))
+                                IPSET_REC_VERSION_CLASSC, NULL))
     {
         skAbort();
     }
@@ -6844,12 +7241,15 @@ ipsetProcessStreamLegacy(
         }
 
         /* handle the block */
-        rv = ipsetProcessStreamBitmap256(slash24, &block24[1], swap_flag,
-                                         proc_stream_state);
+        rv = ipsetProcessStreamBmapSlash24(slash24, &block24[1], swap_flag,
+                                           proc_stream_state);
     }
     if (b == -1) {
         /* read error */
-        rv = -1;
+        ipsetReadStrerrror(stream, ("Attempting to read %" SK_PRIuZ
+                                    " bytes returned %" SK_PRIdZ),
+                           sizeof(block24), b);
+        rv = SKIPSET_ERR_FILEIO;
         goto END;
     }
 
@@ -6951,6 +7351,8 @@ ipsetProcessStreamRadix(
              * skHentryIPSetGetNodeSize(hentry));
     b = skStreamRead(stream, NULL, bytes);
     if (b != bytes) {
+        ipsetReadStrerrror(stream, ("Attempting to read %" SK_PRIdZ
+                                    " bytes returned %" SK_PRIdZ), bytes, b);
         rv = SKIPSET_ERR_FILEIO;
         goto END;
     }
@@ -6962,6 +7364,9 @@ ipsetProcessStreamRadix(
         if (b == 0 && skHentryIPSetGetLeafCount(hentry) == 0) {
             rv = SKIPSET_OK;
         } else {
+            ipsetReadStrerrror(stream, ("Attempting to read %" SK_PRIdZ
+                                        " bytes returned %" SK_PRIdZ),
+                               bytes, b);
             rv = SKIPSET_ERR_FILEIO;
         }
         goto END;
@@ -7034,6 +7439,9 @@ ipsetProcessStreamRadix(
         if (no_more_ipv4 && b == bytes) {
             /* not an error;  we exited the loop via a break; */
         } else {
+            ipsetReadStrerrror(stream, ("Attempting to read %" SK_PRIdZ
+                                        " bytes returned %" SK_PRIdZ),
+                               bytes, b);
             rv = SKIPSET_ERR_FILEIO;
             goto END;
         }
@@ -7047,16 +7455,216 @@ ipsetProcessStreamRadix(
 }
 
 
+#if SK_ENABLE_IPV6
+/*
+ *  status = ipsetProcessStreamSlash64(stream, hdr, proc_stream_state);
+ *
+ *    Helper function for skIPSetProcessStream() and
+ *    ipsetReadSlash64().
+ *
+ *    Treat 'stream' as an IPset in the IPSET_REC_VERSION_SLASH64
+ *    format and process all the IPs and CIDR blocks it contains
+ *    without reading the entire IPset into memory.  The header of the
+ *    stream is in 'hdr'.  The callback to invoke is available in
+ *    'proc_stream_state'.
+ *
+ *    See '#define IPSET_REC_VERSION_SLASH64' for description of the
+ *    file format.
+ */
+static int
+ipsetProcessStreamSlash64(
+    skstream_t         *stream,
+    sk_file_header_t   *hdr,
+    ipset_walk_t       *proc_stream_state)
+{
+    sk_header_entry_t *hentry;
+    uint8_t read_buf[sizeof(uint64_t) + sizeof(uint8_t)];
+    uint32_t bmap[IPTREE_WORDS_PER_SLASH24];
+    /* ensure the file is valid */
+    enum state_st {
+        ANY_ALLOWED, UPPER_REQUIRED, LOWER_REQUIRED
+    } state;
+    int swap_flag;
+    ipset_ipv6_t slash120;
+    int no_more_ipv4;
+    ssize_t b;
+    int rv;
+
+    /*  UINT64_FROM_READ_BUF(value): Set 'value' to the uint64_t value
+     *  in 'read_buf', byte swapping if necessary. */
+#ifdef SK_HAVE_ALIGNED_ACCESS_REQUIRED
+#define UINT64_FROM_READ_BUF(value)                     \
+    memcpy(&(value), read_buf, sizeof(uint64_t));       \
+    if (swap_flag) {                                    \
+        (value) = BSWAP64(value);                       \
+    }
+#else
+#define UINT64_FROM_READ_BUF(value)                     \
+    if (swap_flag) {                                    \
+        (value) = BSWAP64(*(uint64_t *)read_buf);       \
+    } else {                                            \
+        (value) = *(uint64_t *)read_buf;                \
+    }
+#endif  /* SK_HAVE_ALIGNED_ACCESS_REQUIRED */
+
+    /* sanity check input */
+    assert(stream);
+    assert(hdr);
+    assert(proc_stream_state);
+    if (skStreamCheckSilkHeader(stream, FT_IPSET, IPSET_REC_VERSION_SLASH64,
+                                IPSET_REC_VERSION_SLASH64, NULL))
+    {
+        skAbort();
+    }
+    if (skHeaderGetRecordLength(hdr) != 1) {
+        skAbort();
+    }
+    hentry = skHeaderGetFirstMatch(hdr, SK_HENTRY_IPSET_ID);
+    if (NULL == hentry) {
+        skAbort();
+    }
+    if (IPSET_LEN_V6 != skHentryIPSetGetLeafSize(hentry)) {
+        skAbort();
+    }
+
+    swap_flag = !skHeaderIsNativeByteOrder(hdr);
+
+    state = UPPER_REQUIRED;
+
+    no_more_ipv4 = 0;
+    while ((b = skStreamRead(stream, read_buf, sizeof(read_buf)))
+           == sizeof(read_buf))
+    {
+        if (read_buf[sizeof(uint64_t)] <= 64) {
+            /* Upper 64 bits of IPv6 and one byte CIDR prefix */
+            if (LOWER_REQUIRED == state || 0 == read_buf[sizeof(uint64_t)]) {
+                ipsetReadStrerrror(stream, "Unexpected value for prefix %u",
+                                   read_buf[sizeof(uint64_t)]);
+                rv = SKIPSET_ERR_FILEIO;
+                goto END;
+            }
+            state = UPPER_REQUIRED;
+            if (SK_IPV6POLICY_ASV4 == proc_stream_state->v6policy) {
+                /* there cannot be any more IPv4 addresses */
+                no_more_ipv4 = 1;
+                break;
+            }
+            UINT64_FROM_READ_BUF(slash120.ip[0]);
+            slash120.ip[1] = 0;
+            rv = ipsetProcessStreamCallback(&slash120, NULL,
+                                            read_buf[sizeof(uint64_t)],
+                                            proc_stream_state);
+            if (rv) { goto END; }
+        } else if (read_buf[sizeof(uint64_t)] <= 128) {
+            /* Lower 64 bits of IPv6 and one byte CIDR prefix */
+            if (UPPER_REQUIRED == state) {
+                ipsetReadStrerrror(stream, "Unexpected value for prefix %u",
+                                   read_buf[sizeof(uint64_t)]);
+                rv = SKIPSET_ERR_FILEIO;
+                goto END;
+            }
+            state = ANY_ALLOWED;
+            UINT64_FROM_READ_BUF(slash120.ip[1]);
+            if (SK_IPV6POLICY_ASV4 == proc_stream_state->v6policy) {
+                if (slash120.ip[1] < UINT64_C(0x0000ffff00000000)) {
+                    continue;
+                }
+                if (slash120.ip[1] > UINT64_C(0x0000ffffffffffff)) {
+                    no_more_ipv4 = 1;
+                    break;
+                }
+            }
+            rv = ipsetProcessStreamCallback(&slash120, NULL,
+                                            read_buf[sizeof(uint64_t)],
+                                            proc_stream_state);
+            if (rv) { goto END; }
+        } else if (read_buf[sizeof(uint64_t)] == SET_SLASH64_IS_SLASH64) {
+            /* Upper 64 bits of IPv6 */
+            if (LOWER_REQUIRED == state) {
+                ipsetReadStrerrror(stream, "Unexpected value for prefix %u",
+                                   read_buf[sizeof(uint64_t)]);
+                rv = SKIPSET_ERR_FILEIO;
+                goto END;
+            }
+            state = LOWER_REQUIRED;
+            UINT64_FROM_READ_BUF(slash120.ip[0]);
+            if (SK_IPV6POLICY_ASV4 == proc_stream_state->v6policy
+                && slash120.ip[0] != 0)
+            {
+                no_more_ipv4 = 1;
+                break;
+            }
+        } else if (read_buf[sizeof(uint64_t)] != SET_CIDRBMAP_MAP256) {
+            ipsetReadStrerrror(stream, "Unexpected value for prefix %u",
+                               read_buf[sizeof(uint64_t)]);
+            rv = SKIPSET_ERR_FILEIO;
+            goto END;
+        } else {
+            /* Lower 64 bits of IPv6 and 256-bit bitmap */
+            if (UPPER_REQUIRED == state) {
+                ipsetReadStrerrror(stream, "Unexpected value for prefix %u",
+                                   read_buf[sizeof(uint64_t)]);
+                rv = SKIPSET_ERR_FILEIO;
+                goto END;
+            }
+            state = ANY_ALLOWED;
+            UINT64_FROM_READ_BUF(slash120.ip[1]);
+            if ((b = skStreamRead(stream, bmap, sizeof(bmap)))
+                != sizeof(bmap))
+            {
+                ipsetReadStrerrror(stream, ("Attempting to read %" SK_PRIuZ
+                                            " bytes returned %" SK_PRIdZ),
+                                   sizeof(bmap), b);
+                rv = SKIPSET_ERR_FILEIO;
+                goto END;
+            }
+            if (SK_IPV6POLICY_ASV4 == proc_stream_state->v6policy) {
+                if (slash120.ip[1] < UINT64_C(0x0000ffff00000000)) {
+                    continue;
+                }
+                if (slash120.ip[1] > UINT64_C(0x0000ffffffffffff)) {
+                    no_more_ipv4 = 1;
+                    break;
+                }
+            }
+            /* handle the block */
+            rv = ipsetProcessStreamBmapSlash120(&slash120, bmap, swap_flag,
+                                                proc_stream_state);
+            if (rv) { goto END; }
+        }
+    }
+    if (b != 0) {
+        if (no_more_ipv4 && b == sizeof(read_buf)) {
+            /* not an error;  we exited the loop via a break; */
+        } else {
+            /* read error */
+            ipsetReadStrerrror(stream, ("Attempting to read %" SK_PRIuZ
+                                        " bytes returned %" SK_PRIdZ),
+                               sizeof(read_buf), b);
+            rv = SKIPSET_ERR_FILEIO;
+            goto END;
+        }
+    }
+
+    /* Success */
+    rv = SKIPSET_OK;
+
+  END:
+    return rv;
+}
+#endif  /* SK_ENABLE_IPV6 */
+
+
 /*
  *  status = ipsetReadCidrbmapIntoIPTree(&ipset, stream, hdr);
  *
  *    Helper function for skIPSetRead().
  *
  *    Read an IPset containing only IPv4 addresses in the
- *    IPSET_REC_VERSION_CIDR_BMAP format from 'stream' and create a
+ *    IPSET_REC_VERSION_CIDRBMAP format from 'stream' and create a
  *    SiLK-2 IPTree data structure.
  *
- *    See '#define IPSET_REC_VERSION_CIDR_BMAP' for description of the
+ *    See '#define IPSET_REC_VERSION_CIDRBMAP' for description of the
  *    file format.
  */
 static int
@@ -7102,10 +7710,10 @@ ipsetReadCidrbmapIntoIPTree(
  *
  *    Helper function for skIPSetRead().
  *
- *    Read an IPset in the IPSET_REC_VERSION_CIDR_BMAP format from
+ *    Read an IPset in the IPSET_REC_VERSION_CIDRBMAP format from
  *    'stream' and create a radix-tree IPset data structure.
  *
- *    See '#define IPSET_REC_VERSION_CIDR_BMAP' for description of the
+ *    See '#define IPSET_REC_VERSION_CIDRBMAP' for description of the
  *    file format.
  */
 static int
@@ -7184,20 +7792,20 @@ ipsetReadCidrbmapIntoRadixV6(
 
 
 /*
- *  status = ipsetReadLegacyIntoIPTree(&ipset, stream, hdr);
+ *  status = ipsetReadClasscIntoIPTree(&ipset, stream, hdr);
  *
  *    Helper function for skIPSetRead().
  *
  *    Also a helper function for the legacy skIPTreeRead() function.
  *
- *    Read an IPset in the IPSET_REC_VERSION_LEGACY format from
+ *    Read an IPset in the IPSET_REC_VERSION_CLASSC format from
  *    'stream' and create a SiLK-2 IPTree data structure.
  *
- *    See '#define IPSET_REC_VERSION_LEGACY' for description of the
+ *    See '#define IPSET_REC_VERSION_CLASSC' for description of the
  *    file format.
  */
 static int
-ipsetReadLegacyIntoIPTree(
+ipsetReadClasscIntoIPTree(
     skipset_t         **ipset_out,
     skstream_t         *stream,
     sk_file_header_t   *hdr)
@@ -7216,7 +7824,7 @@ ipsetReadLegacyIntoIPTree(
     assert(stream);
     assert(hdr);
     if (skStreamCheckSilkHeader(stream, FT_IPSET, 0,
-                                IPSET_REC_VERSION_LEGACY, NULL))
+                                IPSET_REC_VERSION_CLASSC, NULL))
     {
         skAbort();
     }
@@ -7261,6 +7869,9 @@ ipsetReadLegacyIntoIPTree(
     }
     if (b != 0) {
         /* read error */
+        ipsetReadStrerrror(stream, ("Attempting to read %" SK_PRIuZ
+                                    " bytes returned %" SK_PRIdZ),
+                           sizeof(block24), b);
         rv = SKIPSET_ERR_FILEIO;
         goto END;
     }
@@ -7277,18 +7888,18 @@ ipsetReadLegacyIntoIPTree(
 
 
 /*
- *  status = ipsetReadLegacyIntoRadix(&ipset, stream, hdr);
+ *  status = ipsetReadClasscIntoRadix(&ipset, stream, hdr);
  *
  *    Helper function for skIPSetRead().
  *
- *    Read an IPset in the IPSET_REC_VERSION_LEGACY format from
+ *    Read an IPset in the IPSET_REC_VERSION_CLASSC format from
  *    'stream' and create a radix-tree IPset data structure.
  *
- *    See '#define IPSET_REC_VERSION_LEGACY' for description of the
+ *    See '#define IPSET_REC_VERSION_CLASSC' for description of the
  *    file format.
  */
 static int
-ipsetReadLegacyIntoRadix(
+ipsetReadClasscIntoRadix(
     skipset_t         **ipset_out,
     skstream_t         *stream,
     sk_file_header_t   *hdr)
@@ -7312,7 +7923,7 @@ ipsetReadLegacyIntoRadix(
     proc_stream_state.v6policy = SK_IPV6POLICY_MIX;
     proc_stream_state.cidr_blocks = 1;
 
-    rv = ipsetProcessStreamLegacy(stream, hdr, &proc_stream_state);
+    rv = ipsetProcessStreamClassc(stream, hdr, &proc_stream_state);
 
     if (SKIPSET_OK == rv) {
         skIPSetClean(ipset);
@@ -7494,17 +8105,12 @@ ipsetReadRadixIntoRadix(
         bytes = (skHentryIPSetGetNodeCount(hentry)
                  * ipset->s.v3->nodes.entry_size);
         b = skStreamRead(stream, ipset->s.v3->nodes.buf, bytes);
-        if (b != bytes) {
-            if (b > 0) {
-                /* short read */
-                rv = SKIPSET_ERR_FILEIO;
-                goto END;
-            }
-            if (b == -1) {
-                /* read error */
-                rv = SKIPSET_ERR_FILEIO;
-                goto END;
-            }
+        if (b != bytes && b != 0) {
+            ipsetReadStrerrror(stream, ("Attempting to read %" SK_PRIdZ
+                                        " bytes returned %" SK_PRIdZ),
+                               bytes, b);
+            rv = SKIPSET_ERR_FILEIO;
+            goto END;
         }
         ipset->s.v3->nodes.entry_count = skHentryIPSetGetNodeCount(hentry);
 
@@ -7548,17 +8154,12 @@ ipsetReadRadixIntoRadix(
         bytes = (skHentryIPSetGetLeafCount(hentry)
                  * ipset->s.v3->leaves.entry_size);
         b = skStreamRead(stream, ipset->s.v3->leaves.buf, bytes);
-        if (b != bytes) {
-            if (b > 0) {
-                /* short read */
-                rv = SKIPSET_ERR_FILEIO;
-                goto END;
-            }
-            if (b == -1) {
-                /* read error */
-                rv = SKIPSET_ERR_FILEIO;
-                goto END;
-            }
+        if (b != bytes && b != 0) {
+            ipsetReadStrerrror(stream, ("Attempting to read %" SK_PRIdZ
+                                        " bytes returned %" SK_PRIdZ),
+                               bytes, b);
+            rv = SKIPSET_ERR_FILEIO;
+            goto END;
         }
         ipset->s.v3->leaves.entry_count = skHentryIPSetGetLeafCount(hentry);
 
@@ -7606,6 +8207,59 @@ ipsetReadRadixIntoRadix(
 }
 
 
+#if SK_ENABLE_IPV6
+/*
+ *  status = ipsetReadSlash64(&ipset, stream, hdr);
+ *
+ *    Helper function for skIPSetRead().
+ *
+ *    Read an IPset in the IPSET_REC_VERSION_SLASH64 format from
+ *    'stream' and create an IPv6 Radix data structure.
+ *
+ *    See '#define IPSET_REC_VERSION_SLASH64' for description of the
+ *    file format.
+ *
+ *    This function uses ipsetProcessStreamSlash64() to read the
+ *    IPset.
+ */
+static int
+ipsetReadSlash64(
+    skipset_t         **ipset_out,
+    skstream_t         *stream,
+    sk_file_header_t   *hdr)
+{
+    skipset_t *ipset = NULL;
+    ipset_walk_t proc_stream_state;
+    int rv;
+
+    /* sanity check input */
+    assert(ipset_out);
+    assert(stream);
+    assert(hdr);
+
+    rv = ipsetCreate(&ipset, 1, 1);
+    if (rv != SKIPSET_OK) {
+        return rv;
+    }
+
+    memset(&proc_stream_state, 0, sizeof(proc_stream_state));
+    proc_stream_state.callback = ipsetInsertIPAddrV6;
+    proc_stream_state.cb_data = ipset;
+    proc_stream_state.v6policy = SK_IPV6POLICY_FORCE;
+    proc_stream_state.cidr_blocks = 1;
+
+    rv = ipsetProcessStreamSlash64(stream, hdr, &proc_stream_state);
+    if (SKIPSET_OK == rv) {
+        skIPSetClean(ipset);
+        *ipset_out = ipset;
+    } else {
+        skIPSetDestroy(&ipset);
+    }
+    return rv;
+}
+#endif  /* SK_ENABLE_IPV6 */
+
+
 /*
  *  status = ipsetReadStreamHeader(stream, &hdr, &is_ipv6);
  *
@@ -7624,6 +8278,7 @@ ipsetReadStreamHeader(
     int                *is_ipv6)
 {
     sk_header_entry_t *hentry;
+    sk_file_version_t record_version;
     int rv;
 
     assert(stream);
@@ -7656,11 +8311,12 @@ ipsetReadStreamHeader(
     if (skHeaderGetRecordLength(*hdr) != 1) {
         return SKIPSET_ERR_FILEHEADER;
     }
+    record_version = skHeaderGetRecordVersion(*hdr);
 
-    if (skHeaderGetRecordVersion(*hdr) < IPSET_REC_VERSION_RADIX) {
-        /* the format we call "legacy" */
+    if (record_version < IPSET_REC_VERSION_RADIX) {
+        /* the format we call IPSET_REC_VERSION_CLASSC */
         *is_ipv6 = 0;
-    } else if (skHeaderGetRecordVersion(*hdr) == IPSET_REC_VERSION_RADIX) {
+    } else if (record_version == IPSET_REC_VERSION_RADIX) {
         hentry = skHeaderGetFirstMatch(*hdr, SK_HENTRY_IPSET_ID);
         if (NULL == hentry) {
             return SKIPSET_ERR_FILEHEADER;
@@ -7686,7 +8342,7 @@ ipsetReadStreamHeader(
             /* Unrecognized record sizes */
             return SKIPSET_ERR_FILEHEADER;
         }
-    } else if (skHeaderGetRecordVersion(*hdr) == IPSET_REC_VERSION_CIDR_BMAP) {
+    } else if (record_version == IPSET_REC_VERSION_CIDRBMAP) {
         /* read and verify the header */
         hentry = skHeaderGetFirstMatch(*hdr, SK_HENTRY_IPSET_ID);
         if (NULL == hentry) {
@@ -7709,9 +8365,30 @@ ipsetReadStreamHeader(
             /* Unrecognized record size */
             return SKIPSET_ERR_FILEHEADER;
         }
+    } else if (record_version == IPSET_REC_VERSION_SLASH64){
+        /* read and verify the header */
+        hentry = skHeaderGetFirstMatch(*hdr, SK_HENTRY_IPSET_ID);
+        if (NULL == hentry) {
+            return SKIPSET_ERR_FILEHEADER;
+        }
+        /* most sizes are zero */
+        if (0 != skHentryIPSetGetChildPerNode(hentry)
+            || 0 != skHentryIPSetGetRootIndex(hentry)
+            || 0 != skHentryIPSetGetNodeCount(hentry)
+            || 0 != skHentryIPSetGetNodeSize(hentry)
+            || 0 != skHentryIPSetGetLeafCount(hentry))
+        {
+            return SKIPSET_ERR_FILEHEADER;
+        }
+        /* format only supports IPv6 */
+        if (IPSET_LEN_V6 == skHentryIPSetGetLeafSize(hentry)) {
+            *is_ipv6 = 1;
+        } else {
+            /* Unrecognized record size */
+            return SKIPSET_ERR_FILEHEADER;
+        }
     } else {
-        skAppPrintErr("Unknown header version %d",
-                      skHeaderGetRecordVersion(*hdr));
+        skAppPrintErr("Unknown header version %d", record_version);
         skAbort();
     }
 #if  !SK_ENABLE_IPV6
@@ -7719,9 +8396,37 @@ ipsetReadStreamHeader(
         /* IPv6 IPSet not supported by this build of SiLK */
         return SKIPSET_ERR_IPV6;
     }
-#endif
+#endif  /* SK_ENABLE_IPV6 */
 
     return SKIPSET_OK;
+}
+
+
+/*
+ *    Print the reason an IPset could not be read when the
+ *    SILK_IPSET_PRINT_READ_ERROR environment variable is set.
+ */
+static void
+ipsetReadStrerrror(
+    skstream_t         *stream,
+    const char         *format,
+    ...)
+{
+    char buf[3 * PATH_MAX];
+    const char *env;
+    va_list args;
+
+    va_start(args, format);
+    env = getenv("SILK_IPSET_PRINT_READ_ERROR");
+    if (!env || !env[0] || 0 == strcmp(env, "0")) {
+        va_end(args);
+        return;
+    }
+    vsnprintf(buf, sizeof(buf), format, args);
+    va_end(args);
+
+    skAppPrintErr("Error reading IPset from '%s': %s",
+                  skStreamGetPathname(stream), buf);
 }
 
 
@@ -8481,6 +9186,55 @@ ipsetUnionIPTree(
 
 
 /*
+ *    When the following macro is defined, ipsetVerify() prints a
+ *    message to stderr saying why verification of the IPset failed.
+ *    If it is not defined, no reason is given.
+ *
+ *    The arguments to the macro should appear in double parentheses,
+ *    and the first argument should be VF3.  Example:
+ *
+ *    VERIFAIL((VF3, "root index is invalid"));
+ */
+/* #define VERIFAIL(args) ipsetVerifail args */
+
+#ifndef VERIFAIL
+#define VERIFAIL(args)
+#else
+#define VF3 ipset, __FILE__, __LINE__
+
+/*
+ *    Print a message saying why verification failed.
+ */
+static void
+ipsetVerifail(
+    const skipset_t    *ipset,
+    const char         *file,
+    int                 line,
+    const char         *format,
+    ...)
+    SK_CHECK_PRINTF(4, 5);
+
+static void
+ipsetVerifail(
+    const skipset_t    *ipset,
+    const char         *file,
+    int                 line,
+    const char         *format,
+    ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    fprintf(stderr, "%s:%d: IPset %p is not valid: ",
+            file, line, (void*)ipset);
+    vfprintf(stderr, format, args);
+    fprintf(stderr, "\n");
+    va_end(args);
+}
+#endif  /* #else of #ifndef VERIFAIL */
+
+
+/*
  *  status = ipsetVerify(ipset);
  *
  *    Verify that all the indexes in a Radix-Tree based IPset are
@@ -8492,19 +9246,31 @@ static int
 ipsetVerify(
     const skipset_t    *ipset)
 {
+    uint32_t to_visit[IPSET_MAX_DEPTH];
     uint32_t bitmap_size;
-    sk_bitmap_t *isfree = NULL;
+    sk_bitmap_t *bitmap = NULL;
+    const ipset_node_t *node;
+    const ipset_leaf_t *leaf;
+    const ipset_node_t *n2;
     uint32_t node_idx;
-    uint32_t j;
+    uint32_t depth;
+    uint32_t i;
+
     int rv = SKIPSET_ERR_CORRUPT;
 
     if (NULL == ipset || 1 == ipset->is_iptree) {
         return SKIPSET_OK;
     }
     if (ipset->s.v3->nodes.entry_count > ipset->s.v3->nodes.entry_capacity) {
+        VERIFAIL((VF3, "nodes_count(%u) > nodes_capacity(%u)",
+                  ipset->s.v3->nodes.entry_count,
+                  ipset->s.v3->nodes.entry_capacity));
         return rv;
     }
     if (ipset->s.v3->leaves.entry_count > ipset->s.v3->leaves.entry_capacity) {
+        VERIFAIL((VF3, "leaves_count(%u) > leaves_capacity(%u)",
+                  ipset->s.v3->leaves.entry_count,
+                  ipset->s.v3->leaves.entry_capacity));
         return rv;
     }
 
@@ -8513,154 +9279,217 @@ ipsetVerify(
     }
 
     if (ipset->s.v3->root_is_leaf) {
-        ipset_leaf_t *leaf;
-
         if (IPSET_ROOT_INDEX(ipset) >= ipset->s.v3->leaves.entry_count) {
+            VERIFAIL((VF3, "leaf_index(%u) >= leaves_count(%u) [root]",
+                      IPSET_ROOT_INDEX(ipset),
+                      ipset->s.v3->leaves.entry_count));
             return rv;
         }
         leaf = LEAF_PTR(ipset, IPSET_ROOT_INDEX(ipset));
-        if (ipset->is_ipv6) {
-            if (leaf->v4.prefix > 128) {
-                return rv;
-            }
-        } else if (leaf->v4.prefix > 32) {
+        if (((leaf->v4.prefix > 32) && !ipset->is_ipv6)
+            || (leaf->v4.prefix > 128))
+        {
+            VERIFAIL((VF3, "leaf(%u) prefix is invalid %u [root]",
+                      IPSET_ROOT_INDEX(ipset), leaf->v4.prefix));
             return rv;
         }
         return SKIPSET_OK;
+    }
 
-    } else if (IPSET_ROOT_INDEX(ipset) >= ipset->s.v3->nodes.entry_count) {
+    if (IPSET_ROOT_INDEX(ipset) >= ipset->s.v3->nodes.entry_count) {
+        VERIFAIL((VF3, "node_index(%u) >= nodes_count(%u) [root]",
+                  IPSET_ROOT_INDEX(ipset), ipset->s.v3->nodes.entry_count));
+        return rv;
+    }
+    n2 = NODE_PTR(ipset, IPSET_ROOT_INDEX(ipset));
+    if (((n2->v4.prefix > 32) && !ipset->is_ipv6)
+        || (n2->v4.prefix > 128))
+    {
+        VERIFAIL((VF3, "node(%u) prefix is invalid %u [root]",
+                  IPSET_ROOT_INDEX(ipset), n2->v4.prefix));
         return rv;
     }
 
     /* create a bitmap to note which nodes and leaves are on the free
-     * list.  this is the size of the bitmap */
+     * list and to check for diamonds in the structure.  assume the
+     * IPset is okay if we cannot allocate the bitmap */
     if (ipset->s.v3->nodes.entry_count > ipset->s.v3->leaves.entry_count) {
         bitmap_size = ipset->s.v3->nodes.entry_count;
     } else {
         bitmap_size = ipset->s.v3->leaves.entry_count;
     }
-    if (skBitmapCreate(&isfree, bitmap_size)) {
-        rv = SKIPSET_ERR_ALLOC;
-        goto END;
+    if (skBitmapCreate(&bitmap, bitmap_size)) {
+        VERIFAIL((VF3, "cannot create bitmap"));
+        return SKIPSET_OK;
     }
 
-    /* fill the bitmap for nodes on the free list */
+    /* check the tree for a node linked to by multiple nodes, for
+     * invalid node indexes, and for invalid prefixes */
+    depth = 0;
+    skBitmapSetBit(bitmap, IPSET_ROOT_INDEX(ipset));
+    to_visit[depth++] = IPSET_ROOT_INDEX(ipset);
+    while (depth) {
+        node_idx = to_visit[--depth];
+        node = NODE_PTR(ipset, node_idx);
+        for (i = 0; i < IPSET_NUM_CHILDREN; ++i) {
+            if (node->v4.child[i] && !NODEPTR_CHILD_IS_LEAF(&node->v4, i)) {
+                if (node->v4.child[i] >= ipset->s.v3->nodes.entry_count) {
+                    VERIFAIL((VF3, ("node_index(%u) >= nodes_count(%u)"
+                                    " [child %u of %u]"),
+                              node->v4.child[i],
+                              ipset->s.v3->nodes.entry_count, i, node_idx));
+                    goto END;
+                }
+                if (skBitmapGetBit(bitmap, node->v4.child[i])) {
+                    VERIFAIL((VF3, "duplicate node(%u) [child %u of %u]",
+                              node->v4.child[i], i, node_idx));
+                    goto END;
+                }
+                n2 = NODE_PTR(ipset, node->v4.child[i]);
+                if (((n2->v4.prefix > 32) && !ipset->is_ipv6)
+                    || (n2->v4.prefix > 128) || (0 == n2->v4.prefix))
+                {
+                    VERIFAIL((VF3, ("node(%u) prefix is invalid %u"
+                                    " [child %u of %u]"),
+                              node->v4.child[i], n2->v4.prefix, i, node_idx));
+                    goto END;
+                }
+                skBitmapSetBit(bitmap, node->v4.child[i]);
+                to_visit[depth++] = node->v4.child[i];
+            }
+        }
+    }
+
+    /* check for duplicates on the node free list and for elements on
+     * free list that are also in the tree; use depth to keep track of
+     * how far into the list we go */
+    depth = 0;
     for (node_idx = ipset->s.v3->nodes.free_list;
          0 != node_idx;
          node_idx = NODEIDX_FREE_LIST(ipset, node_idx))
     {
+        ++depth;
         if (node_idx >= ipset->s.v3->nodes.entry_count) {
+            VERIFAIL((VF3, ("node_index(%u) >= nodes_count(%u)"
+                            " [free list item %u]"),
+                      node_idx, ipset->s.v3->nodes.entry_count, depth));
             goto END;
         }
-        skBitmapSetBit(isfree, node_idx);
+        if (!skBitmapGetBit(bitmap, node_idx)) {
+            skBitmapSetBit(bitmap, node_idx);
+        } else {
+            /* is this a duplicate of a node in the tree or on the
+             * free list? */
+            skBitmapClearAllBits(bitmap);
+            for (node_idx = ipset->s.v3->nodes.free_list;
+                 0 != node_idx && depth > 0;
+                 node_idx = NODEIDX_FREE_LIST(ipset, node_idx))
+            {
+                --depth;
+                if (skBitmapGetBit(bitmap, node_idx)) {
+                    VERIFAIL((VF3, "duplicate free node_index(%u)", node_idx));
+                    goto END;
+                }
+                skBitmapSetBit(bitmap, node_idx);
+            }
+            VERIFAIL((VF3, "node_index(%u) also on free list", node_idx));
+            goto END;
+        }
     }
 
-#if SK_ENABLE_IPV6
-    if (ipset->is_ipv6) {
-        ipset_node_v6_t *node;
-        ipset_leaf_v6_t *leaf;
-
-        for (node_idx = 0, node = (ipset_node_v6_t*)ipset->s.v3->nodes.buf;
-             node_idx < ipset->s.v3->nodes.entry_count;
-             ++node_idx, ++node)
-        {
-            if (skBitmapGetBit(isfree, node_idx)) {
-                continue;
-            }
-            if (node->prefix > 128) {
-                goto END;
-            }
-            for (j = 0; j < IPSET_NUM_CHILDREN; ++j) {
-                if (NODEPTR_CHILD_IS_LEAF(node, j)) {
-                    if (node->child[j] >= ipset->s.v3->leaves.entry_count) {
-                        goto END;
-                    }
-                } else if (node->child[j] >= ipset->s.v3->nodes.entry_count) {
+    /* check the tree for a leaf linked to by multiple nodes, for
+     * invalid leaf indexes, and for invalid prefixes */
+    skBitmapClearAllBits(bitmap);
+    depth = 0;
+    to_visit[depth++] = IPSET_ROOT_INDEX(ipset);
+    while (depth) {
+        node_idx = to_visit[--depth];
+        node = NODE_PTR(ipset, node_idx);
+        for (i = 0; i < IPSET_NUM_CHILDREN; ++i) {
+            if (0 == node->v4.child[i]) {
+                /* no-op */
+            } else if (!NODEPTR_CHILD_IS_LEAF(&node->v4, i)) {
+                to_visit[depth++] = node->v4.child[i];
+            } else if (NODEPTR_CHILD_IS_REPEAT(&node->v4, i)) {
+                if (0 == i) {
+                    skAbort();
+                }
+                if (node->v4.child[i] != node->v4.child[i - 1]) {
+                    VERIFAIL((VF3, ("on node %u, bad id on child %u (%u)"
+                                    " marked as repeat of previous (%u)"),
+                              node_idx, i, node->v4.child[i],
+                              node->v4.child[i-1]));
                     goto END;
                 }
+            } else {
+                if (node->v4.child[i] >= ipset->s.v3->leaves.entry_count) {
+                    VERIFAIL((VF3, ("leaf_index(%u) >= leaves_count(%u)"
+                                    " [child %u of %u]"),
+                              node->v4.child[i],
+                              ipset->s.v3->leaves.entry_count, i, node_idx));
+                    goto END;
+                }
+                if (skBitmapGetBit(bitmap, node->v4.child[i])) {
+                    VERIFAIL((VF3, "duplicate leaf(%u) [child %u of %u]",
+                              node->v4.child[i], i, node_idx));
+                    goto END;
+                }
+                leaf = LEAF_PTR(ipset, node->v4.child[i]);
+                if (((leaf->v4.prefix > 32) && !ipset->is_ipv6)
+                    || (leaf->v4.prefix > 128) || (0 == leaf->v4.prefix))
+                {
+                    VERIFAIL((VF3, ("leaf(%u) prefix is invalid %u"
+                                    " [child %u of %u]"),
+                              node->v4.child[i], leaf->v4.prefix, i,node_idx));
+                    goto END;
+                }
+                skBitmapSetBit(bitmap, node->v4.child[i]);
             }
         }
+    }
 
-        skBitmapClearAllBits(isfree);
-        /* mark leaves that are on the free list */
-        for (node_idx = ipset->s.v3->leaves.free_list;
-             0 != node_idx;
-             node_idx = LEAFIDX_FREE_LIST(ipset, node_idx))
-        {
-            if (node_idx >= ipset->s.v3->leaves.entry_count) {
-                goto END;
-            }
-            skBitmapSetBit(isfree, node_idx);
-        }
-
-        for (node_idx = 0, leaf = (ipset_leaf_v6_t*)ipset->s.v3->leaves.buf;
-             node_idx < ipset->s.v3->leaves.entry_count;
-             ++node_idx, ++leaf)
-        {
-            if (skBitmapGetBit(isfree, node_idx)) {
-                continue;
-            }
-            if (leaf->prefix > 128) {
-                goto END;
-            }
-        }
-    } else
-#endif  /* SK_ENABLE_IPV6 */
+    /* check for duplicates on the leaf free list and for elements on
+     * free list that are also in the tree; use depth to keep track of
+     * how far into the list we go */
+    depth = 0;
+    for (node_idx = ipset->s.v3->leaves.free_list;
+         0 != node_idx;
+         node_idx = LEAFIDX_FREE_LIST(ipset, node_idx))
     {
-        ipset_node_v4_t *node;
-        ipset_leaf_v4_t *leaf;
-
-        for (node_idx = 0, node = (ipset_node_v4_t*)ipset->s.v3->nodes.buf;
-             node_idx < ipset->s.v3->nodes.entry_count;
-             ++node_idx, ++node)
-        {
-            if (skBitmapGetBit(isfree, node_idx)) {
-                continue;
-            }
-            if (node->prefix > 32) {
-                goto END;
-            }
-            for (j = 0; j < IPSET_NUM_CHILDREN; ++j) {
-                if (NODEPTR_CHILD_IS_LEAF(node, j)) {
-                    if (node->child[j] >= ipset->s.v3->leaves.entry_count) {
-                        goto END;
-                    }
-                } else if (node->child[j] >= ipset->s.v3->nodes.entry_count) {
+        ++depth;
+        if (node_idx >= ipset->s.v3->leaves.entry_count) {
+            VERIFAIL((VF3, ("leaf_index(%u) >= leaves_count(%u)"
+                            " [free list item %u]"),
+                      node_idx, ipset->s.v3->leaves.entry_count, depth));
+            goto END;
+        }
+        if (!skBitmapGetBit(bitmap, node_idx)) {
+            skBitmapSetBit(bitmap, node_idx);
+        } else {
+            /* is this a duplicate of a leaf in the tree or on the
+             * free list? */
+            skBitmapClearAllBits(bitmap);
+            for (node_idx = ipset->s.v3->leaves.free_list;
+                 0 != node_idx;
+                 node_idx = LEAFIDX_FREE_LIST(ipset, node_idx))
+            {
+                --depth;
+                if (skBitmapGetBit(bitmap, node_idx)) {
+                    VERIFAIL((VF3, "duplicate free leaf_index(%u)", node_idx));
                     goto END;
                 }
+                skBitmapSetBit(bitmap, node_idx);
             }
-        }
-
-        skBitmapClearAllBits(isfree);
-        /* mark leaves that are on the free list */
-        for (node_idx = ipset->s.v3->leaves.free_list;
-             0 != node_idx;
-             node_idx = LEAFIDX_FREE_LIST(ipset, node_idx))
-        {
-            if (node_idx >= ipset->s.v3->leaves.entry_count) {
-                goto END;
-            }
-            skBitmapSetBit(isfree, node_idx);
-        }
-
-        for (node_idx = 0, leaf = (ipset_leaf_v4_t*)ipset->s.v3->leaves.buf;
-             node_idx < ipset->s.v3->leaves.entry_count;
-             ++node_idx, ++leaf)
-        {
-            if (skBitmapGetBit(isfree, node_idx)) {
-                continue;
-            }
-            if (leaf->prefix > 128) {
-                goto END;
-            }
+            VERIFAIL((VF3, "leaf_index(%u) also on free list", node_idx));
+            goto END;
         }
     }
 
     rv = SKIPSET_OK;
 
   END:
-    if (isfree) {
-        skBitmapDestroy(&isfree);
+    if (bitmap) {
+        skBitmapDestroy(&bitmap);
     }
     return rv;
 }
@@ -9157,9 +9986,9 @@ ipsetWalkV6(
  *    Helper function for skIPSetWrite() via ipsetWriteCidrbmap().
  *
  *    Write an IPset from the SiLK-2 IPTree data structure to 'stream'
- *    in the IPSET_REC_VERSION_CIDR_BMAP format.
+ *    in the IPSET_REC_VERSION_CIDRBMAP format.
  *
- *    See '#define IPSET_REC_VERSION_CIDR_BMAP' for description of the
+ *    See '#define IPSET_REC_VERSION_CIDRBMAP' for description of the
  *    file format.
  */
 static int
@@ -9207,7 +10036,7 @@ ipsetWriteCidrbmapFromIPTree(
         skAbort();
     }
     hdr = skStreamGetSilkHeader(stream);
-    if (skHeaderGetRecordVersion(hdr) != IPSET_REC_VERSION_CIDR_BMAP) {
+    if (skHeaderGetRecordVersion(hdr) != IPSET_REC_VERSION_CIDRBMAP) {
         skAbort();
     }
 
@@ -9290,7 +10119,7 @@ ipsetWriteCidrbmapFromIPTree(
 
             /* write the IP and the 'bitmap-follows' value  */
             *(uint32_t*)write_buf = (((i << 16) | (j << 5)) & 0xFFFFFF00);
-            write_buf[sizeof(uint32_t)] = SET_CIDR_BMAP_256;
+            write_buf[sizeof(uint32_t)] = SET_CIDRBMAP_MAP256;
             rv = skStreamWrite(stream, write_buf, sizeof(write_buf));
             if (rv != sizeof(write_buf)) {
                 return SKIPSET_ERR_FILEIO;
@@ -9320,9 +10149,9 @@ ipsetWriteCidrbmapFromIPTree(
  *    Helper function for skIPSetWrite() via ipsetWriteCidrbmap().
  *
  *    Write an IPset from the radix-tree IPset data structure to
- *    'stream' in the IPSET_REC_VERSION_CIDR_BMAP format.
+ *    'stream' in the IPSET_REC_VERSION_CIDRBMAP format.
  *
- *    See '#define IPSET_REC_VERSION_CIDR_BMAP' for description of the
+ *    See '#define IPSET_REC_VERSION_CIDRBMAP' for description of the
  *    file format.
  */
 static int
@@ -9332,19 +10161,19 @@ ipsetWriteCidrbmapFromRadixV4(
 {
     sk_file_header_t *hdr;
     skipset_iterator_t iter;
+    enum status_en {
+        Empty, First_IP, Bitmap
+    };
     struct state_st {
         /* starting ip for this netblock, or an unmasked IP if
-         * 'is_first' is set. */
-        uint32_t  base_ip;
+         * 'status' is First_IP. */
+        uint32_t        base_ip;
         /* the 256-bit bitmap */
-        uint32_t bmap[IPTREE_WORDS_PER_SLASH24];
-        /* the prefix for 'base_ip' if 'is_first' is set */
-        uint8_t   prefix;
-        /* if set, this structure contains data */
-        uint8_t   is_dirty;
-        /* if set, base_ip holds a single, unmasked IP, and prefix is
-         * its prefix */
-        uint8_t   is_first;
+        uint32_t        bmap[IPTREE_WORDS_PER_SLASH24];
+        /* the prefix for 'base_ip' if 'status' is First_IP */
+        uint8_t         prefix;
+        /* what this structure currently holds */
+        enum status_en  status;
     } state;
     /* the bitmap holds 256 bits or a /24 */
     const uint32_t bmap_prefix = 24;
@@ -9364,21 +10193,22 @@ ipsetWriteCidrbmapFromRadixV4(
         skAbort();
     }
     hdr = skStreamGetSilkHeader(stream);
-    if (skHeaderGetRecordVersion(hdr) != IPSET_REC_VERSION_CIDR_BMAP) {
+    if (skHeaderGetRecordVersion(hdr) != IPSET_REC_VERSION_CIDRBMAP) {
         skAbort();
     }
 
     memset(&state, 0, sizeof(state));
+    state.status = Empty;
 
     ASSERT_OK(skIPSetIteratorBind(&iter, ipset, 1, SK_IPV6POLICY_ASV4));
     while (skIPSetIteratorNext(&iter, &ipaddr, &prefix) == SK_ITERATOR_OK){
         ipv4 = skipaddrGetV4(&ipaddr);
-        if (state.is_dirty && (prefix <= bmap_prefix
-                               || (state.base_ip ^ ipv4) > 0xFF))
+        if (state.status != Empty && (prefix <= bmap_prefix
+                                      || (state.base_ip ^ ipv4) > 0xFF))
         {
             /* 'ipv4' is not in the same /24 as 'state'; write the IP
              * or bitmap currently in 'state' */
-            if (state.is_first) {
+            if (First_IP == state.status) {
                 /* write the single ip and prefix */
                 *(uint32_t*)write_buf = state.base_ip;
                 write_buf[sizeof(uint32_t)] = (uint8_t)state.prefix;
@@ -9386,12 +10216,11 @@ ipsetWriteCidrbmapFromRadixV4(
                 if (rv != sizeof(write_buf)) {
                     return SKIPSET_ERR_FILEIO;
                 }
-                state.is_first = 0;
             } else {
                 /* write base ip, 'bitmap-follows' value for the
                  * prefix, and the bitmap */
                 *(uint32_t*)write_buf = state.base_ip;
-                write_buf[sizeof(uint32_t)] = SET_CIDR_BMAP_256;
+                write_buf[sizeof(uint32_t)] = SET_CIDRBMAP_MAP256;
                 rv = skStreamWrite(stream, write_buf, sizeof(write_buf));
                 if (rv != sizeof(write_buf)) {
                     return SKIPSET_ERR_FILEIO;
@@ -9401,33 +10230,34 @@ ipsetWriteCidrbmapFromRadixV4(
                     return SKIPSET_ERR_FILEIO;
                 }
             }
-            state.is_dirty = 0;
+            state.status = Empty;
         }
 
-        if (prefix <= bmap_prefix) {
-            /* prefix is larger than the bitmap; write the block as an
-             * IP and prefix */
-            *(uint32_t*)write_buf = ipv4;
-            write_buf[sizeof(uint32_t)] = (uint8_t)prefix;
-            rv = skStreamWrite(stream, write_buf, sizeof(write_buf));
-            if (rv != sizeof(write_buf)) {
-                return SKIPSET_ERR_FILEIO;
+        if (Empty == state.status) {
+            if (prefix <= bmap_prefix) {
+                /* netblock is larger than fits into a bitmap; write
+                 * the block as an IP and prefix */
+                *(uint32_t*)write_buf = ipv4;
+                write_buf[sizeof(uint32_t)] = (uint8_t)prefix;
+                rv = skStreamWrite(stream, write_buf, sizeof(write_buf));
+                if (rv != sizeof(write_buf)) {
+                    return SKIPSET_ERR_FILEIO;
+                }
+            } else {
+                /* initialize 'state' with this IP and look for more
+                 * IPs in this /24. */
+                state.status = First_IP;
+                state.base_ip = ipv4;
+                state.prefix = (uint8_t)prefix;
             }
             continue;
         }
-        if (!state.is_dirty) {
-            /* 'state' is empty; initialize 'state' with this IP and
-             * look for more IPs in this /24. */
-            state.is_dirty = 1;
-            state.base_ip = ipv4;
-            state.prefix = (uint8_t)prefix;
-            state.is_first = 1;
-            continue;
-        }
-        if (state.is_first) {
+
+        assert(prefix > bmap_prefix);
+        if (First_IP == state.status) {
             /* found a second IP in this /24; convert 'state' to hold
              * a bitmap */
-            state.is_first = 0;
+            state.status = Bitmap;
             memset(state.bmap, 0, sizeof(state.bmap));
 
             buf_idx = ((state.base_ip & 0xFF) >> 5);
@@ -9443,6 +10273,7 @@ ipsetWriteCidrbmapFromRadixV4(
             /* mask base_ip as a /24 */
             state.base_ip = state.base_ip & 0xFFFFFF00;
         }
+        assert(Bitmap == state.status);
         assert((ipv4 & 0xFFFFFF00) == state.base_ip);
 
         /* add the current IP/prefix to the bitmap */
@@ -9458,26 +10289,29 @@ ipsetWriteCidrbmapFromRadixV4(
     }
 
     /* write any IP or bitmap still in 'state' */
-    if (state.is_dirty) {
-        if (state.is_first) {
-            *(uint32_t*)write_buf = state.base_ip;
-            write_buf[sizeof(uint32_t)] = (uint8_t)state.prefix;
-            rv = skStreamWrite(stream, write_buf, sizeof(write_buf));
-            if (rv != sizeof(write_buf)) {
-                return SKIPSET_ERR_FILEIO;
-            }
-        } else {
-            *(uint32_t*)write_buf = state.base_ip;
-            write_buf[sizeof(uint32_t)] = SET_CIDR_BMAP_256;
-            rv = skStreamWrite(stream, write_buf, sizeof(write_buf));
-            if (rv != sizeof(write_buf)) {
-                return SKIPSET_ERR_FILEIO;
-            }
-            rv = skStreamWrite(stream, state.bmap, sizeof(state.bmap));
-            if (rv != sizeof(state.bmap)) {
-                return SKIPSET_ERR_FILEIO;
-            }
+    switch (state.status) {
+      case Empty:
+        break;
+      case First_IP:
+        *(uint32_t*)write_buf = state.base_ip;
+        write_buf[sizeof(uint32_t)] = (uint8_t)state.prefix;
+        rv = skStreamWrite(stream, write_buf, sizeof(write_buf));
+        if (rv != sizeof(write_buf)) {
+            return SKIPSET_ERR_FILEIO;
         }
+        break;
+      case Bitmap:
+        *(uint32_t*)write_buf = state.base_ip;
+        write_buf[sizeof(uint32_t)] = SET_CIDRBMAP_MAP256;
+        rv = skStreamWrite(stream, write_buf, sizeof(write_buf));
+        if (rv != sizeof(write_buf)) {
+            return SKIPSET_ERR_FILEIO;
+        }
+        rv = skStreamWrite(stream, state.bmap, sizeof(state.bmap));
+        if (rv != sizeof(state.bmap)) {
+            return SKIPSET_ERR_FILEIO;
+        }
+        break;
     }
 
     return SKIPSET_OK;
@@ -9491,19 +10325,19 @@ ipsetWriteCidrbmapFromRadixV6(
 {
     sk_file_header_t *hdr;
     skipset_iterator_t iter;
+    enum status_en {
+        Empty, First_IP, Bitmap
+    };
     struct state_st {
         /* starting ip for this netblock, or an unmasked IP if
-         * 'is_first' is set. */
-        ipset_ipv6_t  base_ip;
+         * 'status' is 'First_IP'. */
+        ipset_ipv6_t    base_ip;
         /* the 256-bit bitmap */
-        uint32_t bmap[IPTREE_WORDS_PER_SLASH24];
-        /* the prefix for 'base_ip' if 'is_first' is set */
-        uint8_t   prefix;
-        /* if set, this structure contains data */
-        uint8_t   is_dirty;
-        /* if set, base_ip holds a single, unmasked IP, and prefix is
-         * its prefix */
-        uint8_t   is_first;
+        uint32_t        bmap[IPTREE_WORDS_PER_SLASH24];
+        /* the prefix for 'base_ip' if 'status' is First_IP */
+        uint8_t         prefix;
+        /* what this structure currently holds */
+        enum status_en  status;
     } state;
     /* the bitmap holds 256 bits or a /120 */
     const uint32_t bmap_prefix = 120;
@@ -9523,23 +10357,24 @@ ipsetWriteCidrbmapFromRadixV6(
         skAbort();
     }
     hdr = skStreamGetSilkHeader(stream);
-    if (skHeaderGetRecordVersion(hdr) != IPSET_REC_VERSION_CIDR_BMAP) {
+    if (skHeaderGetRecordVersion(hdr) != IPSET_REC_VERSION_CIDRBMAP) {
         skAbort();
     }
 
     memset(&state, 0, sizeof(state));
+    state.status = Empty;
 
     ASSERT_OK(skIPSetIteratorBind(&iter, ipset, 1, SK_IPV6POLICY_FORCE));
     while (skIPSetIteratorNext(&iter, &ipaddr, &prefix) == SK_ITERATOR_OK) {
         IPSET_IPV6_FROM_ADDRV6(&ipv6, &ipaddr);
-        if (state.is_dirty
+        if (state.status != Empty
             && (prefix <= bmap_prefix
                 || (state.base_ip.ip[0] != ipv6.ip[0])
                 || ((state.base_ip.ip[1] ^ ipv6.ip[1]) > 0xFF)))
         {
             /* 'ipv6' is not in the same /120 as 'state'; write the IP
              * or bitmap currently in 'state' */
-            if (state.is_first) {
+            if (First_IP == state.status) {
                 /* write the single ip and prefix */
                 IPSET_IPV6_TO_ARRAY(&state.base_ip, write_buf);
                 write_buf[IPSET_LEN_V6] = (uint8_t)state.prefix;
@@ -9547,12 +10382,12 @@ ipsetWriteCidrbmapFromRadixV6(
                 if (rv != sizeof(write_buf)) {
                     return SKIPSET_ERR_FILEIO;
                 }
-                state.is_first = 0;
             } else {
                 /* write base ip, 'bitmap-follows' value for the
                  * prefix, and the bitmap */
+                assert(Bitmap == state.status);
                 IPSET_IPV6_TO_ARRAY(&state.base_ip, write_buf);
-                write_buf[IPSET_LEN_V6] = SET_CIDR_BMAP_256;
+                write_buf[IPSET_LEN_V6] = SET_CIDRBMAP_MAP256;
                 rv = skStreamWrite(stream, &write_buf, sizeof(write_buf));
                 if (rv != sizeof(write_buf)) {
                     return SKIPSET_ERR_FILEIO;
@@ -9562,33 +10397,33 @@ ipsetWriteCidrbmapFromRadixV6(
                     return SKIPSET_ERR_FILEIO;
                 }
             }
-            state.is_dirty = 0;
+            state.status = Empty;
         }
 
-        if (prefix <= bmap_prefix) {
-            /* prefix is larger than the bitmap; write the block as an
-             * IP and prefix */
-            IPSET_IPV6_TO_ARRAY(&ipv6, write_buf);
-            write_buf[IPSET_LEN_V6] = (uint8_t)prefix;
-            rv = skStreamWrite(stream, write_buf, sizeof(write_buf));
-            if (rv != sizeof(write_buf)) {
-                return SKIPSET_ERR_FILEIO;
+        if (Empty == state.status) {
+            if (prefix <= bmap_prefix) {
+                /* netblock is larger than fits into a bitmap; write
+                 * the block as an IP and prefix */
+                IPSET_IPV6_TO_ARRAY(&ipv6, write_buf);
+                write_buf[IPSET_LEN_V6] = (uint8_t)prefix;
+                rv = skStreamWrite(stream, write_buf, sizeof(write_buf));
+                if (rv != sizeof(write_buf)) {
+                    return SKIPSET_ERR_FILEIO;
+                }
+            } else {
+                /* initialize 'state' with this IP and look for more
+                 * IPs in this /120. */
+                state.status = First_IP;
+                IPSET_IPV6_COPY(&state.base_ip, &ipv6);
+                state.prefix = (uint8_t)prefix;
             }
             continue;
         }
-        if (!state.is_dirty) {
-            /* 'state' is empty; initialize 'state' with this IP and
-             * look for more IPs in this /120. */
-            state.is_dirty = 1;
-            IPSET_IPV6_COPY(&state.base_ip, &ipv6);
-            state.prefix = (uint8_t)prefix;
-            state.is_first = 1;
-            continue;
-        }
-        if (state.is_first) {
+        assert(prefix > bmap_prefix);
+        if (First_IP == state.status) {
             /* found a second IP in this /120; convert 'state' to hold
              * a bitmap */
-            state.is_first = 0;
+            state.status = Bitmap;
             memset(state.bmap, 0, sizeof(state.bmap));
 
             buf_idx = ((state.base_ip.ip[1] & 0xFF) >> 5);
@@ -9604,6 +10439,7 @@ ipsetWriteCidrbmapFromRadixV6(
             /* mask base_ip as a /120 */
             state.base_ip.ip[1] = (state.base_ip.ip[1] & ~UINT64_C(0xFF));
         }
+        assert(Bitmap == state.status);
         assert(ipv6.ip[0] == state.base_ip.ip[0]);
         assert((ipv6.ip[1] & ~UINT64_C(0xFF)) == state.base_ip.ip[1]);
 
@@ -9620,26 +10456,29 @@ ipsetWriteCidrbmapFromRadixV6(
     }
 
     /* write any IP or bitmap still in 'state' */
-    if (state.is_dirty) {
-        if (state.is_first) {
-            IPSET_IPV6_TO_ARRAY(&state.base_ip, write_buf);
-            write_buf[IPSET_LEN_V6] = (uint8_t)state.prefix;
-            rv = skStreamWrite(stream, write_buf, sizeof(write_buf));
-            if (rv != sizeof(write_buf)) {
-                return SKIPSET_ERR_FILEIO;
-            }
-        } else {
-            IPSET_IPV6_TO_ARRAY(&state.base_ip, write_buf);
-            write_buf[IPSET_LEN_V6] = SET_CIDR_BMAP_256;
-            rv = skStreamWrite(stream, &write_buf, sizeof(write_buf));
-            if (rv != sizeof(write_buf)) {
-                return SKIPSET_ERR_FILEIO;
-            }
-            rv = skStreamWrite(stream, state.bmap, sizeof(state.bmap));
-            if (rv != sizeof(state.bmap)) {
-                return SKIPSET_ERR_FILEIO;
-            }
+    switch (state.status) {
+      case Empty:
+        break;
+      case First_IP:
+        IPSET_IPV6_TO_ARRAY(&state.base_ip, write_buf);
+        write_buf[IPSET_LEN_V6] = (uint8_t)state.prefix;
+        rv = skStreamWrite(stream, write_buf, sizeof(write_buf));
+        if (rv != sizeof(write_buf)) {
+            return SKIPSET_ERR_FILEIO;
         }
+        break;
+      case Bitmap:
+        IPSET_IPV6_TO_ARRAY(&state.base_ip, write_buf);
+        write_buf[IPSET_LEN_V6] = SET_CIDRBMAP_MAP256;
+        rv = skStreamWrite(stream, &write_buf, sizeof(write_buf));
+        if (rv != sizeof(write_buf)) {
+            return SKIPSET_ERR_FILEIO;
+        }
+        rv = skStreamWrite(stream, state.bmap, sizeof(state.bmap));
+        if (rv != sizeof(state.bmap)) {
+            return SKIPSET_ERR_FILEIO;
+        }
+        break;
     }
 
     return SKIPSET_OK;
@@ -9652,7 +10491,7 @@ ipsetWriteCidrbmapFromRadixV6(
  *
  *    Helper function for skIPSetWrite().
  *
- *    Write an IPset to 'stream' in the IPSET_REC_VERSION_CIDR_BMAP
+ *    Write an IPset to 'stream' in the IPSET_REC_VERSION_CIDRBMAP
  *    format.
  *
  *    This function writes the header then calls another helper
@@ -9673,7 +10512,7 @@ ipsetWriteCidrbmap(
         skAbort();
     }
     hdr = skStreamGetSilkHeader(stream);
-    if (skHeaderGetRecordVersion(hdr) != IPSET_REC_VERSION_CIDR_BMAP) {
+    if (skHeaderGetRecordVersion(hdr) != IPSET_REC_VERSION_CIDRBMAP) {
         skAbort();
     }
 
@@ -9703,18 +10542,18 @@ ipsetWriteCidrbmap(
 
 
 /*
- *  status = ipsetWriteLegacyFromIPTree(ipset, stream);
+ *  status = ipsetWriteClasscFromIPTree(ipset, stream);
  *
- *    Helper function for skIPSetWrite() via ipsetWriteLegacy().
+ *    Helper function for skIPSetWrite() via ipsetWriteClassc().
  *
  *    Write an IPset from the SiLK-2 IPTree data structure to 'stream'
- *    in the IPSET_REC_VERSION_LEGACY format.
+ *    in the IPSET_REC_VERSION_CLASSC format.
  *
- *    See '#define IPSET_REC_VERSION_LEGACY' for description of the
+ *    See '#define IPSET_REC_VERSION_CLASSC' for description of the
  *    file format.
  */
 static int
-ipsetWriteLegacyFromIPTree(
+ipsetWriteClasscFromIPTree(
     const skipset_t    *ipset,
     skstream_t         *stream)
 {
@@ -9732,7 +10571,7 @@ ipsetWriteLegacyFromIPTree(
         skAbort();
     }
     hdr = skStreamGetSilkHeader(stream);
-    if (skHeaderGetRecordVersion(hdr) != IPSET_REC_VERSION_LEGACY) {
+    if (skHeaderGetRecordVersion(hdr) != IPSET_REC_VERSION_CLASSC) {
         skAbort();
     }
 
@@ -9775,10 +10614,10 @@ ipsetWriteLegacyFromIPTree(
 
 
 /*
- *  status = ipsetWriteLegacyFromRadixCallbackV4(ipv4, prefix, &state);
- *  status = ipsetWriteLegacyFromRadixCallback(ipaddr, prefix, &state);
+ *  status = ipsetWriteClasscFromRadixCallbackV4(ipv4, prefix, &state);
+ *  status = ipsetWriteClasscFromRadixCallback(ipaddr, prefix, &state);
  *
- *    Callback function used by ipsetWriteLegacyFromRadix().
+ *    Callback function used by ipsetWriteClasscFromRadix().
  *
  *    This function is the callback invoked by skIPSetWalk().  When
  *    the current 'ipaddr' and 'prefix' are part of the same /24
@@ -9787,7 +10626,7 @@ ipsetWriteLegacyFromIPTree(
  *    the buffer is initialized with new data.
  */
 static int
-ipsetWriteLegacyFromRadixCallbackV4(
+ipsetWriteClasscFromRadixCallbackV4(
     uint32_t            ipv4,
     uint32_t            prefix,
     void               *v_state)
@@ -9862,7 +10701,7 @@ ipsetWriteLegacyFromRadixCallbackV4(
 
 #if SK_ENABLE_IPV6
 static int
-ipsetWriteLegacyFromRadixCallback(
+ipsetWriteClasscFromRadixCallback(
     skipaddr_t         *ipaddr,
     uint32_t            prefix,
     void               *v_state)
@@ -9873,24 +10712,24 @@ ipsetWriteLegacyFromRadixCallback(
     if (skipaddrGetAsV4(ipaddr, &ipv4)) {
         return SKIPSET_ERR_IPV6;
     }
-    return ipsetWriteLegacyFromRadixCallbackV4(ipv4, prefix, v_state);
+    return ipsetWriteClasscFromRadixCallbackV4(ipv4, prefix, v_state);
 }
 #endif  /* SK_ENABLE_IPV6 */
 
 
 /*
- *  status = ipsetWriteLegacyFromRadix(ipset, stream);
+ *  status = ipsetWriteClasscFromRadix(ipset, stream);
  *
- *    Helper function for skIPSetWrite() via ipsetWriteLegacy().
+ *    Helper function for skIPSetWrite() via ipsetWriteClassc().
  *
  *    Write an IPset from the radix-tree IPset data structure to
- *    'stream' in the IPSET_REC_VERSION_LEGACY format.
+ *    'stream' in the IPSET_REC_VERSION_CLASSC format.
  *
- *    See '#define IPSET_REC_VERSION_LEGACY' for description of the
+ *    See '#define IPSET_REC_VERSION_CLASSC' for description of the
  *    file format.
  */
 static int
-ipsetWriteLegacyFromRadix(
+ipsetWriteClasscFromRadix(
     const skipset_t    *ipset,
     skstream_t         *stream)
 {
@@ -9905,7 +10744,7 @@ ipsetWriteLegacyFromRadix(
         skAbort();
     }
     hdr = skStreamGetSilkHeader(stream);
-    if (skHeaderGetRecordVersion(hdr) != IPSET_REC_VERSION_LEGACY) {
+    if (skHeaderGetRecordVersion(hdr) != IPSET_REC_VERSION_CLASSC) {
         skAbort();
     }
 
@@ -9915,12 +10754,12 @@ ipsetWriteLegacyFromRadix(
 #if SK_ENABLE_IPV6
     if (ipset->is_ipv6) {
         rv = skIPSetWalk(ipset, 1, SK_IPV6POLICY_ASV4,
-                         &ipsetWriteLegacyFromRadixCallback,
+                         &ipsetWriteClasscFromRadixCallback,
                          (void*)&write_state);
     } else
 #endif
     {
-        rv = ipsetWalkInternalV4(ipset, ipsetWriteLegacyFromRadixCallbackV4,
+        rv = ipsetWalkInternalV4(ipset, ipsetWriteClasscFromRadixCallbackV4,
                                  (void*)&write_state);
     }
     if (rv != 0) {
@@ -9945,18 +10784,18 @@ ipsetWriteLegacyFromRadix(
 
 
 /*
- *  status = ipsetWriteLegacy(&ipset, stream);
+ *  status = ipsetWriteClassc(&ipset, stream);
  *
  *    Helper function for skIPSetWrite().
  *
- *    Write an IPset to 'stream' in the IPSET_REC_VERSION_LEGACY
+ *    Write an IPset to 'stream' in the IPSET_REC_VERSION_CLASSC
  *    format.
  *
  *    This function writes the header then calls another helper
  *    function depending on the data structure being used.
  */
 static int
-ipsetWriteLegacy(
+ipsetWriteClassc(
     const skipset_t    *ipset,
     skstream_t         *stream)
 {
@@ -9970,7 +10809,7 @@ ipsetWriteLegacy(
         skAbort();
     }
     hdr = skStreamGetSilkHeader(stream);
-    if (skHeaderGetRecordVersion(hdr) != IPSET_REC_VERSION_LEGACY) {
+    if (skHeaderGetRecordVersion(hdr) != IPSET_REC_VERSION_CLASSC) {
         skAbort();
     }
 
@@ -9980,9 +10819,9 @@ ipsetWriteLegacy(
     }
 
     if (ipset->is_iptree) {
-        return ipsetWriteLegacyFromIPTree(ipset, stream);
+        return ipsetWriteClasscFromIPTree(ipset, stream);
     }
-    return ipsetWriteLegacyFromRadix(ipset, stream);
+    return ipsetWriteClasscFromRadix(ipset, stream);
 }
 
 
@@ -10072,9 +10911,9 @@ ipsetWriteRadix(
     /* write the arrays */
     if (ipset->s.v3->nodes.entry_count) {
         rv = skStreamWrite(stream, ipset->s.v3->nodes.buf,
-                           ((size_t)ipset->s.v3->nodes.entry_size
+                           (ipset->s.v3->nodes.entry_size
                             * ipset->s.v3->nodes.entry_count));
-        if ((size_t)rv != ((size_t)ipset->s.v3->nodes.entry_size
+        if ((size_t)rv != (ipset->s.v3->nodes.entry_size
                            * ipset->s.v3->nodes.entry_count))
         {
             rv = SKIPSET_ERR_FILEIO;
@@ -10083,9 +10922,9 @@ ipsetWriteRadix(
     }
     if (ipset->s.v3->leaves.entry_count) {
         rv = skStreamWrite(stream, ipset->s.v3->leaves.buf,
-                           ((size_t)ipset->s.v3->leaves.entry_size
+                           (ipset->s.v3->leaves.entry_size
                             * ipset->s.v3->leaves.entry_count));
-        if ((size_t)rv != ((size_t)ipset->s.v3->leaves.entry_size
+        if ((size_t)rv != (ipset->s.v3->leaves.entry_size
                            * ipset->s.v3->leaves.entry_count))
         {
             rv = SKIPSET_ERR_FILEIO;
@@ -10106,6 +10945,211 @@ ipsetWriteRadix(
     skIPSetDestroy(&set3);
     return rv;
 }
+
+
+#if SK_ENABLE_IPV6
+/*
+ *  status = ipsetWriteSlash64(&ipset, stream, hdr);
+ *
+ *    Helper function for skIPSetWrite().
+ *
+ *    Write an IPset to 'stream' in the IPSET_REC_VERSION_SLASH64
+ *    format.
+ *
+ *    See '#define IPSET_REC_VERSION_SLASH64' for description of the
+ *    file format.
+ */
+static int
+ipsetWriteSlash64(
+    const skipset_t    *ipset,
+    skstream_t         *stream)
+{
+    sk_file_header_t *hdr;
+    skipset_iterator_t iter;
+    enum status_en {
+        Empty, First_IP, Bitmap
+    };
+    struct state_st {
+        /* starting ip for this netblock bitmap when 'status' is
+         * Bitmap, an unmasked IP when 'status' is First_IP, or the
+         * start of the outer block when 'outer_written' is set. */
+        ipset_ipv6_t    base_ip;
+        /* the 256-bit bitmap */
+        uint32_t        bmap[IPTREE_WORDS_PER_SLASH24];
+        /* the prefix for 'base_ip' when 'status' is First_IP */
+        uint8_t         prefix;
+        /* what this structure currently holds */
+        enum status_en  status;
+        /* true when the iterator is exhausted */
+        uint8_t         is_last;
+    } state;
+    /* the bitmap holds 256 bits or a /120 */
+    const uint32_t bmap_prefix = 120;
+    /* each uint32_t in the bitmap holds a /123 */
+    const uint32_t word_prefix = 123;
+    uint8_t write_buf[sizeof(uint64_t) + sizeof(uint8_t)];
+    ipset_ipv6_t ipv6;
+    skipaddr_t ipaddr;
+    uint32_t prefix;
+    uint32_t buf_idx;
+    ssize_t rv;
+
+    /* sanity check input */
+    assert(ipset);
+    assert(stream);
+    if (ipset->is_dirty) {
+        skAbort();
+    }
+    if (ipset->is_iptree) {
+        skAbort();
+    }
+    if (!ipset->is_ipv6) {
+        skAbort();
+    }
+    hdr = skStreamGetSilkHeader(stream);
+    if (skHeaderGetRecordVersion(hdr) != IPSET_REC_VERSION_SLASH64) {
+        skAbort();
+    }
+
+    /* Add the appropriate header */
+    rv = skHeaderAddIPSet(hdr, 0, 0, IPSET_LEN_V6, 0, 0, 0);
+    if (rv) {
+        skAppPrintErr("%s", skHeaderStrerror(rv));
+        return SKIPSET_ERR_FILEIO;
+    }
+    rv = skStreamWriteSilkHeader(stream);
+    if (rv) {
+        return SKIPSET_ERR_FILEIO;
+    }
+
+    /* get the first IP */
+    ASSERT_OK(skIPSetIteratorBind(&iter, ipset, 1, SK_IPV6POLICY_FORCE));
+    if (skIPSetIteratorNext(&iter, &ipaddr, &prefix) != SK_ITERATOR_OK) {
+        return SKIPSET_OK;
+    }
+    IPSET_IPV6_FROM_ADDRV6(&ipv6, &ipaddr);
+
+    /* initialize state and ensure base_ip does not match ipv6 */
+    memset(&state, 0, sizeof(state));
+    state.base_ip.ip[0] = ~ipv6.ip[0];
+    state.base_ip.ip[1] = ~ipv6.ip[1];
+    state.status = Empty;
+
+    for (;;) {
+        if (state.status != Empty
+            && (prefix <= bmap_prefix
+                || (state.base_ip.ip[0] != ipv6.ip[0])
+                || ((state.base_ip.ip[1] ^ ipv6.ip[1]) > 0xFF)))
+        {
+            /* 'ipv6' is not in the same /120 as 'state'; write the IP
+             * or bitmap currently in 'state' */
+#ifdef SK_HAVE_ALIGNED_ACCESS_REQUIRED
+            memcpy(write_buf, &state.base_ip.ip[1], sizeof(uint64_t));
+#else
+            *(uint64_t *)write_buf = state.base_ip.ip[1];
+#endif  /* SK_HAVE_ALIGNED_ACCESS_REQUIRED */
+            write_buf[sizeof(uint64_t)] = ((First_IP == state.status)
+                                           ? state.prefix
+                                           : SET_CIDRBMAP_MAP256);
+            rv = skStreamWrite(stream, write_buf, sizeof(write_buf));
+            if (rv != (ssize_t)sizeof(write_buf)) {
+                return SKIPSET_ERR_FILEIO;
+            }
+            if (Bitmap == state.status) {
+                /* write the bitmap */
+                rv = skStreamWrite(stream, state.bmap, sizeof(state.bmap));
+                if (rv != sizeof(state.bmap)) {
+                    return SKIPSET_ERR_FILEIO;
+                }
+            }
+            state.status = Empty;
+        }
+
+        if (Empty == state.status) {
+            if (prefix <= 64) {
+                if (state.is_last) {
+                    break;
+                }
+                /* write the upper 64 bits of the IP and prefix */
+#ifdef SK_HAVE_ALIGNED_ACCESS_REQUIRED
+                memcpy(write_buf, &ipv6.ip[0], sizeof(uint64_t));
+#else
+                *(uint64_t *)write_buf = ipv6.ip[0];
+#endif  /* SK_HAVE_ALIGNED_ACCESS_REQUIRED */
+                write_buf[sizeof(uint64_t)] = (uint8_t)prefix;
+                rv = skStreamWrite(stream, write_buf, sizeof(write_buf));
+                if (rv != (ssize_t)sizeof(write_buf)) {
+                    return SKIPSET_ERR_FILEIO;
+                }
+                state.base_ip.ip[0] = ipv6.ip[0];
+            } else {
+                if (state.base_ip.ip[0] == ipv6.ip[0]) {
+                    /* only need to copy lower uint64 */
+                    state.base_ip.ip[1] = ipv6.ip[1];
+                } else {
+                    IPSET_IPV6_COPY(&state.base_ip, &ipv6);
+                    /* write the upper 64 bits of the IP */
+#ifdef SK_HAVE_ALIGNED_ACCESS_REQUIRED
+                    memcpy(write_buf, &state.base_ip.ip[0], sizeof(uint64_t));
+#else
+                    *(uint64_t *)write_buf = state.base_ip.ip[0];
+#endif  /* SK_HAVE_ALIGNED_ACCESS_REQUIRED */
+                    write_buf[sizeof(uint64_t)] = SET_SLASH64_IS_SLASH64;
+                    rv = skStreamWrite(stream, write_buf, sizeof(write_buf));
+                    if (rv != (ssize_t)sizeof(write_buf)) {
+                        return SKIPSET_ERR_FILEIO;
+                    }
+                }
+                state.prefix = (uint8_t)prefix;
+                state.status = First_IP;
+            }
+        } else {
+            if (First_IP == state.status) {
+                /* convert 'state' to hold a bitmap */
+                state.status = Bitmap;
+                memset(state.bmap, 0, sizeof(state.bmap));
+
+                buf_idx = ((state.base_ip.ip[1] & 0xFF) >> 5);
+                if (state.prefix <= word_prefix) {
+                    /* prefix spans one or more uint32_t's */
+                    memset(&(state.bmap[buf_idx]), 0xff,
+                           sizeof(uint32_t) << (word_prefix - state.prefix));
+                } else {
+                    state.bmap[buf_idx]
+                        |= (((1 << (1 << (128 - state.prefix))) - 1)
+                            << (state.base_ip.ip[1] & 0x1f));
+                }
+                /* mask base_ip as a /120 */
+                state.base_ip.ip[1]
+                    = (state.base_ip.ip[1] & ~UINT64_C(0xFF));
+            }
+            assert(Bitmap == state.status);
+            assert(ipv6.ip[0] == state.base_ip.ip[0]);
+            assert((ipv6.ip[1] & ~UINT64_C(0xFF)) == state.base_ip.ip[1]);
+
+            /* add the current IP/prefix to the bitmap */
+            buf_idx = ((ipv6.ip[1] & 0xFF) >> 5);
+            if (prefix <= word_prefix) {
+                /* set several uint32_t's */
+                memset(&(state.bmap[buf_idx]), 0xff,
+                       (sizeof(uint32_t) << (word_prefix - prefix)));
+            } else {
+                state.bmap[buf_idx] |= (((1 << (1 << (128 - prefix))) - 1)
+                                        << (ipv6.ip[1] & 0x1f));
+            }
+        }
+
+        /* get the next IP */
+        if (skIPSetIteratorNext(&iter, &ipaddr, &prefix) != SK_ITERATOR_OK) {
+            prefix = 0;
+            state.is_last = 1;
+        }
+        IPSET_IPV6_FROM_ADDRV6(&ipv6, &ipaddr);
+    }
+
+    return SKIPSET_OK;
+}
+#endif  /* SK_ENABLE_IPV6 */
 
 
 /* ****  PUBLIC FUNCTION DEFINITIONS BEGIN HERE  **** */
@@ -10463,9 +11507,13 @@ skIPSetClean(
 
     IPSET_COPY_ON_WRITE(ipset);
 
+    if (ipsetVerify(ipset)) {
+        return SKIPSET_ERR_CORRUPT;
+    }
     ipsetCombineAdjacentCIDR(ipset);
     /* ipsetCompact(ipset); -- ipsetSortLeaves() calles this */
     ipsetSortLeaves(ipset);
+    assert(0 == ipsetVerify(ipset));
 
     ipset->is_dirty = 0;
 
@@ -10643,94 +11691,11 @@ skIPSetCountIPsString(
 
 #if SK_ENABLE_IPV6
     if (ipset && ipset->is_ipv6) {
-        static const uint64_t lim = UINT64_C(10000000000);
-        static const uint64_t map_ipv6_to_dec[][4] =
-            {{          UINT64_C(1),                   0,  0, 0}, /* 1 <<  0 */
-             { UINT64_C(4294967296),                   0,  0, 0}, /* 1 << 32 */
-             { UINT64_C(3709551616), UINT64_C(1844674407), 0, 0}, /* 1 << 64 */
-             { UINT64_C(3543950336), UINT64_C(1426433759), UINT64_C(792281625),
-               0}, /* 1 << 96 */
-             };
-        /* the decimal value being calculated */
-        uint64_t decimal[5] = {0, 0, 0, 0, 0};
         ipset_count_t count_state;
-        uint64_t tmp;
-        uint64_t tmp2 = 0;
-        int i, j;
 
         memset(&count_state, 0, sizeof(count_state));
         ipsetWalkInternalV6(ipset, ipsetCountCallbackV6, (void*)&count_state);
-        if (0 == count_state.upper) {
-            sz = snprintf(buf, buflen, ("%" PRIu64), count_state.lower);
-            if ((size_t)sz >= buflen) {
-                return NULL;
-            }
-            return buf;
-        }
-        for (i = 0; i < 4; ++i) {
-            switch (i) {
-              case 0: tmp2 = (count_state.lower & UINT32_MAX);         break;
-              case 1: tmp2 = ((count_state.lower >> 32) & UINT32_MAX); break;
-              case 2: tmp2 = (count_state.upper & UINT32_MAX);         break;
-              case 3: tmp2 = ((count_state.upper >> 32) & UINT32_MAX); break;
-            }
-            if (tmp2) {
-                for (j = 0; j < 4 && map_ipv6_to_dec[i][j] > 0; ++j) {
-                    tmp = tmp2 * map_ipv6_to_dec[i][j];
-                    if (tmp < lim) {
-                        decimal[j] += tmp;
-                    } else {
-                        /* handle overflow */
-                        decimal[j] += tmp % lim;
-                        decimal[j+1] += tmp / lim;
-                    }
-                }
-            }
-        }
-        /* Final check for overflow and determine number of
-         * 'decimal' elements that have a value */
-        i = 0;
-        for (j = 0; j < 4; ++j) {
-            if (decimal[j] >= lim) {
-                i = j;
-                tmp = decimal[j];
-                decimal[j] %= lim;
-                decimal[j+1] += tmp / lim;
-            } else if (decimal[j] > 0) {
-                i = j;
-            }
-        }
-        switch (i) {
-          case 0:
-            sz = snprintf(buf, buflen, "%" PRIu64, decimal[0]);
-            break;
-          case 1:
-            sz = snprintf(buf, buflen, "%" PRIu64 "%010" PRIu64,
-                          decimal[1], decimal[0]);
-            break;
-          case 2:
-            sz = snprintf(buf, buflen, "%" PRIu64 "%010" PRIu64 "%010" PRIu64,
-                          decimal[2], decimal[1], decimal[0]);
-            break;
-          case 3:
-            sz = snprintf(buf, buflen,
-                          "%" PRIu64 "%010" PRIu64 "%010" PRIu64 "%010" PRIu64,
-                          decimal[3], decimal[2], decimal[1], decimal[0]);
-            break;
-          case 4:
-            sz = snprintf(buf, buflen,
-                          ("%" PRIu64 "%010" PRIu64 "%010" PRIu64
-                           "%010" PRIu64 "%010" PRIu64),
-                          decimal[4], decimal[3], decimal[2],
-                          decimal[1], decimal[0]);
-            break;
-          default:
-            skAbortBadCase(i);
-        }
-        if ((size_t)sz >= buflen) {
-            return NULL;
-        }
-        return buf;
+        return ipsetCountToString(&count_state, buf, buflen);
     }
 #endif  /* SK_ENABLE_IPV6 */
 
@@ -11614,7 +12579,7 @@ skIPSetOptionsRegisterRecordVersion(
     /* use the environment to override the default version */
     envar = getenv(IPSET_REC_VERSION_ENVAR);
     if (envar
-        && 0 == skStringParseUint32(&tmp32, envar, IPSET_REC_VERSION_DEFAULT,
+        && 0 == skStringParseUint32(&tmp32, envar, IPSET_REC_VERSION_MIN,
                                     IPSET_REC_VERSION_MAX)
         && 1 != tmp32)
     {
@@ -11680,15 +12645,18 @@ skIPSetOptionsUsageRecordVersion(
     if (NULL == ipset_options_record_version[0].name) {
         return;
     }
-    fprintf(fh, ("--%s %s. Specify version when writing IPset records.\n"
-                 "\tValid values: %d,%d-%d. Def. %d."
-                 " Value of %d means use SiLK-2 format for\n"
-                 "\tIPv4 IPsets and SiLK-3 for IPv6 IPsets.\n"),
-                 ipset_options_record_version[0].name,
-                 SK_OPTION_HAS_ARG(ipset_options_record_version[0]),
-                 IPSET_REC_VERSION_DEFAULT,
-                 IPSET_REC_VERSION_LEGACY, IPSET_REC_VERSION_MAX,
-                 IPSET_REC_VERSION_DEFAULT, IPSET_REC_VERSION_DEFAULT);
+    fprintf(fh, ("--%s %s. Specify version when writing IPset records.\n"),
+            ipset_options_record_version[0].name,
+            SK_OPTION_HAS_ARG(ipset_options_record_version[0]));
+    fprintf(fh, ("\t0 - Default."
+                 " Uses %d for IPv4 IPsets and %d for IPv6 IPsets.\n"),
+            IPSET_REC_VERSION_DEFAULT_IPV4, IPSET_REC_VERSION_DEFAULT_IPV6);
+    fprintf(fh, ("\t2 - Stores IPv4 only (error if IPv6)."
+                 " Available in all releases.\n"));
+    fprintf(fh, ("\t3 - Stores IPv4 or IPv6. Available since SiLK 3.0.\n"));
+    fprintf(fh, ("\t4 - Stores IPv4 or IPv6. Available since SiLK 3.7.\n"));
+    fprintf(fh, ("\t5 - Stores IPv6 only (uses 4 for IPv4)."
+                 " Available since SiLK 3.14.\n"));
 }
 
 
@@ -12077,17 +13045,77 @@ skIPSetProcessStream(
     proc_stream_state.cidr_blocks = proc_stream_settings->visit_cidr;
 
     if (skHeaderGetRecordVersion(hdr) < IPSET_REC_VERSION_RADIX) {
-        /* Handle files in IPSET_REC_VERSION_LEGACY format */
-        return ipsetProcessStreamLegacy(stream, hdr, &proc_stream_state);
+        /* Handle files in IPSET_REC_VERSION_CLASSC format */
+        return ipsetProcessStreamClassc(stream, hdr, &proc_stream_state);
     }
     if (skHeaderGetRecordVersion(hdr) == IPSET_REC_VERSION_RADIX) {
         return ipsetProcessStreamRadix(stream, hdr, &proc_stream_state);
     }
-    if (skHeaderGetRecordVersion(hdr) == IPSET_REC_VERSION_CIDR_BMAP) {
+    if (skHeaderGetRecordVersion(hdr) == IPSET_REC_VERSION_CIDRBMAP) {
         return ipsetProcessStreamCidrbmap(stream, hdr, &proc_stream_state);
+    }
+    if (skHeaderGetRecordVersion(hdr) == IPSET_REC_VERSION_SLASH64) {
+#if !SK_ENABLE_IPV6
+        skAbort();
+#else
+        return ipsetProcessStreamSlash64(stream, hdr, &proc_stream_state);
+#endif  /* SK_ENABLE_IPV6 */
     }
 
     skAbort();
+}
+
+
+static int
+ipsetProcessStreamCountInit(
+    const skipset_t                    *ipset,
+    const sk_file_header_t      UNUSED(*hdr),
+    void                        UNUSED(*init_func_ctx),
+    skipset_procstream_parm_t          *param)
+{
+#if !SK_ENABLE_IPV6
+    /* unused param */
+    (void)ipset;
+#else
+    if (ipset->is_ipv6) {
+        param->v6_policy = SK_IPV6POLICY_FORCE;
+        param->cb_entry_func = ipsetCountStreamCallbackV6;
+        return 0;
+    }
+#endif  /* SK_ENABLE_IPV6 */
+    param->v6_policy = SK_IPV6POLICY_ASV4;
+    param->cb_entry_func = ipsetCountStreamCallbackV4;
+    return 0;
+}
+
+
+int
+skIPSetProcessStreamCountIPs(
+    skstream_t         *stream,
+    char               *count_buf,
+    size_t              count_buf_size)
+{
+    skipset_procstream_parm_t param;
+    ipset_count_t count;
+    int rv;
+
+    memset(&count, 0, sizeof(count));
+
+    memset(&param, 0, sizeof(param));
+    param.visit_cidr = 1;
+    param.cb_entry_func_ctx = &count;
+
+    rv = skIPSetProcessStream(stream, ipsetProcessStreamCountInit,
+                              NULL, &param);
+    if (rv) {
+        return rv;
+    }
+
+    if (NULL == ipsetCountToString(&count, count_buf, count_buf_size)) {
+        return SKIPSET_ERR_BADINPUT;
+    }
+
+    return SKIPSET_OK;
 }
 
 
@@ -12114,11 +13142,11 @@ skIPSetRead(
     /* Go to helper function depending on record version */
 
     if (skHeaderGetRecordVersion(hdr) < IPSET_REC_VERSION_RADIX) {
-        /* Handle files in IPSET_REC_VERSION_LEGACY format */
+        /* Handle files in IPSET_REC_VERSION_CLASSC format */
         if (IPSET_USE_IPTREE) {
-            return ipsetReadLegacyIntoIPTree(ipset_out, stream, hdr);
+            return ipsetReadClasscIntoIPTree(ipset_out, stream, hdr);
         }
-        return ipsetReadLegacyIntoRadix(ipset_out, stream, hdr);
+        return ipsetReadClasscIntoRadix(ipset_out, stream, hdr);
     }
     if (skHeaderGetRecordVersion(hdr) == IPSET_REC_VERSION_RADIX) {
         hentry = skHeaderGetFirstMatch(hdr, SK_HENTRY_IPSET_ID);
@@ -12140,7 +13168,7 @@ skIPSetRead(
         }
         return ipsetReadRadixIntoRadix(ipset_out, stream, hdr, is_ipv6);
     }
-    if (skHeaderGetRecordVersion(hdr) == IPSET_REC_VERSION_CIDR_BMAP) {
+    if (skHeaderGetRecordVersion(hdr) == IPSET_REC_VERSION_CIDRBMAP) {
 #if SK_ENABLE_IPV6
         if (is_ipv6) {
             return ipsetReadCidrbmapIntoRadixV6(ipset_out, stream, hdr);
@@ -12151,6 +13179,14 @@ skIPSetRead(
             return ipsetReadCidrbmapIntoIPTree(ipset_out, stream, hdr);
         }
         return ipsetReadCidrbmapIntoRadixV4(ipset_out, stream, hdr);
+    }
+    if (skHeaderGetRecordVersion(hdr) == IPSET_REC_VERSION_SLASH64) {
+#if SK_ENABLE_IPV6
+        if (!is_ipv6) {
+            skAbort();
+        }
+        return ipsetReadSlash64(ipset_out, stream, hdr);
+#endif  /* SK_ENABLE_IPV6 */
     }
 
     skAbort();
@@ -12677,23 +13713,24 @@ skIPSetWrite(
     opts = ipset->options;
 
     /* Use the version that is explicitly requested.  If none
-     * requested, use LEGACY (Version-2) for IPv4 IPsets and
-     * IPV6_DEFAULT (Version-3) for IPv6 IPsets. */
+     * requested, use DEFAULT_IPV4 for IPv4 IPsets and DEFAULT_IPV6
+     * for IPv6 IPsets. */
     if (NULL == opts
         || IPSET_REC_VERSION_DEFAULT == opts->record_version)
     {
         if (skIPSetContainsV6(ipset)) {
-            record_version = IPSET_REC_VERSION_IPV6_DEFAULT;
+            record_version = IPSET_REC_VERSION_DEFAULT_IPV6;
         } else {
-            record_version = IPSET_REC_VERSION_LEGACY;
+            record_version = IPSET_REC_VERSION_DEFAULT_IPV4;
         }
     } else if (skIPSetContainsV6(ipset)) {
         switch (opts->record_version) {
-          case IPSET_REC_VERSION_LEGACY:
-            /* Cannot write an IPv6 IPset into a legacy IPset file */
+          case IPSET_REC_VERSION_CLASSC:
+            /* Cannot write an IPv6 IPset into a this format */
             return SKIPSET_ERR_IPV6;
           case IPSET_REC_VERSION_RADIX:
-          case IPSET_REC_VERSION_CIDR_BMAP:
+          case IPSET_REC_VERSION_CIDRBMAP:
+          case IPSET_REC_VERSION_SLASH64:
             record_version = opts->record_version;
             break;
           default:
@@ -12701,10 +13738,15 @@ skIPSetWrite(
         }
     } else {
         switch (opts->record_version) {
-          case IPSET_REC_VERSION_LEGACY:
+          case IPSET_REC_VERSION_CLASSC:
           case IPSET_REC_VERSION_RADIX:
-          case IPSET_REC_VERSION_CIDR_BMAP:
+          case IPSET_REC_VERSION_CIDRBMAP:
             record_version = opts->record_version;
+            break;
+          case IPSET_REC_VERSION_SLASH64:
+            /* this is an IPv6 only format; use the Cidrbmap format
+             * for IPv4 IPsets */
+            record_version = IPSET_REC_VERSION_CIDRBMAP;
             break;
           default:
             break;
@@ -12739,21 +13781,28 @@ skIPSetWrite(
         }
     }
 
-    if (IPSET_REC_VERSION_LEGACY == record_version) {
-        return ipsetWriteLegacy(ipset, stream);
+    if (IPSET_REC_VERSION_CLASSC == record_version) {
+        return ipsetWriteClassc(ipset, stream);
     }
     if (IPSET_REC_VERSION_RADIX == record_version) {
         return ipsetWriteRadix(ipset, stream);
     }
-    if (IPSET_REC_VERSION_CIDR_BMAP == record_version) {
+    if (IPSET_REC_VERSION_CIDRBMAP == record_version) {
         return ipsetWriteCidrbmap(ipset, stream);
+    }
+    if (IPSET_REC_VERSION_SLASH64 == record_version) {
+#if !SK_ENABLE_IPV6
+        skAbort();
+#else
+        return ipsetWriteSlash64(ipset, stream);
+#endif  /* SK_ENABLE_IPV6 */
     }
 
     skAbort();
 }
 
 
-/* ****  SUPPORT FOR LEGACY IPTREE CODE BEGINS HERE  **** */
+/* ****  SUPPORT FOR LEGACY IPTREE API BEGINS HERE  **** */
 
 
 #include <silk/iptree.h>
@@ -12766,7 +13815,8 @@ skIPSetWrite(
  *
  *    Initialize a temporary skipset_t, set its IPTree pointer to the
  *    'iptree' parameter, set its skipset_options_t to write a
- *    "legacy" IPset, and call skIPSetWrite() to write the skIPTree_t.
+ *    IPSET_REC_VERSION_CLASSC IPset, and call skIPSetWrite() to write
+ *    the skIPTree_t.
  */
 static int
 iptreeSaveOrWrite(
@@ -12788,7 +13838,7 @@ iptreeSaveOrWrite(
     ipset.options = &opts;
 
     memset(&opts, 0, sizeof(opts));
-    opts.record_version = IPSET_REC_VERSION_LEGACY;
+    opts.record_version = IPSET_REC_VERSION_CLASSC;
 
     if (filename) {
         rv = skIPSetSave(&ipset, filename);
@@ -12916,8 +13966,9 @@ skIPTreeCheckIntersectIPTreeFile(
         goto END;
     }
 
+    /* Only accept SiLK-2 files */
     rv = skStreamCheckSilkHeader(
-        stream, FT_IPSET, 0, IPSET_REC_VERSION_LEGACY, NULL);
+        stream, FT_IPSET, 0, IPSET_REC_VERSION_CLASSC, NULL);
     if (rv) {
         if (SKSTREAM_ERR_UNSUPPORT_VERSION == rv) {
             err = SKIP_ERR_FILEVERSION;
@@ -13109,7 +14160,7 @@ skIPTreeRead(
 
     /* only accept SiLK-2 files */
     rv = skStreamCheckSilkHeader(
-        stream, FT_IPSET, 0, IPSET_REC_VERSION_LEGACY, NULL);
+        stream, FT_IPSET, 0, IPSET_REC_VERSION_CLASSC, NULL);
     if (rv) {
         if (SKSTREAM_ERR_UNSUPPORT_VERSION == rv) {
             return SKIP_ERR_FILEVERSION;
@@ -13122,7 +14173,7 @@ skIPTreeRead(
 
     /* Read the stream as a SiLK-3 IPset */
     ipset = NULL;
-    rv = ipsetReadLegacyIntoIPTree(&ipset, stream, hdr);
+    rv = ipsetReadClasscIntoIPTree(&ipset, stream, hdr);
     switch (rv) {
       case SKIPSET_OK:
         break;

@@ -22,7 +22,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKIPSET_H, "$SiLK: skipset.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_SKIPSET_H, "$SiLK: skipset.h 77a7d16206f7 2016-11-02 13:49:55Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/skheader.h>
@@ -288,9 +288,9 @@ skIPSetCheckRecord(
 
 
 /**
- *    Combines adjacent CIDR blocks into a larger blocks and makes
+ *    Combine adjacent CIDR blocks into a larger blocks and make
  *    certain the IPs in 'ipset' use a contiguous region of memory.
- *    Returns SKIPSET_ERR_BADINPUT when 'ipset' is NULL; returns
+ *    Return SKIPSET_ERR_BADINPUT when 'ipset' is NULL; return
  *    SKIPSET_OK otherwise.
  */
 int
@@ -300,7 +300,7 @@ skIPSetClean(
 
 /**
  *    Return 1 if the IPset 'ipset' contains IPv6 addresses (other
- *    than IPv6-encoded-IPv4 addresses---i.e., ::FFFF:0:0/96); return
+ *    than IPv6-encoded-IPv4 addresses---i.e., ::ffff:0:0/96); return
  *    0 otherwise.
  *
  *    See also skIPSetIsV6().
@@ -311,15 +311,15 @@ skIPSetContainsV6(
 
 
 /**
- *    Changes the form of IP addresses that are stored in the IPset
+ *    Change the form of IP addresses that are stored in the IPset
  *    'ipset'.
  *
- *    When 'target_ip_version' is 6, 'ipset' will be modified to hold
+ *    When 'target_ip_version' is 6, 'ipset' is modified to hold
  *    IPv6 addresses.  An IPset that already holds IPv6 addresses will
  *    not be modified.
  *
  *    When 'target_ip_version' is 4 and 'ipset' holds only
- *    IPv6-encoded-IPv4 addresses, 'ipset' will be modified to hold
+ *    IPv6-encoded-IPv4 addresses, 'ipset' is modified to hold
  *    IPv4 addresses.  If 'ipset' holds addresses that cannot be
  *    converted to IPv4 (i.e., if skIPSetContainsV6() returns true),
  *    the function returns SKIPSET_ERR_IPV6.  An IPset that already
@@ -336,12 +336,13 @@ skIPSetConvert(
 
 
 /**
- *    Counts the number of IPs in the IPset 'ipset'.  Returns the
- *    count and, when 'count' is specified, stores the count in that
+ *    Count the number of IPs in the IPset 'ipset'.  Return the
+ *    count and, when 'count' is specified, store the count in that
  *    memory location.  If 'ipset' contains more than UINT64_MAX IPv6
  *    addresses, the return value is UINT64_MAX.
  *
- *    See also skIPSetCountIPsString().
+ *    See also skIPSetCountIPsString() and
+ *    skIPSetProcessStreamCountIPs().
  */
 uint64_t
 skIPSetCountIPs(
@@ -350,15 +351,15 @@ skIPSetCountIPs(
 
 
 /**
- *    Counts the number of IPs in the IPset 'ipset'.  Fills 'buf' with
- *    the base-10 representation of the count and returns 'buf'.
+ *    Count the number of IPs in the IPset 'ipset', fills 'buf' with
+ *    the base-10 representation of the count, and return 'buf'.
  *
  *    The caller must pass the size of 'buf' in the 'buflen'
  *    parameter.  If 'buflen' is not large enough to hold the number
  *    of IPs in the IPset, the function returns NULL.  (A 'buflen' of
  *    40 or greater will be sufficient for an IPv6 IPset.)
  *
- *    See also skIPSetCountIPs().
+ *    See also skIPSetCountIPs() and skIPSetProcessStreamCountIPs().
  */
 char *
 skIPSetCountIPsString(
@@ -368,7 +369,7 @@ skIPSetCountIPsString(
 
 
 /**
- *    Allocates and initializes a new IPset at the location referenced
+ *    Allocate and initialize a new IPset at the location referenced
  *    specified by 'ipset'.  The set is initially empty.
  *
  *    Assuming IPv6 support is enabled in SiLK, the default behavior
@@ -379,10 +380,10 @@ skIPSetCountIPsString(
  *    the need for the IPset to convert itself to the IPv6 format.
  *    (See also skIPSetAutoConvertDisable().)
  *
- *    Returns SKIPSET_OK on success.  Returns SKIPSET_ERR_ALLOC on an
+ *    Return SKIPSET_OK on success.  Return SKIPSET_ERR_ALLOC on an
  *    allocation failure, SKIPSET_ERR_BADINPUT if the 'ipset'
  *    parameter was NULL, or SKIPSET_ERR_IPV6 if 'support_ipv6' is
- *    non-zero and SiLK was configured without IPv6 support.  Leaves
+ *    non-zero and SiLK was configured without IPv6 support.  Leave
  *    the memory referenced by 'ipset' unchanged when an error code is
  *    returned.
  *
@@ -395,8 +396,8 @@ skIPSetCreate(
 
 
 /**
- *    Deallocates all memory associated with IPset stored in '*ipset'.
- *    On completion, sets *ipset to NULL.  If 'ipset' or '*ipset' are
+ *    Deallocate all memory associated with IPset stored in '*ipset'.
+ *    On completion, set *ipset to NULL.  If 'ipset' or '*ipset' are
  *    NULL, no action is taken.
  */
 void
@@ -405,19 +406,19 @@ skIPSetDestroy(
 
 
 /**
- *    Adds the CIDR block represented by 'ip'/'prefix' to the binary
+ *    Add the CIDR block represented by 'ip'/'prefix' to the binary
  *    IPSet 'ipset'.
  *
  *    If 'prefix' is 0, the function inserts the single IP address
  *    'ip'.  If 'prefix' is too large for the given IP,
  *    SKIPSET_ERR_PREFIX is returned.
  *
- *    The 'ip' will be converted to the appropriate form (IPv4 or
+ *    The 'ip' is converted to the appropriate form (IPv4 or
  *    IPv6) to match the 'ipset'.  For an IPv4 address and an IPv6
- *    set, the IPv4 address is mapped into the ::FFFF:0:0/96 subnet on
+ *    set, the IPv4 address is mapped into the ::ffff:0:0/96 subnet on
  *    the IPset.
  *
- *    For an IPv4 set, an IPv6 address in the ::FFFF:0:0/96 subnet
+ *    For an IPv4 set, an IPv6 address in the ::ffff:0:0/96 subnet
  *    will be treated as an IPv6-encoded IPv4 address and IPv4 address
  *    will be added.  Any other IPv6 address will cause 'ipset' to be
  *    automatically converted to an IPv6 IPset UNLESS the
@@ -425,7 +426,7 @@ skIPSetDestroy(
  *    When auto-conversion is disabled, the address will be rejected
  *    and the function will return SKIPSET_ERR_IPV6.
  *
- *    Returns SKIPSET_OK for success, or SKIPSET_ERR_ALLOC if there is
+ *    Return SKIPSET_OK for success, or SKIPSET_ERR_ALLOC if there is
  *    not enough memory to allocate space for the new IP address
  *    block.
  *
@@ -500,12 +501,12 @@ skIPSetIsV6(
  *    there has been any modification to the IPset, a call to
  *    skIPSetClean() must precede the call to this function.
  *
- *    If 'cidr_blocks' is 0, the skIPSetIteratorNext() function will
- *    visit each individual IP.  If 'cidr_blocks' is 1,
- *    skIPSetIteratorNext() will visit CIDR blocks.  Any other value
+ *    If 'cidr_blocks' is 0, the skIPSetIteratorNext() function
+ *    visits each individual IP.  If 'cidr_blocks' is 1,
+ *    skIPSetIteratorNext() visits CIDR blocks.  Any other value
  *    for 'cidr_blocks' is illegal.
  *
- *    The 'v6_policy' parameter can be used to force
+ *    The 'v6_policy' parameter may be used to force
  *    skIPSetIteratorNext() to return an IPv4 or an IPv6 address.
  *    When either 'v6_policy' is SK_IPV6POLICY_ONLY and 'ipset' is an
  *    IPv4 IPset or 'v6_policy' is SK_IPV6POLICY_IGNORE and 'ipset' is
@@ -551,7 +552,7 @@ skIPSetIteratorNext(
 
 
 /**
- *    Resets the iterator 'iter' to begin looping through the entries
+ *    Reset the iterator 'iter' to begin looping through the entries
  *    in the IPSet again.
  */
 void
@@ -560,14 +561,14 @@ skIPSetIteratorReset(
 
 
 /**
- *    Creates a new IPset at the location pointed at by 'ipset' and
- *    fills it with the data that the function reads from 'filename'.
+ *    Create a new IPset at the location pointed at by 'ipset' and
+ *    fill it with the data that the function reads from 'filename'.
  *
  *    This function is similar to skIPSetRead(), except that this
- *    function will create the stream from the specified filename.
+ *    function creates the stream from the specified filename.
  *
- *    Returns SKIPSET_ERR_OPEN if there is a problem opening the file.
- *    Otherwise, it returns the result of skIPSetRead().
+ *    Return SKIPSET_ERR_OPEN if there is a problem opening the file.
+ *    Otherwise, return the result of skIPSetRead().
  */
 int
 skIPSetLoad(
@@ -598,8 +599,8 @@ skIPSetLoad(
  *        32.32.0.0
  *        32.33.0.0
  *
- *    Returns SKIPSET_OK on success.  Returns SKIPSET_ERR_PREFIX if
- *    the 'prefix' value is 0 or too large for the 'ipset'.  Returns
+ *    Return SKIPSET_OK on success.  Return SKIPSET_ERR_PREFIX if
+ *    the 'prefix' value is 0 or too large for the 'ipset'.  Return
  *    SKIPSET_ERR_ALLOC if memory cannot be allocated.
  */
 int
@@ -631,7 +632,7 @@ skIPSetMask(
  *    When the prefix of a net-block is smaller than 'prefix', that
  *    block is not modified.
  *
- *    Returns SKIPSET_OK on success.  Returns SKIPSET_ERR_PREFIX if
+ *    Return SKIPSET_OK on success.  Return SKIPSET_ERR_PREFIX if
  *    the 'prefix' value is 0 or too large for the 'ipset'.
  */
 int
@@ -720,7 +721,7 @@ skIPSetOptionsUsageRecordVersion(
 
 
 /**
- *    Prints, to the stream 'stream', a textual representation of the
+ *    Print, to the stream 'stream', a textual representation of the
  *    IPset given by 'ipset'.  The parameter 'ip_format' decribes how
  *    to print the ipset (see utils.h).  If 'as_cidr' is non-zero, the
  *    output will be in CIDR notation.
@@ -839,15 +840,36 @@ skIPSetProcessStream(
 
 
 /**
- *    Allocates a new IPset at the location pointed at by 'ipset' and
- *    fills it with the data that the function reads from the stream
+ *    Read an IPset from 'stream', count the number of IPs in the
+ *    IPset, and write the base-10 representation of that number as a
+ *    string to 'buf', a buffer of size 'buflen'.  See
+ *    skIPSetCountIPsString() for information on the suggested minimum
+ *    size for 'buf'.
+ *
+ *    Return SKIPSET_OK on success or the error code returned by
+ *    skIPSetProcessStream() if an IPset cannot be read from 'stream'.
+ *    If 'buf' is too small to hold the number of IPs, return
+ *    SKIPSET_ERR_BADINPUT.
+ *
+ *    Since SiLK 3.14.0.
+ */
+int
+skIPSetProcessStreamCountIPs(
+    skstream_t         *stream,
+    char               *buf,
+    size_t              buflen);
+
+
+/**
+ *    Allocate a new IPset at the location pointed at by 'ipset' and
+ *    fill it with the data that the function reads from the stream
  *    'stream'.  'stream' should be bound to a file and open.
  *
  *    The skIPSetLoad() function is a wrapper around this function.
  *
  *    On failure, 'ipset' is set to NULL.
  *
- *    Returns SKIPSET_OK on success.  Otherwise, returns
+ *    Return SKIPSET_OK on success.  Otherwise, return
  *    SKIPSET_ERR_BADINPUT if either input parameter is NULL,
  *    SKIPSET_ERR_FILETYPE if the input is not an IPset stream,
  *    SKIPSET_ERR_FILEVERSION if the IPset file version is newer than
@@ -868,27 +890,27 @@ skIPSetRead(
 
 
 /**
- *    Removes the CIDR block represented by 'ip'/'prefix' from the
+ *    Remove the CIDR block represented by 'ip'/'prefix' from the
  *    binary IPSet 'ipset'.
  *
  *    If 'prefix' is 0, the function removes the single IP address
  *    'ip'.  If 'prefix' is too large for the given IP,
  *    SKIPSET_ERR_PREFIX is returned.
  *
- *    The 'ip' will be converted to the appropriate form (IPv4 or
+ *    The 'ip' is converted to the appropriate form (IPv4 or
  *    IPv6) to match the 'ipset'.  For an IPv4 address and an IPv6
- *    set, the IPv4 address is mapped into the ::FFFF:0:0/96 subnet on
+ *    set, the IPv4 address is mapped into the ::ffff:0:0/96 subnet on
  *    the IPset.
  *
- *    For an IPv4 set, an IPv6 address in the ::FFFF:0:0/96 subnet
+ *    For an IPv4 set, an IPv6 address in the ::ffff:0:0/96 subnet
  *    will be treated as an IPv6-encoded IPv4 address and IPv4 address
  *    will be removed.  Any other IPv6 address is considered not be a
  *    member of the IPset and SKIPSET_OK is returned.
  *
- *    Returns SKIPSET_OK for success.  This function may require
+ *    Return SKIPSET_OK for success.  This function may require
  *    memory allocation: Since the IPset stores CIDR blocks
  *    interanlly, the removal of a single IP from a CIDR block
- *    requires more entries.  If memory allocatoin fails,
+ *    requires more entries.  If memory allocation fails,
  *    SKIPSET_ERR_ALLOC is returned.
  */
 int
@@ -918,7 +940,7 @@ skIPSetRemoveIPWildcard(
 
 
 /**
- *    Writes the IPset at 'ipset' to 'filename'.
+ *    Write the IPset at 'ipset' to 'filename'.
  *
  *    This function is similar to skIPSetWrite(), except this
  *    function writes directly to a file using the default compression
@@ -960,14 +982,14 @@ skIPSetUnion(
 
 
 /**
- *    Calls the specified 'callback' function on the contents of the
+ *    Call the specified 'callback' function on the contents of the
  *    specified 'ipset'.
  *
  *    If 'cidr_blocks' is 0, the 'callback' is called on each
  *    individual IP in the 'ipset'.  If 'cidr_blocks' is 1, blocks of
  *    IP addresses are passed to the 'callback'.
  *
- *    The 'v6_policy' parameter can be used to force the IP addresses
+ *    The 'v6_policy' parameter may be used to force the IP addresses
  *    to be passed to callback as IPv4 or IPv6 addresses.  When either
  *    'v6_policy' is SK_IPV6POLICY_ONLY and 'ipset' is an IPv4 IPset
  *    or 'v6_policy' is SK_IPV6POLICY_IGNORE and 'ipset' is an IPv6

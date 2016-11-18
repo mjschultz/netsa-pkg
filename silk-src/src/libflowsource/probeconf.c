@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconf.c d49b1e47d2e3 2016-06-15 20:31:17Z mthomas $");
+RCSIDENT("$SiLK: probeconf.c 301c05a106b7 2016-11-15 18:04:23Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/probeconf.h>
@@ -881,6 +881,10 @@ skpcProbeAddQuirk(
     }
     if (0 == strcmp(quirk, "zero-packets")) {
         probe->quirks |= SKPC_QUIRK_ZERO_PACKETS;
+        return 0;
+    }
+    if (0 == strcmp(quirk, "nf9-sysuptime-seconds")) {
+        probe->quirks |= SKPC_QUIRK_NF9_SYSUPTIME_SECS;
         return 0;
     }
     /* unrecognized quirk */
