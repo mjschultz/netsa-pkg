@@ -13,7 +13,7 @@ B<rwbagtool> - Perform high-level operations on binary Bag files
         [--mincounter=VALUE] [--maxcounter=VALUE]
         [--minkey=VALUE] [--maxkey=VALUE]
         [--invert] [--coverset] [--ipset-record-version=VERSION]
-        [--output-path=OUTPUTFILE]
+        [--output-path=PATH]
         [--note-strip] [--note-add=TEXT] [--note-file-add=FILE]
         [--compression-method=COMP_METHOD]
         [BAGFILE[ BAGFILE...]]
@@ -239,11 +239,17 @@ are usually more compact that version 4.
 
 =back
 
-=item B<--output-path>=I<OUTPUTFILE>
+=item B<--output-path>=I<PATH>
 
-Redirect output to I<OUTPUTFILE>.  I<OUTPUTFILE> is the name of a file
-or a named pipe, or the name C<stdout> or C<-> to write the result to
-the standard output.
+Write the resulting Bag to I<PATH>, where I<PATH> is a filename, a
+named pipe, the keyword C<stderr> to write the output to the standard
+error, or the keyword C<stdout> or C<-> to write the output to the
+standard output.  If I<PATH> names an existing file, B<rwbagtool>
+exits with an error unless the SILK_CLOBBER environment variable is
+set, in which case I<PATH> is overwritten.  If this switch is not
+given, the output is written to the standard output.  Attempting to
+write the binary output to a terminal causes B<rwbagtool> to exit with
+an error.
 
 =item B<--note-strip>
 
@@ -562,7 +568,7 @@ B<rwset(1)>, B<rwsetbuild(1)>, B<rwsetcat(1)>, B<silk(7)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwbagtool.pod 88cee5c95d36 2016-10-31 16:57:21Z mthomas $
+$SiLK: rwbagtool.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
 
 Local Variables:
 mode:text

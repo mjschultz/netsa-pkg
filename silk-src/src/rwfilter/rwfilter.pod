@@ -348,6 +348,16 @@ the (deprecated) B<--input-pipe> switch.
 
 =over 4
 
+=item B<--xargs>
+
+=item B<--xargs>=I<INPUT_PATH>
+
+Read the names of the input files from I<INPUT_PATH> or from the
+standard input if I<INPUT_PATH> is not provided.  The input is
+expected to have one filename per line.  B<rwfilter> opens each named
+file in turn and reads records from it as if the filenames had been
+listed on the command line.
+
 =item B<--input-pipe>=I<INPUT_PATH>
 
 Specify a source for SiLK Flow records, where I<INPUT_PATH> is a named
@@ -356,15 +366,6 @@ You do not need to use this switch, you can simply specify the named
 pipe or the strings C<stdin> or C<-> on the command line.  B<NOTE:>
 This switch is deprecated, and it will be removed in the SiLK 4.0
 release.
-
-=item B<--xargs>
-
-=item B<--xargs>=I<INPUT_PATH>
-
-Tell B<rwfilter> to read file names from I<INPUT_PATH>; if
-I<INPUT_PATH> is not provided, the names of the files are read from
-the standard input.  The input should have one file name per line.
-B<rwfilter> opens each file in turn and read records from it.
 
 =back
 
@@ -2014,7 +2015,7 @@ I<Analysts' Handbook: Using SiLK for Network Traffic Analysis>
 
 =cut
 
-$SiLK: rwfilter.pod 7c452d1f409f 2016-09-23 21:00:08Z mthomas $
+$SiLK: rwfilter.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
 
 Local Variables:
 mode:text

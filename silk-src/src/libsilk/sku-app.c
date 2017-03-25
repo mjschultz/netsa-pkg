@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-app.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: sku-app.c 935d889f48a7 2017-03-03 22:58:26Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sksite.h>
@@ -451,27 +451,58 @@ skAppVerifyFeatures(
     const silk_features_t          *app_features,
     void                    UNUSED(*future_use))
 {
-#define FEATURE_ERROR_MSG                                                \
-    ("Application/Library mismatch for feature %s\n"                     \
-     "\tThe set of features enabled in the SiLK library are different\n" \
-     "\tthan those enabled in this application.  All of SiLK must be\n"  \
-     "\tconfigured, built, and installed with the same settings.\n"      \
-     "\tRebuild from a clean source tree and reinstall.")
+    SILK_FEATURES_DEFINE_STRUCT(libsilk_features);
+    const silk_features_t *f;
+    char name[PATH_MAX];
+    FILE *fh;
+    int i;
 
 #define FEATURE_COMPARE(fc_feat)                                \
-    if (silk_features.fc_feat != app_features->fc_feat) {       \
-        skAppPrintErr(FEATURE_ERROR_MSG, #fc_feat);             \
-        exit(EXIT_FAILURE);                                     \
+    (libsilk_features.fc_feat == app_features->fc_feat)
+
+    if (FEATURE_COMPARE(struct_version)
+        && FEATURE_COMPARE(big_endian)
+        && FEATURE_COMPARE(enable_ipv6)
+        && FEATURE_COMPARE(enable_ipfix)
+        && FEATURE_COMPARE(enable_localtime)
+        /* && FEATURE_COMPARE(enable_gnutls) */
+        )
+    {
+        return;
     }
 
-    SILK_FEATURES_DEFINE_STRUCT(silk_features);
+    fh = app_context->err_stream;
+    if (NULL == fh) {
+        exit(EXIT_FAILURE);
+    }
 
-    FEATURE_COMPARE(struct_version);
-    FEATURE_COMPARE(big_endian);
-    FEATURE_COMPARE(enable_ipv6);
-    FEATURE_COMPARE(enable_ipfix);
-    FEATURE_COMPARE(enable_localtime);
-    /* FEATURE_COMPARE(enable_gnutls); */
+    skAppPrintErr("There is a problem with your SiLK installation:");
+    for (i = 0; i < 2; ++i) {
+        if (0 == i) {
+            f = &libsilk_features;
+            snprintf(name, sizeof(name), "libsilk library");
+        } else {
+            f = app_features;
+            snprintf(name, sizeof(name), "%s application", skAppName());
+        }
+        fprintf(fh, "The %s was built with this set of features:\n", name);
+        fprintf(fh, "  feature-set=v%" PRIu64, f->struct_version);
+        fprintf(fh, ", %s-endian", (f->big_endian ? "big" : "little"));
+        fprintf(fh, ", %sipv6", (f->enable_ipv6 ? "" : "without-"));
+        fprintf(fh, ", %sipfix", (f->enable_ipfix ? "" : "without-"));
+        fprintf(fh, ", %slocaltime", (f->enable_localtime ? "" : "without-"));
+        fprintf(fh, "\n");
+    }
+    fprintf(fh, "This inconsistency prevents %s from running.\n", skAppName());
+    fprintf(fh,
+            ("Perhaps %s is finding a previous version of libsilk?"
+             "  If so, you may\n"
+             "need to adjust your LD_LIBRARY_PATH variable or"
+             " the /etc/ld.so.conf file.\n"
+             "As a last resort, rebuild and reinstall all of SiLK"
+             " using a clean source tree.\n"),
+            skAppName());
+    exit(EXIT_FAILURE);
 }
 
 

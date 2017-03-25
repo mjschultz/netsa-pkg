@@ -14,7 +14,7 @@ B<rwsetcat> - Print the IP addresses in a binary IPset file
         [--no-columns] [--column-separator=C] [--no-final-delimiter]
         [{--delimited | --delimited=C}]
         [--print-filenames | --print-filenames=0 | --print-filenames=1]
-        [--pager=PAGER_PROG] [SET_FILE...]
+        [--output-path=PATH] [--pager=PAGER_PROG] [SET_FILE...]
 
   rwsetcat --help
 
@@ -268,14 +268,25 @@ the name of a file, a colon (B<:>), a newline (unless B<--count-ips>
 was specified), and the requested information; otherwise, B<rwsetcat>
 does not print the file name.
 
+=item B<--output-path>=I<PATH>
+
+Write the textual output to I<PATH>, where I<PATH> is a filename, a
+named pipe, the keyword C<stderr> to write the output to the standard
+error, or the keyword C<stdout> or C<-> to write the output to the
+standard output (and bypass the paging program).  If I<PATH> names an
+existing file, B<rwsetcat> exits with an error unless the
+SILK_CLOBBER environment variable is set, in which case I<PATH> is
+overwritten.  If this switch is not given, the output is either sent
+to the pager or written to the standard output.  I<Since SiLK 3.15.0.>
+
 =item B<--pager>=I<PAGER_PROG>
 
 When output is to a terminal, invoke the program I<PAGER_PROG> to view
 the output one screen full at a time.  This switch overrides the
 SILK_PAGER environment variable, which in turn overrides the PAGER
-variable.  If the value of the pager is determined to be the empty
-string, no paging will be performed and all output will be printed to
-the terminal.
+variable.  If the B<--output-path> switch is given or if the value of
+the pager is determined to be the empty string, no paging is performed
+and all output is written to the terminal.
 
 =item B<--help>
 
@@ -740,7 +751,7 @@ B<rwbagtool(1)>, B<rwcut(1)>, B<silk(7)>, B<cut(1)>
 
 =cut
 
-$SiLK: rwsetcat.pod 05b6729d2e5e 2016-06-14 15:24:12Z mthomas $
+$SiLK: rwsetcat.pod 4a14e7ea8fe2 2017-03-13 20:17:43Z mthomas $
 
 Local Variables:
 mode:text

@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-B<rwbagcat> - Output a binary Bag as text.
+B<rwbagcat> - Output a binary Bag file as text
 
 =head1 SYNOPSIS
 
@@ -15,8 +15,9 @@ B<rwbagcat> - Output a binary Bag as text.
         [--key-format=FORMAT] [--integer-keys] [--zero-pad-ips]
         [--no-columns] [--column-separator=C]
         [--no-final-delimiter] [{--delimited | --delimited=C}]
-        [--output-path=OUTPUTFILE] [--pager=PAGER_PROG]
-        [BAGFILE...]
+        [--output-path=PATH] [--pager=PAGER_PROG]
+        [--site-config-file=FILENAME]
+        [BAGFILE [BAGFILE...]]
 
   rwbagcat --help
 
@@ -25,9 +26,9 @@ B<rwbagcat> - Output a binary Bag as text.
 =head1 DESCRIPTION
 
 B<rwbagcat> reads a binary Bag as created by B<rwbag(1)> or
-B<rwbagbuild(1)>, converts it to text, and outputs it to the standard
-output or the specified file.  It can also print various statistics
-and summary information about the Bag.
+B<rwbagbuild(1)>, converts it to text, and writes it to the standard
+output, to the pager, or to the specified output file.  It can also
+print various statistics and summary information about the Bag.
 
 As of SiLK 3.12.0, B<rwbagcat> uses information in the Bag file's
 header to determine how to display the key column.
@@ -81,16 +82,15 @@ format to display keys that are not IP addresses.
 
 B<rwbagcat> reads the I<BAGFILE>s specified on the command line; if no
 I<BAGFILE> arguments are given, B<rwbagcat> attempts to read the Bag
-from the standard input.  I<BAGFILE> may also explicitly be the
-keyword C<stdin> or a hyphen (C<->) to allow B<rwbagcat> to combine
-files and piped input.  If any input does not contain a Bag,
-B<rwbagcat> prints an error to the standard error and exits
-abnormally.
+from the standard input.  I<BAGFILE> may be the keyword C<stdin> or a
+hyphen (C<->) to allow B<rwbagcat> to print data from both files and
+piped input.  If any input does not contain a Bag, B<rwbagcat> prints
+an error to the standard error and exits abnormally.
 
 When multiple I<BAGFILE>s are specified on the command line, each is
-handled individually.  To process the combination of the I<BAGFILE>s,
-use B<rwbagtool(1)> to join the bags together and pipe its output into
-B<rwbagcat>.
+handled individually.  To process the files as a single Bag, use
+B<rwbagtool(1)> to combine the bags and pipe the output of
+B<rwbagtool> into B<rwbagcat>.
 
 =head1 OPTIONS
 
@@ -242,7 +242,17 @@ B<--network-structure> or B<--bin-ips> switches.  I<Since SiLK
 =item B<--print-statistics>=I<OUTFILE>
 
 Print a breakdown of the network hosts seen, and print general
-statistics about the keys and counters.
+statistics about the keys and counters.  When B<--print-statistics> is
+specified, no other output is produced unless one of
+B<--sort-counters>, B<--network-structure>, or B<--bin-ips> is also
+specified.  When the I<OUTFILE> argument is not given, the statistics
+are written to the standard output or to the pager if output is to a
+terminal.  I<OUTFILE> is a filename, named pipe, the keyword C<stderr>
+to write to the standard error, or the keyword C<stdout> or C<-> to
+write to the standard output.  If I<OUTFILE> names an existing file,
+B<rwbagcat> exits with an error unless the SILK_CLOBBER environment
+variable is set, in which case I<OUTFILE> is overwritten.  The output
+statistics produced by this switch are:
 
 =over 4
 
@@ -311,10 +321,6 @@ total bytes allocated for leaves
 density of the data
 
 =back
-
-I<OUTFILE> is a filename, named pipe, the values C<stdout> or C<-> to
-print to the standard output, or the value C<stderr> to print to the
-standard error.  Defaults to printing to the standard output.
 
 =item B<--minkey>=I<VALUE>
 
@@ -505,20 +511,33 @@ had been specified.  That is, disable fixed-width columnar output; if
 character I<C> is provided, it is used as the delimiter between
 columns instead of the default 'B<|>'.
 
-=item B<--output-path>=I<OUTPUTFILE>
+=item B<--output-path>=I<PATH>
 
-Redirect output of the B<--network-structure> or B<--bin-ips> options
-to I<OUTPUTFILE>.  I<OUTPUTFILE> is a filename, named pipe, or the
-values C<stdout> or C<-> to print to the standard output.
+Write the textual output of the B<--network-structure>, B<--bin-ips>,
+or B<--sort-counters> switch to I<PATH>, where I<PATH> is a filename,
+a named pipe, the keyword C<stderr> to write the output to the
+standard error, or the keyword C<stdout> or C<-> to write the output
+to the standard output (and bypass the paging program).  If I<PATH>
+names an existing file, B<rwbagcat> exits with an error unless the
+SILK_CLOBBER environment variable is set, in which case I<PATH> is
+overwritten.  If this option is not given, the output is either sent
+to the pager or written to the standard output.
 
 =item B<--pager>=I<PAGER_PROG>
 
 When output is to a terminal, invoke the program I<PAGER_PROG> to view
 the output one screen full at a time.  This switch overrides the
 SILK_PAGER environment variable, which in turn overrides the PAGER
-variable.  If the value of the pager is determined to be the empty
-string, no paging will be performed and all output will be printed to
-the terminal.
+variable.  If the B<--output-path> switch is given or if the value of
+the pager is determined to be the empty string, no paging is performed
+and all output is written to the terminal.
+
+=item B<--site-config-file>=I<FILENAME>
+
+Read the SiLK site configuration from the named file I<FILENAME>.
+When this switch is not provided, B<rwbagcat> searches for the site
+configuration file in the locations specified in the L</FILES>
+section.  I<Since SiLK 3.15.0.>
 
 =item B<--help>
 
@@ -760,6 +779,61 @@ string, B<rwbagcat> does not automatically page its output.
 When set and SILK_PAGER is not set, B<rwbagcat> automatically invokes
 this program to display its output a screen at a time.
 
+=item SILK_CONFIG_FILE
+
+This environment variable is used as the value for the
+B<--site-config-file> when that switch is not provided.
+
+=item SILK_DATA_ROOTDIR
+
+This environment variable specifies the root directory of data
+repository.  As described in the L</FILES> section, B<rwbagcat> may
+use this environment variable when searching for the SiLK site
+configuration file.
+
+=item SILK_PATH
+
+This environment variable gives the root of the install tree.  When
+searching for configuration files, B<rwbagcat> may use this
+environment variable.  See the L</FILES> section for details.
+
+=item TZ
+
+When the argument to the B<--key-format> switch includes
+C<localtime> or when a SiLK installation is built to use the local
+timezone, the value of the TZ environment variable determines the
+timezone in which B<rwbagcat> displays timestamps.  (If both of
+those are false, the TZ environment variable is ignored.)  If the TZ
+environment variable is not set, the machine's default timezone is
+used.  Setting TZ to the empty string or 0 causes timestamps to be
+displayed in UTC.  For system information on the TZ variable, see
+B<tzset(3)> or B<environ(7)>.  (To determine if SiLK was built with
+support for the local timezone, check the C<Timezone support> value in
+the output of B<rwbagcat --version>.)
+
+=back
+
+=head1 FILES
+
+=over 4
+
+=item F<${SILK_CONFIG_FILE}>
+
+=item F<${SILK_DATA_ROOTDIR}/silk.conf>
+
+=item F<@SILK_DATA_ROOTDIR@/silk.conf>
+
+=item F<${SILK_PATH}/share/silk/silk.conf>
+
+=item F<${SILK_PATH}/share/silk.conf>
+
+=item F<@prefix@/share/silk/silk.conf>
+
+=item F<@prefix@/share/silk.conf>
+
+Possible locations for the SiLK site configuration file which are
+checked when the B<--site-config-file> switch is not provided.
+
 =back
 
 =head1 SEE ALSO
@@ -769,7 +843,7 @@ B<rwfileinfo(1)>, B<rwset(1)>, B<rwsetbuild(1)>, B<silk(7)>
 
 =cut
 
-$SiLK: rwbagcat.pod c24a31ef468d 2016-09-07 14:11:17Z mthomas $
+$SiLK: rwbagcat.pod 66e65613d494 2017-03-21 19:29:56Z mthomas $
 
 Local Variables:
 mode:text

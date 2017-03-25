@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -48,7 +48,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-options.c 77a7d16206f7 2016-11-02 13:49:55Z mthomas $");
+RCSIDENT("$SiLK: sku-options.c b814c8307c05 2017-03-24 20:22:12Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sksite.h>
@@ -178,7 +178,7 @@ printVersion(
     void)
 {
 #define COPYRIGHT_LICENSE                                       \
-    ("Copyright (C) 2001-2016 by Carnegie Mellon University\n"  \
+    ("Copyright (C) 2001-2017 by Carnegie Mellon University\n"  \
      "GNU General Public License (GPL) Rights"                  \
      " pursuant to Version 2, June 1991.\n"                     \
      "Some included library code covered by LGPL 2.1;"          \
@@ -780,11 +780,13 @@ skOptionsTempDirUsage(
  *    Support for formatting IP addresses
  */
 
+static uint32_t ip_format_flags = 0;
+
 enum ipformat_option_en {
     OPT_VAL_IP_FORMAT, OPT_VAL_INTEGER_IPS, OPT_VAL_ZERO_PAD_IPS
 };
 
-static struct option ipformat_option[] = {
+static const struct option ipformat_option[] = {
     {"ip-format",           REQUIRED_ARG, 0, OPT_VAL_IP_FORMAT},
     {"integer-ips",         NO_ARG,       0, OPT_VAL_INTEGER_IPS},
     {"zero-pad-ips",        NO_ARG,       0, OPT_VAL_ZERO_PAD_IPS},
@@ -904,6 +906,7 @@ ipformat_option_handler(
         }
         break;
       case OPT_VAL_INTEGER_IPS:
+        assert(ip_format_flags & SK_OPTION_IP_FORMAT_INTEGER_IPS);
         if (ipformat_option_parse(
                 "decimal", var_location, ipformat_option[opt_index].name))
         {
@@ -911,6 +914,7 @@ ipformat_option_handler(
         }
         break;
       case OPT_VAL_ZERO_PAD_IPS:
+        assert(ip_format_flags & SK_OPTION_IP_FORMAT_ZERO_PAD_IPS);
         if (ipformat_option_parse(
                 "zero-padded", var_location, ipformat_option[opt_index].name))
         {
@@ -924,10 +928,14 @@ ipformat_option_handler(
 
 int
 skOptionsIPFormatRegister(
-    uint32_t           *var_location)
+    uint32_t           *var_location,
+    uint32_t            flags)
 {
+    struct option opts[2];
     const char *env;
     uint32_t tmp_val = 0;
+    unsigned int i;
+    int rv = 0;
 
     if (var_location == NULL) {
         return -1;
@@ -939,9 +947,23 @@ skOptionsIPFormatRegister(
         }
     }
 
-    return skOptionsRegister(ipformat_option, ipformat_option_handler,
-                             (clientData)var_location);
+    ip_format_flags = flags;
+
+    memset(opts, 0, sizeof(opts));
+
+    for (i = 0; ipformat_option[i].name; ++i) {
+        if ((0 == i) || (ip_format_flags & (1 << (i - 1)))) {
+            memcpy(opts, &ipformat_option[i], sizeof(struct option));
+            rv = skOptionsRegister(opts, ipformat_option_handler,
+                                   (clientData)var_location);
+            if (rv) {
+                return rv;
+            }
+        }
+    }
+    return rv;
 }
+
 
 /*
  *  skOptionsIPFormatUsage(fh);
@@ -965,12 +987,17 @@ skOptionsIPFormatUsage(
                 e->name, (const char*)e->userdata);
     }
 
-    fprintf(fh, "--%s %s. DEPRECATED. Equivalent to --ip-format=decimal\n",
-            ipformat_option[OPT_VAL_INTEGER_IPS].name,
-            SK_OPTION_HAS_ARG(ipformat_option[OPT_VAL_INTEGER_IPS]));
-    fprintf(fh, "--%s %s. DEPRECATED. Equivalent to --ip-format=zero-padded\n",
-            ipformat_option[OPT_VAL_ZERO_PAD_IPS].name,
-            SK_OPTION_HAS_ARG(ipformat_option[OPT_VAL_ZERO_PAD_IPS]));
+    if (ip_format_flags & SK_OPTION_IP_FORMAT_INTEGER_IPS) {
+        fprintf(fh, "--%s %s. DEPRECATED. Equivalent to --ip-format=decimal\n",
+                ipformat_option[OPT_VAL_INTEGER_IPS].name,
+                SK_OPTION_HAS_ARG(ipformat_option[OPT_VAL_INTEGER_IPS]));
+    }
+    if (ip_format_flags & SK_OPTION_IP_FORMAT_ZERO_PAD_IPS) {
+        fprintf(fh,
+                "--%s %s. DEPRECATED. Equivalent to --ip-format=zero-padded\n",
+                ipformat_option[OPT_VAL_ZERO_PAD_IPS].name,
+                SK_OPTION_HAS_ARG(ipformat_option[OPT_VAL_ZERO_PAD_IPS]));
+    }
 }
 
 

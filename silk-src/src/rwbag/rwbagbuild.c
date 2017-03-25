@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2016 by Carnegie Mellon University.
+** Copyright (C) 2004-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -10,12 +10,29 @@
  *    rwbagbuild can read an IP set and generate a bag with a default
  *    count for each IP address, or it can read a pipe-separated text
  *    file representing a bag.
+ *
+ *
+ *    TODO:
+ *
+ *        Add a --multiple-files={ipset | text} switch that allows
+ *        rwbagbuild to process data from multiple input files.  This
+ *        switch is parallel to --set-input and --bag-input.
+ *
+ *        Make --text-input an alias for --bag-input.
+ *
+ *        Add a --missing-count=VALUE switch that only uses VALUE as
+ *        the counter when none is specified on a line.
+ *
+ *        Replace the --default-count switch with a --force-count (or
+ *        --use-count (hard ess), --displace-count) to make it clear
+ *        that the counter on a line is being ignored and displaced
+ *        (replaced, dislodged, ousted) with a different counter.
  */
 
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagbuild.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: rwbagbuild.c 62dfd3881f79 2017-03-21 19:33:08Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skcountry.h>
@@ -146,7 +163,7 @@ static const char *appHelp[] = {
     ("For the key-types that end with '-pmap', map the key field\n"
      "\tin the input to a string using the values in this prefix map file.\n"
      "\tMay be specified as MAPNAME:PATH, but the map-name is ignored"),
-    ("Specify destination for the new bag. Def. stdout"),
+    ("Write the new bag to this stream or file. Def. stdout"),
     ("Strip invocation history from the output bag files.\n"
      "\tDef. Record command used to create the file"),
     (char *)NULL

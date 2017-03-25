@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -471,6 +471,10 @@ extern "C" {
 #endif
 
 
+/*  Alternate approach to marking unused parameters */
+#define SK_UNUSED_PARAM(unused_param)   (void)(unused_param)
+
+
 /*
  *  Create a variable for magic RCS variables: Define 'var' to be the
  *  string in 'id'.  Can be used in header, keep 'var's unique.  Use:
@@ -494,7 +498,7 @@ extern "C" {
 #define RCSIDENT(id) RCSIDENTVAR(_rcsID, (id))
 
 
-RCSIDENTVAR(rcsID_SILK_H, "$SiLK: silk.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_SILK_H, "$SiLK: silk.h 4ad908b01905 2017-01-19 22:41:56Z mthomas $");
 
 
 /* Name of environment variable pointing to the root of install */

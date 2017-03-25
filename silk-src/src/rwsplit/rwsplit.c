@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2016 by Carnegie Mellon University.
+** Copyright (C) 2006-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -26,7 +26,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsplit.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: rwsplit.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipset.h>

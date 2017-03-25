@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2014-2016 by Carnegie Mellon University.
+** Copyright (C) 2014-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -52,7 +52,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcombine.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
+RCSIDENT("$SiLK: rwcombine.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 #include "rwcombine.h"
 #include <silk/skheap.h>

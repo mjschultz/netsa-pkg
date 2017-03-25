@@ -10,7 +10,7 @@ B<rwsettool> - Operate on IPset files to produce a new IPset
               | --symmetric-difference
               | --sample {--size=SIZE | --ratio=RATIO} [--seed=SEED]
               | --mask=NET_BLOCK_SIZE | --fill-blocks=NET_BLOCK_SIZE }
-        [--output-path=OUTPUT_PATH] [--record-version=VERSION]
+        [--output-path=PATH] [--record-version=VERSION]
         [--invocation-strip]
         [--note-strip] [--note-add=TEXT] [--note-file-add=FILE]
         [--compression-method=COMP_METHOD] [INPUT_SET ...]
@@ -197,11 +197,17 @@ These switches control the output:
 
 =over 4
 
-=item B<--output-path>=I<OUTPUT_PATH>
+=item B<--output-path>=I<PATH>
 
-Write the resulting IPset to I<OUTPUT_PATH>.  If this switch is not
-provided, B<rwsettool> attempts to write the IPset to the standard
-output when the standard output is not connected to a terminal.
+Write the resulting IPset to I<PATH>, where I<PATH> is a filename, a
+named pipe, the keyword C<stderr> to write the output to the standard
+error, or the keyword C<stdout> or C<-> to write the output to the
+standard output.  If I<PATH> names an existing file, B<rwsettool>
+exits with an error unless the SILK_CLOBBER environment variable is
+set, in which case I<PATH> is overwritten.  If this switch is not
+given, the output is written to the standard output.  Attempting to
+write the binary output to a terminal causes B<rwsettool> to exit with
+an error.
 
 =item B<--record-version>=I<VERSION>
 
@@ -504,7 +510,7 @@ than the product of I<SIZE> and the number of inputs when the input
 sets have IPs in common or when an IPset has fewer than I<SIZE>
 members.
 
-When using the B<--size> switch, the probably of selecting an
+When using the B<--size> switch, the probability of selecting an
 individual IP address varies with the number of IPs to be selected and
 the number of IPs remaining in the set.  If I<N> is the number of IPs
 in a set, the probability of selecting the first IP is I<SIZE>/I<N>.
@@ -665,7 +671,7 @@ environment variable.  Version 5 was added in S<SiLK 3.14>.
 
 =cut
 
-$SiLK: rwsettool.pod 88cee5c95d36 2016-10-31 16:57:21Z mthomas $
+$SiLK: rwsettool.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
 
 Local Variables:
 mode:text

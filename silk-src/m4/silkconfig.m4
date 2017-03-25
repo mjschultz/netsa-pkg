@@ -1,10 +1,10 @@
-dnl Copyright (C) 2004-2016 by Carnegie Mellon University.
+dnl Copyright (C) 2004-2017 by Carnegie Mellon University.
 dnl
 dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in ../LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: silkconfig.m4 77a7d16206f7 2016-11-02 13:49:55Z mthomas $")
+dnl RCSIDENT("$SiLK: silkconfig.m4 275df62a2e41 2017-01-05 17:30:40Z mthomas $")
 
 # ---------------------------------------------------------------------------
 # SILK_AC_COMPILER

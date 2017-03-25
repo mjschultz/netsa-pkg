@@ -1,17 +1,17 @@
-dnl Copyright (C) 2003-2016 by Carnegie Mellon University.
+dnl Copyright (C) 2003-2017 by Carnegie Mellon University.
 dnl
 dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: configure.ac 9d844f629b99 2016-11-16 20:29:28Z mthomas $")
+dnl RCSIDENT("$SiLK: configure.ac e4c6d3d38708 2017-03-24 22:01:06Z mthomas $")
 
 AC_PREREQ(2.64)
-AC_INIT([SiLK],[3.14.0],[netsa-help@cert.org],[silk],[http://tools.netsa.cert.org/silk/])
-AC_COPYRIGHT([Copyright (C) 2001-2016 by Carnegie Mellon University
+AC_INIT([SiLK],[3.15.0],[netsa-help@cert.org],[silk],[http://tools.netsa.cert.org/silk/])
+AC_COPYRIGHT([Copyright (C) 2001-2017 by Carnegie Mellon University
 GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
 Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013])
-AC_REVISION($SiLK: configure.ac 9d844f629b99 2016-11-16 20:29:28Z mthomas $)
+AC_REVISION($SiLK: configure.ac e4c6d3d38708 2017-03-24 22:01:06Z mthomas $)
 AC_CONFIG_SRCDIR([src/libsilk/silk.h])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_CONFIG_MACRO_DIR([m4])
@@ -250,7 +250,7 @@ m4_ifdef([PKG_CHECK_MODULES],[],[m4_pattern_forbid([PKG_CHECK_MODULES])])
 
 # pkg_config library checks
 AX_PKG_CHECK_GNUTLS([1.4.1])
-AX_PKG_CHECK_LIBFIXBUF([1.6.0],[2.0.0])
+AX_PKG_CHECK_LIBFIXBUF([1.7.0],[2.0.0])
 AX_PKG_CHECK_LIBIPA([0.5.0])
 #AX_ARG_WITH_PCRE
 
@@ -332,6 +332,7 @@ AC_CONFIG_FILES([
     src/plugins/Makefile
     src/pysilk/Makefile
     src/rwaddrcount/Makefile
+    src/rwaggbag/Makefile
     src/rwappend/Makefile
     src/rwbag/Makefile
     src/rwcat/Makefile
@@ -420,6 +421,7 @@ AC_CONFIG_LINKS(sk_make_include_silk_list([
     src/libsilk/silk.h
     src/libsilk/silk_files.h
     src/libsilk/silk_types.h
+    src/libsilk/skaggbag.h
     src/libsilk/skbag.h
     src/libsilk/skcountry.h
     src/libsilk/skdaemon.h

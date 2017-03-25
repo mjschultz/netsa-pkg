@@ -12,7 +12,7 @@ B<rwpmapcat> - Print each range and label present in a prefix map file
         [--ip-format=FORMAT] [--integer-ips] [--zero-pad-ips]
         [--no-titles] [--no-columns] [--column-separator=C]
         [--no-final-delimiter] [{--delimited | --delimited=C}]
-        [--pager=PAGER_PROG]
+        [--output-path=PATH] [--pager=PAGER_PROG]
         [ { --map-file=PMAP_FILE | PMAP_FILE
             | --address-types | --address-types=MAP_FILE
             | --country-codes | --country-codes=MAP_FILE } ]
@@ -262,14 +262,25 @@ had been specified.  That is, disable fixed-width columnar output; if
 character I<C> is provided, it is used as the delimiter between
 columns instead of the default 'B<|>'.
 
+=item B<--output-path>=I<PATH>
+
+Write the textual output to I<PATH>, where I<PATH> is a filename, a
+named pipe, the keyword C<stderr> to write the output to the standard
+error, or the keyword C<stdout> or C<-> to write the output to the
+standard output (and bypass the paging program).  If I<PATH> names an
+existing file, B<rwpmapcat> exits with an error unless the
+SILK_CLOBBER environment variable is set, in which case I<PATH> is
+overwritten.  If this switch is not given, the output is either sent
+to the pager or written to the standard output.  I<Since SiLK 3.15.0.>
+
 =item B<--pager>=I<PAGER_PROG>
 
 When output is to a terminal, invoke the program I<PAGER_PROG> to view
 the output one screen full at a time.  This switch overrides the
 SILK_PAGER environment variable, which in turn overrides the PAGER
-variable.  If the value of the pager is determined to be the empty
-string, no paging will be performed and all output will be printed to
-the terminal.
+variable.  If the B<--output-path> switch is given or if the value of
+the pager is determined to be the empty string, no paging is performed
+and all output is written to the terminal.
 
 =item B<--help>
 
@@ -489,7 +500,7 @@ SiLK 3.8.0.
 
 =cut
 
-$SiLK: rwpmapcat.pod 9dd9f9b1d75b 2016-06-22 22:00:34Z mthomas $
+$SiLK: rwpmapcat.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
 
 Local Variables:
 mode:text

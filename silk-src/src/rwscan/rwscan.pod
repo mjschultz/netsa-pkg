@@ -6,7 +6,7 @@ B<rwscan> - Detect scanning activity in a SiLK dataset
 
 =head1 SYNOPSIS
 
-  rwscan [--scan-model=MODEL] [--output-path=OUTFILE]
+  rwscan [--scan-model=MODEL] [--output-path=PATH]
         [--trw-internal-set=SETFILE]
         [--trw-theta0=PROB] [--trw-theta1=PROB]
         [--no-titles] [--no-columns] [--column-separator=CHAR]
@@ -47,7 +47,7 @@ B<rwscan> reads SiLK Flow records from the files named on the command
 line or from the standard input when no file names are specified.  To
 read the standard input in addition to the named files, use C<-> or
 C<stdin> as a file name.  If an input file name ends in C<.gz>, the
-file will be uncompressed as it is read.
+file is uncompressed as it is read.
 
 =head1 OPTIONS
 
@@ -81,10 +81,16 @@ Use only the BLR scan detection model.
 
 =back
 
-=item B<--output-path>=I<OUTFILE>
+=item B<--output-path>=I<PATH>
 
-Specify the output file that scan records will be written to.  If not
-specified, the scan records are written to standard output.
+Write the textual output to I<PATH>, where I<PATH> is a filename, a
+named pipe, the keyword C<stderr> to write the output to the standard
+error, or the keyword C<stdout> or C<-> to write the output to the
+standard output (and bypass the paging program).  If I<PATH> names an
+existing file, B<rwscan> exits with an error unless the SILK_CLOBBER
+environment variable is set, in which case I<PATH> is overwritten.  If
+this switch is not given, the output is either sent to the pager or
+written to the standard output.
 
 =item B<--trw-internal-set>=I<SETFILE>
 
@@ -603,7 +609,7 @@ records outside of that prefix are silently ignored.
 
 =cut
 
-$SiLK: rwscan.pod cd09f0a5fcc6 2014-06-14 15:43:33Z mthomas $
+$SiLK: rwscan.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
 
 Local Variables:
 mode:text

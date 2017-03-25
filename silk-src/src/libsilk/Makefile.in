@@ -14,12 +14,12 @@
 
 @SET_MAKE@
 
-# RCSIDENT("$SiLK: Makefile.am 9d844f629b99 2016-11-16 20:29:28Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am e4c6d3d38708 2017-03-24 22:01:06Z mthomas $");
 
 # Installed Targets
 
 # -*- makefile -*-
-# RCSIDENT("$SiLK: Makefile-sources 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $");
+# RCSIDENT("$SiLK: Makefile-sources 7e6884832fbd 2017-01-20 22:59:46Z mthomas $");
 
 # RCSIDENT("$SiLK: build.mk b4d1f1d9c507 2014-07-28 19:37:42Z mthomas $")
 #
@@ -191,8 +191,8 @@ am__libsilk_la_SOURCES_DIST = addrtype.c flowcapio.c hashlib.c \
 	pmapfilter.c rwascii.c rwaugmentedio.c rwaugroutingio.c \
 	rwaugsnmpoutio.c rwaugwebio.c rwfilterio.c rwgenericio.c \
 	rwipv6io.c rwipv6routingio.c rwnotroutedio.c rwpack.c rwrec.c \
-	rwroutedio.c rwsplitio.c rwwwwio.c skbag.c skbitmap.c \
-	skcompmethod.c skcountry.c skdaemon.c skdllist.c \
+	rwroutedio.c rwsplitio.c rwwwwio.c skaggbag.c skbag.c \
+	skbitmap.c skcompmethod.c skcountry.c skdaemon.c skdllist.c \
 	skfileformat.c skheader.c skheader-legacy.c skheader_priv.h \
 	skheap.c skiobuf.c skiobuf.h skipset.c sklog.c skmempool.c \
 	skoptionsctx.c skoptions-notes.c skplugin-simple.c skplugin.c \
@@ -209,8 +209,8 @@ am__objects_3 = addrtype.lo flowcapio.lo hashlib.lo pmapfilter.lo \
 	rwascii.lo rwaugmentedio.lo rwaugroutingio.lo \
 	rwaugsnmpoutio.lo rwaugwebio.lo rwfilterio.lo rwgenericio.lo \
 	rwipv6io.lo rwipv6routingio.lo rwnotroutedio.lo rwpack.lo \
-	rwrec.lo rwroutedio.lo rwsplitio.lo rwwwwio.lo skbag.lo \
-	skbitmap.lo skcompmethod.lo skcountry.lo skdaemon.lo \
+	rwrec.lo rwroutedio.lo rwsplitio.lo rwwwwio.lo skaggbag.lo \
+	skbag.lo skbitmap.lo skcompmethod.lo skcountry.lo skdaemon.lo \
 	skdllist.lo skfileformat.lo skheader.lo skheader-legacy.lo \
 	skheap.lo skiobuf.lo skipset.lo sklog.lo skmempool.lo \
 	skoptionsctx.lo skoptions-notes.lo skplugin-simple.lo \
@@ -378,12 +378,13 @@ NROFF = nroff
 MANS = $(man1_MANS) $(man5_MANS) $(man7_MANS)
 DATA = $(dist_pkgdata_DATA)
 am__pkginclude_HEADERS_DIST = hashlib.h iptree.h rwascii.h rwrec.h \
-	silk.h silk_files.h silk_types.h skbag.h skcountry.h \
-	skdaemon.h skdeque.h skdllist.h skheader.h skheap.h skipaddr.h \
-	skipset.h sklog.h skmempool.h skplugin.h skpolldir.h \
-	skprefixmap.h skprintnets.h sksite.h skstream.h skstringmap.h \
-	sktempfile.h skthread.h sktimer.h sktracemsg.h skvector.h \
-	utils.h redblack/redblack.h bagtree.h rwpack.h gnu_getopt.h
+	silk.h silk_files.h silk_types.h skaggbag.h skbag.h \
+	skcountry.h skdaemon.h skdeque.h skdllist.h skheader.h \
+	skheap.h skipaddr.h skipset.h sklog.h skmempool.h skplugin.h \
+	skpolldir.h skprefixmap.h skprintnets.h sksite.h skstream.h \
+	skstringmap.h sktempfile.h skthread.h sktimer.h sktracemsg.h \
+	skvector.h utils.h redblack/redblack.h bagtree.h rwpack.h \
+	gnu_getopt.h
 HEADERS = $(pkginclude_HEADERS)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) \
 	$(LISP)silk_config1.h.in silk_config2.h.in
@@ -587,16 +588,16 @@ am__DIST_COMMON = $(srcdir)/Makefile-sources $(srcdir)/Makefile.in \
 	$(srcdir)/iptree.h $(srcdir)/rwascii.h $(srcdir)/rwpack.h \
 	$(srcdir)/rwrec.h $(srcdir)/silk.h $(srcdir)/silk_config.c.in \
 	$(srcdir)/silk_files.h $(srcdir)/silk_types.h \
-	$(srcdir)/skbag.h $(srcdir)/skcountry.h $(srcdir)/skdaemon.h \
-	$(srcdir)/skdeque.h $(srcdir)/skdllist.h $(srcdir)/skheader.h \
-	$(srcdir)/skheap.h $(srcdir)/skipaddr.h $(srcdir)/skipset.h \
-	$(srcdir)/sklog.h $(srcdir)/skmempool.h $(srcdir)/skplugin.h \
-	$(srcdir)/skpolldir.h $(srcdir)/skprefixmap.h \
-	$(srcdir)/skprintnets.h $(srcdir)/sksite.h \
-	$(srcdir)/skstream.h $(srcdir)/skstringmap.h \
-	$(srcdir)/sktempfile.h $(srcdir)/skthread.h \
-	$(srcdir)/sktimer.h $(srcdir)/sktracemsg.h \
-	$(srcdir)/skvector.h $(srcdir)/utils.h \
+	$(srcdir)/skaggbag.h $(srcdir)/skbag.h $(srcdir)/skcountry.h \
+	$(srcdir)/skdaemon.h $(srcdir)/skdeque.h $(srcdir)/skdllist.h \
+	$(srcdir)/skheader.h $(srcdir)/skheap.h $(srcdir)/skipaddr.h \
+	$(srcdir)/skipset.h $(srcdir)/sklog.h $(srcdir)/skmempool.h \
+	$(srcdir)/skplugin.h $(srcdir)/skpolldir.h \
+	$(srcdir)/skprefixmap.h $(srcdir)/skprintnets.h \
+	$(srcdir)/sksite.h $(srcdir)/skstream.h \
+	$(srcdir)/skstringmap.h $(srcdir)/sktempfile.h \
+	$(srcdir)/skthread.h $(srcdir)/sktimer.h \
+	$(srcdir)/sktracemsg.h $(srcdir)/skvector.h $(srcdir)/utils.h \
 	$(top_srcdir)/autoconf/depcomp \
 	$(top_srcdir)/autoconf/test-driver \
 	$(top_srcdir)/autoconf/ylwrap $(top_srcdir)/build.mk \
@@ -789,8 +790,8 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 lib_LTLIBRARIES = libsilk.la libsilk-thrd.la
-libsilk_version = 22:0:0
-# At previous release: libsilk_version = 22:0:0
+libsilk_version = 23:0:0
+# At previous release: libsilk_version = 23:0:0
 libsilk_thrd_version = 6:3:1
 # At previous release: libsilk_thrd_version = 6:3:1
 
@@ -804,11 +805,12 @@ EXTRA_DIST = silk_config.pod silk.conf.pod silk.pod getopt.c \
 @HAVE_POD2MAN_TRUE@man5_MANS = silk.conf.5
 @HAVE_POD2MAN_TRUE@man7_MANS = silk.7
 pkginclude_HEADERS = hashlib.h iptree.h rwascii.h rwrec.h silk.h	\
-	 silk_files.h silk_types.h skbag.h skcountry.h skdaemon.h	\
-	 skdeque.h skdllist.h skheader.h skheap.h skipaddr.h skipset.h	\
-	 sklog.h skmempool.h skplugin.h	skpolldir.h skprefixmap.h	\
-	 skprintnets.h sksite.h skstream.h skstringmap.h sktempfile.h	\
-	 skthread.h sktimer.h sktracemsg.h skvector.h utils.h		\
+	 silk_files.h silk_types.h skaggbag.h skbag.h skcountry.h	\
+	 skdaemon.h skdeque.h skdllist.h skheader.h skheap.h skipaddr.h \
+	 skipset.h sklog.h skmempool.h skplugin.h skpolldir.h		\
+	 skprefixmap.h skprintnets.h sksite.h skstream.h skstringmap.h	\
+	 sktempfile.h skthread.h sktimer.h sktracemsg.h skvector.h	\
+	 utils.h			 				\
 	 redblack/redblack.h $(LEGACY_HDRS) $(EXTRA_HDRS)
 
 LEGACY_HDRS = bagtree.h rwpack.h
@@ -834,8 +836,8 @@ SOURCES_LIBSILK = addrtype.c flowcapio.c hashlib.c pmapfilter.c \
 	rwascii.c rwaugmentedio.c rwaugroutingio.c rwaugsnmpoutio.c \
 	rwaugwebio.c rwfilterio.c rwgenericio.c rwipv6io.c \
 	rwipv6routingio.c rwnotroutedio.c rwpack.c rwrec.c \
-	rwroutedio.c rwsplitio.c rwwwwio.c skbag.c skbitmap.c \
-	skcompmethod.c skcountry.c skdaemon.c skdllist.c \
+	rwroutedio.c rwsplitio.c rwwwwio.c skaggbag.c skbag.c \
+	skbitmap.c skcompmethod.c skcountry.c skdaemon.c skdllist.c \
 	skfileformat.c skheader.c skheader-legacy.c skheader_priv.h \
 	skheap.c skiobuf.c skiobuf.h skipset.c sklog.c skmempool.c \
 	skoptionsctx.c skoptions-notes.c skplugin-simple.c skplugin.c \
@@ -1366,6 +1368,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rwsplitio.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rwwwwio.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/silk_config-silk_config.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skaggbag.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skbag.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skbitmap-test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/skbitmap.Plo@am__quote@

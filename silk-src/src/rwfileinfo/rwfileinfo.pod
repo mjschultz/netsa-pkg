@@ -8,7 +8,7 @@ B<rwfileinfo> - Print information about a SiLK file
 
   rwfileinfo [--fields=FIELDS] [--summary] [--no-titles]
         [--site-config-file=FILENAME]
-        FILE [ FILE ... ]
+        {--xargs | --xargs=FILENAME | FILE [FILE...]}
 
   rwfileinfo --help
 
@@ -22,9 +22,14 @@ B<rwfileinfo> prints information about a binary SiLK file that can be
 determined by reading the file's header and by moving quickly over the
 data blocks in the file.
 
-B<rwfileinfo> requires one or more file arguments to be given on the
-command line.  To have B<rwfileinfo> read a file's contents from the
-standard input, use C<-> or C<stdin> as a file argument.
+B<rwfileinfo> requires one or more filename arguments to be given on
+the command line or the use of the B<--xargs> switch.  When the
+B<--xargs> switch is provided, B<rwfileinfo> reads the names of the
+files to process from the named text file or from the standard input
+if no file name argument is provided to the switch.  The input to
+B<--xargs> must contain one file name per line.  B<rwfileinfo> does
+not read a SiLK file's content from the standard input by default, but
+it does when either C<-> or C<stdin> is given as a filename argument.
 
 When the B<--summary> switch is given, B<rwfileinfo> first prints the
 information for each individual file and then prints the number of
@@ -387,8 +392,12 @@ of IP addresses (IPv4 or IPv6).
 
 For a bag file, the type and size of the key and of the counter.
 
-=back
+=item aggregate-bag,18
 
+For an aggregate bag file, the field types that comprise the key and
+the counter.
+
+=back
 
 =item B<--summary>
 
@@ -408,6 +417,16 @@ Read the SiLK site configuration from the named file I<FILENAME>.
 When this switch is not provided, B<rwfileinfo> searches for the site
 configuration file in the locations specified in the L</FILES>
 section.
+
+=item B<--xargs>
+
+=item B<--xargs>=I<FILENAME>
+
+Read the names of the input files from I<FILENAME> or from the
+standard input if I<FILENAME> is not provided.  The input is expected
+to have one filename per line.  B<rwfileinfo> opens each named file in
+turn and prints its information as if the filenames had been listed on
+the command line.  I<Since S<SiLK 3.15.0>.>
 
 =item B<--help>
 
@@ -516,7 +535,7 @@ B<rwflowpack(8)>, B<silk(7)>, B<gzip(1)>
 
 =cut
 
-$SiLK: rwfileinfo.pod 22da9b03c74d 2016-09-19 18:28:03Z mthomas $
+$SiLK: rwfileinfo.pod 92ab6152d2f4 2017-03-21 19:49:03Z mthomas $
 
 Local Variables:
 mode:text

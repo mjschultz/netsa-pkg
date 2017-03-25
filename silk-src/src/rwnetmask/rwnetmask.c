@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2016 by Carnegie Mellon University.
+** Copyright (C) 2004-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwnetmask.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: rwnetmask.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -99,7 +99,7 @@ static const char *appHelp[] = {
     "High bits of destination IPv6 to keep. Def 128",
     "High bits of next-hop IPv6 to keep. Def 128",
 #endif
-    "Write output to given file path. Def. stdout",
+    "Write the output to this stream or file. Def. stdout",
     (char *)NULL
 };
 

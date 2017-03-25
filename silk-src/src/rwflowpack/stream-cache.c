@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2016 by Carnegie Mellon University.
+** Copyright (C) 2004-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -9,7 +9,7 @@
 /* #define SKTHREAD_DEBUG_MUTEX */
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: stream-cache.c 44ea9b8a3a43 2016-06-16 18:36:27Z mthomas $");
+RCSIDENT("$SiLK: stream-cache.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/sklog.h>

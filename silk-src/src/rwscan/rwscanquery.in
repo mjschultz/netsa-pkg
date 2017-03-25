@@ -1,13 +1,13 @@
 #! @PERL@
 #######################################################################
-# Copyright (C) 2006-2016 by Carnegie Mellon University.
+# Copyright (C) 2006-2017 by Carnegie Mellon University.
 #
 # @OPENSOURCE_LICENSE_START@
 # See license information in ../../LICENSE.txt
 # @OPENSOURCE_LICENSE_END@
 #
 #######################################################################
-# $SiLK: rwscanquery.in 85572f89ddf9 2016-05-05 20:07:39Z mthomas $
+# $SiLK: rwscanquery.in 275df62a2e41 2017-01-05 17:30:40Z mthomas $
 #######################################################################
 # rwscanquery
 #
@@ -693,7 +693,7 @@ sub load_rcfile()
         }
         elsif ( $conf_db_driver =~ /sqlite/i ) {
             $conf_db_driver = "sqlite";
-            die if !eval { require DBD::sqlite; };
+            die if !eval { require DBD::SQLite; };
         }
         else {
             die "$appname: Unsupported db_driver: $conf_db_driver\n";
@@ -1106,7 +1106,7 @@ sub tool_version_exit()
 
     print <<EOF;
 $appname: Part of $pkg
-Copyright (C) 2001-2016 by Carnegie Mellon University
+Copyright (C) 2001-2017 by Carnegie Mellon University
 GNU General Public License (GPL) Rights pursuant to Version 2, June 1991.
 Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013.
 Send bug reports, feature requests, and comments to $bugs.

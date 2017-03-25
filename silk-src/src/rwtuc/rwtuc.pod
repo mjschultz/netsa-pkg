@@ -7,7 +7,7 @@ B<rwtuc> - Text Utility Converter - B<rwcut> output to SiLK flows
 =head1 SYNOPSIS
 
   rwtuc [--fields=FIELDS] [--column-separator=CHAR]
-        [--output-path=FILEPATH] [--bad-input-lines=FILEPATH]
+        [--output-path=PATH] [--bad-input-lines=FILEPATH]
         [--verbose] [--stop-on-error] [--no-titles] [--note-add=TEXT]
         [--note-file-add=FILE] [--compression-method=COMP_METHOD]
         [--site-config-file=FILENAME] [--saddress=IPADDR]
@@ -20,7 +20,7 @@ B<rwtuc> - Text Utility Converter - B<rwcut> output to SiLK flows
         [--attributes=ATTR] [--application=NUM] [--class=NAME]
         [--type=NAME] [--stime+msec=TIME] [--etime+msec=TIME]
         [--duration+msec=NUM] [--icmp-type=NUM] [--icmp-code=NUM]
-        [FILES]
+        {[--xargs] | [--xargs=FILENAME] | [FILE [FILE...]]}
 
   rwtuc --help
 
@@ -34,11 +34,11 @@ of input.
 
 The fields which make up a single record should be separated by the
 pipe character ('B<|>'); use the B<--column-separator> switch to
-change this delimiter.  Note that the space character will not work as
+change this delimiter.  Note that the space character does not work as
 delimiter since several fields (e.g., time, TCP-flags) may contain
 embedded spaces.
 
-The fields to be read from each line can be specified with the
+The fields to be read from each line may be specified with the
 B<--fields> switch; if the switch is not provided, B<rwtuc> treats the
 first line as a title and attempts to determine the fields from the
 title strings.
@@ -46,18 +46,23 @@ title strings.
 When B<--fields> is specified, B<rwtuc> still checks whether the first
 line contains title strings, and B<rwtuc> skips the line if it
 determines it does.  Specify the B<--no-titles> switch to force
-B<rwtuc> to treat the first line as record values to be parsed.
+B<rwtuc> to treat the first line as field values to be parsed.
 
 Command line switches exist which force a field to have a fixed value.
 These switches cause B<rwtuc> to override the value read from the
 input file (if any) for those fields.  See the L</Fixed Values>
 section below for details.
 
-The textual input is read from the files named on the command line; if
-no files are specified, B<rwtuc> attempts to read the text from the
-standard input if it is not connected to a terminal.  To force
-B<rwtuc> to read input from the terminal, specify C<stdin> or C<-> as
-the input stream.
+B<rwtuc> reads the textual input from the files named on the command
+line or from the standard input when no file names are specified, when
+B<--xargs> is not present, and when the standard input is not a
+terminal.  To read the standard input in addition to the named files
+or to force B<rwfileinfo> to read input from a terminal, use C<-> or
+C<stdin> as a file name.  When the B<--xargs> switch is provided,
+B<rwtuc> reads the names of the files to process from the named text
+file or from the standard input if no file name argument is provided
+to the switch.  The input to B<--xargs> must contain one file name per
+line.
 
 When the B<--output-path> switch is not provided, output is sent to
 the standard output when it is not connected to a terminal.
@@ -65,12 +70,12 @@ the standard output when it is not connected to a terminal.
 By default, lines that cannot be parsed are silently ignored (unless
 B<rwtuc> is attempting to determine the fields from the title line).
 When the B<--verbose> switch is specified, problems parsing an input
-line will be reported to the standard error, and B<rwtuc> will
-continue to process the input.  The B<--stop-on-error> switch is
+line are reported to the standard error, and B<rwtuc>
+continues to process the input.  The B<--stop-on-error> switch is
 similar to the B<--verbose> switch, except processing stops after the
-first error.  Input lines that cause parse errors can be copied to
+first error.  Input lines that cause parse errors may be copied to
 another output stream with the B<--bad-input-lines> switch.  Each bad
-line will have the source file name and line number prepended to it,
+line has the source file name and line number prepended to it,
 separated from each other and the source line by colons ('B<:>').
 
 =head2 Field Constraints
@@ -137,10 +142,12 @@ I<FIELDS> contains the list of fields (columns) to parse.  I<FIELDS>
 is a comma separated list of field-names, field-integers, and ranges
 of field-integers; a range is specified by separating the start and
 end of the range with a hyphen (B<->).  Field-names are case
-insensitive.
+insensitive.  A field name may not be specified more than once.  (As
+of SiLK 3.15.0, C<ignore> may appear multiple times, allowing multiple
+input fields to be ignored.)
 
-A field is ignored when the fixed value switch that corresponds to
-that field is given on the command line (see L</Fixed Values>).
+A field is ignored when its name corresponds to a fixed value switch
+(e.g. B<--protocol>) given on the command line (see L</Fixed Values>).
 
 The field names and their descriptions are:
 
@@ -154,7 +161,7 @@ a field that B<rwtuc> is to skip
 
 source IP address in the canonical form: dotted-quad for IPv4 or
 hex-encoded for IPv6 (when SiLK has been compiled with IPv6 support).
-Integers from 0 to 4294967295 will be treated as an IPv4 address.
+Integers from 0 to 4294967295 are treated as IPv4 addresses.
 
 =item dIP,2
 
@@ -183,16 +190,16 @@ byte count as an integer from 1 to 4294967295 inclusive
 
 =item flags,8
 
-bitwise OR of TCP flags over all packets; the string may contain C<F>,
-C<S>, C<R>, C<P>, C<A>, C<U>, C<E>, C<C> in upper- or lowercase
-(cf. L</Field Constraints>)
+bit-wise OR of TCP flags over all packets in the flow; the string may
+contain C<F>, C<S>, C<R>, C<P>, C<A>, C<U>, C<E>, C<C> in upper- or
+lowercase (cf. L</Field Constraints>)
 
 =item sTime,9
 
 starting time of the flow, in the form
-C<YYYY/MM/DD[:hh[:mm[:ss[.sss]]]]>.  A C<T> may be used in place of
-C<:> to separate the day and hour fields.  A floating point value
-between 536870912 and 4294967295 is also allowed and will be treated
+C<YYYY/MM/DD[:hh[:mm[:ss[.sss]]]]>.  The letter C<T> may be used in
+place of C<:> to separate the day and hour fields.  A floating point
+value between 536870912 and 4294967295 is also allowed and is treated
 as seconds since the UNIX epoch.
 
 =item duration,10
@@ -206,7 +213,8 @@ L</Field Constraints>)
 
 =item sensor,12
 
-router sensor name or ID as given in F<silk.conf>
+router sensor name or ID as given in F<silk.conf> (cf.
+B<silk.conf(5)>)
 
 =item class
 
@@ -218,17 +226,9 @@ L</Field Constraints>)
 type of router at collection point as given in F<silk.conf>
 (cf. L</Field Constraints>)
 
-=back
-
-Many of our packed files do not store the following fields and their
-values will always be 0, but they are listed here for completeness:
-
-=over 4
-
 =item in,13
 
-router SNMP input interface or vlanId if packing tools were configured
-to capture it (see B<sensor.conf(5)>); an integer from 0 to 65535
+router SNMP input interface or vlanId; an integer from 0 to 65535
 
 =item out,14
 
@@ -238,15 +238,6 @@ router SNMP output interface or postVlanId; an integer from 0 to 65535
 
 router next hop IP address in the same format as C<sIP,1>
 
-=back
-
-SiLK can store flows generated by enhanced collection software that
-provides more information than NetFlow v5.  These flows may support
-some or all of these additional fields; for flows without this
-additional information, the field's value is always 0.
-
-=over 4
-
 =item initialFlags,26
 
 TCP flags on first packet in the flow; same form as the C<flags,8>
@@ -254,8 +245,8 @@ field (cf. L</Field Constraints>)
 
 =item sessionFlags,27
 
-bitwise OR of TCP flags over all packets except the first in the flow;
-same form as the C<flags,8> field (cf. L</Field Constraints>)
+bit-wise OR of TCP flags on the second through final packet in the
+flow; same form as the C<flags,8> field (cf. L</Field Constraints>)
 
 =item attribute,28
 
@@ -276,7 +267,7 @@ with a FIN flag (excluding ACK packets)
 
 flow generator prematurely created a record for a long-running
 connection due to a timeout.  (When the flow generator B<yaf(1)> is
-run with the B<--silk> switch, it will prematurely create a flow and
+run with the B<--silk> switch, it prematurely creates a flow and
 mark it with C<T> if the byte count of the flow cannot be stored in a
 32-bit value.)
 
@@ -324,46 +315,62 @@ L</Field Constraints>)
 
 =back
 
-Fields may not be specified more than once.
-
 =item B<--column-separator>=I<CHAR>
 
-Expect the character I<CHAR> to used as the delimiter between columns
-instead of the default 'B<|>'.
+Use the character I<CHAR> as the delimiter between columns (fields) in
+the input.  The default column separator is the vertical pipe
+('C<|>').  B<rwtuc> normally ignores whitespace (space and tab) around
+the column separator; however, using space or tab as the separator
+causes I<each> space or tab character to be treated as a field
+delimiter.  The newline character is not a valid delimiter character
+since it is used to denote records.
 
-=item B<--output-path>=I<FILEPATH>
+=item B<--output-path>=I<PATH>
 
-Write the SiLK Flow records to I<FILEPATH>.  The strings C<stdout> and
-C<stderr> may be used for the standard output and standard error,
-respectively, as long as they are not connected to a terminal.
+Write the binary SiLK Flow records to I<PATH>, where I<PATH> is a
+filename, a named pipe, the keyword C<stderr> to write the output to
+the standard error, or the keyword C<stdout> or C<-> to write the
+output to the standard output.  If I<PATH> names an existing file,
+B<rwtuc> exits with an error unless the SILK_CLOBBER environment
+variable is set, in which case I<PATH> is overwritten.  When I<PATH>
+ends in C<.gz>, the output is compressed using the library associated
+with B<gzip(1)>.  If this switch is not given, the output is written
+to the standard output.  Attempting to write the binary output to a
+terminal causes B<rwtuc> to exit with an error.
 
 =item B<--bad-input-lines>=I<FILEPATH>
 
 Copy any lines which could not be parsed to I<FILEPATH>.  The strings
 C<stdout> and C<stderr> may be used for the standard output and
-standard error, respectively.  Each bad line will be prepended by the
+standard error, respectively.  Each bad line is prepended by the
 source input file, a colon, the line number, and a colon.  On exit,
-B<rwtuc> will remove I<FILEPATH> if all input lines were successfully
+B<rwtuc> removes I<FILEPATH> if all input lines were successfully
 parsed.
 
 =item B<--verbose>
 
-If an input line fails to parse, print a message describing the error
-to the standard error, and continue to process the input.
+When an input line fails to parse, print a message to the standard
+error describing the problem.  When this switch is not specified,
+parsing failures are not reported.  B<rwtuc> continues to process the
+input after printing the message.  To stop processing when a parsing
+error occurs, use B<--stop-on-error>.
 
 =item B<--stop-on-error>
 
-If an input line fails to parse, print a message describing the error
-to the standard error and exit.  The output file will contain any
-records successfully created prior to reading the bad input line.
+When an input line fails to parse, print a message to the standard
+error describing the problem and exit the program.  When this occurs,
+the output file contains any records successfully created prior to
+reading the bad input line.  The default behavior of B<rwtuc> is to
+silently ignore parsing errors.  To report parsing errors and continue
+processing the input, use B<--verbose>.
 
 =item B<--no-titles>
 
-Treat the first line of input as record values to be parsed.  When
-this switch is not provided, B<rwtuc> skips the first line of input if
-it determines that the line contains the names of fields (titles).
-B<rwtuc> exits with an error when B<--no-titles> is given but
-B<--fields> is not.
+Parse the first line of the input as field values.  Normally when the
+B<--fields> switch is specified, B<rwtuc> examines the first line to
+determine if the line contains the names (titles) of fields and skips
+the line if it does.  B<rwtuc> exits with an error when B<--no-titles>
+is given but B<--fields> is not.
 
 =item B<--note-add>=I<TEXT>
 
@@ -433,6 +440,16 @@ When this switch is not provided, B<rwtuc> searches for the site
 configuration file in the locations specified in the L</FILES>
 section.
 
+=item B<--xargs>
+
+=item B<--xargs>=I<FILENAME>
+
+Read the names of the input files from I<FILENAME> or from the
+standard input if I<FILENAME> is not provided.  The input is expected
+to have one filename per line.  B<rwtuc> opens each named file in turn
+and reads text from it as if the filenames had been listed on the
+command line.  I<Since S<SiLK 3.15.0>.>
+
 =item B<--help>
 
 Print the available options and exit.
@@ -446,7 +463,7 @@ configured, then exit the application.
 
 =head2 Fixed Values
 
-The following switches can be used to set fields to fixed values.  A
+The following switches may be used to set fields to fixed values.  A
 value specified using one these switches overrides the field when it
 appears in the input, causing that column of input to be completely
 ignored.
@@ -456,12 +473,12 @@ ignored.
 =item B<--saddress>=I<IPADDR>
 
 Set the source address field to I<IPADDR> for all records.  I<IPADDR>
-can be in canonical notation or an unsigned integer.
+may be in canonical notation or an unsigned integer.
 
 =item B<--daddress>=I<IPADDR>
 
 Set the destination address field to I<IPADDR> for all records.
-I<IPADDR> can be in canonical notation or an unsigned integer.
+I<IPADDR> may be in canonical notation or an unsigned integer.
 
 =item B<--sport>=I<NUM>
 
@@ -508,7 +525,7 @@ L</Field Constraints>)
 
 =item B<--sensor>=I<SID>
 
-Set the sensor field to I<SID> for all records.  This can either be a
+Set the sensor field to I<SID> for all records.  This may either be a
 sensor name or sensor ID.
 
 =item B<--input-index>=I<NUM>
@@ -523,7 +540,7 @@ between 0 and 65535.
 
 =item B<--next-hop-ip>=I<IPADDR>
 
-Set the next-hop-ip field to I<IPADDR> for all records.  I<IPADDR> can
+Set the next-hop-ip field to I<IPADDR> for all records.  I<IPADDR> may
 be in canonical notation or an unsigned integer.
 
 =item B<--flags-initial>=I<TCPFLAGS>
@@ -604,7 +621,7 @@ F<flows.rw> and save the result in F<reverse.rw>:
  $ rwcut --fields=dip,dport,sip,sport,5-15,20-29 flows.rw   \
    | rwtuc --fields=1-15,20-29 --output-path=reverse.rw
 
-B<rwtuc> can be used to obfuscate the flow data in F<myflows.rw> to
+B<rwtuc> may be used to obfuscate the flow data in F<myflows.rw> to
 produce F<obflows.rw>.  Pipe the output from B<rwcut> into a script
 that manipulates the IP addresses, then pipe that into B<rwtuc>.
 Using the B<sed(1)> script in F<priv.sed>, the invocation is:
@@ -613,9 +630,9 @@ Using the B<sed(1)> script in F<priv.sed>, the invocation is:
    | sed -f priv.sed                                        \
    | rwtuc --sensor=1 > obflows.rw
 
-If the first line of input appears to contain titles, B<rwtuc> will
-ignore it.  In the first invocation below, B<rwtuc> treats C<SP> as an
-abbreviation for C<sPort> and ignores the line.  Use the
+If the first line of input appears to contain titles, B<rwtuc>
+ignores it.  In the first invocation below, B<rwtuc> treats C<SP> as
+an abbreviation for C<sPort> and ignores the line.  Use the
 B<--no-titles> switch to force B<rwtuc> to parse the line:
 
  $ echo 'SP' | rwtuc --fields=flags | rwcut --fields=flags
@@ -710,7 +727,7 @@ B<silk(7)>, B<yaf(1)>, B<sed(1)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwtuc.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
+$SiLK: rwtuc.pod 73da84b89ac7 2017-03-23 21:34:10Z mthomas $
 
 Local Variables:
 mode:text

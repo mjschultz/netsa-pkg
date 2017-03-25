@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKUNIQUE_H, "$SiLK: skunique.h 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $");
+RCSIDENTVAR(rcsID_SKUNIQUE_H, "$SiLK: skunique.h 9d04be8e27ff 2017-01-05 19:09:17Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -635,18 +635,6 @@ skUniqueSetTempDirectory(
     const char         *temp_dir);
 
 /*
- *  skUniqueSetErrorFunction(uniq, err_fn);
- *
- *    Use the function 'err_fn' to report errors encountered during
- *    processing.  If 'err_fn' is NULL, error messages are not
- *    reported.
- */
-void
-skUniqueSetErrorFunction(
-    sk_unique_t        *uniq,
-    sk_msg_fn_t         err_fn);
-
-/*
  *  ok = skUniqueSetFields(uniq, keys, distincts, values);
  *
  *    Specify the fields that the unique object 'uniq' should use.  It
@@ -919,18 +907,6 @@ void
 skPresortedUniqueSetTempDirectory(
     sk_sort_unique_t   *ps_uniq,
     const char         *temp_dir);
-
-/*
- *  skPresortedUniqueSetErrorFunction(uniq, err_fn);
- *
- *    Use the function 'err_fn' to report errors encountered during
- *    processing.  If 'err_fn' is NULL, error messages are not
- *    reported.
- */
-void
-skPresortedUniqueSetErrorFunction(
-    sk_sort_unique_t   *uniq,
-    sk_msg_fn_t         err_fn);
 
 /*
  *  ok = skPresortedUniqueSetFields(ps_uniq, keys, distincts, values);

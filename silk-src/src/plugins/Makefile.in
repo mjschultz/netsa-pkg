@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-# RCSIDENT("$SiLK: Makefile.am 28d53ce15dab 2011-05-24 17:30:15Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am d82586e0bb8f 2016-12-13 22:17:26Z mthomas $");
 
 # Installed Targets
 
@@ -180,6 +180,12 @@ cutmatch_la_OBJECTS = $(am_cutmatch_la_OBJECTS)
 cutmatch_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(cutmatch_la_LDFLAGS) $(LDFLAGS) -o $@
+flowkey_la_LIBADD =
+am_flowkey_la_OBJECTS = flowkey.lo
+flowkey_la_OBJECTS = $(am_flowkey_la_OBJECTS)
+flowkey_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(flowkey_la_LDFLAGS) $(LDFLAGS) -o $@
 flowrate_la_LIBADD =
 am_flowrate_la_OBJECTS = flowrate.lo
 flowrate_la_OBJECTS = $(am_flowrate_la_OBJECTS)
@@ -255,15 +261,15 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(app_mismatch_la_SOURCES) $(conficker_c_la_SOURCES) \
-	$(cutmatch_la_SOURCES) $(flowrate_la_SOURCES) \
-	$(int_ext_fields_la_SOURCES) $(rwslammer_la_SOURCES) \
-	$(rwsynackfin_la_SOURCES) $(skplugin_test_la_SOURCES) \
-	$(uniq_distproto_la_SOURCES)
+	$(cutmatch_la_SOURCES) $(flowkey_la_SOURCES) \
+	$(flowrate_la_SOURCES) $(int_ext_fields_la_SOURCES) \
+	$(rwslammer_la_SOURCES) $(rwsynackfin_la_SOURCES) \
+	$(skplugin_test_la_SOURCES) $(uniq_distproto_la_SOURCES)
 DIST_SOURCES = $(app_mismatch_la_SOURCES) $(conficker_c_la_SOURCES) \
-	$(cutmatch_la_SOURCES) $(flowrate_la_SOURCES) \
-	$(int_ext_fields_la_SOURCES) $(rwslammer_la_SOURCES) \
-	$(rwsynackfin_la_SOURCES) $(skplugin_test_la_SOURCES) \
-	$(uniq_distproto_la_SOURCES)
+	$(cutmatch_la_SOURCES) $(flowkey_la_SOURCES) \
+	$(flowrate_la_SOURCES) $(int_ext_fields_la_SOURCES) \
+	$(rwslammer_la_SOURCES) $(rwsynackfin_la_SOURCES) \
+	$(skplugin_test_la_SOURCES) $(uniq_distproto_la_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -480,11 +486,11 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-pkglib_LTLIBRARIES = app-mismatch.la conficker-c.la flowrate.la \
-	cutmatch.la uniq-distproto.la int-ext-fields.la
+pkglib_LTLIBRARIES = app-mismatch.la conficker-c.la cutmatch.la \
+	 flowkey.la flowrate.la int-ext-fields.la uniq-distproto.la
 
-EXTRA_DIST = flowrate.pod int-ext-fields.pod silk-plugin.pod
-@HAVE_POD2MAN_TRUE@man3_MANS = flowrate.3 int-ext-fields.3 silk-plugin.3
+EXTRA_DIST = flowkey.pod flowrate.pod int-ext-fields.pod silk-plugin.pod
+@HAVE_POD2MAN_TRUE@man3_MANS = flowkey.3 flowrate.3 int-ext-fields.3 silk-plugin.3
 noinst_LTLIBRARIES = skplugin-test.la rwslammer.la rwsynackfin.la
 
 # Flags used when building plug-ins to be installed.  (This variable
@@ -505,6 +511,8 @@ conficker_c_la_SOURCES = conficker-c.c
 conficker_c_la_LDFLAGS = $(INSTALLED_PLUGIN_FLAGS)
 cutmatch_la_SOURCES = cutmatch.c
 cutmatch_la_LDFLAGS = $(INSTALLED_PLUGIN_FLAGS)
+flowkey_la_SOURCES = flowkey.c
+flowkey_la_LDFLAGS = $(INSTALLED_PLUGIN_FLAGS)
 flowrate_la_SOURCES = flowrate.c
 flowrate_la_LDFLAGS = $(INSTALLED_PLUGIN_FLAGS)
 int_ext_fields_la_SOURCES = int-ext-fields.c
@@ -769,6 +777,9 @@ conficker-c.la: $(conficker_c_la_OBJECTS) $(conficker_c_la_DEPENDENCIES) $(EXTRA
 cutmatch.la: $(cutmatch_la_OBJECTS) $(cutmatch_la_DEPENDENCIES) $(EXTRA_cutmatch_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(cutmatch_la_LINK) -rpath $(pkglibdir) $(cutmatch_la_OBJECTS) $(cutmatch_la_LIBADD) $(LIBS)
 
+flowkey.la: $(flowkey_la_OBJECTS) $(flowkey_la_DEPENDENCIES) $(EXTRA_flowkey_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(flowkey_la_LINK) -rpath $(pkglibdir) $(flowkey_la_OBJECTS) $(flowkey_la_LIBADD) $(LIBS)
+
 flowrate.la: $(flowrate_la_OBJECTS) $(flowrate_la_DEPENDENCIES) $(EXTRA_flowrate_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(flowrate_la_LINK) -rpath $(pkglibdir) $(flowrate_la_OBJECTS) $(flowrate_la_LIBADD) $(LIBS)
 
@@ -805,6 +816,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/app-mismatch.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/conficker-c.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cutmatch.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/flowkey.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/flowrate.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/int-ext-fields.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rwslammer.Plo@am__quote@

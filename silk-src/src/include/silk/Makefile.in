@@ -114,13 +114,14 @@ DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = silk_config1.h silk_config2.h
 CONFIG_CLEAN_FILES = hashlib.h iptree.h redblack.h rwascii.h rwrec.h \
-	silk.h silk_files.h silk_types.h skbag.h skcountry.h \
-	skdaemon.h skdeque.h skdllist.h skheader.h skheap.h skipaddr.h \
-	skipset.h sklog.h skmempool.h skplugin.h skpolldir.h \
-	skprefixmap.h skprintnets.h sksite.h skstream.h skstringmap.h \
-	sktempfile.h skthread.h sktimer.h sktracemsg.h skvector.h \
-	utils.h silkpython.h bagtree.h rwpack.h gnu_getopt.h \
-	libflowsource.h probeconf.h skipfix.h rwflowpack.h
+	silk.h silk_files.h silk_types.h skaggbag.h skbag.h \
+	skcountry.h skdaemon.h skdeque.h skdllist.h skheader.h \
+	skheap.h skipaddr.h skipset.h sklog.h skmempool.h skplugin.h \
+	skpolldir.h skprefixmap.h skprintnets.h sksite.h skstream.h \
+	skstringmap.h sktempfile.h skthread.h sktimer.h sktracemsg.h \
+	skvector.h utils.h silkpython.h bagtree.h rwpack.h \
+	gnu_getopt.h libflowsource.h probeconf.h skipfix.h \
+	rwflowpack.h
 CONFIG_CLEAN_VPATH_FILES =
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)

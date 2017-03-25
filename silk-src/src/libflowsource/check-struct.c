@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2008-2016 by Carnegie Mellon University.
+** Copyright (C) 2008-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -21,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcs_CHECK_STRUCT_C, "$SiLK: check-struct.c 73c4e79b709d 2016-06-16 13:59:02Z mthomas $");
+RCSIDENTVAR(rcs_CHECK_STRUCT_C, "$SiLK: check-struct.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 
 /*

@@ -14,7 +14,8 @@ B<rwsiteinfo> - Print information from the silk.conf site configuration file
         [--timestamp-format=FORMAT] [--no-titles]
         [--no-columns] [--column-separator=CHAR]
         [--no-final-delimiter] [{--delimited | --delimited=CHAR}]
-        [--list-delimiter=CHAR] [--pager=PAGER_PROG]
+        [--list-delimiter=CHAR] [--output-path=PATH]
+        [--pager=PAGER_PROG]
 
   rwsiteinfo --help
 
@@ -328,14 +329,25 @@ columns instead of the default C<|>.
 Specify the character to use between items that comprise a
 I<FIELD>B<:list> column.  The default list delimiter is comma C<,>.
 
+=item B<--output-path>=I<PATH>
+
+Write the textual output to I<PATH>, where I<PATH> is a filename, a
+named pipe, the keyword C<stderr> to write the output to the standard
+error, or the keyword C<stdout> or C<-> to write the output to the
+standard output (and bypass the paging program).  If I<PATH> names an
+existing file, B<rwsiteinfo> exits with an error unless the
+SILK_CLOBBER environment variable is set, in which case I<PATH> is
+overwritten.  If this switch is not given, the output is either sent
+to the pager or written to the standard output.  I<Since SiLK 3.15.0.>
+
 =item B<--pager>=I<PAGER_PROG>
 
 When output is to a terminal, invoke the program I<PAGER_PROG> to view
 the output one screen full at a time.  This switch overrides the
 SILK_PAGER environment variable, which in turn overrides the PAGER
-variable.  If the value of the pager is determined to be the empty
-string, no paging will be performed and all output will be printed to
-the terminal.
+variable.  If the B<--output-path> switch is given or if the value of
+the pager is determined to be the empty string, no paging is performed
+and all output is written to the terminal.
 
 =item B<--help>
 
@@ -645,7 +657,7 @@ B<packlogic-twoway(3)>, B<silk(7)>, B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwsiteinfo.pod 093f18894c79 2015-09-08 20:02:01Z mthomas $
+$SiLK: rwsiteinfo.pod 4a14e7ea8fe2 2017-03-13 20:17:43Z mthomas $
 
 Local Variables:
 mode:text

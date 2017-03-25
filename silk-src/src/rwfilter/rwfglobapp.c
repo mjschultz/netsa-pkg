@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2003-2016 by Carnegie Mellon University.
+** Copyright (C) 2003-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -21,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfglobapp.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwfglobapp.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
 
 #include "rwfilter.h"
 
@@ -67,6 +67,9 @@ static int no_summary = 0;
  * 0==print file names; 1==no file names */
 static int no_file_names = 0;
 
+/* FIXME: Consider adding --pager and --output-file support.  Or
+ * perhaps enable different streams for missing files vs existing
+ * files. */
 
 /* OPTIONS SETUP */
 

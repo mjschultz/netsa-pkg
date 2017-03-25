@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2011-2016 by Carnegie Mellon University.
+** Copyright (C) 2011-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SILK_TYPES_H, "$SiLK: silk_types.h 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENTVAR(rcsID_SILK_TYPES_H, "$SiLK: silk_types.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 /**
  *  @file

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -28,7 +28,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_IPTREE_H, "$SiLK: iptree.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_IPTREE_H, "$SiLK: iptree.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/skipset.h>

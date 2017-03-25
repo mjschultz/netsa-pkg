@@ -36,10 +36,10 @@ from the files named on the command line or from the standard input
 when no file names are specified and neither B<--xargs> nor
 B<--no-files> is present.  To read the standard input in addition to
 the named files, use C<-> or C<stdin> as a file name.  When the
-B<--xargs> switch is provided, B<rwpmaplookup> will read the names of
-the files to process from the named text file, or from the standard
-input if no file name argument is provided to the switch.  The input
-to B<--xargs> must contain one file name per line.
+B<--xargs> switch is provided, B<rwpmaplookup> reads the names of the
+files to process from the named text file or from the standard input
+if no file name argument is provided to the switch.  The input to
+B<--xargs> must contain one file name per line.
 
 You must tell B<rwpmaplookup> the prefix map to use for look-ups using
 one of three switches:
@@ -140,7 +140,7 @@ I<COUNTRY_CODE_FILE>.
 
 =item B<--fields>=I<FIELDS>
 
-Specify the columns to include in the output.  The columns will be
+Specify the columns to include in the output.  The columns are
 displayed in the order the fields are specified.  I<FIELDS> is a comma
 separated list of field-names.  Field-names are case-insensitive.
 When this switch is not provided, the default fields are C<key,value>.
@@ -294,8 +294,14 @@ columns instead of the default 'B<|>'.
 
 =item B<--output-path>=I<PATH>
 
-Determines where the output of B<rwpmaplookup> is written.  If this
-option is not given, output is written to the standard output.
+Write the textual output to I<PATH>, where I<PATH> is a filename, a
+named pipe, the keyword C<stderr> to write the output to the standard
+error, or the keyword C<stdout> or C<-> to write the output to the
+standard output (and bypass the paging program).  If I<PATH> names an
+existing file, B<rwpmaplookup> exits with an error unless the
+SILK_CLOBBER environment variable is set, in which case I<PATH> is
+overwritten.  If this option is not given, the output is either sent
+to the pager or written to the standard output.
 
 =item B<--pager>=I<PAGER_PROG>
 
@@ -303,18 +309,20 @@ When the B<--no-files> switch has not been specified and output is to
 a terminal, invoke the program I<PAGER_PROG> to view the output one
 screen full at a time.  This switch overrides the SILK_PAGER
 environment variable, which in turn overrides the PAGER variable.  If
-the value of the pager is determined to be the empty string, no paging
-will be performed and all output will be printed to the terminal.
+the B<--output-path> switch is given or if the value of the pager is
+determined to be the empty string, no paging is performed and all
+output is written to the terminal.
 
 =item B<--xargs>
 
 =item B<--xargs>=I<FILENAME>
 
-Causes B<rwpmaplookup> to read file names from I<FILENAME> or from the
-standard input if I<FILENAME> is not provided.  The input should have
-one file name per line.  B<rwpmaplookup> will open each file in turn
-and read the IPset, textual IP addresses, or textual protocol/port
-pairs from it, as if the files had been listed on the command line.
+Read the names of the input files from I<FILENAME> or from the
+standard input if I<FILENAME> is not provided.  The input is expected
+to have one filename per line.  B<rwpmaplookup> opens each named file
+in turn and reads the IPset, the textual IP addresses, or the textual
+protocol/port pairs from it as if the filenames had been listed on the
+command line.
 
 =item B<--help>
 
@@ -731,7 +739,7 @@ B<rwsetbuild(1)>, B<rwsetcat(1)>, B<rwsettool(1)>, B<silk(7)>
 
 =cut
 
-$SiLK: rwpmaplookup.pod 093f18894c79 2015-09-08 20:02:01Z mthomas $
+$SiLK: rwpmaplookup.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
 
 Local Variables:
 mode:text

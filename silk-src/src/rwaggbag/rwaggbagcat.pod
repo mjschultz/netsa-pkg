@@ -1,0 +1,369 @@
+=pod
+
+=head1 NAME
+
+B<rwaggbagcat> - Output a binary Aggregate Bag file as text
+
+=head1 SYNOPSIS
+
+  rwaggbagcat [--timestamp-format=FORMAT] [--ip-format=FORMAT]
+        [--integer-sensors] [--integer-tcp-flags]
+        [--no-titles] [--no-columns] [--column-separator=C]
+        [--no-final-delimiter] [{--delimited | --delimited=C}]
+        [--output-path=PATH] [--pager=PAGER_PROG]
+        [--site-config-file=FILENAME]
+        [AGGBAGFILE [AGGBAGFILE...]]
+
+  rwaggbagcat --help
+
+  rwaggbagcat --version
+
+=head1 DESCRIPTION
+
+B<rwaggbagcat> reads a binary Aggregate Bag as created by
+B<rwaggbag(1)> or B<rwaggbagbuild(1)>, converts it to text, and
+outputs it to the standard output, the pager, or the specified file.
+
+B<rwaggbagcat> reads the I<AGGBAGFILE>s specified on the command line;
+if no I<AGGBAGFILE> arguments are given, B<rwaggbagcat> attempts to
+read an Aggregate Bag from the standard input.  To read the standard
+input in addition to the named files, use C<-> or C<stdin> as an
+I<AGGBAGFILE> name.  If any input does not contain an Aggregate Bag
+file, B<rwaggbagcat> prints an error to the standard error and exits
+abnormally.
+
+When multiple I<AGGBAGFILE>s are specified on the command line, each
+is handled individually.  To process the files as a single Aggregate
+Bag, use B<rwaggbagtool(1)> to combine the Aggregate Bags and pipe the
+output of B<rwaggbagtool> into B<rwaggbagcat>.
+
+=head1 OPTIONS
+
+Option names may be abbreviated if the abbreviation is unique or is an
+exact match for an option.  A parameter to an option may be specified
+as B<--arg>=I<param> or S<B<--arg> I<param>>, though the first form is
+required for options that take optional parameters.
+
+=over 4
+
+=item B<--timestamp-format>=I<FORMAT>
+
+Specify the format, timezone, and/or modifier to use when printing
+timestamps.  When this switch is not specified, the
+SILK_TIMESTAMP_FORMAT environment variable is checked for a format,
+timezone, and modifier.  If it is empty or contains invalid values,
+timestamps are printed in the default format, and the timezone is UTC
+unless SiLK was compiled with local timezone support.  I<FORMAT> is a
+comma-separated list of a format, a timezone, and/or a modifier.  The
+format is one of:
+
+=over 4
+
+=item default
+
+Print the timestamps as I<YYYY>/I<MM>/I<DD>TI<hh>:I<mm>:I<ss>.I<sss>.
+
+=item iso
+
+Print the timestamps as I<YYYY>-I<MM>-I<DD> I<hh>:I<mm>:I<ss>.I<sss>.
+
+=item m/d/y
+
+Print the timestamps as I<MM>/I<DD>/I<YYYY> I<hh>:I<mm>:I<ss>.I<sss>.
+
+=item epoch
+
+Print the timestamps as the number of seconds since 00:00:00 UTC on
+1970-01-01.
+
+=back
+
+When a timezone is specified, it is used regardless of the default
+timezone support compiled into SiLK.  The timezone is one of:
+
+=over 4
+
+=item utc
+
+Use Coordinated Universal Time to print timestamps.
+
+=item local
+
+Use the TZ environment variable or the local timezone.
+
+=back
+
+=item B<--ip-format>=I<FORMAT>
+
+Specify how IP addresses are printed.  When this switch is not
+specified, the SILK_IP_FORMAT environment variable is checked for a
+format.  If it is empty or contains an invalid format, IPs are printed
+in the canonical format.  The I<FORMAT> is one of:
+
+=over 4
+
+=item canonical
+
+Print IP addresses in their canonical form: dotted quad for IPv4
+(C<127.0.0.1>) and hexadectet for IPv6 (C<2001:db8::1>).  Note that
+IPv6 addresses in ::ffff:0:0/96 and some IPv6 addresses in ::/96 will
+be printed as a mixture of IPv6 and IPv4.
+
+=item zero-padded
+
+Print IP addresses in their canonical form, but add zeros to the
+output so it fully fills the width of column.  The addresses
+C<127.0.0.1> and C<2001:db8::1> are printed as C<127.000.000.001> and
+C<2001:0db8:0000:0000:0000:0000:0000:0001>, respectively.  When the
+B<--ipv6-policy> is C<force>, the output for C<127.0.0.1> becomes
+C<0000:0000:0000:0000:0000:ffff:7f00:0001>.
+
+=item decimal
+
+Print IP addresses as integers in decimal format.  The addresses
+C<127.0.0.1> and C<2001:db8::1> are printed as C<2130706433> and
+C<42540766411282592856903984951653826561>, respectively.
+
+=item hexadecimal
+
+Print IP addresses as integers in hexadecimal format.  The addresses
+C<127.0.0.1> and C<2001:db8::1> are printed as C<7f000001> and
+C<20010db8000000000000000000000001>, respectively.
+
+=item force-ipv6
+
+Print all IP addresses in the canonical form for IPv6 without using
+any IPv4 notation.  Any IPv4 address is mapped into the ::ffff:0:0/96
+netblock.  The addresses C<127.0.0.1> and C<2001:db8::1> are printed
+as C<::ffff:7f00:1> and C<2001:db8::1>, respectively.
+
+=back
+
+=item B<--integer-sensors>
+
+Print the integer ID of the sensor rather than its name.
+
+=item B<--integer-tcp-flags>
+
+Print the TCP flag fields (flags, initialFlags, sessionFlags) as an
+integer value.  Typically, the characters C<F,S,R,P,A,U,E,C> are used
+to represent the TCP flags.
+
+=item B<--no-titles>
+
+Turn off column titles.  By default, titles are printed.
+
+=item B<--no-columns>
+
+Disable fixed-width columnar output.
+
+=item B<--column-separator>=I<C>
+
+Use specified character between columns and after the final column.
+When this switch is not specified, the default of 'B<|>' is used.
+
+=item B<--no-final-delimiter>
+
+Do not print the column separator after the final column.  Normally a
+delimiter is printed.
+
+=item B<--delimited>
+
+=item B<--delimited>=I<C>
+
+Run as if B<--no-columns> B<--no-final-delimiter> B<--column-sep>=I<C>
+had been specified.  That is, disable fixed-width columnar output; if
+character I<C> is provided, it is used as the delimiter between
+columns instead of the default 'B<|>'.
+
+=item B<--output-path>=I<PATH>
+
+Write the textual output to I<PATH>, where I<PATH> is a filename, a
+named pipe, the keyword C<stderr> to write the output to the standard
+error, or the keyword C<stdout> or C<-> to write the output to the
+standard output (and bypass the paging program).  If I<PATH> names an
+existing file, B<rwaggbagcat> exits with an error unless the
+SILK_CLOBBER environment variable is set, in which case I<PATH> is
+overwritten.  If this option is not given, the output is either sent
+to the pager or written to the standard output.
+
+=item B<--pager>=I<PAGER_PROG>
+
+When output is to a terminal, invoke the program I<PAGER_PROG> to view
+the output one screen full at a time.  This switch overrides the
+SILK_PAGER environment variable, which in turn overrides the PAGER
+variable.  If the B<--output-path> switch is given or if the value of
+the pager is determined to be the empty string, no paging is performed
+and all output is written to the terminal.
+
+=item B<--site-config-file>=I<FILENAME>
+
+Read the SiLK site configuration from the named file I<FILENAME>.
+When this switch is not provided, B<rwaggbagcat> searches for the site
+configuration file in the locations specified in the L</FILES>
+section.
+
+=item B<--help>
+
+Print the available options and exit.
+
+=item B<--version>
+
+Print the version number and information about how SiLK was
+configured, then exit the application.
+
+=back
+
+=head1 EXAMPLES
+
+In the following examples, the dollar sign (C<$>) represents the shell
+prompt.  The text after the dollar sign represents the command line.
+Lines have been wrapped for improved readability, and the back slash
+(C<\>) is used to indicate a wrapped line.
+
+The formatting switches on B<rwaggbagcat> are similar to those on the
+other SiLK tools.
+
+First, use B<rwaggbag(1)> to create an Aggregate Bag file from the
+SiLK Flow file F<data.rw>:
+
+ $ rwaggbag --key=sport,dport --counter=sum-pack,sum-byte \
+        --output-path=ab.aggbag data.rw
+
+To print Aggregate Bag:
+
+ $ rwaggbagcat ab.aggbag | head -4
+ sPort|dPort|    sum-packets|           sum-bytes|
+     0|    0|          73452|             6169968|
+     0|  769|          15052|              842912|
+     0|  771|          14176|              793856|
+
+To produce column separated data:
+
+ rwaggbagcat --delimited=, /tmp/ab.aggbag | head -4
+ sPort,dPort,sum-packets,sum-bytes
+ 0,0,73452,6169968
+ 0,769,15052,842912
+ 0,771,14176,793856
+
+To remove the title:
+
+ $ rwaggbagcat --no-title ab.aggbag | head -4
+     0|    0|          73452|             6169968|
+     0|  769|          15052|              842912|
+     0|  771|          14176|              793856|
+     0| 2048|          14356|             1205904|
+
+To change the format of IP addresses:
+
+ $ rwaggbag --key=sipv4,dipv4 --counter=sum-pack,sum-byte data.rw   \
+   | rwaggbagcat --ip-format=decimal | head -4
+      sIPv4|     dIPv4|    sum-packets|           sum-bytes|
+  168047851|3232295339|            255|               18260|
+  168159227|3232293505|            331|              536169|
+  168381813|3232282689|            563|               55386|
+
+To change the format of timestamps:
+
+ $ rwaggbag --key=stime,etime --counter=sum-pack,sum-byte data.rwf  \
+   | rwaggbagcat --timestamp-format=epoch | head -4
+      sTime|     eTime|    sum-packets|           sum-bytes|
+ 1234396802|1234396802|              2|                 259|
+ 1234396802|1234398594|            526|               38736|
+ 1234396803|1234396803|              9|                 504|
+
+=head1 ENVIRONMENT
+
+=over 4
+
+=item SILK_CLOBBER
+
+The SiLK tools normally refuse to overwrite existing files.  Setting
+SILK_CLOBBER to a non-empty value removes this restriction.
+
+=item SILK_PAGER
+
+When set to a non-empty string, B<rwaggbagcat> automatically invokes
+this program to display its output a screen at a time.  If set to an
+empty string, B<rwaggbagcat> does not automatically page its output.
+
+=item PAGER
+
+When set and SILK_PAGER is not set, B<rwaggbagcat> automatically
+invokes this program to display its output a screen at a time.
+
+=item SILK_CONFIG_FILE
+
+This environment variable is used as the value for the
+B<--site-config-file> when that switch is not provided.
+
+=item SILK_DATA_ROOTDIR
+
+This environment variable specifies the root directory of data
+repository.  As described in the L</FILES> section, B<rwaggbagcat> may
+use this environment variable when searching for the SiLK site
+configuration file.
+
+=item SILK_PATH
+
+This environment variable gives the root of the install tree.  When
+searching for configuration files and plug-ins, B<rwaggbagcat> may use
+this environment variable.  See the L</FILES> section for details.
+
+=item TZ
+
+When the argument to the B<--timestamp-format> switch includes
+C<local> or when a SiLK installation is built to use the local
+timezone, the value of the TZ environment variable determines the
+timezone in which B<rwaggbagcat> displays timestamps.  (If both of
+those are false, the TZ environment variable is ignored.)  If the TZ
+environment variable is not set, the machine's default timezone is
+used.  Setting TZ to the empty string or 0 causes timestamps to be
+displayed in UTC.  For system information on the TZ variable, see
+B<tzset(3)> or B<environ(7)>.  (To determine if SiLK was built with
+support for the local timezone, check the C<Timezone support> value in
+the output of B<rwaggbagcat --version>.)
+
+=back
+
+=head1 FILES
+
+=over 4
+
+=item F<${SILK_CONFIG_FILE}>
+
+=item F<${SILK_DATA_ROOTDIR}/silk.conf>
+
+=item F<@SILK_DATA_ROOTDIR@/silk.conf>
+
+=item F<${SILK_PATH}/share/silk/silk.conf>
+
+=item F<${SILK_PATH}/share/silk.conf>
+
+=item F<@prefix@/share/silk/silk.conf>
+
+=item F<@prefix@/share/silk.conf>
+
+Possible locations for the SiLK site configuration file which are
+checked when the B<--site-config-file> switch is not provided.
+
+=back
+
+=head1 NOTES
+
+B<rwaggbagcat> and the other Aggregate Bag tools were introduced in
+SiLK 3.15.0.
+
+=head1 SEE ALSO
+
+B<rwaggbag(1)>, B<rwaggbagbuild(1)>, B<rwaggbagtool(1)>, B<silk(7)>,
+B<tzset(3)>, B<environ(7)>
+
+=cut
+
+$SiLK: rwaggbagcat.pod 19097c33c9cb 2017-03-24 19:36:51Z mthomas $
+
+Local Variables:
+mode:text
+indent-tabs-mode:nil
+End:

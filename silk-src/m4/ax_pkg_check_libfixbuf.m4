@@ -1,10 +1,10 @@
-dnl Copyright (C) 2004-2016 by Carnegie Mellon University.
+dnl Copyright (C) 2004-2017 by Carnegie Mellon University.
 dnl
 dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in ../LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: ax_pkg_check_libfixbuf.m4 85572f89ddf9 2016-05-05 20:07:39Z mthomas $")
+dnl RCSIDENT("$SiLK: ax_pkg_check_libfixbuf.m4 d8ee22371cf3 2017-03-23 22:39:48Z mthomas $")
 
 
 # ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ fbCollectorSetSFlowTranslator(c, &e);
 
     AC_DEFINE_UNQUOTED([ENABLE_IPFIX],[${ENABLE_IPFIX}],
         [Define to 1 to build with support for IPFIX.  Define to 0 otherwise.
-         Requires libfixbuf-1.6.0 or later support and the
+         Requires libfixbuf-1.7.0 or later support and the
          <fixbuf/public.h> header file.])
 
 ])# AX_PKG_CHECK_LIBFIXBUF

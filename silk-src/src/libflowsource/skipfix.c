@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2016 by Carnegie Mellon University.
+** Copyright (C) 2007-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -22,7 +22,7 @@
 #define SKIPFIX_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipfix.c 301c05a106b7 2016-11-15 18:04:23Z mthomas $");
+RCSIDENT("$SiLK: skipfix.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/skipaddr.h>

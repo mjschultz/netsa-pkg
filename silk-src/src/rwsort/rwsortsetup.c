@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsortsetup.c b87f61575a2a 2016-09-22 18:42:02Z mthomas $");
+RCSIDENT("$SiLK: rwsortsetup.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skcountry.h>
@@ -117,7 +117,7 @@ static const char *appHelp[] = {
      "\tcomma-separated list of names, IDs, and/or ID-ranges"),
     "Reverse the sort order. Def. No",
     "Print names of input files as they are opened. Def. No",
-    ("Write sorted output to this file path. Def. stdout"),
+    ("Write sorted output to this stream or file. Def. stdout"),
     ("Load given plug-in to add fields. Switch may be repeated to\n"
      "\tload multiple plug-ins. Def. None"),
     ("Assume input has been presorted using\n"

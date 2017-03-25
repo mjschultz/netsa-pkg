@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2016 by Carnegie Mellon University.
+** Copyright (C) 2005-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwgroupsetup.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: rwgroupsetup.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/sksite.h>
@@ -120,7 +120,7 @@ static const char *appHelp[] = {
     ("Only write flow records to the output stream when the\n"
      "\trecord's group contains at least this number of records. Def. 1"),
     ("Use thie value as the ID for first group. Def. 0"),
-    ("Write the output to the named location. Def. stdout"),
+    ("Write the output to this stream or file. Def. stdout"),
     ("Copy the input records to the named location. Def. No"),
     (char *)NULL
 };

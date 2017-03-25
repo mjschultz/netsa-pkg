@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2016 by Carnegie Mellon University.
+** Copyright (C) 2005-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -20,7 +20,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKVECTOR_H, "$SiLK: skvector.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_SKVECTOR_H, "$SiLK: skvector.h 78caf6ae8f54 2017-02-14 14:54:52Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -28,6 +28,25 @@ RCSIDENTVAR(rcsID_SKVECTOR_H, "$SiLK: skvector.h 85572f89ddf9 2016-05-05 20:07:3
  *  @file
  *
  *    Implementation of sk_vector_t, a simple growable array.
+ *
+ *    Elements in a vector are accessed by a numeric index.  The
+ *    minimum index is 0.
+ *
+ *    The size of an individual element in the vector is specified
+ *    when the vector is created.  This is the element_size.
+ *
+ *    Operations that add and get elements to and from the vector copy
+ *    data in multiples of the element_size.
+ *
+ *    A vector has a maximum number of items it can hold without
+ *    needing to reallocate its iternal memory.  This is the capacity.
+ *    Appending an item to the vector automatically grows the capacity
+ *    as needed, but other functions that insert into the vector do
+ *    not modify the capacity.
+ *
+ *    A vector also knows the numeric index of the last element in its
+ *    internal memory.  One more than this value is the count of
+ *    elements in the vector.
  *
  *    This file is part of libsilk.
  */
@@ -44,6 +63,12 @@ RCSIDENTVAR(rcsID_SKVECTOR_H, "$SiLK: skvector.h 85572f89ddf9 2016-05-05 20:07:3
  *
  *    Returns the new vector or NULL if 'element_size' is 0 or the
  *    allocation fails.
+ *
+ *    The caller should use skVectorDestroy() to free the vector once
+ *    it is no longer needed.
+ *
+ *    Other functions that create a new vector are
+ *    skVectorNewFromArray() and skVectorClone().
  */
 sk_vector_t *
 skVectorNew(
@@ -54,11 +79,18 @@ skVectorNew(
  *    Creates a new vector where the size of each element is
  *    'element_size' bytes, allocates enough space for 'count'
  *    elements, and copies ('count' * 'element_size') bytes from
- *    'array' into the vector.
+ *    'array' into the vector.  This is equivalent to calling
+ *    skVectorNew() and skVectorAppendFromArray().
  *
  *    Returns the new vector or NULL on allocation error or if
  *    'element_size' is 0.  Returns an empty vector when 'count' is 0
  *    or 'array' is NULL.
+ *
+ *    The caller should use skVectorDestroy() to free the vector once
+ *    it is no longer needed.
+ *
+ *    Other functions that create a new vector are skVectorNew() and
+ *    skVectorClone().
  */
 sk_vector_t *
 skVectorNewFromArray(
@@ -74,6 +106,12 @@ skVectorNewFromArray(
  *    of elements in 'v'.
  *
  *    Returns the new vector or NULL on allocation error.
+ *
+ *    The caller should use skVectorDestroy() to free the vector once
+ *    it is no longer needed.
+ *
+ *    Other functions that create a new vector are skVectorNew() and
+ *    skVectorNewFromArray().
  */
 sk_vector_t *
 skVectorClone(
@@ -94,8 +132,8 @@ skVectorDestroy(
 
 
 /**
- *    Sets the capacity of the vector to 'v', growing or shrinking the
- *    spaced allocated for the elements as required.
+ *    Sets the capacity of the vector 'v' to 'capacity', growing or
+ *    shrinking the spaced allocated for the elements as required.
  *
  *    When shrinking a vector that contains pointers, it is the
  *    caller's responsibility to free the items before changing its
@@ -176,7 +214,7 @@ skVectorAppendValue(
 /**
  *    Copies the data from 'src' into the vector 'dst' at position
  *    skVectorGetCount(v), increasing the capacity of the vector 'dst'
- *    if necessary..  Returns 0 on success or -1 for an allocation
+ *    if necessary.  Returns 0 on success or -1 for an allocation
  *    error.
  */
 int
@@ -187,7 +225,9 @@ skVectorAppendVector(
 /**
  *    Copies the data from 'array' into the vector 'v' at position
  *    skVectorGetCount(v), increasing the capacity of the 'v' if
- *    necessary..  Returns 0 on success or -1 for an allocation error.
+ *    necessary.  Returns 0 on success or -1 for an allocation error.
+ *
+ *    See also skVectorNewFromArray().
  */
 int
 skVectorAppendFromArray(
@@ -202,11 +242,17 @@ skVectorAppendFromArray(
  *    is position 0.  Returns 0 on success or -1 if 'position' is not
  *    less than skVectorGetCount(v).
  *
- *    Equivalent to
+ *    See also skVectorGetValuePointer(), which returns a pointer to
+ *    the element without needing to copy the contents of the element.
  *
- *    -1 + skVectorGetMultipleValues(out_element, v, position, 1)
+ *    To get multiple values from a vector, consider using
+ *    skVectorGetMultipleValues(), skVectorToArray(), or
+ *    skVectorToArrayAlloc().  This function is equivalent to
  *
- *    See also skVectorGetValuePointer().
+ *    -1 + skVectorGetMultipleValues(out_element, v, position, 1);
+ *
+ *    To get a value and also remove it from the vector, use
+ *    skVectorRemoveValue().
  */
 int
 skVectorGetValue(
@@ -240,6 +286,9 @@ skVectorGetValuePointer(
  *    previous element at that position is overwritten.  If the vector
  *    contains pointers, it is the caller's responsibility to free the
  *    element at that position prior to overwriting it.
+ *
+ *    Use skVectorInsertValue() to insert a value at a position
+ *    without overwriting the existing data.
  *
  *    The value 'position' must be within the current capacity of the
  *    vector (that is, less than the value skVectorGetCapacity())
@@ -299,6 +348,9 @@ skVectorInsertValue(
  *
  *    Returns 0 on success.  Returns -1 if 'position' is not less than
  *    skVectorGetCount(v).
+ *
+ *    Use skVectorGetValue() to get a value without removing it from
+ *    the vector.
  *
  *    Since SiLK 3.11.0.
  */

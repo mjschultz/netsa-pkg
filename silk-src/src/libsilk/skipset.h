@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2008-2016 by Carnegie Mellon University.
+** Copyright (C) 2008-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -22,7 +22,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKIPSET_H, "$SiLK: skipset.h 77a7d16206f7 2016-11-02 13:49:55Z mthomas $");
+RCSIDENTVAR(rcsID_SKIPSET_H, "$SiLK: skipset.h ef5b2378ee80 2017-02-27 21:48:55Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/skheader.h>
@@ -540,9 +540,10 @@ skIPSetIteratorBind(
 
 /**
  *    If there are more entries in the IPSet, this function puts the
- *    next IP Address into the location referenced by 'out_addr' and
- *    returns SK_ITERATOR_OK.  Otherwise, 'out_addr' is not touched
- *    and SK_ITERATOR_NO_MORE_ENTRIES is returned.
+ *    next IP Address and its CIDR prefix into the locations
+ *    referenced by 'ipaddr' and 'prefix', respectively, and returns
+ *    SK_ITERATOR_OK.  Otherwise, neither 'ipaddr' nor 'prefix' are
+ *    modified and SK_ITERATOR_NO_MORE_ENTRIES is returned.
  */
 int
 skIPSetIteratorNext(
@@ -873,8 +874,8 @@ skIPSetProcessStreamCountIPs(
  *    SKIPSET_ERR_BADINPUT if either input parameter is NULL,
  *    SKIPSET_ERR_FILETYPE if the input is not an IPset stream,
  *    SKIPSET_ERR_FILEVERSION if the IPset file version is newer than
- *    support by this comile of SiLK, SKIPSET_ERR_FILEHEADER on other
- *    header errors reading the header (this may include if the
+ *    supported by this release of SiLK, SKIPSET_ERR_FILEHEADER on
+ *    other header errors reading the header (this may include if the
  *    stream's header includes features not available in this compile
  *    of SiLK---such as file compression or an attempt to read an IPv6
  *    IPset in an IPv4-only compile of SiLK), SKIPSET_ERR_FILEIO on

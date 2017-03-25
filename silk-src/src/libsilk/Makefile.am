@@ -1,12 +1,12 @@
-# RCSIDENT("$SiLK: Makefile.am 9d844f629b99 2016-11-16 20:29:28Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am e4c6d3d38708 2017-03-24 22:01:06Z mthomas $");
 
 # Installed Targets
 
 bin_PROGRAMS = silk_config
 
 lib_LTLIBRARIES = libsilk.la libsilk-thrd.la
-libsilk_version = 22:0:0
-# At previous release: libsilk_version = 22:0:0
+libsilk_version = 23:0:0
+# At previous release: libsilk_version = 23:0:0
 
 libsilk_thrd_version = 6:3:1
 # At previous release: libsilk_thrd_version = 6:3:1
@@ -20,11 +20,12 @@ man7_MANS = silk.7
 endif
 
 pkginclude_HEADERS = hashlib.h iptree.h rwascii.h rwrec.h silk.h	\
-	 silk_files.h silk_types.h skbag.h skcountry.h skdaemon.h	\
-	 skdeque.h skdllist.h skheader.h skheap.h skipaddr.h skipset.h	\
-	 sklog.h skmempool.h skplugin.h	skpolldir.h skprefixmap.h	\
-	 skprintnets.h sksite.h skstream.h skstringmap.h sktempfile.h	\
-	 skthread.h sktimer.h sktracemsg.h skvector.h utils.h		\
+	 silk_files.h silk_types.h skaggbag.h skbag.h skcountry.h	\
+	 skdaemon.h skdeque.h skdllist.h skheader.h skheap.h skipaddr.h \
+	 skipset.h sklog.h skmempool.h skplugin.h skpolldir.h		\
+	 skprefixmap.h skprintnets.h sksite.h skstream.h skstringmap.h	\
+	 sktempfile.h skthread.h sktimer.h sktracemsg.h skvector.h	\
+	 utils.h			 				\
 	 redblack/redblack.h $(LEGACY_HDRS) $(EXTRA_HDRS)
 
 LEGACY_HDRS = bagtree.h rwpack.h

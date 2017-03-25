@@ -42,7 +42,7 @@
 #undef ENABLE_IPA
 
 /* Define to 1 to build with support for IPFIX. Define to 0 otherwise.
-   Requires libfixbuf-1.6.0 or later support and the <fixbuf/public.h> header
+   Requires libfixbuf-1.7.0 or later support and the <fixbuf/public.h> header
    file. */
 #undef ENABLE_IPFIX
 

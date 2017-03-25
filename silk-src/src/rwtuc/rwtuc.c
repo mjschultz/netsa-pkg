@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2016 by Carnegie Mellon University.
+** Copyright (C) 2006-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwtuc.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: rwtuc.c 6c153f4d1288 2017-03-22 13:43:57Z mthomas $");
 
 #include <silk/rwascii.h>
 #include <silk/rwrec.h>
@@ -45,6 +45,9 @@ RCSIDENT("$SiLK: rwtuc.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
 /* how big of an input line to accept; lines longer than this size are
  * ignored */
 #define RWTUC_LINE_BUFSIZE 2048
+
+/* whitespace chars used in strspn(); list taken from isspace() */
+#define RWTUC_WHITESPACE    "\t\v\f\r "
 
 /* additional field types to define, it addition to the RWREC_FIELD_*
  * values defined by rwascii.h; values must be contiguous with the
@@ -88,22 +91,6 @@ typedef struct current_line_st {
     int         lineno;
 } current_line_t;
 
-#define BAD_LINE(bl_printerr_args)                                      \
-    do {                                                                \
-        if (bad_stream) {                                               \
-            skStreamPrint(bad_stream, "%s:%d:%s\n",                     \
-                          skStreamGetPathname(current_line.stream),     \
-                          current_line.lineno, current_line.text);      \
-        }                                                               \
-        if (verbose || stop_on_error) {                                 \
-            skAppPrintErr bl_printerr_args ;                            \
-            if (stop_on_error) {                                        \
-                skStreamWriteSilkHeader(out_stream);                    \
-                exit(EXIT_FAILURE);                                     \
-            }                                                           \
-        }                                                               \
-    } while(0)
-
 
 /* LOCAL VARIABLES */
 
@@ -124,6 +111,9 @@ static skstream_t *out_stream = NULL;
 /* where to copy bad input lines, set by --bad-output-lines */
 static skstream_t *bad_stream = NULL;
 
+/* the number of bad input lines */
+static unsigned int bad_line_count = 0;
+
 /* whether to report parsing errors, set by --verbose */
 static int verbose = 0;
 
@@ -139,8 +129,8 @@ static sk_stringmap_t *field_map = NULL;
 /* character that separates input fields (the delimiter) */
 static char column_separator = '|';
 
-/* first file option to process */
-static int arg_index;
+/* for processing the input files */
+static sk_options_ctx_t *optctx;
 
 /* the fields (columns) to parse in the order to parse them; each
  * value is an ID from field_map, set by --fields */
@@ -166,6 +156,9 @@ static sk_compmethod_t comp_method;
 /* current input line, and stream from which it was read */
 static current_line_t current_line;
 
+/* a pointer to the current input line */
+static current_line_t *curline = &current_line;
+
 
 /* OPTIONS SETUP */
 
@@ -190,7 +183,7 @@ static struct option appOptions[] = {
 static const char *appHelp[] = {
     NULL, /* generated dynamically */
     "Split input fields on this character. Def. '|'",
-    "Write SiLK flow records to this stream. Def. stdout",
+    "Write the SiLK Flow records to this stream. Def. stdout",
     ("Write each bad input line to this file or stream.\n"
      "\tLines will have the file name and line number prepended. Def. none"),
     ("Print an error message for each bad input line to the\n"
@@ -248,22 +241,16 @@ static struct option defaultValueOptions[] = {
 static int  appOptionsHandler(clientData cData, int opt_index, char *opt_arg);
 static int  defaultValueHandler(clientData cData, int opt_ind, char *opt_arg);
 static int  createStringmaps(void);
-static int  parseFields(const char *field_string);
+static int  parseFields(const char *field_string, char **errmsg);
 static int
 processFields(
     parsed_values_t        *val,
     uint32_t                field_count,
     uint32_t               *field_type,
     char                  **field_val,
-    const current_line_t   *curline);
-static int  firstLineIsTitle(char *first_line);
-static int
-processFirstLine(
-    uint32_t          **field_type,
-    char             ***field_val,
-    parsed_values_t    *defaults,
-    char               *first_line);
-static int  processFile(current_line_t *curline);
+    int                     checking_defaults);
+static void badLine(const char *fmt, ...)
+    SK_CHECK_PRINTF(1, 2);
 
 
 /* FUNCTION DEFINITIONS */
@@ -311,6 +298,7 @@ appUsageLong(
     skOptionsNotesUsage(fh);
     skCompMethodOptionsUsage(fh);
     sksiteOptionsUsage(fh);
+    skOptionsCtxOptionsUsage(optctx, fh);
 
     for (i = 0; defaultValueOptions[i].name; ++i) {
         fprintf(fh, "--%s %s. Use given value for the %s field.\n",
@@ -352,7 +340,11 @@ appTeardown(
 
     if (bad_stream) {
         rv = skStreamClose(bad_stream);
-        if (rv && rv != SKSTREAM_ERR_NOT_OPEN) {
+        if (SKSTREAM_OK == rv) {
+            if (0 == bad_line_count && skStreamIsSeekable(bad_stream)) {
+                unlink(skStreamGetPathname(bad_stream));
+            }
+        } else if (rv != SKSTREAM_ERR_NOT_OPEN) {
             skStreamPrintLastErr(bad_stream, rv, &skAppPrintErr);
         }
         skStreamDestroy(&bad_stream);
@@ -370,6 +362,7 @@ appTeardown(
     regfree(&time_regex);
 
     skOptionsNotesTeardown();
+    skOptionsCtxDestroy(&optctx);
     skAppUnregister();
 }
 
@@ -391,11 +384,14 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
+    unsigned int optctx_flags;
     int rv;
 
     /* verify same number of options and help strings */
     assert((sizeof(appHelp)/sizeof(char *)) ==
            (sizeof(appOptions)/sizeof(struct option)));
+
+    assert(TUC_FIELD_IGNORED < TUC_ARRAY_SIZE);
 
     /* register the application */
     skAppRegister(argv[0]);
@@ -405,8 +401,16 @@ appSetup(
     /* initialize globals */
     memset(default_val, 0, sizeof(default_val));
 
+    /* although the input to rwtuc is text and not binary, set the
+     * INPUT_BINARY flag so rwtuc does not accept input from a TTY
+     * without the user explicitly providing an arg of "stdin" */
+    optctx_flags = (SK_OPTIONS_CTX_ALLOW_STDIN | SK_OPTIONS_CTX_XARGS
+                    | SK_OPTIONS_CTX_INPUT_BINARY);
+
     /* register the options */
-    if (skOptionsRegister(appOptions, &appOptionsHandler, NULL)
+    if (skOptionsCtxCreate(&optctx, optctx_flags)
+        || skOptionsCtxOptionsRegister(optctx)
+        || skOptionsRegister(appOptions, &appOptionsHandler, NULL)
         || skOptionsRegister(defaultValueOptions, &defaultValueHandler, NULL)
         || skOptionsNotesRegister(NULL)
         || skCompMethodOptionsRegister(&comp_method)
@@ -440,9 +444,8 @@ appSetup(
     }
 
     /* parse the options */
-    arg_index = skOptionsParse(argc, argv);
-    if (arg_index < 0) {
-        /* options parsing should print error */
+    rv = skOptionsCtxOptionsParse(optctx, argc, argv);
+    if (rv < 0) {
         skAppUsage();           /* never returns */
     }
 
@@ -457,15 +460,6 @@ appSetup(
     /* try to load site config file; if it fails, we will not be able
      * to resolve flowtype and sensor from input file names */
     sksiteConfigure(0);
-
-    /* arg_index is looking at first file name to process */
-    if (arg_index == argc) {
-        if (FILEIsATty(stdin)) {
-            skAppPrintErr("No input files on command line and"
-                          " stdin is connected to a terminal");
-            skAppUsage();
-        }
-    }
 
     /* use "stdout" as default output path */
     if (NULL == out_stream) {
@@ -533,20 +527,45 @@ appOptionsHandler(
     int                 opt_index,
     char               *opt_arg)
 {
+    const char *char_name;
+    char *errmsg;
     int rv;
 
     switch ((appOptionsEnum)opt_index) {
       case OPT_FIELDS:
-        return parseFields(opt_arg);
-
-      case OPT_COLUMN_SEPARATOR:
-        /* column_separator */
-        column_separator = *opt_arg;
-        if ('\0' == column_separator) {
-            skAppPrintErr("Invalid %s: Empty string not valid argument",
+        if (field_list != NULL) {
+            skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
             return 1;
         }
+        if (parseFields(opt_arg, &errmsg)) {
+            skAppPrintErr("Invalid %s: %s",
+                          appOptions[opt_index].name, errmsg);
+            return 1;
+        }
+        break;
+
+      case OPT_COLUMN_SEPARATOR:
+        switch (opt_arg[0]) {
+          case '\n':
+            char_name = "newline";
+            break;
+          case '\r':
+            char_name = "carriage return";
+            break;
+          case '\0':
+            char_name = "end-of-string";
+            break;
+          default:
+            char_name = NULL;
+            break;
+        }
+        if (char_name) {
+            skAppPrintErr("Invalid %s: May not be the %s character",
+                          appOptions[opt_index].name, char_name);
+            return 1;
+        }
+        column_separator = opt_arg[0];
         break;
 
       case OPT_OUTPUT_PATH:
@@ -647,29 +666,41 @@ createStringmaps(
  */
 static int
 parseFields(
-    const char         *field_string)
+    const char         *field_string,
+    char              **errmsg)
 {
+    static char buf[256];
+    BITMAP_DECLARE(field_dup, TUC_ARRAY_SIZE);
     sk_stringmap_iter_t *iter = NULL;
     sk_stringmap_entry_t *entry;
-    char *errmsg;
     int rv = -1;
     uint32_t i;
 
-    /* have we been here before? */
-    if (field_list != NULL) {
-        skAppPrintErr("Invalid %s: Switch used multiple times",
-                      appOptions[OPT_FIELDS].name);
+    assert(NULL == field_list);
+
+    /* parse the fields; duplicate 'ignore' fields are okay, but any
+     * other duplcate is an error */
+    if (skStringMapParse(field_map, field_string, SKSTRINGMAP_DUPES_KEEP,
+                         &iter, errmsg))
+    {
         goto END;
     }
 
-    /* parse the fields */
-    if (skStringMapParse(field_map, field_string, SKSTRINGMAP_DUPES_ERROR,
-                         &iter, &errmsg))
-    {
-        skAppPrintErr("Invalid %s: %s",
-                      appOptions[OPT_FIELDS].name, errmsg);
-        goto END;
+    /* check for duplicate fields */
+    BITMAP_INIT(field_dup);
+    while (skStringMapIterNext(iter, &entry, NULL) == SK_ITERATOR_OK) {
+        assert(entry->id < TUC_ARRAY_SIZE);
+        if (BITMAP_GETBIT(field_dup, entry->id)
+            && TUC_FIELD_IGNORED != entry->id)
+        {
+            snprintf(buf, sizeof(buf), "Duplicate name '%s'", entry->name);
+            *errmsg = buf;
+            goto END;
+        }
+        BITMAP_SETBIT(field_dup, entry->id);
     }
+
+    skStringMapIterReset(iter);
 
     /* create an array to hold the IDs */
     num_fields = skStringMapIterCountMatches(iter);
@@ -696,11 +727,49 @@ parseFields(
 
 
 /*
+ *    If invalid input lines are being written to a stream, write the
+ *    text in 'curline', preceeded by the input file's name and line
+ *    number.
+ *
+ *    If verbose output or stop-on-error is set, format the error
+ *    message given by the arguments and print an error message.  The
+ *    error message includes the current input file and line number.
+ */
+static void badLine(
+    const char         *fmt,
+    ...)
+{
+    char errbuf[2 * PATH_MAX];
+    va_list ap;
+
+    ++bad_line_count;
+
+    va_start(ap, fmt);
+    if (bad_stream) {
+        skStreamPrint(bad_stream, "%s:%d:%s\n",
+                      skStreamGetPathname(curline->stream),
+                      curline->lineno, curline->text);
+    }
+    if (verbose || stop_on_error) {
+        vsnprintf(errbuf, sizeof(errbuf), fmt, ap);
+        skAppPrintErr("%s:%d:%s",
+                      skStreamGetPathname(curline->stream), curline->lineno,
+                      errbuf);
+        if (stop_on_error) {
+            va_end(ap);
+            exit(EXIT_FAILURE);
+        }
+    }
+    va_end(ap);
+}
+
+
+/*
  *  is_title = firstLineIsTitle(first_line);
  *
- *    Determine if the input line in 'first_line' is a title line.
- *    Return 1 if it is, 0 if it is not.  Return -1 on error due
- *    memory allocation or no delimiters.
+ *    Determine if the input line in 'first_line' is a title line by
+ *    looking for a word that matches a field name.  Return 1 if it
+ *    is, 0 if it is not.
  */
 static int
 firstLineIsTitle(
@@ -712,39 +781,50 @@ firstLineIsTitle(
     uint32_t i;
     int is_title = 0;
 
+    assert(first_line);
+    assert(field_list);
+
     /* we have the fields, need to determine if first_line is a
      * title line. */
     cp = first_line;
     for (i = 0; i < num_fields; ++i) {
         ep = strchr(cp, column_separator);
-        if (field_list[i] == TUC_FIELD_IGNORED) {
-            if (ep == NULL) {
-                skAppPrintErr("Cannot find delimiter in first line");
-                return -1;
-            }
-            cp = ep + 1;
-        } else {
-            /* see if the value in this column maps to a valid
-             * stringmap-entry; if so, assume the row is a title
-             * row */
+        if (!is_title && field_list[i] != TUC_FIELD_IGNORED) {
             if (ep) {
                 *ep = '\0';
             }
             while ((isspace((int)*cp))) {
                 ++cp;
             }
-            if (skStringMapGetByName(field_map, cp, &entry) == SKSTRINGMAP_OK){
-                /* a number that maps to a field name should not be
-                 * considered a title */
-                if (!isdigit((int)*cp)) {
+            if ('\0' == *cp) {
+                /* ignore */
+            } else if (!isdigit((int)*cp)) {
+                if (skStringMapGetByName(field_map, cp, &entry)
+                    == SKSTRINGMAP_OK)
+                {
                     is_title = 1;
-                    break;
                 }
             }
-            if (ep) {
-                *ep = column_separator;
-            }
         }
+        if (ep) {
+            *ep = column_separator;
+            cp = ep + 1;
+        } else {
+            cp += strlen(cp);
+            if ((1 + i != num_fields) && is_title) {
+                badLine(("Too few fields on title line:"
+                         " found %" PRIu32 " of %" PRIu32 " expected"),
+                        i, num_fields);
+            }
+            break;
+        }
+    }
+
+    if (is_title && (*cp != '\0')
+        && (strlen(cp) != strspn(cp, RWTUC_WHITESPACE)))
+    {
+        badLine(("Too many fields on title line:"
+                 " text follows delimiter number %" PRIu32), num_fields);
     }
 
     return is_title;
@@ -752,7 +832,7 @@ firstLineIsTitle(
 
 
 /*
- *  is_title = processFirstLine(&field_type, &field_val, &defaults, firstline);
+ *  is_title = determineFields(&field_type, &field_val, &defaults, firstline);
  *
  *    Set the types of fields to be parsed in this file (field_type),
  *    an array to hold the strings to be parsed on each row
@@ -775,11 +855,11 @@ firstLineIsTitle(
  *    would not need to be reallocated each time.
  */
 static int
-processFirstLine(
-    uint32_t          **field_type,
-    char             ***field_val,
-    parsed_values_t    *defaults,
-    char               *first_line)
+determineFields(
+    uint32_t              **field_type,
+    char                 ***field_val,
+    parsed_values_t        *defaults,
+    char                   *first_line)
 {
     uint32_t have_field[TUC_ARRAY_SIZE];
     uint32_t default_list[TUC_ARRAY_SIZE];
@@ -789,18 +869,19 @@ processFirstLine(
     int is_title = 0;
     int per_file_field_list = 0;
     int have_stime, have_etime, have_elapsed;
+    char *errmsg;
 
     memset(defaults, 0, sizeof(parsed_values_t));
     memset(have_field, 0, sizeof(have_field));
 
-    if (no_titles) {
-        /* do not check whether first line is a title */
-        assert(field_list);
-    } else if (field_list != NULL) {
-        /* already have a field list; is the first line a title? */
-        is_title = firstLineIsTitle(first_line);
-        if (is_title < 0) {
-            return is_title;
+    if (field_list != NULL) {
+        /* already have a field list */
+        if (0 == no_titles) {
+            /* check whether the first line a title */
+            is_title = firstLineIsTitle(first_line);
+            if (is_title < 0) {
+                return is_title;
+            }
         }
     } else {
         /* need to get fields from the first line */
@@ -821,8 +902,10 @@ processFirstLine(
             }
         }
         *ep = *cp;
-        if (parseFields(first_line)) {
-            skAppPrintErr("Unable to guess fields from first line of file");
+        if (parseFields(first_line, &errmsg)) {
+            skAppPrintErr(("Unable to determine fields from first line"
+                           " of stream '%s': %s"),
+                          skStreamGetPathname(curline->stream), errmsg);
             return -1;
         }
         is_title = 1;
@@ -970,7 +1053,7 @@ processFirstLine(
     }
 
     /* process the default fields */
-    if (processFields(defaults,num_defaults,default_list,active_defaults,NULL))
+    if (processFields(defaults,num_defaults,default_list,active_defaults,1))
     {
         return -1;
     }
@@ -1018,15 +1101,15 @@ convertOldTime(
 
 
 /*
- *  ok = processFields(val, field_count, field_types, field_values, curline);
+ *  ok = processFields(val, field_count, field_types, field_values, checking_defaults);
  *
  *    Parse the 'field_count' fields whose types and string-values are
  *    given in the 'field_types' and 'field_values' arrays,
  *    respectively.  Set the fields specified in the 'val' structure.
  *
- *    'curline' is the current input line, and it is provided for
- *    error reporting.  It should be NULL when processing the default
- *    values.
+ *    'checking_defaults' should be non-zero when processing the
+ *    default values and 0 otherwise.  It is used to determine the
+ *    text of the error message should a value be invalid.
  *
  *    Return 0 on success, non-zero on failure.
  */
@@ -1036,7 +1119,7 @@ processFields(
     uint32_t                field_count,
     uint32_t               *field_type,
     char                  **field_val,
-    const current_line_t   *curline)
+    int                     checking_defaults)
 {
     char field_name[128];
     sktime_t t;
@@ -1282,7 +1365,7 @@ processFields(
     }
 
     /* Handle initialFlags, sessionFlags, and ALL-Flags */
-    if (NULL == curline) {
+    if (checking_defaults) {
         /* processing the defaults; do not modify anything */
     } else if (rwRecGetInitFlags(&val->rec) || rwRecGetRestFlags(&val->rec)) {
         if (IPPROTO_TCP == proto) {
@@ -1309,30 +1392,28 @@ processFields(
   PARSE_ERROR:
     rwAsciiGetFieldName(field_name, sizeof(field_name),
                         (rwrec_printable_fields_t)field_type[i]);
-    if (curline == NULL) {
+    if (checking_defaults) {
         skAppPrintErr("Error parsing default %s value '%s': %s",
                       field_name, cp, skStringParseStrerror(rv));
         return -1;
     }
-    BAD_LINE(("%s:%d: Invalid %s '%s': %s",
-              skStreamGetPathname(curline->stream), curline->lineno,
-              field_name, cp, skStringParseStrerror(rv)));
+    badLine("Invalid %s '%s': %s", field_name, cp, skStringParseStrerror(rv));
     return -1;
 }
 
 
 /*
- *  ok = processFile(curline);
+ *  ok = processFile();
  *
- *    Read each line of text from the stream in the 'curline'
+ *    Read each line of text from the stream in the global 'curline'
  *    structure, create an rwRec from the fields on the line, and
  *    write the records to the global out_stream stream.
  *
- *    Return 0 on success, non-zero on failure.
+ *    Return 0 on success or -1 on failure.
  */
 static int
 processFile(
-    current_line_t     *curline)
+    void)
 {
     static char line[RWTUC_LINE_BUFSIZE];
     parsed_values_t defaults;
@@ -1359,8 +1440,7 @@ processFile(
             break;
           case SKSTREAM_ERR_LONG_LINE:
             /* bad: line was longer than sizeof(line) */
-            BAD_LINE(("%s:%d: Input line too long",
-                      skStreamGetPathname(curline->stream), curline->lineno));
+            badLine("Input line too long");
             continue;
           default:
             /* unexpected error */
@@ -1372,8 +1452,8 @@ processFile(
          * switch or based on the first line in the file. */
         if (is_title < 0) {
             /* fill in the defaults */
-            is_title = processFirstLine(&field_type, &field_val,
-                                        &defaults, line);
+            is_title = determineFields(&field_type, &field_val,
+                                       &defaults, line);
             if (is_title < 0) {
                 /* error */
                 return -1;
@@ -1407,21 +1487,23 @@ processFile(
         }
 
         /* check for extra fields at the end */
-        if (*cp != '\0') {
-            BAD_LINE(("%s:%d: Too many fields on line",
-                      skStreamGetPathname(curline->stream), curline->lineno));
+        if ((*cp != '\0') && (strlen(cp) != strspn(cp, RWTUC_WHITESPACE))) {
+            badLine(("Too many fields on line:"
+                     " text follows delimiter number %" PRIu32),
+                    num_fields);
             goto NEXT_LINE;
         }
 
         /* check for too few fields */
         if (field != num_fields) {
-            BAD_LINE(("%s:%d: Too few fields on line",
-                      skStreamGetPathname(curline->stream), curline->lineno));
+            badLine(("Too few fields on line:"
+                     " found %" PRIu32 " of %" PRIu32 " expected"),
+                    field, num_fields);
             goto NEXT_LINE;
         }
 
         /* process fields */
-        if (processFields(&currents,num_fields,field_type,field_val,curline)) {
+        if (processFields(&currents, num_fields, field_type, field_val, 0)) {
             goto NEXT_LINE;
         }
 
@@ -1440,17 +1522,13 @@ processFile(
 
           case CALC_ELAPSED:
             if (rwRecGetStartTime(&currents.rec) > currents.eTime) {
-                BAD_LINE(("%s:%d: End time less than start time",
-                          skStreamGetPathname(curline->stream),
-                          curline->lineno));
+                badLine("End time less than start time");
                 goto NEXT_LINE;
             }
             if (currents.eTime - rwRecGetStartTime(&currents.rec) > UINT32_MAX)
             {
                 /* FIXME: Clamp value to max instead of rejecting */
-                BAD_LINE(("%s:%d: Computed duration too large",
-                          skStreamGetPathname(curline->stream),
-                          curline->lineno));
+                badLine("Computed duration too large");
                 goto NEXT_LINE;
             }
             rwRecSetElapsed(&currents.rec,
@@ -1486,63 +1564,27 @@ processFile(
 }
 
 
-/*
- *  status = appNextInput(argc, argv, stream);
- *
- *    Open the next input file from the command line or the standard
- *    input if no files were given on the command line.  Return 0
- *    while there are more files to process, 1 if no more files, or -1
- *    to indicate an error.
- */
-static int
-appNextInput(
-    int                 argc,
-    char              **argv,
-    skstream_t        **stream)
-{
-    static int initialized = 0;
-    const char *fname = NULL;
-    int rv;
-
-    if (arg_index < argc) {
-        /* get current file and prepare to get next */
-        fname = argv[arg_index];
-        ++arg_index;
-    } else {
-        if (initialized) {
-            /* no more input */
-            return 1;
-        }
-        /* input is from stdin */
-        fname = "stdin";
-    }
-
-    initialized = 1;
-
-    /* create an input stream and open text file */
-    if ((rv = skStreamCreate(stream, SK_IO_READ, SK_CONTENT_TEXT))
-        || (rv = skStreamBind(*stream, fname))
-        || (rv = skStreamOpen(*stream)))
-    {
-        skStreamPrintLastErr(*stream, rv, &skAppPrintErr);
-        skStreamDestroy(stream);
-        return -1;
-    }
-
-    return 0;
-}
-
-
 int main(int argc, char **argv)
 {
-    int rv = 0;
+    char *fname;
+    ssize_t rv = 0;
 
-    appSetup(argc, argv);                       /* never returns on error */
+    appSetup(argc, argv);
 
-    while (0 == (rv = appNextInput(argc, argv, &current_line.stream))) {
-        current_line.lineno = 0;
-        rv = processFile(&current_line);
-        skStreamDestroy(&current_line.stream);
+    /* process the input file(s) */
+    while ((rv = skOptionsCtxNextArgument(optctx, &fname)) == 0) {
+        /* create an input stream and open text file */
+        if ((rv = skStreamCreate(&curline->stream, SK_IO_READ,SK_CONTENT_TEXT))
+            || (rv = skStreamBind(curline->stream, fname))
+            || (rv = skStreamOpen(curline->stream)))
+        {
+            skStreamPrintLastErr(curline->stream, rv, &skAppPrintErr);
+            skStreamDestroy(&curline->stream);
+            rv = -1;
+            break;
+        }
+        rv = processFile();
+        skStreamDestroy(&curline->stream);
         if (rv != 0) {
             break;
         }
@@ -1558,6 +1600,23 @@ int main(int argc, char **argv)
                 rv = 0;
             } else {
                 skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+            }
+        }
+
+        if (bad_line_count && !verbose) {
+            if (bad_stream) {
+                skAppPrintErr(("Could not parse %u line%s;"
+                               " invalid input written to '%s'"),
+                              bad_line_count,
+                              ((1 == bad_line_count) ? "" : "s"),
+                              skStreamGetPathname(bad_stream));
+            } else {
+                skAppPrintErr(("Could not parse %u line%s;"
+                               " try again with --%s or --%s for details"),
+                              bad_line_count,
+                              ((1 == bad_line_count) ? "" : "s"),
+                              appOptions[OPT_STOP_ON_ERROR].name,
+                              appOptions[OPT_VERBOSE].name);
             }
         }
     }

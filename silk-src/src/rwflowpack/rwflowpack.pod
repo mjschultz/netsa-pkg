@@ -181,7 +181,7 @@ the C<respool> input-mode)
 Multiple sources may be specified.
 
 Processing of IPFIX, NetFlow v9, or sFlow is only available when SiLK is
-compiled with support for libfixbuf-1.6.0 or later.  Processing of
+compiled with support for libfixbuf-1.7.0 or later.  Processing of
 sFlow records was added in SiLK 3.9.0.  libfixbuf is available from
 L<http://tools.netsa.cert.org/fixbuf/>.
 
@@ -1115,7 +1115,7 @@ attempt to write to the same hourly file simultaneously.
 
 =cut
 
-$SiLK: rwflowpack.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
+$SiLK: rwflowpack.pod d8ee22371cf3 2017-03-23 22:39:48Z mthomas $
 
 Local variables:
 mode:text

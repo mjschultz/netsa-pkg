@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2016 by Carnegie Mellon University.
+** Copyright (C) 2007-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-ips.c 35360d98d580 2016-09-22 18:30:40Z mthomas $");
+RCSIDENT("$SiLK: sku-ips.c d84fde825740 2017-02-14 14:49:23Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/utils.h>
@@ -108,14 +108,14 @@ skIntegerLog2(
             }
         }
     } else {                             /* MSB is in bits 31- 0 */
-        if ((tmp1 = value >> 16)) {    /* MSB is in bits 31-16 */
+        if ((tmp1 = value >> 16)) {      /* MSB is in bits 31-16 */
             if ((tmp2 = tmp1 >> 8)) {    /* MSB is in bits 31-24 */
                 return 24 + log_table_256[tmp2];
             } else {                     /* MSB is in bits 23-16 */
                 return 16 + log_table_256[tmp1];
             }
         } else {                         /* MSB is in bits 15- 0 */
-            if ((tmp1 = value >> 8)) { /* MSB is in bits 15- 8 */
+            if ((tmp1 = value >> 8)) {   /* MSB is in bits 15- 8 */
                 return 8 + log_table_256[tmp1];
             } else {                     /* MSB is in bits  7- 0 */
                 return log_table_256[value];
@@ -330,17 +330,16 @@ skCIDR2IPRange(
         uint8_t ip6[16];
         uint32_t i;
 
-        if (cidr == 128) {
+        if (cidr >= 128) {
+            if (cidr > 128) {
+                return -1;
+            }
             /* don't use skipaddrCopy() in case caller supplied
              * pointers are the same */
             skipaddrGetV6(ipaddr, ip6);
             skipaddrSetV6(min_ip, ip6);
             skipaddrSetV6(max_ip, ip6);
             return 0;
-        }
-
-        if (cidr > 128) {
-            return -1;
         }
 
         skipaddrGetV6(ipaddr, ip6);
@@ -362,15 +361,14 @@ skCIDR2IPRange(
     }
 #endif /* SK_ENABLE_IPV6 */
 
-    if (cidr == 32) {
+    if (cidr >= 32) {
+        if (cidr > 32) {
+            return -1;
+        }
         ip4 = skipaddrGetV4(ipaddr);
         skipaddrSetV4(min_ip, &ip4);
         skipaddrSetV4(max_ip, &ip4);
         return 0;
-    }
-
-    if (cidr > 32) {
-        return -1;
     }
 
     /* handle max IP */
@@ -398,15 +396,14 @@ skCIDRComputeStart(
         uint8_t ip6[16];
         uint32_t i;
 
-        if (cidr == 128) {
+        if (cidr >= 128) {
+            if (cidr > 128) {
+                return -1;
+            }
             if (ipaddr != min_ip) {
                 skipaddrCopy(min_ip, ipaddr);
             }
             return 0;
-        }
-
-        if (cidr > 128) {
-            return -1;
         }
 
         skipaddrGetV6(ipaddr, ip6);
@@ -423,14 +420,13 @@ skCIDRComputeStart(
     }
 #endif /* SK_ENABLE_IPV6 */
 
-    if (cidr == 32) {
+    if (cidr >= 32) {
+        if (cidr > 32) {
+            return -1;
+        }
         ip4 = skipaddrGetV4(ipaddr);
         skipaddrSetV4(min_ip, &ip4);
         return 0;
-    }
-
-    if (cidr > 32) {
-        return -1;
     }
 
     /* handle min IP */
@@ -454,15 +450,14 @@ skCIDRComputeEnd(
         uint8_t ip6[16];
         uint32_t i;
 
-        if (cidr == 128) {
+        if (cidr >= 128) {
+            if (cidr > 128) {
+                return -1;
+            }
             if (ipaddr != max_ip) {
                 skipaddrCopy(max_ip, ipaddr);
             }
             return 0;
-        }
-
-        if (cidr > 128) {
-            return -1;
         }
 
         skipaddrGetV6(ipaddr, ip6);
@@ -479,14 +474,13 @@ skCIDRComputeEnd(
     }
 #endif /* SK_ENABLE_IPV6 */
 
-    if (cidr == 32) {
+    if (cidr >= 32) {
+        if (cidr > 32) {
+            return -1;
+        }
         ip4 = skipaddrGetV4(ipaddr);
         skipaddrSetV4(max_ip, &ip4);
         return 0;
-    }
-
-    if (cidr > 32) {
-        return -1;
     }
 
     /* handle max IP */

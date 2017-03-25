@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2016 by Carnegie Mellon University.
+** Copyright (C) 2006-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -18,9 +18,8 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skheader.c 4c36563f30bb 2016-09-28 22:00:57Z mthomas $");
+RCSIDENT("$SiLK: skheader.c 7e6884832fbd 2017-01-20 22:59:46Z mthomas $");
 
-#include <silk/skbag.h>
 #include "skheader_priv.h"
 #include "skstream_priv.h"
 
@@ -112,14 +111,14 @@ skHentryDefaultFree(
 
 static ssize_t
 skHentryDefaultPacker(
-    sk_header_entry_t  *in_hentry,
-    uint8_t            *out_packed,
-    size_t              bufsize);
+    const sk_header_entry_t    *in_hentry,
+    uint8_t                    *out_packed,
+    size_t                      bufsize);
 
 static void
 skHentryDefaultPrint(
-    sk_header_entry_t  *hentry,
-    FILE               *fh);
+    const sk_header_entry_t    *hentry,
+    FILE                       *fh);
 
 static sk_header_entry_t *
 skHentryDefaultUnpacker(
@@ -494,7 +493,7 @@ skHeaderEntryCopy(
 
 void
 skHeaderEntryPrint(
-    sk_header_entry_t  *hentry,
+    const sk_header_entry_t  *hentry,
     FILE               *fp)
 {
     sk_hentry_type_t *htype;
@@ -503,16 +502,35 @@ skHeaderEntryPrint(
         return;
     }
 
-    fprintf(fp, ("HDR id = %" PRIu32 " / len = %" PRIu32 " / "),
-            (uint32_t)skHeaderEntryGetTypeId(hentry),
-            (uint32_t)hentry->he_spec.hes_len);
-
     htype = skHentryTypeLookup(skHeaderEntryGetTypeId(hentry));
     if (htype && htype->het_print) {
         htype->het_print(hentry, fp);
     } else {
         skHentryDefaultPrint(hentry, fp);
     }
+}
+
+
+size_t
+skHeaderEntrySpecPack(
+    const sk_header_entry_spec_t   *he_spec,
+    uint8_t                        *out_packed,
+    size_t                          bufsize)
+{
+    if (bufsize >= sizeof(sk_header_entry_spec_t)) {
+        SK_HENTRY_SPEC_PACK(out_packed, he_spec);
+    }
+    return sizeof(sk_header_entry_spec_t);
+}
+
+
+void
+skHeaderEntrySpecUnpack(
+    sk_header_entry_spec_t *he_spec,
+    const uint8_t          *in_packed)
+{
+    SK_HENTRY_SPEC_UNPACK(he_spec, in_packed);
+    assert(he_spec->hes_len >= sizeof(sk_header_entry_spec_t));
 }
 
 
@@ -740,24 +758,14 @@ skHeaderInitialize(
                                &skHentryProbenameCopy,
                                &skHentryProbenameFree,
                                &skHentryProbenamePrint);
-    rv |= skHentryTypeRegister(SK_HENTRY_PREFIXMAP_ID,
-                               &skHentryPrefixmapPacker,
-                               &skHentryPrefixmapUnpacker,
-                               &skHentryPrefixmapCopy,
-                               &skHentryPrefixmapFree,
-                               &skHentryPrefixmapPrint);
-    rv |= skHentryTypeRegister(SK_HENTRY_BAG_ID,
-                               &skHentryBagPacker,
-                               &skHentryBagUnpacker,
-                               &skHentryBagCopy,
-                               &skHentryBagFree,
-                               &skHentryBagPrint);
-    rv |= skHentryTypeRegister(SK_HENTRY_IPSET_ID,
-                               &skHentryIPSetPacker,
-                               &skHentryIPSetUnpacker,
-                               &skHentryIPSetCopy,
-                               &skHentryIPSetFree,
-                               &skHentryIPSetPrint);
+    /* defined in skprefixmap.c */
+    rv |= skPrefixMapRegisterHeaderEntry(SK_HENTRY_PREFIXMAP_ID);
+    /* defined in skbag.c */
+    rv |= skBagRegisterHeaderEntry(SK_HENTRY_BAG_ID);
+    /* defined in skipset.c */
+    rv |= skIPSetRegisterHeaderEntry(SK_HENTRY_IPSET_ID);
+    /* defined in skaggbag.c */
+    rv |= skAggBagRegisterHeaderEntry(SK_HENTRY_AGGBAG_ID);
 
     rv |= skHeaderLegacyInitialize();
 
@@ -1719,11 +1727,12 @@ skHentryDefaultFree(
  */
 static ssize_t
 skHentryDefaultPacker(
-    sk_header_entry_t  *in_hentry,
-    uint8_t            *out_packed,
-    size_t              bufsize)
+    const sk_header_entry_t    *in_hentry,
+    uint8_t                    *out_packed,
+    size_t                      bufsize)
+
 {
-    sk_header_entry_spec_t *spec;
+    const sk_header_entry_spec_t *spec;
     uint32_t tmp;
 
     spec = &(in_hentry->he_spec);
@@ -1755,8 +1764,8 @@ skHentryDefaultPacker(
  */
 static void
 skHentryDefaultPrint(
-    sk_header_entry_t  *hentry,
-    FILE               *fh)
+    const sk_header_entry_t    *hentry,
+    FILE                       *fh)
 {
     fprintf(fh, ("unknown; length %" PRIu32), hentry->he_spec.hes_len);
 }
@@ -1894,9 +1903,9 @@ skHentryPackedfileFree(
 
 ssize_t
 skHentryPackedfilePacker(
-    sk_header_entry_t  *in_hentry,
-    uint8_t            *out_packed,
-    size_t              bufsize)
+    const sk_header_entry_t    *in_hentry,
+    uint8_t                    *out_packed,
+    size_t                      bufsize)
 {
     sk_hentry_packedfile_t *pf_hdr = (sk_hentry_packedfile_t*)in_hentry;
     sk_hentry_packedfile_t tmp_hdr;
@@ -1920,8 +1929,8 @@ skHentryPackedfilePacker(
 
 void
 skHentryPackedfilePrint(
-    sk_header_entry_t  *hentry,
-    FILE               *fh)
+    const sk_header_entry_t    *hentry,
+    FILE                       *fh)
 {
     sk_hentry_packedfile_t *pf_hdr = (sk_hentry_packedfile_t*)hentry;
     char buf[512];
@@ -2107,9 +2116,9 @@ skHentryInvocationFree(
 
 ssize_t
 skHentryInvocationPacker(
-    sk_header_entry_t  *in_hentry,
-    uint8_t            *out_packed,
-    size_t              bufsize)
+    const sk_header_entry_t    *in_hentry,
+    uint8_t                    *out_packed,
+    size_t                      bufsize)
 {
     sk_hentry_invocation_t *ci_hdr = (sk_hentry_invocation_t*)in_hentry;
     uint32_t check_len;
@@ -2138,8 +2147,8 @@ skHentryInvocationPacker(
 
 void
 skHentryInvocationPrint(
-    sk_header_entry_t  *hentry,
-    FILE               *fh)
+    const sk_header_entry_t    *hentry,
+    FILE                       *fh)
 {
     sk_hentry_invocation_t *ci_hdr = (sk_hentry_invocation_t*)hentry;
 
@@ -2381,9 +2390,9 @@ skHentryAnnotationFree(
 
 ssize_t
 skHentryAnnotationPacker(
-    sk_header_entry_t  *in_hentry,
-    uint8_t            *out_packed,
-    size_t              bufsize)
+    const sk_header_entry_t    *in_hentry,
+    uint8_t                    *out_packed,
+    size_t                      bufsize)
 {
     sk_hentry_annotation_t *an_hdr = (sk_hentry_annotation_t*)in_hentry;
     uint32_t check_len;
@@ -2412,8 +2421,8 @@ skHentryAnnotationPacker(
 
 void
 skHentryAnnotationPrint(
-    sk_header_entry_t  *hentry,
-    FILE               *fh)
+    const sk_header_entry_t    *hentry,
+    FILE                       *fh)
 {
     sk_hentry_annotation_t *an_hdr = (sk_hentry_annotation_t*)hentry;
 
@@ -2548,9 +2557,9 @@ skHentryProbenameFree(
 
 ssize_t
 skHentryProbenamePacker(
-    sk_header_entry_t  *in_hentry,
-    uint8_t            *out_packed,
-    size_t              bufsize)
+    const sk_header_entry_t    *in_hentry,
+    uint8_t                    *out_packed,
+    size_t                      bufsize)
 {
     sk_hentry_probename_t *pn_hdr = (sk_hentry_probename_t*)in_hentry;
     uint32_t check_len;
@@ -2579,8 +2588,8 @@ skHentryProbenamePacker(
 
 void
 skHentryProbenamePrint(
-    sk_header_entry_t  *hentry,
-    FILE               *fh)
+    const sk_header_entry_t    *hentry,
+    FILE                       *fh)
 {
     sk_hentry_probename_t *pn_hdr = (sk_hentry_probename_t*)hentry;
 
@@ -2627,541 +2636,6 @@ skHentryProbenameUnpacker(
     return (sk_header_entry_t*)pn_hdr;
 }
 
-
-/*
- *
- *  Prefixmap
- *
- */
-
-
-int
-skHeaderAddPrefixmap(
-    sk_file_header_t   *hdr,
-    const char         *mapname)
-{
-    int rv;
-    sk_header_entry_t *pn_hdr;
-
-    pn_hdr = skHentryPrefixmapCreate(mapname);
-    if (pn_hdr == NULL) {
-        return SKHEADER_ERR_ALLOC;
-    }
-
-    rv = skHeaderAddEntry(hdr, pn_hdr);
-    if (rv) {
-        skHentryPrefixmapFree(pn_hdr);
-    }
-    return rv;
-}
-
-
-sk_header_entry_t *
-skHentryPrefixmapCopy(
-    const sk_header_entry_t    *hentry)
-{
-    const sk_hentry_prefixmap_t *pn_hdr = (sk_hentry_prefixmap_t*)hentry;
-
-    return skHentryPrefixmapCreate(pn_hdr->mapname);
-}
-
-
-sk_header_entry_t *
-skHentryPrefixmapCreate(
-    const char         *mapname)
-{
-    sk_hentry_prefixmap_t *pn_hdr;
-    int len;
-
-    /* verify name is specified */
-    if (mapname == NULL || mapname[0] == '\0') {
-        return NULL;
-    }
-    len = 1 + strlen(mapname);
-
-    pn_hdr = (sk_hentry_prefixmap_t*)calloc(1, sizeof(sk_hentry_prefixmap_t));
-    if (NULL == pn_hdr) {
-        return NULL;
-    }
-    pn_hdr->he_spec.hes_id  = SK_HENTRY_PREFIXMAP_ID;
-    pn_hdr->he_spec.hes_len = sizeof(sk_hentry_prefixmap_t) + len;
-
-    pn_hdr->version = 1;
-    pn_hdr->mapname = strdup(mapname);
-    if (NULL == pn_hdr->mapname) {
-        free(pn_hdr);
-        return NULL;
-    }
-
-    return (sk_header_entry_t*)pn_hdr;
-}
-
-
-void
-skHentryPrefixmapFree(
-    sk_header_entry_t  *hentry)
-{
-    sk_hentry_prefixmap_t *pn_hdr = (sk_hentry_prefixmap_t*)hentry;
-
-    if (pn_hdr) {
-        assert(skHeaderEntryGetTypeId(pn_hdr) == SK_HENTRY_PREFIXMAP_ID);
-        pn_hdr->he_spec.hes_id = UINT32_MAX;
-        if (pn_hdr->mapname) {
-            free(pn_hdr->mapname);
-            pn_hdr->mapname = NULL;
-        }
-        free(pn_hdr);
-    }
-}
-
-
-ssize_t
-skHentryPrefixmapPacker(
-    sk_header_entry_t  *in_hentry,
-    uint8_t            *out_packed,
-    size_t              bufsize)
-{
-    sk_hentry_prefixmap_t *pn_hdr = (sk_hentry_prefixmap_t*)in_hentry;
-    uint32_t check_len;
-    uint32_t mapname_len;
-    uint32_t version;
-    uint8_t *pos;
-
-    assert(in_hentry);
-    assert(out_packed);
-    assert(skHeaderEntryGetTypeId(pn_hdr) == SK_HENTRY_PREFIXMAP_ID);
-
-    /* adjust the length recorded in the header it if it too small */
-    mapname_len = 1 + strlen(pn_hdr->mapname);
-    check_len = (mapname_len + sizeof(pn_hdr->version)
-                 + sizeof(sk_header_entry_spec_t));
-    if (check_len > pn_hdr->he_spec.hes_len) {
-        pn_hdr->he_spec.hes_len = check_len;
-    }
-
-    if (bufsize >= pn_hdr->he_spec.hes_len) {
-        SK_HENTRY_SPEC_PACK(out_packed, &(pn_hdr->he_spec));
-        pos = out_packed + sizeof(sk_header_entry_spec_t);
-        version = htonl(pn_hdr->version);
-        memcpy(pos, &version, sizeof(uint32_t));
-        pos += sizeof(uint32_t);
-        memcpy(pos, pn_hdr->mapname, mapname_len);
-    }
-
-    return pn_hdr->he_spec.hes_len;
-}
-
-
-void
-skHentryPrefixmapPrint(
-    sk_header_entry_t  *hentry,
-    FILE               *fh)
-{
-    sk_hentry_prefixmap_t *pn_hdr = (sk_hentry_prefixmap_t*)hentry;
-
-    assert(skHeaderEntryGetTypeId(pn_hdr) == SK_HENTRY_PREFIXMAP_ID);
-    fprintf(fh, ("v%" PRIu32 ": %s"),
-            pn_hdr->version, (pn_hdr->mapname ? pn_hdr->mapname : "NULL"));
-}
-
-
-sk_header_entry_t *
-skHentryPrefixmapUnpacker(
-    uint8_t            *in_packed)
-{
-    sk_hentry_prefixmap_t *pn_hdr;
-    uint32_t len;
-    uint8_t *pos;
-
-    assert(in_packed);
-
-    /* create space for new header */
-    pn_hdr = (sk_hentry_prefixmap_t*)calloc(1, sizeof(sk_hentry_prefixmap_t));
-    if (NULL == pn_hdr) {
-        return NULL;
-    }
-
-    /* copy the spec */
-    SK_HENTRY_SPEC_UNPACK(&(pn_hdr->he_spec), in_packed);
-    assert(skHeaderEntryGetTypeId(pn_hdr) == SK_HENTRY_PREFIXMAP_ID);
-
-    /* copy the data */
-    len = pn_hdr->he_spec.hes_len;
-    if (len < sizeof(sk_header_entry_spec_t)) {
-        free(pn_hdr);
-        return NULL;
-    }
-    len -= sizeof(sk_header_entry_spec_t);
-    pos = in_packed + sizeof(sk_header_entry_spec_t);
-
-    if (len < sizeof(uint32_t)) {
-        free(pn_hdr);
-        return NULL;
-    }
-    memcpy(&(pn_hdr->version), pos, sizeof(uint32_t));
-    pn_hdr->version = ntohl(pn_hdr->version);
-    len -= sizeof(uint32_t);
-    pos += sizeof(uint32_t);
-
-    pn_hdr->mapname = (char*)calloc(len, sizeof(char));
-    if (NULL == pn_hdr->mapname) {
-        free(pn_hdr);
-        return NULL;
-    }
-    memcpy(pn_hdr->mapname, pos, len);
-
-    return (sk_header_entry_t*)pn_hdr;
-}
-
-
-/*
- *
- *  Bag
- *
- */
-
-
-int
-skHeaderAddBag(
-    sk_file_header_t   *hdr,
-    uint16_t            key_type,
-    uint16_t            key_length,
-    uint16_t            counter_type,
-    uint16_t            counter_length)
-{
-    int rv;
-    sk_header_entry_t *bag_hdr;
-
-    bag_hdr = skHentryBagCreate(key_type, key_length,
-                                counter_type, counter_length);
-    if (bag_hdr == NULL) {
-        return SKHEADER_ERR_ALLOC;
-    }
-
-    rv = skHeaderAddEntry(hdr, bag_hdr);
-    if (rv) {
-        skHentryBagFree(bag_hdr);
-    }
-    return rv;
-}
-
-
-sk_header_entry_t *
-skHentryBagCopy(
-    const sk_header_entry_t    *hentry)
-{
-    const sk_hentry_bag_t *bag_hdr = (sk_hentry_bag_t*)hentry;
-
-    return skHentryBagCreate(bag_hdr->key_type, bag_hdr->key_length,
-                             bag_hdr->counter_type, bag_hdr->counter_length);
-}
-
-
-sk_header_entry_t *
-skHentryBagCreate(
-    uint16_t            key_type,
-    uint16_t            key_length,
-    uint16_t            counter_type,
-    uint16_t            counter_length)
-{
-    sk_hentry_bag_t *bag_hdr;
-
-    bag_hdr = (sk_hentry_bag_t*)calloc(1, sizeof(sk_hentry_bag_t));
-    if (NULL == bag_hdr) {
-        return NULL;
-    }
-    bag_hdr->he_spec.hes_id  = SK_HENTRY_BAG_ID;
-    bag_hdr->he_spec.hes_len = sizeof(sk_hentry_bag_t);
-    bag_hdr->key_type        = key_type;
-    bag_hdr->key_length      = key_length;
-    bag_hdr->counter_type    = counter_type;
-    bag_hdr->counter_length  = counter_length;
-
-    return (sk_header_entry_t*)bag_hdr;
-}
-
-
-void
-skHentryBagFree(
-    sk_header_entry_t  *hentry)
-{
-    sk_hentry_bag_t *bag_hdr = (sk_hentry_bag_t*)hentry;
-
-    if (bag_hdr) {
-        assert(skHeaderEntryGetTypeId(bag_hdr) == SK_HENTRY_BAG_ID);
-        bag_hdr->he_spec.hes_id = UINT32_MAX;
-        free(bag_hdr);
-    }
-}
-
-
-ssize_t
-skHentryBagPacker(
-    sk_header_entry_t  *in_hentry,
-    uint8_t            *out_packed,
-    size_t              bufsize)
-{
-    sk_hentry_bag_t *bag_hdr = (sk_hentry_bag_t*)in_hentry;
-    sk_hentry_bag_t tmp_hdr;
-
-    assert(in_hentry);
-    assert(out_packed);
-    assert(skHeaderEntryGetTypeId(bag_hdr) == SK_HENTRY_BAG_ID);
-
-    if (bufsize >= sizeof(sk_hentry_bag_t)) {
-        SK_HENTRY_SPEC_PACK(&tmp_hdr, &(bag_hdr->he_spec));
-        tmp_hdr.key_type       = htons(bag_hdr->key_type);
-        tmp_hdr.key_length     = htons(bag_hdr->key_length);
-        tmp_hdr.counter_type   = htons(bag_hdr->counter_type);
-        tmp_hdr.counter_length = htons(bag_hdr->counter_length);
-
-        memcpy(out_packed, &tmp_hdr, sizeof(sk_hentry_bag_t));
-    }
-
-    return sizeof(sk_hentry_bag_t);
-}
-
-
-void
-skHentryBagPrint(
-    sk_header_entry_t  *hentry,
-    FILE               *fh)
-{
-    sk_hentry_bag_t *bag_hdr = (sk_hentry_bag_t*)hentry;
-    char key_buf[64];
-    char counter_buf[64];
-
-    assert(skHeaderEntryGetTypeId(bag_hdr) == SK_HENTRY_BAG_ID);
-
-    if (!skBagFieldTypeAsString((skBagFieldType_t)bag_hdr->key_type,
-                                key_buf, sizeof(key_buf)))
-    {
-        snprintf(key_buf, sizeof(key_buf), "UNKNOWN[%" PRIu16 "]",
-                 bag_hdr->key_type);
-    }
-    if (!skBagFieldTypeAsString((skBagFieldType_t)bag_hdr->counter_type,
-                                counter_buf, sizeof(counter_buf)))
-    {
-        snprintf(counter_buf,  sizeof(counter_buf), "UNKNOWN[%" PRIu16 "]",
-                 bag_hdr->counter_type);
-    }
-
-    fprintf(fh, ("key: %s @ %" PRIu16 " octets; "
-                 "counter: %s @ %" PRIu16 " octets"),
-            key_buf, bag_hdr->key_length,
-            counter_buf, bag_hdr->counter_length);
-}
-
-
-sk_header_entry_t *
-skHentryBagUnpacker(
-    uint8_t            *in_packed)
-{
-    sk_hentry_bag_t *bag_hdr;
-
-    assert(in_packed);
-
-    /* create space for new header */
-    bag_hdr = (sk_hentry_bag_t*)calloc(1, sizeof(sk_hentry_bag_t));
-    if (NULL == bag_hdr) {
-        return NULL;
-    }
-
-    /* copy the spec */
-    SK_HENTRY_SPEC_UNPACK(&(bag_hdr->he_spec), in_packed);
-    assert(skHeaderEntryGetTypeId(bag_hdr) == SK_HENTRY_BAG_ID);
-
-    /* copy the data */
-    if (bag_hdr->he_spec.hes_len != sizeof(sk_hentry_bag_t)) {
-        free(bag_hdr);
-        return NULL;
-    }
-    memcpy(&(bag_hdr->key_type),
-           &(in_packed[sizeof(sk_header_entry_spec_t)]),
-           sizeof(sk_hentry_bag_t) - sizeof(sk_header_entry_spec_t));
-    bag_hdr->key_type       = htons(bag_hdr->key_type);
-    bag_hdr->key_length     = htons(bag_hdr->key_length);
-    bag_hdr->counter_type   = htons(bag_hdr->counter_type);
-    bag_hdr->counter_length = htons(bag_hdr->counter_length);
-
-    return (sk_header_entry_t*)bag_hdr;
-}
-
-
-/*
- *
- *  IPSet
- *
- */
-
-
-int
-skHeaderAddIPSet(
-    sk_file_header_t   *hdr,
-    uint32_t            child_node,
-    uint32_t            leaf_count,
-    uint32_t            leaf_size,
-    uint32_t            node_count,
-    uint32_t            node_size,
-    uint32_t            root_idx)
-{
-    int rv;
-    sk_header_entry_t *ipset_hdr = NULL;
-
-    ipset_hdr = skHentryIPSetCreate(child_node, leaf_count, leaf_size,
-                                    node_count, node_size, root_idx);
-    if (ipset_hdr == NULL) {
-        return SKHEADER_ERR_ALLOC;
-    }
-
-    rv = skHeaderAddEntry(hdr, ipset_hdr);
-    if (rv) {
-        skHentryIPSetFree(ipset_hdr);
-    }
-    return rv;
-}
-
-
-sk_header_entry_t *
-skHentryIPSetCopy(
-    const sk_header_entry_t    *hentry)
-{
-    const sk_hentry_ipset_t *ipset_hdr = (sk_hentry_ipset_t*)hentry;
-
-    return skHentryIPSetCreate(ipset_hdr->child_node, ipset_hdr->leaf_count,
-                               ipset_hdr->leaf_size, ipset_hdr->node_count,
-                               ipset_hdr->node_size, ipset_hdr->root_idx);
-}
-
-
-sk_header_entry_t *
-skHentryIPSetCreate(
-    uint32_t            child_node,
-    uint32_t            leaf_count,
-    uint32_t            leaf_size,
-    uint32_t            node_count,
-    uint32_t            node_size,
-    uint32_t            root_idx)
-{
-    sk_hentry_ipset_t *ipset_hdr;
-
-    ipset_hdr = (sk_hentry_ipset_t*)calloc(1, sizeof(sk_hentry_ipset_t));
-    if (NULL == ipset_hdr) {
-        return NULL;
-    }
-    ipset_hdr->he_spec.hes_id  = SK_HENTRY_IPSET_ID;
-    ipset_hdr->he_spec.hes_len = sizeof(sk_hentry_ipset_t);
-    ipset_hdr->child_node      = child_node;
-    ipset_hdr->leaf_count      = leaf_count;
-    ipset_hdr->leaf_size       = leaf_size;
-    ipset_hdr->node_count      = node_count;
-    ipset_hdr->node_size       = node_size;
-    ipset_hdr->root_idx        = root_idx;
-
-    return (sk_header_entry_t*)ipset_hdr;
-}
-
-
-void
-skHentryIPSetFree(
-    sk_header_entry_t  *hentry)
-{
-    if (hentry) {
-        assert(skHeaderEntryGetTypeId(hentry) == SK_HENTRY_IPSET_ID);
-        hentry->he_spec.hes_id = UINT32_MAX;
-        free(hentry);
-    }
-}
-
-
-ssize_t
-skHentryIPSetPacker(
-    sk_header_entry_t  *in_hentry,
-    uint8_t            *out_packed,
-    size_t              bufsize)
-{
-    sk_hentry_ipset_t *ipset_hdr = (sk_hentry_ipset_t*)in_hentry;
-    sk_hentry_ipset_t tmp_hdr;
-
-    assert(in_hentry);
-    assert(out_packed);
-    assert(skHeaderEntryGetTypeId(ipset_hdr) == SK_HENTRY_IPSET_ID);
-
-    if (bufsize >= sizeof(sk_hentry_ipset_t)) {
-        SK_HENTRY_SPEC_PACK(&tmp_hdr, &(ipset_hdr->he_spec));
-        tmp_hdr.child_node = htonl(ipset_hdr->child_node);
-        tmp_hdr.leaf_count = htonl(ipset_hdr->leaf_count);
-        tmp_hdr.leaf_size  = htonl(ipset_hdr->leaf_size);
-        tmp_hdr.node_count = htonl(ipset_hdr->node_count);
-        tmp_hdr.node_size  = htonl(ipset_hdr->node_size);
-        tmp_hdr.root_idx   = htonl(ipset_hdr->root_idx);
-
-        memcpy(out_packed, &tmp_hdr, sizeof(sk_hentry_ipset_t));
-    }
-
-    return sizeof(sk_hentry_ipset_t);
-}
-
-
-void
-skHentryIPSetPrint(
-    sk_header_entry_t  *hentry,
-    FILE               *fh)
-{
-    sk_hentry_ipset_t *ipset_hdr = (sk_hentry_ipset_t*)hentry;
-
-    assert(skHeaderEntryGetTypeId(ipset_hdr) == SK_HENTRY_IPSET_ID);
-    if ((0 == ipset_hdr->child_node) && (0 == ipset_hdr->root_idx)) {
-        /* assume this is a RecordVersion 4 file */
-        fprintf(fh, "IPv%d",
-                ((sizeof(uint32_t) == ipset_hdr->leaf_size) ? 4 : 6));
-    } else {
-        fprintf(fh, ("%" PRIu32 "-way branch, root@%" PRIu32 ", "
-                     "%" PRIu32 " x %" PRIu32 "b node%s, "
-                     "%" PRIu32 " x %" PRIu32 "b leaves"),
-                ipset_hdr->child_node, ipset_hdr->root_idx,
-                ipset_hdr->node_count, ipset_hdr->node_size,
-                ((ipset_hdr->node_count > 1) ? "s" : ""),
-                ipset_hdr->leaf_count, ipset_hdr->leaf_size);
-    }
-}
-
-
-sk_header_entry_t *
-skHentryIPSetUnpacker(
-    uint8_t            *in_packed)
-{
-    sk_hentry_ipset_t *ipset_hdr;
-
-    assert(in_packed);
-
-    /* create space for new header */
-    ipset_hdr = (sk_hentry_ipset_t*)calloc(1, sizeof(sk_hentry_ipset_t));
-    if (NULL == ipset_hdr) {
-        return NULL;
-    }
-
-    /* copy the spec */
-    SK_HENTRY_SPEC_UNPACK(&(ipset_hdr->he_spec), in_packed);
-    assert(skHeaderEntryGetTypeId(ipset_hdr) == SK_HENTRY_IPSET_ID);
-
-    /* copy the data */
-    if (ipset_hdr->he_spec.hes_len != sizeof(sk_hentry_ipset_t)) {
-        free(ipset_hdr);
-        return NULL;
-    }
-    memcpy(&(ipset_hdr->child_node),
-           &(in_packed[sizeof(sk_header_entry_spec_t)]),
-           sizeof(sk_hentry_ipset_t) - sizeof(sk_header_entry_spec_t));
-    ipset_hdr->child_node  = htonl(ipset_hdr->child_node);
-    ipset_hdr->leaf_count  = htonl(ipset_hdr->leaf_count);
-    ipset_hdr->leaf_size   = htonl(ipset_hdr->leaf_size);
-    ipset_hdr->node_count  = htonl(ipset_hdr->node_count);
-    ipset_hdr->node_size   = htonl(ipset_hdr->node_size);
-    ipset_hdr->root_idx    = htonl(ipset_hdr->root_idx);
-
-    return (sk_header_entry_t*)ipset_hdr;
-}
 
 
 /*

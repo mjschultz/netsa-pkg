@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2016 by Carnegie Mellon University.
+** Copyright (C) 2004-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -25,7 +25,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwip2cc.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwip2cc.c a50d57a6c6a9 2017-03-13 20:35:05Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
@@ -90,8 +90,8 @@ static const char *appHelp[] = {
     "Use specified character between columns. Def. '|'",
     "Suppress column delimiter at end of line. Def. No",
     "Shortcut for --no-columns --no-final-del --column-sep=CHAR",
-    "Send output to given file path. Def. stdout",
-    "Program to invoke to page output. Def. $SILK_PAGER or $PAGER",
+    "Write the output to this stream or file. Def. stdout",
+    "Invoke this program to page output. Def. $SILK_PAGER or $PAGER",
     (char *)NULL
 };
 
@@ -114,7 +114,7 @@ static struct app_opt_st {
     unsigned    no_columns          :1;
     unsigned    no_final_delimiter  :1;
 } app_opt = {
-    NULL, NULL, NULL, "stdout", NULL, '|', -1, 0, 0
+    NULL, NULL, NULL, NULL, NULL, '|', -1, 0, 0
 };
 
 
@@ -261,23 +261,24 @@ appSetup(
         }
     }
 
-    /* create the output stream. Only page output when processing
-     * input file */
+    /* if an output_path is set, bypass the pager by setting it to the
+     * empty string.  if no output_path was set, use stdout */
+    if (app_opt.output_path) {
+        app_opt.pager = "";
+    } else {
+        app_opt.output_path = "-";
+    }
+    /* do not use the pager when input is not from an input file */
+    if (NULL == app_opt.input_file) {
+        app_opt.pager = "";
+    }
+
+    /* create the output stream */
     if ((rv = skStreamCreate(&out, SK_IO_WRITE, SK_CONTENT_TEXT))
-        || (rv = skStreamBind(out, app_opt.output_path)))
+        || (rv = skStreamBind(out, app_opt.output_path))
+        || (rv = skStreamPageOutput(out, app_opt.pager))
+        || (rv = skStreamOpen(out)))
     {
-        skStreamPrintLastErr(out, rv, &skAppPrintErr);
-        exit(EXIT_FAILURE);
-    }
-    if (app_opt.input_file) {
-        rv = skStreamPageOutput(out, app_opt.pager);
-        if (rv) {
-            skStreamPrintLastErr(out, rv, &skAppPrintErr);
-            exit(EXIT_FAILURE);
-        }
-    }
-    rv = skStreamOpen(out);
-    if (rv) {
         skStreamPrintLastErr(out, rv, &skAppPrintErr);
         exit(EXIT_FAILURE);
     }

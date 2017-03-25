@@ -1,4 +1,4 @@
-## Copyright (C) 2009-2016 by Carnegie Mellon University.
+## Copyright (C) 2009-2017 by Carnegie Mellon University.
 ##
 ## @OPENSOURCE_LICENSE_START@
 ## See license information in ../LICENSE.txt
@@ -11,7 +11,7 @@
 #  March 2009
 #
 #######################################################################
-#  RCSIDENT("$SiLK: SiLKTests.pm 2b970e551829 2016-10-31 20:50:52Z mthomas $")
+#  RCSIDENT("$SiLK: SiLKTests.pm 22c7d008aa07 2017-01-26 23:10:13Z mthomas $")
 #######################################################################
 #
 #    Perl module used by the scripts that "make check" runs.
@@ -199,32 +199,37 @@ END {
 
 
 BEGIN {
-    our $PWD = `pwd`;
-    chomp $PWD;
-    our $top_srcdir = $ENV{top_srcdir};
-    defined $top_srcdir
-        or die "Must set top_srcdir environment variable\n";
-    our $top_builddir = $ENV{top_builddir};
-    defined $top_builddir
-        or die "Must set top_builddir environment variable\n";
-    our $testsdir = "$top_builddir/tests";
-    if ($top_builddir) {
-        require "$testsdir/config-vars.pm";
-    }
-
-    our $srcdir = $ENV{srcdir};
-
-    use Exporter ();
-    our ($VERSION, @ISA, @EXPORT, @EXPORT_OK, %EXPORT_TAGS);
-
-    # These define the type of tests to run.
-    our $STATUS = 0;  # Just check exit status of command
-    our $MD5 = 1;     # Check MD5 checksum of output against known value
-    our $ERR_MD5 = 2; # Check MD5 checksum, expect cmd to exit non-zero
-    our $CMP_MD5 = 3; # Compare the MD5 checksums of two commands
-
     our $NAME = $0;
     $NAME =~ s,.*/,,;
+
+    #  Set the required variables from the environment
+    our $srcdir = $ENV{srcdir};
+    our $top_srcdir = $ENV{top_srcdir};
+    our $top_builddir = $ENV{top_builddir};
+    unless (defined $srcdir && defined $top_srcdir && defined $top_builddir) {
+        # do not use skip_test(), it is not defined yet
+        my @not_defined =
+            grep {!defined $ENV{$_}} qw(srcdir top_srcdir top_builddir);
+        warn("$NAME: Skipping test: The following environment",
+             " variable", ((@not_defined > 1) ? "s are" : " is"),
+             " not defined: @not_defined\n");
+        exit 77;
+    }
+
+    #  Make certain MD5 is available
+    eval { require Digest::MD5; Digest::MD5->import; };
+    if ($@) {
+        # do not use skip_test(), it is not defined yet
+        warn "$NAME: Skipping test: Digest::MD5 module not available\n";
+        exit 77;
+    }
+
+    our $testsdir = "$top_builddir/tests";
+    require "$testsdir/config-vars.pm";
+
+    #  Set up the Exporter and export variables
+    use Exporter ();
+    our ($VERSION, @ISA, @EXPORT, @EXPORT_OK, %EXPORT_TAGS);
 
     # set the version for version checking
     $VERSION     = 1.00;
@@ -249,14 +254,18 @@ BEGIN {
     @EXPORT_OK   = ( );  #qw($Var1 %Hashit &func3);
 
 
+    # These define the type of tests to run.
+    our $STATUS = 0;  # Just check exit status of command
+    our $MD5 = 1;     # Check MD5 checksum of output against known value
+    our $ERR_MD5 = 2; # Check MD5 checksum, expect cmd to exit non-zero
+    our $CMP_MD5 = 3; # Compare the MD5 checksums of two commands
+
+    our $PWD = `pwd`;
+    chomp $PWD;
+
     # Default to being verbose
     unless (defined $ENV{SK_TESTS_VERBOSE}) {
         $ENV{SK_TESTS_VERBOSE} = 1;
-    }
-
-    eval { require Digest::MD5; Digest::MD5->import; };
-    if ($@) {
-        skip_test("Digest::MD5 module not available");
     }
 
     # List of features used by check_features().

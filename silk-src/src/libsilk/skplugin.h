@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2008-2016 by Carnegie Mellon University.
+** Copyright (C) 2008-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -25,7 +25,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKPLUGIN_H, "$SiLK: skplugin.h c59a52ca2878 2016-09-07 14:22:52Z mthomas $");
+RCSIDENTVAR(rcsID_SKPLUGIN_H, "$SiLK: skplugin.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/utils.h>         /* need "struct option" */

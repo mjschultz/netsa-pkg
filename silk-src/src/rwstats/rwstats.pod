@@ -54,10 +54,10 @@ names are specified and B<--xargs> is not present.  To read the
 standard input in addition to the named files, use C<-> or C<stdin> as
 a file name.  If an input file name ends in C<.gz>, the file will be
 uncompressed as it is read.  When the B<--xargs> switch is provided,
-B<rwstats> will read the names of the files to process from the named
-text file, or from the standard input if no file name argument is
-provided to the switch.  The input to B<--xargs> must contain one file
-name per line.
+B<rwstats> reads the names of the files to process from the named text
+file or from the standard input if no file name argument is provided
+to the switch.  The input to B<--xargs> must contain one file name per
+line.
 
 =head2 TOP-N DESCRIPTION
 
@@ -825,24 +825,30 @@ opened.
 
 =item B<--copy-input>=I<PATH>
 
-Copy all binary input to the specified file or named pipe.  I<PATH>
-can be C<stdout> to print flows to the standard output as long as the
-B<--output-path> switch has been used to redirect B<rwstats>'s ASCII
-output.
+Copy all binary SiLK Flow records read as input to the specified file
+or named pipe.  I<PATH> may be C<stdout> or C<-> to write flows to the
+standard output as long as the B<--output-path> switch is specified to
+redirect B<rwstats>' textual output to a different location.
 
 =item B<--output-path>=I<PATH>
 
-Determine where the output of B<rwstats> (ASCII text) is written.
-If this option is not given, output is written to the standard output.
+Write the textual output to I<PATH>, where I<PATH> is a filename, a
+named pipe, the keyword C<stderr> to write the output to the standard
+error, or the keyword C<stdout> or C<-> to write the output to the
+standard output (and bypass the paging program).  If I<PATH> names an
+existing file, B<rwstats> exits with an error unless the SILK_CLOBBER
+environment variable is set, in which case I<PATH> is overwritten.  If
+this switch is not given, the output is either sent to the pager or
+written to the standard output.
 
 =item B<--pager>=I<PAGER_PROG>
 
 When output is to a terminal, invoke the program I<PAGER_PROG> to view
 the output one screen full at a time.  This switch overrides the
 SILK_PAGER environment variable, which in turn overrides the PAGER
-variable.  If the value of the pager is determined to be the empty
-string, no paging will be performed and all output will be printed to
-the terminal.
+variable.  If the B<--output-path> switch is given or if the value of
+the pager is determined to be the empty string, no paging is performed
+and all output is written to the terminal.
 
 =item B<--temp-directory>=I<DIR_PATH>
 
@@ -873,11 +879,11 @@ the SiLK 4.0 release.
 
 =item B<--xargs>=I<FILENAME>
 
-Causes B<rwstats> to read file names from I<FILENAME> or from the
-standard input if I<FILENAME> is not provided.  The input should have
-one file name per line.  B<rwstats> will open each file in turn and
-read records from it, as if the files had been listed on the command
-line.
+Read the names of the input files from I<FILENAME> or from the
+standard input if I<FILENAME> is not provided.  The input is expected
+to have one filename per line.  B<rwstats> opens each named file in
+turn and reads records from it as if the filenames had been listed on
+the command line.
 
 =item B<--help>
 
@@ -1475,7 +1481,7 @@ B<environ(7)>
 
 =cut
 
-$SiLK: rwstats.pod c121bd41bc4a 2016-03-30 21:06:27Z mthomas $
+$SiLK: rwstats.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
 
 Local Variables:
 mode:text

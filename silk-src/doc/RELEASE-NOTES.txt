@@ -1,3 +1,56 @@
+SiLK-3.15.0 Release, 2017-Mar-24
+
+* rwaggbag
+  -- Create a new tool similar to rwbag: a tool to bin SiLK Flow
+     records using a key and counter that support multiple fields and
+     store the results in a binary Aggregate Bag file.
+* rwaggbagbuild
+  -- Create a new tool to create an Aggregate Bag file from text.
+* rwaggbagcat
+  -- Create a new tool to print the contents of an Aggregate Bag file
+     as text.
+* rwaggbagtool
+  -- Create a new tool to manipulate binary Aggregate Bag files and
+     create a new Aggregate Bag file.
+* flowkey
+  -- Add a new plug-in that uses the same algorithm as YAF to compute
+     a 32-bit flow key hash.
+* rwpmapcat
+  -- Add the --output-path switch to specify the output file.
+  -- POTENTIAL INCOMPATIBILITY. Note that the shortest unique prefix
+     for the --output-type switch is now "--output-t".
+* rwfileinfo
+  -- Add the --xargs switch to read input file names from a file.
+* rwsetcat
+  -- Add the --output-path switch to specify the output file.
+  -- Do not use the the pager when the output contains only the count
+     of the number of IPs in a singe IPset.
+* rwsiteinfo
+  -- Add the --output-path switch to specify the output file.
+* rwtuc
+  -- Add the --xargs switch to read input file names from a file.
+  -- Allow multiple fields in the input to be ignored.
+  -- At shutdown, print the number of input lines that were not parsed
+     unless --verbose is given or an error occurs.
+  -- Remove the --bad-input-lines file when it is empty (in accordance
+     with the manual page).
+  -- Fix a bug that treated white space after the final delimiter as
+     another field.
+  -- Fix issues in parsing the title line when --fields is given.
+* rwbagcat
+  -- Add the --site-config-file switch to select the silk.conf file.
+  -- Do not invoke the pager when --print-statistics is the only
+     output and a destination argument is given to the switch.
+* rwip2cc
+  -- Do not use the pager when the --output-path switch is given.
+* rwscanquery
+  -- Fix a bug that prevented use of the SQLite database driver on a
+     case-sensitive file system and caused "make check" to fail.
+* Building
+  -- Fix a compilation error in rwsiteinfo on Ubuntu.
+  -- Remove support for fixbuf releases prior to libfixbuf-1.7.0.
+
+
 SiLK-3.14.0 Release, 2016-Nov-17
 
 * IPset changes

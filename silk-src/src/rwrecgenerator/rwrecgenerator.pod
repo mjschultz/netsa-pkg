@@ -217,10 +217,10 @@ Exactly one of the following switches is required.
 
 =item B<--silk-output-path>=I<PATH>
 
-Specifies that B<rwrecgenerator> should create a single binary file of
-SiLK flow records to the specified location.  If I<PATH> is C<->, the
-records are written to the standard output.  B<rwrecgenerator> will
-not support writing binary data to a terminal.
+Tell B<rwrecgenerator> to create a single binary file of SiLK flow
+records at the specified location.  If I<PATH> is C<->, the records
+are written to the standard output.  B<rwrecgenerator> does not
+support writing binary data to a terminal.
 
 =item B<--output-directory>=I<DIR_PATH>
 
@@ -229,11 +229,10 @@ the flush timeout is reached.
 
 =item B<--text-output-path>=I<PATH>
 
-Specifies that B<rwrecgenerator> should convert the flow records it
-creates to text and to print the result in a format similar to that
-created by B<rwcut(1)>.  The output will be written to the specified
-location.  If I<PATH> is C<->, the records are written to the standard
-output.
+Tell B<rwrecgenerator> to convert the flow records it creates to text
+and to print the result in a format similar to that created by
+B<rwcut(1)>.  The output is written to the specified location.  If
+I<PATH> is C<->, the records are written to the standard output.
 
 =back
 
@@ -765,7 +764,7 @@ B<syslog(3)>, B<zlib(3)>, B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwrecgenerator.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
+$SiLK: rwrecgenerator.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
 
 Local Variables:
 mode:text
