@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sklog.c 4732ab1b2fad 2016-09-08 18:45:38Z mthomas $");
+RCSIDENT("$SiLK: sklog.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 #include <silk/sklog.h>
 #include <silk/skstringmap.h>

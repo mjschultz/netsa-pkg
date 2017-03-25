@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2016 by Carnegie Mellon University.
+** Copyright (C) 2004-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagcat.c 0432f6547214 2016-09-19 19:08:31Z mthomas $");
+RCSIDENT("$SiLK: rwbagcat.c 66e65613d494 2017-03-21 19:29:56Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skcountry.h>
@@ -202,7 +202,8 @@ static struct limits_st {
 /* name of program to run to page output */
 static char *pager = NULL;
 
-/* whether the pager has been invoked */
+/* whether the pager has been invoked.  this is set to true when the
+ * --output-path switch is specified to bypass the pager */
 static int pager_invoked = 0;
 
 /* values provided to min-key and max-key switches; for errros */
@@ -326,8 +327,8 @@ static const char *appHelp[] = {
     "Use specified character between columns. Def. '|'",
     "Suppress column delimiter at end of line. Def. No",
     "Shortcut for --no-columns --no-final-del --column-sep=CHAR",
-    "Write output to named stream. Def. stdout",
-    "Program to invoke to page output. Def. $SILK_PAGER or $PAGER",
+    "Write the output to this stream or file. Def. stdout",
+    "Invoke this program to page output. Def. $SILK_PAGER or $PAGER",
     (char *) NULL
 };
 
@@ -431,6 +432,7 @@ appUsageLong(
     }
 
     skOptionsCtxOptionsUsage(optctx, fh);
+    sksiteOptionsUsage(fh);
 }
 
 
@@ -505,7 +507,8 @@ appSetup(
     /* register the options */
     if (skOptionsCtxCreate(&optctx, optctx_flags)
         || skOptionsCtxOptionsRegister(optctx)
-        || skOptionsRegister(appOptions, &appOptionsHandler, NULL))
+        || skOptionsRegister(appOptions, &appOptionsHandler, NULL)
+        || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE))
     {
         skAppPrintErr("Unable to register options");
         exit(EXIT_FAILURE);
@@ -582,20 +585,33 @@ appSetup(
         }
     }
 
-    /* Set the default output if none was set */
-    if (output == NULL) {
+    /* when an output-path was given, disable the pager.  If no
+     * output-path was given, set it to the default */
+    if (output) {
+        /* do not page the output */
+        pager_invoked = 1;
+    } else {
         if (setOutput("stdout", &output)) {
             skAppPrintErr("Unable to print to standard output");
             exit(EXIT_FAILURE);
         }
     }
 
-    /* If print-statistics was requested but its output stream hasn't
-     * been set, set it to stdout. */
-    if (print_statistics && stats_stream == NULL) {
-        if (setOutput("stdout", &stats_stream)) {
-            skAppPrintErr("Unable to print to standard output");
-            exit(EXIT_FAILURE);
+    /* set stream and pager for --print-statistics */
+    if (print_statistics) {
+        if (NULL == stats_stream) {
+            /* Set the --print-stat output stream to stdout if the
+             * user did not set it */
+            if (setOutput("stdout", &stats_stream)) {
+                skAppPrintErr("Unable to print to standard output");
+                exit(EXIT_FAILURE);
+            }
+        } else if (bin_scheme == BINSCHEME_NONE
+                   && !sort_counters && !print_network)
+        {
+            /* Disable the pager when the only output is --print-stat
+             * and an explicit stream was specified */
+            pager_invoked = 1;
         }
     }
 

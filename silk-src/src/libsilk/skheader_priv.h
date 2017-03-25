@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2016 by Carnegie Mellon University.
+** Copyright (C) 2006-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -23,7 +23,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKHEADER_PRIV_H, "$SiLK: skheader_priv.h 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENTVAR(rcsID_SKHEADER_PRIV_H, "$SiLK: skheader_priv.h 7e6884832fbd 2017-01-20 22:59:46Z mthomas $");
 
 #include <silk/skheader.h>
 
@@ -269,6 +269,40 @@ skHeaderWrite(
 sk_hentry_type_t *
 skHentryTypeLookup(
     sk_hentry_type_id_t entry_id);
+
+
+
+/**
+ *    Function in skaggbag.c that registers the callback functions
+ *    used by header entry whose ID is SK_HENTRY_AGGBAG_ID.
+ */
+int
+skAggBagRegisterHeaderEntry(
+    sk_hentry_type_id_t     entry_id);
+
+/**
+ *    Function in skbag.c that registers the callback functions used
+ *    by header entry whose ID is SK_HENTRY_BAG_ID.
+ */
+int
+skBagRegisterHeaderEntry(
+    sk_hentry_type_id_t     entry_id);
+
+/**
+ *    Function in skipset.c that registers the callback functions used
+ *    by header entry whose ID is SK_HENTRY_IPSET_ID.
+ */
+int
+skIPSetRegisterHeaderEntry(
+    sk_hentry_type_id_t     entry_id);
+
+/**
+ *    Function in skprefixmap.c that registers the callback functions
+ *    used by header entry whose ID is SK_HENTRY_PREFIXMAP_ID.
+ */
+int
+skPrefixMapRegisterHeaderEntry(
+    sk_hentry_type_id_t     entry_id);
 
 
 

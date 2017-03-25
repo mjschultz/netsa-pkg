@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2016 by Carnegie Mellon University.
+** Copyright (C) 2004-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -7,15 +7,15 @@
 */
 
 /*
-**  skbag.c
-**
-**    Implementation of skbag according to skbag.h
-**
-*/
+ *  skbag.c
+ *
+ *    Implementation of skbag according to skbag.h
+ *
+ */
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skbag.c aefb6d38d9a6 2016-10-18 19:20:00Z mthomas $");
+RCSIDENT("$SiLK: skbag.c 470ce106b096 2017-03-21 19:56:22Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/skbag.h>
@@ -23,15 +23,55 @@ RCSIDENT("$SiLK: skbag.c aefb6d38d9a6 2016-10-18 19:20:00Z mthomas $");
 #include <silk/skmempool.h>
 #include <silk/skstream.h>
 #include <silk/utils.h>
+#include "skheader_priv.h"
+
+
+/*
+ *    BAG FILE FORMAT NOTES
+ *
+ *    All Bag files have a file format of FT_RWBAG (0x21).
+ *
+ *    The initial record version number for Bag files was 1.  These
+ *    files have a 32-bit key and a 32-bit counter.  These were the
+ *    default rwbag output files prior to SiLK 0.8.0.
+ *
+ *    Bag file record version 2 was introduced at SiLK 0.8.0.  These
+ *    files use a 32-bit key and a 64-bit counter.  Files in this
+ *    format may not use compression.
+ *
+ *    A bug with compressed files introduced at SiLK 0.10.0 was fixed
+ *    in SiLK 0.10.5 by bumping the version number of every SiLK file
+ *    that supports compression, and all Bag files began to be written
+ *    using record version 3.
+ *
+ *    SiLK 3.0.0 introduced Bag file record version 4.  These files
+ *    support an arbitrary key size.  The key and counter sizes for a
+ *    file are specified in a Bag Header Entry (id = 6).  The header
+ *    entry also contains the type of the key and counter.
+ *
+ *    For compatibility with SiLK 2.x, this library writes a version 3
+ *    file unless the key contains IPv6 addresses.  The library writes
+ *    a header entry to these files, but SiLK 2.x ignores it.
+ *
+ */
 
 
 /* LOCAL DEFINES AND TYPEDEFS */
 
 /*
- *    Version number to write into the Bag's header.  KEY_FIXED
- *    assumes a fixed key of 4 bytes and a counter of 8 bytes;
- *    KEY_VARIES allows for variable key and value sizes.
+ *    Version number to write into the Bag's header.
+ *
+ *    _COUNTER32 uses a 32-key and a 32-bit counter.
+ *
+ *    _NO_COMPR uses a 32-key, a 64-bit counter, and the data section
+ *    may not be compressed.
+ *
+ *    _KEY_FIXED is identical to _COUNTER64 but may be compressed.
+ *
+ *    _KEY_VARIES allows for variable key and value sizes.
  */
+#define RWBAG_FILE_VERS_COUNTER32   1
+#define RWBAG_FILE_VERS_NO_COMPR    2
 #define RWBAG_FILE_VERS_KEY_FIXED   3
 #define RWBAG_FILE_VERS_KEY_VARIES  4
 
@@ -405,6 +445,17 @@ typedef struct bag_field_info_st {
 } bag_field_info_t;
 
 
+/*    when writing a Bag to a stream, this header entry is used to
+ *    contain information about the bag. */
+typedef struct sk_hentry_bag_st {
+    sk_header_entry_spec_t  he_spec;
+    uint16_t                key_type;
+    uint16_t                key_length;
+    uint16_t                counter_type;
+    uint16_t                counter_length;
+} sk_hentry_bag_t;
+
+
 /* LOCAL VARIABLES */
 
 #if SK_ENABLE_IPV6
@@ -524,6 +575,12 @@ bagOperationRedblack(
     skBagTypedCounter_t    *result_value,
     bag_operation_t         op);
 #endif  /* SK_ENABLE_IPV6 */
+static sk_header_entry_t *
+bagHentryCreate(
+    uint16_t            key_type,
+    uint16_t            key_length,
+    uint16_t            counter_type,
+    uint16_t            counter_length);
 
 
 /* FUNCTION DEFINITIONS */
@@ -839,6 +896,210 @@ bagComputeStats(
       default:
         skAbortBadCase(bag->key_octets);
     }
+}
+
+
+/*
+ *  hentry = bagHentryCopy(hentry);
+ *
+ *    Create and return a new header entry for Bag files that is a
+ *    copy of the header entry 'hentry'.
+ *
+ *    This is the 'copy_fn' callback for skHentryTypeRegister().
+ */
+static sk_header_entry_t *
+bagHentryCopy(
+    const sk_header_entry_t    *hentry)
+{
+    const sk_hentry_bag_t *bag_hdr = (sk_hentry_bag_t*)hentry;
+
+    return bagHentryCreate(bag_hdr->key_type, bag_hdr->key_length,
+                             bag_hdr->counter_type, bag_hdr->counter_length);
+}
+
+
+/*
+ *    Create and return a new header entry for Bag files.  'key_type'
+ *    is the type of the key, 'key_length' is the octet length of a
+ *    key, 'counter_type' is the type of the counter, 'counter_length'
+ *    is the octet length of a counter.
+ */
+static sk_header_entry_t *
+bagHentryCreate(
+    uint16_t            key_type,
+    uint16_t            key_length,
+    uint16_t            counter_type,
+    uint16_t            counter_length)
+{
+    sk_hentry_bag_t *bag_hdr;
+
+    bag_hdr = (sk_hentry_bag_t*)calloc(1, sizeof(sk_hentry_bag_t));
+    if (NULL == bag_hdr) {
+        return NULL;
+    }
+    bag_hdr->he_spec.hes_id  = SK_HENTRY_BAG_ID;
+    bag_hdr->he_spec.hes_len = sizeof(sk_hentry_bag_t);
+    bag_hdr->key_type        = key_type;
+    bag_hdr->key_length      = key_length;
+    bag_hdr->counter_type    = counter_type;
+    bag_hdr->counter_length  = counter_length;
+
+    return (sk_header_entry_t*)bag_hdr;
+}
+
+
+/*
+ *  bagHentryFree(hentry);
+ *
+ *    Release any memory that is used by the in-memory representation
+ *    of the file header for Bag files.
+ *
+ *    This is the 'free_fn' callback for skHentryTypeRegister().
+ */
+static void
+bagHentryFree(
+    sk_header_entry_t  *hentry)
+{
+    sk_hentry_bag_t *bag_hdr = (sk_hentry_bag_t*)hentry;
+
+    if (bag_hdr) {
+        assert(skHeaderEntryGetTypeId(bag_hdr) == SK_HENTRY_BAG_ID);
+        bag_hdr->he_spec.hes_id = UINT32_MAX;
+        free(bag_hdr);
+    }
+}
+
+
+#define bagHentryGetKeyType(hentry)             \
+    (((sk_hentry_bag_t*)(hentry))->key_type)
+
+#define bagHentryGetKeyLength(hentry)           \
+    (((sk_hentry_bag_t*)(hentry))->key_length)
+
+#define bagHentryGetCounterType(hentry)                 \
+    (((sk_hentry_bag_t*)(hentry))->counter_type)
+
+#define bagHentryGetCounterLength(hentry)               \
+    (((sk_hentry_bag_t*)(hentry))->counter_length)
+
+
+
+/*
+ *  size = bagHentryPacker(hentry, buf, bufsiz);
+ *
+ *    Pack the contents of the header entry for Bag files, 'hentry'
+ *    into the buffer 'buf', whose size is 'bufsiz', for writing the
+ *    file to disk.
+ *
+ *    This the 'pack_fn' callback for skHentryTypeRegister().
+ */
+static ssize_t
+bagHentryPacker(
+    const sk_header_entry_t    *in_hentry,
+    uint8_t                    *out_packed,
+    size_t                      bufsize)
+{
+    sk_hentry_bag_t *bag_hdr = (sk_hentry_bag_t*)in_hentry;
+    sk_hentry_bag_t tmp_hdr;
+
+    assert(in_hentry);
+    assert(out_packed);
+    assert(skHeaderEntryGetTypeId(bag_hdr) == SK_HENTRY_BAG_ID);
+
+    if (bufsize >= sizeof(sk_hentry_bag_t)) {
+        skHeaderEntrySpecPack(&(bag_hdr->he_spec), (uint8_t *)&tmp_hdr,
+                              sizeof(tmp_hdr));
+        tmp_hdr.key_type       = htons(bag_hdr->key_type);
+        tmp_hdr.key_length     = htons(bag_hdr->key_length);
+        tmp_hdr.counter_type   = htons(bag_hdr->counter_type);
+        tmp_hdr.counter_length = htons(bag_hdr->counter_length);
+
+        memcpy(out_packed, &tmp_hdr, sizeof(sk_hentry_bag_t));
+    }
+
+    return sizeof(sk_hentry_bag_t);
+}
+
+
+/*
+ *  bagHentryPrint(hentry, fh);
+ *
+ *    Print a textual representation of a file's Bag header entry in
+ *    'hentry' to the FILE pointer 'fh'.
+ *
+ *    This is the 'print_fn' callback for skHentryTypeRegister().
+ */
+static void
+bagHentryPrint(
+    const sk_header_entry_t    *hentry,
+    FILE                       *fh)
+{
+    sk_hentry_bag_t *bag_hdr = (sk_hentry_bag_t*)hentry;
+    char key_buf[64];
+    char counter_buf[64];
+
+    assert(skHeaderEntryGetTypeId(bag_hdr) == SK_HENTRY_BAG_ID);
+
+    if (!skBagFieldTypeAsString((skBagFieldType_t)bag_hdr->key_type,
+                                key_buf, sizeof(key_buf)))
+    {
+        snprintf(key_buf, sizeof(key_buf), "UNKNOWN[%" PRIu16 "]",
+                 bag_hdr->key_type);
+    }
+    if (!skBagFieldTypeAsString((skBagFieldType_t)bag_hdr->counter_type,
+                                counter_buf, sizeof(counter_buf)))
+    {
+        snprintf(counter_buf,  sizeof(counter_buf), "UNKNOWN[%" PRIu16 "]",
+                 bag_hdr->counter_type);
+    }
+
+    fprintf(fh, ("key: %s @ %" PRIu16 " octets; "
+                 "counter: %s @ %" PRIu16 " octets"),
+            key_buf, bag_hdr->key_length,
+            counter_buf, bag_hdr->counter_length);
+}
+
+
+/*
+ *  hentry = bagHentryUnpacker(buf);
+ *
+ *    Unpack the data in 'buf' to create an in-memory representation
+ *    of a file's Bag header entry.
+ *
+ *    This is the 'unpack_fn' callback for skHentryTypeRegister().
+ */
+static sk_header_entry_t *
+bagHentryUnpacker(
+    uint8_t            *in_packed)
+{
+    sk_hentry_bag_t *bag_hdr;
+
+    assert(in_packed);
+
+    /* create space for new header */
+    bag_hdr = (sk_hentry_bag_t*)calloc(1, sizeof(sk_hentry_bag_t));
+    if (NULL == bag_hdr) {
+        return NULL;
+    }
+
+    /* copy the spec */
+    skHeaderEntrySpecUnpack(&(bag_hdr->he_spec), in_packed);
+    assert(skHeaderEntryGetTypeId(bag_hdr) == SK_HENTRY_BAG_ID);
+
+    /* copy the data */
+    if (bag_hdr->he_spec.hes_len != sizeof(sk_hentry_bag_t)) {
+        free(bag_hdr);
+        return NULL;
+    }
+    memcpy(&(bag_hdr->key_type),
+           &(in_packed[sizeof(sk_header_entry_spec_t)]),
+           sizeof(sk_hentry_bag_t) - sizeof(sk_header_entry_spec_t));
+    bag_hdr->key_type       = htons(bag_hdr->key_type);
+    bag_hdr->key_length     = htons(bag_hdr->key_length);
+    bag_hdr->counter_type   = htons(bag_hdr->counter_type);
+    bag_hdr->counter_length = htons(bag_hdr->counter_length);
+
+    return (sk_header_entry_t*)bag_hdr;
 }
 
 
@@ -2896,7 +3157,7 @@ skBagProcessStreamTyped(
     }
 
     bag_version = skHeaderGetRecordVersion(hdr);
-    if ((bag_version <= 2) &&
+    if ((bag_version <= RWBAG_FILE_VERS_NO_COMPR) &&
         (SK_COMPMETHOD_NONE != skHeaderGetCompressionMethod(hdr)))
     {
         /*skAppPrintErr("Bag files prior to v2 do not support compression");*/
@@ -2917,7 +3178,7 @@ skBagProcessStreamTyped(
     key_read_len = sizeof(uint32_t);
     counter_read_len = sizeof(uint64_t);
 
-    if (1 == bag_version) {
+    if (RWBAG_FILE_VERS_COUNTER32 == bag_version) {
         /* file version v1 used 32bit counters */
         counter_read_len = sizeof(uint32_t);
     }
@@ -2939,19 +3200,19 @@ skBagProcessStreamTyped(
          * counter sizes */
         if (RWBAG_FILE_VERS_KEY_VARIES == bag_version) {
             /* binary lengths of keys/counters vary */
-            key_read_len = skHentryBagGetKeyLength(hentry);
-            counter_read_len = skHentryBagGetCounterLength(hentry);
+            key_read_len = bagHentryGetKeyLength(hentry);
+            counter_read_len = bagHentryGetCounterLength(hentry);
         }
 
-        bag->key_type = (skBagFieldType_t)skHentryBagGetKeyType(hentry);
+        bag->key_type = (skBagFieldType_t)bagHentryGetKeyType(hentry);
         bf = BAG_GET_FIELD_INFO(bag->key_type);
         if (NULL == bf) {
             /* don't recognize the field type; treat as custom */
             bag->key_type = SKBAG_FIELD_CUSTOM;
-            bag->key_octets = skHentryBagGetKeyLength(hentry);
+            bag->key_octets = bagHentryGetKeyLength(hentry);
         } else if (bf->octets == SKBAG_OCTETS_CUSTOM) {
             /* type was explicitly custom, get length from header */
-            bag->key_octets = skHentryBagGetKeyLength(hentry);
+            bag->key_octets = bagHentryGetKeyLength(hentry);
         } else {
             /* type is known; use the type's standard length unless it
              * is larger than the on-disk key size */
@@ -2961,7 +3222,7 @@ skBagProcessStreamTyped(
             }
         }
 
-        bag->counter_type = (skBagFieldType_t)skHentryBagGetCounterType(hentry);
+        bag->counter_type = (skBagFieldType_t)bagHentryGetCounterType(hentry);
         if (NULL == BAG_GET_FIELD_INFO(bag->counter_type)) {
             /* don't recognize the field type; treat as custom */
             bag->counter_type = SKBAG_FIELD_CUSTOM;
@@ -3151,6 +3412,18 @@ skBagRead(
 }
 
 
+/* The prototype for this function is in skheader_priv.h */
+int
+skBagRegisterHeaderEntry(
+    sk_hentry_type_id_t     entry_id)
+{
+    assert(SK_HENTRY_BAG_ID == entry_id);
+    return (skHentryTypeRegister(
+                entry_id, &bagHentryPacker, &bagHentryUnpacker,
+                &bagHentryCopy, &bagHentryFree, &bagHentryPrint));
+}
+
+
 /* Write 'bag' to 'filename'--a wrapper around skBagWrite(). */
 skBagErr_t
 skBagSave(
@@ -3229,6 +3502,7 @@ skBagWrite(
     skstream_t         *stream_out)
 {
     sk_file_header_t *hdr;
+    sk_header_entry_t *bag_hdr;
     uint32_t key;
     uint64_t counter;
     skBagIterator_t *iter = NULL;
@@ -3239,26 +3513,31 @@ skBagWrite(
     }
 
     hdr = skStreamGetSilkHeader(stream_out);
+    skHeaderSetByteOrder(hdr, SILK_ENDIAN_NATIVE);
     skHeaderSetFileFormat(hdr, FT_RWBAG);
 
     if (bag->key_octets <= 4) {
         /* write a SiLK-2 compatible bag */
         skHeaderSetRecordVersion(hdr, RWBAG_FILE_VERS_KEY_FIXED);
-        skHeaderSetRecordLength(hdr,
-                                sizeof(uint32_t) + sizeof(uint64_t));
-        rv = skHeaderAddBag(hdr, bag->key_type, (uint16_t)sizeof(uint32_t),
-                            bag->counter_type,
-                            (uint16_t)sizeof(uint64_t));
+        skHeaderSetRecordLength(hdr, sizeof(uint32_t) + sizeof(uint64_t));
+        bag_hdr = bagHentryCreate(bag->key_type, (uint16_t)sizeof(uint32_t),
+                                  bag->counter_type,
+                                  (uint16_t)sizeof(uint64_t));
     } else {
         /* write a SiLK-3.x+ style bag */
         skHeaderSetRecordVersion(hdr, RWBAG_FILE_VERS_KEY_VARIES);
-        skHeaderSetRecordLength(hdr,
-                                bag->key_octets + sizeof(uint64_t));
-        rv = skHeaderAddBag(hdr, bag->key_type, bag->key_octets,
-                            bag->counter_type,
-                            (uint16_t)sizeof(uint64_t));
+        skHeaderSetRecordLength(hdr, bag->key_octets + sizeof(uint64_t));
+        bag_hdr = bagHentryCreate(bag->key_type, bag->key_octets,
+                                  bag->counter_type,
+                                  (uint16_t)sizeof(uint64_t));
     }
+    if (NULL == bag_hdr) {
+        return SKBAG_ERR_MEMORY;
+    }
+
+    rv = skHeaderAddEntry(hdr, bag_hdr);
     if (rv) {
+        bagHentryFree(bag_hdr);
         return SKBAG_ERR_MEMORY;
     }
 

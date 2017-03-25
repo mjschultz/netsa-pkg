@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwuniqsetup.c 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $");
+RCSIDENT("$SiLK: rwuniqsetup.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skcountry.h>
@@ -82,8 +82,12 @@ static const char *temp_directory = NULL;
 /* how to print IP addresses */
 static uint32_t ip_format = SKIPADDR_CANONICAL;
 
+/* flags when registering --ip-format */
+static const unsigned int ip_format_register_flags =
+    (SK_OPTION_IP_FORMAT_INTEGER_IPS | SK_OPTION_IP_FORMAT_ZERO_PAD_IPS);
+
 /* how to print timestamps */
-static uint32_t time_flags = 0;
+static uint32_t timestamp_format = 0;
 
 /* flags when registering --timestamp-format */
 static const uint32_t time_register_flags =
@@ -228,8 +232,8 @@ static const char *appHelp[] = {
     "Shortcut for --no-columns --no-final-del --column-sep=CHAR",
     "Print names of input files as they are opened. Def. No",
     "Copy all input SiLK Flows to given pipe or file. Def. No",
-    "Send output to given file path. Def. stdout",
-    "Program to invoke to page output. Def. $SILK_PAGER or $PAGER",
+    "Write the output to this stream or file. Def. stdout",
+    "Invoke this program to page output. Def. $SILK_PAGER or $PAGER",
     (char *)NULL
 };
 
@@ -368,8 +372,9 @@ appSetup(
         || skOptionsCtxOptionsRegister(optctx)
         || skOptionsRegister(appOptions, &appOptionsHandler, NULL)
         || skOptionsTempDirRegister(&temp_directory)
-        || skOptionsTimestampFormatRegister(&time_flags, time_register_flags)
-        || skOptionsIPFormatRegister(&ip_format)
+        || skOptionsTimestampFormatRegister(
+            &timestamp_format, time_register_flags)
+        || skOptionsIPFormatRegister(&ip_format, ip_format_register_flags)
         || skIPv6PolicyOptionsRegister(&ipv6_policy)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE))
     {
@@ -411,7 +416,7 @@ appSetup(
     rwAsciiSetDelimiter(ascii_str, delimiter);
     rwAsciiSetIPv6Policy(ascii_str, ipv6_policy);
     rwAsciiSetIPFormatFlags(ascii_str, ip_format);
-    rwAsciiSetTimestampFlags(ascii_str, time_flags);
+    rwAsciiSetTimestampFlags(ascii_str, timestamp_format);
     if (app_flags.no_final_delimiter) {
         rwAsciiSetNoFinalDelimiter(ascii_str);
     }
@@ -469,7 +474,6 @@ appSetup(
         }
 
         skPresortedUniqueSetTempDirectory(ps_uniq, temp_directory);
-        skPresortedUniqueSetErrorFunction(ps_uniq, skAppPrintErr);
 
         if (skPresortedUniqueSetFields(ps_uniq, key_fields, distinct_fields,
                                        value_fields))
@@ -499,7 +503,6 @@ appSetup(
         }
 
         skUniqueSetTempDirectory(uniq, temp_directory);
-        skUniqueSetErrorFunction(uniq, skAppPrintErr);
 
         if (skUniqueSetFields(uniq, key_fields, distinct_fields, value_fields)
             || skUniquePrepareForInput(uniq))
@@ -928,7 +931,7 @@ value_to_ascii(
         skFieldListExtractFromBuffer(value_fields, ((uint8_t**)v_outbuf)[1],
                                      fl_entry, (uint8_t*)&val32);
         assert(text_buf_size > SKTIMESTAMP_STRLEN);
-        sktimestamp_r(text_buf, sktimeCreate(val32, 0), time_flags);
+        sktimestamp_r(text_buf, sktimeCreate(val32, 0), timestamp_format);
         break;
 
       case SK_FIELD_CALLER:
@@ -1737,7 +1740,7 @@ parseValueFields(
     }
 #endif  /* SK_ENABLE_IPV6 */
 
-    if (time_flags & SKTIMESTAMP_EPOCH) {
+    if (timestamp_format & SKTIMESTAMP_EPOCH) {
         /* Reduce width of the textual columns for the MIN_STARTTIME
          * and MAX_ENDTIME fields. */
         for (i = 0, bf = builtin_values; i < num_builtin_values; ++i, ++bf) {

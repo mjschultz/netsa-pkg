@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2016 by Carnegie Mellon University.
+** Copyright (C) 2004-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbag.c 614ba66c35e8 2016-10-12 21:12:16Z mthomas $");
+RCSIDENT("$SiLK: rwbag.c 259bfd3bc809 2017-01-19 22:35:17Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skbag.h>
@@ -1378,37 +1378,35 @@ int main(int argc, char **argv)
             skStreamPrintLastErr(bag->stream, rv, &skAppPrintErr);
         }
 
-        {
-            err = skBagWrite(bag->bag, bag->stream);
-            if (SKBAG_OK == err) {
-                rv = skStreamClose(bag->stream);
-                if (rv) {
-                    had_err = 1;
-                    skStreamLastErrMessage(bag->stream, rv,
-                                           errbuf, sizeof(errbuf));
-                    skAppPrintErr("Error writing %s=%s: %s",
-                                  appOptions[OPT_BAG_FILE].name,
-                                  createBagFileArgument(bag),
-                                  errbuf);
-                }
-            } else if (SKBAG_ERR_OUTPUT == err) {
+        err = skBagWrite(bag->bag, bag->stream);
+        if (SKBAG_OK == err) {
+            rv = skStreamClose(bag->stream);
+            if (rv) {
                 had_err = 1;
-                rv = skStreamGetLastReturnValue(bag->stream);
                 skStreamLastErrMessage(bag->stream, rv,
                                        errbuf, sizeof(errbuf));
                 skAppPrintErr("Error writing %s=%s: %s",
                               appOptions[OPT_BAG_FILE].name,
                               createBagFileArgument(bag),
                               errbuf);
-            } else {
-                had_err = 1;
-                skAppPrintErr("Error writing %s=%s: %s",
-                              appOptions[OPT_BAG_FILE].name,
-                              createBagFileArgument(bag),
-                              skBagStrerror(err));
             }
-            skStreamDestroy(&bag->stream);
+        } else if (SKBAG_ERR_OUTPUT == err) {
+            had_err = 1;
+            rv = skStreamGetLastReturnValue(bag->stream);
+            skStreamLastErrMessage(bag->stream, rv,
+                                   errbuf, sizeof(errbuf));
+            skAppPrintErr("Error writing %s=%s: %s",
+                          appOptions[OPT_BAG_FILE].name,
+                          createBagFileArgument(bag),
+                          errbuf);
+        } else {
+            had_err = 1;
+            skAppPrintErr("Error writing %s=%s: %s",
+                          appOptions[OPT_BAG_FILE].name,
+                          createBagFileArgument(bag),
+                          skBagStrerror(err));
         }
+        skStreamDestroy(&bag->stream);
     }
 
     /* done */

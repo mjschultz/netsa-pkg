@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2016 by Carnegie Mellon University.
+** Copyright (C) 2005-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_STRINGMAP_H, "$SiLK: skstringmap.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_STRINGMAP_H, "$SiLK: skstringmap.h a0772d608106 2017-02-14 15:15:29Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -174,7 +174,8 @@ typedef enum {
 
 
 /**
- *    How parse functions should handle duplicate entries
+ *    Parameter to pass to the parsing functions (skStringMapParse(),
+ *    etc) that specify how they are to handle duplicate entries.
  */
 typedef enum {
     SKSTRINGMAP_DUPES_KEEP = 0,
@@ -186,7 +187,7 @@ typedef enum {
 
 
 /**
- *    Create a new string-map and puts the result into 'out_str_map'.
+ *    Create a new string-map and put the result into 'out_str_map'.
  *    Return SKSTRINGMAP_OK on success, or SKSTRINGMAP_ERR_MEM if
  *    allocation fails.
  *
@@ -197,8 +198,8 @@ skStringMapCreate(
 
 
 /**
- *    Destroy the string-map 'str_map'.  Does nothing if 'str_map' is
- *    NULL.
+ *    Destroy the string-map 'str_map'.  Do nothing if 'str_map' is
+ *    NULL.  Return SKSTRINGMAP_OK;
  */
 sk_stringmap_status_t
 skStringMapDestroy(
@@ -219,18 +220,20 @@ skStringMapDestroy(
  *    When 'entryc' is positive or zero, it is taken as the count of
  *    entries in 'entryv'.  When 'entryc' is negative, 'entryv' is
  *    considered to be a NULL-terminated array of entries; i.e., all
- *    entries in 'entryv' are added one of the form
+ *    entries in 'entryv' are added until an entry that matches
  *    SK_STRINGMAP_SENTINEL is reached.
  *
- *    Returns SKSTRINGMAP_OK if all entries are successfully added.
- *    If an error occurs, some entries may have been added to the
- *    StringMap.  Returns SKSTRINGMAP_ERR_INPUT if 'str_map' or
- *    'entryv' is NULL, or if 'entryc' is positive and a "name" in
- *    entryv is NULL.  Returns SKSTRINGMAP_ERR_MEM if allocation
- *    fails.  May also return any of SKSTRINGMAP_ZERO_LENGTH_ENTRY,
- *    SKSTRINGMAP_ERR_NUMERIC_START_ENTRY,
- *    SKSTRINGMAP_ERR_ALPHANUM_START_ENTRY,
- *    SKSTRINGMAP_DUPLICATE_ENTRY.
+ *    Return SKSTRINGMAP_OK if all entries are successfully added.  If
+ *    an error occurs, some entries may have been added to the
+ *    StringMap.  Return SKSTRINGMAP_ERR_INPUT if 'str_map' or
+ *    'entryv' is NULL or if 'entryc' is positive and a "name" member
+ *    within the first 'entryc' entries of 'entryv' is NULL.  Return
+ *    SKSTRINGMAP_ERR_MEM if allocation fails.  If a "name" member is
+ *    not a valid name, return SKSTRINGMAP_ZERO_LENGTH_ENTRY,
+ *    SKSTRINGMAP_ERR_NUMERIC_START_ENTRY, or
+ *    SKSTRINGMAP_ERR_ALPHANUM_START_ENTRY.  Return
+ *    SKSTRINGMAP_DUPLICATE_ENTRY if an entry having the same name
+ *    already exists in the map.
  */
 sk_stringmap_status_t
 skStringMapAddEntries(
@@ -242,7 +245,8 @@ skStringMapAddEntries(
 /**
  *    Remove the single entry from the StringMap 'str_map' whose name
  *    is 'name'.  Return SKSTRINGMAP_ERR_INPUT if 'str_map' or 'name'
- *    is NULL, else return SKSTRINGMAP_OK.
+ *    is NULL, else return SKSTRINGMAP_OK.  Return SKSTRINGMAP_OK even
+ *    if an entry with the name 'name' does not exist in the map.
  */
 sk_stringmap_status_t
 skStringMapRemoveByName(
@@ -253,7 +257,8 @@ skStringMapRemoveByName(
 /**
  *    Remove all entries from the StringMap 'str_map' whose ID is
  *    'id'.  Return SKSTRINGMAP_ERR_INPUT if 'str_map' is NULL, else
- *    return SKSTRINGMAP_OK.
+ *    return SKSTRINGMAP_OK.  Return SKSTRINGMAP_OK even
+ *    if an entry with the ID 'id' does not exist in the map.
  */
 sk_stringmap_status_t
 skStringMapRemoveByID(
@@ -268,8 +273,13 @@ skStringMapRemoveByID(
  *    When 'entryc' is positive or zero, it is taken as the count of
  *    entries in 'entryv'.  When 'entryc' is negative, 'entryv' is
  *    considered to be a NULL-terminated array of entries; i.e., all
- *    entries in 'entryv' are removed one of the form
+ *    entries in 'entryv' are added until an entry that matches
  *    SK_STRINGMAP_SENTINEL is reached.
+ *
+ *    Return SKSTRINGMAP_ERR_INPUT if 'str_map' or 'entryv' is NULL or
+ *    if 'entryc' is positive and a "name" member within the first
+ *    'entryc' entries of 'entryv' is NULL.  Otherwise, return
+ *    SKSTRINGMAP_OK, even if the StringMap was not modified.
  */
 sk_stringmap_status_t
 skStringMapRemoveEntries(
@@ -416,6 +426,10 @@ skStringMapGetByNameWithAttributes(
  *    When the caller is finished with the iterator, she must call
  *    skStringMapIterDestroy() to free the resources used by the
  *    iterator.
+ *
+ *    Return SKSTRINGMAP_OK on success.  Return SKSTRINGMAP_ERR_INPUT
+ *    if a parameter is NULL, and return SKSTRINGMAP_ERR_MEM if an
+ *    error occurs when creating or appending to the iterator.
  */
 sk_stringmap_status_t
 skStringMapGetByID(

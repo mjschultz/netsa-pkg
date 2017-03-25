@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2003-2016 by Carnegie Mellon University.
+** Copyright (C) 2003-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsetcat.c 88cee5c95d36 2016-10-31 16:57:21Z mthomas $");
+RCSIDENT("$SiLK: rwsetcat.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skipset.h>
@@ -61,11 +61,18 @@ static char output_delimiter = '|';
 /* type of network structure to print */
 static const char *net_structure = NULL;
 
-/* paging program to use for output */
+/* where to write the output; set by --output-path */
+static const char *output_path = NULL;
+
+/* paging program to use for output; set by --pager */
 static const char *pager = NULL;
 
 /* how to print IPs from silk_types.h: enum skipaddr_flags_t */
 static uint32_t ip_format = SKIPADDR_CANONICAL;
+
+/* flags when registering --ip-format */
+static const unsigned int ip_format_register_flags =
+    (SK_OPTION_IP_FORMAT_INTEGER_IPS | SK_OPTION_IP_FORMAT_ZERO_PAD_IPS);
 
 /* option flags */
 static struct opt_flags_st {
@@ -112,6 +119,7 @@ typedef enum {
     OPT_NO_FINAL_DELIMITER,
     OPT_DELIMITED,
     OPT_PRINT_FILENAMES,
+    OPT_OUTPUT_PATH,
     OPT_PAGER
 } appOptionsEnum;
 
@@ -127,6 +135,7 @@ static struct option appOptions[] = {
     {"no-final-delimiter",  NO_ARG,       0, OPT_NO_FINAL_DELIMITER},
     {"delimited",           OPTIONAL_ARG, 0, OPT_DELIMITED},
     {"print-filenames",     OPTIONAL_ARG, 0, OPT_PRINT_FILENAMES},
+    {"output-path",         REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
     {"pager",               REQUIRED_ARG, 0, OPT_PAGER},
     {0,0,0,0}               /* sentinel entry */
 };
@@ -152,7 +161,8 @@ static const char *appHelp[] = {
     ("Print the name of each filename. 0 = no; 1 = yes.\n"
      "\tDefault is no unless multiple input files are provided and output\n"
      "\tis --count-ips or --print-statistics"),
-    "Program to invoke to page output. Def. $SILK_PAGER or $PAGER",
+    "Write the output to this stream or file. Def. stdout",
+    "Invoke this program to page output. Def. $SILK_PAGER or $PAGER",
     (char *)NULL /* sentinel entry */
 };
 
@@ -279,7 +289,7 @@ appSetup(
 
     /* register the options */
     if (skOptionsRegister(appOptions, &appOptionsHandler, NULL)
-        || skOptionsIPFormatRegister(&ip_format))
+        || skOptionsIPFormatRegister(&ip_format, ip_format_register_flags))
     {
         skAppPrintErr("Unable to register options");
         exit(EXIT_FAILURE);
@@ -359,9 +369,25 @@ appSetup(
         opt_flags.print_ips = 1;
     }
 
+    /* If an output_path is set, bypass the pager by setting it to the
+     * empty string.  if no output_path was set, use stdout */
+    if (output_path) {
+        pager = "";
+    } else {
+        output_path = "-";
+    }
+    /* If the only output is count_ips, do not use the pager */
+    if (opt_flags.count_ips
+        && !opt_flags.print_filenames && !opt_flags.print_ips
+        && !opt_flags.network_structure && !opt_flags.ip_ranges
+        && !opt_flags.statistics)
+    {
+        pager = "";
+    }
+
     /* Create the output stream */
     if ((rv = skStreamCreate(&outstream, SK_IO_WRITE, SK_CONTENT_TEXT))
-        || (rv = skStreamBind(outstream, "stdout"))
+        || (rv = skStreamBind(outstream, output_path))
         || (rv = skStreamPageOutput(outstream, pager))
         || (rv = skStreamOpen(outstream)))
     {
@@ -463,6 +489,15 @@ appOptionsHandler(
                           appOptions[opt_index].name);
             return -1;
         }
+        break;
+
+      case OPT_OUTPUT_PATH:
+        if (output_path) {
+            skAppPrintErr("Invalid %s: Switch used multiple times",
+                          appOptions[opt_index].name);
+            return 1;
+        }
+        output_path = opt_arg;
         break;
 
       case OPT_PAGER:

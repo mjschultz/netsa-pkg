@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2016 by Carnegie Mellon University.
+** Copyright (C) 2006-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwscan_utils.c 0432f6547214 2016-09-19 19:08:31Z mthomas $");
+RCSIDENT("$SiLK: rwscan_utils.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
 
 #include "rwscan.h"
 
@@ -71,7 +71,8 @@ static const char *appHelp[] = {
      "\t0 - hybrid TRW + BLR (default)\n"
      "\t1 - Threshold Random Walk (TRW) only\n"
      "\t2 - Bayesian Logistic Regression (BLR) only"),
-    "Write scan records to this file.  Def. stdout",
+    ("Write the textual scan records to this stream or\n"
+     "\tfile path.  Def. stdout"),
     ("Specify IPset file containing ALL valid internal\n"
      "\tIP addresses. The TRW model requires a list of targeted IPs."),
      NULL, /* generate dynamically */

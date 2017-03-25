@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2016 by Carnegie Mellon University.
+** Copyright (C) 2004-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagtool.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: rwbagtool.c be27ed2dac34 2017-03-14 15:39:34Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skipaddr.h>
@@ -131,8 +131,8 @@ static uint64_t maxcounter = SKBAG_COUNTER_MAX;
 static skipaddr_t minkey;
 static skipaddr_t maxkey;
 
-static int have_minkey = 0;
-static int have_maxkey = 0;
+static const char *have_minkey = NULL;
+static const char *have_maxkey = NULL;
 
 /* Bag comparison map */
 static const struct bag_compare_map_st {
@@ -428,9 +428,9 @@ appSetup(
     if (have_minkey && have_maxkey &&
         skipaddrCompare(&minkey, &maxkey) > 0)
     {
-        skAppPrintErr("Minimum key greater than maximum: %s > %s",
-                      skipaddrString(ipbuf1, &minkey, 0),
-                      skipaddrString(ipbuf2, &maxkey, 0));
+        skAppPrintErr("Minimum key greater than maximum: %s (%s) > %s (%s)",
+                      have_minkey, skipaddrString(ipbuf1, &minkey, 0),
+                      have_maxkey, skipaddrString(ipbuf2, &maxkey, 0));
         exit(EXIT_FAILURE);
     }
 
@@ -653,7 +653,7 @@ appOptionsHandler(
         if (rv) {
             goto PARSE_ERROR;
         }
-        have_minkey = 1;
+        have_minkey = opt_arg;
         break;
 
       case OPT_MAXKEY:
@@ -661,7 +661,7 @@ appOptionsHandler(
         if (rv) {
             goto PARSE_ERROR;
         }
-        have_maxkey = 1;
+        have_maxkey = opt_arg;
         break;
 
       case OPT_OUTPUT_PATH:
@@ -691,11 +691,13 @@ appOptionsHandler(
 
 
 /*
- *  ok = bagtoolDivide(pathname);
+ *  ok = bagtoolDivide(stream);
  *
- *    Divide the values in the global 'out_bag' by the values
- *    found in the bag stored in 'pathname'.  The keys of the two bags
- *    must match exactly.  Return 0 on success; non-zero otherwise.
+ *    Divide the values in the global 'out_bag' by the values found in
+ *    the bag read from 'stream'.  Ignore a key when it is in the
+ *    input bag but not in 'out_bag'.  Return an error code when a key
+ *    is in 'out_bag' but not in the input bag---treat it as division
+ *    by zero.  is in Return 0 on success; non-zero otherwise.
  */
 static int
 bagtoolDivide(
@@ -814,13 +816,8 @@ bagtoolDivide(
                 SKBAG_OCTETS_NO_CHANGE, SKBAG_OCTETS_NO_CHANGE);
 
   END:
-    if (iter_dividend) {
-        skBagIteratorDestroy(iter_dividend);
-    }
-    if (iter_divisor) {
-        skBagIteratorDestroy(iter_divisor);
-    }
-
+    skBagIteratorDestroy(iter_dividend);
+    skBagIteratorDestroy(iter_divisor);
     /* Blow the bag away. We're done with it */
     skBagDestroy(&in_bag);
 
@@ -896,10 +893,11 @@ bagtoolSubtractEntry(
 /*
  *  ok = bagtoolSubtract(stream);
  *
- *    Subtract the values found in the bag read from 'stream' from
- *    the values in the global 'out_bag'.  Missing keys are
- *    treated as if they had the value 0.  A negative value is treated
- *    as 0.
+ *    Subtract the values found in the bag read from 'stream' from the
+ *    values in the global 'out_bag'.  Ignore a key read from 'stream'
+ *    when the key is not present in 'out_bag'.  Remove a key from
+ *    'out_bag' when its counter is less than the counter read from
+ *    'stream'.
  */
 static int
 bagtoolSubtract(
@@ -921,7 +919,8 @@ bagtoolSubtract(
  *
  *    Update the counters in the global 'out_bag' to the minimum of
  *    the 'out_bag' counter or the counter from the bag read from
- *    'stream'.  Missing keys are treated as 0.
+ *    'stream'.  Remove form 'out_bag' keys that are not present in
+ *    the input bag---that is, treat them as having the value zero.
  */
 static int
 bagtoolMinimize(
@@ -969,9 +968,7 @@ bagtoolMinimize(
     }
 
   END:
-    if (iter) {
-        skBagIteratorDestroy(iter);
-    }
+    skBagIteratorDestroy(iter);
     /* Blow the input bag away. We're done with it */
     skBagDestroy(&in_bag);
 
@@ -985,7 +982,7 @@ bagtoolMinimize(
  *    Callback to support bagtoolMaximize().  Look up the value of
  *    'key' in 'bag'.  If 'counter' is greater than the value, set the
  *    value of 'key' to 'counter'.  Since missing keys have the value
- *    0, keys not already in 'bag' will be added.  Return SKBAG_OK on
+ *    0, keys not already in 'bag' are added.  Return SKBAG_OK on
  *    success.
  */
 static skBagErr_t
@@ -1040,10 +1037,14 @@ bagtoolMaximize(
 /*
  *  ok = bagtoolCompare(stream);
  *
- *    Subtract the values found in the bag read from 'stream' from
- *    the values in the global 'out_bag'.  Missing keys are
- *    .  A negative value is treated
- *    as 0.
+ *    Compare the counters in 'out_bag' with the counters in the bag
+ *    read from 'stream' using the comparison specified in the global
+ *    'bag_cmp'.  For a key in 'out_bag' but not in the input bag,
+ *    treat its comparison as false and remove it from 'out_bag'.
+ *
+ *    Compare the counter pair for each key: If the comparison is
+ *    true, set the key's counter in 'out_bag' to one; otherwise
+ *    remove the key from 'out_bag'.
  */
 static int
 bagtoolCompare(
@@ -1182,12 +1183,8 @@ bagtoolCompare(
     }
 
   END:
-    if (iter_bag1) {
-        skBagIteratorDestroy(iter_bag1);
-    }
-    if (iter_bag2) {
-        skBagIteratorDestroy(iter_bag2);
-    }
+    skBagIteratorDestroy(iter_bag1);
+    skBagIteratorDestroy(iter_bag2);
     /* Blow the bag away. We're done with it */
     skBagDestroy(&bag2);
 
@@ -1287,12 +1284,9 @@ bagtoolInvert(
     rv = 0;
 
   END:
-    if (inv_bag) {
-        skBagDestroy(&inv_bag);
-    }
-    if (iter) {
-        skBagIteratorDestroy(iter);
-    }
+    skBagDestroy(&inv_bag);
+    skBagIteratorDestroy(iter);
+
     return rv;
 }
 
@@ -1363,12 +1357,8 @@ bagtoolCoverSet(
     rv = 0;
 
   END:
-    if (iter) {
-        skBagIteratorDestroy(iter);
-    }
-    if (set) {
-        skIPSetDestroy(&set);
-    }
+    skBagIteratorDestroy(iter);
+    skIPSetDestroy(&set);
 
     return ((rv == 0) ? 0 : -1);
 }
@@ -1398,8 +1388,8 @@ applyCutoffs(
     /* determine whether there are any cut-offs to apply. If no sets
      * are given and the limits are all at their defaults, return. */
     if ((NULL == mask_set)
-        && (0 == have_minkey)
-        && (0 == have_maxkey)
+        && (NULL == have_minkey)
+        && (NULL == have_maxkey)
         && (SKBAG_COUNTER_MIN == mincounter)
         && (SKBAG_COUNTER_MAX == maxcounter))
     {
@@ -1445,9 +1435,7 @@ applyCutoffs(
     }
 
   END:
-    if (iter) {
-        skBagIteratorDestroy(iter);
-    }
+    skBagIteratorDestroy(iter);
     return ((SKBAG_OK == rv_bag) ? 0 : -1);
 }
 
@@ -1497,9 +1485,7 @@ bagtoolScalarMultiply(
     }
 
   END:
-    if (iter) {
-        skBagIteratorDestroy(iter);
-    }
+    skBagIteratorDestroy(iter);
     return ((SKBAG_OK == rv_bag) ? 0 : -1);
 }
 

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcountsetup.c 274b023fde5c 2016-09-22 14:44:25Z mthomas $");
+RCSIDENT("$SiLK: rwcountsetup.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
 
 #include <silk/skstringmap.h>
 #include "rwcount.h"
@@ -105,8 +105,8 @@ static const char *appHelp[] = {
     "Use specified character between columns. Def. '|'",
     "Suppress column delimiter at end of line. Def. No",
     "Shortcut for --no-columns --no-final-del --column-sep=CHAR",
-    "Send output to given file path. Def. stdout",
-    "Program to invoke to page output. Def. $SILK_PAGER or $PAGER",
+    "Write the output to this stream or file. Def. stdout",
+    "Invoke this program to page output. Def. $SILK_PAGER or $PAGER",
     (char *)NULL
 };
 

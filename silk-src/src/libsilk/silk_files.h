@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SILK_FILES_H, "$SiLK: silk_files.h b05e4158b14b 2016-09-23 19:45:57Z mthomas $");
+RCSIDENTVAR(rcsID_SILK_FILES_H, "$SiLK: silk_files.h 7e6884832fbd 2017-01-20 22:59:46Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -292,7 +292,7 @@ skFileFormatFromName(
 #define FT_EXPERIMENT1      0x06        /* free for all ID */
 #define FT_EXPERIMENT2      0x07        /* free for all ID */
 #define FT_TEMPFILE         0x08
-#define FT_RESERVED_09      0x09
+#define FT_AGGREGATEBAG     0x09
 #define FT_IPFIX            0x0A
 #define FT_RWIPV6           0x0B
 #define FT_RWIPV6ROUTING    0x0C
@@ -345,7 +345,7 @@ static const char *sk_file_format_names[] = {
     /* 0x06 */  "FT_EXPERIMENT1",
     /* 0x07 */  "FT_EXPERIMENT2",
     /* 0x08 */  "FT_TEMPFILE",
-    /* 0x09 */  "FT_RESERVED_09",
+    /* 0x09 */  "FT_AGGREGATEBAG",
     /* 0x0A */  "FT_IPFIX",
     /* 0x0B */  "FT_RWIPV6",
     /* 0x0C */  "FT_RWIPV6ROUTING",

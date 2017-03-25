@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skunique.c 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $");
+RCSIDENT("$SiLK: skunique.c 9d04be8e27ff 2017-01-05 19:09:17Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/rwascii.h>
@@ -1786,12 +1786,11 @@ static struct allowed_fieldid_st {
 
 
 /*
- *  status = uniqCheckFields(uniq_fields, err_fn);
+ *  status = uniqCheckFields(uniq_fields);
  *
  *    Verify that the fields for a unique object make sense.  The
  *    fields are given in 'uniq_fields'.  Return 0 if the fields are
- *    valid.  Return -1 if they are invalid and print an error using
- *    the 'err_fn' if it is non-NULL.
+ *    valid.  Return -1 if they are invalid and print an error.
  *
  *    For the fields to make sense, there must be more or more key
  *    fields and at least one distinct field or one aggregate value
@@ -1799,16 +1798,13 @@ static struct allowed_fieldid_st {
  */
 static int
 uniqCheckFields(
-    sk_uniq_field_info_t   *field_info,
-    sk_msg_fn_t             err_fn)
+    sk_uniq_field_info_t   *field_info)
 {
-#define ERR_FN  if (!err_fn) { } else err_fn
-
 #define SAFE_SET(variable, value)               \
     {                                           \
         size_t sz = (value);                    \
         if (sz > UINT8_MAX) {                   \
-            ERR_FN("Overflow");                 \
+            skAppPrintErr("Overflow");          \
             return -1;                          \
         }                                       \
         variable = (uint8_t)value;              \
@@ -1829,14 +1825,14 @@ uniqCheckFields(
 
     /* must have at least one key field */
     if (NULL == field_info->key_fields) {
-        ERR_FN("No key fields were specified");
+        skAppPrintErr("No key fields were specified");
         return -1;
     }
     /* must have at least one value or one distinct field */
     if (NULL == field_info->value_fields
         && NULL == field_info->distinct_fields)
     {
-        ERR_FN("Neither value nor distinct fields were specified");
+        skAppPrintErr("Neither value nor distinct fields were specified");
         return -1;
     }
 
@@ -1852,11 +1848,11 @@ uniqCheckFields(
             }
         }
         if (field_type == 0) {
-            ERR_FN("Unknown field %d", field->id);
+            skAppPrintErr("Unknown field %d", field->id);
             return -1;
         }
         if (!(field_type & KEY_ONLY)) {
-            ERR_FN("Field %d is not allowed in the key", field->id);
+            skAppPrintErr("Field %d is not allowed in the key", field->id);
             return -1;
         }
     }
@@ -1865,7 +1861,7 @@ uniqCheckFields(
     SAFE_SET(field_info->key_octets,
              skFieldListGetBufferSize(field_info->key_fields));
     if (field_info->key_num_fields == 0 || field_info->key_octets == 0) {
-        ERR_FN("No key fields were specified");
+        skAppPrintErr("No key fields were specified");
         return -1;
     }
 
@@ -1882,11 +1878,12 @@ uniqCheckFields(
                 }
             }
             if (field_type == 0) {
-                ERR_FN("Unknown field %d", field->id);
+                skAppPrintErr("Unknown field %d", field->id);
                 return -1;
             }
             if (!(field_type & VALUE_ONLY)) {
-                ERR_FN("Field %d is not allowed in the value", field->id);
+                skAppPrintErr("Field %d is not allowed in the value",
+                              field->id);
                 return -1;
             }
         }
@@ -1910,11 +1907,12 @@ uniqCheckFields(
                 }
             }
             if (field_type == 0) {
-                ERR_FN("Unknown field %d", field->id);
+                skAppPrintErr("Unknown field %d", field->id);
                 return -1;
             }
             if (!(field_type & DISTINCT_ONLY)) {
-                ERR_FN("Field %d is not allowed in the distinct", field->id);
+                skAppPrintErr("Field %d is not allowed in the distinct",
+                              field->id);
                 return -1;
             }
 
@@ -1925,8 +1923,8 @@ uniqCheckFields(
                 while (NULL != (field2 = skFieldListIteratorNext(&fl_iter2))) {
                     if (skFieldListEntryGetId(field2) == SK_FIELD_CALLER) {
                         if (skFieldListEntryGetContext(field2) == field_ctx) {
-                            ERR_FN("Will not count distinct"
-                                   " value that is also part of key");
+                            skAppPrintErr("Will not count distinct"
+                                          " value that is also part of key");
                             return -1;
                         }
                     }
@@ -1935,8 +1933,8 @@ uniqCheckFields(
                 skFieldListIteratorBind(field_info->key_fields, &fl_iter2);
                 while (NULL != (field2 = skFieldListIteratorNext(&fl_iter2))) {
                     if (skFieldListEntryGetId(field2) == field_id) {
-                        ERR_FN("Will not count distinct"
-                               " value that is also part of key");
+                        skAppPrintErr("Will not count distinct"
+                                      " value that is also part of key");
                         return -1;
                     }
                 }
@@ -1953,7 +1951,7 @@ uniqCheckFields(
     if (((field_info->value_num_fields + field_info->distinct_num_fields) == 0)
         || ((field_info->value_octets + field_info->distinct_octets) == 0))
     {
-        ERR_FN("No value or distinct fields were specified");
+        skAppPrintErr("No value or distinct fields were specified");
         return -1;
     }
 
@@ -2612,7 +2610,7 @@ uniqTempWriteHelper(
 #endif
 
     if (rv >= 0) {
-        snprintf(errbuf,sizeof(errbuf),
+        snprintf(errbuf, sizeof(errbuf),
                  "Short write of %" SK_PRIdZ " bytes to '%s'",
                  rv, skStreamGetPathname(stream));
     }
@@ -2742,9 +2740,6 @@ struct sk_unique_st {
     /* the hash table */
     HashTable              *ht;
 
-    /* error function for reporting of errors */
-    sk_msg_fn_t             err_fn;
-
     /* the temp file context */
     sk_tempfilectx_t       *tmpctx;
 
@@ -2801,7 +2796,7 @@ uniqueCreateHashTable(
                                     HASH_INITIAL_SIZE,
                                     DEFAULT_LOAD_FACTOR);
     if (NULL == uniq->ht) {
-        uniq->err_fn("Error allocating hash table");
+        skAppPrintErr("Error allocating hash table");
         return -1;
     }
     return 0;
@@ -2825,6 +2820,9 @@ uniqueDestroyHashTable(
     if (NULL == uniq->ht) {
         return;
     }
+#if 0 && defined(HASHLIB_RECORD_STATS)
+    hashlib_print_stats(stderr, uniq->ht);
+#endif
     if (0 == uniq->fi.distinct_num_fields) {
         hashlib_free_table(uniq->ht);
         uniq->ht = NULL;
@@ -2892,9 +2890,9 @@ uniqueDumpHashToTemp(
                                     hash_key, hash_val, NULL))
             {
                 /* error writing, errno may or may not be set */
-                uniq->err_fn(("Error writing key/value pair"
-                              " to temporary file '%s': %s"),
-                             UNIQUE_TMPNAME_OUT(uniq), strerror(errno));
+                skAppPrintSyserror(
+                    "Error writing key/value pair to temporary file '%s'",
+                    UNIQUE_TMPNAME_OUT(uniq));
                 return -1;
             }
         }
@@ -2913,9 +2911,9 @@ uniqueDumpHashToTemp(
                                     hash_key, hash_val, distincts))
             {
                 /* error writing, errno may or may not be set */
-                uniq->err_fn(("Error writing key/value/distinct triple"
-                              " to temporary file '%s': %s"),
-                             UNIQUE_TMPNAME_OUT(uniq), strerror(errno));
+                skAppPrintSyserror(("Error writing key/value/distinct triple"
+                                    " to temporary file '%s'"),
+                                   UNIQUE_TMPNAME_OUT(uniq));
                 return -1;
             }
         }
@@ -2941,16 +2939,14 @@ uniqueDumpHashToTemp(
     /* open a new temporary file */
     uniq->temp_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
     if (NULL == uniq->temp_fp) {
-        uniq->err_fn("Error creating temporary file: %s",
-                     strerror(errno));
+        skAppPrintSyserror("Error creating temporary file");
         return -1;
     }
     uniq->temp_idx = uniq->max_temp_idx;
     if (uniq->fi.distinct_num_fields) {
         uniq->dist_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
         if (NULL == uniq->dist_fp) {
-            uniq->err_fn("Error creating temporary file: %s",
-                         strerror(errno));
+            skAppPrintSyserror("Error creating temporary file");
             return -1;
         }
     }
@@ -2976,12 +2972,10 @@ skUniqueCreate(
 
     u->temp_idx = -1;
     u->max_temp_idx = -1;
-    u->err_fn = &skMsgNone;
 
     env_value = getenv(SKUNIQUE_DEBUG_ENVAR);
     if (env_value && 0 == skStringParseUint32(&debug_lvl, env_value, 1, 0)) {
         u->print_debug = 1;
-        u->err_fn = &skAppPrintErr;
     }
 
     *uniq = u;
@@ -3032,8 +3026,8 @@ skUniqueSetSortedOutput(
     assert(uniq);
 
     if (uniq->ready_for_input) {
-        uniq->err_fn("May not call skUniqueSetSortedOutput"
-                     " after calling skUniquePrepareForInput");
+        skAppPrintErr("May not call skUniqueSetSortedOutput"
+                      " after calling skUniquePrepareForInput");
         return -1;
     }
     uniq->sort_output = 1;
@@ -3050,8 +3044,8 @@ skUniqueSetTempDirectory(
     assert(uniq);
 
     if (uniq->ready_for_input) {
-        uniq->err_fn("May not call skUniqueSetTempDirectory"
-                     " after calling skUniquePrepareForInput");
+        skAppPrintErr("May not call skUniqueSetTempDirectory"
+                      " after calling skUniquePrepareForInput");
         return;
     }
 
@@ -3061,20 +3055,6 @@ skUniqueSetTempDirectory(
     }
     if (temp_dir) {
         uniq->temp_dir = strdup(temp_dir);
-    }
-}
-
-
-/* set function used to report errors */
-void
-skUniqueSetErrorFunction(
-    sk_unique_t        *uniq,
-    sk_msg_fn_t         err_fn)
-{
-    if (NULL == err_fn) {
-        uniq->err_fn = skMsgNone;
-    } else {
-        uniq->err_fn = err_fn;
     }
 }
 
@@ -3090,8 +3070,8 @@ skUniqueSetFields(
     assert(uniq);
 
     if (uniq->ready_for_input) {
-        uniq->err_fn("May not call skUniqueSetFields"
-                     " after calling skUniquePrepareForInput");
+        skAppPrintErr("May not call skUniqueSetFields"
+                      " after calling skUniquePrepareForInput");
         return -1;
     }
 
@@ -3110,16 +3090,13 @@ int
 skUniquePrepareForInput(
     sk_unique_t        *uniq)
 {
-    sk_msg_fn_t err_fn;         /* required by SAFE_SET() */
-
     assert(uniq);
-    err_fn = uniq->err_fn;
 
     if (uniq->ready_for_input) {
         return 0;
     }
 
-    if (uniqCheckFields(&uniq->fi, uniq->err_fn)) {
+    if (uniqCheckFields(&uniq->fi)) {
         return -1;
     }
 
@@ -3135,7 +3112,7 @@ skUniquePrepareForInput(
 
     /* initialize temp file context on the unique object */
     if (skTempFileInitialize(&uniq->tmpctx, uniq->temp_dir,
-                             NULL, uniq->err_fn))
+                             NULL, &skAppPrintErr))
     {
         return -1;
     }
@@ -3143,16 +3120,14 @@ skUniquePrepareForInput(
     /* open an intermediate file */
     uniq->temp_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
     if (NULL == uniq->temp_fp) {
-        uniq->err_fn("Error creating intermediate temporary file: %s",
-                     strerror(errno));
+        skAppPrintSyserror("Error creating intermediate temporary file");
         return -1;
     }
     uniq->temp_idx = uniq->max_temp_idx;
     if (uniq->fi.distinct_num_fields) {
         uniq->dist_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
         if (NULL == uniq->dist_fp) {
-            uniq->err_fn("Error creating temporary file: %s",
-                         strerror(errno));
+            skAppPrintSyserror("Error creating temporary file");
             return -1;
         }
     }
@@ -3179,8 +3154,8 @@ skUniqueAddRecord(
     assert(rwrec);
 
     if (!uniq->ready_for_input) {
-        uniq->err_fn("May not call skUniqueAddRecord"
-                     " before calling skUniquePrepareForInput");
+        skAppPrintErr("May not call skUniqueAddRecord"
+                      " before calling skUniquePrepareForInput");
         return -1;
     }
 
@@ -3235,8 +3210,8 @@ skUniqueAddRecord(
             break;
 
           default:
-            uniq->err_fn("Unexpected return code '%d' from hash table insert",
-                         rv);
+            skAppPrintErr("Unexpected return code '%d' from hash table insert",
+                          rv);
             return -1;
         }
 
@@ -3247,12 +3222,12 @@ skUniqueAddRecord(
         if (memory_error > (1u << 31)) {
             /* this is our second memory error */
             if (OK != rv) {
-                uniq->err_fn(("Unexpected return code '%d'"
-                              " from hash table insert on new hash table"),
-                             rv);
+                skAppPrintErr(("Unexpected return code '%d'"
+                               " from hash table insert on new hash table"),
+                              rv);
             } else {
-                uniq->err_fn(("Error allocating memory after writing"
-                              " hash table to temporary file"));
+                skAppPrintErr(("Error allocating memory after writing"
+                               " hash table to temporary file"));
             }
             return -1;
         }
@@ -3291,8 +3266,8 @@ skUniquePrepareForOutput(
         return 0;
     }
     if (!uniq->ready_for_input) {
-        uniq->err_fn("May not call skUniquePrepareForOutput"
-                     " before calling skUniquePrepareForInput");
+        skAppPrintErr("May not call skUniquePrepareForOutput"
+                      " before calling skUniquePrepareForInput");
         return -1;
     }
 
@@ -3405,7 +3380,7 @@ uniqIterSimpleCreate(
 
     iter = (uniqiter_simple_t*)calloc(1, sizeof(uniqiter_simple_t));
     if (NULL == iter) {
-        uniq->err_fn("Error allocating unique iterator");
+        skAppPrintErr("Error allocating unique iterator");
         return -1;
     }
 
@@ -3527,7 +3502,7 @@ uniqIterDistinctCreate(
 
     iter = (uniqiter_distinct_t*)calloc(1, sizeof(uniqiter_distinct_t));
     if (NULL == iter) {
-        uniq->err_fn("Error allocating unique iterator");
+        skAppPrintErr("Error allocating unique iterator");
         return -1;
     }
 
@@ -3720,8 +3695,8 @@ uniqIterTempfilesReset(
         {
             skHeapInsert(iter->heap, &j);
         } else if (skStreamGetLastErrno(iter->fps[j])) {
-            iter->uniq->err_fn("Cannot read first key from temporary file: %s",
-                               strerror(skStreamGetLastErrno(iter->fps[j])));
+            skAppPrintErr("Cannot read first key from temporary file: %s",
+                          strerror(skStreamGetLastErrno(iter->fps[j])));
             return -1;
         } else {
             UNIQUE_DEBUG(iter->uniq, (SKUNIQUE_DEBUG_ENVAR
@@ -3731,7 +3706,7 @@ uniqIterTempfilesReset(
     }
 
     if (skHeapGetNumberEntries(iter->heap) == 0) {
-        iter->uniq->err_fn("Could not read records from any temporary files");
+        skAppPrintErr("Could not read records from any temporary files");
         return -1;
     }
 
@@ -3980,7 +3955,7 @@ uniqIterTempfilesCreate(
         skHeapFree(iter->heap);
         free(iter);
     }
-    uniq->err_fn("Error allocating unique iterator");
+    skAppPrintErr("Error allocating unique iterator");
     return -1;
 }
 
@@ -4041,9 +4016,9 @@ uniqIterTempfilesNodistMergeValues(
                          ((SKUNIQUE_DEBUG_ENVAR
                            ": Cannot read from temporary file #%u"),
                           UNIQUE_TMPNUM_READ(iter, lowest)));
-            iter->uniq->err_fn(
+            skAppPrintErr(
                 "Cannot read value field from temporary file: %s",
-                (last_errno ? strerror(last_errno) :"EOF"));
+                (last_errno ? strerror(last_errno) : "EOF"));
             return -1;
         }
         skFieldListMergeBuffers(
@@ -4269,8 +4244,7 @@ uniqIterTempfilesNodistMergeFiles(
                 iter->fps[lowest], rv, errbuf, sizeof(errbuf));
             TRACEMSG(("%s:%d: Failed to read %" SK_PRIuZ " bytes: %s",
                       __FILE__, __LINE__, sizeof(buf), errbuf));
-            iter->uniq->err_fn("Cannot read from temporary file: %s",
-                               errbuf);
+            skAppPrintErr("Cannot read from temporary file: %s", errbuf);
             return -1;
         }
         UNIQUE_DEBUG(iter->uniq,
@@ -4321,7 +4295,7 @@ uniqIterTempfilesMergeOne(
                           iter->uniq->fi.value_octets))
         {
             last_errno = skStreamGetLastErrno(iter->fps[fps_index]);
-            iter->uniq->err_fn(
+            skAppPrintErr(
                 "Cannot read value field from temporary file: %s",
                 (last_errno ? strerror(last_errno) : "EOF"));
             return -1;
@@ -4345,9 +4319,9 @@ uniqIterTempfilesMergeOne(
         if (!uniqTempRead(iter->fps[fps_index], &dist_count, sizeof(uint64_t)))
         {
             last_errno = skStreamGetLastErrno(iter->fps[fps_index]);
-            iter->uniq->err_fn(
+            skAppPrintErr(
                 "Cannot read distinct count from temporary file: %s",
-                (last_errno ? strerror(errno) : "EOF"));
+                (last_errno ? strerror(last_errno) : "EOF"));
             return -1;
         }
 
@@ -4364,7 +4338,7 @@ uniqIterTempfilesMergeOne(
              * 'NULL' as the buffer */
             if (!uniqTempRead(iter->fps[fps_index + 1], NULL, to_read)) {
                 last_errno = skStreamGetLastErrno(iter->fps[fps_index + 1]);
-                iter->uniq->err_fn(
+                skAppPrintErr(
                     "Cannot read distinct values from temporary file: %s",
                     (last_errno ? strerror(last_errno) : "EOF"));
                 return -1;
@@ -4375,7 +4349,7 @@ uniqIterTempfilesMergeOne(
                 exp_len = ((to_read < sizeof(buf)) ? to_read : sizeof(buf));
                 if (!uniqTempRead(iter->fps[fps_index + 1], buf, exp_len)) {
                     last_errno = skStreamGetLastErrno(iter->fps[fps_index + 1]);
-                    iter->uniq->err_fn(
+                    skAppPrintErr(
                         "Cannot read distinct values from temporary file: %s",
                         (last_errno ? strerror(last_errno) : "EOF"));
                     return -1;
@@ -4444,7 +4418,7 @@ uniqIterTempfilesMergeValuesDist(
                              ((SKUNIQUE_DEBUG_ENVAR
                                ": Cannot read from temporary file #%u"),
                               UNIQUE_TMPNUM_READ(iter, fps_index)));
-                iter->uniq->err_fn(
+                skAppPrintErr(
                     "Cannot read value field from temporary file: %s",
                     (last_errno ? strerror(last_errno) : "EOF"));
                 return -1;
@@ -4482,7 +4456,7 @@ uniqIterTempfilesMergeValuesDist(
                              ((SKUNIQUE_DEBUG_ENVAR
                                ": Cannot read from temporary file #%u"),
                               UNIQUE_TMPNUM_READ(iter, fps_index)));
-                iter->uniq->err_fn(
+                skAppPrintErr(
                     "Cannot read distinct count from temporary file: %s",
                     (last_errno ? strerror(last_errno) : "EOF"));
                 return -1;
@@ -4498,7 +4472,7 @@ uniqIterTempfilesMergeValuesDist(
                                  ((SKUNIQUE_DEBUG_ENVAR
                                    ": Cannot read from temporary file #%u"),
                                   UNIQUE_TMPNUM_READ(iter, fps_index + 1)));
-                    iter->uniq->err_fn(
+                    skAppPrintErr(
                         "Cannot read distinct values from temporary file: %s",
                         (last_errno ? strerror(last_errno) : "EOF"));
                     return -1;
@@ -4553,7 +4527,7 @@ uniqIterTempfilesMergeValuesDist(
                                  ((SKUNIQUE_DEBUG_ENVAR
                                    ": Cannot read from temporary file #%u"),
                                   UNIQUE_TMPNUM_READ(iter, lowest)));
-                    iter->uniq->err_fn(
+                    skAppPrintErr(
                         "Cannot read distinct values from temporary file: %s",
                         (last_errno ? strerror(last_errno) : "EOF"));
                     return -1;
@@ -4808,10 +4782,9 @@ uniqIterTempfilesOpenAll(
                                  strerror(errno)));
                     break;
                 } else {
-                    iter->uniq->err_fn(("Error opening existing"
-                                        " temporary file '%s': %s"),
-                                       skTempFileGetName(iter->uniq->tmpctx, j),
-                                       strerror(errno));
+                    skAppPrintSyserror(
+                        "Error opening existing temporary file '%s'",
+                        skTempFileGetName(iter->uniq->tmpctx, j));
                     return -1;
                 }
             }
@@ -4855,7 +4828,7 @@ uniqIterTempfilesOpenAll(
             } else {
                 last_errno = skStreamGetLastErrno(iter->fps[i]);
                 if (last_errno) {
-                    iter->uniq->err_fn(
+                    skAppPrintErr(
                         "Cannot read first key from temporary file '%s': %s",
                         skTempFileGetName(iter->uniq->tmpctx, tmp_idx_a + i),
                         strerror(last_errno));
@@ -4906,9 +4879,7 @@ uniqIterTempfilesOpenAll(
         iter->uniq->temp_fp = uniqTempCreate(iter->uniq->tmpctx,
                                              &iter->uniq->max_temp_idx);
         if (iter->uniq->temp_fp == NULL) {
-            iter->uniq->err_fn(("Error creating intermediate"
-                                " temporary file: %s"),
-                               strerror(errno));
+            skAppPrintSyserror("Error creating intermediate temporary file");
             return -1;
         }
         iter->uniq->temp_idx = iter->uniq->max_temp_idx;
@@ -4916,8 +4887,7 @@ uniqIterTempfilesOpenAll(
             iter->uniq->dist_fp = uniqTempCreate(iter->uniq->tmpctx,
                                                  &iter->uniq->max_temp_idx);
             if (NULL == iter->uniq->dist_fp) {
-                iter->uniq->err_fn("Error creating temporary file: %s",
-                                   strerror(errno));
+                skAppPrintSyserror("Error creating temporary file");
                 return -1;
             }
         }
@@ -4944,8 +4914,8 @@ skUniqueIteratorCreate(
     UNIQUE_DEBUG(uniq, ((SKUNIQUE_DEBUG_ENVAR ": Initializing iterator")));
 
     if (!uniq->ready_for_output) {
-        uniq->err_fn("May not call skUniqueIteratorCreate"
-                     " before calling skUniquePrepareForOutput");
+        skAppPrintErr("May not call skUniqueIteratorCreate"
+                      " before calling skUniquePrepareForOutput");
         return -1;
     }
     if (uniq->temp_idx > 0) {
@@ -5012,8 +4982,6 @@ struct sk_sort_unique_st {
 
     int                   (*post_open_fn)(skstream_t *);
     int                   (*read_rec_fn)(skstream_t *, rwRec *);
-
-    sk_msg_fn_t             err_fn;
 
     /* vector containing the names of files to process */
     sk_vector_t            *files;
@@ -5130,7 +5098,7 @@ sortuniqOpenNextInput(
                              (SKUNIQUE_DEBUG_ENVAR ": Unable to open '%s': %s",
                               filename, strerror(errno)));
             } else {
-                skStreamPrintLastErr(stream, rv, uniq->err_fn);
+                skStreamPrintLastErr(stream, rv, skAppPrintErr);
                 rv = -1;
             }
             skStreamDestroy(&stream);
@@ -5180,7 +5148,7 @@ sortuniqFillRecordAndKey(
     rv = uniq->read_rec_fn(uniq->fps[idx], &uniq->rec[idx]);
     if (rv) {
         if (rv != SKSTREAM_ERR_EOF) {
-            skStreamPrintLastErr(uniq->fps[idx], rv, uniq->err_fn);
+            skStreamPrintLastErr(uniq->fps[idx], rv, skAppPrintErr);
         }
         return 0;
     }
@@ -5359,9 +5327,9 @@ sortuniqReadSilkNodist(
                        &uniq->fi, uniq->temp_fp, NULL,
                        cached_key, merged_values, uniq->distincts))
         {
-            uniq->err_fn(("Error writing merged keys/values"
-                          " to temporary file '%s': %s"),
-                         UNIQUE_TMPNAME_OUT(uniq), strerror(errno));
+            skAppPrintSyserror(
+                "Error writing merged keys/values to temporary file '%s'",
+                UNIQUE_TMPNAME_OUT(uniq));
             return -1;
         }
     } while (heap_count > 0);
@@ -5421,7 +5389,7 @@ sortuniqReadSilkTotemp(
         /* reset the values and distincts */
         skFieldListInitializeBuffer(uniq->fi.value_fields, merged_values);
         if (uniqDistinctReset(&uniq->fi, uniq->distincts)) {
-            uniq->err_fn("Error allocating table for distinct values");
+            skAppPrintErr("Error allocating table for distinct values");
             return -1;
         }
 
@@ -5440,15 +5408,16 @@ sortuniqReadSilkTotemp(
                         &uniq->fi, uniq->temp_fp, uniq->dist_fp,
                         cached_key, merged_values, uniq->distincts))
                 {
-                    uniq->err_fn(("Error writing merged keys/values/distincts"
-                                  " to temporary file '%s': %s"),
-                                 UNIQUE_TMPNAME_OUT(uniq), strerror(errno));
+                    skAppPrintSyserror(
+                        ("Error writing merged keys/values/distincts"
+                         " to temporary file '%s'"),
+                        UNIQUE_TMPNAME_OUT(uniq));
                     return -1;
                 }
                 skFieldListInitializeBuffer(
                     uniq->fi.value_fields, merged_values);
                 if (uniqDistinctReset(&uniq->fi, uniq->distincts)) {
-                    uniq->err_fn("Error allocating table for distinct values");
+                    skAppPrintErr("Error allocating table for distinct values");
                     return -1;
                 }
             }
@@ -5503,9 +5472,9 @@ sortuniqReadSilkTotemp(
                 &uniq->fi, uniq->temp_fp, uniq->dist_fp,
                 cached_key, merged_values, uniq->distincts))
         {
-            uniq->err_fn(("Error writing merged  keys/values/distincts"
-                          " to temporary file '%s': %s"),
-                         UNIQUE_TMPNAME_OUT(uniq), strerror(errno));
+            skAppPrintSyserror(("Error writing merged  keys/values/distincts"
+                                " to temporary file '%s'"),
+                               UNIQUE_TMPNAME_OUT(uniq));
             return -1;
         }
     } while (heap_count > 0);
@@ -5559,8 +5528,8 @@ sortuniqMergeSingleFile(
     if (uniq->fi.value_octets) {
         if (!uniqTempRead(uniq->fps[fps_index], buf, uniq->fi.value_octets)) {
             last_errno = skStreamGetLastErrno(uniq->fps[fps_index]);
-            uniq->err_fn("Cannot read value field from temporary file: %s",
-                         (last_errno ? strerror(last_errno) : "EOF"));
+            skAppPrintErr("Cannot read value field from temporary file: %s",
+                          (last_errno ? strerror(last_errno) : "EOF"));
             return -1;
         }
         if (output_fn) {
@@ -5578,8 +5547,8 @@ sortuniqMergeSingleFile(
         if (!uniqTempRead(uniq->fps[fps_index], &dist_count, sizeof(uint64_t)))
         {
             last_errno = skStreamGetLastErrno(uniq->fps[fps_index]);
-            uniq->err_fn("Cannot read distinct count from temporary file: %s",
-                         (last_errno ? strerror(last_errno) : "EOF"));
+            skAppPrintErr("Cannot read distinct count from temporary file: %s",
+                          (last_errno ? strerror(last_errno) : "EOF"));
             return -1;
         }
         if (output_fn) {
@@ -5597,7 +5566,7 @@ sortuniqMergeSingleFile(
              * 'NULL' as the buffer */
             if (!uniqTempRead(uniq->fps[fps_index + 1], NULL, to_read)) {
                 last_errno = skStreamGetLastErrno(uniq->fps[fps_index + 1]);
-                uniq->err_fn(
+                skAppPrintErr(
                     "Cannot read distinct values from temporary file: %s",
                     (last_errno ? strerror(last_errno) : "EOF"));
                 return -1;
@@ -5608,7 +5577,7 @@ sortuniqMergeSingleFile(
                 exp_len = ((to_read < sizeof(buf)) ? to_read : sizeof(buf));
                 if (!uniqTempRead(uniq->fps[fps_index + 1], buf, exp_len)) {
                     last_errno = skStreamGetLastErrno(uniq->fps[fps_index + 1]);
-                    uniq->err_fn(
+                    skAppPrintErr(
                         "Cannot read distinct values from temporary file: %s",
                         (last_errno ? strerror(last_errno) : "EOF"));
                     return -1;
@@ -5701,8 +5670,9 @@ sortuniqMergeValuesDist(
                              ((SKUNIQUE_DEBUG_ENVAR
                                ": Cannot read from temporary file #%u"),
                               UNIQUE_TMPNUM_READ(uniq, fps_index)));
-                uniq->err_fn("Cannot read values field from temporary file: %s",
-                             (last_errno ? strerror(last_errno) : "EOF"));
+                skAppPrintErr(
+                    "Cannot read values field from temporary file: %s",
+                    (last_errno ? strerror(last_errno) : "EOF"));
                 return -1;
             }
             skFieldListMergeBuffers(
@@ -5737,7 +5707,7 @@ sortuniqMergeValuesDist(
                              ((SKUNIQUE_DEBUG_ENVAR
                                ": Cannot read from temporary file #%u"),
                               UNIQUE_TMPNUM_READ(uniq, fps_index)));
-                uniq->err_fn(
+                skAppPrintErr(
                     "Cannot read distinct count from temporary file: %s",
                     (last_errno ? strerror(last_errno) : "EOF"));
                 return -1;
@@ -5753,7 +5723,7 @@ sortuniqMergeValuesDist(
                                  ((SKUNIQUE_DEBUG_ENVAR
                                    ": Cannot read from temporary file #%u"),
                                   UNIQUE_TMPNUM_READ(uniq, fps_index + 1)));
-                    uniq->err_fn(
+                    skAppPrintErr(
                         "Cannot read distinct values from temporary file: %s",
                         (last_errno ? strerror(last_errno) : "EOF"));
                     return -1;
@@ -5807,7 +5777,7 @@ sortuniqMergeValuesDist(
                                  ((SKUNIQUE_DEBUG_ENVAR
                                    ": Cannot read from temporary file #%u"),
                                   UNIQUE_TMPNUM_READ(uniq, lowest + 1)));
-                    uniq->err_fn(
+                    skAppPrintErr(
                         "Cannot read distinct count from temporary file: %s",
                         (last_errno ? strerror(last_errno) : "EOF"));
                     return -1;
@@ -6021,8 +5991,9 @@ sortuniqMergeFilesNodist(
                 UNIQUE_DEBUG(uniq, ((SKUNIQUE_DEBUG_ENVAR
                                      ": Cannot read from temporary file #%u"),
                                     UNIQUE_TMPNUM_READ(uniq, lowest)));
-                uniq->err_fn("Cannot read value field from temporary file: %s",
-                             (last_errno ? strerror(last_errno) : "EOF"));
+                skAppPrintErr(
+                    "Cannot read value field from temporary file: %s",
+                    (last_errno ? strerror(last_errno) : "EOF"));
                 return -1;
             }
             skFieldListMergeBuffers(
@@ -6071,9 +6042,9 @@ sortuniqMergeFilesNodist(
                        &uniq->fi, uniq->temp_fp, NULL,
                        cached_key, merged_values, uniq->distincts))
         {
-            uniq->err_fn(("Error writing merged key/values"
-                          " to temporary file '%s': %s"),
-                         UNIQUE_TMPNAME_OUT(uniq), strerror(errno));
+            skAppPrintSyserror(
+                "Error writing merged key/values to temporary file '%s'",
+                UNIQUE_TMPNAME_OUT(uniq));
             return -1;
         }
     } while (heap_count > 0);
@@ -6106,12 +6077,10 @@ skPresortedUniqueCreate(
     }
 
     u->read_rec_fn = &skStreamReadRecord;
-    u->err_fn = &skMsgNone;
 
     env_value = getenv(SKUNIQUE_DEBUG_ENVAR);
     if (env_value && 0 == skStringParseUint32(&debug_lvl, env_value, 1, 0)) {
         u->print_debug = 1;
-        u->err_fn = &skAppPrintErr;
     }
 
     u->temp_idx = -1;
@@ -6205,20 +6174,6 @@ skPresortedUniqueAddInputFile(
     }
 
     return 0;
-}
-
-
-/* set function used to report errors */
-void
-skPresortedUniqueSetErrorFunction(
-    sk_sort_unique_t   *uniq,
-    sk_msg_fn_t         err_fn)
-{
-    if (NULL == err_fn) {
-        uniq->err_fn = skMsgNone;
-    } else {
-        uniq->err_fn = err_fn;
-    }
 }
 
 
@@ -6327,11 +6282,12 @@ skPresortedUniqueProcess(
     }
     uniq->processing = 1;
 
-    if (uniqCheckFields(&uniq->fi, uniq->err_fn)) {
+    if (uniqCheckFields(&uniq->fi)) {
         return -1;
     }
 
-    if (skTempFileInitialize(&uniq->tmpctx, uniq->temp_dir, NULL,uniq->err_fn))
+    if (skTempFileInitialize(&uniq->tmpctx, uniq->temp_dir,
+                             NULL, skAppPrintErr))
     {
         return -1;
     }
@@ -6339,7 +6295,7 @@ skPresortedUniqueProcess(
     /* set up distinct fields */
     if (uniq->fi.distinct_num_fields) {
         if (uniqDistinctAlloc(&uniq->fi, &uniq->distincts)) {
-            uniq->err_fn("Error allocating space for distinct counts");
+            skAppPrintErr("Error allocating space for distinct counts");
             return -1;
         }
 
@@ -6348,7 +6304,7 @@ skPresortedUniqueProcess(
                                         MAX_MERGE_FILES, sizeof(uint16_t),
                                         NULL, uniq);
         if (NULL == uniq->dist_heap) {
-            uniq->err_fn("Error allocating distinct heap");
+            skAppPrintErr("Error allocating distinct heap");
             return -1;
         }
     }
@@ -6362,16 +6318,15 @@ skPresortedUniqueProcess(
          * files. */
         uniq->temp_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
         if (uniq->temp_fp == NULL) {
-            uniq->err_fn("Error creating intermediate temporary file: %s",
-                         strerror(errno));
+            skAppPrintSyserror("Error creating intermediate temporary file:");
             return -1;
         }
         uniq->temp_idx = uniq->max_temp_idx;
         if (uniq->fi.distinct_num_fields) {
             uniq->dist_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
             if (uniq->dist_fp == NULL) {
-                uniq->err_fn("Error creating intermediate temporary file: %s",
-                             strerror(errno));
+                skAppPrintSyserror(
+                    "Error creating intermediate temporary file");
                 return -1;
             }
         }
@@ -6429,21 +6384,21 @@ skPresortedUniqueProcess(
             uint8_t *n;
             uniq->rec = (rwRec*)malloc(MAX_MERGE_FILES * sizeof(rwRec));
             if (NULL == uniq->rec) {
-                uniq->err_fn("Error allocating space for %u records",
-                             MAX_MERGE_FILES);
+                skAppPrintErr("Error allocating space for %u records",
+                              MAX_MERGE_FILES);
                 return -1;
             }
             uniq->key_data = ((uint8_t*)
                               malloc(MAX_MERGE_FILES * uniq->fi.key_octets));
             if (NULL == uniq->key_data) {
-                uniq->err_fn("Error allocating space for %u keys",
-                             MAX_MERGE_FILES);
+                skAppPrintErr("Error allocating space for %u keys",
+                              MAX_MERGE_FILES);
                 return -1;
             }
             uniq->key = (uint8_t**)malloc(MAX_MERGE_FILES * sizeof(uint8_t*));
             if (NULL == uniq->key) {
-                uniq->err_fn("Error allocating space for %u key pointers",
-                             MAX_MERGE_FILES);
+                skAppPrintErr("Error allocating space for %u key pointers",
+                              MAX_MERGE_FILES);
                 return -1;
             }
             for (i = 0, n = uniq->key_data;
@@ -6455,8 +6410,8 @@ skPresortedUniqueProcess(
             uniq->heap = skHeapCreate2(sortuniqHeapKeysCmp, MAX_MERGE_FILES,
                                        sizeof(uint16_t), NULL, uniq);
             if (NULL == uniq->heap) {
-                uniq->err_fn("Error allocating space for %u heap entries",
-                             MAX_MERGE_FILES);
+                skAppPrintErr("Error allocating space for %u heap entries",
+                              MAX_MERGE_FILES);
                 return -1;
             }
         }
@@ -6566,16 +6521,16 @@ skPresortedUniqueProcess(
          * reading the data. */
         uniq->temp_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
         if (uniq->temp_fp == NULL) {
-            uniq->err_fn("Error creating intermediate temporary file: %s",
-                         strerror(errno));
+            skAppPrintSyserror(
+                "Error creating intermediate temporary file");
             return -1;
         }
         uniq->temp_idx = uniq->max_temp_idx;
         if (uniq->fi.distinct_num_fields) {
             uniq->dist_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
             if (uniq->dist_fp == NULL) {
-                uniq->err_fn("Error creating intermediate temporary file: %s",
-                             strerror(errno));
+                skAppPrintSyserror(
+                    "Error creating intermediate temporary file");
                 return -1;
             }
         }
@@ -6601,10 +6556,9 @@ skPresortedUniqueProcess(
                                   strerror(errno)));
                     break;
                 } else {
-                    uniq->err_fn(("Error opening existing"
-                                  " temporary file '%s': %s"),
-                                 skTempFileGetName(uniq->tmpctx, i),
-                                 strerror(errno));
+                    skAppPrintSyserror(
+                        "Error opening existing temporary file '%s'",
+                        skTempFileGetName(uniq->tmpctx, i));
                     return -1;
                 }
             }
@@ -6651,7 +6605,7 @@ skPresortedUniqueProcess(
             } else {
                 last_errno = skStreamGetLastErrno(uniq->fps[i]);
                 if (last_errno) {
-                    uniq->err_fn(
+                    skAppPrintErr(
                         "Cannot read first key from temporary file '%s'; %s",
                         skTempFileGetName(uniq->tmpctx, tmp_idx_a + i),
                         strerror(last_errno));

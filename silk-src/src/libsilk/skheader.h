@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2016 by Carnegie Mellon University.
+** Copyright (C) 2006-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -23,7 +23,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKHEADER_H, "$SiLK: skheader.h 4c36563f30bb 2016-09-28 22:00:57Z mthomas $");
+RCSIDENTVAR(rcsID_SKHEADER_H, "$SiLK: skheader.h 7e6884832fbd 2017-01-20 22:59:46Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -253,9 +253,9 @@ struct sk_hentry_iterator_st {
  */
 typedef ssize_t
 (*sk_hentry_pack_fn_t)(
-    sk_header_entry_t      *hentry_in,
-    uint8_t                *packed_entry_out,
-    size_t                  packed_avail_size);
+    const sk_header_entry_t    *hentry_in,
+    uint8_t                    *packed_entry_out,
+    size_t                      packed_avail_size);
 
 /**
  *    When a binary SiLK file is read, the 'sk_hentry_unpack_fn_t' is
@@ -288,8 +288,8 @@ typedef sk_header_entry_t *
  */
 typedef void
 (*sk_hentry_print_fn_t)(
-    sk_header_entry_t      *hentry,
-    FILE                   *fh);
+    const sk_header_entry_t  *hentry,
+    FILE                     *fh);
 
 /**
  *    A generic callback function for the header entry 'hentry'.  One
@@ -434,13 +434,38 @@ skHeaderEntryGetTypeId(
 
 
 /**
- *   Print a textual representation of the Header Entry 'hentry' to
- *   the stream 'fp'.
+ *    Print a textual representation of the Header Entry 'hentry' to
+ *    the stream 'fp'.
  */
 void
 skHeaderEntryPrint(
-    sk_header_entry_t  *hentry,
+    const sk_header_entry_t  *hentry,
     FILE               *fp);
+
+
+/**
+ *    Pack the header entry spec 'he_spec' into the octet array
+ *    'out_packed' whose size is 'bufsize'.  If 'bufsize' is smaller
+ *    than required, write nothing to the buffer.  Return the number
+ *    of bytes written to the buffer or that would be written to the
+ *    buffer if the buffer were large enough.
+ */
+size_t
+skHeaderEntrySpecPack(
+    const sk_header_entry_spec_t   *he_spec,
+    uint8_t                        *out_packed,
+    size_t                          bufsize);
+
+
+/**
+ *    Unpack the header entry spec from the octet array 'in_packed'
+ *    into the 'he_spec' structure.  The function assumes the length
+ *    of 'in_packed' is at least sizeof(sk_header_entry_spec_t).
+ */
+void
+skHeaderEntrySpecUnpack(
+    sk_header_entry_spec_t *he_spec,
+    const uint8_t          *in_packed);
 
 
 /**
@@ -717,14 +742,14 @@ skHentryPackedfileFree(
 
 ssize_t
 skHentryPackedfilePacker(
-    sk_header_entry_t  *in_hentry,
-    uint8_t            *out_packed,
-    size_t              bufsize);
+    const sk_header_entry_t    *in_hentry,
+    uint8_t                    *out_packed,
+    size_t                      bufsize);
 
 void
 skHentryPackedfilePrint(
-    sk_header_entry_t  *hentry,
-    FILE               *fh);
+    const sk_header_entry_t    *hentry,
+    FILE                       *fh);
 
 sk_header_entry_t *
 skHentryPackedfileUnpacker(
@@ -795,14 +820,14 @@ skHentryInvocationFree(
 
 ssize_t
 skHentryInvocationPacker(
-    sk_header_entry_t  *in_hentry,
-    uint8_t            *out_packed,
-    size_t              bufsize);
+    const sk_header_entry_t    *in_hentry,
+    uint8_t                    *out_packed,
+    size_t                      bufsize);
 
 void
 skHentryInvocationPrint(
-    sk_header_entry_t  *hentry,
-    FILE               *fh);
+    const sk_header_entry_t    *hentry,
+    FILE                       *fh);
 
 sk_header_entry_t *
 skHentryInvocationUnpacker(
@@ -859,14 +884,14 @@ skHentryAnnotationFree(
 
 ssize_t
 skHentryAnnotationPacker(
-    sk_header_entry_t  *in_hentry,
-    uint8_t            *out_packed,
-    size_t              bufsize);
+    const sk_header_entry_t    *in_hentry,
+    uint8_t                    *out_packed,
+    size_t                      bufsize);
 
 void
 skHentryAnnotationPrint(
-    sk_header_entry_t  *hentry,
-    FILE               *fh);
+    const sk_header_entry_t    *hentry,
+    FILE                       *fh);
 
 sk_header_entry_t *
 skHentryAnnotationUnpacker(
@@ -908,14 +933,14 @@ skHentryProbenameFree(
 
 ssize_t
 skHentryProbenamePacker(
-    sk_header_entry_t  *in_hentry,
-    uint8_t            *out_packed,
-    size_t              bufsize);
+    const sk_header_entry_t    *in_hentry,
+    uint8_t                    *out_packed,
+    size_t                      bufsize);
 
 void
 skHentryProbenamePrint(
-    sk_header_entry_t  *hentry,
-    FILE               *fh);
+    const sk_header_entry_t    *hentry,
+    FILE                       *fh);
 
 sk_header_entry_t *
 skHentryProbenameUnpacker(
@@ -937,50 +962,6 @@ skHentryProbenameUnpacker(
 
 #define SK_HENTRY_PREFIXMAP_ID  5
 
-typedef struct sk_hentry_prefixmap_st {
-    sk_header_entry_spec_t  he_spec;
-    uint32_t                version;
-    char                   *mapname;
-} sk_hentry_prefixmap_t;
-
-int
-skHeaderAddPrefixmap(
-    sk_file_header_t   *hdr,
-    const char         *mapname);
-
-sk_header_entry_t *
-skHentryPrefixmapCopy(
-    const sk_header_entry_t    *hentry);
-
-sk_header_entry_t *
-skHentryPrefixmapCreate(
-    const char         *mapname);
-
-void
-skHentryPrefixmapFree(
-    sk_header_entry_t  *hentry);
-
-ssize_t
-skHentryPrefixmapPacker(
-    sk_header_entry_t  *in_hentry,
-    uint8_t            *out_packed,
-    size_t              bufsize);
-
-void
-skHentryPrefixmapPrint(
-    sk_header_entry_t  *hentry,
-    FILE               *fh);
-
-sk_header_entry_t *
-skHentryPrefixmapUnpacker(
-    uint8_t            *in_packed);
-
-
-#define skHentryPrefixmapGetMapmame(hentry)   \
-    ((hentry)->mapname)
-
-#define skHentryPrefixmapGetVersion(hentry)   \
-    ((hentry)->version)
 
 
 /*
@@ -994,63 +975,6 @@ skHentryPrefixmapUnpacker(
 
 #define SK_HENTRY_BAG_ID        6
 
-typedef struct sk_hentry_bag_st {
-    sk_header_entry_spec_t  he_spec;
-    uint16_t                key_type;
-    uint16_t                key_length;
-    uint16_t                counter_type;
-    uint16_t                counter_length;
-} sk_hentry_bag_t;
-
-int
-skHeaderAddBag(
-    sk_file_header_t   *hdr,
-    uint16_t            key_type,
-    uint16_t            key_length,
-    uint16_t            counter_type,
-    uint16_t            counter_length);
-
-sk_header_entry_t *
-skHentryBagCopy(
-    const sk_header_entry_t    *hentry);
-
-sk_header_entry_t *
-skHentryBagCreate(
-    uint16_t            key_type,
-    uint16_t            key_length,
-    uint16_t            counter_type,
-    uint16_t            counter_length);
-
-void
-skHentryBagFree(
-    sk_header_entry_t  *hentry);
-
-ssize_t
-skHentryBagPacker(
-    sk_header_entry_t  *in_hentry,
-    uint8_t            *out_packed,
-    size_t              bufsize);
-
-void
-skHentryBagPrint(
-    sk_header_entry_t  *hentry,
-    FILE               *fh);
-
-sk_header_entry_t *
-skHentryBagUnpacker(
-    uint8_t            *in_packed);
-
-#define skHentryBagGetKeyType(hentry)           \
-    (((sk_hentry_bag_t*)(hentry))->key_type)
-
-#define skHentryBagGetKeyLength(hentry)         \
-    (((sk_hentry_bag_t*)(hentry))->key_length)
-
-#define skHentryBagGetCounterType(hentry)               \
-    (((sk_hentry_bag_t*)(hentry))->counter_type)
-
-#define skHentryBagGetCounterLength(hentry)             \
-    (((sk_hentry_bag_t*)(hentry))->counter_length)
 
 
 /*
@@ -1064,75 +988,20 @@ skHentryBagUnpacker(
 
 #define SK_HENTRY_IPSET_ID      7
 
-typedef struct sk_hentry_ipset_st {
-    sk_header_entry_spec_t  he_spec;
-    uint32_t                child_node;
-    uint32_t                leaf_count;
-    uint32_t                leaf_size;
-    uint32_t                node_count;
-    uint32_t                node_size;
-    uint32_t                root_idx;
-} sk_hentry_ipset_t;
 
-int
-skHeaderAddIPSet(
-    sk_file_header_t   *hdr,
-    uint32_t            child_node,
-    uint32_t            leaf_count,
-    uint32_t            leaf_size,
-    uint32_t            node_count,
-    uint32_t            node_size,
-    uint32_t            root_idx);
 
-sk_header_entry_t *
-skHentryIPSetCopy(
-    const sk_header_entry_t    *hentry);
+/*
+ *    **********************************************************************
+ *
+ *    The 'aggbag' header entry type is used to store information
+ *    particular to binary Aggregate Bag files.
+ *
+ *    **********************************************************************
+ */
 
-sk_header_entry_t *
-skHentryIPSetCreate(
-    uint32_t            child_node,
-    uint32_t            leaf_count,
-    uint32_t            leaf_size,
-    uint32_t            node_count,
-    uint32_t            node_size,
-    uint32_t            root_idx);
+#define SK_HENTRY_AGGBAG_ID        8
 
-void
-skHentryIPSetFree(
-    sk_header_entry_t  *hentry);
 
-ssize_t
-skHentryIPSetPacker(
-    sk_header_entry_t  *in_hentry,
-    uint8_t            *out_packed,
-    size_t              bufsize);
-
-void
-skHentryIPSetPrint(
-    sk_header_entry_t  *hentry,
-    FILE               *fh);
-
-sk_header_entry_t *
-skHentryIPSetUnpacker(
-    uint8_t            *in_packed);
-
-#define skHentryIPSetGetChildPerNode(hentry)    \
-    (((sk_hentry_ipset_t*)(hentry))->child_node)
-
-#define skHentryIPSetGetLeafCount(hentry)       \
-    (((sk_hentry_ipset_t*)(hentry))->leaf_count)
-
-#define skHentryIPSetGetLeafSize(hentry)        \
-    (((sk_hentry_ipset_t*)(hentry))->leaf_size)
-
-#define skHentryIPSetGetNodeCount(hentry)       \
-    (((sk_hentry_ipset_t*)(hentry))->node_count)
-
-#define skHentryIPSetGetNodeSize(hentry)        \
-    (((sk_hentry_ipset_t*)(hentry))->node_size)
-
-#define skHentryIPSetGetRootIndex(hentry)       \
-    (((sk_hentry_ipset_t*)(hentry))->root_idx)
 
 #ifdef __cplusplus
 }

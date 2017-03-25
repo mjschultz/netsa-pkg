@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2016 by Carnegie Mellon University.
+** Copyright (C) 2006-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -20,7 +20,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKSITE_H, "$SiLK: sksite.h 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENTVAR(rcsID_SKSITE_H, "$SiLK: sksite.h 87921afb7143 2017-02-14 14:50:58Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -156,7 +156,10 @@ sksiteTeardown(
 /** Iterators *********************************************************/
 
 /**
- *    Iterator to visit sensors
+ *    sk_sensor_iter_t is an iterator to visit sensors.
+ *
+ *    The iterator should be created on the stack.  Its definition is
+ *    given at the end of this file.
  *
  *    sksiteSensorIterator() creates an iterator over all sensors.
  *
@@ -169,7 +172,10 @@ sksiteTeardown(
 typedef struct sk_sensor_iter_st        sk_sensor_iter_t;
 
 /**
- *    Iterator to visit classes
+ *    sk_class_iter_t is an iterator to visit classes
+ *
+ *    The iterator should be created on the stack.  Its definition is
+ *    given at the end of this file.
  *
  *    sksiteClassIterator() creates an iterator over all classes.
  *
@@ -179,7 +185,10 @@ typedef struct sk_sensor_iter_st        sk_sensor_iter_t;
 typedef struct sk_class_iter_st         sk_class_iter_t;
 
 /**
- *    Iterator to visit sensor groups
+ *    sk_sensorgroup_iter_t is an iterator to visit sensor groups.
+ *
+ *    The iterator should be created on the stack.  Its definition is
+ *    given at the end of this file.
  *
  *    sksiteSensorgroupIterator() creates an iterator over all
  *    sensor groups.
@@ -187,7 +196,10 @@ typedef struct sk_class_iter_st         sk_class_iter_t;
 typedef struct sk_sensorgroup_iter_st   sk_sensorgroup_iter_t;
 
 /**
- *    Iterator to visit flowtypes
+ *    sk_flowtype_iter_t is an iterator to visit flowtypes.
+ *
+ *    The iterator should be created on the stack.  Its definition is
+ *    given at the end of this file.
  *
  *    sksiteFlowtypeIterator() creates an iterator over all flowtypes.
  *
@@ -257,49 +269,6 @@ int
 sksiteFlowtypeIteratorNext(
     sk_flowtype_iter_t *iter,
     sk_flowtype_id_t   *out_flowtype_id);
-
-
-/*
- *    Iterators should be created on the stack, and their internal
- *    strucure is visible so they can be created on the stack.
- *    However, the caller should treat the internals as opaque.
- */
-
-struct sk_sensor_iter_st {
-    /** vector of candidates */
-    sk_vector_t        *si_vector;
-    /** position in the vector */
-    int                 si_index;
-    /** 1 if vector contains pointers, 0 if it contains IDs */
-    int                 si_contains_pointers;
-};
-
-struct sk_class_iter_st {
-    /** vector of candidates */
-    sk_vector_t        *ci_vector;
-    /** position in the vector */
-    int                 ci_index;
-    /** 1 if vector contains pointers, 0 if it contains IDs */
-    int                 ci_contains_pointers;
-};
-
-struct sk_sensorgroup_iter_st {
-    /** vector of candidates */
-    sk_vector_t        *gi_vector;
-    /** position in the vector */
-    int                 gi_index;
-    /** 1 if vector contains pointers, 0 if it contains IDs */
-    int                 gi_contains_pointers;
-};
-
-struct sk_flowtype_iter_st {
-    /** vector of candidates */
-    sk_vector_t        *fi_vector;
-    /** position in the vector */
-    int                 fi_index;
-    /** 1 if vector contains pointers, 0 if it contains IDs */
-    int                 fi_contains_pointers;
-};
 
 
 /** Sensors ***********************************************************/
@@ -912,11 +881,14 @@ sksiteSensorgroupSensorIterator(
  *    already in use, unknown class id, illegal flowtype name, illegal
  *    type name, type name not unique within class, out of memory.
  *
- *    Use sksiteFlowtypeLookup() to get a flowtype ID given the name,
- *    and use sksiteFlowtypeGetName() to get a flowtype name given the
- *    ID.
+ *    Use sksiteFlowtypeLookup() to get a flowtype ID given the
+ *    flowtype name, use sksiteFlowtypeLookupByClassType() to get a
+ *    flowtype ID given the class name and type name, and use
+ *    sksiteFlowtypeLookupByClassIDType() to get a flowtype ID given
+ *    the class ID and type name.
  *
- *    Use sksiteFlowtypeGetClassID() to get the class ID given a
+ *    Use sksiteFlowtypeGetName() to get a flowtype name given the ID,
+ *    use sksiteFlowtypeGetClassID() to get the class ID given a
  *    flowtype ID, sksiteFlowtypeGetClass() to get the class name
  *    given a flowtype ID, and sksiteFlowtypeGetType() to get the type
  *    name given a flowtype ID.
@@ -2070,6 +2042,54 @@ sk_file_format_t
 sksiteFileformatFromName(
     const char         *name)
     SK_GCC_DEPRECATED;
+
+
+
+/** Iterator Definitions **********************************************/
+
+/*
+ *    Iterators should be created on the stack.
+ *
+ *    The internal structure of the iterator is visible here so they
+ *    can be created on the stack.  However, the caller should treat
+ *    the internals as opaque.
+ */
+
+struct sk_sensor_iter_st {
+    /** vector of candidates */
+    sk_vector_t        *si_vector;
+    /** position in the vector */
+    int                 si_index;
+    /** 1 if vector contains pointers, 0 if it contains IDs */
+    int                 si_contains_pointers;
+};
+
+struct sk_class_iter_st {
+    /** vector of candidates */
+    sk_vector_t        *ci_vector;
+    /** position in the vector */
+    int                 ci_index;
+    /** 1 if vector contains pointers, 0 if it contains IDs */
+    int                 ci_contains_pointers;
+};
+
+struct sk_sensorgroup_iter_st {
+    /** vector of candidates */
+    sk_vector_t        *gi_vector;
+    /** position in the vector */
+    int                 gi_index;
+    /** 1 if vector contains pointers, 0 if it contains IDs */
+    int                 gi_contains_pointers;
+};
+
+struct sk_flowtype_iter_st {
+    /** vector of candidates */
+    sk_vector_t        *fi_vector;
+    /** position in the vector */
+    int                 fi_index;
+    /** 1 if vector contains pointers, 0 if it contains IDs */
+    int                 fi_contains_pointers;
+};
 
 
 #ifdef __cplusplus

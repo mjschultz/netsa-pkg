@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwrtd2split.c 314c5852c1b4 2016-06-03 21:41:11Z mthomas $");
+RCSIDENT("$SiLK: rwrtd2split.c 5129c94db905 2017-01-19 22:25:14Z mthomas $");
 
 #include <silk/skstream.h>
 #include <silk/rwrec.h>
@@ -135,7 +135,7 @@ appSetup(
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
     sk_file_header_t *in_hdr;
-    sk_file_header_t *out_hdr;
+    sk_file_header_t *out_hdr = NULL;
     int arg_index;
     int rv;
 

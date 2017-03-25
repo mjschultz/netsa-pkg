@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2011-2016 by Carnegie Mellon University.
+** Copyright (C) 2011-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -15,7 +15,7 @@
 #include <Python.h>
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pysilk_common.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: pysilk_common.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 #include "pysilk_common.h"
 

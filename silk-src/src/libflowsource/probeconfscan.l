@@ -1,6 +1,6 @@
 %{
 /*
-** Copyright (C) 2005-2016 by Carnegie Mellon University.
+** Copyright (C) 2005-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconfscan.l 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: probeconfscan.l 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 #include "probeconfscan.h"
 #include "probeconfparse.h"

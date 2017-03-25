@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsettool.c 56e2ec1fb1aa 2016-07-15 17:25:38Z mthomas $");
+RCSIDENT("$SiLK: rwsettool.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skipset.h>
@@ -143,10 +143,9 @@ static const char *appHelp[] = {
      "\texactly this number of IP addresses from each input IPset.\n"
      "\tMay only be used with the --sample switch"),
 
-    ("Create an IPset where the probably of including each IP\n"
+    ("Create an IPset where the probability of including each IP\n"
      "\taddress of each input is given by this value, a floating point value\n"
      "\tbetween 0.0 and 1.0.  May only be used with the --sample switch"),
-
 
     ("Specify the seed for the pseudo-random number generator used by\n"
      "\tthe --sample operation"),

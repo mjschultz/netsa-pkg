@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2016 by Carnegie Mellon University.
+** Copyright (C) 2006-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skheader-test.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: skheader-test.c 4d3dd8f76605 2017-01-12 16:13:52Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstream.h>
@@ -255,6 +255,9 @@ doread(
 
     skHeaderIteratorBind(&iter, hdr);
     while ((he = skHeaderIteratorNext(&iter)) != NULL) {
+        printf("HDR id = %" PRIu32 " / len = %" PRIu32 " / ",
+                (uint32_t)skHeaderEntryGetTypeId(he),
+                (uint32_t)he->he_spec.hes_len);
         skHeaderEntryPrint(he, stdout);
         printf("\n");
     }

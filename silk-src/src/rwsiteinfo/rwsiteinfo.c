@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2011-2016 by Carnegie Mellon University.
+** Copyright (C) 2011-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsiteinfo.c 692731fe85c5 2016-06-03 17:28:17Z mthomas $");
+RCSIDENT("$SiLK: rwsiteinfo.c 4a14e7ea8fe2 2017-03-13 20:17:43Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/skmempool.h>
@@ -41,18 +41,6 @@ RCSIDENT("$SiLK: rwsiteinfo.c 692731fe85c5 2016-06-03 17:28:17Z mthomas $");
 
 /* maximum number of file descriptors for nftw() to keep open */
 #define RWS_MAX_FD_NFTW  16
-
-
-/*
- *  Printer function typedef.
- *
- *    rwsiteinfo "prints" the output twice.  In the first pass, it
- *    uses a print function that does not produce output but instead
- *    determines the sizes of what it would print.  In the second
- *    pass, it uses an actual print function (fprintf) to produce the
- *    output.
- */
-typedef int (*rws_fprintf_t)(FILE *f, const char *fmt, ...);
 
 
 /* Sub-iterator types */
@@ -256,7 +244,7 @@ typedef enum {
     OPT_CLASSES, OPT_TYPES, OPT_FLOWTYPES, OPT_SENSORS,
     OPT_NO_TITLES, OPT_NO_COLUMNS, OPT_COLUMN_SEPARATOR,
     OPT_NO_FINAL_DELIMITER, OPT_DELIMITED, OPT_LIST_DELIMETER,
-    OPT_PAGER, OPT_DATA_ROOTDIR
+    OPT_OUTPUT_PATH, OPT_PAGER, OPT_DATA_ROOTDIR
 } appOptionsEnum;
 
 static struct option appOptions[] = {
@@ -272,6 +260,7 @@ static struct option appOptions[] = {
     {"no-final-delimiter",  NO_ARG,       0, OPT_NO_FINAL_DELIMITER},
     {"delimited",           OPTIONAL_ARG, 0, OPT_DELIMITED},
     {"list-delimiter",      REQUIRED_ARG, 0, OPT_LIST_DELIMETER},
+    {"output-path",         REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
     {"pager",               REQUIRED_ARG, 0, OPT_PAGER},
     {"data-rootdir",        REQUIRED_ARG, 0, OPT_DATA_ROOTDIR},
     {0,0,0,0}               /* sentinel entry */
@@ -300,7 +289,8 @@ static const char *appHelp[] = {
     ("Shortcut for --no-columns --no-final-del --column-sep=CHAR"),
     ("Use specified character between items in FIELD:list\n"
      "\tfields. Def. ','"),
-    ("Program to invoke to page output. Def. $SILK_PAGER or $PAGER"),
+    ("Write the output to this stream or file. Def. stdout"),
+    ("Invoke this program to page output. Def. $SILK_PAGER or $PAGER"),
     ("Root of directory tree containing packed data."),
     (char *)NULL
 };
@@ -314,12 +304,11 @@ static void helpFields(FILE *fh);
 static sk_stringmap_t *createStringmap(void);
 static int rws_parse_fields(void);
 static int rws_parse_restrictions(void);
-static int fprintf_size(FILE *stream, const char *format, ...);
 static int rws_repo_scan(void);
 static int rws_repo_file_compare(const void *a, const void *b, const void *c);
+static int rws_print(FILE *fp, const char *format, ...) SK_CHECK_PRINTF(2, 3);
 static int
 rws_print_list_field(
-    rws_fprintf_t       printer,
     FILE               *fd,
     rws_iter_t         *iter,
     rws_field_t         field,
@@ -561,11 +550,11 @@ appSetup(
         }
     }
 
-    /* Initialize column widths */
+    /* initialize column widths */
     if (no_titles || no_columns) {
         memset(col_width, 0, sizeof(col_width));
     } else {
-        for (i = 0; i < RWST_MAX_FIELD_COUNT; i++) {
+        for (i = 0; i < RWST_MAX_FIELD_COUNT; ++i) {
             col_width[i] = strlen((char *)field_map_entries[i].userdata);
 
             /* While looping through, verify that the
@@ -575,14 +564,26 @@ appSetup(
         }
     }
 
-    /* Set the final delimiter, if used */
+    /* set the final delimiter, if used */
     if (!no_final_delimiter) {
         final_delim[0] = column_separator;
     }
 
-    rv = skFileptrOpenPager(&output, pager);
-    if (rv && rv != SK_FILEPTR_PAGER_IGNORED) {
-        skAppPrintErr("Unable to invoke pager");
+    /* open the --output-path: the 'of_name' member is non-NULL when
+     * the switch is given.  only invoke the pager when the user has
+     * not specified the output-path, even if output-path is stdout */
+    if (output.of_name) {
+        rv = skFileptrOpen(&output, SK_IO_WRITE);
+        if (rv) {
+            skAppPrintErr("Cannot open '%s': %s",
+                          output.of_name, skFileptrStrerror(rv));
+            exit(EXIT_FAILURE);
+        }
+    } else {
+        rv = skFileptrOpenPager(&output, pager);
+        if (rv && rv != SK_FILEPTR_PAGER_IGNORED) {
+            skAppPrintErr("Unable to invoke pager");
+        }
     }
 
     return;  /* OK */
@@ -704,6 +705,15 @@ appOptionsHandler(
 
       case OPT_LIST_DELIMETER:
         list_separator = opt_arg[0];
+        break;
+
+      case OPT_OUTPUT_PATH:
+        if (output.of_name) {
+            skAppPrintErr("Invalid %s: Switch used multiple times",
+                          appOptions[opt_index].name);
+            return 1;
+        }
+        output.of_name = opt_arg;
         break;
 
       case OPT_PAGER:
@@ -1588,9 +1598,53 @@ rws_iter_next(
 }
 
 
+SK_DIAGNOSTIC_FORMAT_NONLITERAL_PUSH
+/*
+ *  len = rws_print(fd, format, ...);
+ *
+ *    If the file handle 'fd' is NULL, compute the number of
+ *    characters that WOULD be printed using the format string
+ *    'format' and argument list and return that length.
+ *
+ *    Otherwise, print the format string and its argument list to the
+ *    file pointer 'fd' and return the number of characters printed.
+ */
+static int
+rws_print(
+    FILE               *fd,
+    const char         *format,
+    ...)
+{
+    va_list args;
+    int len;
+
+    va_start(args, format);
+    if (fd) {
+        len = vfprintf(fd, format, args);
+    } else {
+        char buf;
+        len = vsnprintf(&buf, 0, format, args);
+    }
+    va_end(args);
+    return len;
+}
+SK_DIAGNOSTIC_FORMAT_NONLITERAL_POP
+
+
+/*
+ *  len = rws_print_repo_field(fd, iter, field, width);
+ *
+ *    Print a 'width'-wide column containing the value for 'field'
+ *    (where 'field' is a repository field) to the FILE pointer 'fd',
+ *    where 'iter' is the current context.
+ *
+ *    This function prints using rws_print(), meaning if 'fd' is NULL
+ *    no output is generated and the length of the output is computed.
+ *
+ *    Return the number of characters printed.
+ */
 static int
 rws_print_repo_field(
-    rws_fprintf_t       printer,
     FILE               *fd,
     rws_iter_t         *iter,
     rws_field_t         field,
@@ -1646,21 +1700,21 @@ rws_print_repo_field(
     switch (field) {
       case RWST_REPO_START_DATE:
         if (INT64_MAX == startdate) {
-            return printer(fd, "");
+            return 0;
         }
         sktimestamp_r(timebuf, startdate, time_flags);
-        return printer(fd, "%s", timebuf);
+        return rws_print(fd, "%s", timebuf);
       case RWST_REPO_END_DATE:
         if (0 == enddate) {
-            return printer(fd, "");
+            return 0;
         }
         sktimestamp_r(timebuf, enddate, time_flags);
-        return printer(fd, "%s", timebuf);
+        return rws_print(fd, "%s", timebuf);
       case RWST_REPO_FILE_COUNT:
         if (0 != width) {
-            return printer(fd, "%*" PRIu64, width, count);
+            return rws_print(fd, "%*" PRIu64, width, count);
         }
-        return printer(fd, "%" PRIu64, count);
+        return rws_print(fd, "%" PRIu64, count);
       default:
         skAbortBadCase(field);
     }
@@ -1668,17 +1722,18 @@ rws_print_repo_field(
 
 
 /*
- *  len = rws_print_field(printer, fd, iter, field, width);
+ *  len = rws_print_field(fd, iter, field, width);
  *
- *    Print a 'width'-wide column containing the value for 'field'
- *    using the fprintf-style function 'printer' to the FILE pointer
- *    'fd', where 'iter' is the current context.
+ *    Print a 'width'-wide column containing the value for 'field' to
+ *    the FILE pointer 'fd', where 'iter' is the current context.
+ *
+ *    This function prints using rws_print(), meaning if 'fd' is NULL
+ *    no output is generated and the length of the output is computed.
  *
  *    Return the number of characters printed.
  */
 static int
 rws_print_field(
-    rws_fprintf_t       printer,
     FILE               *fd,
     rws_iter_t         *iter,
     rws_field_t         field,
@@ -1694,7 +1749,7 @@ rws_print_field(
       case RWST_CLASS:
         if (iter->class_id != SK_INVALID_CLASS) {
             sksiteClassGetName(buf, sizeof(buf), iter->class_id);
-            rv = printer(fd, "%*s", width, buf);
+            rv = rws_print(fd, "%*s", width, buf);
         }
         break;
 
@@ -1711,7 +1766,7 @@ rws_print_field(
                 while (sksiteFlowtypeIteratorNext(&fi, &ft)) {
                     if (iter->flowtype_id == ft) {
                         sksiteFlowtypeGetType(buf, sizeof(buf), ft);
-                        rv = printer(fd, "%*s", width, buf);
+                        rv = rws_print(fd, "%*s", width, buf);
                         break;
                     }
                 }
@@ -1722,33 +1777,33 @@ rws_print_field(
       case RWST_TYPE:
         if (iter->flowtype_id != SK_INVALID_FLOWTYPE) {
             sksiteFlowtypeGetType(buf, sizeof(buf), iter->flowtype_id);
-            rv = printer(fd, "%*s", width, buf);
+            rv = rws_print(fd, "%*s", width, buf);
         }
         break;
 
       case RWST_FLOWTYPE:
         if (iter->flowtype_id != SK_INVALID_FLOWTYPE) {
             sksiteFlowtypeGetName(buf, sizeof(buf), iter->flowtype_id);
-            rv = printer(fd, "%*s", width, buf);
+            rv = rws_print(fd, "%*s", width, buf);
         }
         break;
 
       case RWST_FLOWTYPE_ID:
         if (iter->flowtype_id != SK_INVALID_FLOWTYPE) {
-            rv = printer(fd, "%*" PRIu8, width, iter->flowtype_id);
+            rv = rws_print(fd, "%*" PRIu8, width, iter->flowtype_id);
         }
         break;
 
       case RWST_SENSOR:
         if (iter->sensor_id != SK_INVALID_SENSOR) {
             sksiteSensorGetName(buf, sizeof(buf), iter->sensor_id);
-            rv = printer(fd, "%*s", width, buf);
+            rv = rws_print(fd, "%*s", width, buf);
         }
         break;
 
       case RWST_SENSOR_ID:
         if (iter->sensor_id != SK_INVALID_SENSOR) {
-            rv = printer(fd, "%*" PRIu16, width, iter->sensor_id);
+            rv = rws_print(fd, "%*" PRIu16, width, iter->sensor_id);
         }
         break;
 
@@ -1756,7 +1811,7 @@ rws_print_field(
         if (iter->sensor_id != SK_INVALID_SENSOR) {
             s = sksiteSensorGetDescription(iter->sensor_id);
             if (s != NULL) {
-                rv = printer(fd, "%*s", width, s);
+                rv = rws_print(fd, "%*s", width, s);
             }
         }
         break;
@@ -1769,7 +1824,7 @@ rws_print_field(
             sk_class_id_t cid = sksiteClassGetDefault();
             if (cid != SK_INVALID_CLASS) {
                 sksiteClassGetName(buf, sizeof(buf), cid);
-                rv = printer(fd, "%*s", width, buf);
+                rv = rws_print(fd, "%*s", width, buf);
             }
         }
         break;
@@ -1802,36 +1857,36 @@ rws_print_field(
                     }
                 }
             }
-            rv = printer(fd, "%*s", width, mark);
+            rv = rws_print(fd, "%*s", width, mark);
         }
         break;
 
       case RWST_CLASS_LIST:
-        rv = rws_print_list_field(printer, fd, iter, RWST_CLASS, width);
+        rv = rws_print_list_field(fd, iter, RWST_CLASS, width);
         break;
       case RWST_TYPE_LIST:
-        rv = rws_print_list_field(printer, fd, iter, RWST_TYPE, width);
+        rv = rws_print_list_field(fd, iter, RWST_TYPE, width);
         break;
       case RWST_FLOWTYPE_LIST:
-        rv = rws_print_list_field(printer, fd, iter, RWST_FLOWTYPE, width);
+        rv = rws_print_list_field(fd, iter, RWST_FLOWTYPE, width);
         break;
       case RWST_FLOWTYPE_ID_LIST:
-        rv = rws_print_list_field(printer, fd, iter, RWST_FLOWTYPE_ID, width);
+        rv = rws_print_list_field(fd, iter, RWST_FLOWTYPE_ID, width);
         break;
       case RWST_SENSOR_LIST:
-        rv = rws_print_list_field(printer, fd, iter, RWST_SENSOR, width);
+        rv = rws_print_list_field(fd, iter, RWST_SENSOR, width);
         break;
       case RWST_SENSOR_ID_LIST:
-        rv = rws_print_list_field(printer, fd, iter, RWST_SENSOR_ID, width);
+        rv = rws_print_list_field(fd, iter, RWST_SENSOR_ID, width);
         break;
       case RWST_DEFAULT_TYPE_LIST:
-        rv = rws_print_list_field(printer, fd, iter, RWST_DEFAULT_TYPE, width);
+        rv = rws_print_list_field(fd, iter, RWST_DEFAULT_TYPE, width);
         break;
 
       case RWST_REPO_START_DATE:
       case RWST_REPO_END_DATE:
       case RWST_REPO_FILE_COUNT:
-        rv = rws_print_repo_field(printer, fd, iter, field, width);
+        rv = rws_print_repo_field(fd, iter, field, width);
         break;
 
       case RWST_MAX_FIELD_COUNT:
@@ -1840,7 +1895,7 @@ rws_print_field(
 
     /* Fill in any missing spaces. */
     if (rv < width) {
-        printer(fd, "%*s", width - rv, "");
+        rws_print(fd, "%*s", width - rv, "");
     }
 
     return rv;
@@ -1848,18 +1903,19 @@ rws_print_field(
 
 
 /*
- *  len = rws_print_list_field(printer, fd, iter, field, width);
+ *  len = rws_print_list_field(fd, iter, field, width);
  *
  *    Print a 'width'-wide column containing the value for 'field'
- *    (where 'field' represents a "FIELD:list" field) using the
- *    fprintf-style function 'printer' to the FILE pointer 'fd', where
- *    'iter' is the current context.
+ *    (where 'field' represents a "FIELD:list" field) to the FILE
+ *    pointer 'fd', where 'iter' is the current context.
+ *
+ *    This function prints using rws_print(), meaning if 'fd' is NULL
+ *    no output is generated and the length of the output is computed.
  *
  *    Return the number of characters printed.
  */
 static int
 rws_print_list_field(
-    rws_fprintf_t       printer,
     FILE               *fd,
     rws_iter_t         *iter,
     rws_field_t         field,
@@ -1914,12 +1970,12 @@ rws_print_list_field(
     }
     rws_iter_bind(&subiter, 0);
 
-    /* Call ourself with the fake-fprintf to determine the number of
+    /* Call ourself with a NULL FILE* to determine the number of
      * printed characters in this field, and then print the padding */
     if (width != 0) {
-        len = rws_print_list_field(fprintf_size, NULL, iter, field, 0);
+        len = rws_print_list_field(NULL, iter, field, 0);
         if (len < width) {
-            total += printer(fd, "%*s", width - len, "");
+            total += rws_print(fd, "%*s", width - len, "");
         }
     }
 
@@ -1927,10 +1983,10 @@ rws_print_list_field(
     first = 1;
     while (rws_iter_next(&subiter, 0)) {
         if (!first) {
-            len = printer(fd, "%c", list_separator);
+            len = rws_print(fd, "%c", list_separator);
             total += len;
         }
-        len = rws_print_field(printer, fd, &subiter, field, 0);
+        len = rws_print_field(fd, &subiter, field, 0);
         total += len;
         first = 0;
     }
@@ -1954,42 +2010,16 @@ rws_print_row(
         if (i > 0) {
             fprintf(output.of_fp, "%c", column_separator);
         }
-        rws_print_field(fprintf, output.of_fp, iter,
-                        fields[i], col_width[fields[i]]);
+        rws_print_field(output.of_fp, iter, fields[i], col_width[fields[i]]);
     }
     fprintf(output.of_fp, "%s\n", final_delim);
 }
 
 
-SK_DIAGNOSTIC_FORMAT_NONLITERAL_PUSH
-/*
- *  len = fprintf_size(fs, format, ...);
- *
- *    Used to calculate print sizes.  This fprintf() variation does
- *    not produce outout, it simply returns how many charcters it
- *    WOULD have printed.
- */
-static int
-fprintf_size(
-    FILE        UNUSED(*stream),
-    const char         *format,
-    ...)
-{
-    char buf;
-    int len;
-    va_list ap;
-    va_start(ap, format);
-    len = vsnprintf(&buf, 0, format, ap);
-    va_end(ap);
-    return len;
-}
-SK_DIAGNOSTIC_FORMAT_NONLITERAL_POP
-
-
 /*
  *  rws_calcsize_row(iter);
  *
- *    Updates column sizes based on a single row that would be printed
+ *    Update column sizes based on a single row that would be printed
  *    from the given iterator.
  */
 static void
@@ -1999,8 +2029,8 @@ rws_calcsize_row(
     size_t i;
     int len;
 
-    for (i = 0; i < num_fields; i++) {
-        len = rws_print_field(fprintf_size, NULL, iter, fields[i], 0);
+    for (i = 0; i < num_fields; ++i) {
+        len = rws_print_field(NULL, iter, fields[i], 0);
         if (len > col_width[fields[i]]) {
             col_width[fields[i]] = len;
         }
@@ -2065,7 +2095,7 @@ rws_setup_iter_from_fields(
     memset(iter, 0, sizeof(*iter));
     iter->level = -1;
 
-    for (i = 0; i < num_fields; i++) {
+    for (i = 0; i < num_fields; ++i) {
         switch (fields[i]) {
           case RWST_CLASS:
           case RWST_DEFAULT_CLASS:

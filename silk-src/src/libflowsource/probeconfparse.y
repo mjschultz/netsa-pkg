@@ -1,6 +1,6 @@
 %{
 /*
-** Copyright (C) 2005-2016 by Carnegie Mellon University.
+** Copyright (C) 2005-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconfparse.y d49b1e47d2e3 2016-06-15 20:31:17Z mthomas $");
+RCSIDENT("$SiLK: probeconfparse.y 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/probeconf.h>

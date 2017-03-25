@@ -1,4 +1,4 @@
-# RCSIDENT($SiLK: Makefile.am 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $)
+# RCSIDENT($SiLK: Makefile.am 7e6884832fbd 2017-01-20 22:59:46Z mthomas $)
 
 SILK_SRC_MAKE_BASE_LIBS = \
 	 libsilk
@@ -22,6 +22,7 @@ SILK_SRC_MAKE_PACKING_TOOLS = \
 SILK_SRC_MAKE_ANALYSIS_TOOLS = \
          num2dot \
          rwaddrcount \
+         rwaggbag \
          rwappend \
          rwbag \
          rwcat \

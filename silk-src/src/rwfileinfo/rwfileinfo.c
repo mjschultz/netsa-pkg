@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2003-2016 by Carnegie Mellon University.
+** Copyright (C) 2003-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -7,25 +7,19 @@
 */
 
 /*
-**  rwfileinfo
-**
-**  Prints information about an rw-file:
-**    file type
-**    file version
-**    byte order
-**    compression level
-**    header size
-**    record size
-**    record count
-**    file size
-**    command line args used to generate file
-**
-*/
+ *  rwfileinfo
+ *
+ *    Prints information from the header of a SiLK file; also reports
+ *    the file's size and the number of records in the file.
+ *
+ *  Mark Thomas
+ *  November 2003
+ */
 
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfileinfo.c 92e40ed6709b 2016-10-12 17:53:53Z mthomas $");
+RCSIDENT("$SiLK: rwfileinfo.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstream.h>
@@ -67,7 +61,8 @@ enum rwinfo_id {
     RWINFO_ANNOTATIONS,
     RWINFO_PREFIX_MAP,
     RWINFO_IPSET,
-    RWINFO_BAG
+    RWINFO_BAG,
+    RWINFO_AGGBAG
 };
 
 /*
@@ -191,6 +186,12 @@ static const sk_stringmap_entry_t rwinfo_entry[] = {
      NULL},
     {"17",  RWINFO_BAG, NULL, NULL},
 
+    {"aggregate-bag",
+     RWINFO_AGGBAG,
+     ("For an aggregate bag file, the types of the key and the counter"),
+     NULL},
+    {"18",  RWINFO_AGGBAG, NULL, NULL},
+
     SK_STRINGMAP_SENTINEL
 };
 
@@ -212,6 +213,8 @@ static int no_titles = 0;
 
 /* for looping over files on the command line */
 static sk_options_ctx_t *optctx = NULL;
+
+/* FIXME: Consider adding --pager and --output-file support. */
 
 
 /* OPTIONS SETUP */
@@ -355,7 +358,7 @@ appSetup(
     skAppVerifyFeatures(&features, NULL);
     skOptionsSetUsageCallback(&appUsageLong);
 
-    optctx_flags = (SK_OPTIONS_CTX_INPUT_BINARY);
+    optctx_flags = (SK_OPTIONS_CTX_INPUT_BINARY | SK_OPTIONS_CTX_XARGS);
 
     /* register the options */
     if (skOptionsCtxCreate(&optctx, optctx_flags)
@@ -745,7 +748,7 @@ printFileInfo(
         skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_PACKEDFILE_ID);
         while ((he = skHeaderIteratorNext(&iter)) != NULL) {
             printLabel(RWINFO_PACKED_FILE_INFO, count);
-            skHentryPackedfilePrint(he, stdout);
+            skHeaderEntryPrint(he, stdout);
             printf("\n");
             ++count;
         }
@@ -756,7 +759,7 @@ printFileInfo(
         skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_PROBENAME_ID);
         while ((he = skHeaderIteratorNext(&iter)) != NULL) {
             printLabel(RWINFO_PROBE_NAME, count);
-            skHentryProbenamePrint(he, stdout);
+            skHeaderEntryPrint(he, stdout);
             printf("\n");
             ++count;
         }
@@ -767,7 +770,7 @@ printFileInfo(
         skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_PREFIXMAP_ID);
         while ((he = skHeaderIteratorNext(&iter)) != NULL) {
             printLabel(RWINFO_PREFIX_MAP, count);
-            skHentryPrefixmapPrint(he, stdout);
+            skHeaderEntryPrint(he, stdout);
             printf("\n");
             ++count;
         }
@@ -778,7 +781,7 @@ printFileInfo(
         skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_IPSET_ID);
         while ((he = skHeaderIteratorNext(&iter)) != NULL) {
             printLabel(RWINFO_IPSET, count);
-            skHentryIPSetPrint(he, stdout);
+            skHeaderEntryPrint(he, stdout);
             printf("\n");
             ++count;
         }
@@ -789,7 +792,18 @@ printFileInfo(
         skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_BAG_ID);
         while ((he = skHeaderIteratorNext(&iter)) != NULL) {
             printLabel(RWINFO_BAG, 0);
-            skHentryBagPrint(he, stdout);
+            skHeaderEntryPrint(he, stdout);
+            printf("\n");
+            ++count;
+        }
+    }
+
+    if (skBitmapGetBit(print_fields, RWINFO_AGGBAG)) {
+        count = 0;
+        skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_AGGBAG_ID);
+        while ((he = skHeaderIteratorNext(&iter)) != NULL) {
+            printLabel(RWINFO_AGGBAG, 0);
+            skHeaderEntryPrint(he, stdout);
             printf("\n");
             ++count;
         }
@@ -807,7 +821,7 @@ printFileInfo(
             if (!no_titles) {
                 printf(LABEL_NUM_FMT, count);
             }
-            skHentryInvocationPrint(he, stdout);
+            skHeaderEntryPrint(he, stdout);
             printf("\n");
         }
     }
@@ -824,7 +838,7 @@ printFileInfo(
             if (!no_titles) {
                 printf(LABEL_NUM_FMT, count);
             }
-            skHentryAnnotationPrint(he, stdout);
+            skHeaderEntryPrint(he, stdout);
             printf("\n");
         }
     }

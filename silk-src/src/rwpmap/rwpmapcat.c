@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2016 by Carnegie Mellon University.
+** Copyright (C) 2007-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmapcat.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwpmapcat.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
@@ -98,6 +98,10 @@ static char delimiter = '|';
 /* format for printing IP addresses */
 static uint32_t ip_format = SKIPADDR_CANONICAL;
 
+/* flags when registering --ip-format */
+static const unsigned int ip_format_register_flags =
+    (SK_OPTION_IP_FORMAT_INTEGER_IPS | SK_OPTION_IP_FORMAT_ZERO_PAD_IPS);
+
 
 /* OPTIONS SETUP */
 
@@ -108,25 +112,26 @@ typedef enum {
     OPT_LEFT_JUSTIFY_LABEL,  OPT_NO_CIDR_BLOCKS,
     OPT_NO_TITLES, OPT_NO_COLUMNS, OPT_COLUMN_SEPARATOR,
     OPT_NO_FINAL_DELIMITER, OPT_DELIMITED,
-    OPT_PAGER
+    OPT_OUTPUT_PATH, OPT_PAGER
 } appOptionsEnum;
 
 static struct option appOptions[] = {
-    {"map-file",                REQUIRED_ARG, 0, OPT_MAP_FILE},
-    {"address-types",           OPTIONAL_ARG, 0, OPT_ADDRESS_TYPES},
-    {"country-codes",           OPTIONAL_ARG, 0, OPT_COUNTRY_CODES},
-    {"output-types",            REQUIRED_ARG, 0, OPT_OUTPUT_TYPES},
-    {"ignore-label",            REQUIRED_ARG, 0, OPT_IGNORE_LABEL},
-    {"ip-label-to-ignore",      REQUIRED_ARG, 0, OPT_IP_LABEL_TO_IGNORE},
-    {"left-justify-labels",     NO_ARG,       0, OPT_LEFT_JUSTIFY_LABEL},
-    {"no-cidr-blocks",          NO_ARG,       0, OPT_NO_CIDR_BLOCKS},
-    {"no-titles",               NO_ARG,       0, OPT_NO_TITLES},
-    {"no-columns",              NO_ARG,       0, OPT_NO_COLUMNS},
-    {"column-separator",        REQUIRED_ARG, 0, OPT_COLUMN_SEPARATOR},
-    {"no-final-delimiter",      NO_ARG,       0, OPT_NO_FINAL_DELIMITER},
-    {"delimited",               OPTIONAL_ARG, 0, OPT_DELIMITED},
-    {"pager",                   REQUIRED_ARG, 0, OPT_PAGER},
-    {0,0,0,0}                   /* sentinel entry */
+    {"map-file",            REQUIRED_ARG, 0, OPT_MAP_FILE},
+    {"address-types",       OPTIONAL_ARG, 0, OPT_ADDRESS_TYPES},
+    {"country-codes",       OPTIONAL_ARG, 0, OPT_COUNTRY_CODES},
+    {"output-types",        REQUIRED_ARG, 0, OPT_OUTPUT_TYPES},
+    {"ignore-label",        REQUIRED_ARG, 0, OPT_IGNORE_LABEL},
+    {"ip-label-to-ignore",  REQUIRED_ARG, 0, OPT_IP_LABEL_TO_IGNORE},
+    {"left-justify-labels", NO_ARG,       0, OPT_LEFT_JUSTIFY_LABEL},
+    {"no-cidr-blocks",      NO_ARG,       0, OPT_NO_CIDR_BLOCKS},
+    {"no-titles",           NO_ARG,       0, OPT_NO_TITLES},
+    {"no-columns",          NO_ARG,       0, OPT_NO_COLUMNS},
+    {"column-separator",    REQUIRED_ARG, 0, OPT_COLUMN_SEPARATOR},
+    {"no-final-delimiter",  NO_ARG,       0, OPT_NO_FINAL_DELIMITER},
+    {"delimited",           OPTIONAL_ARG, 0, OPT_DELIMITED},
+    {"output-path",         REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {"pager",               REQUIRED_ARG, 0, OPT_PAGER},
+    {0,0,0,0}               /* sentinel entry */
 };
 
 static const char *appHelp[] = {
@@ -146,7 +151,8 @@ static const char *appHelp[] = {
     "Use specified character between columns. Def. '|'",
     "Suppress column delimiter at end of line. Def. No",
     "Shortcut for --no-columns --no-final-del --column-sep=CHAR",
-    "Program to invoke to page output. Def. $SILK_PAGER or $PAGER",
+    "Write the output to this stream or file. Def. stdout",
+    "Invoke this program to page output. Def. $SILK_PAGER or $PAGER",
     NULL
 };
 
@@ -155,6 +161,7 @@ typedef struct option_values_st {
     const char *ignore_label;
     const char *ip_label_to_ignore;
     const char *output_types;
+    const char *output_path;
     const char *pager;
 } option_values_t;
 
@@ -298,7 +305,7 @@ appSetup(
 
     /* register the options */
     if (skOptionsRegister(appOptions, &appOptionsHandler,(clientData)&opt_val)
-        || skOptionsIPFormatRegister(&ip_format))
+        || skOptionsIPFormatRegister(&ip_format, ip_format_register_flags))
     {
         skAppPrintErr("Unable to register options");
         exit(EXIT_FAILURE);
@@ -362,16 +369,6 @@ appSetup(
         exit(EXIT_FAILURE);
     }
 
-    /* Create the output stream */
-    if ((rv = skStreamCreate(&stream_out, SK_IO_WRITE, SK_CONTENT_TEXT))
-        || (rv = skStreamBind(stream_out, "stdout"))
-        || (rv = skStreamPageOutput(stream_out, opt_val.pager))
-        || (rv = skStreamOpen(stream_out)))
-    {
-        skStreamPrintLastErr(stream_out, rv, &skAppPrintErr);
-        exit(EXIT_FAILURE);
-    }
-
     /* if an ignore-label or an ignore-IP was given, find the
      * corresponding value. */
     if (opt_val.ignore_label) {
@@ -411,6 +408,24 @@ appSetup(
             exit(EXIT_FAILURE);
         }
         ignore_val = skPrefixMapFindValue(map, &ip);
+    }
+
+    /* if an output_path is set, bypass the pager by setting it to the
+     * empty string.  if no output_path was set, use stdout */
+    if (opt_val.output_path) {
+        opt_val.pager = "";
+    } else {
+        opt_val.output_path = "-";
+    }
+
+    /* create the output stream */
+    if ((rv = skStreamCreate(&stream_out, SK_IO_WRITE, SK_CONTENT_TEXT))
+        || (rv = skStreamBind(stream_out, opt_val.output_path))
+        || (rv = skStreamPageOutput(stream_out, opt_val.pager))
+        || (rv = skStreamOpen(stream_out)))
+    {
+        skStreamPrintLastErr(stream_out, rv, &skAppPrintErr);
+        exit(EXIT_FAILURE);
     }
 
     return;                     /* OK */
@@ -529,6 +544,15 @@ appOptionsHandler(
         if (opt_arg) {
             delimiter = opt_arg[0];
         }
+        break;
+
+      case OPT_OUTPUT_PATH:
+        if (opt_val->output_path) {
+            skAppPrintErr("Invalid %s: Switch used multiple times",
+                          appOptions[opt_index].name);
+            return 1;
+        }
+        opt_val->output_path = opt_arg;
         break;
 
       case OPT_PAGER:

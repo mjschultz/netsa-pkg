@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2016 by Carnegie Mellon University.
+** Copyright (C) 2004-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -37,7 +37,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKBAG_H, "$SiLK: skbag.h 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_SKBAG_H, "$SiLK: skbag.h 470ce106b096 2017-03-21 19:56:22Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -103,7 +103,7 @@ typedef struct skBagIterator_st skBagIterator_t;
  *
  *    When getting a key or counter, the caller may specify the
  *    special ANY type to have the Bag return the "natural" type for
- *    the data structure; the Bag will set the type to the type of
+ *    the data structure; the Bag sets the type to the type of
  *    value returned.
  *
  *    The following enumerations list the types for keys and
@@ -161,6 +161,9 @@ typedef uint64_t skBagCounter_t;
  *
  *    Note that the maximum counter in SiLK 3.0 is less than that in
  *    SiLK 2.0.
+ *
+ *    Although SKBAG_COUNTER_MIN is 0, setting the counter of a key is
+ *    0 effectively removes the key from the bag.
  */
 
 #define SKBAG_COUNTER_MIN   UINT64_C(0)
@@ -177,36 +180,36 @@ typedef uint64_t skBagCounter_t;
 
 
 /**
- *    The Bag data-strucutre maintains a key-type and counter-type
- *    that specify what the key and/ore counter represent.  For
- *    example, this Bag maps source-ports to the number of flows seen
- *    for each port.
+ *    The Bag data-structure maintains a key-type and counter-type
+ *    that specify what the key and counter represent.  For example, a
+ *    Bag could map each source-port value to the number of flows seen
+ *    for that port.
  *
- *    The following enumeration list those types.
+ *    The following enumeration lists those types.
  */
 typedef enum skBagFieldType_en {
     /* the following correspond to values in rwascii.h */
-    SKBAG_FIELD_SIPv4,
+    SKBAG_FIELD_SIPv4 = 0,
     SKBAG_FIELD_DIPv4,
     SKBAG_FIELD_SPORT,
     SKBAG_FIELD_DPORT,
-    SKBAG_FIELD_PROTO,
+    SKBAG_FIELD_PROTO = 4,
     SKBAG_FIELD_PACKETS,
     SKBAG_FIELD_BYTES,
     SKBAG_FIELD_FLAGS,
-    SKBAG_FIELD_STARTTIME,
+    SKBAG_FIELD_STARTTIME = 8,
     SKBAG_FIELD_ELAPSED,
     SKBAG_FIELD_ENDTIME,
     SKBAG_FIELD_SID,
-    SKBAG_FIELD_INPUT,
+    SKBAG_FIELD_INPUT = 12,
     SKBAG_FIELD_OUTPUT,
     SKBAG_FIELD_NHIPv4,
     SKBAG_FIELD_INIT_FLAGS,
-    SKBAG_FIELD_REST_FLAGS,
+    SKBAG_FIELD_REST_FLAGS = 16,
     SKBAG_FIELD_TCP_STATE,
     SKBAG_FIELD_APPLICATION,
     SKBAG_FIELD_FTYPE_CLASS,
-    SKBAG_FIELD_FTYPE_TYPE,
+    SKBAG_FIELD_FTYPE_TYPE = 20,
     /*
      *  SKBAG_FIELD_STARTTIME_MSEC = 21,
      *  SKBAG_FIELD_ENDTIME_MSEC,
@@ -218,28 +221,28 @@ typedef enum skBagFieldType_en {
     SKBAG_FIELD_SIPv6,
     SKBAG_FIELD_DIPv6,
     SKBAG_FIELD_NHIPv6,
-    SKBAG_FIELD_RECORDS,
+    SKBAG_FIELD_RECORDS = 28,
     SKBAG_FIELD_SUM_PACKETS,
     SKBAG_FIELD_SUM_BYTES,
     SKBAG_FIELD_SUM_ELAPSED,
 
-    SKBAG_FIELD_ANY_IPv4,
+    SKBAG_FIELD_ANY_IPv4 = 32,
     SKBAG_FIELD_ANY_IPv6,
     SKBAG_FIELD_ANY_PORT,
     SKBAG_FIELD_ANY_SNMP,
-    SKBAG_FIELD_ANY_TIME,
+    SKBAG_FIELD_ANY_TIME = 36,
 
     SKBAG_FIELD_SIP_COUNTRY,
     SKBAG_FIELD_DIP_COUNTRY,
     SKBAG_FIELD_ANY_COUNTRY,
 
-    SKBAG_FIELD_SIP_PMAP,
+    SKBAG_FIELD_SIP_PMAP = 40,
     SKBAG_FIELD_DIP_PMAP,
     SKBAG_FIELD_ANY_IP_PMAP,
 
     SKBAG_FIELD_SPORT_PMAP,
-    SKBAG_FIELD_DPORT_PMAP,
-    SKBAG_FIELD_ANY_PORT_PMAP,
+    SKBAG_FIELD_DPORT_PMAP = 44,
+    SKBAG_FIELD_ANY_PORT_PMAP = 45,
 
     SKBAG_FIELD_CUSTOM = 255
 } skBagFieldType_t;
@@ -292,19 +295,19 @@ typedef struct skBagFieldTypeIterator_st {
 
 
 /**
- *    In skBagModify(), the value to use value to use for 'key_octets'
- *    or 'counter_octets' that indicates the size should remain
+ *    In skBagModify(), the value to use for 'key_octets' or
+ *    'counter_octets' that indicates the size should remain
  *    unchagned.
  */
 #define SKBAG_OCTETS_NO_CHANGE      (SIZE_MAX-2)
 
 
 /**
- *    The signature of a callback used by skBagAddBag() when adding to
- *    counters causes an overflow.
+ *    The signature of a callback used by skBagAddBag() when adding
+ *    two counters causes an overflow.
  *
  *    The value in 'key' is the key where the overflow is occuring,
- *    'in_out_counter' is the current value of the counter in
+ *    'in_out_counter' is the current value of the counter in the
  *    destination bag, 'in_counter' is the current value in the source
  *    bag, and 'cb_data' is the caller-supplied parameter to
  *    skBagAddBag().
@@ -312,9 +315,10 @@ typedef struct skBagFieldTypeIterator_st {
  *    The callback should modify 'in_out_counter' to the value the
  *    caller wants to insert into the destination bag for 'key'.  If
  *    the callback returns any value other than SKBAG_OK,
- *    skBagAddBag() will stop processing and return that value.
+ *    skBagAddBag() stops processing and returns that value.
  */
-typedef skBagErr_t (*skBagBoundsCallback_t)(
+typedef skBagErr_t
+(*skBagBoundsCallback_t)(
     const skBagTypedKey_t      *key,
     skBagTypedCounter_t        *in_out_counter,
     const skBagTypedCounter_t  *in_counter,
@@ -330,7 +334,7 @@ typedef skBagErr_t (*skBagBoundsCallback_t)(
  *    If this function returns a value other than SKBAG_OK, processing
  *    of the bag stops.
  *
- *    The 'fake_bag' argument is partially constructed bag that can
+ *    The 'fake_bag' argument is partially constructed bag that may
  *    be used to query the type and/or size of the key and counter in
  *    the bag that is being read.  This parameter must be considered
  *    read-only.
@@ -338,7 +342,8 @@ typedef skBagErr_t (*skBagBoundsCallback_t)(
  *    The 'cb_data' parameter is provided for the caller to use.  It
  *    is the parameter specified to skBagProcessStream().
  */
-typedef skBagErr_t (*skBagStreamInitFunc_t)(
+typedef skBagErr_t
+(*skBagStreamInitFunc_t)(
     const skBag_t          *fake_bag,
     void                   *cb_data);
 
@@ -348,23 +353,23 @@ typedef skBagErr_t (*skBagStreamInitFunc_t)(
  *    when reading a bag from a stream.  This callback is invoked for
  *    each entry (that is, each key/counter pair) read from the bag.
  *
- *    The 'fake_bag' argument is partially constructed bag that can be
+ *    The 'fake_bag' argument is partially constructed bag that may be
  *    used to query the type and/or size of the key and counter in the
  *    bag that is being read.  This parameter must be considered
  *    read-only.
  *
- *    The 'key' parameter is a pointer to the current key, as a
- *    uint32_t.  When reading a Bag that contains IPv6 data, addresses
- *    in the ::ffff:0:0/96 block will be converted to IPv4 addresses,
- *    and then those addresses will be converted to native 32 bit
- *    integers.  All other IPv6 addresses will be ignored.
+ *    The 'key' parameter is a pointer to the current key.  If the bag
+ *    contains IPv6 addresses, the type of the key is
+ *    SKBAG_KEY_IPADDR.  Otherwise, the type of the key is
+ *    SKBAG_KEY_U32.
  *
- *    The 'counter' paramter is a pointer to the current key.
+ *    The 'counter' paramter is a pointer to the current counter.
  *
  *    The 'cb_data' parameter is provided for the caller to use.  It
  *    is the parameter specified to skBagProcessStream().
  */
-typedef skBagErr_t (*skBagStreamEntryFunc_t)(
+typedef skBagErr_t
+(*skBagStreamEntryFunc_t)(
     const skBag_t              *fake_bag,
     const skBagTypedKey_t      *key,
     const skBagTypedCounter_t  *counter,
@@ -391,17 +396,17 @@ extern const skBagTypedCounter_t *skbag_counter_incr;
  *    'dest_bag' may change as a result of this operation.
  *
  *    The 'bounds_cb' callback may be NULL.  When it is specified, it
- *    will be invoked whenever summing two counters causes an overflow
+ *    is invoked whenever summing two counters causes an overflow
  *    (that is, when skBagCounterAdd() returns SKBAG_ERR_OP_BOUNDS).
- *    The callback will be invoked with the key, the counter from
+ *    The callback is invoked with the key, the counter from
  *    'dest_bag', the counter from 'src_bag', and the 'cb_data'.  The
  *    callback should modify the counter from 'dest_bag' to the value
  *    the caller wants to insert into 'dest_bag' and return SKBAG_OK,
- *    and the function will then attempt to set the key in 'dest_bag'
+ *    and the function then attempts to set the key in 'dest_bag'
  *    to that value.  If the insert succeeds, processing continues;
- *    otherwise the result of the attempt to set the key will be
+ *    otherwise the result of the attempt to set the key is
  *    returned.  If 'bounds_cb' returns a value other than SKBAG_OK,
- *    that value will be returned.
+ *    that value is returned.
  *
  *    Return SKBAG_OK on success.  Return SKBAG_ERR_INPUT if
  *    'dest_bag' or 'src_bag' is NULL.  Return SKBAG_ERR_KEY_RANGE if
@@ -421,9 +426,15 @@ skBagAddBag(
 
 /**
  *    Read a serialized Bag from the input stream 'stream' and add
- *    its key/counter pairs to the existing Bag 'bag'.  New keys will
- *    be created if required; existing keys will have their values
+ *    its key/counter pairs to the existing Bag 'bag'.  New keys are
+ *    created if required; existing keys have their values
  *    summed.
+ *
+ *    Return SKBAG_ERR_INPUT if 'bag' or 'stream_in' is NULL.  Return
+ *    SKBAG_ERR_OP_BOUNDS if summing counters results in an overflow.
+ *    Return SKBAG_ERR_KEY_RANGE if auto-conversion is disabled on
+ *    'bag' (see skBagAutoConvertDisable()) and the key size in 'bag'
+ *    is smaller than the key size of the bag in 'stream_in'.
  */
 skBagErr_t
 skBagAddFromStream(
@@ -435,13 +446,12 @@ skBagAddFromStream(
  *    Prevent auto-conversion of keys from happening on 'bag'.
  *
  *    By default, attempting to insert a key whose octet width is
- *    larger than the Bag current supports will promote the keys in
- *    the Bag to hold the larger key.  Such an auto-conversion may
- *    occur when inserting an IPv6 address into a uint32_t Bag, or
- *    when inserting a uint32_t key into an uint8_t Bag.  This
- *    function disables this conversion.  An attempt to insert an
- *    unsupported key size into such a Bag will return
- *    SKBAG_ERR_OP_BOUNDS.
+ *    larger than the Bag current supports promotes the keys in the
+ *    Bag to hold the larger key.  Such an auto-conversion may occur
+ *    when inserting an IPv6 address into a uint32_t Bag, or when
+ *    inserting a uint32_t key into an uint8_t Bag.  This function
+ *    disables this conversion.  An attempt to insert an unsupported
+ *    key size into such a Bag returns SKBAG_ERR_KEY_RANGE.
  *
  *    See also skBagAutoConvertEnable() and
  *    skBagAutoConvertIsEnabled().
@@ -465,9 +475,8 @@ skBagAutoConvertEnable(
 
 
 /**
- *    Return 1 if 'bag' will automatically convert its keys' octet
- *    width to a larger size when an attempt is made to insert a
- *    larger key.
+ *    Return 1 if 'bag' automatically converts its keys' octet width
+ *    to a larger size when an attempt is made to insert a larger key.
  *
  *    See also skBagAutoConvertDisable() and
  *    skBagAutoConvertEnable().
@@ -478,8 +487,8 @@ skBagAutoConvertIsEnabled(
 
 
 /**
- *    Make a new bag that is a deep copy of src, and set '*dest' to
- *    it.
+ *    Make a new bag that is a deep copy of src, and set the referent
+ *    of 'dest' to it.
  */
 skBagErr_t
 skBagCopy(
@@ -501,10 +510,12 @@ skBagCountKeys(
  *    'bag' and set its value to 'counter_add'.
  *
  *    If 'key' is larger than the maximum key currently supported by
- *    'bag', 'bag' will be converted to a size capable of holding
- *    'key'.
+ *    'bag', 'bag' is converted to a size capable of holding 'key'
+ *    unless auto-conversion is disabled for 'bag'; see
+ *    skBagAutoConvertEnable(), skBagAutoConvertDisable(), and
+ *    skBagAutoConvertIsEnabled().
  *
- *    If 'new_counter' is not NULL, the new value of the counter will be
+ *    If 'new_counter' is not NULL, the new value of the counter is
  *    copied into that location.  'new_counter' is unchanged when this
  *    function turns a value other than SKBAG_OK.
  *
@@ -518,6 +529,11 @@ skBagCountKeys(
  *    (other than 'new_counter') is NULL, if the type of 'key' is
  *    SKBAG_KEY_ANY, if the type of 'counter' is SKBAG_COUNTER_ANY, or
  *    if 'counter' is larger than SKBAG_COUNTER_MAX.
+ *
+ *    See also skBagCounterSet() and skBagCounterSubtract().  The
+ *    convenience wrapper skBagCounterIncrement() may be used to add 1
+ *    to a key's counter.  Use skBagCounterGet() to get a key's
+ *    counter.
  */
 skBagErr_t
 skBagCounterAdd(
@@ -541,7 +557,7 @@ skBagCounterAdd(
 
 
 /**
- *    Return the number of octets the counters of 'bag' occupy
+ *    Return the number of octets the counter of 'bag' occupies
  *    for the in-core representation of 'bag'.
  */
 size_t
@@ -550,11 +566,14 @@ skBagCounterFieldLength(
 
 
 /**
- *    Return the type of counter that 'bag' contains, and fill 'buf'
- *    with a string representation of that type.  The caller must
- *    specify the size of 'buf' in 'buflen'.  If 'buf' is too small to
- *    hold the string representation, 'buf' will be filled with as
- *    much of the name as will fit.
+ *    Return the type of counter that 'bag' contains, and, if 'buf' is
+ *    not NULL, fill 'buf' with a string representation of that type.
+ *    The caller must specify the size of 'buf' in 'buflen'.  If 'buf'
+ *    is too small to hold the string representation, 'buf' is filled
+ *    with as much of the name as possible.
+ *
+ *    See also skBagCounterFieldType(), skBagKeyFieldName(), and
+ *    skBagKeyFieldType().
  */
 skBagFieldType_t
 skBagCounterFieldName(
@@ -565,6 +584,9 @@ skBagCounterFieldName(
 
 /**
  *    Return the type of counter that 'bag' contains.
+ *
+ *    See also skBagCounterFieldName(), skBagKeyFieldType(), and
+ *    skBagKeyFieldName().
  */
 skBagFieldType_t
 skBagCounterFieldType(
@@ -580,6 +602,9 @@ skBagCounterFieldType(
  *    Return SKBAG_OK on success, or SKBAG_ERR_INPUT when any input
  *    parameter is NULL or when the type of 'key' or 'counter' is not
  *    recognized.
+ *
+ *    Use skBagCounterSet() to set a key's counter.  See also
+ *    skBagCounterAdd() and skBagCounterSubtract().
  */
 skBagErr_t
 skBagCounterGet(
@@ -590,7 +615,8 @@ skBagCounterGet(
 
 /**
  *    In 'bag', increment the counter associated with 'key' by one.
- *    Create the key if it does not exist in the bag.
+ *    Create the key and set its counter to 1 if the key does not
+ *    exist in the bag.
  *
  *    This is a convenience wrapper around skBagCounterAdd(), which
  *    see for additional information.
@@ -606,8 +632,10 @@ skBagCounterGet(
  *    it exists in 'bag'; otherwise, do nothing.
  *
  *    If 'key' is larger than the maximum key currently supported by
- *    'bag', 'bag' will be converted to a size capable of holding
- *    'key' unless auto-conversion in 'bag' is disabled.
+ *    'bag', 'bag' is converted to a size capable of holding 'key'
+ *    unless auto-conversion in 'bag' is disabled; see
+ *    skBagAutoConvertEnable(), skBagAutoConvertDisable(), and
+ *    skBagAutoConvertIsEnabled().
  *
  *    Return SKBAG_OK on success.  Return SKBAG_ERR_MEMORY if there is
  *    an allocation error when inserting the 'key'.  Unless 'counter'
@@ -617,6 +645,9 @@ skBagCounterGet(
  *    if the type of 'key' is SKBAG_KEY_ANY, if the type of 'counter'
  *    is SKBAG_COUNTER_ANY, or if 'counter' is larger than
  *    SKBAG_COUNTER_MAX.
+ *
+ *    See also skBagCounterAdd() and skBagCounterSubtract().  Use
+ *    skBagCounterGet() to get a key's counter.
  */
 skBagErr_t
 skBagCounterSet(
@@ -627,13 +658,16 @@ skBagCounterSet(
 
 /**
  *    In 'bag', subtract from the counter associated with 'key' the
- *    value 'counter_sub'.  If 'counter_sub' is 0, return SKBAG_OK,
- *    setting 'new_counter' if it is supplied; otherwise, 'key' must
+ *    value 'counter_sub'.  When 'counter_sub' is non-zero, 'key' must
  *    exist in 'bag'; if it does not, SKBAG_ERR_OP_BOUNDS is returned.
  *    SKBAG_ERR_OP_BOUNDS is also returned when 'key' is outside the
  *    range of keys supported by 'bag'.
  *
- *    If 'new_counter' is not NULL, the new value of the counter will be
+ *    When 'counter_sub' is 0, return SKBAG_OK regardless of whether
+ *    'key' is in 'bag' and, if 'new_counter' is not NULL, set it to
+ *    the counter for 'key' if 'key' is in 'bag' or 0 otherwise.
+ *
+ *    If 'new_counter' is not NULL, the new value of the counter is
  *    copied into that location.  'new_counter' is unchanged when this
  *    function turns a value other than SKBAG_OK.
  *
@@ -644,6 +678,11 @@ skBagCounterSet(
  *    NULL, if the type of 'key' is SKBAG_KEY_ANY, if the type of
  *    'counter' is SKBAG_COUNTER_ANY, or if 'counter' is larger than
  *    SKBAG_COUNTER_MAX.
+ *
+ *    See also skBagCounterSet() and skBagCounterAdd().  The
+ *    convenience wrapper skBagCounterDecrement() may be used to
+ *    subtract 1 from a key's counter.  Use skBagCounterGet() to
+ *    get a key's counter.
  */
 skBagErr_t
 skBagCounterSubtract(
@@ -654,9 +693,12 @@ skBagCounterSubtract(
 
 
 /**
- *    Allocate memory for a new Bag and set '*bag' to point to it.
- *    The type of the key and counter are set to SKBAG_FIELD_CUSTOM.
- *    The bag is created with a 4 octet key and an 8 octet counter.
+ *    Allocate memory for a new Bag and set the referent of 'bag' to
+ *    it.  The type of the key and counter are set to
+ *    SKBAG_FIELD_CUSTOM.  The bag is created with a 4 octet key and
+ *    an 8 octet counter.
+ *
+ *    See also skBagCreateTyped().
  */
 skBagErr_t
 skBagCreate(
@@ -665,8 +707,8 @@ skBagCreate(
 
 /**
  *    Allocate memory for a new Bag to hold a specific type of key and
- *    counter, each having the specified number of octets.  Set '*bag'
- *    to point to the newly allocated bag.
+ *    counter, each having the specified number of octets.  Set the
+ *    referent of 'bag' to the newly allocated bag.
  *
  *    When 'key_type' is SKBAG_FIELD_CUSTOM, the value in 'key_octets'
  *    must be one of the supported key lengths.  Currently, the
@@ -716,9 +758,9 @@ skBagDestroy(
 /**
  *    Fill 'buf' with a string representation of the field-type
  *    'field'.  The caller must specify the size of 'buf' in 'buflen'.
- *    Return a pointer to 'buf', or NULL if 'field' is not a valid
- *    field type or if 'buf' is too small to contain the string
- *    representation of the field-type.
+ *    Return the value 'buf' when 'field' is a valid field type and
+ *    'buflen' is large enough to hold the complete type name.
+ *    Otherwise leave 'buf' unchanged and return NULL.
  */
 char *
 skBagFieldTypeAsString(
@@ -754,11 +796,12 @@ skBagFieldTypeIteratorBind(
  *    no more field types to vist; return SKBAG_ERR_INPUT if 'iter' is
  *    NULL.
  *
- *    If 'id' is not NULL, fill it with the skBagFieldType_t value.
- *    If 'octets' is not NULL, fill it with the number of octets
- *    normally used by that field.  If 'name' is not-null and name_len
- *    is not zero, fill 'name' with the string representation of the
- *    type.
+ *    If 'field_id' is not NULL, fill it with the skBagFieldType_t
+ *    value.  If 'field_octets' is not NULL, fill it with the number
+ *    of octets normally used by that field.  If 'field_name' is not
+ *    NULL and 'field_name_len' is large enough to hold the entire
+ *    field name, fill 'field_name' with the string representation of
+ *    the type.
  */
 skBagErr_t
 skBagFieldTypeIteratorNext(
@@ -778,15 +821,15 @@ skBagFieldTypeIteratorReset(
 
 
 /**
- *    Find the field-type whose name is the string 'name'.  If 'name'
- *    is not a valid field-type name, return SKBAG_ERR_INPUT;
- *    otherwise return SKBAG_OK.
+ *    Find the field-type whose name is the string 'type_name'.  If
+ *    'type_name' is not a valid field-type name, return
+ *    SKBAG_ERR_INPUT; otherwise return SKBAG_OK.
  *
- *    If the argument 'field_type' is not NULL, fill the memory it
- *    points to with the ID corresponding to 'name'.  If the argument
- *    'field_octets' is not NULL, fill the memory it points to the
- *    number of octets that field normally occupies---that is, the
- *    result of calling skBagFieldTypeGetLength() on the field.
+ *    If the argument 'field_type' is not NULL, fill its referent with
+ *    the ID corresponding to 'name'.  If the argument 'field_octets'
+ *    is not NULL, fill its referent with the number of octets that
+ *    field normally occupies---that is, the result of calling
+ *    skBagFieldTypeGetLength() on the field.
  */
 skBagErr_t
 skBagFieldTypeLookup(
@@ -809,12 +852,12 @@ skBagFieldTypeMerge(
 
 /**
  *    Create a new iterator to iterate over the bag 'bag' and store
- *    the iterator in '*iter'.  The iterator is initialized so that
- *    the first call to skBagIteratorNextTyped() will return the
- *    counter associated with the first key
+ *    the iterator in the referent of 'iter'.  The iterator is
+ *    initialized so that the first call to skBagIteratorNextTyped()
+ *    returns the counter associated with the first key.
  *
  *    If the key size of the bag changes during iteration,
- *    SKBAG_ERR_MODIFIED will be returned.  At that point, the
+ *    SKBAG_ERR_MODIFIED is returned.  At that point, the
  *    iterator may be destroyed or reset.
  *
  *    If keys are added or removed during iteration, the entries may
@@ -822,6 +865,9 @@ skBagFieldTypeMerge(
  *
  *    The iterator visits the entries in 'bag' in order from the
  *    smallest key to the largest key.
+ *
+ *    Once iteration is complete, the caller must destroy the iterator
+ *    by calling skBagIteratorDestroy().
  */
 skBagErr_t
 skBagIteratorCreate(
@@ -852,23 +898,23 @@ skBagIteratorDestroy(
 
 /**
  *    Get the next key/counter pair associated with the given
- *    iterator, 'iter', store them in the memory pointed at by
+ *    iterator, 'iter', store them in the referents of
  *    'key' and 'counter', respectively, and return SKBAG_OK.
  *
  *    The 'type' field of 'key' and 'counter' structures determine how
- *    the key and counter will be returned.  If the key's type is
+ *    the key and counter are returned.  If the key's type is
  *    SKBAG_KEY_ANY, 'key' is filled with an SKBAG_KEY_IPADDR for a
  *    bag containing IPv6 addresses and an SKBAG_KEY_U32 otherwise.
  *    'counter' is always filled with an SKBAG_COUNTER_U64.
  *
  *    If the range of keys does not fit into the specified type of
  *    'key', the iterator returns SKBAG_ERR_KEY_NOT_FOUND once all
- *    values that will fit into 'key' have been visited.  When
+ *    values that fit into 'key' have been visited.  When
  *    iterating over a Bag that contains IPv6 data and the key type is
- *    an integer, addresses in the ::ffff:0:0/96 block will be
- *    converted to IPv4 addresses, and then those addresses will be
+ *    an integer, addresses in the ::ffff:0:0/96 block are
+ *    converted to IPv4 addresses, and then those addresses are
  *    converted to native integers and returned by this function.  All
- *    other IPv6 addresses will be ignored.
+ *    other IPv6 addresses are ignored.
  *
  *    If the iterator has visited all entries, the 'key' and 'counter'
  *    values are unchanged and the function returns
@@ -887,7 +933,7 @@ skBagIteratorNextTyped(
 
 /**
  *    Reset the iterator at 'iter' so the next call to
- *    skBagIteratorNextTyped() will return the counter associated with
+ *    skBagIteratorNextTyped() returns the counter associated with
  *    the first key.
  */
 skBagErr_t
@@ -896,7 +942,7 @@ skBagIteratorReset(
 
 
 /**
- *    Return the number octets the keys of 'bag' occupy for the
+ *    Return the number octets the key of 'bag' occupies for the
  *    in-core representation of 'bag'.
  */
 size_t
@@ -905,11 +951,14 @@ skBagKeyFieldLength(
 
 
 /**
- *    Return the type of key that 'bag' contains, and fill 'buf' with
- *    a string representation of that type.  The caller must specify
- *    the size of 'buf' in 'buflen'.  If 'buf' is too small to hold
- *    the string representation, 'buf' will be filled with as much of
- *    the name as will fit.
+ *    Return the type of key that 'bag' contains, and, if 'buf' is not
+ *    NULL, fill 'buf' with a string representation of that type.  The
+ *    caller must specify the size of 'buf' in 'buflen'.  If 'buf' is
+ *    too small to hold the string representation, 'buf' is filled
+ *    with as much of the name as possible.
+ *
+ *    See also skBagKeyFieldType(), skBagCounterFieldName(), and
+ *    skBagCounterFieldType().
  */
 skBagFieldType_t
 skBagKeyFieldName(
@@ -920,6 +969,9 @@ skBagKeyFieldName(
 
 /**
  *    Return the type of key that 'bag' contains.
+ *
+ *    See also skBagKeyFieldName(), skBagCounterFieldType(), and
+ *    skBagCounterFieldName().
  */
 skBagFieldType_t
 skBagKeyFieldType(
@@ -935,13 +987,14 @@ skBagKeyFieldType(
 
 
 /**
- *    Create a new Bag at '*bag' and read a serialized Bag from the
- *    file specified by 'filename'.  This function is a wrapper around
- *    skBagRead().
+ *    Read a serialized Bag from the file specified by 'filename' into
+ *    a newly created bag and set the referent of 'bag' to its
+ *    location.  This function is a wrapper around skBagRead().
  *
- *    Return SKBAG_OK on success.  Return SKBAG_ERR_INPUT if
- *    'filename' is NULL.  Return SKBAG_ERR_READ (and print an error)
- *    if 'filename' cannot be opened.  May also return the error codes
+ *    Return SKBAG_OK on success.  Return SKBAG_ERR_INPUT and do not
+ *    create the bag if any input parameter is NULL.  Return
+ *    SKBAG_ERR_READ, print an error, and do not create the bag if
+ *    'filename' cannot be opened.  Otherwise, return the error code
  *    specified by skBagRead().
  */
 skBagErr_t
@@ -963,7 +1016,7 @@ skBagLoad(
  *    When 'key_octets' and/or 'counter_octets' specifies a size
  *    smaller than that bag's current key/counter lengths,
  *    keys/counters whose value is outside the range of the new
- *    key/counter will removed from the bag.
+ *    key/counter are removed from the bag.
  *
  *    Return SKBAG_OK on success.  Return SKBAG_ERR_INPUT when 'bag'
  *    is NULL or when the other parameters are not recognized or have
@@ -980,7 +1033,7 @@ skBagModify(
 
 
 /**
- *    Print to the stream 'stream' metadata on how the bag 'bag' is
+ *    Print to the stream 'stream' meta-data on how the bag 'bag' is
  *    performing.
  */
 skBagErr_t
@@ -1011,7 +1064,7 @@ skBagPrintTreeStats(
  *    contain a Bag file, if the Bag file version is unsupported, or
  *    if the file contains key or counter types or octet lengths that
  *    are not supported by the library.  Otherwise, the return status
- *    of this function will be the return status of 'cb_entry_func'.
+ *    of this function is the return status of 'cb_entry_func'.
  */
 skBagErr_t
 skBagProcessStreamTyped(
@@ -1022,17 +1075,22 @@ skBagProcessStreamTyped(
 
 
 /**
- *    Create a new Bag at '*bag' and read a serialized Bag from the
- *    input stream 'stream' into the it.
+ *    Read a serialized Bag from the input stream 'stream' into a
+ *    newly created Bag and set 'bag' to its location.
  *
- *    Return SKBAG_OK on success.  Return SKBAG_ERR_INPUT if any input
- *    parameter is NULL.  Return SKBAG_ERR_MEMORY if there is an error
- *    creating the bag or adding entries to it.  Return SKBAG_ERR_READ
- *    (and print an error) if there is an error reading from 'stream'.
- *    Return SKBAG_ERR_HEADER (and print an error) if 'stream' does
- *    not contain a Bag file, if the bag file version is unsupported,
- *    or if the file contains key or counter types or octet lengths
- *    that are not supported by the library.
+ *    Return SKBAG_OK on success.  Return SKBAG_ERR_INPUT and do not
+ *    create the bag if any input parameter is NULL.  Return
+ *    SKBAG_ERR_HEADER, print an error, and do not create the bag if
+ *    'stream' does not contain a Bag file, if the bag file version is
+ *    unsupported, or if the file contains key or counter types or
+ *    octet lengths that are not supported by the library.  Return
+ *    SKBAG_ERR_MEMORY if there is an error creating the bag or adding
+ *    entries to it; in the latter case, the bag is returned.  Return
+ *    SKBAG_ERR_READ (and print an error) if there is an error reading
+ *    from 'stream'; the bag may or may not be created depending on
+ *    when the error occurred.
+ *
+ *    See also skBagLoad().
  */
 skBagErr_t
 skBagRead(
@@ -1044,10 +1102,10 @@ skBagRead(
  *    Serialize the Bag 'bag' to the file specified by 'filename'.
  *    This function is a wrapper around skBagWrite().
  *
- *    Return SKBAG_OK on success.  Return SKBAG_ERR_INPUT if
- *    'filename' is NULL.  Return SKBAG_ERR_OUTPUT (and print an
- *    error) if 'filename' cannot be opened for writing.  May also
- *    return the error codes specified by skBagWrite().
+ *    Return SKBAG_OK on success.  Return SKBAG_ERR_INPUT if any
+ *    parameter is NULL.  Return SKBAG_ERR_OUTPUT (and print an error)
+ *    if 'filename' cannot be opened for writing.  May also return the
+ *    error codes specified by skBagWrite().
  */
 skBagErr_t
 skBagSave(
@@ -1071,6 +1129,8 @@ skBagStrerror(
  *    Return SKBAG_OK on success.  Return SKBAG_ERR_INPUT if any input
  *    parameter is NULL.  Return SKBAG_ERR_OUTPUT if there is an error
  *    writing 'bag' to 'stream'.
+ *
+ *    See also skBagSave().
  */
 skBagErr_t
 skBagWrite(

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h 0432f6547214 2016-09-19 19:08:31Z mthomas $");
+RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -1303,15 +1303,23 @@ skOptionsTempDirUsage(
 
 /**
  *    Registers an --ip-format switch for the application that allows
- *    the user to specify how IP addresses will be displayed.  In
- *    addition, legacy --integer-ips and --zero-pad-ips switches are
- *    registered.  Use skOptionsIPFormatUsage() to print the usage for
- *    these switches.
+ *    the user to specify how IP addresses will be displayed.
  *
  *    The parameter 'var_location' must be specified.  The variable at
  *    that location will be set to the value the user specifies in the
  *    various switches.  This value will be one of the values defined
  *    in skipaddr_flags_t.
+ *
+ *    Use skOptionsIPFormatUsage() to print the usage for these
+ *    switches.
+ *
+ *    The 'settings' parameter registers additional switches.
+ *
+ *    When SK_OPTION_IP_FORMAT_INTEGER_IPS is specified, an
+ *    --integer-ips switch is also registered.
+ *
+ *    When SK_OPTION_IP_FORMAT_ZERO_PAD_IPS is specified, a
+ *    --zero-pad-ips switch is also registered.
  *
  *    The variable at 'var_location' is only modified if the user
  *    specifies the --ip-format switch.
@@ -1320,10 +1328,13 @@ skOptionsTempDirUsage(
  *    'var_location' is initialized with the result of parsing that
  *    variable's value as if it was an argument to the --ip-format
  *    switch.
+ *
+ *    The 'settings' parameter was added in SiLK 3.15.0.
  */
 int
 skOptionsIPFormatRegister(
-    uint32_t           *var_location);
+    uint32_t           *var_location,
+    uint32_t            settings);
 
 /**
  *    Print the usage information for the switches registered by
@@ -1332,6 +1343,20 @@ skOptionsIPFormatRegister(
 void
 skOptionsIPFormatUsage(
     FILE               *fp);
+
+/**
+ *    A bit to include in the 'settings' argument to
+ *    skOptionsIPFormatRegister() that indicates an --integer-ips
+ *    switch should be included.  Since SiLK 3.15.0.
+ */
+#define SK_OPTION_IP_FORMAT_INTEGER_IPS     (1 << 0)
+
+/**
+ *    A bit to include in the 'settings' argument to
+ *    skOptionsIPFormatRegister() that indicates an --zero-pad-ips
+ *    switch should be included.  Since SiLK 3.15.0.
+ */
+#define SK_OPTION_IP_FORMAT_ZERO_PAD_IPS    (1 << 1)
 
 
 /**

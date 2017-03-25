@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2016 by Carnegie Mellon University.
+** Copyright (C) 2007-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -15,7 +15,7 @@
 #undef NDEBUG
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skmsg-test.c 680dbfb90a50 2016-09-20 19:22:50Z mthomas $");
+RCSIDENT("$SiLK: skmsg-test.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sklog.h>

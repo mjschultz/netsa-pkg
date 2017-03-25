@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcount.c 274b023fde5c 2016-09-22 14:44:25Z mthomas $");
+RCSIDENT("$SiLK: rwcount.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 #include "rwcount.h"
 

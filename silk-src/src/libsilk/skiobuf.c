@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2016 by Carnegie Mellon University.
+** Copyright (C) 2006-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -12,7 +12,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skiobuf.c 22da9b03c74d 2016-09-19 18:28:03Z mthomas $");
+RCSIDENT("$SiLK: skiobuf.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 #include <silk/utils.h>
 #include "skiobuf.h"

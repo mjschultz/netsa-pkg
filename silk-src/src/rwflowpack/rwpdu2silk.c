@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpdu2silk.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: rwpdu2silk.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/rwrec.h>
@@ -82,7 +82,8 @@ static struct option appOptions[] = {
 };
 
 static const char *appHelp[] = {
-    ("Write the SiLK Flow records to the specified path.\n\tDef. stdout"),
+    ("Write the SiLK Flow records to the specified stream or\n"
+     "\tfile path. Def. stdout"),
     "Print the number of records written. Def. No.",
     ("Write messages about number of records read from\n"
      "\teach input and messages about invalid records to the specified\n"

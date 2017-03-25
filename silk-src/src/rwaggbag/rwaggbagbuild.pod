@@ -1,0 +1,621 @@
+=pod
+
+=head1 NAME
+
+B<rwaggbagbuild> - Create a binary aggregate bag from non-flow data
+
+=head1 SYNOPSIS
+
+  rwaggbagbuild [--fields=FIELDS]
+        [--constant-field=FIELD=VALUE [--constant-field=FIELD=VALUE...]]
+        [--column-separator=CHAR] [--no-titles]
+        [--bad-input-lines=FILE] [--verbose] [--stop-on-error]
+        [--note-add=TEXT] [--note-file-add=FILE]
+        [--invocation-strip] [--compression-method=COMP_METHOD]
+        [--output-path=PATH] [--site-config-file=FILENAME]
+        {[--xargs] | [--xargs=FILENAME] | [FILE [FILE...]]}
+
+  rwaggbagbuild --help
+
+  rwaggbagbuild --version
+
+=head1 DESCRIPTION
+
+B<rwaggbagbuild> builds a binary Aggregate Bag file by reading one or
+more files containing textual input.  To build an Aggregate Bag from
+SiLK Flow records, use B<rwaggbag(1)>.
+
+An I<Aggregate Bag> is a binary file that maps a key to a counter,
+where the key and the counter are both composed of one or more fields.
+For example, an Aggregate Bag could contain the sum of the packet
+count and the sum of the byte count for each unique source IP and
+source port pair.
+
+B<rwaggbagbuild> reads its input from the files named on the command
+line or from the standard input when no file names are specified, when
+B<--xargs> is not present, and when the standard input is not a
+terminal.  To read the standard input in addition to the named files,
+use C<-> or C<stdin> as a file name.  When the B<--xargs> switch is
+provided, B<rwaggbagbuild> reads the names of the files to process
+from the named text file or from the standard input if no file name
+argument is provided to the switch.  The input to B<--xargs> must
+contain one file name per line.
+
+The new Aggregate Bag file is written to the location specified by the
+B<--output-path> switch.  If it is not provided, output is sent to the
+standard output when it is not connected to a terminal.
+
+The Aggregate Bag file must have at least one field that it considers
+and key field and at least one field that it considers a counter
+field.  See the description of the B<--fields> switch.
+
+In general (and as detailed below), each line of the text input files
+becomes one entry in the Aggregate Bag file.  It is also possible to
+specify that each entry in the Aggregate Bag file contains additional
+fields, each with a specific value.  These fields are specified by the
+B<--constant-field> switch whose argument is a field name, an equals
+sign ('C<=>'), and a textual representation of a value.  The named
+field becomes one of the key or counter fields in the Aggregate Bag
+file, and that field is given the specified value for each entry that
+is read from an input file.  See the B<--fields> switch in the
+L</OPTIONS> section for the names of the fields and the acceptable
+forms of the textual input for each field.
+
+The remainder of this section details how B<rwaggbagbuild> processes
+each text input file to create an Aggregate Bag file.
+
+When the B<--fields> switch is specified, its argument specifies the
+key and counter fields that the new Aggregate Bag file is to contain.
+If B<--fields> is not specified, the first line of the first input
+file is expected to contain field names, and those names determine the
+Aggregate Bag's key and counter.  A field name of C<ignore> causes
+B<rwaggbagbuild> to ignore the values in that field when parsing the
+input.
+
+The textual input is processed one line at a time.  Comments begin
+with a 'C<#>'-character and continue to the end of the line; they are
+stripped from each line.  After removing the comments, any line that
+is blank or contains only whitespace is ignored.
+
+All other lines must contain valid input, which is a set of fields
+separated by a delimiter.  The default delimiter is the virtual bar
+('C<|>') and may be changed with the B<--column-separator> switch.
+Whitespace around a delimiter is allowed; however, using space or tab
+as the separator causes I<each> space or tab character to be treated
+as a field delimiter.  The newline character is not a valid delimiter
+character since it is used to denote records, and 'C<#>' is not a
+valid delimiter since it begins a comment.
+
+The first line of each input file may contain delimiter-separated
+field names denoting in which order the fields appear in this input
+file.  As mentioned above, when the B<--fields> switch is not given,
+the first line of the first file determines the Aggregate Bag's key
+and counter.  To tell B<rwaggbagbuild> to treat the first line of each
+file as field values to be parsed, specify the B<--no-titles> switch.
+
+Every other line must contain delimiter-separated field values.  A
+delimiter may follow the final field on a line.  B<rwaggbagbuild>
+ignores lines that contain either too few or too many fields.
+
+See the description of the B<--fields> switch in the L</OPTIONS>
+section for the names of the fields and the acceptable forms of the
+textual input for each field.
+
+=head1 OPTIONS
+
+Option names may be abbreviated if the abbreviation is unique or is an
+exact match for an option.  A parameter to an option may be specified
+as B<--arg>=I<param> or S<B<--arg> I<param>>, though the first form is
+required for options that take optional parameters.
+
+=over 4
+
+=item B<--fields>=I<FIELDS>
+
+Specify the fields in the input files.  I<FIELDS> is a comma separated
+list of field names.  Field names are case-insensitive, and a name may
+be abbreviated to the shortest unique prefix.  Other than the
+C<ignore> field, a field name may not be specified more than once.
+The Aggregate Bag file must have at least one key field and at least
+one counter field.
+
+The names of the fields that are considered key fields, their
+descriptions, and the format of the input that each expects are:
+
+=over 4
+
+=item ignore
+
+field that B<rwaggbagbuild> is to skip
+
+=item sIPv4
+
+source IP address, IPv4 only; either the canonical dotted-quad format
+or an integer from 0 to 4294967295 inclusive
+
+=item dIPv4
+
+destination IP address, IPv4 only; uses the same format as C<sIPv4>
+
+=item nhIPv4
+
+next hop IP address, IPv4 only; uses the same format as C<sIPv4>
+
+=item any-IPv4
+
+a generic IPv4 address; uses the same format as C<sIPv4>
+
+=item sIPv6
+
+source IP address, IPv6 only; the canonical hex-encoded format for
+IPv6 addresses
+
+=item dIPv6
+
+destination IP address, IPv6 only; uses the same format as C<sIPv6>
+
+=item nhIPv6
+
+next hop IP address, IPv6 only; uses the same format as C<sIPv6>
+
+=item any-IPv6
+
+a generic IPv6 address; uses the same format as C<sIPv6>
+
+=item sPort
+
+source port; an integer from 0 to 65535 inclusive
+
+=item dPort
+
+destination port; an integer from 0 to 65535 inclusive
+
+=item any-port
+
+a generic port; an integer from 0 to 65535 inclusive
+
+=item protocol
+
+IP protocol; an integer from 0 to 255 inclusive
+
+=item packets
+
+packet count; an integer from 1 to 4294967295 inclusive
+
+=item bytes
+
+byte count; an integer from 1 to 4294967295 inclusive
+
+=item flags
+
+bit-wise OR of TCP flags over all packets; a string containing C<F>,
+C<S>, C<R>, C<P>, C<A>, C<U>, C<E>, C<C> in upper- or lowercase
+
+=item initialFlags
+
+TCP flags on the first packet; uses the same form as C<flags>
+
+=item sessionFlags
+
+bit-wise OR of TCP flags on the second through final packet; uses the
+same form as C<flags>
+
+=item sTime
+
+starting time in seconds; uses the form
+C<YYYY/MM/DD[:hh[:mm[:ss[.sss]]]]> (any milliseconds value is
+dropped).  A C<T> may be used in place of C<:> to separate the day and
+hour fields.  A floating point value between 536870912 and 2147483647
+is also allowed and is treated as seconds since the UNIX epoch.
+
+=item eTime
+
+ending time in seconds; uses the same format as C<sTime>
+
+=item any-time
+
+a generic time in seconds; uses the same format as C<sTime>
+
+=item duration
+
+duration of flow; a floating point value from 0.0 to 4294967.295
+
+=item sensor
+
+sensor name or ID at the collection point; a string as given in
+B<silk.conf(5)>
+
+=item class
+
+class at collection point; a string as given in F<silk.conf>
+
+=item type
+
+type at collection point; a string as given in F<silk.conf>
+
+=item input
+
+router SNMP ingress interface or vlanId; an integer from 0 to 65535
+
+=item output
+
+router SNMP egress interface or postVlanId; an integer from 0 to 65535
+
+=item any-snmp
+
+a generic SNMP value; an integer from 0 to 65535
+
+=item attribute
+
+flow attributes set by the flow generator:
+
+=over 4
+
+=item C<S>
+
+all the packets in this flow record are exactly the same size
+
+=item C<F>
+
+flow generator saw additional packets in this flow following a packet
+with a FIN flag (excluding ACK packets)
+
+=item C<T>
+
+flow generator prematurely created a record for a long-running
+connection due to a timeout or a byte-count threshold
+
+=item C<C>
+
+flow generator created a record as a continuation of a previous record
+for a connection that exceeded a timeout or byte-count threshold
+
+=back
+
+=item application
+
+guess as to the content of the flow; as an integer from 0 to 65535
+
+=item icmpType
+
+ICMP type; an integer from 0 to 255 inclusive
+
+=item icmpCode
+
+ICMP code; an integer from 0 to 255 inclusive
+
+=item custom-key
+
+a generic key; an integer from 0 to 4294967295 inclusive
+
+=back
+
+The names and descriptions of the fields that are considered counter
+fields are listed next.  For each, the type of input is an unsigned
+64-bit number; that is, an integer from 0 to 18446744073709551615.
+
+=over 4
+
+=item records
+
+count of records that match the key
+
+=item sum-packets
+
+sum of packet counts
+
+=item sum-bytes
+
+sum of byte counts
+
+=item sum-duration
+
+sum of duration values
+
+=item custom-counter
+
+a generic counter
+
+=back
+
+=item B<--constant-field>=I<FIELD>B<=>I<VALUE>
+
+For each entry read from the input file(s), insert a field named
+I<FIELD> and set its value to I<VALUE>.  I<VALUE> is a textual
+representation of the field's value as described in the description of
+the B<--fields> switch above.  When I<FIELD> is a counter field and
+the same key appears multiple times in the input, I<VALUE> is added to
+the counter multiple times.  If a field named I<FIELD> appears in an
+input file, its value from that file is ignored.  Specify the
+B<--constant-field> switch multiple times to insert multiple fields.
+
+=item B<--column-separator>=I<CHAR>
+
+When reading textual input, use the character I<CHAR> as the delimiter
+between columns (fields) in the input.  The default column separator
+is the vertical pipe ('C<|>').  B<rwaggbagbuild> normally ignores
+whitespace (space and tab) around the column separator; however, using
+space or tab as the separator causes I<each> space or tab character to
+be treated as a field delimiter.  The newline character is not a valid
+delimiter character since it is used to denote records, and 'C<#>' is
+not a valid delimiter since it begins a comment.
+
+=item B<--bad-input-lines>=I<FILEPATH>
+
+When parsing textual input, copy any lines than cannot be parsed to
+I<FILEPATH>.  The strings C<stdout> and C<stderr> may be used for the
+standard output and standard error, respectively.  Each bad line is
+prepended by the name of the source input file, a colon, the line
+number, and a colon.  On exit, B<rwaggbagbuild> removes I<FILEPATH> if
+all input lines were successfully parsed.
+
+=item B<--verbose>
+
+When a textual input line fails to parse, print a message to the
+standard error describing the problem.  When this switch is not
+specified, parsing failures are not reported.  B<rwaggbagbuild>
+continues to process the input after printing the message.  To stop
+processing when a parsing error occurs, use B<--stop-on-error>.
+
+=item B<--stop-on-error>
+
+When a textual input line fails to parse, print a message to the
+standard error describing the problem and exit the program.  When this
+occurs, the output file contains any records successfully created
+prior to reading the bad input line.  The default behavior of
+B<rwaggbagbuild> is to silently ignore parsing errors.  To report
+parsing errors and continue processing the input, use B<--verbose>.
+
+=item B<--no-titles>
+
+Parse the first line of the input as field values.  Normally when the
+B<--fields> switch is specified, B<rwaggbagbuild> examines the first
+line to determine if the line contains the names (titles) of fields
+and skips the line if it does.  B<rwaggbagbuild> exits with an error
+when B<--no-titles> is given but B<--fields> is not.
+
+=item B<--note-add>=I<TEXT>
+
+Add the specified I<TEXT> to the header of the output file as an
+annotation.  This switch may be repeated to add multiple annotations
+to a file.  To view the annotations, use the B<rwfileinfo(1)> tool.
+
+=item B<--note-file-add>=I<FILENAME>
+
+Open I<FILENAME> and add the contents of that file to the header of
+the output file as an annotation.    This switch may be repeated to
+add multiple annotations.  Currently the application makes no effort
+to ensure that I<FILENAME> contains text; be careful that you do not
+attempt to add a SiLK data file as an annotation.
+
+=item B<--invocation-strip>
+
+Do not record the command used to create the Aggregate Bag file in the
+output.  When this switch is not given, the invocation is written to
+the file's header, and the invocation may be viewed with
+B<rwfileinfo(1)>.
+
+=item B<--compression-method>=I<COMP_METHOD>
+
+Specify the compression library to use when writing output files.  If
+this switch is not given, the value in the SILK_COMPRESSION_METHOD
+environment variable is used if the value names an available
+compression method.  When no compression method is specified,
+output to the standard output or to named pipes is not compressed, and
+output to files is compressed using the default chosen when SiLK was
+compiled.  The valid values for I<COMP_METHOD> are determined by which
+external libraries were found when SiLK was compiled.  To see the
+available compression methods and the default method, use the
+B<--help> or B<--version> switch.  SiLK can support the following
+I<COMP_METHOD> values when the required libraries are available.
+
+=over 4
+
+=item none
+
+Do not compress the output using an external library.
+
+=item zlib
+
+Use the B<zlib(3)> library for compressing the output, and always
+compress the output regardless of the destination.  Using zlib
+produces the smallest output files at the cost of speed.
+
+=item lzo1x
+
+Use the I<lzo1x> algorithm from the LZO real time compression library
+for compression, and always compress the output regardless of the
+destination.  This compression provides good compression with less
+memory and CPU overhead.
+
+=item snappy
+
+Use the I<snappy> library for compression, and always compress the
+output regardless of the destination.  This compression provides good
+compression with less memory and CPU overhead.
+
+=item best
+
+Use lzo1x if available, otherwise use snappy if available, otherwise
+use zlib if available.  Only compress the output when writing to a
+file.
+
+=back
+
+=item B<--output-path>=I<PATH>
+
+Write the binary Aggregate Bag output to I<PATH>, where I<PATH> is a
+filename, a named pipe, the keyword C<stderr> to write the output to
+the standard error, or the keyword C<stdout> or C<-> to write the
+output to the standard output.  If I<PATH> names an existing file,
+B<rwaggbagbuild> exits with an error unless the SILK_CLOBBER
+environment variable is set, in which case I<PATH> is overwritten.  If
+this switch is not given, the output is written to the standard
+output.  Attempting to write the binary output to a terminal causes
+B<rwaggbagbuild> to exit with an error.
+
+=item B<--site-config-file>=I<FILENAME>
+
+Read the SiLK site configuration from the named file I<FILENAME>.
+When this switch is not provided, B<rwaggbagbuild> searches for the
+site configuration file in the locations specified in the L</FILES>
+section.
+
+=item B<--help>
+
+Print the available options and exit.
+
+=item B<--version>
+
+Print the version number and information about how SiLK was
+configured, then exit the application.
+
+=back
+
+=head1 EXAMPLES
+
+In the following examples, the dollar sign (C<$>) represents the shell
+prompt.  The text after the dollar sign represents the command line.
+Lines have been wrapped for improved readability, and the back slash
+(C<\>) is used to indicate a wrapped line.
+
+Assume the following textual data in the file F<rec.txt>:
+
+             dIP|dPort|   packets|     bytes|
+   10.245.15.175|   80|       127|     12862|
+ 192.168.251.186|29222|       131|    351213|
+  10.247.186.130|   80|       596|     38941|
+ 192.168.239.224|29362|       600|    404478|
+ 192.168.215.219|   80|       400|     32375|
+   10.255.252.19|28925|       404|   1052274|
+ 192.168.255.249|   80|       112|      7412|
+    10.208.7.238|29246|       109|    112977|
+ 192.168.254.127|   80|       111|      9759|
+   10.218.34.108|29700|       114|    461845|
+
+To create an Aggregate Bag file from this data, provide the --fields
+switch with the names used by the Aggregate Bag tools:
+
+ $ rwaggbagbuild --fields=dipv4,dport,sum-packets,sum-bytes  \
+        --output-path=ab.aggbag rec.txt
+
+Use the B<rwaggbagcat(1)> tool to view it:
+
+ $ rwaggbagcat ab.aggbag
+           dIPv4|dPort|    sum-packets|           sum-bytes|
+    10.208.7.238|29246|            109|              112977|
+   10.218.34.108|29700|            114|              461845|
+   10.245.15.175|   80|            127|               12862|
+  10.247.186.130|   80|            596|               38941|
+   10.255.252.19|28925|            404|             1052274|
+ 192.168.215.219|   80|            400|               32375|
+ 192.168.239.224|29362|            600|              404478|
+ 192.168.251.186|29222|            131|              351213|
+ 192.168.254.127|   80|            111|                9759|
+ 192.168.255.249|   80|            112|                7412|
+
+Create an Aggregate Bag from the destination port field and count the
+number of times each port appears, ignore all fields except the
+C<dPort> fields and use B<--constant-field> to add a new field:
+
+ $ rwaggbagbuild --fields=ignore,dport,ignore,ignore  \
+        --constant-field=record=1                     \
+   | rwaggbagcat
+ dPort|   records|
+    80|         5|
+ 28925|         1|
+ 29222|         1|
+ 29246|         1|
+ 29362|         1|
+ 29700|         1|
+
+Alternatively, use B<rwaggbagtool(1)> to get the same information from
+the F<ab.aggbag> file created above:
+
+ $ rwaggbagtool --select-fields=dport        \
+        --insert-field=record=1 ab.aggbag    \
+   | rwaggbagcat
+ dPort|   records|
+    80|         5|
+ 28925|         1|
+ 29222|         1|
+ 29246|         1|
+ 29362|         1|
+ 29700|         1|
+
+=head1 ENVIRONMENT
+
+=over 4
+
+=item SILK_CLOBBER
+
+The SiLK tools normally refuse to overwrite existing files.  Setting
+SILK_CLOBBER to a non-empty value removes this restriction.
+
+=item SILK_COMPRESSION_METHOD
+
+This environment variable is used as the value for
+B<--compression-method> when that switch is not provided.
+
+=item SILK_CONFIG_FILE
+
+This environment variable is used as the value for the
+B<--site-config-file> when that switch is not provided.
+
+=item SILK_DATA_ROOTDIR
+
+This environment variable specifies the root directory of data
+repository.  As described in the L</FILES> section, B<rwaggbagbuild>
+may use this environment variable when searching for the SiLK site
+configuration file.
+
+=item SILK_PATH
+
+This environment variable gives the root of the install tree.  When
+searching for configuration files, B<rwaggbagbuild> may use this
+environment variable.  See the L</FILES> section for details.
+
+=back
+
+=head1 FILES
+
+=over 4
+
+=item F<${SILK_CONFIG_FILE}>
+
+=item F<${SILK_DATA_ROOTDIR}/silk.conf>
+
+=item F<@SILK_DATA_ROOTDIR@/silk.conf>
+
+=item F<${SILK_PATH}/share/silk/silk.conf>
+
+=item F<${SILK_PATH}/share/silk.conf>
+
+=item F<@prefix@/share/silk/silk.conf>
+
+=item F<@prefix@/share/silk.conf>
+
+Possible locations for the SiLK site configuration file which are
+checked when the B<--site-config-file> switch is not provided.
+
+=back
+
+=head1 SEE ALSO
+
+B<rwaggbag(1)>, B<rwaggbagcat(1)>, B<rwaggbagtool(1)>, B<rwfileinfo(1)>,
+B<rwpmapbuild(1)>, B<rwset(1)>, B<rwsetbuild(1)>, B<rwsetcat(1)>,
+B<rwsettool(1)>, B<silk(7)>, B<ccfilter(3)>, B<zlib(3)>
+
+=head1 NOTES
+
+B<rwaggbagbuild> and the other Aggregate Bag tools were introduced in
+SiLK 3.15.0.
+
+=cut
+
+$SiLK: rwaggbagbuild.pod 19097c33c9cb 2017-03-24 19:36:51Z mthomas $
+
+Local Variables:
+mode:text
+indent-tabs-mode:nil
+End:

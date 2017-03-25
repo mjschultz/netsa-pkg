@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2016 by Carnegie Mellon University.
+** Copyright (C) 2006-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -18,7 +18,7 @@
 /* NOTE: pull in the sklog source file */
 #include "sklog.c"
 
-RCSIDENTVAR(rcsID_sklog_c, "$SiLK: sklog-test.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENTVAR(rcsID_sklog_c, "$SiLK: sklog-test.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 
 /* LOCAL DEFINES AND TYPEDEFS */

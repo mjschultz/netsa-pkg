@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2016 by Carnegie Mellon University.
+** Copyright (C) 2005-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwallformats.c 89a0d024f7f6 2016-09-20 20:13:27Z mthomas $");
+RCSIDENT("$SiLK: rwallformats.c 5129c94db905 2017-01-19 22:25:14Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -396,6 +396,7 @@ openOutput(
                     }
 
                     /* create and open the file */
+                    hdr = NULL;
                     rv = SKSTREAM_OK;
                     if ( !rv) {
                         rv = skStreamCreate(&stream, SK_IO_WRITE,

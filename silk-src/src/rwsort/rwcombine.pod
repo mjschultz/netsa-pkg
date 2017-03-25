@@ -71,11 +71,11 @@ B<rwcombine> reads SiLK Flow records from the files named on the
 command line or from the standard input when no file names are
 specified and B<--xargs> is not present.  To read the standard input
 in addition to the named files, use C<-> or C<stdin> as a file name.
-If an input file name ends in C<.gz>, the file will be uncompressed as
-it is read.  When the B<--xargs> switch is provided, B<rwcombine> will
-read the names of the files to process from the named text file, or
-from the standard input if no file name argument is provided to the
-switch.  The input to B<--xargs> must contain one file name per line.
+If an input file name ends in C<.gz>, the file is uncompressed as it
+is read.  When the B<--xargs> switch is provided, B<rwcombine> reads
+the names of the files to process from the named text file or from the
+standard input if no file name argument is provided to the switch.
+The input to B<--xargs> must contain one file name per line.
 
 =head2 Algorithm
 
@@ -323,10 +323,15 @@ for reading the input and writing the output.)
 
 =item B<--output-path>=I<PATH>
 
-Write the SiLK Flow records to the specified file or named pipe.  When
-the standard output is not a terminal and this switch is not provided
-or its argument is C<-> or C<stdout>, the records are written to the
-standard output.
+Write the binary SiLK Flow records to I<PATH>, where I<PATH> is a
+filename, a named pipe, the keyword C<stderr> to write the output to
+the standard error, or the keyword C<stdout> or C<-> to write the
+output to the standard output.  If I<PATH> names an existing file,
+B<rwcombine> exits with an error unless the SILK_CLOBBER environment
+variable is set, in which case I<PATH> is overwritten.  If this switch
+is not given, the output is written to the standard output.
+Attempting to write the binary output to a terminal causes
+B<rwcombine> to exit with an error.
 
 =item B<--note-add>=I<TEXT>
 
@@ -405,11 +410,11 @@ section.
 
 =item B<--xargs>=I<FILENAME>
 
-Causes B<rwcombine> to read file names from I<FILENAME> or from the
-standard input if I<FILENAME> is not provided.  The input should have
-one file name per line.  B<rwcombine> will open each file in turn and
-read records from it, as if the files had been listed on the command
-line.
+Read the names of the input files from I<FILENAME> or from the
+standard input if I<FILENAME> is not provided.  The input is expected
+to have one filename per line.  B<rwcombine> opens each named file in
+turn and reads records from it as if the filenames had been listed on
+the command line.
 
 =item B<--help>
 
@@ -592,7 +597,7 @@ The first release of B<rwcombine> occurred in SiLK 3.9.0.
 
 =cut
 
-$SiLK: rwcombine.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
+$SiLK: rwcombine.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
 
 Local Variables:
 mode:text

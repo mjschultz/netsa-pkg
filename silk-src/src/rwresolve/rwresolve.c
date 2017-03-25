@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2016 by Carnegie Mellon University.
+** Copyright (C) 2005-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -59,7 +59,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwresolve.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwresolve.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/skipaddr.h>
@@ -320,6 +320,8 @@ static size_t namebuf_avail = 0;
 
 /* maintain list of line objects previous allocated */
 static line_t *free_list = NULL;
+
+/* FIXME: Consider adding --pager and --output-file support. */
 
 
 

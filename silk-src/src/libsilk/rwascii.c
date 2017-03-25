@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2016 by Carnegie Mellon University.
+** Copyright (C) 2005-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwascii.c 0432f6547214 2016-09-19 19:08:31Z mthomas $");
+RCSIDENT("$SiLK: rwascii.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 #include <silk/rwascii.h>
 #include <silk/skipaddr.h>

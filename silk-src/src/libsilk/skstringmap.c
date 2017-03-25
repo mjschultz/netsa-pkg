@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2016 by Carnegie Mellon University.
+** Copyright (C) 2005-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skstringmap.c 8b0fd8a0d083 2016-06-16 18:49:42Z mthomas $");
+RCSIDENT("$SiLK: skstringmap.c a0772d608106 2017-02-14 15:15:29Z mthomas $");
 
 #include <silk/skdllist.h>
 #include <silk/skstringmap.h>
@@ -97,12 +97,19 @@ skStringMapAddEntries(
         return SKSTRINGMAP_ERR_INPUT;
     }
 
-    if (entryc < 0) {
-        /* a null-terminated array; get the element count */
-        entryc = 0;
-        while (entryv[entryc].name) {
-            ++entryc;
+    /* use "i != entryc" to handle entryc < 0 */
+    for (i = 0, e = entryv; i != entryc && e->name != NULL; ++i, ++e) {
+        /* check to see if the name is valid */
+        rv = stringMapCheckValidName(str_map, e->name);
+        if (SKSTRINGMAP_OK != rv) {
+            return rv;
         }
+    }
+    if (entryc < 0) {
+        entryc = i;
+    } else if (i < entryc) {
+        /* NULL name given within the first entryc entries */
+        return SKSTRINGMAP_ERR_INPUT;
     }
 
 #if 0
@@ -118,16 +125,7 @@ skStringMapAddEntries(
 #endif  /* 0 */
 
     for (i = 0, e = entryv; i < entryc; ++i, ++e) {
-        if (NULL == e->name) {
-            return SKSTRINGMAP_ERR_INPUT;
-        }
-
-        /* check to see if the name is valid */
-        rv = stringMapCheckValidName(str_map, e->name);
-        if (SKSTRINGMAP_OK != rv) {
-            return rv;
-        }
-
+        assert(e->name);
         /* allocate entry */
         map_entry = (sk_stringmap_entry_t*)malloc(sizeof(sk_stringmap_entry_t));
         if (NULL == map_entry) {
@@ -254,16 +252,28 @@ skStringMapRemoveEntries(
     int                         entryc,
     const sk_stringmap_entry_t *entryv)
 {
-    int i;
+    const sk_stringmap_entry_t *e;
     sk_stringmap_status_t rv;
+    int i;
 
     /* check inputs */
     if (str_map == NULL || entryv == NULL) {
         return SKSTRINGMAP_ERR_INPUT;
     }
 
-    for (i = 0; (i < entryc && NULL != entryv[i].name); ++i) {
-        rv = skStringMapRemoveByName(str_map, entryv[i].name);
+    /* use "i != entryc" to handle entryc < 0 */
+    for (i = 0, e = entryv; i != entryc && e->name != NULL; ++i, ++e)
+        ;  /* empty */
+    if (entryc < 0) {
+        entryc = i;
+    } else if (i < entryc) {
+        /* NULL name given within the first entryc entries */
+        return SKSTRINGMAP_ERR_INPUT;
+    }
+
+    for (i = 0, e = entryv; i < entryc; ++i, ++e) {
+        assert(e->name);
+        rv = skStringMapRemoveByName(str_map, e->name);
         if (rv != SKSTRINGMAP_OK) {
             return rv;
         }

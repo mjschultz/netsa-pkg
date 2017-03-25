@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-B<rwbagbuild> - Create a binary Bag from non-flow data.
+B<rwbagbuild> - Create a binary Bag from non-flow data
 
 =head1 SYNOPSIS
 
@@ -13,7 +13,7 @@ B<rwbagbuild> - Create a binary Bag from non-flow data.
         [{ --pmap-file=PATH | --pmap-file=MAPNAME:PATH }]
         [--note-add=TEXT] [--note-file-add=FILE]
         [--invocation-strip] [--compression-method=COMP_METHOD]
-        [--output-path=OUTPUTFILE]
+        [--output-path=PATH]
 
   rwbagbuild --help
 
@@ -40,8 +40,9 @@ address is the value specified by the B<--default-count> switch or 1
 if the switch is not provided.
 
 If the B<--key-type> is C<sip-country>, C<dip-country>, or
-C<any-country>, each IP address is mapped to its country code and that
-value is stored in the Bag file.
+C<any-country>, each IP address is mapped to its country code using
+the country code mapping file (see L</FILES>) and that value is stored
+in the Bag file.
 
 If the B<--key-type> is C<sip-pmap>, C<dip-pmap>, or C<any-ip-pmap>,
 each IP address is mapped to a value found in the prefix map file
@@ -492,11 +493,17 @@ file.
 
 =back
 
-=item B<--output-path>=I<OUTPUTFILE>
+=item B<--output-path>=I<PATH>
 
-Redirect output to I<OUTPUTFILE>.  I<OUTPUTFILE> is a filename, a
-named pipe, or the keyword C<stdout> or C<-> to write the bag to the
-standard output.
+Write the binary Bag output to I<PATH>, where I<PATH> is a filename, a
+named pipe, the keyword C<stderr> to write the output to the standard
+error, or the keyword C<stdout> or C<-> to write the output to the
+standard output.  If I<PATH> names an existing file, B<rwbagtool>
+exits with an error unless the SILK_CLOBBER environment variable is
+set, in which case I<PATH> is overwritten.  If this switch is not
+given, the output is written to the standard output.  Attempting to
+write the binary output to a terminal causes B<rwbagtool> to exit with
+an error.
 
 =item B<--help>
 
@@ -595,6 +602,20 @@ overrides the existing value:
           6|                   1|
          17|                   1|
 
+=head2 Create a bag from multiple text files
+
+To create a bag from multiple text files (F<X.txt>, F<Y.txt>, and
+F<Z.txt>), use the UNIX B<cat(1)> utility to concatenate the files and
+have B<rwbagbuild> read the combined input.  To avoid creating a
+temporary file, feed the output of B<cat> as the standard input to
+B<rwbagbuild>.
+
+ $ cat X.txt Y.txt Z.txt                                \
+   | rwbagbuild --bag-input=- --output-path=xyz.bag
+
+For each key that appears in multiple input files, B<rwbagbuild> sums
+the counters for the key.
+
 =head2 Create a bag with IP addresses as keys from an IPset file
 
 Given the IP set F<myset.set>, create a bag where every entry in the
@@ -603,7 +624,7 @@ bag has a count of 3:
  $ rwbagbuild --set-input=myset.set --default-count=3  \
         --out=mybag2.bag
 
-=head2 Create a bag from multiple input files
+=head2 Create a bag from multiple IPset files
 
 Suppose we have three IPset files, F<A.set>, F<B.set>, and F<C.set>:
 
@@ -629,9 +650,9 @@ the following:
 multiple times would be annoying if we had 300 files instead of only
 3.)
 
-The IPset files are (mathematical) sets, so if we join them together
-first with B<rwsettool(1)> and then run B<rwbagbuild>, each IP address
-gets a count of 1:
+Since IPset files are (mathematical) sets, joining them together first
+with B<rwsettool(1)> and then running B<rwbagbuild> causes each IP
+address to get a count of 1:
 
  $ rwsettool --union A.set B.set C.set   \
    | rwbagbuild --set-input=-            \
@@ -807,7 +828,7 @@ The B<--default-count> switch is poorly named.
 
 =cut
 
-$SiLK: rwbagbuild.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
+$SiLK: rwbagbuild.pod 62dfd3881f79 2017-03-21 19:33:08Z mthomas $
 
 Local Variables:
 mode:text

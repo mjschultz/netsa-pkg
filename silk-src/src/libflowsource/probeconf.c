@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2016 by Carnegie Mellon University.
+** Copyright (C) 2004-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconf.c 301c05a106b7 2016-11-15 18:04:23Z mthomas $");
+RCSIDENT("$SiLK: probeconf.c d8ee22371cf3 2017-03-23 22:39:48Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/probeconf.h>
@@ -34,13 +34,13 @@ RCSIDENT("$SiLK: probeconf.c 301c05a106b7 2016-11-15 18:04:23Z mthomas $");
 /* LOCAL DEFINES AND TYPEDEFS */
 
 /* Minimum version of libfixbuf required for IPFIX */
-#define SKPC_LIBFIXBUF_VERSION_IPFIX        "1.6.0"
+#define SKPC_LIBFIXBUF_VERSION_IPFIX        "1.7.0"
 
 /* Minimum version of libfixbuf required for NetFlow V9 */
-#define SKPC_LIBFIXBUF_VERSION_NETFLOWV9    "1.6.0"
+#define SKPC_LIBFIXBUF_VERSION_NETFLOWV9    SKPC_LIBFIXBUF_VERSION_IPFIX
 
 /* Minimum version of libfixbuf required for sFlow */
-#define SKPC_LIBFIXBUF_VERSION_SFLOW        "1.6.0"
+#define SKPC_LIBFIXBUF_VERSION_SFLOW        SKPC_LIBFIXBUF_VERSION_IPFIX
 
 /* Maximum valid value for a port 2^16 - 1 */
 #define PORT_VALID_MAX 0xFFFF

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcombinesetup.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: rwcombinesetup.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstringmap.h>
@@ -101,8 +101,8 @@ static const char *appHelp[] = {
     ("Print statistics regarding number of flows combined\n"
      "\tand idle times to the named file or stream or to 'stderr' when no\n"
      "\targument provided to switch. Def. no"),
-    ("Write the output to this location (a file, named pipe,\n"
-     "\tor '-' or 'stdout'. Def. stdout"),
+    ("Write the combined SiLK Flow records to this location\n"
+     "\t(a file, named pipe, or '-' or 'stdout'). Def. stdout"),
     NULL, /* generated dynamically */
     (char *)NULL
 };

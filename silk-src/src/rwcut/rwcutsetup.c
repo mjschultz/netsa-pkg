@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcutsetup.c 0432f6547214 2016-09-19 19:08:31Z mthomas $");
+RCSIDENT("$SiLK: rwcutsetup.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skcountry.h>
@@ -67,6 +67,10 @@ static char delimiter;
 
 /* how to print IP addresses */
 static uint32_t ip_format = SKIPADDR_CANONICAL;
+
+/* flags when registering --ip-format */
+static const unsigned int ip_format_register_flags =
+    (SK_OPTION_IP_FORMAT_INTEGER_IPS | SK_OPTION_IP_FORMAT_ZERO_PAD_IPS);
 
 /* how to print timestamps */
 static uint32_t time_flags = 0;
@@ -175,8 +179,8 @@ static const char *appHelp[] = {
     "Use specified character between columns. Def. '|'",
     "Suppress column delimiter at end of line. Def. No",
     "Shortcut for --no-columns --no-final-del --column-sep=CHAR",
-    "Send output to given file path. Def. stdout",
-    "Program to invoke to page output. Def. $SILK_PAGER or $PAGER",
+    "Write the output to this stream or file. Def. stdout",
+    "Invoke this program to page output. Def. $SILK_PAGER or $PAGER",
     (char *)NULL
 };
 
@@ -351,7 +355,7 @@ appSetup(
         || skOptionsRegister(appOptions, &appOptionsHandler, NULL)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE)
         || skOptionsTimestampFormatRegister(&time_flags, time_register_flags)
-        || skOptionsIPFormatRegister(&ip_format)
+        || skOptionsIPFormatRegister(&ip_format, ip_format_register_flags)
         || skIPv6PolicyOptionsRegister(&ipv6_policy))
     {
         skAppPrintErr("Unable to register options");

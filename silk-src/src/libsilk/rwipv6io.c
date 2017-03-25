@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwipv6io.c 85572f89ddf9 2016-05-05 20:07:39Z mthomas $");
+RCSIDENT("$SiLK: rwipv6io.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 /* #define RWPACK_BYTES_PACKETS          1 */
 /* #define RWPACK_FLAGS_TIMES_VOLUMES    1 */

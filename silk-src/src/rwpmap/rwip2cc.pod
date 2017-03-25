@@ -123,8 +123,14 @@ columns instead of the default 'B<|>'.
 
 =item B<--output-path>=I<PATH>
 
-Determines where the output of B<rwuniq> (ASCII text) is written.  If
-this option is not given, output is written to the standard output.
+Write the textual output to I<PATH>, where I<PATH> is a filename, a
+named pipe, the keyword C<stderr> to write the output to the standard
+error, or the keyword C<stdout> or C<-> to write the output to the
+standard output (and bypass the paging program).  If I<PATH> names an
+existing file, B<rwip2cc> exits with an error unless the SILK_CLOBBER
+environment variable is set, in which case I<PATH> is overwritten.  If
+this option is not given, the output is either sent to the pager or
+written to the standard output.
 
 =item B<--pager>=I<PAGER_PROG>
 
@@ -132,8 +138,9 @@ When the B<--input-file> switch is specified and output is to a
 terminal, invoke the program I<PAGER_PROG> to view the output one
 screen full at a time.  This switch overrides the SILK_PAGER
 environment variable, which in turn overrides the PAGER variable.  If
-the value of the pager is determined to be the empty string, no paging
-will be performed and all output will be printed to the terminal.
+the B<--output-path> switch is given or if the value of the pager is
+determined to be the empty string, no paging is performed and all
+output is written to the terminal.
 
 =item B<--help>
 
@@ -302,7 +309,7 @@ B<rwsetcat(1)>, B<silk(7)>
 
 =cut
 
-$SiLK: rwip2cc.pod 8b39dddcaab4 2013-12-06 21:47:40Z mthomas $
+$SiLK: rwip2cc.pod a50d57a6c6a9 2017-03-13 20:35:05Z mthomas $
 
 Local Variables:
 mode:text

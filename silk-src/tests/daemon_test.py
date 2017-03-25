@@ -1,5 +1,5 @@
 #######################################################################
-# Copyright (C) 2009-2016 by Carnegie Mellon University.
+# Copyright (C) 2009-2017 by Carnegie Mellon University.
 #
 # @OPENSOURCE_LICENSE_START@
 # See license information in ../LICENSE.txt
@@ -8,7 +8,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: daemon_test.py 85572f89ddf9 2016-05-05 20:07:39Z mthomas $
+# $SiLK: daemon_test.py 275df62a2e41 2017-01-05 17:30:40Z mthomas $
 #######################################################################
 from __future__ import print_function
 import numbers

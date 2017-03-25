@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2011-2016 by Carnegie Mellon University.
+** Copyright (C) 2011-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -26,7 +26,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwrecgenerator.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: rwrecgenerator.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
 
 #include <silk/rwascii.h>
 #include <silk/rwrec.h>
@@ -286,6 +286,10 @@ static sk_fileptr_t text_output;
 /* when writing textual output, how to print IP addresses.  set by the
  * --ip-format switch. */
 static uint32_t ip_format = SKIPADDR_CANONICAL;
+
+/* flags when registering --ip-format */
+static const unsigned int ip_format_register_flags =
+    (SK_OPTION_IP_FORMAT_INTEGER_IPS | SK_OPTION_IP_FORMAT_ZERO_PAD_IPS);
 
 /* when writing textual output, how to print timestamps.  set by the
  * --timestamp-format switch. */
@@ -679,7 +683,7 @@ appSetup(
         || skCompMethodOptionsRegister(&comp_method)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE)
         || skOptionsTimestampFormatRegister(&time_flags, time_register_flags)
-        || skOptionsIPFormatRegister(&ip_format))
+        || skOptionsIPFormatRegister(&ip_format, ip_format_register_flags))
     {
         skAppPrintErr("Unable to register options");
         appExit(EXIT_FAILURE);

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2016 by Carnegie Mellon University.
+** Copyright (C) 2001-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcat.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: rwcat.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -72,7 +72,7 @@ static struct option appOptions[] = {
 };
 
 static const char *appHelp[] = {
-    "Full path name of the output file. Def. stdout",
+    "Write the output to this stream or file. Def. stdout",
     ("Write the output in this byte order. Def. 'native'.\n"
      "\tChoices: 'native', 'little', 'big'"),
     ("Force the output to contain only IPv4 addresses. Def. no"),

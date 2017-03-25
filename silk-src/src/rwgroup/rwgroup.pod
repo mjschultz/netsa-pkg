@@ -439,14 +439,22 @@ attempt to add a SiLK data file as an annotation.
 
 =item B<--copy-input>=I<PATH>
 
-Copy all binary input to the specified file or named pipe.  I<PATH>
-can be C<stdout> to print flows to the standard output as long as the
-B<--output-path> switch has been used to redirect B<rwgroup>'s output.
+Copy all binary SiLK Flow records read as input to the specified file
+or named pipe.  I<PATH> may be C<stdout> or C<-> to write flows to the
+standard output as long as the B<--output-path> switch is specified to
+redirect B<rwgroup>'s output to a different location.
 
 =item B<--output-path>=I<PATH>
 
-Determines where the output of B<rwgroup> is written.  If
-this option is not given, output is written to the standard output.
+Write the binary SiLK Flow records to I<PATH>, where I<PATH> is a
+filename, a named pipe, the keyword C<stderr> to write the output to
+the standard error, or the keyword C<stdout> or C<-> to write the
+output to the standard output.  If I<PATH> names an existing file,
+B<rwgroup> exits with an error unless the SILK_CLOBBER environment variable
+is set, in which case I<PATH> is overwritten.  If this switch is not
+given, the output is written to the standard output.  Attempting to
+write the binary output to a terminal causes B<rwgroup> to exit with an
+error.
 
 =item B<--compression-method>=I<COMP_METHOD>
 
@@ -721,7 +729,7 @@ B<silk(7)>, B<yaf(1)>, B<dlopen(3)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwgroup.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
+$SiLK: rwgroup.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
 
 Local Variables:
 mode:text

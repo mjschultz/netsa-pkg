@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2016 by Carnegie Mellon University.
+** Copyright (C) 2005-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -26,7 +26,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwptoflow.c 01d7e4ea44d3 2016-09-20 18:14:33Z mthomas $");
+RCSIDENT("$SiLK: rwptoflow.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
@@ -170,7 +170,7 @@ static const char *appHelp[] = {
      "\tthe specified range.  Def. Generate flows for all packets\n"
      "\tYYYY/MM/DD:hh:dd:mm:ss.uuuuuu-YYYY/MM/DD:hh:dd:mm:ss.uuuuuu"),
     ("Write the generated SiLK Flow records to the specified\n"
-     "\tpath. Def. stdout"),
+     "\tstream or file path. Def. stdout"),
     ("For each generated flow, write its corresponding\n"
      "\tpacket to the specified path.  Def. No"),
     ("Write each packet that occurs within the\n"

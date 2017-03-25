@@ -6,7 +6,7 @@ B<rwpdu2silk> - Convert NetFlow v5 records to SiLK Flow records
 
 =head1 SYNOPSIS
 
-  rwpdu2silk [--silk-output=FILE] [--print-statistics]
+  rwpdu2silk [--silk-output=PATH] [--print-statistics]
         [--log-destination={stdout | stderr | none | PATH}]
         [--log-flags={none | { {all | bad | default | missing
                                 | record-timestamps} ...} } ]
@@ -34,11 +34,11 @@ of valid records per chunk is specified in the header.
 
 B<rwpdu2silk> reads NetFlow v5 records from the files named on the
 command line when B<--xargs> is not present.  If an input file name
-ends in C<.gz>, the file will be uncompressed as it is read.  When the
-B<--xargs> switch is provided, B<rwpdu2silk> will read the names of
-the files to process from the named text file, or from the standard
-input if no file name argument is provided to the switch.  The input
-to B<--xargs> must contain one file name per line.
+ends in C<.gz>, the file is uncompressed as it is read.  When the
+B<--xargs> switch is provided, B<rwpdu2silk> reads the names of the
+files to process from the named text file or from the standard input
+if no file name argument is provided to the switch.  The input to
+B<--xargs> must contain one file name per line.
 
 =head1 OPTIONS
 
@@ -49,11 +49,17 @@ required for options that take optional parameters.
 
 =over 4
 
-=item B<--silk-output>=I<FILE>
+=item B<--silk-output>=I<PATH>
 
-Write the SiLK records to I<FILE>, which must not exist.  If the
-switch is not provided or if I<FILE> has the value C<stdout> or C<->,
-the SiLK flows are written to the standard output.
+Write the binary SiLK Flow records to I<PATH>, where I<PATH> is a
+filename, a named pipe, the keyword C<stderr> to write the output to
+the standard error, or the keyword C<stdout> or C<-> to write the
+output to the standard output.  If I<PATH> names an existing file,
+B<rwpdu2silk> exits with an error unless the SILK_CLOBBER environment
+variable is set, in which case I<PATH> is overwritten.  If this switch
+is not given, the output is written to the standard output.
+Attempting to write the binary output to a terminal causes
+B<rwpdu2silk> to exit with an error.
 
 =item B<--print-statistics>
 
@@ -199,11 +205,11 @@ file.
 
 =item B<--xargs>=I<FILENAME>
 
-Causes B<rwpdu2silk> to read file names from I<FILENAME> or from the
-standard input if I<FILENAME> is not provided.  The input should have
-one file name per line.  B<rwpdu2silk> will open each file in turn and
-read records from it, as if the files had been listed on the command
-line.
+Read the names of the input files from I<FILENAME> or from the
+standard input if I<FILENAME> is not provided.  The input is expected
+to have one filename per line.  B<rwpdu2silk> opens each named file in
+turn and reads records from it as if the filenames had been listed on
+the command line.
 
 =item B<--help>
 
@@ -244,7 +250,7 @@ B<rwpdu2silk> cannot read from the standard input.
 
 =cut
 
-$SiLK: rwpdu2silk.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
+$SiLK: rwpdu2silk.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
 
 Local Variables:
 mode:text

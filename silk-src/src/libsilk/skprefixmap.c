@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2016 by Carnegie Mellon University.
+** Copyright (C) 2004-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -72,15 +72,16 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skprefixmap.c 5e30affa7b9a 2016-06-17 17:19:37Z mthomas $");
+RCSIDENT("$SiLK: skprefixmap.c 9dd70c6ccd3b 2017-03-14 15:42:18Z mthomas $");
 
-#include <silk/skprefixmap.h>
-#include <silk/skipaddr.h>
-#include <silk/skstream.h>
-#include <silk/rwrec.h>
-#include <silk/utils.h>
 #include <silk/redblack.h>
+#include <silk/rwrec.h>
+#include <silk/skipaddr.h>
 #include <silk/skmempool.h>
+#include <silk/skprefixmap.h>
+#include <silk/skstream.h>
+#include <silk/utils.h>
+#include "skheader_priv.h"
 
 
 /* DEFINES AND TYPEDEFS */
@@ -128,6 +129,14 @@ typedef struct skPrefixMapDictNode_st {
     const char *word;
     uint32_t    value;
 } skPrefixMapDictNode_t;
+
+/* Contains data used when a PrefixMap is represented by a stream */
+typedef struct sk_hentry_prefixmap_st {
+    sk_header_entry_spec_t  he_spec;
+    uint32_t                version;
+    char                   *mapname;
+} sk_hentry_prefixmap_t;
+
 
 /* if the high bit of a value is set, the value is a leaf */
 #define SKPMAP_LEAF_BIT        UINT32_C(0x80000000)
@@ -209,6 +218,9 @@ prefixMapGrowDictionaryWords(
 static skPrefixMapErr_t
 prefixMapGrowTree(
     skPrefixMap_t      *map);
+static sk_header_entry_t *
+prefixMapHentryCreate(
+    const char         *mapname);
 static int
 prefixMapWordCompare(
     const void         *va,
@@ -613,11 +625,7 @@ prefixMapFind(
         {
             uint8_t key128[16];
 
-            if (skipaddrIsV6((const skipaddr_t*)key)) {
-                skipaddrGetV6((const skipaddr_t*)key, key128);
-            } else {
-                skipaddrGetAsV6((const skipaddr_t*)key, key128);
-            }
+            skipaddrGetAsV6((const skipaddr_t*)key, key128);
 
             *depth = 128;                /* Start at the leftmost bit */
             while (SKPMAP_IS_NODE(node)) {
@@ -676,6 +684,220 @@ prefixMapFind(
         }
     }
     return SKPMAP_LEAF_VALUE(node);
+}
+
+
+/*
+ *  hentry = prefixMapHentryCopy(hentry);
+ *
+ *    Create and return a new header entry for prefix map files that is a
+ *    copy of the header entry 'hentry'.
+ *
+ *    This is the 'copy_fn' callback for skHentryTypeRegister().
+ */
+static sk_header_entry_t *
+prefixMapHentryCopy(
+    const sk_header_entry_t    *hentry)
+{
+    const sk_hentry_prefixmap_t *pn_hdr = (sk_hentry_prefixmap_t*)hentry;
+
+    return prefixMapHentryCreate(pn_hdr->mapname);
+}
+
+
+/*
+ *    Create and return a new header entry for prefix map files.
+ *    'child_node' is the number of children per node, 'leaf_count' is
+ *    the number of leaves, 'leaf_size' is the size of an individual
+ *    leaf, 'node_count' is the number of (internal) nodes,
+ *    'node_size' is the size of an individual node, and
+ *    'root_index'is the index of the root of the tree.
+ */
+static sk_header_entry_t *
+prefixMapHentryCreate(
+    const char         *mapname)
+{
+    sk_hentry_prefixmap_t *pn_hdr;
+    int len;
+
+    /* verify name is specified */
+    if (mapname == NULL || mapname[0] == '\0') {
+        return NULL;
+    }
+    len = 1 + strlen(mapname);
+
+    pn_hdr = (sk_hentry_prefixmap_t*)calloc(1, sizeof(sk_hentry_prefixmap_t));
+    if (NULL == pn_hdr) {
+        return NULL;
+    }
+    pn_hdr->he_spec.hes_id  = SK_HENTRY_PREFIXMAP_ID;
+    pn_hdr->he_spec.hes_len = sizeof(sk_hentry_prefixmap_t) + len;
+
+    pn_hdr->version = 1;
+    pn_hdr->mapname = strdup(mapname);
+    if (NULL == pn_hdr->mapname) {
+        free(pn_hdr);
+        return NULL;
+    }
+
+    return (sk_header_entry_t*)pn_hdr;
+}
+
+
+/*
+ *  prefixMapHentryFree(hentry);
+ *
+ *    Release any memory that is used by the in-memory representation
+ *    of the file header for prefix map files.
+ *
+ *    This is the 'free_fn' callback for skHentryTypeRegister().
+ */
+static void
+prefixMapHentryFree(
+    sk_header_entry_t  *hentry)
+{
+    sk_hentry_prefixmap_t *pn_hdr = (sk_hentry_prefixmap_t*)hentry;
+
+    if (pn_hdr) {
+        assert(skHeaderEntryGetTypeId(pn_hdr) == SK_HENTRY_PREFIXMAP_ID);
+        pn_hdr->he_spec.hes_id = UINT32_MAX;
+        if (pn_hdr->mapname) {
+            free(pn_hdr->mapname);
+            pn_hdr->mapname = NULL;
+        }
+        free(pn_hdr);
+    }
+}
+
+
+#define prefixMapHentryGetMapmame(hentry)               \
+    (((sk_hentry_prefixmap_t *)(hentry))->mapname)
+
+#define prefixMapHentryGetVersion(hentry)               \
+    (((sk_hentry_prefixmap_t *)(hentry))->version)
+
+
+/*
+ *  size = prefixMapHentryPacker(hentry, buf, bufsiz);
+ *
+ *    Pack the contents of the header entry for prefix map files, 'hentry'
+ *    into the buffer 'buf', whose size is 'bufsiz', for writing the
+ *    file to disk.
+ *
+ *    This the 'pack_fn' callback for skHentryTypeRegister().
+ */
+static ssize_t
+prefixMapHentryPacker(
+    const sk_header_entry_t    *in_hentry,
+    uint8_t                    *out_packed,
+    size_t                      bufsize)
+{
+    sk_hentry_prefixmap_t *pn_hdr = (sk_hentry_prefixmap_t*)in_hentry;
+    uint32_t check_len;
+    uint32_t mapname_len;
+    uint32_t version;
+    uint8_t *pos;
+
+    assert(in_hentry);
+    assert(out_packed);
+    assert(skHeaderEntryGetTypeId(pn_hdr) == SK_HENTRY_PREFIXMAP_ID);
+
+    /* adjust the length recorded in the header it if it too small */
+    mapname_len = 1 + strlen(pn_hdr->mapname);
+    check_len = (mapname_len + sizeof(pn_hdr->version)
+                 + sizeof(sk_header_entry_spec_t));
+    if (check_len > pn_hdr->he_spec.hes_len) {
+        pn_hdr->he_spec.hes_len = check_len;
+    }
+
+    if (bufsize >= pn_hdr->he_spec.hes_len) {
+        skHeaderEntrySpecPack(&(pn_hdr->he_spec), out_packed, bufsize);
+        pos = out_packed + sizeof(sk_header_entry_spec_t);
+        version = htonl(pn_hdr->version);
+        memcpy(pos, &version, sizeof(uint32_t));
+        pos += sizeof(uint32_t);
+        memcpy(pos, pn_hdr->mapname, mapname_len);
+    }
+
+    return pn_hdr->he_spec.hes_len;
+}
+
+
+/*
+ *  prefixMapHentryPrint(hentry, fh);
+ *
+ *    Print a textual representation of a file's prefix map header entry in
+ *    'hentry' to the FILE pointer 'fh'.
+ *
+ *    This is the 'print_fn' callback for skHentryTypeRegister().
+ */
+static void
+prefixMapHentryPrint(
+    const sk_header_entry_t    *hentry,
+    FILE                       *fh)
+{
+    sk_hentry_prefixmap_t *pn_hdr = (sk_hentry_prefixmap_t*)hentry;
+
+    assert(skHeaderEntryGetTypeId(pn_hdr) == SK_HENTRY_PREFIXMAP_ID);
+    fprintf(fh, ("v%" PRIu32 ": %s"),
+            pn_hdr->version, (pn_hdr->mapname ? pn_hdr->mapname : "NULL"));
+}
+
+
+/*
+ *  hentry = prefixMapHentryUnpacker(buf);
+ *
+ *    Unpack the data in 'buf' to create an in-memory representation
+ *    of a file's prefix map header entry.
+ *
+ *    This is the 'unpack_fn' callback for skHentryTypeRegister().
+ */
+static sk_header_entry_t *
+prefixMapHentryUnpacker(
+    uint8_t            *in_packed)
+{
+    sk_hentry_prefixmap_t *pn_hdr;
+    uint32_t len;
+    uint8_t *pos;
+
+    assert(in_packed);
+
+    /* create space for new header */
+    pn_hdr = (sk_hentry_prefixmap_t*)calloc(1, sizeof(sk_hentry_prefixmap_t));
+    if (NULL == pn_hdr) {
+        return NULL;
+    }
+
+    /* copy the spec */
+    skHeaderEntrySpecUnpack(&(pn_hdr->he_spec), in_packed);
+    assert(skHeaderEntryGetTypeId(pn_hdr) == SK_HENTRY_PREFIXMAP_ID);
+
+    /* copy the data */
+    len = pn_hdr->he_spec.hes_len;
+    if (len < sizeof(sk_header_entry_spec_t)) {
+        free(pn_hdr);
+        return NULL;
+    }
+    len -= sizeof(sk_header_entry_spec_t);
+    pos = in_packed + sizeof(sk_header_entry_spec_t);
+
+    if (len < sizeof(uint32_t)) {
+        free(pn_hdr);
+        return NULL;
+    }
+    memcpy(&(pn_hdr->version), pos, sizeof(uint32_t));
+    pn_hdr->version = ntohl(pn_hdr->version);
+    len -= sizeof(uint32_t);
+    pos += sizeof(uint32_t);
+
+    pn_hdr->mapname = (char*)calloc(len, sizeof(char));
+    if (NULL == pn_hdr->mapname) {
+        free(pn_hdr);
+        return NULL;
+    }
+    memcpy(pn_hdr->mapname, pos, len);
+
+    return (sk_header_entry_t*)pn_hdr;
 }
 
 
@@ -1121,17 +1343,8 @@ skPrefixMapAddRange(
             {
                 return SKPREFIXMAP_ERR_ARGS;
             }
-
-            if (skipaddrIsV6((const skipaddr_t*)low_val)) {
-                skipaddrGetV6((const skipaddr_t*)low_val, low128);
-            } else {
-                skipaddrGetAsV6((const skipaddr_t*)low_val, low128);
-            }
-            if (skipaddrIsV6((const skipaddr_t*)high_val)) {
-                skipaddrGetV6((const skipaddr_t*)high_val, high128);
-            } else {
-                skipaddrGetAsV6((const skipaddr_t*)high_val, high128);
-            }
+            skipaddrGetAsV6((const skipaddr_t*)low_val, low128);
+            skipaddrGetAsV6((const skipaddr_t*)high_val, high128);
             return prefixMapAdd128(map, low128, high128,
                                    SKPMAP_MAKE_LEAF(dict_val), 0, 127);
         }
@@ -1736,12 +1949,9 @@ skPrefixMapRead(
     skstream_t         *in)
 {
     char errbuf[2 * PATH_MAX];
-    union h_un {
-        sk_header_entry_t      *he;
-        sk_hentry_prefixmap_t  *pm;
-    } h;
     sk_file_header_t *hdr;
     sk_file_version_t vers;
+    sk_header_entry_t *hentry;
     skPrefixMap_t *map;
     int has_dictionary;
     size_t tree_size;
@@ -1861,9 +2071,9 @@ skPrefixMapRead(
 
     /* Get the mapname from the header if it was specified and if the
      * header-entry version is 1. */
-    h.he = skHeaderGetFirstMatch(hdr, SK_HENTRY_PREFIXMAP_ID);
-    if ((h.he) && (1 == skHentryPrefixmapGetVersion(h.pm))) {
-        map->mapname = strdup(skHentryPrefixmapGetMapmame(h.pm));
+    hentry = skHeaderGetFirstMatch(hdr, SK_HENTRY_PREFIXMAP_ID);
+    if ((hentry) && (1 == prefixMapHentryGetVersion(hentry))) {
+        map->mapname = strdup(prefixMapHentryGetMapmame(hentry));
         if (NULL == map->mapname) {
             skAppPrintErr("Failed to allocate prefix map name");
             err = SKPREFIXMAP_ERR_MEMORY;
@@ -1914,6 +2124,19 @@ skPrefixMapRead(
   ERROR:
     skPrefixMapDelete(map);
     return err;
+}
+
+
+/* The prototype for this function is in skheader_priv.h */
+int
+skPrefixMapRegisterHeaderEntry(
+    sk_hentry_type_id_t     entry_id)
+{
+    assert(SK_HENTRY_PREFIXMAP_ID == entry_id);
+    return (skHentryTypeRegister(
+                entry_id, &prefixMapHentryPacker, &prefixMapHentryUnpacker,
+                &prefixMapHentryCopy, &prefixMapHentryFree,
+                &prefixMapHentryPrint));
 }
 
 
@@ -2055,8 +2278,8 @@ skPrefixMapWrite(
     skstream_t         *stream)
 {
     sk_file_header_t *hdr;
-    ssize_t rv;
     sk_file_version_t vers;
+    ssize_t rv;
 
     if (stream == NULL || map == NULL) {
         return SKPREFIXMAP_ERR_ARGS;
@@ -2082,6 +2305,7 @@ skPrefixMapWrite(
 
     /* create the header */
     hdr = skStreamGetSilkHeader(stream);
+    skHeaderSetByteOrder(hdr, SILK_ENDIAN_NATIVE);
     skHeaderSetFileFormat(hdr, FT_PREFIXMAP);
     skHeaderSetRecordVersion(hdr, vers);
     skHeaderSetCompressionMethod(hdr, SK_COMPMETHOD_NONE);
@@ -2089,10 +2313,15 @@ skPrefixMapWrite(
 
     /* add the prefixmap header if a mapname was given */
     if (map->mapname) {
-        rv = skHeaderAddPrefixmap(hdr, map->mapname);
+        sk_header_entry_t *pn_hdr;
+        pn_hdr = prefixMapHentryCreate(map->mapname);
+        if (pn_hdr == NULL) {
+            return SKPREFIXMAP_ERR_MEMORY;
+        }
+        rv = skHeaderAddEntry(hdr, pn_hdr);
         if (rv) {
-            skAppPrintErr("%s", skHeaderStrerror(rv));
-            return SKPREFIXMAP_ERR_IO;
+            prefixMapHentryFree(pn_hdr);
+            return SKPREFIXMAP_ERR_MEMORY;
         }
     }
 

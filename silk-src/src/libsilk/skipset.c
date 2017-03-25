@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2008-2016 by Carnegie Mellon University.
+** Copyright (C) 2008-2017 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -24,7 +24,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipset.c f879a436e5b1 2016-11-03 19:16:05Z mthomas $");
+RCSIDENT("$SiLK: skipset.c ef5b2378ee80 2017-02-27 21:48:55Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
@@ -33,6 +33,7 @@ RCSIDENT("$SiLK: skipset.c f879a436e5b1 2016-11-03 19:16:05Z mthomas $");
 #include <silk/skstream.h>
 #include <silk/skvector.h>
 #include <silk/utils.h>
+#include "skheader_priv.h"
 
 
 /*
@@ -212,18 +213,32 @@ RCSIDENT("$SiLK: skipset.c f879a436e5b1 2016-11-03 19:16:05Z mthomas $");
  *    header entry specifies which).
  *
  *    This version contains a dump of the radix-tree data structure
- *    that is used in-memory.  If the file's data is not compressed
- *    and the byte-order is correct, this format can be mmap()ed so
- *    that the data does not need to be read from disk.
+ *    that is used in-memory.  The reasoning behind this was that the
+ *    data could be mmap()ed directly from disk without having to read
+ *    the file into memory.  For this to work, the file's data must
+ *    not be compressed, the byte-order of the file must match the
+ *    machine's byte-order, and the stream must be seekable (not
+ *    standard input).
  *
- *    Data is written to the file in an arbitrary (non-sorted) order,
- *    though all nodes appear before all leaves.
+ *    The radix data structure maintains the (interior) nodes separate
+ *    from the leaves.  In the output stream, all nodes are written
+ *    first, then the leaves.  The leaves are sorted by IP before
+ *    being written, and the first leaf in the output stream does not
+ *    contain data.  An individual leaf is 8 octets for IPv4 and 24
+ *    octets for IPv6.  For IPv4, a leaf contains the CIDR prefix in
+ *    the first octet, three empty octets, and the 32-bit IPv4 address
+ *    in native byte order.  For IPv6, a leaf contains the CIDR prefix
+ *    in the first octet, seven(!) empty octets, followed by two
+ *    unsigned 64-bit numbers is native byte order.  The first 64-bit
+ *    number contains the upper 8 octets of the IPv6 address, and the
+ *    second number contains the lower 8 octets.
  *
- *    The file has a header entry that indictates whether the file
- *    contains IPv4 or IPv6 addresses.  The contents of the header are
- *    the number of children per node, the number of leaves, the size
- *    of a leaf, the number of (interior) nodes, the size of a node,
- *    and the location of the root node.
+ *    The file has a header entry that may be used to determine
+ *    whether the file contains IPv4 or IPv6 addresses.  The contents
+ *    of the header are the number of children per node, the number of
+ *    leaves, the size of a leaf, the number of (interior) nodes, the
+ *    size of a node, and the location of the root node.  The leaf
+ *    size is 8 for IPv4 and 24 for IPv6.
  *
  *    All IPv4 IPsets were written in this format between SiLK 3.0.0
  *    and SiLK 3.5.1.  SiLK 3.6.0 reverted to using
@@ -241,10 +256,10 @@ RCSIDENT("$SiLK: skipset.c f879a436e5b1 2016-11-03 19:16:05Z mthomas $");
  *    configuration of this release.
  *
  *    IP addresses are stored as "blocks".  Each block starts with an
- *    IP address and a single octet value.  If the single octet is
- *    less than or equal to 0x80, that is the end of the block.  The
- *    IP address is the base address of a netblock and the single
- *    octet is the CIDR mask for the netblock.
+ *    IP address and a single unsigned octet value.  If the single
+ *    octet is less than or equal to 0x80, that is the end of the
+ *    block.  The IP address is the base address of a netblock and the
+ *    single octet is the CIDR mask for the netblock.
  *
  *    If the octet is strictly greater than 0x80, the address is the
  *    base address for a bitmap.  The value of 0x81 means the bitmap
@@ -253,13 +268,15 @@ RCSIDENT("$SiLK: skipset.c f879a436e5b1 2016-11-03 19:16:05Z mthomas $");
  *
  *    The IPs in the file appear in sorted order.  IPv4 addresses and
  *    values in the bitmap are written in native byte order.  IPv6
- *    addresses are stored in network byte order.
+ *    addresses are stored as an array of 16 uint8_t's in network byte
+ *    order.
  *
- *    The file has a header entry that indicates whether the file
- *    contains IPv4 or IPv6 addresses.  The header entry is identical
- *    with that used by IPSET_REC_VERSION_RADIX.  The leaf length
- *    field is used to determine the type of the contents; all other
- *    fields are 0.
+ *    The file has a header entry that may be used to determine
+ *    whether the file contains IPv4 or IPv6 addresses.  The header
+ *    entry is identical with that used by IPSET_REC_VERSION_RADIX.
+ *    All fields are 0 except for the leaf length field.  The leaf
+ *    length is 4 for files containing IPv4 addresses and 16 for files
+ *    containing IPv6.
  */
 #define IPSET_REC_VERSION_CIDRBMAP          4
 
@@ -276,7 +293,7 @@ RCSIDENT("$SiLK: skipset.c f879a436e5b1 2016-11-03 19:16:05Z mthomas $");
  *    appear on one level and the lower 64 bits on the other.  Each 64
  *    bit value is followed by a single byte.  When the IP represents
  *    a /64 or larger (more IPs), the block is represented by a single
- *    64 bit value and the prefix; all other IPs are represenetd by
+ *    64 bit value and the prefix; all other IPs are represented by
  *    two 64 bit values.  For IPs in the same /64, the upper 64 bit
  *    value appears once followed by 0x82.  Next are the lower 64 bits
  *    of all the IPs in that /64.  Each lower IP is followed either by
@@ -288,10 +305,11 @@ RCSIDENT("$SiLK: skipset.c f879a436e5b1 2016-11-03 19:16:05Z mthomas $");
  *    The IPs appear in sorted order.  All values are written in
  *    native byte order.
  *
- *    Although the file contains only IPv6 addresses, there is a
- *    header entry that confirms this.  The header entry is compatible
- *    with that used by IPSET_REC_VERSION_RADIX.  The leaf length
- *    field specifies the contents; all other fields are 0.
+ *    Although the file format contains only IPv6 addresses, there is
+ *    a header entry that confirms this.  The header entry is
+ *    identical to that used by IPSET_REC_VERSION_RADIX.  All fields
+ *    are 0 except for the leaf length field.  The expected leaf
+ *    length is 16.
  */
 #define IPSET_REC_VERSION_SLASH64           5
 
@@ -1181,6 +1199,25 @@ struct skIPNode_st {
                               ((m_addr) & 0xFFFF)))
 
 
+/*  HEADER ENTRY */
+
+/*
+ *    sk_hentry_ipset_t is an in-memory representation of a streams's
+ *    header entry that describes the IPset data structure.  It is
+ *    present in IPset version 3, version 4, and version 5 files.
+ */
+struct sk_hentry_ipset_st {
+    sk_header_entry_spec_t  he_spec;
+    uint32_t                child_node;
+    uint32_t                leaf_count;
+    uint32_t                leaf_size;
+    uint32_t                node_count;
+    uint32_t                node_size;
+    uint32_t                root_idx;
+};
+typedef struct sk_hentry_ipset_st sk_hentry_ipset_t;
+
+
 /*  IPSET OPTIONS  */
 
 enum ipset_options_en {
@@ -1274,6 +1311,17 @@ ipsetFindV6(
     const uint32_t      prefix,
     ipset_find_t       *find_state);
 #endif
+static sk_header_entry_t *
+ipsetHentryCreate(
+    uint32_t            child_node,
+    uint32_t            leaf_count,
+    uint32_t            leaf_size,
+    uint32_t            node_count,
+    uint32_t            node_size,
+    uint32_t            root_idx);
+static void
+ipsetHentryFree(
+    sk_header_entry_t  *hentry);
 static int
 ipsetNewEntries(
     skipset_t          *ipset,
@@ -3441,6 +3489,249 @@ ipsetFixNodeSingleChild(
     NODEIDX_FREE(ipset, node_idx);
     ++remove_count;
     return remove_count;
+}
+
+
+/*
+ *    Call ipsetHentryCreate() (which see) to a new SiLK stream header
+ *    entry for an IPset and add that header entry to the file's
+ *    headers in 'hdr'.  Return an SKHEADER error code on failure.
+ */
+static int
+ipsetHentryAddToFile(
+    sk_file_header_t   *hdr,
+    uint32_t            child_node,
+    uint32_t            leaf_count,
+    uint32_t            leaf_size,
+    uint32_t            node_count,
+    uint32_t            node_size,
+    uint32_t            root_idx)
+{
+    int rv;
+    sk_header_entry_t *ipset_hdr = NULL;
+
+    ipset_hdr = ipsetHentryCreate(child_node, leaf_count, leaf_size,
+                                  node_count, node_size, root_idx);
+    if (NULL == ipset_hdr) {
+        return SKHEADER_ERR_ALLOC;
+    }
+
+    rv = skHeaderAddEntry(hdr, ipset_hdr);
+    if (rv) {
+        ipsetHentryFree(ipset_hdr);
+    }
+    return rv;
+}
+
+
+/*
+ *  hentry = ipsetHentryCopy(hentry);
+ *
+ *    Create and return a new header entry for IPset files that is a
+ *    copy of the header entry 'hentry'.
+ *
+ *    This is the 'copy_fn' callback for skHentryTypeRegister().
+ */
+static sk_header_entry_t *
+ipsetHentryCopy(
+    const sk_header_entry_t    *hentry)
+{
+    const sk_hentry_ipset_t *ipset_hdr = (sk_hentry_ipset_t*)hentry;
+
+    return ipsetHentryCreate(ipset_hdr->child_node, ipset_hdr->leaf_count,
+                             ipset_hdr->leaf_size, ipset_hdr->node_count,
+                             ipset_hdr->node_size, ipset_hdr->root_idx);
+}
+
+
+/*
+ *    Create and return a new header entry for IPset files.
+ *    'child_node' is the number of children per node, 'leaf_count' is
+ *    the number of leaves, 'leaf_size' is the size of an individual
+ *    leaf, 'node_count' is the number of (internal) nodes,
+ *    'node_size' is the size of an individual node, and
+ *    'root_index'is the index of the root of the tree.
+ */
+static sk_header_entry_t *
+ipsetHentryCreate(
+    uint32_t            child_node,
+    uint32_t            leaf_count,
+    uint32_t            leaf_size,
+    uint32_t            node_count,
+    uint32_t            node_size,
+    uint32_t            root_idx)
+{
+    sk_hentry_ipset_t *ipset_hdr;
+
+    ipset_hdr = (sk_hentry_ipset_t*)calloc(1, sizeof(sk_hentry_ipset_t));
+    if (NULL == ipset_hdr) {
+        return NULL;
+    }
+    ipset_hdr->he_spec.hes_id  = SK_HENTRY_IPSET_ID;
+    ipset_hdr->he_spec.hes_len = sizeof(sk_hentry_ipset_t);
+    ipset_hdr->child_node      = child_node;
+    ipset_hdr->leaf_count      = leaf_count;
+    ipset_hdr->leaf_size       = leaf_size;
+    ipset_hdr->node_count      = node_count;
+    ipset_hdr->node_size       = node_size;
+    ipset_hdr->root_idx        = root_idx;
+
+    return (sk_header_entry_t*)ipset_hdr;
+}
+
+
+/*
+ *  ipsetHentryFree(hentry);
+ *
+ *    Release any memory that is used by the in-memory representation
+ *    of the file header for IPset files.
+ *
+ *    This is the 'free_fn' callback for skHentryTypeRegister().
+ */
+static void
+ipsetHentryFree(
+    sk_header_entry_t  *hentry)
+{
+    if (hentry) {
+        assert(skHeaderEntryGetTypeId(hentry) == SK_HENTRY_IPSET_ID);
+        hentry->he_spec.hes_id = UINT32_MAX;
+        free(hentry);
+    }
+}
+
+
+#define ipsetHentryGetChildPerNode(hentry)              \
+    (((sk_hentry_ipset_t*)(hentry))->child_node)
+
+#define ipsetHentryGetLeafCount(hentry)                 \
+    (((sk_hentry_ipset_t*)(hentry))->leaf_count)
+
+#define ipsetHentryGetLeafSize(hentry)          \
+    (((sk_hentry_ipset_t*)(hentry))->leaf_size)
+
+#define ipsetHentryGetNodeCount(hentry)                 \
+    (((sk_hentry_ipset_t*)(hentry))->node_count)
+
+#define ipsetHentryGetNodeSize(hentry)          \
+    (((sk_hentry_ipset_t*)(hentry))->node_size)
+
+#define ipsetHentryGetRootIndex(hentry)         \
+    (((sk_hentry_ipset_t*)(hentry))->root_idx)
+
+
+/*
+ *  size = ipsetHentryPacker(hentry, buf, bufsiz);
+ *
+ *    Pack the contents of the header entry for IPset files, 'hentry'
+ *    into the buffer 'buf', whose size is 'bufsiz', for writing the
+ *    file to disk.
+ *
+ *    This the 'pack_fn' callback for skHentryTypeRegister().
+ */
+static ssize_t
+ipsetHentryPacker(
+    const sk_header_entry_t    *in_hentry,
+    uint8_t                    *out_packed,
+    size_t                      bufsize)
+{
+    sk_hentry_ipset_t *ipset_hdr = (sk_hentry_ipset_t*)in_hentry;
+    sk_hentry_ipset_t tmp_hdr;
+
+    assert(in_hentry);
+    assert(out_packed);
+    assert(skHeaderEntryGetTypeId(ipset_hdr) == SK_HENTRY_IPSET_ID);
+
+    if (bufsize >= sizeof(sk_hentry_ipset_t)) {
+        skHeaderEntrySpecPack(&(ipset_hdr->he_spec), (uint8_t *)&tmp_hdr,
+                              sizeof(tmp_hdr));
+        tmp_hdr.child_node = htonl(ipset_hdr->child_node);
+        tmp_hdr.leaf_count = htonl(ipset_hdr->leaf_count);
+        tmp_hdr.leaf_size  = htonl(ipset_hdr->leaf_size);
+        tmp_hdr.node_count = htonl(ipset_hdr->node_count);
+        tmp_hdr.node_size  = htonl(ipset_hdr->node_size);
+        tmp_hdr.root_idx   = htonl(ipset_hdr->root_idx);
+
+        memcpy(out_packed, &tmp_hdr, sizeof(sk_hentry_ipset_t));
+    }
+
+    return sizeof(sk_hentry_ipset_t);
+}
+
+
+/*
+ *  ipsetHentryPrint(hentry, fh);
+ *
+ *    Print a textual representation of a file's IPset header entry in
+ *    'hentry' to the FILE pointer 'fh'.
+ *
+ *    This is the 'print_fn' callback for skHentryTypeRegister().
+ */
+static void
+ipsetHentryPrint(
+    const sk_header_entry_t    *hentry,
+    FILE                       *fh)
+{
+    sk_hentry_ipset_t *ipset_hdr = (sk_hentry_ipset_t*)hentry;
+
+    assert(skHeaderEntryGetTypeId(ipset_hdr) == SK_HENTRY_IPSET_ID);
+    if ((0 == ipset_hdr->child_node) && (0 == ipset_hdr->root_idx)) {
+        /* assume this is a RecordVersion 4 file */
+        fprintf(fh, "IPv%d",
+                ((sizeof(uint32_t) == ipset_hdr->leaf_size) ? 4 : 6));
+    } else {
+        fprintf(fh, ("%" PRIu32 "-way branch, root@%" PRIu32 ", "
+                     "%" PRIu32 " x %" PRIu32 "b node%s, "
+                     "%" PRIu32 " x %" PRIu32 "b leaves"),
+                ipset_hdr->child_node, ipset_hdr->root_idx,
+                ipset_hdr->node_count, ipset_hdr->node_size,
+                ((ipset_hdr->node_count > 1) ? "s" : ""),
+                ipset_hdr->leaf_count, ipset_hdr->leaf_size);
+    }
+}
+
+
+/*
+ *  hentry = ipsetHentryUnpacker(buf);
+ *
+ *    Unpack the data in 'buf' to create an in-memory representation
+ *    of a file's IPset header entry.
+ *
+ *    This is the 'unpack_fn' callback for skHentryTypeRegister().
+ */
+static sk_header_entry_t *
+ipsetHentryUnpacker(
+    uint8_t            *in_packed)
+{
+    sk_hentry_ipset_t *ipset_hdr;
+
+    assert(in_packed);
+
+    /* create space for new header */
+    ipset_hdr = (sk_hentry_ipset_t*)calloc(1, sizeof(sk_hentry_ipset_t));
+    if (NULL == ipset_hdr) {
+        return NULL;
+    }
+
+    /* copy the spec */
+    skHeaderEntrySpecUnpack(&(ipset_hdr->he_spec), in_packed);
+    assert(skHeaderEntryGetTypeId(ipset_hdr) == SK_HENTRY_IPSET_ID);
+
+    /* copy the data */
+    if (ipset_hdr->he_spec.hes_len != sizeof(sk_hentry_ipset_t)) {
+        free(ipset_hdr);
+        return NULL;
+    }
+    memcpy(&(ipset_hdr->child_node),
+           &(in_packed[sizeof(sk_header_entry_spec_t)]),
+           sizeof(sk_hentry_ipset_t) - sizeof(sk_header_entry_spec_t));
+    ipset_hdr->child_node  = htonl(ipset_hdr->child_node);
+    ipset_hdr->leaf_count  = htonl(ipset_hdr->leaf_count);
+    ipset_hdr->leaf_size   = htonl(ipset_hdr->leaf_size);
+    ipset_hdr->node_count  = htonl(ipset_hdr->node_count);
+    ipset_hdr->node_size   = htonl(ipset_hdr->node_size);
+    ipset_hdr->root_idx    = htonl(ipset_hdr->root_idx);
+
+    return (sk_header_entry_t*)ipset_hdr;
 }
 
 
@@ -6866,7 +7157,7 @@ ipsetProcessStreamCidrbmapV4(
     if (NULL == hentry) {
         skAbort();
     }
-    if (sizeof(uint32_t) != skHentryIPSetGetLeafSize(hentry)) {
+    if (sizeof(uint32_t) != ipsetHentryGetLeafSize(hentry)) {
         skAbort();
     }
 
@@ -6957,7 +7248,7 @@ ipsetProcessStreamCidrbmapV6(
     if (NULL == hentry) {
         skAbort();
     }
-    if (IPSET_LEN_V6 != skHentryIPSetGetLeafSize(hentry)) {
+    if (IPSET_LEN_V6 != ipsetHentryGetLeafSize(hentry)) {
         skAbort();
     }
 
@@ -7099,19 +7390,19 @@ ipsetProcessStreamCidrbmap(
         skAbort();
     }
     /* most sizes are zero */
-    if (0 != skHentryIPSetGetChildPerNode(hentry)
-        || 0 != skHentryIPSetGetRootIndex(hentry)
-        || 0 != skHentryIPSetGetNodeCount(hentry)
-        || 0 != skHentryIPSetGetNodeSize(hentry)
-        || 0 != skHentryIPSetGetLeafCount(hentry))
+    if (0 != ipsetHentryGetChildPerNode(hentry)
+        || 0 != ipsetHentryGetRootIndex(hentry)
+        || 0 != ipsetHentryGetNodeCount(hentry)
+        || 0 != ipsetHentryGetNodeSize(hentry)
+        || 0 != ipsetHentryGetLeafCount(hentry))
     {
         skAbort();
     }
-    if (sizeof(uint32_t) == skHentryIPSetGetLeafSize(hentry)) {
+    if (sizeof(uint32_t) == ipsetHentryGetLeafSize(hentry)) {
         return ipsetProcessStreamCidrbmapV4(stream, hdr, proc_stream_state);
     }
 #if SK_ENABLE_IPV6
-    if (IPSET_LEN_V6 == skHentryIPSetGetLeafSize(hentry)) {
+    if (IPSET_LEN_V6 == ipsetHentryGetLeafSize(hentry)) {
         return ipsetProcessStreamCidrbmapV6(stream, hdr, proc_stream_state);
     }
 #endif
@@ -7323,21 +7614,21 @@ ipsetProcessStreamRadix(
     }
 
     /* Verify that children/node is what we expect */
-    if (IPSET_NUM_CHILDREN != skHentryIPSetGetChildPerNode(hentry)) {
+    if (IPSET_NUM_CHILDREN != ipsetHentryGetChildPerNode(hentry)) {
         skAbort();
     }
 
     /* See if leaf and node sizes are for IPv4 or IPv6.  We must check
-     * IPv4 first, since IPv4 and IPv6 sizes are identical when SiLK
-     * is built without IPv6 support */
-    if (sizeof(ipset_leaf_v4_t) == skHentryIPSetGetLeafSize(hentry)
-        && sizeof(ipset_node_v4_t) == skHentryIPSetGetNodeSize(hentry))
+     * IPv4 first, since the size of the IPv4 and IPv6 structs are
+     * identical when SiLK is built without IPv6 support */
+    if (sizeof(ipset_leaf_v4_t) == ipsetHentryGetLeafSize(hentry)
+        && sizeof(ipset_node_v4_t) == ipsetHentryGetNodeSize(hentry))
     {
 #if SK_ENABLE_IPV6
         is_ipv6 = 0;
     }
-    else if (sizeof(ipset_leaf_v6_t) == skHentryIPSetGetLeafSize(hentry)
-             && sizeof(ipset_node_v6_t) == skHentryIPSetGetNodeSize(hentry))
+    else if (sizeof(ipset_leaf_v6_t) == ipsetHentryGetLeafSize(hentry)
+             && sizeof(ipset_node_v6_t) == ipsetHentryGetNodeSize(hentry))
     {
         is_ipv6 = 1;
 #endif  /* SK_ENABLE_IPV6 */
@@ -7347,8 +7638,8 @@ ipsetProcessStreamRadix(
     }
 
     /* skip over the nodes since we only need the IPs in the leaves */
-    bytes = (skHentryIPSetGetNodeCount(hentry)
-             * skHentryIPSetGetNodeSize(hentry));
+    bytes = (ipsetHentryGetNodeCount(hentry)
+             * ipsetHentryGetNodeSize(hentry));
     b = skStreamRead(stream, NULL, bytes);
     if (b != bytes) {
         ipsetReadStrerrror(stream, ("Attempting to read %" SK_PRIdZ
@@ -7358,10 +7649,10 @@ ipsetProcessStreamRadix(
     }
 
     /* skip the first leaf, which contains no data */
-    bytes = skHentryIPSetGetLeafSize(hentry);
+    bytes = ipsetHentryGetLeafSize(hentry);
     b = skStreamRead(stream, NULL, bytes);
     if (b != bytes) {
-        if (b == 0 && skHentryIPSetGetLeafCount(hentry) == 0) {
+        if (b == 0 && ipsetHentryGetLeafCount(hentry) == 0) {
             rv = SKIPSET_OK;
         } else {
             ipsetReadStrerrror(stream, ("Attempting to read %" SK_PRIdZ
@@ -7446,7 +7737,7 @@ ipsetProcessStreamRadix(
             goto END;
         }
     }
-    assert(skHentryIPSetGetLeafCount(hentry) == count);
+    assert(ipsetHentryGetLeafCount(hentry) == count);
 
     rv = SKIPSET_OK;
 
@@ -7523,7 +7814,7 @@ ipsetProcessStreamSlash64(
     if (NULL == hentry) {
         skAbort();
     }
-    if (IPSET_LEN_V6 != skHentryIPSetGetLeafSize(hentry)) {
+    if (IPSET_LEN_V6 != ipsetHentryGetLeafSize(hentry)) {
         skAbort();
     }
 
@@ -8032,8 +8323,8 @@ ipsetReadRadixIntoRadix(
     }
 
     /* if no nodes or only node#0, root is a leaf */
-    IPSET_ROOT_INDEX_SET(ipset, skHentryIPSetGetRootIndex(hentry),
-                         (skHentryIPSetGetNodeCount(hentry) <= 1));
+    IPSET_ROOT_INDEX_SET(ipset, ipsetHentryGetRootIndex(hentry),
+                         (ipsetHentryGetNodeCount(hentry) <= 1));
 
     if (skStreamIsSeekable(stream)
         && skHeaderIsNativeByteOrder(hdr)
@@ -8064,17 +8355,17 @@ ipsetReadRadixIntoRadix(
                 buf += data_start;
                 ipset->s.v3->nodes.buf = buf;
                 ipset->s.v3->nodes.entry_count
-                    = skHentryIPSetGetNodeCount(hentry);
+                    = ipsetHentryGetNodeCount(hentry);
 
                 /* move over the nodes (to the leaves)  */
-                buf += (skHentryIPSetGetNodeCount(hentry)
+                buf += (ipsetHentryGetNodeCount(hentry)
                         * ipset->s.v3->nodes.entry_size);
                 ipset->s.v3->leaves.buf = buf;
                 ipset->s.v3->nodes.entry_count
-                    = skHentryIPSetGetLeafCount(hentry);
+                    = ipsetHentryGetLeafCount(hentry);
 
                 /* move over the leaves to the end of the file */
-                buf += (skHentryIPSetGetLeafCount(hentry)
+                buf += (ipsetHentryGetLeafCount(hentry)
                         * ipset->s.v3->leaves.entry_size);
                 if (buf >= ((uint8_t*)ipset->s.v3->mapped_file
                             + ipset->s.v3->mapped_size))
@@ -8097,12 +8388,12 @@ ipsetReadRadixIntoRadix(
     if (NULL == ipset->s.v3->mapped_file) {
         /* Allocate and read the nodes */
         rv = ipsetAllocEntries(&ipset->s.v3->nodes,
-                               skHentryIPSetGetNodeCount(hentry));
+                               ipsetHentryGetNodeCount(hentry));
         if (rv) {
             goto END;
         }
 
-        bytes = (skHentryIPSetGetNodeCount(hentry)
+        bytes = (ipsetHentryGetNodeCount(hentry)
                  * ipset->s.v3->nodes.entry_size);
         b = skStreamRead(stream, ipset->s.v3->nodes.buf, bytes);
         if (b != bytes && b != 0) {
@@ -8112,7 +8403,7 @@ ipsetReadRadixIntoRadix(
             rv = SKIPSET_ERR_FILEIO;
             goto END;
         }
-        ipset->s.v3->nodes.entry_count = skHentryIPSetGetNodeCount(hentry);
+        ipset->s.v3->nodes.entry_count = ipsetHentryGetNodeCount(hentry);
 
         /* now, if the data is not in native byte order, we need to
          * byte-swap the values */
@@ -8146,12 +8437,12 @@ ipsetReadRadixIntoRadix(
 
         /* Allocate and read the leaves */
         rv = ipsetAllocEntries(&ipset->s.v3->leaves,
-                               skHentryIPSetGetLeafCount(hentry));
+                               ipsetHentryGetLeafCount(hentry));
         if (rv) {
             goto END;
         }
 
-        bytes = (skHentryIPSetGetLeafCount(hentry)
+        bytes = (ipsetHentryGetLeafCount(hentry)
                  * ipset->s.v3->leaves.entry_size);
         b = skStreamRead(stream, ipset->s.v3->leaves.buf, bytes);
         if (b != bytes && b != 0) {
@@ -8161,7 +8452,7 @@ ipsetReadRadixIntoRadix(
             rv = SKIPSET_ERR_FILEIO;
             goto END;
         }
-        ipset->s.v3->leaves.entry_count = skHentryIPSetGetLeafCount(hentry);
+        ipset->s.v3->leaves.entry_count = ipsetHentryGetLeafCount(hentry);
 
         /* now, if the data is not in native byte order, we need to
          * byte-swap the values */
@@ -8322,20 +8613,21 @@ ipsetReadStreamHeader(
             return SKIPSET_ERR_FILEHEADER;
         }
         /* Verify that children/node is what we expect */
-        if (IPSET_NUM_CHILDREN != skHentryIPSetGetChildPerNode(hentry)) {
+        if (IPSET_NUM_CHILDREN != ipsetHentryGetChildPerNode(hentry)) {
             return SKIPSET_ERR_FILEHEADER;
         }
 
         /* See if leaf and node sizes are for IPv4 or IPv6.  We must
-         * check IPv4 first, since IPv4 and IPv6 sizes are identical
-         * when SiLK is built without IPv6 support */
-        if (sizeof(ipset_leaf_v4_t) == skHentryIPSetGetLeafSize(hentry)
-            && sizeof(ipset_node_v4_t) == skHentryIPSetGetNodeSize(hentry))
+         * check IPv4 first, since the size of the IPv4 and IPv6
+         * structs are identical when SiLK is built without IPv6
+         * support */
+        if (sizeof(ipset_leaf_v4_t) == ipsetHentryGetLeafSize(hentry)
+            && sizeof(ipset_node_v4_t) == ipsetHentryGetNodeSize(hentry))
         {
             *is_ipv6 = 0;
         }
-        else if (sizeof(ipset_leaf_v6_t) == skHentryIPSetGetLeafSize(hentry)
-                 && sizeof(ipset_node_v6_t) ==skHentryIPSetGetNodeSize(hentry))
+        else if (sizeof(ipset_leaf_v6_t) == ipsetHentryGetLeafSize(hentry)
+                 && sizeof(ipset_node_v6_t) == ipsetHentryGetNodeSize(hentry))
         {
             *is_ipv6 = 1;
         } else {
@@ -8349,17 +8641,17 @@ ipsetReadStreamHeader(
             return SKIPSET_ERR_FILEHEADER;
         }
         /* most sizes are zero */
-        if (0 != skHentryIPSetGetChildPerNode(hentry)
-            || 0 != skHentryIPSetGetRootIndex(hentry)
-            || 0 != skHentryIPSetGetNodeCount(hentry)
-            || 0 != skHentryIPSetGetNodeSize(hentry)
-            || 0 != skHentryIPSetGetLeafCount(hentry))
+        if (0 != ipsetHentryGetChildPerNode(hentry)
+            || 0 != ipsetHentryGetRootIndex(hentry)
+            || 0 != ipsetHentryGetNodeCount(hentry)
+            || 0 != ipsetHentryGetNodeSize(hentry)
+            || 0 != ipsetHentryGetLeafCount(hentry))
         {
             return SKIPSET_ERR_FILEHEADER;
         }
-        if (sizeof(uint32_t) == skHentryIPSetGetLeafSize(hentry)) {
+        if (sizeof(uint32_t) == ipsetHentryGetLeafSize(hentry)) {
             *is_ipv6 = 0;
-        } else if (IPSET_LEN_V6 == skHentryIPSetGetLeafSize(hentry)) {
+        } else if (IPSET_LEN_V6 == ipsetHentryGetLeafSize(hentry)) {
             *is_ipv6 = 1;
         } else {
             /* Unrecognized record size */
@@ -8372,16 +8664,16 @@ ipsetReadStreamHeader(
             return SKIPSET_ERR_FILEHEADER;
         }
         /* most sizes are zero */
-        if (0 != skHentryIPSetGetChildPerNode(hentry)
-            || 0 != skHentryIPSetGetRootIndex(hentry)
-            || 0 != skHentryIPSetGetNodeCount(hentry)
-            || 0 != skHentryIPSetGetNodeSize(hentry)
-            || 0 != skHentryIPSetGetLeafCount(hentry))
+        if (0 != ipsetHentryGetChildPerNode(hentry)
+            || 0 != ipsetHentryGetRootIndex(hentry)
+            || 0 != ipsetHentryGetNodeCount(hentry)
+            || 0 != ipsetHentryGetNodeSize(hentry)
+            || 0 != ipsetHentryGetLeafCount(hentry))
         {
             return SKIPSET_ERR_FILEHEADER;
         }
         /* format only supports IPv6 */
-        if (IPSET_LEN_V6 == skHentryIPSetGetLeafSize(hentry)) {
+        if (IPSET_LEN_V6 == ipsetHentryGetLeafSize(hentry)) {
             *is_ipv6 = 1;
         } else {
             /* Unrecognized record size */
@@ -10517,9 +10809,9 @@ ipsetWriteCidrbmap(
     }
 
     /* Add the appropriate header */
-    rv = skHeaderAddIPSet(hdr, 0, 0,
-                          ipset->is_ipv6 ? IPSET_LEN_V6 : sizeof(uint32_t),
-                          0, 0, 0);
+    rv = ipsetHentryAddToFile(hdr, 0, 0,
+                              ipset->is_ipv6 ? IPSET_LEN_V6 : sizeof(uint32_t),
+                              0, 0, 0);
     if (rv) {
         skAppPrintErr("%s", skHeaderStrerror(rv));
         return SKIPSET_ERR_FILEIO;
@@ -10891,12 +11183,12 @@ ipsetWriteRadix(
     }
 
     /* Add the appropriate header */
-    rv = skHeaderAddIPSet(hdr, IPSET_NUM_CHILDREN,
-                          ipset->s.v3->leaves.entry_count,
-                          ipset->s.v3->leaves.entry_size,
-                          ipset->s.v3->nodes.entry_count,
-                          ipset->s.v3->nodes.entry_size,
-                          IPSET_ROOT_INDEX(ipset));
+    rv = ipsetHentryAddToFile(hdr, IPSET_NUM_CHILDREN,
+                              ipset->s.v3->leaves.entry_count,
+                              ipset->s.v3->leaves.entry_size,
+                              ipset->s.v3->nodes.entry_count,
+                              ipset->s.v3->nodes.entry_size,
+                              IPSET_ROOT_INDEX(ipset));
     if (rv) {
         skAppPrintErr("%s", skHeaderStrerror(rv));
         rv = SKIPSET_ERR_FILEIO;
@@ -11012,7 +11304,7 @@ ipsetWriteSlash64(
     }
 
     /* Add the appropriate header */
-    rv = skHeaderAddIPSet(hdr, 0, 0, IPSET_LEN_V6, 0, 0, 0);
+    rv = ipsetHentryAddToFile(hdr, 0, 0, IPSET_LEN_V6, 0, 0, 0);
     if (rv) {
         skAppPrintErr("%s", skHeaderStrerror(rv));
         return SKIPSET_ERR_FILEIO;
@@ -13154,8 +13446,8 @@ skIPSetRead(
             skAbort();
         }
         /* check for an empty IPset */
-        if (0 == skHentryIPSetGetNodeCount(hentry)
-            && 0 == skHentryIPSetGetLeafCount(hentry))
+        if (0 == ipsetHentryGetNodeCount(hentry)
+            && 0 == ipsetHentryGetLeafCount(hentry))
         {
             if (!is_ipv6 && IPSET_USE_IPTREE) {
                 return ipsetCreate(ipset_out, 0, 0);
@@ -13190,6 +13482,18 @@ skIPSetRead(
     }
 
     skAbort();
+}
+
+
+/* the prototype for this function is in skheader_priv.h */
+int
+skIPSetRegisterHeaderEntry(
+    sk_hentry_type_id_t     entry_id)
+{
+    assert(SK_HENTRY_IPSET_ID == entry_id);
+    return (skHentryTypeRegister(
+                entry_id, &ipsetHentryPacker, &ipsetHentryUnpacker,
+                &ipsetHentryCopy, &ipsetHentryFree, &ipsetHentryPrint));
 }
 
 
@@ -13758,6 +14062,7 @@ skIPSetWrite(
 
     /* prep the header */
     hdr = skStreamGetSilkHeader(stream);
+    skHeaderSetByteOrder(hdr, SILK_ENDIAN_NATIVE);
     skHeaderSetFileFormat(hdr, FT_IPSET);
     skHeaderSetRecordVersion(hdr, record_version);
     skHeaderSetRecordLength(hdr, 1);
