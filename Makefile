@@ -2,40 +2,42 @@ MAINTAINER = "Bo Bayles <bbayles+netsa@gmail.com>"
 VERSION = 20170325
 PROC_ARC ?= amd64
 TARGET_ROOT = $(shell pwd)/packaging/root
-YAF_PREFIX = ${TARGET_ROOT}/opt/yaf
-SILK_PREFIX = ${TARGET_ROOT}/opt/silk
-LIBFIXBUF_PREFIX = ${TARGET_ROOT}/opt/libfixbuf
 OUTPUT_DIR = $(shell pwd)/packaging/output
 
 libfixbuf:
-	mkdir -p ${LIBFIXBUF_PREFIX}
+	mkdir -p ${TARGET_ROOT}
 	(cd libfixbuf-src; \
 		autoreconf -if; \
-		./configure --prefix="${LIBFIXBUF_PREFIX}")
+		./configure)
 	make -C libfixbuf-src
-	make -C libfixbuf-src install
+	make -C libfixbuf-src install DESTDIR="${TARGET_ROOT}"
 
 yaf:
-	mkdir -p ${YAF_PREFIX}
+	mkdir -p ${TARGET_ROOT}
 	(cd yaf-src; \
 		autoreconf -if; \
-		PKG_CONFIG_PATH="${LIBFIXBUF_PREFIX}/lib/pkgconfig" ./configure \
-			--prefix="${YAF_PREFIX}")
+		./configure \
+			PKG_CONFIG_PATH="${TARGET_ROOT}/usr/local/lib/pkgconfig" \
+			CPPFLAGS="-I${TARGET_ROOT}/usr/local/include" \
+			CFLAGS="-I${TARGET_ROOT}/usr/local/include" \
+			LDFLAGS="-L${TARGET_ROOT}/usr/local/lib" \
+			--enable-applabel \
+			--enable-plugins)
 	make -C yaf-src
-	make -C yaf-src install
+	make -C yaf-src install DESTDIR="${TARGET_ROOT}"
 
 silk:
-	mkdir -p ${SILK_PREFIX}
+	mkdir -p ${TARGET_ROOT}
 	(cd silk-src; \
 		autoreconf -if; \
 		./configure \
-			--with-libfixbuf="${LIBFIXBUF_PREFIX}/lib/pkgconfig" \
-			--enable-ipv6 \
-			--prefix="${SILK_PREFIX}")
+			--with-libfixbuf="${TARGET_ROOT}/usr/local/lib/pkgconfig" \
+			--enable-ipv6)
 	make -C silk-src
-	make -C silk-src install
+	make -C silk-src install DESTDIR="${TARGET_ROOT}"
 
 deb:
+	mkdir -p ${OUTPUT_DIR}
 	fpm \
 		-s dir \
 		-t deb \
@@ -60,6 +62,7 @@ deb:
 		packaging/root/=/
 
 rpm:
+	mkdir -p ${OUTPUT_DIR}
 	fpm \
 		-s dir \
 		-t rpm \
@@ -96,5 +99,6 @@ build_centos:
 	docker run -v "${OUTPUT_DIR}:/netsa-pkg/packaging/output" $(IMAGE_ID) /usr/bin/make build_rpm
 	chmod -R 776 ${OUTPUT_DIR}/*
 
+.PHONY: clean
 clean:
 	git clean -dxf
