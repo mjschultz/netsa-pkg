@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpdedupe.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwpdedupe.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include "rwppacketheaders.h"
 #include <silk/skdllist.h>
@@ -717,7 +717,9 @@ selectDuplicate(
     sk_dllist_t        *dupes)
 {
     sk_dll_iter_t node;
+
     pcap_pkt_t *pkt;
+
     double chance;
     double value;
     int count;

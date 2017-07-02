@@ -20,7 +20,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKVECTOR_H, "$SiLK: skvector.h 78caf6ae8f54 2017-02-14 14:54:52Z mthomas $");
+RCSIDENTVAR(rcsID_SKVECTOR_H, "$SiLK: skvector.h e2e369df9c53 2017-06-23 14:59:01Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -48,6 +48,8 @@ RCSIDENTVAR(rcsID_SKVECTOR_H, "$SiLK: skvector.h 78caf6ae8f54 2017-02-14 14:54:5
  *    internal memory.  One more than this value is the count of
  *    elements in the vector.
  *
+ *    The functions in this file exit when memory cannot be allocated.
+ *
  *    This file is part of libsilk.
  */
 
@@ -61,18 +63,21 @@ RCSIDENTVAR(rcsID_SKVECTOR_H, "$SiLK: skvector.h 78caf6ae8f54 2017-02-14 14:54:5
  *    Does not allocate space for the elements; that is, the initial
  *    capacity of the vector is 0.
  *
- *    Returns the new vector or NULL if 'element_size' is 0 or the
- *    allocation fails.
+ *    Returns the new vector.  Returns NULL if 'element_size' is 0.
+ *    Exits on allocation error.
  *
- *    The caller should use skVectorDestroy() to free the vector once
- *    it is no longer needed.
+ *    The caller should use sk_vector_destroy() to free the vector
+ *    once it is no longer needed.
  *
  *    Other functions that create a new vector are
- *    skVectorNewFromArray() and skVectorClone().
+ *    sk_vector_create_from_array() and sk_vector_clone().
  */
 sk_vector_t *
-skVectorNew(
+sk_vector_create(
     size_t              element_size);
+
+#define skVectorNew(element_size)               \
+    sk_vector_create(element_size)
 
 
 /**
@@ -80,23 +85,27 @@ skVectorNew(
  *    'element_size' bytes, allocates enough space for 'count'
  *    elements, and copies ('count' * 'element_size') bytes from
  *    'array' into the vector.  This is equivalent to calling
- *    skVectorNew() and skVectorAppendFromArray().
+ *    sk_vector_create() and sk_vector_append_from_array().
  *
- *    Returns the new vector or NULL on allocation error or if
- *    'element_size' is 0.  Returns an empty vector when 'count' is 0
- *    or 'array' is NULL.
+ *    Returns NULL when 'element_size' is 0.  When 'array' is NULL or
+ *    'count' is 0, equivalent to sk_vector_create(element_size).
  *
- *    The caller should use skVectorDestroy() to free the vector once
- *    it is no longer needed.
+ *    The caller should use sk_vector_destroy() to free the vector
+ *    once it is no longer needed.
  *
- *    Other functions that create a new vector are skVectorNew() and
- *    skVectorClone().
+ *    Returns the new vector.  Exits on allocation error.
+ *
+ *    Other functions that create a new vector are sk_vector_create()
+ *    and sk_vector_clone().
  */
 sk_vector_t *
-skVectorNewFromArray(
+sk_vector_create_from_array(
     size_t              element_size,
     const void         *array,
     size_t              count);
+
+#define skVectorNewFromArray(element_size, array, count)        \
+    sk_vector_create_from_array(element_size, array, count)
 
 
 /**
@@ -105,17 +114,20 @@ skVectorNewFromArray(
  *    The capacity of the new vector is set to the count of the number
  *    of elements in 'v'.
  *
- *    Returns the new vector or NULL on allocation error.
+ *    Returns the new vector.  Exits on allocation error.
  *
- *    The caller should use skVectorDestroy() to free the vector once
- *    it is no longer needed.
+ *    The caller should use sk_vector_destroy() to free the vector
+ *    once it is no longer needed.
  *
- *    Other functions that create a new vector are skVectorNew() and
- *    skVectorNewFromArray().
+ *    Other functions that create a new vector are sk_vector_create()
+ *    and sk_vector_create_from_array().
  */
 sk_vector_t *
-skVectorClone(
+sk_vector_clone(
     const sk_vector_t  *v);
+
+#define skVectorClone(v)                        \
+    sk_vector_clone(v)
 
 
 /**
@@ -127,8 +139,11 @@ skVectorClone(
  *    destroying it.
  */
 void
-skVectorDestroy(
+sk_vector_destroy(
     sk_vector_t        *v);
+
+#define skVectorDestroy(v)                      \
+    sk_vector_destroy(v)
 
 
 /**
@@ -139,14 +154,17 @@ skVectorDestroy(
  *    caller's responsibility to free the items before changing its
  *    capacity.
  *
- *    Returns 0 on success or -1 for an allocation error.
+ *    Returns 0 on success.  Exits on allocation error.
  *
- *    See also skVectorGetCapacity().
+ *    See also sk_vector_get_capacity().
  */
 int
-skVectorSetCapacity(
+sk_vector_set_capacity(
     sk_vector_t        *v,
     size_t              capacity);
+
+#define skVectorSetCapacity(v, capacity)        \
+    sk_vector_set_capacity(v, capacity)
 
 
 /**
@@ -159,32 +177,42 @@ skVectorSetCapacity(
  *    clearing it.
  */
 void
-skVectorClear(
+sk_vector_clear(
     sk_vector_t        *v);
+
+#define skVectorClear(v)                        \
+    sk_vector_clear(v)
 
 
 /**
  *    Returns the element size that was specified when the vector 'v'
- *    was created via skVectorNew() or skVectorNewFromArray().
+ *    was created via sk_vector_create() or
+ *    sk_vector_create_from_array().
  */
 size_t
-skVectorGetElementSize(
+sk_vector_get_element_size(
     const sk_vector_t  *v);
+
+#define skVectorGetElementSize(v)               \
+    sk_vector_get_element_size(v)
 
 
 /**
  *    Returns the capacity of the vector 'v', i.e., the number of
  *    elements the vector can hold without requiring a re-allocation.
  *
- *    The functions skVectorInsertValue() and skVectorSetValue()
+ *    The functions sk_vector_insert_value() and sk_vector_set_value()
  *    return -1 when their 'position' argument is not less than the
  *    value returned by this function.
  *
- *    See also skVectorSetCapacity().
+ *    See also sk_vector_set_capacity().
  */
 size_t
-skVectorGetCapacity(
+sk_vector_get_capacity(
     const sk_vector_t  *v);
+
+#define skVectorGetCapacity(v)                  \
+    sk_vector_get_capacity(v)
 
 
 /**
@@ -192,147 +220,133 @@ skVectorGetCapacity(
  *    'v'.  (Technically, returns one more than the highest position
  *    currently in use in 'v'.)
  *
- *    The functions skVectorGetValue() and skVectorGetValuePointer()
- *    return -1 when their 'position' argument is not less than the
- *    value returned by this function.
+ *    The functions sk_vector_get_value() and
+ *    sk_vector_get_value_pointer() return -1 when their 'position'
+ *    argument is not less than the value returned by this function.
  */
 size_t
-skVectorGetCount(
+sk_vector_get_count(
     const sk_vector_t  *v);
+
+#define skVectorGetCount(v)                     \
+    sk_vector_get_count(v)
 
 
 /**
  *    Copies the data at 'value' into the vector 'v' at position
- *    skVectorGetCount(v), increasing the capacity of the 'v' if
- *    necessary.  Returns 0 on success or -1 for an allocation error.
+ *    sk_vector_get_count(v).
+ *
+ *    Equivalent to the following, except this function increases the
+ *    capacity of the vector as needed:
+ *
+ *    sk_vector_set_value(v, sk_vector_get_count(v), value);
+ *
+ *    Returns 0.  Exits on allocation error.
  */
 int
-skVectorAppendValue(
+sk_vector_append_value(
     sk_vector_t        *v,
     const void         *value);
 
+#define skVectorAppendValue(v, value)           \
+    sk_vector_append_value(v, value)
+
+
 /**
  *    Copies the data from 'src' into the vector 'dst' at position
- *    skVectorGetCount(v), increasing the capacity of the vector 'dst'
- *    if necessary.  Returns 0 on success or -1 for an allocation
- *    error.
+ *    sk_vector_get_count(v).
+ *
+ *    Returns 0 on success.  Returns -1 if 'src' and 'dst' do not have
+ *    the same element size.  Exits on allocation error.
  */
 int
-skVectorAppendVector(
+sk_vector_append_vector(
     sk_vector_t        *dst,
     const sk_vector_t  *src);
 
+#define skVectorAppendVector(dst, src)          \
+    sk_vector_append_vector(dst, src)
+
+
 /**
- *    Copies the data from 'array' into the vector 'v' at position
- *    skVectorGetCount(v), increasing the capacity of the 'v' if
- *    necessary.  Returns 0 on success or -1 for an allocation error.
+ *    Copies 'count' elements from 'array' into the vector 'v' at
+ *    position sk_vector_get_count(v).  Assumes the size of the
+ *    elements in 'array' are sk_vector_get_element_size(v).
  *
- *    See also skVectorNewFromArray().
+ *    Returns 0 on success.  Exits on allocation error.
+ *
+ *    See also sk_vector_append_value() and
+ *    sk_vector_create_from_array().
  */
 int
-skVectorAppendFromArray(
+sk_vector_append_from_array(
     sk_vector_t        *v,
     const void         *array,
     size_t              count);
 
-
-/**
- *    Copies the data in vector 'v' at 'position' to the location
- *    pointed at by 'out_element'.  The first position in the vector
- *    is position 0.  Returns 0 on success or -1 if 'position' is not
- *    less than skVectorGetCount(v).
- *
- *    See also skVectorGetValuePointer(), which returns a pointer to
- *    the element without needing to copy the contents of the element.
- *
- *    To get multiple values from a vector, consider using
- *    skVectorGetMultipleValues(), skVectorToArray(), or
- *    skVectorToArrayAlloc().  This function is equivalent to
- *
- *    -1 + skVectorGetMultipleValues(out_element, v, position, 1);
- *
- *    To get a value and also remove it from the vector, use
- *    skVectorRemoveValue().
- */
-int
-skVectorGetValue(
-    void               *out_element,
-    const sk_vector_t  *v,
-    size_t              position);
-
-
-/**
- *    Returns a pointer to the data item in vector 'v' at 'position'.
- *    The first position in the vector is position 0.  Returns NULL if
- *    'position' is not less than skVectorGetCount(v).
- *
- *    The caller should not cache this value, since any addition to
- *    the vector may result in a re-allocation that could make the
- *    pointer invalid.
- *
- *    See also skVectorGetValue().
- */
-void *
-skVectorGetValuePointer(
-    const sk_vector_t  *v,
-    size_t              position);
+#define skVectorAppendFromArray(v, array, count)        \
+    sk_vector_append_from_array(v, array, count)
 
 
 /**
  *    Copies the data at 'value' into the vector 'v' at 'position',
  *    where 0 denotes the first position in the vector.
  *
- *    If 'position' is less than the value skVectorGetCount(), the
+ *    If 'position' is less than the value sk_vector_get_count(), the
  *    previous element at that position is overwritten.  If the vector
  *    contains pointers, it is the caller's responsibility to free the
  *    element at that position prior to overwriting it.
  *
- *    Use skVectorInsertValue() to insert a value at a position
+ *    Use sk_vector_insert_value() to insert a value at a position
  *    without overwriting the existing data.
  *
  *    The value 'position' must be within the current capacity of the
- *    vector (that is, less than the value skVectorGetCapacity())
+ *    vector (that is, less than the value sk_vector_get_capacity())
  *    since the vector will not grow to support data at 'position'.
  *    If 'position' is too large, -1 is returned.
  *
- *    When 'position' is greater than or equal to skVectorGetCount()
- *    and less than skVectorGetCapacity(), the count of elements in
- *    'v' is set to 1+'position' and the bytes for the elements from
- *    skVectorGetCount() to 'position' are set to '\0'.
+ *    When 'position' is greater than or equal to
+ *    sk_vector_get_count() and less than sk_vector_get_capacity(),
+ *    the count of elements in 'v' is set to 1+'position' and the
+ *    bytes for the elements from sk_vector_get_count() to 'position'
+ *    are set to '\0'.
  *
  *    Return 0 on success or -1 if 'position' is too large.
  */
 int
-skVectorSetValue(
+sk_vector_set_value(
     sk_vector_t        *v,
     size_t              position,
     const void         *value);
+
+#define skVectorSetValue(v, position, value)    \
+    sk_vector_set_value(v, position, value)
 
 
 /**
  *    Copies the data at 'value' into the vector 'v' at position
  *    'position', where 0 is the first position in the vector.
  *
- *    If 'position' is less than the value skVectorGetCount(),
- *    elements from 'position' to skVectorGetCount(v) are moved one
- *    location higher, increasing the capacity of the vector if
- *    necessary.
+ *    If 'position' is less than sk_vector_get_count(v), elements from
+ *    'position' to sk_vector_get_count(v) are moved one location
+ *    higher, increasing the capacity of the vector if necessary.
  *
- *    When 'position' is not less than skVectorGetCount(v), this
- *    function is equivalent to skVectorSetValue(v, position, value),
- *    which requires 'position' to be within the current capacity of
- *    the vector.  See skVectorSetValue() for details.
+ *    When 'position' is not less than sk_vector_get_count(v), this
+ *    function is equivalent to sk_vector_set_value(v, position,
+ *    value), which requires 'position' to be within the current
+ *    capacity of the vector.  See sk_vector_set_value() for details.
  *
- *    Returns 0 on success.  Returns -1 on allocation error or if
- *    'position' is not less than skVectorGetCapacity().
- *
- *    Since SiLK 3.11.0.
+ *    Returns 0 on success..  Returns -1 if 'position' is not less
+ *    than sk_vector_get_capacity().  Exits on allocation error.
  */
 int
-skVectorInsertValue(
+sk_vector_insert_value(
     sk_vector_t        *v,
     size_t              position,
     const void         *value);
+
+#define skVectorInsertValue(v, position, value) \
+    sk_vector_insert_value(v, position, value)
 
 
 /**
@@ -341,24 +355,79 @@ skVectorInsertValue(
  *    the vector.  The first position in the vector is position 0.
  *    The 'out_element' parameter may be NULL.
  *
- *    All elements in 'v' from 'position' to skVectorGetCount(v) are
- *    moved one location lower.  If the vector contains pointers, it
- *    is the caller's responsibility to free the removed item.  Does
- *    not change the capacity of the vector.
+ *    All elements in 'v' from 'position' to sk_vector_get_count(v)
+ *    are moved one location lower.  If the vector contains pointers,
+ *    it is the caller's responsibility to free the removed item.
+ *    Does not change the capacity of the vector.
  *
  *    Returns 0 on success.  Returns -1 if 'position' is not less than
- *    skVectorGetCount(v).
+ *    sk_vector_get_count(v).
  *
- *    Use skVectorGetValue() to get a value without removing it from
- *    the vector.
- *
- *    Since SiLK 3.11.0.
+ *    Use sk_vector_get_value() to get a value without removing it
+ *    from the vector.
  */
 int
-skVectorRemoveValue(
+sk_vector_remove_value(
     sk_vector_t        *v,
     size_t              position,
     void               *out_element);
+
+#define skVectorRemoveValue(v, position, out_element)   \
+    sk_vector_remove_value(v, position, out_element)
+
+
+/**
+ *    Copies the data in vector 'v' at 'position' to the location
+ *    pointed at by 'out_element'.  The first position in the vector
+ *    is position 0.  Returns 0 on success, or -1 if 'position' is
+ *    not less than sk_vector_get_count(v).
+ *
+ *    It is the caller's responsibility to ensure that the location
+ *    referenced by 'out_element' can hold a value of size
+ *    sk_vector_get_element_size(v).
+ *
+ *    See also sk_vector_get_value_pointer(), which returns a pointer
+ *    to the element without needing to copy the contents of the
+ *    element.
+ *
+ *    To get multiple values from a vector, consider using
+ *    sk_vector_get_multiple_values(), sk_vector_to_array(), or
+ *    sk_vector_to_array_alloc().  This function is equivalent to
+ *
+ *    -1 + sk_vector_get_multiple_values(v, position, out_element, 1)
+ *
+ *    To get a value and also remove it from the vector, use
+ *    sk_vector_remove_value().
+ */
+int
+sk_vector_get_value(
+    const sk_vector_t  *v,
+    size_t              position,
+    void               *out_element);
+
+/* note argument order change */
+#define skVectorGetValue(out_element, v, position)      \
+    sk_vector_get_value(v, position, out_element)
+
+
+/**
+ *    Returns a pointer to the data item in vector 'v' at 'position'.
+ *    The first position in the vector is position 0.  Returns NULL if
+ *    'position' is not less than sk_vector_get_count(v).
+ *
+ *    The caller should not cache this value, since any addition to
+ *    the vector may result in a re-allocation that could make the
+ *    pointer invalid.
+ *
+ *    See also sk_vector_get_value().
+ */
+void *
+sk_vector_get_value_pointer(
+    const sk_vector_t  *v,
+    size_t              position);
+
+#define skVectorGetValuePointer(v, position)    \
+    sk_vector_get_value_pointer(v, position)
 
 
 /**
@@ -367,39 +436,50 @@ skVectorRemoveValue(
  *    'out_array'.  The first position in the vector is position 0.
  *
  *    It is the caller's responsibility to ensure that 'out_array' can
- *    hold 'num_elements' elements of size skVectorGetElementSize(v).
+ *    hold 'num_elements' elements of size
+ *    sk_vector_get_element_size(v).
  *
  *    Returns the number of elements copied into the array.  Returns
  *    fewer than 'num_elements' if the end of the vector is reached.
  *    Returns 0 if 'start_position' is not less than
- *    skVectorGetCount(v).
+ *    sk_vector_get_count(v).
  *
- *    See also skVectorToArray() and skVectorToArrayAlloc().
+ *    See also sk_vector_to_array() and sk_vector_to_array_alloc().
  */
 size_t
-skVectorGetMultipleValues(
-    void               *out_array,
+sk_vector_get_multiple_values(
     const sk_vector_t  *v,
     size_t              start_position,
+    void               *out_array,
     size_t              num_elements);
+
+/* note argument order change */
+#define skVectorGetMultipleValues(out_array, v, start_position, num_elements) \
+    sk_vector_get_multiple_values(v, start_position, out_array, num_elements)
+
 
 
 /**
  *    Copies the data in the vector 'v' to the C-array 'out_array'.
  *    This is equivalent to:
  *
- *    skVectorGetMultipleValues(out_array, v, 0, skVectorGetCount(v));
+ *    sk_vector_get_multiple_values(v, 0, out_array, sk_vector_get_count(v));
  *
  *    It is the caller's responsibility to ensure that 'out_array' is
- *    large enough to hold skVectorGetCount(v) elements of size
- *    skVectorGetElementSize(v).
+ *    large enough to hold sk_vector_get_count(v) elements of size
+ *    sk_vector_get_element_size(v).
  *
- *    See also skVectorToArrayAlloc().
+ *    See also sk_vector_to_array_alloc().
  */
 void
-skVectorToArray(
-    void               *out_array,
-    const sk_vector_t  *v);
+sk_vector_to_array(
+    const sk_vector_t  *v,
+    void               *out_array);
+
+/* note argument order change */
+#define skVectorToArray(out_array,  v)          \
+    sk_vector_to_array(v, out_array)
+
 
 
 /**
@@ -409,19 +489,20 @@ skVectorToArray(
  *
  *    The caller must free() the array when it is no longer required.
  *
- *    The function returns NULL if the vector is empty or if the array
- *    could not be allocated.
+ *    Returns NULL if the vector is empty.  Exits if memory cannot be
+ *    allocated.
  *
  *    This function is equivalent to:
  *
- *    a = malloc(skVectorGetElementSize(v) * skVectorGetCount(v));
- *    skVectorGetMultipleValues(a, v, 0, skVectorGetCount(v));
- *
- *    See also skVectorToArray().
+ *    a = malloc(sk_vector_get_element_size(v) * sk_vector_get_count(v));
+ *    sk_vector_get_multiple_values(v, 0, a, sk_vector_get_count(v));
  */
 void *
-skVectorToArrayAlloc(
+sk_vector_to_array_alloc(
     const sk_vector_t  *v);
+
+#define skVectorToArrayAlloc(v)                 \
+    sk_vector_to_array_alloc(v)
 
 
 #ifdef __cplusplus

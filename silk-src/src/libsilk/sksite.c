@@ -19,7 +19,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sksite.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: sksite.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstream.h>
@@ -393,12 +393,6 @@ int
 sksiteConfigure(
     int                 verbose)
 {
-    char cl_name[SK_MAX_STRLEN_FLOWTYPE+1];
-    sk_class_iter_t cl_iter;
-    sk_class_id_t cl_id;
-    sk_flowtype_iter_t ft_iter;
-    sk_flowtype_id_t ft_id;
-
     /* once we've attempted to parse a file, this function no longer
      * attempts configuration */
     if (configured != 0) {
@@ -441,25 +435,18 @@ sksiteConfigure(
         /* Failed */
         configured = -1;
     } else {
-        /* Success (so far) */
+        /* Success */
         configured = 1;
-
-        sksiteClassIterator(&cl_iter);
-        while (sksiteClassIteratorNext(&cl_iter, &cl_id)) {
-            sksiteClassFlowtypeIterator(cl_id, &ft_iter);
-            if (!sksiteFlowtypeIteratorNext(&ft_iter, &ft_id)) {
-                sksiteClassGetName(cl_name, sizeof(cl_name), cl_id);
-                sksiteconfigErr(
-                    "Site configuration error: class '%s' contains no types",
-                    cl_name);
-                configured = -1;
-            }
-        }
-        /* a total absence of classes is not an error */
     }
     return ((configured == -1) ? -1 : 0);
 }
 
+int
+sksiteIsConfigured(
+    void)
+{
+    return configured == 1;
+}
 
 int
 sksiteSetConfigPath(
@@ -1107,22 +1094,7 @@ int
 sksiteClassSetDefault(
     sk_class_id_t       class_id)
 {
-    sk_flowtype_iter_t ft_iter;
-    sk_flowtype_id_t ft_id;
-    sk_sensor_iter_t sn_iter;
-    sk_sensor_id_t sn_id;
-
     if (0 == sksiteClassExists(class_id)) {
-        return -1;
-    }
-    sksiteClassFlowtypeIterator(class_id, &ft_iter);
-    if (!sksiteFlowtypeIteratorNext(&ft_iter, &ft_id)) {
-        /* no flowtypes exist for this class */
-        return -1;
-    }
-    sksiteClassSensorIterator(class_id, &sn_iter);
-    if (!sksiteSensorIteratorNext(&sn_iter, &sn_id)) {
-        /* no sensors exist for this class */
         return -1;
     }
     default_class = class_id;
@@ -2098,7 +2070,6 @@ siteErrorIterCreate(
     }
     if (siteErrorIterCreateVector(*iter)) {
         free(*iter);
-        *iter = NULL;
         return -1;
     }
     sksiteErrorIteratorReset(*iter);
@@ -2827,10 +2798,6 @@ sksiteParseSensorList(
     if (skVectorGetElementSize(sensor_vector) != sizeof(sk_sensor_id_t)) {
         goto END;
     }
-    if (SK_INVALID_SENSOR == min_sensor_id) {
-        rv = 0;
-        goto END;
-    }
     if ('\0' == *sensor_name_list) {
         rv = 0;
         goto END;
@@ -3315,17 +3282,15 @@ sksiteSetPackingLogicPath(
 
 char *
 sksiteGeneratePathname(
-    char               *buffer,
-    size_t              bufsize,
-    sk_flowtype_id_t    flowtype_id,
-    sk_sensor_id_t      sensor_id,
-    sktime_t            timestamp,
-    const char         *suffix,
-    char              **reldir_begin,
-    char              **filename_begin)
+    char                       *buffer,
+    size_t                      bufsize,
+    const sksite_repo_key_t    *repo_key,
+    const char                 *suffix,
+    char                      **reldir_begin,
+    char                      **filename_begin)
 {
     /* convert sktime_t to time_t platforms */
-    const time_t tt = (time_t)(timestamp / 1000);
+    const time_t tt = sktimeGetSeconds(repo_key->timestamp);
     struct tm trec;
     char ftype_name_buffer[SK_MAX_STRLEN_FLOWTYPE+1];
     char sensor_name_buffer[SK_MAX_STRLEN_SENSOR+1];
@@ -3339,11 +3304,11 @@ sksiteGeneratePathname(
         return NULL;
     }
 
-    if (!sksiteFlowtypeExists(flowtype_id)) {
+    if (!sksiteFlowtypeExists(repo_key->flowtype_id)) {
         return NULL;
     }
 
-    if (!sksiteSensorExists(sensor_id)) {
+    if (!sksiteSensorExists(repo_key->sensor_id)) {
         return NULL;
     }
 
@@ -3390,19 +3355,19 @@ sksiteGeneratePathname(
             len = 1;
             break;
           case 'C':
-            len = sksiteFlowtypeGetClass(buf, bufsize, flowtype_id);
+            len = sksiteFlowtypeGetClass(buf, bufsize, repo_key->flowtype_id);
             break;
           case 'F':
-            len = sksiteFlowtypeGetName(buf, bufsize, flowtype_id);
+            len = sksiteFlowtypeGetName(buf, bufsize, repo_key->flowtype_id);
             break;
           case 'H':
             len = snprintf(buf, bufsize, "%02d", trec.tm_hour);
             break;
           case 'N':
-            len = sksiteSensorGetName(buf, bufsize, sensor_id);
+            len = sksiteSensorGetName(buf, bufsize, repo_key->sensor_id);
             break;
           case 'T':
-            len = sksiteFlowtypeGetType(buf, bufsize, flowtype_id);
+            len = sksiteFlowtypeGetType(buf, bufsize, repo_key->flowtype_id);
             break;
           case 'Y':
             len = snprintf(buf, bufsize, "%04d", trec.tm_year + 1900);
@@ -3411,19 +3376,19 @@ sksiteGeneratePathname(
             len = snprintf(buf, bufsize, "%02d", trec.tm_mday);
             break;
           case 'f':
-            len = snprintf(buf, bufsize, "%u", flowtype_id);
+            len = snprintf(buf, bufsize, "%u", repo_key->flowtype_id);
             break;
           case 'm':
             len = snprintf(buf, bufsize, "%02d", trec.tm_mon + 1);
             break;
           case 'n':
-            len = snprintf(buf, bufsize, "%u", sensor_id);
+            len = snprintf(buf, bufsize, "%u", repo_key->sensor_id);
             break;
           case 'x':
             sksiteFlowtypeGetName(ftype_name_buffer, sizeof(ftype_name_buffer),
-                                  flowtype_id);
-            sksiteSensorGetName(sensor_name_buffer,
-                                sizeof(sensor_name_buffer), sensor_id);
+                                  repo_key->flowtype_id);
+            sksiteSensorGetName(sensor_name_buffer, sizeof(sensor_name_buffer),
+                                repo_key->sensor_id);
             len = snprintf(buf, bufsize, "%s-%s_%04d%02d%02d.%02d",
                            ftype_name_buffer, sensor_name_buffer,
                            trec.tm_year + 1900,
@@ -3478,11 +3443,9 @@ sksiteGeneratePathname(
 
 sk_flowtype_id_t
 sksiteParseFilename(
-    sk_flowtype_id_t   *out_flowtype,
-    sk_sensor_id_t     *out_sensor,
-    sktime_t           *out_timestamp,
-    const char        **out_suffix,
-    const char         *filename)
+    const char         *filename,
+    sksite_repo_key_t  *out_repo_key,
+    const char        **out_suffix)
 {
     char buf[PATH_MAX];
     char *cp;
@@ -3527,8 +3490,8 @@ sksiteParseFilename(
     if (NULL == ep) {
         return SK_INVALID_FLOWTYPE;
     }
-    if (out_flowtype) {
-        *out_flowtype = ft;
+    if (out_repo_key) {
+        out_repo_key->flowtype_id = ft;
     }
 
     /* find the sensor/timestamp separator, which is an underscore,
@@ -3541,8 +3504,8 @@ sksiteParseFilename(
     *ep = '\0';
     ++ep;
 
-    if (out_sensor) {
-        *out_sensor = sksiteSensorLookup(sp);
+    if (out_repo_key) {
+        out_repo_key->sensor_id = sksiteSensorLookup(sp);
     }
 
     /* move to start of time; convert "YYYYMMDD." into a single
@@ -3566,7 +3529,7 @@ sksiteParseFilename(
         return SK_INVALID_FLOWTYPE;
     }
 
-    if (out_timestamp) {
+    if (out_repo_key) {
         struct tm trec;
         time_t t;
 
@@ -3580,7 +3543,7 @@ sksiteParseFilename(
         if (t == (time_t)(-1)) {
             return SK_INVALID_FLOWTYPE;
         }
-        *out_timestamp = sktimeCreate(t, 0);
+        out_repo_key->timestamp = sktimeCreate(t, 0);
     }
 
     if (out_suffix) {
@@ -3600,14 +3563,11 @@ sksiteParseGeneratePath(
     char              **reldir_begin,
     char              **filename_begin)
 {
-    sk_flowtype_id_t flowtype;
-    sk_sensor_id_t sensor;
-    sktime_t timestamp;
+    sksite_repo_key_t repo_key;
     const char *old_suffix;
     char new_suffix[PATH_MAX];
 
-    if (sksiteParseFilename(&flowtype, &sensor, &timestamp, &old_suffix,
-                            filename)
+    if (sksiteParseFilename(filename, &repo_key, &old_suffix)
         == SK_INVALID_FLOWTYPE)
     {
         return NULL;
@@ -3624,7 +3584,7 @@ sksiteParseGeneratePath(
         suffix = new_suffix;
     }
 
-    return sksiteGeneratePathname(buffer, bufsize, flowtype, sensor, timestamp,
+    return sksiteGeneratePathname(buffer, bufsize, &repo_key,
                                   suffix, reldir_begin, filename_begin);
 }
 
@@ -4078,10 +4038,10 @@ typedef struct sensor_flowtype_st {
 
 
 /*
- *  more_files = siteRepoIterIncrement(iter, &attr);
+ *  more_files = siteRepoIterIncrement(iter, &repo_key);
  *
  *    Increment the file iterator so that it points to the next file,
- *    and set the values in 'attr' to the tuple for that file.
+ *    and set the values in 'repo_key' to the tuple for that file.
  *
  *    Return 1 if the iterator moved to the next file, or 0 if there
  *    are no more files.
@@ -4089,7 +4049,7 @@ typedef struct sensor_flowtype_st {
 static int
 siteRepoIterIncrement(
     sksite_repo_iter_t *iter,
-    sksite_fileattr_t  *attr)
+    sksite_repo_key_t  *repo_key)
 {
     sensor_flowtype_t sen_ft;
 
@@ -4103,9 +4063,9 @@ siteRepoIterIncrement(
         assert(iter->sensor_idx == 0);
         if (skVectorGetValue(&sen_ft, iter->sen_ft_vec, iter->sensor_idx) == 0)
         {
-            attr->sensor = sen_ft.sensor;
-            attr->flowtype = sen_ft.flowtype;
-            attr->timestamp = iter->time_idx;
+            repo_key->sensor_id = sen_ft.sensor;
+            repo_key->flowtype_id = sen_ft.flowtype;
+            repo_key->timestamp = iter->time_idx;
             return 1;
         }
         /* Empty iterator */
@@ -4115,9 +4075,9 @@ siteRepoIterIncrement(
     /* First, see if we can increment the sensor/flowtype pair */
     ++iter->sensor_idx;
     if (skVectorGetValue(&sen_ft, iter->sen_ft_vec, iter->sensor_idx) == 0) {
-        attr->sensor = sen_ft.sensor;
-        attr->flowtype = sen_ft.flowtype;
-        attr->timestamp = iter->time_idx;
+        repo_key->sensor_id = sen_ft.sensor;
+        repo_key->flowtype_id = sen_ft.flowtype;
+        repo_key->timestamp = iter->time_idx;
         return 1;
     }
     /* On last sensor/flowtype; reset and try time */
@@ -4133,18 +4093,18 @@ siteRepoIterIncrement(
     if (skVectorGetValue(&sen_ft, iter->sen_ft_vec, iter->sensor_idx) != 0) {
         return 0;
     }
-    attr->sensor = sen_ft.sensor;
-    attr->flowtype = sen_ft.flowtype;
-    attr->timestamp = iter->time_idx;
+    repo_key->sensor_id = sen_ft.sensor;
+    repo_key->flowtype_id = sen_ft.flowtype;
+    repo_key->timestamp = iter->time_idx;
     return 1;
 }
 
 
 /*
- *  more_files = siteRepoIterNext(iter, &attr, name, name_len, &is_missing);
+ *  more_files = siteRepoIterNext(iter, &repo_key, name, name_len, &is_missing);
  *
  *    Increment the file iterator so that it points to the next file,
- *    set the values in 'attr' to the tuple for that file, set 'name'
+ *    set the values in 'repo_key' to the tuple for that file, set 'name'
  *    to the pathname to that file, and, if 'is_missing' is not NULL,
  *    set 'is_missing' to 0 if the file exists, or 1 if it does not.
  *
@@ -4154,7 +4114,7 @@ siteRepoIterIncrement(
 static int
 siteRepoIterNext(
     sksite_repo_iter_t *iter,
-    sksite_fileattr_t  *attr,
+    sksite_repo_key_t  *repo_key,
     char               *name,
     size_t              name_len,
     int                *is_missing)
@@ -4163,15 +4123,12 @@ siteRepoIterNext(
     char *cp;
 
     assert(iter);
-    assert(attr);
+    assert(repo_key);
     assert(name);
 
-    while (siteRepoIterIncrement(iter, attr)) {
-
-        /* check whether file exists */
-        if (NULL == sksiteGeneratePathname(name, name_len, attr->flowtype,
-                                           attr->sensor, attr->timestamp,
-                                           suffix, NULL, NULL))
+    while (siteRepoIterIncrement(iter, repo_key)) {
+        if (sksiteGeneratePathname(name, name_len, repo_key, suffix, NULL,NULL)
+            == NULL)
         {
             /* error */
             continue;
@@ -4298,14 +4255,14 @@ sksiteRepoIteratorDestroy(
 
 
 int
-sksiteRepoIteratorNextFileattr(
+sksiteRepoIteratorNextKey(
     sksite_repo_iter_t *iter,
-    sksite_fileattr_t  *fileattr,
+    sksite_repo_key_t  *repo_key,
     int                *is_missing)
 {
     char path[PATH_MAX];
 
-    return siteRepoIterNext(iter, fileattr, path, sizeof(path), is_missing);
+    return siteRepoIterNext(iter, repo_key, path, sizeof(path), is_missing);
 }
 
 int
@@ -4315,9 +4272,9 @@ sksiteRepoIteratorNextPath(
     size_t              path_len,
     int                *is_missing)
 {
-    sksite_fileattr_t attr;
+    sksite_repo_key_t repo_key;
 
-    return siteRepoIterNext(iter, &attr, path, path_len, is_missing);
+    return siteRepoIterNext(iter, &repo_key, path, path_len, is_missing);
 }
 
 
@@ -4329,7 +4286,7 @@ sksiteRepoIteratorNextStream(
     sk_msg_fn_t             err_fn)
 {
     char path[PATH_MAX];
-    sksite_fileattr_t attr;
+    sksite_repo_key_t repo_key;
     int file_missing;
     int rv;
 
@@ -4338,7 +4295,7 @@ sksiteRepoIteratorNextStream(
     }
 
     do {
-        rv = siteRepoIterNext(iter, &attr, path, sizeof(path), is_missing);
+        rv = siteRepoIterNext(iter, &repo_key, path, sizeof(path), is_missing);
         if (0 != rv) {
             return rv;
         }
@@ -4368,48 +4325,48 @@ sksiteRepoIteratorNextStream(
 
 
 size_t
-sksiteRepoIteratorGetFileattrs(
+sksiteRepoIteratorGetKeys(
     sksite_repo_iter_t *iter,
-    sksite_fileattr_t  *attr_array,
-    size_t              attr_max_count)
+    sksite_repo_key_t  *repo_key_array,
+    size_t              repo_key_max_count)
 {
     char path[PATH_MAX];
     int is_missing;
     size_t count = 0;
-    sksite_fileattr_t *attr = attr_array;
+    sksite_repo_key_t *repo_key = repo_key_array;
     int rv;
 
-    while (attr_max_count > 0) {
-        --attr_max_count;
-        rv = siteRepoIterNext(iter, attr, path, sizeof(path), &is_missing);
+    while (repo_key_max_count > 0) {
+        --repo_key_max_count;
+        rv = siteRepoIterNext(iter, repo_key, path, sizeof(path), &is_missing);
         if (rv) {
             return count;
         }
         ++count;
-        ++attr;
+        ++repo_key;
     }
     return count;
 }
 
 int
-sksiteRepoIteratorRemainingFileattrs(
+sksiteRepoIteratorRemainingKeys(
     sksite_repo_iter_t *iter,
-    sk_vector_t        *fileattr_vec)
+    sk_vector_t        *repo_key_vec)
 {
     char path[PATH_MAX];
     int is_missing;
-    sksite_fileattr_t attr;
+    sksite_repo_key_t repo_key;
 
-    if (NULL == fileattr_vec
-        || sizeof(sksite_fileattr_t) != skVectorGetElementSize(fileattr_vec))
+    if (NULL == repo_key_vec
+        || sizeof(sksite_repo_key_t) != skVectorGetElementSize(repo_key_vec))
     {
         return -1;
     }
 
-    while (siteRepoIterNext(iter, &attr, path, sizeof(path), &is_missing)
+    while (siteRepoIterNext(iter, &repo_key, path, sizeof(path), &is_missing)
            == SK_ITERATOR_OK)
     {
-        if (skVectorAppendValue(fileattr_vec, &attr)) {
+        if (skVectorAppendValue(repo_key_vec, &repo_key)) {
             return -1;
         }
     }

@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: stream-cache.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: stream-cache.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sklog.h>
@@ -52,10 +52,10 @@ struct stream_cache_st {
 
 static int
 cacheEntryAdd(
-    stream_cache_t     *cache,
-    skstream_t         *stream,
-    const cache_key_t  *key,
-    cache_entry_t     **new_entry);
+    stream_cache_t             *cache,
+    skstream_t                 *stream,
+    const sksite_repo_key_t    *key,
+    cache_entry_t             **new_entry);
 static int
 cacheEntryCompare(
     const void         *entry1_v,
@@ -71,8 +71,8 @@ cacheEntryLogRecordCount(
     cache_entry_t      *entry);
 static cache_entry_t *
 cacheEntryLookup(
-    stream_cache_t     *cache,
-    const cache_key_t  *key);
+    stream_cache_t             *cache,
+    const sksite_repo_key_t    *key);
 
 
 /* FUNCTION DEFINITIONS */
@@ -93,10 +93,10 @@ cacheEntryLookup(
  */
 static int
 cacheEntryAdd(
-    stream_cache_t     *cache,
-    skstream_t         *stream,
-    const cache_key_t  *key,
-    cache_entry_t     **new_entry)
+    stream_cache_t             *cache,
+    skstream_t                 *stream,
+    const sksite_repo_key_t    *key,
+    cache_entry_t             **new_entry)
 {
     cache_entry_t *entry;
     const void *node;
@@ -136,7 +136,7 @@ cacheEntryAdd(
     }
 
     /* fill the new entry */
-    entry->key.time_stamp = key->time_stamp;
+    entry->key.timestamp = key->timestamp;
     entry->key.sensor_id = key->sensor_id;
     entry->key.flowtype_id = key->flowtype_id;
     entry->stream = stream;
@@ -152,7 +152,7 @@ cacheEntryAdd(
         }
         CRITMSG(("Duplicate entries in stream cache "
                  "for time=%" PRId64 " sensor=%d flowtype=%d"),
-                key->time_stamp, key->sensor_id, key->flowtype_id);
+                key->timestamp, key->sensor_id, key->flowtype_id);
         skAbort();
     }
 
@@ -173,8 +173,8 @@ cacheEntryCompare(
     const void         *entry2_v,
     const void  UNUSED(*config))
 {
-    cache_key_t key1 = ((cache_entry_t*)entry1_v)->key;
-    cache_key_t key2 = ((cache_entry_t*)entry2_v)->key;
+    sksite_repo_key_t key1 = ((cache_entry_t*)entry1_v)->key;
+    sksite_repo_key_t key2 = ((cache_entry_t*)entry2_v)->key;
 
     if (key1.sensor_id < key2.sensor_id) {
         return -1;
@@ -188,10 +188,10 @@ cacheEntryCompare(
     if (key1.flowtype_id > key2.flowtype_id) {
         return 1;
     }
-    if (key1.time_stamp < key2.time_stamp) {
+    if (key1.timestamp < key2.timestamp) {
         return -1;
     }
-    if (key1.time_stamp > key2.time_stamp) {
+    if (key1.timestamp > key2.timestamp) {
         return 1;
     }
     return 0;
@@ -211,7 +211,7 @@ cacheEntryMove(
     cache_entry_t      *src_entry)
 {
     const cache_entry_t *node;
-    const cache_key_t *key;
+    const sksite_repo_key_t *key;
 
     /* remove from tree and destroy */
     rbdelete(src_entry, cache->rbtree);
@@ -229,7 +229,7 @@ cacheEntryMove(
         key = &dst_entry->key;
         CRITMSG(("Duplicate entries in stream cache during move "
                  "for time=%" PRId64 " sensor=%d flowtype=%d"),
-                key->time_stamp, key->sensor_id, key->flowtype_id);
+                key->timestamp, key->sensor_id, key->flowtype_id);
         skAbort();
     }
 }
@@ -310,14 +310,14 @@ cacheEntryLogRecordCount(
  */
 static cache_entry_t *
 cacheEntryLookup(
-    stream_cache_t     *cache,
-    const cache_key_t  *key)
+    stream_cache_t             *cache,
+    const sksite_repo_key_t    *key)
 {
     cache_entry_t *entry;
     cache_entry_t search_key;
 
     /* fill the search key */
-    search_key.key.time_stamp = key->time_stamp;
+    search_key.key.timestamp = key->timestamp;
     search_key.key.sensor_id = key->sensor_id;
     search_key.key.flowtype_id = key->flowtype_id;
 
@@ -329,7 +329,7 @@ cacheEntryLookup(
         char sensor[SK_MAX_STRLEN_SENSOR+1];
         char flowtype[SK_MAX_STRLEN_FLOWTYPE+1];
 
-        sktimestamp_r(tstamp, key->time_stamp, SKTIMESTAMP_NOMSEC),
+        sktimestamp_r(tstamp, key->timestamp, SKTIMESTAMP_NOMSEC),
         sksiteSensorGetName(sensor, sizeof(sensor), key->sensor_id);
         sksiteFlowtypeGetName(flowtype, sizeof(flowtype), key->flowtype_id);
 
@@ -351,10 +351,10 @@ cacheEntryLookup(
 /* add an entry to the cache.  return entry in locked state. */
 int
 skCacheAdd(
-    stream_cache_t     *cache,
-    skstream_t         *stream,
-    const cache_key_t  *key,
-    cache_entry_t     **entry)
+    stream_cache_t             *cache,
+    skstream_t                 *stream,
+    const sksite_repo_key_t    *key,
+    cache_entry_t             **entry)
 {
     int retval;
 
@@ -547,8 +547,8 @@ skCacheLockAndCloseAll(
 /* find an entry in the cache.  return entry in locked state. */
 cache_entry_t *
 skCacheLookup(
-    stream_cache_t     *cache,
-    const cache_key_t  *key)
+    stream_cache_t             *cache,
+    const sksite_repo_key_t    *key)
 {
     cache_entry_t *entry;
 
@@ -562,10 +562,10 @@ skCacheLookup(
  * function to open/create the stream and then add it. */
 int
 skCacheLookupOrOpenAdd(
-    stream_cache_t     *cache,
-    const cache_key_t  *key,
-    void               *caller_data,
-    cache_entry_t     **entry)
+    stream_cache_t             *cache,
+    const sksite_repo_key_t    *key,
+    void                       *caller_data,
+    cache_entry_t             **entry)
 {
     skstream_t *stream;
     int retval = 0;

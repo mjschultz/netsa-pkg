@@ -23,7 +23,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKHEADER_PRIV_H, "$SiLK: skheader_priv.h 7e6884832fbd 2017-01-20 22:59:46Z mthomas $");
+RCSIDENTVAR(rcsID_SKHEADER_PRIV_H, "$SiLK: skheader_priv.h 373f990778e9 2017-06-22 21:57:36Z mthomas $");
 
 #include <silk/skheader.h>
 
@@ -127,6 +127,28 @@ struct sk_hentry_type_st {
 
 
 /**
+ *    Append 'count' bytes from 'buf' onto the sk_header_start_t
+ *    section of the sk_file_header_t 'hdr'.  The function may be
+ *    called multiple times until the header's size reaches the size
+ *    of the sk_header_start_t.
+ *
+ *    Return SKHEADER_OK on success.  Return SKHEADER_ERR_TOOLONG if
+ *    'hdr' already contains the entire sk_header_start_t.  Return
+ *    SKHEADER_ERR_NULL_ARGUMENT if 'buf' is NULL.
+ *
+ *    This function can be used in lieu of or in addition to using
+ *    skHeaderReadStart() to read the header.  skHeaderReadStart()
+ *    must still be called to initialize the header after it has been
+ *    read.
+ */
+int
+skHeaderAppendStartBytes(
+    sk_file_header_t   *hdr,
+    const void         *buf,
+    size_t              count);
+
+
+/**
  *    Create a new File Header at the location specified by '*hdr'.
  *    The header will be suitable for writing an FT_RWGENERIC file
  *    using the machine's native byte order.
@@ -184,8 +206,11 @@ skHeaderReadEntries(
  *    Initialize the first section of 'hdr' and verify that the header
  *    contains the SiLK magic number.
  *
- *    This function reads into 'hdr' from the file descriptor 'stream'
- *    the first bytes (the sk_file_header_t section) of a SiLK stream.
+ *    Unless the entire sk_header_start_t for 'hdr' has been read from
+ *    another source (see skHeaderAppendStartBytes()), this function
+ *    reads into 'hdr' from the file descriptor 'stream' the
+ *    (remaining) first bytes (the sk_file_header_t section) of a SiLK
+ *    stream.
  *
  *    Return SKHEADER_OK on success.  Return SKSTREAM_ERR_BAD_MAGIC if
  *    the file is not a SiLK stream.  Return SKSTREAM_ERR_READ or
@@ -273,14 +298,6 @@ skHentryTypeLookup(
 
 
 /**
- *    Function in skaggbag.c that registers the callback functions
- *    used by header entry whose ID is SK_HENTRY_AGGBAG_ID.
- */
-int
-skAggBagRegisterHeaderEntry(
-    sk_hentry_type_id_t     entry_id);
-
-/**
  *    Function in skbag.c that registers the callback functions used
  *    by header entry whose ID is SK_HENTRY_BAG_ID.
  */
@@ -304,6 +321,13 @@ int
 skPrefixMapRegisterHeaderEntry(
     sk_hentry_type_id_t     entry_id);
 
+/**
+ *    Function in sksidecar.c that registers the callback functions
+ *    used by a header_entry whose ID is SK_HENTRY_SIDECAR_ID.
+ */
+int
+sk_sidecar_register_header_entry(
+    sk_hentry_type_id_t     endry_id);
 
 
 /*

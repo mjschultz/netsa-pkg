@@ -19,10 +19,11 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skoptionsctx.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skoptionsctx.c 64d7ed05a614 2017-06-26 16:36:15Z mthomas $");
 
-#include <silk/utils.h>
+#include <silk/skfglob.h>
 #include <silk/skstream.h>
+#include <silk/utils.h>
 
 
 /* LOCAL DEFINES AND TYPEDEFS */
@@ -34,22 +35,104 @@ RCSIDENT("$SiLK: skoptionsctx.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 /* typedef struct sk_options_ctx_st sk_options_ctx_t; */
 struct sk_options_ctx_st {
-    sk_options_ctx_open_cb_t    open_cb_fn;
-    FILE           *print_filenames;
-    skstream_t     *xargs;
-    skstream_t     *copy_input;
-    const char     *input_pipe;
-    char          **argv;
-    int             argc;
-    int             arg_index;
-    unsigned int    flags;
-    unsigned        stdin_used      :1;
-    unsigned        stdout_used     :1;
-    unsigned        parse_ok        :1;
-    unsigned        init_ok         :1;
-    unsigned        init_failed     :1;
-    unsigned        read_stdin      :1;
-    unsigned        no_more_inputs  :1;
+    /**
+     *    If non-NULL, the file handle to print filenames to.  Set by
+     *    --print-filenames. Requires SK_OPTIONS_CTX_PRINT_FILENAMES
+     */
+    FILE               *print_filenames;
+    /**
+     *    If non-NULL, the stream to read filenames from.  Set by
+     *    --xargs.  Requires SK_OPTIONS_CTX_XARGS
+     */
+    skstream_t         *xargs;
+    /**
+     *    If non-NULL, the stream to copy all SiLK Flow records
+     *    to. Set by --copy-input.  Requires SK_OPTIONS_CTX_COPY_INPUT
+     */
+    skstream_t         *copy_input;
+    /**
+     *    If non-NULL, the file globbing context.  Requires
+     *    SK_OPTIONS_CTX_FGLOB.
+     */
+    sk_fglob_t         *fglob;
+    /**
+     *    When certain fglob arguments are paired with other
+     *    arguments, the fglob arguments become partitioning switches.
+     *    This is the set of sensor IDs to use for partitioning.
+     */
+    sk_bitmap_t        *sensor_bmap;
+    /**
+     *    When certain fglob arguments are paired with other
+     *    arguments, the fglob arguments become partitioning switches.
+     *    This is the set of flowtype IDs to use for partitioning.
+     */
+    sk_bitmap_t        *flowtype_bmap;
+    /**
+     *    The command line arguments.  This is a pointer to the
+     *    command line arguments passed into
+     *    skOptionsCtxOptionsParse(), not a copy of them.
+     */
+    char              **argv;
+    /**
+     *    The number of command line arguments.
+     */
+    int                 argc;
+    /**
+     *    An index into the array of command line arguments.
+     */
+    int                 arg_index;
+    /**
+     *    Return code from calling skFGlobSetFilters().
+     */
+    int                 fglob_set_fltr;
+    /**
+     *    The flags that determine the behavior of the options ctx.
+     */
+    unsigned int        flags;
+    /**
+     *    True if any input stream or the --xargs stream reads from
+     *    the standard input.
+     */
+    unsigned            stdin_used      :1;
+    /**
+     *    True when the --copy-input stream writes to the standard
+     *    output.
+     */
+    unsigned            stdout_used     :1;
+    /**
+     *    True when file globbing is requested.
+     */
+    unsigned            fglob_valid     :1;
+    /**
+     *    True after a successful return from
+     *    skOptionsCtxOptionsParse() and the options_ctx handles the
+     *    input.
+     */
+    unsigned            parse_ok        :1;
+    /**
+     *    True after a successful return from
+     *    skOptionsCtxOpenStreams()
+     */
+    unsigned            init_ok         :1;
+    /**
+     *    True after a unsuccessful return from
+     *    skOptionsCtxOpenStreams()
+     */
+    unsigned            init_failed     :1;
+    /**
+     *    True if the options ctx has determined that it should read
+     *    input from the standard input
+     */
+    unsigned            read_stdin      :1;
+    /**
+     *    True if all input streams have been returned to the caller
+     */
+    unsigned            no_more_inputs  :1;
+    /**
+     *    The IPv6 policy.  Set by --ipv6-policy.  Requires
+     *    SK_OPTIONS_CTX_IPV6_POLICY
+     */
+    sk_ipv6policy_t     ipv6_policy;
 };
 
 
@@ -63,10 +146,6 @@ static const struct options_ctx_options_st {
      ("Print input filenames while processing. Def. no")},
     {{"copy-input",      REQUIRED_ARG, 0, SK_OPTIONS_CTX_COPY_INPUT},
      ("Copy all input SiLK Flows to given pipe or file. Def. No")},
-    {{"input-pipe",      REQUIRED_ARG, 0, SK_OPTIONS_CTX_INPUT_PIPE},
-     ("Get input byte stream from pipe (stdin|pipe).\n"
-      "\tThis switch is deprecated and will be removed in a future release.\n"
-      "\tDefault is stdin if no filenames are given on the command line")},
     {{"xargs",           OPTIONAL_ARG, 0, SK_OPTIONS_CTX_XARGS},
      ("Read the names of the files to process from named text file,\n"
       "\tone name per line, or from the standard input if no parameter."
@@ -118,7 +197,7 @@ optionsCtxHandler(
                           optionsCtxSwitchName(opt_index));
             return 1;
         }
-        if (NULL == opt_arg || PATH_IS_STDOUT(opt_arg)) {
+        if (PATH_IS_STDOUT(opt_arg)) {
             if (arg_ctx->stdout_used) {
                 skAppPrintErr("Multiple outputs attempt"
                               " to use standard output");
@@ -158,37 +237,56 @@ optionsCtxHandler(
         }
         break;
 
-      case SK_OPTIONS_CTX_INPUT_PIPE:
-        if (arg_ctx->input_pipe) {
-            skAppPrintErr("Invalid %s: Switch used multiple times",
-                          optionsCtxSwitchName(opt_index));
-            return 1;
-        }
-        if (NULL == opt_arg || PATH_IS_STDIN(opt_arg)) {
-            if (FILEIsATty(stdin)
-                && (arg_ctx->flags & (SK_OPTIONS_CTX_INPUT_BINARY
-                                      | SK_OPTIONS_CTX_INPUT_SILK_FLOW)))
-            {
-                skAppPrintErr(("Invalid %s '%s': "
-                               "Will not read binary data on a terminal"),
-                              optionsCtxSwitchName(SK_OPTIONS_CTX_INPUT_PIPE),
-                              opt_arg);
-                return 1;
-            }
-            if (arg_ctx->stdin_used) {
-                skAppPrintErr("Multiple inputs attempt to use standard input");
-                return 1;
-            }
-            arg_ctx->stdin_used = 1;
-        }
-        arg_ctx->input_pipe = opt_arg;
-        break;
-
       default:
         skAbortBadCase(opt_index);
     }
 
     return 0;
+}
+
+
+/*
+ *    If fglob is not active, return 0.  Otherwise, check whether
+ *    fglob arguments were specified on the command line.  If not
+ *    return 0.  If so and they could be used as partitioning switches
+ *    to rwfilter, store the bitmaps that rwfilter would use for
+ *    partitioning and return 0.  Otherwise, return -1.
+ */
+static int
+optionsCtxParseCheckFGlob(
+    sk_options_ctx_t   *arg_ctx,
+    int                 xarg_or_argc)
+{
+    int fglob_valid;
+    int rv;
+
+    assert(arg_ctx);
+
+    if (NULL == arg_ctx->fglob) {
+        return 0;
+    }
+    rv = skFGlobSetFilters(arg_ctx->fglob, &arg_ctx->sensor_bmap,
+                           &arg_ctx->flowtype_bmap);
+    if (rv < 0) {
+        return -1;
+    }
+    arg_ctx->fglob_set_fltr = rv;
+
+    fglob_valid = skFGlobValid(arg_ctx->fglob);
+    if (0 == fglob_valid) {
+        return 0;
+    }
+    if (-1 == fglob_valid) {
+        return -1;
+    }
+    if (0 == xarg_or_argc) {
+        skAppPrintErr("May not use --%s and specify file selection switches",
+                      optionsCtxSwitchName(SK_OPTIONS_CTX_XARGS));
+    } else {
+        skAppPrintErr("May not give files on the command line"
+                      " and specify file selection switches");
+    }
+    return -1;
 }
 
 
@@ -198,6 +296,8 @@ skOptionsCtxCopyStreamClose(
     sk_msg_fn_t         err_fn)
 {
     int rv;
+
+    assert(arg_ctx);
 
     if (arg_ctx->copy_input && arg_ctx->init_ok) {
         rv = skStreamClose(arg_ctx->copy_input);
@@ -214,6 +314,7 @@ int
 skOptionsCtxCopyStreamIsActive(
     const sk_options_ctx_t *arg_ctx)
 {
+    assert(arg_ctx);
     return ((arg_ctx->copy_input) ? 1 : 0);
 }
 
@@ -222,6 +323,7 @@ int
 skOptionsCtxCopyStreamIsStdout(
     const sk_options_ctx_t *arg_ctx)
 {
+    assert(arg_ctx);
     if (arg_ctx->copy_input) {
         return PATH_IS_STDOUT(skStreamGetPathname(arg_ctx->copy_input));
     }
@@ -233,6 +335,7 @@ int
 skOptionsCtxCountArgs(
     const sk_options_ctx_t *arg_ctx)
 {
+    assert(arg_ctx);
     if (!arg_ctx->parse_ok) {
         return -1;
     }
@@ -242,40 +345,104 @@ skOptionsCtxCountArgs(
 
 int
 skOptionsCtxCreate(
-    sk_options_ctx_t  **arg_ctx,
+    sk_options_ctx_t  **arg_ctx_parm,
     unsigned int        flags)
 {
-    *arg_ctx = (sk_options_ctx_t*)calloc(1, sizeof(sk_options_ctx_t));
-    if (NULL == *arg_ctx) {
+    sk_options_ctx_t *arg_ctx;
+
+    /* this flags must be used by itself */
+    if ((flags & SK_OPTIONS_CTX_SWITCHES_ONLY)
+        && (flags != SK_OPTIONS_CTX_SWITCHES_ONLY))
+    {
         return -1;
     }
-    (*arg_ctx)->flags = flags;
+
+    /* some flags imply others */
+    if (flags & SK_OPTIONS_CTX_COPY_INPUT) {
+        flags |= SK_OPTIONS_CTX_INPUT_SILK_FLOW;
+    }
+    if (flags & SK_OPTIONS_CTX_FGLOB) {
+        flags |= SK_OPTIONS_CTX_INPUT_SILK_FLOW;
+    }
+    if (flags & SK_OPTIONS_CTX_INPUT_SILK_FLOW) {
+        flags |= SK_OPTIONS_CTX_INPUT_BINARY;
+    }
+
+    arg_ctx = sk_alloc(sk_options_ctx_t);
+    arg_ctx->ipv6_policy = SK_IPV6POLICY_MIX;
+    arg_ctx->flags = flags;
+
+    *arg_ctx_parm = arg_ctx;
     return 0;
 }
 
 
 int
 skOptionsCtxDestroy(
-    sk_options_ctx_t  **arg_ctx)
+    sk_options_ctx_t  **arg_ctx_parm)
 {
-    sk_options_ctx_t *ctx;
+    sk_options_ctx_t *arg_ctx;
     int rv = 0;
 
-    if (NULL == arg_ctx || NULL == *arg_ctx) {
+    if (NULL == arg_ctx_parm || NULL == *arg_ctx_parm) {
         return 0;
     }
-    ctx = *arg_ctx;
-    *arg_ctx = NULL;
+    arg_ctx = *arg_ctx_parm;
+    *arg_ctx_parm = NULL;
 
-    skStreamDestroy(&ctx->xargs);
-    if (ctx->copy_input) {
-        if (ctx->init_ok) {
-            rv = skStreamClose(ctx->copy_input);
+    skFGlobDestroy(&arg_ctx->fglob);
+
+    skStreamDestroy(&arg_ctx->xargs);
+    if (arg_ctx->copy_input) {
+        if (arg_ctx->init_ok) {
+            rv = skStreamClose(arg_ctx->copy_input);
         }
-        skStreamDestroy(&ctx->copy_input);
+        skStreamDestroy(&arg_ctx->copy_input);
     }
-    free(ctx);
+    skBitmapDestroy(&arg_ctx->sensor_bmap);
+    skBitmapDestroy(&arg_ctx->flowtype_bmap);
+    free(arg_ctx);
     return rv;
+}
+
+
+skstream_t*
+skOptionsCtxGetCopyStream(
+    const sk_options_ctx_t *arg_ctx)
+{
+    assert(arg_ctx);
+    return arg_ctx->copy_input;
+}
+
+
+int
+skOptionsCtxGetFGlobFilters(
+    sk_options_ctx_t   *arg_ctx,
+    sk_bitmap_t       **sensor_bitmap,
+    sk_bitmap_t       **flowtype_bitmap)
+{
+    int rv;
+
+    assert(arg_ctx);
+
+    rv = arg_ctx->fglob_set_fltr;
+    *sensor_bitmap = arg_ctx->sensor_bmap;
+    *flowtype_bitmap = arg_ctx->flowtype_bmap;
+
+    arg_ctx->fglob_set_fltr = 0;
+    arg_ctx->sensor_bmap = NULL;
+    arg_ctx->flowtype_bmap = NULL;
+
+    return rv;
+}
+
+
+sk_ipv6policy_t
+skOptionsCtxGetIPv6Policy(
+    const sk_options_ctx_t *arg_ctx)
+{
+    assert(arg_ctx);
+    return arg_ctx->ipv6_policy;
 }
 
 
@@ -283,6 +450,7 @@ FILE *
 skOptionsCtxGetPrintFilenames(
     const sk_options_ctx_t *arg_ctx)
 {
+    assert(arg_ctx);
     return arg_ctx->print_filenames;
 }
 
@@ -290,13 +458,13 @@ skOptionsCtxGetPrintFilenames(
 int
 skOptionsCtxNextArgument(
     sk_options_ctx_t   *arg_ctx,
-    char              **arg)
+    char               *buf,
+    size_t              bufsize)
 {
-    static char buf[PATH_MAX];
     int rv;
 
     assert(arg_ctx);
-    assert(arg);
+    assert(buf);
 
     if (arg_ctx->no_more_inputs) {
         return 1;
@@ -311,11 +479,17 @@ skOptionsCtxNextArgument(
         }
     }
 
+    if (arg_ctx->fglob_valid) {
+        if (skFGlobNext(arg_ctx->fglob, buf, bufsize)) {
+            return 0;
+        }
+        arg_ctx->no_more_inputs = 1;
+        return 1;
+    }
     if (arg_ctx->xargs) {
         for (;;) {
-            rv = skStreamGetLine(arg_ctx->xargs, buf, sizeof(buf), NULL);
+            rv = skStreamGetLine(arg_ctx->xargs, buf, bufsize, NULL);
             if (SKSTREAM_OK == rv) {
-                *arg = buf;
                 return 0;
             }
             if (SKSTREAM_ERR_LONG_LINE == rv) {
@@ -329,18 +503,14 @@ skOptionsCtxNextArgument(
             return -1;
         }
     }
-    if (arg_ctx->input_pipe) {
-        arg_ctx->no_more_inputs = 1;
-        *arg = (char*)arg_ctx->input_pipe;
-        return 0;
-    }
     if (arg_ctx->read_stdin) {
         arg_ctx->no_more_inputs = 1;
-        *arg = (char*)"-";
+        strncpy(buf, "-", bufsize);
         return 0;
     }
     if (arg_ctx->arg_index < arg_ctx->argc) {
-        *arg = arg_ctx->argv[arg_ctx->arg_index];
+        strncpy(buf, arg_ctx->argv[arg_ctx->arg_index], bufsize);
+        buf[bufsize - 1] = '\0';
         ++arg_ctx->arg_index;
         return 0;
     }
@@ -350,54 +520,13 @@ skOptionsCtxNextArgument(
 
 
 int
-skOptionsCtxNextSilkFile(
-    sk_options_ctx_t   *arg_ctx,
-    skstream_t        **stream,
-    sk_msg_fn_t         err_fn)
-{
-    char *path;
-    int rv;
-
-    for (;;) {
-        rv = skOptionsCtxNextArgument(arg_ctx, &path);
-        if (rv != 0) {
-            return rv;
-        }
-        rv = skStreamOpenSilkFlow(stream, path, SK_IO_READ);
-        if (rv != SKSTREAM_OK) {
-            if (err_fn) {
-                skStreamPrintLastErr(*stream, rv, err_fn);
-                skStreamDestroy(stream);
-            }
-            return -1;
-        }
-        if (arg_ctx->open_cb_fn) {
-            rv = arg_ctx->open_cb_fn(*stream);
-            if (rv) {
-                if (rv > 0) {
-                    skStreamDestroy(stream);
-                    continue;
-                }
-                return rv;
-            }
-        }
-        if (arg_ctx->copy_input) {
-            skStreamSetCopyInput(*stream, arg_ctx->copy_input);
-        }
-        if (arg_ctx->print_filenames) {
-            fprintf(arg_ctx->print_filenames, "%s\n", path);
-        }
-        return 0;
-    }
-}
-
-
-int
 skOptionsCtxOpenStreams(
     sk_options_ctx_t   *arg_ctx,
     sk_msg_fn_t         err_fn)
 {
     int rv;
+
+    assert(arg_ctx);
 
     if (!arg_ctx->parse_ok) {
         return -1;
@@ -442,6 +571,8 @@ skOptionsCtxOptionsParse(
     int                 argc,
     char              **argv)
 {
+    int fglob_valid;
+
     if (NULL == arg_ctx) {
         return skOptionsParse(argc, argv);
     }
@@ -459,7 +590,9 @@ skOptionsCtxOptionsParse(
      * }
      */
 
-    /* handle case where all args are specified with switches */
+    /* handle case where none of the input capabilities of the
+     * options-ctx are required and there should be no remaining
+     * command-line arguments once all switches are processed */
     if (arg_ctx->flags & SK_OPTIONS_CTX_SWITCHES_ONLY) {
         if (arg_ctx->arg_index != argc) {
             skAppPrintErr("Too many arguments or unrecognized switch '%s'",
@@ -472,50 +605,44 @@ skOptionsCtxOptionsParse(
     /* some sort of input is required */
 
     if (arg_ctx->xargs) {
-        if (arg_ctx->input_pipe) {
-            skAppPrintErr("May not use both --%s and --%s",
-                          optionsCtxSwitchName(SK_OPTIONS_CTX_XARGS),
-                          optionsCtxSwitchName(SK_OPTIONS_CTX_INPUT_PIPE));
-            return 1;
-        }
         if (arg_ctx->arg_index != argc) {
-            skAppPrintErr("May not use --%s and give files on command line",
-                          optionsCtxSwitchName(SK_OPTIONS_CTX_XARGS));
+            skAppPrintErr(
+                "May not use --%s and give files on the command line",
+                optionsCtxSwitchName(SK_OPTIONS_CTX_XARGS));
+            return -1;
+        }
+        if (optionsCtxParseCheckFGlob(arg_ctx, 0)) {
             return -1;
         }
         arg_ctx->parse_ok = 1;
         return 0;
     }
 
-    if (arg_ctx->input_pipe) {
-        if (arg_ctx->arg_index != argc) {
-            skAppPrintErr("May not use --%s and give files on command line",
-                          optionsCtxSwitchName(SK_OPTIONS_CTX_INPUT_PIPE));
+    if (arg_ctx->arg_index < argc) {
+        if (optionsCtxParseCheckFGlob(arg_ctx, 1)) {
             return -1;
         }
+        arg_ctx->parse_ok = 1;
+        return 0;
+    }
+
+    fglob_valid = skFGlobValid(arg_ctx->fglob);
+    if (fglob_valid) {
+        if (-1 == fglob_valid) {
+            return -1;
+        }
+        arg_ctx->fglob_valid = 1;
         arg_ctx->parse_ok = 1;
         return 0;
     }
 
     if (!(arg_ctx->flags & SK_OPTIONS_CTX_ALLOW_STDIN)) {
-        if (arg_ctx->arg_index == argc) {
-            skAppPrintErr("No input files specified on the command line");
-            return -1;
-        }
-        arg_ctx->parse_ok = 1;
-        return 0;
-    }
-
-    /* stdin or files listed on command line allowed */
-
-    if (arg_ctx->arg_index < argc) {
-        arg_ctx->parse_ok = 1;
-        return 0;
+        skAppPrintErr("No input files specified on the command line");
+        return -1;
     }
 
     if (FILEIsATty(stdin)
-        && (arg_ctx->flags &
-            (SK_OPTIONS_CTX_INPUT_BINARY | SK_OPTIONS_CTX_INPUT_SILK_FLOW)))
+        && (arg_ctx->flags & SK_OPTIONS_CTX_INPUT_BINARY))
     {
         skAppPrintErr("No input files specified on the command line"
                       " and standard input is a terminal");
@@ -535,10 +662,12 @@ skOptionsCtxOptionsParse(
 
 int
 skOptionsCtxOptionsRegister(
-    const sk_options_ctx_t *arg_ctx)
+    sk_options_ctx_t   *arg_ctx)
 {
     size_t i;
     int rv = 0;
+
+    assert(arg_ctx);
 
     for (i = 0; options_ctx_options[i].help && 0 == rv; ++i) {
         if (arg_ctx->flags & options_ctx_options[i].opt.val) {
@@ -546,8 +675,15 @@ skOptionsCtxOptionsRegister(
                                         optionsCtxHandler,(clientData)arg_ctx);
         }
     }
+    if (0 == rv && (arg_ctx->flags & SK_OPTIONS_CTX_IPV6_POLICY)) {
+        rv = skIPv6PolicyOptionsRegister(&arg_ctx->ipv6_policy);
+    }
+    if (0 == rv && arg_ctx->flags & SK_OPTIONS_CTX_FGLOB) {
+        rv = skFGlobCreate(&arg_ctx->fglob);
+    }
     return rv;
 }
+
 
 void
 skOptionsCtxOptionsUsage(
@@ -556,6 +692,8 @@ skOptionsCtxOptionsUsage(
 {
     size_t i;
 
+    assert(arg_ctx);
+
     for (i = 0; options_ctx_options[i].help; ++i) {
         if (arg_ctx->flags & options_ctx_options[i].opt.val) {
             fprintf(fh, "--%s %s. %s\n", options_ctx_options[i].opt.name,
@@ -563,16 +701,12 @@ skOptionsCtxOptionsUsage(
                     options_ctx_options[i].help);
         }
     }
-}
-
-
-void
-skOptionsCtxSetOpenCallback(
-    sk_options_ctx_t           *arg_ctx,
-    sk_options_ctx_open_cb_t    open_callback_fn)
-{
-    assert(arg_ctx);
-    arg_ctx->open_cb_fn = open_callback_fn;
+    if (arg_ctx->flags & SK_OPTIONS_CTX_IPV6_POLICY) {
+        skIPv6PolicyUsage(fh);
+    }
+    if (arg_ctx->fglob) {
+        skFGlobUsage(arg_ctx->fglob, fh);
+    }
 }
 
 

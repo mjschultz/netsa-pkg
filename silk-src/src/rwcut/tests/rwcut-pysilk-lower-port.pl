@@ -12,8 +12,7 @@ $file{pysilk_plugin} = get_data_or_exit77('pysilk_plugin');
 $ENV{PYTHONPATH} = $SiLKTests::testsdir.((defined $ENV{PYTHONPATH}) ? ":$ENV{PYTHONPATH}" : "");
 add_plugin_dirs('/src/pysilk');
 
-skip_test('Cannot use --python-file') 
-    unless check_exit_status(qq|$rwcut --python-file=$file{pysilk_plugin} --help|);
+check_python_plugin($rwcut);
 my $cmd = "$rwcut --python-file=$file{pysilk_plugin} --fields=3-5,lower_port --num-recs=10000 $file{data}";
 my $md5 = "f34477c91c883cb331554a12c790c79d";
 

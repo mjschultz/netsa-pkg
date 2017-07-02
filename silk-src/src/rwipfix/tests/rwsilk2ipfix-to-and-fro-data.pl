@@ -10,7 +10,6 @@ my $rwipfix2silk = check_silk_app('rwipfix2silk');
 my $rwcat = check_silk_app('rwcat');
 my %file;
 $file{data} = get_data_or_exit77('data');
-check_features(qw(ipfix));
 my $cmd = "$rwsilk2ipfix $file{data} | $rwipfix2silk --silk-output=stdout | $rwcat --compression-method=none --byte-order=little --ipv4-output";
 my $md5 = "393789257810fde6263977f90d106343";
 

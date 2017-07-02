@@ -168,7 +168,7 @@ B<rwfileinfo(1)>, B<rwcat(1)>, B<rwsort(1)>, B<silk(7)>
 
 =cut
 
-$SiLK: rwcompare.pod 9dd9f9b1d75b 2016-06-22 22:00:34Z mthomas $
+$SiLK: rwcompare.pod ce150ce9bf2a 2016-09-02 21:07:24Z mthomas $
 
 Local Variables:
 mode:text

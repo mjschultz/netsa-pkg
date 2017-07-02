@@ -16,14 +16,18 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpdu2silk.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
+RCSIDENT("$SiLK: rwpdu2silk.c d1637517606d 2017-06-23 16:51:31Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/rwrec.h>
 #include <silk/sklog.h>
+#include <silk/sksidecar.h>
 #include <silk/sksite.h>
 #include <silk/skstream.h>
 #include <silk/utils.h>
+
+
+#define PDU2SILK_ENABLE_SIDECAR  1
 
 
 /* TYPEDEFS AND DEFINES */
@@ -60,8 +64,9 @@ static const char *log_flags = NULL;
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
-/* required to process the PDUs */
-static skpc_probe_t *probe;
+static sk_sidecar_t *sidecar = NULL;
+
+static lua_State *L = NULL;
 
 
 /* OPTIONS SETUP */
@@ -97,7 +102,6 @@ static const char *appHelp[] = {
 /* LOCAL FUNCTION PROTOTYPES */
 
 static int  appOptionsHandler(clientData cData, int opt_index, char *opt_arg);
-static int  parseLogFlags(const char *log_flags_str);
 static size_t logprefix(char *buffer, size_t bufsize);
 
 
@@ -159,6 +163,11 @@ appTeardown(
         skStreamDestroy(&silk_output);
     }
 
+    sk_sidecar_destroy(&sidecar);
+
+    sk_lua_closestate(L);
+    L = NULL;
+
     skpcTeardown();
 
     /* set level to "warning" to avoid the "Stopped logging" message */
@@ -188,9 +197,22 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
+    const struct sidecar_field_st {
+        const char             *name;
+        sk_sidecar_type_t       data_type;
+        sk_field_ident_t        ipfix_ident;
+    } sidecar_field[] = {
+        {"ipClassOfService",            SK_SIDECAR_UINT8,    5},
+        {"bgpSourceAsNumber",           SK_SIDECAR_UINT16,  16},
+        {"bgpDestinationAsNumber",      SK_SIDECAR_UINT16,  17},
+        {"sourceIPv4PrefixLength",      SK_SIDECAR_UINT8,    9},
+        {"destinationIPv4PrefixLength", SK_SIDECAR_UINT8,   13},
+        {NULL, SK_SIDECAR_UNKNOWN, 0}                /* sentinel */
+    };
     unsigned int optctx_flags;
     sk_file_header_t *silk_hdr;
     int logmask;
+    unsigned int i;
     int rv;
 
     /* verify same number of options and help strings */
@@ -236,10 +258,18 @@ appSetup(
     if ('\0' == log_destination[0]) {
         strncpy(log_destination, LOG_DESTINATION_DEFAULT,
                 sizeof(log_destination));
-    } else {
-        sklogSetLevel("debug");
     }
     sklogSetDestination(log_destination);
+
+    L = sk_lua_newstate();
+
+    /* Create the sidecar data */
+    sk_sidecar_create(&sidecar);
+    for (i = 0; sidecar_field[i].name; ++i) {
+        sk_sidecar_append(
+            sidecar, sidecar_field[i].name, 0,
+            sidecar_field[i].data_type, sidecar_field[i].ipfix_ident);
+    }
 
     /* default output is "stdout" */
     if (!silk_output) {
@@ -257,8 +287,20 @@ appSetup(
     /* open the output */
     if ((rv = skHeaderSetCompressionMethod(silk_hdr, comp_method))
         || (rv = skOptionsNotesAddToStream(silk_output))
-        || (rv = skHeaderAddInvocation(silk_hdr, 1, argc, argv))
-        || (rv = skStreamOpen(silk_output))
+        || (rv = skHeaderAddInvocation(silk_hdr, 1, argc, argv)))
+    {
+        skStreamPrintLastErr(silk_output, rv, &skAppPrintErr);
+        exit(EXIT_FAILURE);
+    }
+
+#ifdef PDU2SILK_ENABLE_SIDECAR
+    if ((rv = skStreamSetSidecar(silk_output, sidecar))) {
+        skStreamPrintLastErr(silk_output, rv, &skAppPrintErr);
+        exit(EXIT_FAILURE);
+    }
+#endif
+
+    if ((rv = skStreamOpen(silk_output))
         || (rv = skStreamWriteSilkHeader(silk_output)))
     {
         skStreamPrintLastErr(silk_output, rv, &skAppPrintErr);
@@ -266,18 +308,6 @@ appSetup(
     }
 
     if (skpcSetup()) {
-        exit(EXIT_FAILURE);
-    }
-    if (skpcProbeCreate(&probe)) {
-        exit(EXIT_FAILURE);
-    }
-    skpcProbeSetName(probe, skAppName());
-    skpcProbeSetType(probe, PROBE_ENUM_NETFLOW_V5);
-    skpcProbeSetFileSource(probe, "/dev/null");
-    if (parseLogFlags(log_flags)) {
-        exit(EXIT_FAILURE);
-    }
-    if (skpcProbeVerify(probe, 0)) {
         exit(EXIT_FAILURE);
     }
 
@@ -395,6 +425,7 @@ appOptionsHandler(
  */
 static int
 parseLogFlags(
+    skpc_probe_t       *probe,
     const char         *log_flags_str)
 {
     char *log_flags_copy = NULL;
@@ -474,24 +505,41 @@ pdu2silk(
 {
     static unsigned int file_count = 0;
     char probe_name[128];
-    skPDUSource_t *pdu_src;
-    skFlowSourceParams_t params;
     int64_t count;
     rwRec rwrec;
     int rv;
+    /* required to process the PDUs */
+    skpc_probe_t *probe;
 
     ++file_count;
     snprintf(probe_name, sizeof(probe_name), "input%04u", file_count);
 
-    params.path_name = filename;
+    if (skpcProbeCreate(&probe)) {
+        skAppPrintErr("Unable to create probe");
+        return -1;
+    }
     skpcProbeSetName(probe, probe_name);
-    pdu_src = skPDUSourceCreate(probe, &params);
-    if (pdu_src == NULL) {
+    skpcProbeSetType(probe, PROBE_ENUM_NETFLOW_V5);
+    skpcProbeSetFileSource(probe, filename);
+    if (parseLogFlags(probe, log_flags)) {
+        return -1;
+    }
+    if (skpcProbeVerify(probe, 0)) {
+        skAppPrintErr("Unable to verify probe");
         return -1;
     }
 
+    if (skpcProbeStartSource(probe)) {
+        return -1;
+    }
+
+#ifdef PDU2SILK_ENABLE_SIDECAR
+    memset(&rwrec, 0, sizeof(rwrec));
+    rwrec.lua_state = L;
+#endif
+
     count = 0;
-    while (-1 != skPDUSourceGetGeneric(pdu_src, &rwrec)) {
+    while (-1 != skpcProbeGetRecordFromSource(probe, &rwrec)) {
         ++count;
         rv = skStreamWriteRecord(silk_output, &rwrec);
         if (rv) {
@@ -502,8 +550,12 @@ pdu2silk(
         }
     }
 
-    skPDUSourceLogStatsAndClear(pdu_src);
-    skPDUSourceDestroy(pdu_src);
+    skpcProbeLogSourceStats(probe);
+    skpcProbeDestroySource(probe);
+
+    /* FIXME: Do not destroy the probe, since it exists in a global
+     * list of probes, and it will be destroyed by skpcTeardown(). */
+    /* FIXME: skpcProbeDestroy(&probe); */
 
     return count;
 }
@@ -511,7 +563,7 @@ pdu2silk(
 
 int main(int argc, char **argv)
 {
-    char *path;
+    char path[PATH_MAX];
     int64_t total_count;
     int64_t count;
     int rv;
@@ -521,7 +573,7 @@ int main(int argc, char **argv)
     total_count = 0;
 
     /* process each file on the command line */
-    while ((rv = skOptionsCtxNextArgument(optctx, &path)) == 0) {
+    while ((rv = skOptionsCtxNextArgument(optctx, path, sizeof(path))) == 0) {
         count = pdu2silk(path);
         if (count < 0) {
             exit(EXIT_FAILURE);

@@ -189,7 +189,7 @@ B<ipaimport(1)>, B<ipaexport(1)>, B<ipaquery(1)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwipaexport.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
+$SiLK: rwipaexport.pod da926cd32b63 2016-10-03 19:40:30Z mthomas $
 
 Local Variables:
 mode:text

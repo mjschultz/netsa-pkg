@@ -29,7 +29,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmaplookup.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
+RCSIDENT("$SiLK: rwpmaplookup.c d1637517606d 2017-06-23 16:51:31Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
@@ -141,10 +141,6 @@ static const char *pager;
 
 /* flags used to print IPs */
 static uint32_t ip_format = SKIPADDR_CANONICAL;
-
-/* flags when registering --ip-format */
-static const unsigned int ip_format_register_flags =
-    (SK_OPTION_IP_FORMAT_INTEGER_IPS | SK_OPTION_IP_FORMAT_ZERO_PAD_IPS);
 
 /* delimiter */
 static char column_separator = '|';
@@ -384,7 +380,7 @@ appSetup(
     if (skOptionsCtxCreate(&optctx, optctx_flags)
         || skOptionsCtxOptionsRegister(optctx)
         || skOptionsRegister(appOptions, &appOptionsHandler, NULL)
-        || skOptionsIPFormatRegister(&ip_format, ip_format_register_flags))
+        || skOptionsIPFormatRegister(&ip_format))
     {
         skAppPrintErr("Unable to register options");
         exit(EXIT_FAILURE);
@@ -1098,7 +1094,6 @@ processAddress(
         if (printing_input) {
             printInputOnly(string);
         }
-#if SK_ENABLE_IPV6
     } else if (PMAPLOOKUP_TYPE_CHECK_IPV6(pmaplookup_type)) {
         if (!skipaddrIsV6(&ip)) {
             /* force IP to be IPv6 when querying an IPv6 prefix map so
@@ -1115,7 +1110,6 @@ processAddress(
         } else if (printing_input) {
             printInputOnly(string);
         }
-#endif /* SK_ENABLE_IPV6 */
     } else {
         printAddress(&ip, string);
     }
@@ -1331,20 +1325,6 @@ processIPSetFile(
 
     skIPSetIteratorBind(&iter, ipset, 0, SK_IPV6POLICY_MIX);
 
-#if !SK_ENABLE_IPV6
-    if (!printing_input) {
-        while (skIPSetIteratorNext(&iter, &ip, &prefix) == SK_ITERATOR_OK) {
-            printAddress(&ip, NULL);
-        }
-    } else {
-        while (skIPSetIteratorNext(&iter, &ip, &prefix) == SK_ITERATOR_OK) {
-            skipaddrString(buf, &ip, SKIPADDR_CANONICAL);
-            printAddress(&ip, buf);
-        }
-    }
-
-#else  /* SK_ENABLE_IPV6 */
-
     if (!printing_input) {
         if (PMAPLOOKUP_TYPE_IPV4 == pmaplookup_type) {
             /* Tell the iterator to skip any IPv6 addresses */
@@ -1380,7 +1360,6 @@ processIPSetFile(
             printAddress(&ip, buf);
         }
     }
-#endif  /* #else of #if !SK_ENABLE_IPV6 */
 
     skIPSetDestroy(&ipset);
 
@@ -1390,13 +1369,13 @@ processIPSetFile(
 
 int main(int argc, char **argv)
 {
-    char *arg;
+    char arg[PATH_MAX];
     int rv = 0;
 
     appSetup(argc, argv);                       /* never returns on error */
 
     printTitles();
-    while (skOptionsCtxNextArgument(optctx, &arg) == 0 && rv == 0) {
+    while (skOptionsCtxNextArgument(optctx, arg, sizeof(arg)) == 0 && rv == 0){
         if (ipset_files) {
             rv = processIPSetFile(arg);
         } else if (!no_files) {

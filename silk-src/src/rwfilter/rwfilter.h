@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWFILTER_H, "$SiLK: rwfilter.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_RWFILTER_H, "$SiLK: rwfilter.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 /*
 **  rwfilter.h
@@ -23,6 +23,8 @@ RCSIDENTVAR(rcsID_RWFILTER_H, "$SiLK: rwfilter.h 275df62a2e41 2017-01-05 17:30:4
 */
 
 #include <silk/rwrec.h>
+#include <silk/skfglob.h>
+#include <silk/skflowiter.h>
 #include <silk/skipaddr.h>
 #include <silk/skplugin.h>
 #include <silk/sksite.h>
@@ -43,26 +45,42 @@ RCSIDENTVAR(rcsID_RWFILTER_H, "$SiLK: rwfilter.h 275df62a2e41 2017-01-05 17:30:4
 /* whether rwfilter supports threads */
 #define SK_RWFILTER_THREADED 1
 
+
 /* environment variable that determines number of threads */
 #define RWFILTER_THREADS_ENVAR  "SILK_RWFILTER_THREADS"
 
 /* default number of threads to use */
 #define RWFILTER_THREADS_DEFAULT 1
 
+/*
+ *    Size of buffer, in bytes, for storing records prior to writing
+ *    them.  There will be one of these buffers per destination type
+ *    per thread.
+ */
+#define THREAD_RECBUF_SIZE   0x10000
 
-/* maximum number of dynamic libraries that we support */
+/*
+ *    Maximum number of records the recbuf can hold
+ */
+#define RECBUF_MAX_RECS ((uint32_t)(THREAD_RECBUF_SIZE / sizeof(rwRec)))
+
+/*
+ *    Maximum number of dynamic libraries that we support
+ */
 #define APP_MAX_DYNLIBS 8
 
 /* maximum number of filter checks */
-#define MAX_CHECKERS (APP_MAX_DYNLIBS + 2)
+#define MAX_CHECKERS (APP_MAX_DYNLIBS + 8)
+
+
 
 /*
  *  The number and types of skstream_t output streams: pass, fail, all
  */
 #define DESTINATION_TYPES 3
-#define DEST_PASS  0
-#define DEST_FAIL  1
-#define DEST_ALL   2
+enum {
+    DEST_PASS = 0, DEST_FAIL, DEST_ALL
+};
 
 
 typedef struct destination_st destination_t;
@@ -92,14 +110,33 @@ typedef struct filter_stats_st {
     uint32_t        files;          /* count of files */
 } filter_stats_t;
 
+/* holds records for a single destination */
+typedef struct recbuf_st {
+    rwRec              *buf;
+    uint32_t            count;
+    uint32_t            max_count;
+} recbuf_t;
+
+/* holds state for a single thread */
+typedef struct filter_thread_st {
+    recbuf_t        recbuf[DESTINATION_TYPES];
+    filter_stats_t  stats;
+    pthread_t       thread;
+    rwRec           rwrec;
+    lua_State      *lua_state;
+    int             rv;
+} filter_thread_t;
+
 /* output of checker functions */
 typedef enum {
-    RWF_FAIL,                   /* filter fails the record */
-    RWF_PASS,                   /* filter passes the record */
-    RWF_PASS_NOW,               /* filter passes the record;
-                                 * run no more filters */
-    RWF_IGNORE                  /* this record neither passes or
-                                 * fails; run no more filters */
+    /* filter fails the record */
+    RWF_FAIL,
+    /* filter passes the record */
+    RWF_PASS,
+    /* filter passes the record; run no more filters */
+    RWF_PASS_NOW,
+    /* this record neither passes or fails; run no more filters */
+    RWF_IGNORE
 } checktype_t;
 
 
@@ -135,22 +172,11 @@ extern skstream_t *print_stat;
  * not been provided */
 extern FILE *dryrun_fp;
 
-/* where to print output for --print-filenames; NULL when the switch
- * has not been provided */
-extern FILE *filenames_fp;
+/* handle command line switches for input files, xargs, fglob */
+extern sk_options_ctx_t *optctx;
 
-/* input file specified by --input-pipe; NULL when the switch has not
- * been provided */
-extern const char *input_pipe;
-
-/* support for the --xargs switch; NULL when the switch has not been
- * provided */
-extern skstream_t *xargs;
-
-/* index into argv of first option that does not start with a '--'.
- * This assumes getopt rearranges the options, which gnu getopt will
- * do. */
-extern int arg_index;
+/* handle for looping over the input records or files */
+extern sk_flow_iter_t *flowiter;
 
 /* true as long as we are reading records */
 extern int reading_records;
@@ -165,39 +191,15 @@ extern uint32_t thread_count;
 extern int checker_count;
 
 /* function pointers to handle checking and or processing */
-extern checktype_t (*checker[MAX_CHECKERS])(rwRec*);
+extern checktype_t (*checker[MAX_CHECKERS])(const rwRec*);
+
+/* The Lua state */
+extern lua_State *L;
 
 
 /* FUNCTION DECLARATIONS */
 
-/* fglob functions (fglob.c) */
-
-void
-fglobUsage(
-    FILE               *);
-int
-fglobSetup(
-    void);
-void
-fglobTeardown(
-    void);
-char *
-fglobNext(
-    char               *buf,
-    size_t              bufsize);
-int
-fglobFileCount(
-    void);
-int
-fglobValid(
-    void);
-int
-fglobSetFilters(
-    sk_bitmap_t       **sensor_bitmap,
-    sk_bitmap_t       **flowtype_bitmap);
-
-
-/* application setup functions (rwfilterutils.c) */
+/* application setup functions (rwfiltersetup.c) */
 
 void
 appSetup(
@@ -214,6 +216,9 @@ filterOpenInputData(
     skstream_t        **stream,
     skcontent_t         content_type,
     const char         *filename);
+lua_State *
+filterLuaCreateState(
+    void);
 
 
 /* application functions (rwfilter.c) */
@@ -229,10 +234,11 @@ int
 closeOneOutput(
     const int           dest_id,
     destination_t      *dest);
-char *
-appNextInput(
-    char               *buf,
-    size_t              bufsize);
+int
+filterFile(
+    skstream_t         *in_stream,
+    const char         *ipfile_basename,
+    filter_thread_t    *thread);
 
 
 /* filtering  functions (rwfiltercheck.c) */
@@ -249,9 +255,6 @@ filterUsage(
     FILE*);
 int
 filterGetCheckCount(
-    void);
-int
-filterGetFGlobFilters(
     void);
 int
 filterSetup(
@@ -286,6 +289,11 @@ tupleGetCheckCount(
 int
 threadedFilter(
     filter_stats_t     *stats);
+int
+writeBufferThreaded(
+    filter_thread_t    *thread,
+    int                 dest_id);
+
 
 
 

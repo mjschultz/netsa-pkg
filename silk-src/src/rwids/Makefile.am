@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am f09105e13b0f 2014-05-23 20:14:04Z mthomas $")
+# RCSIDENT("$SiLK: Makefile.am 9ebd52e51160 2014-05-27 13:15:06Z mthomas $")
 
 # Installed Targets
 
@@ -20,13 +20,7 @@ AM_CPPFLAGS = $(SK_SRC_INCLUDES) $(SK_CPPFLAGS)
 AM_CFLAGS = $(WARN_CFLAGS) $(SK_CFLAGS)
 AM_LDFLAGS = $(SK_LDFLAGS) $(STATIC_APPLICATIONS)
 
-EXTRA_DIST += rwidsquery.in rwidsquery24.in
-
-if HAVE_PYTHON24
-rwidsquery_tmpl = rwidsquery24.in
-else
-rwidsquery_tmpl = rwidsquery.in
-endif
+EXTRA_DIST += rwidsquery.in
 
 make_rwidsquery_edit = sed \
   -e 's|@PYTHON[@]|$(PYTHON)|g' \
@@ -37,13 +31,13 @@ make_rwidsquery_edit = sed \
 MAKE_RWIDSQUERY = $(AM_V_GEN) \
   rm -f $@ $@.tmp ; \
   srcdir='' ; \
-  test -f ./$(rwidsquery_tmpl) || srcdir=$(srcdir)/ ; \
+  test -f ./$@.in || srcdir=$(srcdir)/ ; \
   my_rwfilter=`echo rwfilter | sed -e '$(transform)'` ; \
-  $(make_rwidsquery_edit) "$${srcdir}$(rwidsquery_tmpl)" >$@.tmp && \
+  $(make_rwidsquery_edit) "$${srcdir}$@.in" >$@.tmp && \
   chmod +x $@.tmp && \
   mv $@.tmp $@
 
-rwidsquery: Makefile $(rwidsquery_tmpl)
+rwidsquery: Makefile rwidsquery.in
 	$(MAKE_RWIDSQUERY)
 
 MOSTLYCLEANFILES = rwidsquery.tmp

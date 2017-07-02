@@ -15,27 +15,13 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfilterthread.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwfilterthread.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
+#include <silk/skthread.h>
 #include "rwfilter.h"
 
 
 /* TYPEDEFS AND DEFINES */
-
-/*
- *    Size of buffer, in bytes, for storing records prior to writing
- *    them.  There will be one of these buffers per destination type
- *    per thread.
- */
-#define THREAD_RECBUF_SIZE   0x10000
-
-
-typedef struct filter_thread_st {
-    rwRec          *recbuf[DESTINATION_TYPES];
-    filter_stats_t  stats;
-    pthread_t       thread;
-    int             rv;
-} filter_thread_t;
 
 
 /* LOCAL VARIABLE DEFINITIONS */
@@ -46,9 +32,6 @@ static pthread_t main_thread;
 static pthread_mutex_t next_file_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static pthread_mutex_t dest_mutex[DESTINATION_TYPES];
-
-/* max number of records the recbuf can hold */
-static const size_t recbuf_max_recs = THREAD_RECBUF_SIZE / sizeof(rwRec);
 
 
 /* FUNCTION DEFINITIONS */
@@ -78,18 +61,22 @@ appHandleSignal(
 
 
 /*
- *  status = dumpBuffer(dest_id, rec_buffer, rec_count);
+ *  status = writeBufferThreaded(dest_id, rec_buffer);
  *
- *    Write 'rec_count' records from 'rec_buffer' to the destinations
- *    in the global 'dest_type' array indexed by 'dest_id' (PASS,
- *    FAIL, ALL).  Return SKSTREAM_OK on success, non-zero on error.
+ *    Write the records from 'rec_buffer' to the destinations in the
+ *    global 'dest_type' array indexed by 'dest_id' (PASS, FAIL, ALL).
+ *    Return SKSTREAM_OK on success, non-zero on error.
+ *
+ *    Reset the count of records in 'rec_buffer' to 0.
+ *
+ *    This function is called by filterFile() in rwfilter.c.
  */
-static int
-dumpBuffer(
-    int                 dest_id,
-    const rwRec        *recbuf,
-    uint32_t            reccount)
+int
+writeBufferThreaded(
+    filter_thread_t    *thread,
+    int                 dest_id)
 {
+    recbuf_t *recbuf;
     destination_t *dest;
     destination_t *dest_next;
     const rwRec *recbuf_pos;
@@ -100,6 +87,8 @@ dumpBuffer(
     int i;
     int rv = SKSTREAM_OK;
 
+    recbuf = &thread->recbuf[dest_id];
+
     pthread_mutex_lock(&dest_mutex[dest_id]);
 
     /* list of destinations to get the records */
@@ -109,24 +98,28 @@ dumpBuffer(
         goto END;
     }
 
-    /* if an output limit was specified, see if we will hit it while
-     * adding these records.  If so, adjust the reccount and set a
-     * flag to close the output after adding the records. */
-    if (dest_type[dest_id].max_records) {
+    if (0 == dest_type[dest_id].max_records) {
+        /* find location of our stopping condition */
+        end_rec = recbuf->buf + recbuf->count;
+    } else {
+        /* an output limit was specified, so see if we will hit it
+         * while adding these records.  If so, do not write all
+         * records and set a flag to close the output after adding the
+         * records. */
+        uint32_t reccount = recbuf->count;
         total_rec_count = skStreamGetRecordCount(dest->stream);
         if (total_rec_count + reccount > dest_type[dest_id].max_records) {
+            assert(dest_type[dest_id].max_records >= total_rec_count);
             reccount = dest_type[dest_id].max_records - total_rec_count;
             close_after_add = 1;
             recompute_reading = 1;
         }
+        end_rec = recbuf->buf + reccount;
     }
-
-    /* find location of our stopping condition */
-    end_rec = recbuf + reccount;
 
     do {
         dest_next = dest->next;
-        for (recbuf_pos = recbuf; recbuf_pos < end_rec; ++recbuf_pos) {
+        for (recbuf_pos = recbuf->buf; recbuf_pos < end_rec; ++recbuf_pos) {
             rv = skStreamWriteRecord(dest->stream, recbuf_pos);
             if (SKSTREAM_ERROR_IS_FATAL(rv)) {
                 if (skStreamGetLastErrno(dest->stream) == EPIPE) {
@@ -164,268 +157,18 @@ dumpBuffer(
         if (!num_outs) {
             reading_records = 0;
         }
-        for (i = DESTINATION_TYPES - 1; i >= 0; --i) {
+        for (i = DESTINATION_TYPES; i > 0; ) {
+            --i;
             pthread_mutex_unlock(&dest_mutex[i]);
         }
         return rv;
     }
 
   END:
+    recbuf->count = 0;
     pthread_mutex_unlock(&dest_mutex[dest_id]);
     return rv;
 }
-
-
-/*
- *  ok = filterFileThreaded(datafile, ipfile_basename, stats, recbuf,reccount);
- *
- *    This is the actual filtering of the file named 'datafile'.
- *    The 'ipfile_basename' parameter is passed to filterCheckFile();
- *    it should be NULL or contain the full-path (minus extension) of the
- *    file that contains Bloom filter or IPset information about the
- *    'datafile'.  The function returns 0 on success; or 1 if the
- *    input file could not be opened.
- *
- *    'recbuf' contains pointers to DESTINATION_TYPES number of record
- *    buffers.  A record buffer may be NULL if that output was not
- *    requested to that dest_id.  'reccount' is the current number of
- *    records in each record buffer.  Records that PASS or FAIL the
- *    checks are written into the appropriate record buffer.  When the
- *    count for the buffer reaches the buffer size, the records in the
- *    buffer are written to the output stream.
- */
-static int
-filterFileThreaded(
-    const char         *datafile,
-    const char         *ipfile_basename,
-    filter_stats_t     *stats,
-    rwRec              *recbuf[],
-    uint32_t            recbuf_count[])
-{
-    rwRec rwrec;
-    skstream_t *in_stream;
-    int i;
-    int fail_entire_file = 0;
-    int result = RWF_PASS;
-    int rv = SKSTREAM_OK;
-    int in_rv = SKSTREAM_OK;
-    rwRec *recbuf_pos[DESTINATION_TYPES];
-
-    /* nothing to do in dry-run mode but print the file names */
-    if (dryrun_fp) {
-        fprintf(dryrun_fp, "%s\n", datafile);
-        return 0;
-    }
-
-    if (!reading_records) {
-        return 0;
-    }
-
-    /* initialize: set each buffer's current record pointer to the
-     * appropriate location */
-    for (i = 0; i < DESTINATION_TYPES; ++i) {
-        if (dest_type[i].count) {
-            assert(NULL != recbuf[i]);
-            recbuf_pos[i] = recbuf[i] + recbuf_count[i];
-        } else {
-            /* not used.  initialize to avoid gcc warning. */
-            recbuf_pos[i] = NULL;
-        }
-    }
-
-    /* print filenames if requested */
-    if (filenames_fp) {
-        fprintf(filenames_fp, "%s\n", datafile);
-    }
-
-    /* open the input file */
-    in_rv = skStreamOpenSilkFlow(&in_stream, datafile, SK_IO_READ);
-    if (in_rv) {
-        goto END;
-    }
-
-    ++stats->files;
-
-    /* determine if all the records in the file will fail the checks */
-    if (filterCheckFile(in_stream, ipfile_basename) == 1) {
-        /* all records in the file will fail the user's tests */
-        fail_entire_file = 1;
-        result = RWF_FAIL;
-
-        /* determine if we can more efficiently handle the file */
-        if ((dest_type[DEST_ALL].count == 0)
-            && (dest_type[DEST_FAIL].count == 0))
-        {
-            /* no output is being generated for these records */
-            if (print_stat == NULL) {
-                /* not generating statistics either.  we can move to
-                 * the next file */
-                goto END;
-            }
-            if (print_volume_stats == 0) {
-                /* all we need to do is to count the records in the
-                 * file, which we can do by skipping them all. */
-                size_t skipped = 0;
-                in_rv = skStreamSkipRecords(in_stream, SIZE_MAX, &skipped);
-                stats->read.flows += skipped;
-                goto END;
-            }
-            /* else computing volume stats, and we need to read each
-             * record to get its byte and packet counts. */
-        }
-    }
-
-    /* read and process each record */
-    while (reading_records
-           && (SKSTREAM_OK == (in_rv = skStreamReadRecord(in_stream, &rwrec))))
-    {
-        /* increment number of read records */
-        INCR_REC_COUNT(stats->read, &rwrec);
-
-        /* the all-dest */
-        if (dest_type[DEST_ALL].count) {
-            memcpy(recbuf_pos[DEST_ALL], &rwrec, sizeof(rwRec));
-            ++recbuf_pos[DEST_ALL];
-            ++recbuf_count[DEST_ALL];
-            if (recbuf_count[DEST_ALL] == recbuf_max_recs) {
-                rv = dumpBuffer(DEST_ALL, recbuf[DEST_ALL],
-                                recbuf_count[DEST_ALL]);
-                if (rv) {
-                    goto END;
-                }
-                recbuf_pos[DEST_ALL] = recbuf[DEST_ALL];
-                recbuf_count[DEST_ALL] = 0;
-            }
-        }
-
-        if (!fail_entire_file) {
-            /* run all checker()'s until end or one doesn't pass */
-            for (i=0, result=RWF_PASS;
-                 i < checker_count && result == RWF_PASS;
-                 ++i)
-            {
-                result = (*(checker[i]))(&rwrec);
-            }
-        }
-
-        switch (result) {
-          case RWF_PASS:
-          case RWF_PASS_NOW:
-            /* increment number of record that pass */
-            INCR_REC_COUNT(stats->pass, &rwrec);
-
-            /* the pass-dest */
-            if (dest_type[DEST_PASS].count) {
-                memcpy(recbuf_pos[DEST_PASS], &rwrec, sizeof(rwRec));
-                ++recbuf_pos[DEST_PASS];
-                ++recbuf_count[DEST_PASS];
-                if (recbuf_count[DEST_PASS] == recbuf_max_recs) {
-                    rv = dumpBuffer(DEST_PASS, recbuf[DEST_PASS],
-                                    recbuf_count[DEST_PASS]);
-                    if (rv) {
-                        goto END;
-                    }
-                    recbuf_pos[DEST_PASS] = recbuf[DEST_PASS];
-                    recbuf_count[DEST_PASS] = 0;
-                }
-            }
-            break;
-
-          case RWF_FAIL:
-            /* the fail-dest */
-            if (dest_type[DEST_FAIL].count) {
-                memcpy(recbuf_pos[DEST_FAIL], &rwrec, sizeof(rwRec));
-                ++recbuf_pos[DEST_FAIL];
-                ++recbuf_count[DEST_FAIL];
-                if (recbuf_count[DEST_FAIL] == recbuf_max_recs) {
-                    rv = dumpBuffer(DEST_FAIL, recbuf[DEST_FAIL],
-                                    recbuf_count[DEST_FAIL]);
-                    if (rv) {
-                        goto END;
-                    }
-                    recbuf_pos[DEST_FAIL] = recbuf[DEST_FAIL];
-                    recbuf_count[DEST_FAIL] = 0;
-                }
-            }
-            break;
-
-          default:
-            break;
-        }
-
-    } /* while (reading_records && skStreamReadRecord()) */
-
-  END:
-    if (in_rv == SKSTREAM_OK || in_rv == SKSTREAM_ERR_EOF) {
-        in_rv = 0;
-    } else {
-        skStreamPrintLastErr(in_stream, in_rv, &skAppPrintErr);
-        in_rv = 1;
-    }
-
-    /* close input */
-    skStreamDestroy(&in_stream);
-
-    if (rv) {
-        return -1;
-    }
-    return in_rv;
-}
-
-
-/*
- *  filename = nextInputThreaded(buf, bufsize);
- *
- *    Fill 'buf', a buffer of size 'bufsize' with the name of the next
- *    file to process.  Return 'buf' if there are more files to
- *    process, NULL if there are no more files or on error.
- */
-static char *
-nextInputThreaded(
-    char               *buf,
-    size_t              bufsize)
-{
-    char *fname;
-
-    pthread_mutex_lock(&next_file_mutex);
-    fname = appNextInput(buf, bufsize);
-    pthread_mutex_unlock(&next_file_mutex);
-
-    return fname;
-}
-
-
-#ifndef SKTHREAD_UNKNOWN_ID
-/* Create a local copy of the function from libsilk-thrd. */
-/*
- *    Tell the current thread to ignore all signals except those
- *    indicating a failure (e.g., SIGBUS and SIGSEGV).
- */
-static void
-skthread_ignore_signals(
-    void)
-{
-    sigset_t sigs;
-
-    sigfillset(&sigs);
-    sigdelset(&sigs, SIGABRT);
-    sigdelset(&sigs, SIGBUS);
-    sigdelset(&sigs, SIGILL);
-    sigdelset(&sigs, SIGSEGV);
-
-#ifdef SIGEMT
-    sigdelset(&sigs, SIGEMT);
-#endif
-#ifdef SIGIOT
-    sigdelset(&sigs, SIGIOT);
-#endif
-#ifdef SIGSYS
-    sigdelset(&sigs, SIGSYS);
-#endif
-
-    pthread_sigmask(SIG_SETMASK, &sigs, NULL);
-}
-#endif  /* #ifndef SKTHREAD_UNKNOWN_ID */
 
 
 /*
@@ -433,44 +176,75 @@ skthread_ignore_signals(
  *
  *    THREAD ENTRY POINT.
  *
- *    Gets the name of the next file to process and calls
- *    filterFileThreaded() to process that file.  Stops processing
- *    when there are no more files to process or when an error occurs.
+ *    Get the name of the next file to process and calls filterFile()
+ *    to process that file.  Stop processing when there are no more
+ *    files to process or when an error occurs.
+ *
+ *    The filterFile() function calls writeBufferThreaded() to write
+ *    buffers to disk.
  */
 static void *
 workerThread(
     void               *v_thread)
 {
-    filter_stats_t *stats = &(((filter_thread_t*)v_thread)->stats);
-    rwRec **recbuf = ((filter_thread_t*)v_thread)->recbuf;
-    uint32_t recbuf_count[DESTINATION_TYPES];
-    char datafile[PATH_MAX];
+    filter_thread_t *self = (filter_thread_t *)v_thread;
+    skstream_t *stream = NULL;
     int rv = 0;
     int i;
 
     /* ignore all signals unless this thread is the main thread */
-    if (!pthread_equal(main_thread, ((filter_thread_t*)v_thread)->thread)) {
+    if (!pthread_equal(main_thread, self->thread)) {
         skthread_ignore_signals();
     }
 
-    memset(recbuf_count, 0, sizeof(recbuf_count));
+    self->rv = 0;
 
-    ((filter_thread_t*)v_thread)->rv = 0;
+    if (dryrun_fp) {
+        char flowfile[PATH_MAX];
 
-    while (nextInputThreaded(datafile, sizeof(datafile)) != NULL) {
-        rv = filterFileThreaded(datafile, NULL, stats, recbuf, recbuf_count);
+        for (;;) {
+            pthread_mutex_lock(&next_file_mutex);
+            rv = skOptionsCtxNextArgument(optctx, flowfile, sizeof(flowfile));
+            pthread_mutex_unlock(&next_file_mutex);
+            if (0 != rv) {
+                break;
+            }
+            fprintf(dryrun_fp, "%s\n", flowfile);
+        }
+        return NULL;
+    }
+
+    for (;;) {
+        pthread_mutex_lock(&next_file_mutex);
+        /* close the previous stream */
+        if (stream) {
+            sk_flow_iter_close_stream(flowiter, stream);
+        }
+        rv = sk_flow_iter_get_next_stream(flowiter, &stream);
+        pthread_mutex_unlock(&next_file_mutex);
+        if (SKSTREAM_OK != rv) {
+            if (SKSTREAM_ERR_EOF == rv) {
+                break;
+            }
+            continue;
+        }
+
+        rv = filterFile(stream, NULL, self);
         if (rv < 0) {
             /* fatal error */
-            ((filter_thread_t*)v_thread)->rv = rv;
+            self->rv = rv;
+            pthread_mutex_lock(&next_file_mutex);
+            sk_flow_iter_close_stream(flowiter, stream);
+            pthread_mutex_unlock(&next_file_mutex);
             return NULL;
         }
         /* if (rv > 0) there was an error opening/reading input: ignore */
     }
 
-    /* dump any records still in the buffers */
+    /* write any records still in the buffers */
     for (i = 0; i < DESTINATION_TYPES; ++i) {
-        if (recbuf_count[i]) {
-            dumpBuffer(i, recbuf[i], recbuf_count[i]);
+        if (self->recbuf[i].count) {
+            writeBufferThreaded(self, i);
         }
     }
 
@@ -493,6 +267,7 @@ threadedFilter(
     filter_stats_t     *stats)
 {
     filter_thread_t *thread;
+    filter_thread_t *t;
     int i;
     uint32_t j;
     int rv = 0;
@@ -513,19 +288,42 @@ threadedFilter(
         pthread_mutex_init(&dest_mutex[i], NULL);
     }
 
-    /* create the data structures used by each thread */
+    /* create the data structure to hold each thread's state */
     thread = (filter_thread_t*)calloc(thread_count, sizeof(filter_thread_t));
     if (thread == NULL) {
         goto END;
     }
+
+    /* create a Lua state for each thread.  The thread's Lua state is
+     * used to pass the sidecar data through the thread and it is not
+     * used for partitioning the flow records.  Initialize the rwRec
+     * on each thread using that Lua state. */
+    for (j = 0, t = thread; j < thread_count; ++j, ++t) {
+        /* thread 0 uses the existing lua state */
+        if (j == 0) {
+            t->lua_state = L;
+        } else {
+            t->lua_state = filterLuaCreateState();
+            if (NULL == t->lua_state) {
+                goto END;
+            }
+        }
+        rwRecInitialize(&t->rwrec, t->lua_state);
+    }
+
+    /* for active each destination type, create buffers on each thread
+     * that buffer the records prior to writing them to the stream. */
     for (i = 0; i < DESTINATION_TYPES; ++i) {
         if (dest_type[i].count) {
-            for (j = 0; j < thread_count; ++j) {
-                thread[j].recbuf[i]
-                    = (rwRec*)malloc(recbuf_max_recs * sizeof(rwRec));
-                if (thread[j].recbuf[i] == NULL) {
+            for (j = 0, t = thread; j < thread_count; ++j, ++t) {
+                t->recbuf[i].buf
+                    = (rwRec *)malloc(RECBUF_MAX_RECS * sizeof(rwRec));
+                if (t->recbuf[i].buf == NULL) {
                     goto END;
                 }
+                rwRecInitializeArray(
+                    t->recbuf[i].buf, t->lua_state, RECBUF_MAX_RECS);
+                t->recbuf[i].max_count = RECBUF_MAX_RECS;
             }
         }
     }
@@ -534,42 +332,43 @@ threadedFilter(
     thread[0].thread = main_thread;
 
     /* create the threads, skip 0 since that is the main thread */
-    for (j = 1; j < thread_count; ++j) {
-        pthread_create(&thread[j].thread, NULL, &workerThread, &thread[j]);
+    for (j = 1, t = &thread[j]; j < thread_count; ++j, ++t) {
+        pthread_create(&t->thread, NULL, &workerThread, t);
     }
 
     /* allow the main thread to also process files */
     workerThread(&thread[0]);
 
     /* join with the threads as they die off */
-    for (j = 0; j < thread_count; ++j) {
+    for (j = 0, t = thread; j < thread_count; ++j, ++t) {
         if (j > 0) {
-            pthread_join(thread[j].thread, NULL);
+            pthread_join(t->thread, NULL);
         }
-        rv |= thread[j].rv;
-        stats->read.flows += thread[j].stats.read.flows;
-        stats->read.pkts  += thread[j].stats.read.pkts;
-        stats->read.bytes += thread[j].stats.read.bytes;
-        stats->pass.flows += thread[j].stats.pass.flows;
-        stats->pass.pkts  += thread[j].stats.pass.pkts;
-        stats->pass.bytes += thread[j].stats.pass.bytes;
-        stats->files      += thread[j].stats.files;
+        rv |= t->rv;
+        stats->read.flows += t->stats.read.flows;
+        stats->read.pkts  += t->stats.read.pkts;
+        stats->read.bytes += t->stats.read.bytes;
+        stats->pass.flows += t->stats.pass.flows;
+        stats->pass.pkts  += t->stats.pass.pkts;
+        stats->pass.bytes += t->stats.pass.bytes;
+        stats->files      += t->stats.files;
 #if 0
         fprintf(stderr,
                 "thread %d processed %" PRIu32 " files and "
                 "passed %" PRIu64 "/%" PRIu64 " flows\n",
-                j, thread[j].stats.files, thread[j].stats.pass.flows,
-                thread[j].stats.read.flows);
+                j, t->stats.files, t->stats.pass.flows,
+                t->stats.read.flows);
 #endif
     }
 
   END:
     if (thread) {
-        for (i = 0; i < DESTINATION_TYPES; ++i) {
-            for (j = 0; j < thread_count; ++j) {
-                if (thread[j].recbuf[i]) {
-                    free(thread[j].recbuf[i]);
-                }
+        for (j = 0, t = thread; j < thread_count; ++j, ++t) {
+            for (i = 0; i < DESTINATION_TYPES; ++i) {
+                free(t->recbuf[i].buf);
+            }
+            if (j > 0 && t->lua_state) {
+                sk_lua_closestate(t->lua_state);
             }
         }
         free(thread);

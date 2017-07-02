@@ -1,14 +1,14 @@
 #######################################################################
-## Copyright (C) 2008-2017 by Carnegie Mellon University.
-##
-## @OPENSOURCE_LICENSE_START@
-## See license information in ../LICENSE.txt
-## @OPENSOURCE_LICENSE_END@
-##
+# Copyright (C) 2008-2017 by Carnegie Mellon University.
+#
+# @OPENSOURCE_LICENSE_START@
+# See license information in ../LICENSE.txt
+# @OPENSOURCE_LICENSE_END@
+#
 #######################################################################
 
 #######################################################################
-# $SiLK: silk-python-info.py 275df62a2e41 2017-01-05 17:30:40Z mthomas $
+# $SiLK: silk-python-info.py efd886457770 2017-06-21 18:43:23Z mthomas $
 #######################################################################
 
 from distutils.sysconfig import *
@@ -17,8 +17,8 @@ import sys
 import os
 import re
 
-# See if we are python version >= 2.4 and < 4.0
-version_ok = (0x020400f0 <= sys.hexversion < 0x04000000)
+# See if we are python version >= 2.6 and < 4.0
+version_ok = (0x020600f0 <= sys.hexversion < 0x04000000)
 
 if len(sys.argv) > 1 and sys.argv[1] == "--check-version":
     if version_ok:

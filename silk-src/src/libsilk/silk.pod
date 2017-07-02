@@ -101,7 +101,7 @@ B<rwmatch(1)> matches (mates) records as queries and responses and
 marks mated records with an ID that is stored in the next-hop IP
 field.  B<rwmatch> requires that its input is sorted.
 
-I<IPsets, Bags, Aggregate Bags, and Prefix Maps>
+I<IPsets, Bags, and Prefix Maps>
 
 An I<IPset> is a data structure and a binary file format that contains
 a list of IP addresses where each IP appears once (a mathematical
@@ -114,10 +114,6 @@ is a 64-bit number.  Usually the key represents an aspect of a flow
 record (an IP address, a port number, the protocol) and the counter is
 a volume (the number of flow records, the sum of the packet counts)
 for the flow records that match that key.
-
-An I<Aggregate Bag> is similar to a Bag except the key and/or the
-counter may be comprised of multiple fields.  Aggregate Bags were
-introduced in SiLK 3.15.0.
 
 A I<prefix map> is a data structure and file format that maps I<every>
 IP address to string.  An example prefix map gives the two-letter
@@ -151,21 +147,6 @@ B<rwbagcat(1)> prints binary Bag files as text.
 
 B<rwbagtool(1)> performs operations (e.g., addition, subtraction) on
 binary Bag files and produces a new Bag file.
-
-B<rwaggbag(1)> reads SiLK Flow records and builds a binary Aggregate
-Bag containing key-count pairs.  An example is a Aggregate Bag
-containing the sum of the byte counts for each source port seen on the
-flow records.  I<Since SiLK 3.15.0.>
-
-B<rwaggbagbuild(1)> creates a binary Aggregate Bag file from a textual
-input file.  I<Since SiLK 3.15.0.>
-
-B<rwaggbagcat(1)> prints binary Aggregate Bag files as text.  I<Since
-SiLK 3.15.0.>
-
-B<rwaggbagtool(1)> performs operations (e.g., addition, subtraction)
-on binary Aggregate Bag files and produces a new Aggregate Bag file.
-I<Since SiLK 3.15.0.>
 
 B<rwpmapbuild(1)> reads textual input and creates a binary prefix map
 file for use with the Address Type (B<addrtype(3)>) and Prefix Map
@@ -203,21 +184,35 @@ file is created by B<rwpmapbuild(1)>.
 
 I<Run Time Plug-Ins>
 
-These plug-ins must be explicitly loaded into an application using the
-application's B<--plugin> switch.
+To use most of these plug-ins, the plug-in must be explicitly loaded
+into an application by using the application's B<--plugin> switch and
+giving the plug-in's library name or path as the argument.  For a
+plug-in named I<NAME>, the library is typically named F<NAME.so>.
 
-B<flowkey(3)>. The flowkey plug-in, which must be loaded explicitly,
-adds a switch and a field that computes a 32-bit hash for a flow
-record using the same algorithm as YAF uses for its flow key utility
-B<getFlowKeyHash(1)>.  I<Since SiLK 3.15.0.>
+B<app-mismatch(3)>. The application-mismatch plug-in helps to find
+services running on unusual or non-typical ports by causing
+B<rwfilter(1)> to only pass a flow record when the record's
+application field is non-zero and its value is different than that in
+the source port and destination port fields.
 
-B<flowrate(3)>.  The flowrate plug-in, which must be loaded
-explicitly, adds switches and fields to compute packets/second,
-bytes/second, bytes/packet, payload-bytes, and payload-bytes/second.
+B<conficker-c(3)>. The conficker-c plug-in was written in March 2009
+to detect traffic that matches the signature of the .C variant of the
+Conficker worm.
+
+B<cutmatch(3)>. The cutmatch plug-in creates a field in B<rwcut(1)>
+that provides a more user-friendly representation of the match
+parameter value that B<rwmatch(1)> writes into a SiLK Flow record's
+next hop IP field.
+
+B<flowrate(3)>.  The flowrate plug-in adds switches and fields to
+compute packets/second, bytes/second, bytes/packet, payload-bytes, and
+payload-bytes/second.
 
 B<int-ext-fields(3)>.  The internal/external plug-in makes available
 fields containing internal and external IPs and ports (int-ip, ext-ip,
-int-port, and ext-port).
+int-port, and ext-port).  It can be used to print, sort by, or group
+by the internal or external IP or port, which is useful when a single
+flow file contains flows in multiple directions.
 
 B<ipafilter(3)>.  The IPA (IP Association) plug-in works with
 B<rwfilter> to partition flows based on data in an IPA data store.
@@ -290,7 +285,6 @@ attributes field contains the I<flow timed-out> flag, B<rwcombine>
 attempts to find the record with the corresponding I<continuation>
 flag set and combine those records into a single flow.  B<rwcombine>
 writes the results to the named output file or to the standard output.
-I<Since SiLK 3.9.0.>
 
 B<rwcompare(1)> determines whether two SiLK Flow files contain the
 same flow records.
@@ -312,7 +306,6 @@ in given input file.
 
 B<rwrecgenerator(1)> generates SiLK Flow records using a pseudo-random
 number generator; these records may be used to test SiLK applications.
-I<Since SiLK 3.6.0.>
 
 B<rwsplit(1)> reads SiLK Flow records and generates a set of sub-files
 from the input.  The sub-files may be limited by flow-, byte-, or
@@ -357,27 +350,8 @@ B<silk_config(1)> prints information about how SiLK was compiled; this
 information may be used to compile and link other files and programs
 against the SiLK header files and libraries.
 
-I<Deprecated Tools>
-
-These tools are deprecated.  Their functionality is available in other
-applications.
-
-B<mapsid(1)> maps between sensor names and sensor IDs using the values
-specified in the B<silk.conf(5)> file.  B<mapsid> is deprecated as of
-SiLK 3.0.0, and it will be removed in the SiLK 4.0 release.  This
-functionality is available in B<rwsiteinfo(1)>.
-
-B<rwguess(8)> reads a file containing NetFlow v5 PDU records and
-prints the SNMP interfaces that are used most often and the number of
-records seen for each interface.  B<rwguess> is deprecated as of SiLK
-3.8.3, and it will be removed in the SiLK 4.0 release.  Similar
-functionality is available using a combination of B<rwpdu2silk(1)>,
-B<rwstats(1)>, and B<rwuniq(1)>.
-
-B<rwip2cc(1)> maps a (textual) list of IP addresses to their country
-code.  B<rwip2cc> is deprecated as of SiLK 3.0.0, and it will be
-removed in the SiLK 4.0 release.  This functionality is available in
-B<rwpmaplookup(1)>.
+=for comment
+I<Deprecated tools>
 
 =head2 Packing System
 
@@ -392,22 +366,14 @@ files covering each hour at the leaves.
 The tools, configuration files, and plug-ins that comprise the SiLK
 Packing System are:
 
-B<flowcap(8)> listens to flow generators (devices which produce
-network flow data) and stores the data in temporary files prior to
-transferring the files to a remote machine for processing by
-B<rwflowpack>.
-
 B<rwflowpack(8)> reads flow data either directly from a flow generator
-or from files generated by B<flowcap>, converts the data to the SiLK
+or from files generated by a previous run of B<rwflowpack>,
+converts the data to the SiLK
 flow record format, categorizes the flow records according to rules
-loaded from a packing-logic plug-in, and writes the
+loaded from a packing-logic Lua configuration file, and writes the
 records either to hourly flat-files organized in a time-based
 directory structure or to files for transfer to a remote machine for
-processing by B<rwflowappend>.
-
-B<rwflowappend(8)> watches a directory for files containing small
-numbers of SiLK flow records and appends those records to hourly files
-organized in a time-based directory tree.
+processing by another instance of B<rwflowpack>.
 
 B<rwsender(8)> watches an incoming directory for files, moves the
 files into a processing directory, and transfers the files to one or
@@ -425,17 +391,6 @@ user-specified command on each file.
 
 B<rwpackchecker(8)> reads SiLK Flow records and checks for unusual
 patterns that may indicate data file corruption.
-
-B<sensor.conf(5)> is a configuration file for sensors and probes used
-by B<rwflowpack> and B<flowcap>.
-
-B<packlogic-twoway(3)> is one of the plug-ins available that describe
-a set of rules (the packing-logic) that B<rwflowpack> may use when
-categorizing flow records as incoming or output.
-
-B<packlogic-generic(3)> is one of the plug-ins available that describe
-a set of rules (the packing-logic) that B<rwflowpack> may use when
-categorizing flow records as incoming or output.
 
 =head1 ENVIRONMENT
 
@@ -763,7 +718,7 @@ L<http://tools.netsa.cert.org/silk/>
 
 =cut
 
-$SiLK: silk.pod 7f87df5c3e66 2017-03-24 21:16:58Z mthomas $
+$SiLK: silk.pod cdb00b7f134a 2017-06-23 21:13:05Z mthomas $
 
 Local Variables:
 mode:text

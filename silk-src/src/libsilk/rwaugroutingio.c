@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaugroutingio.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwaugroutingio.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 /* #define RWPACK_BYTES_PACKETS          1 */
 #define RWPACK_FLAGS_TIMES_VOLUMES    1
@@ -101,16 +101,16 @@ RCSIDENT("$SiLK: rwaugroutingio.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 static int
 augroutingioRecordUnpack_V5(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         augroutingioRecordSwap_V5(ar);
     }
 
     /* Start time, TCP flags, Protocol, TCP State */
-    rwpackUnpackTimesFlagsProto(rwrec, ar, stream->hdr_starttime);
+    rwpackUnpackTimesFlagsProto(rwrec, ar, stream->silkflow.hdr_starttime);
 
     /* application */
     rwRecMemSetApplication(rwrec, &ar[ 6]);
@@ -123,8 +123,8 @@ augroutingioRecordUnpack_V5(
     rwRecMemSetElapsed(rwrec, &ar[12]);
 
     /* packets, bytes */
-    rwRecMemSetPkts(rwrec,  &ar[16]);
-    rwRecMemSetBytes(rwrec, &ar[20]);
+    rwpackUnpackPackets32(rwrec, &ar[16]);
+    rwpackUnpackBytes32(rwrec, &ar[20]);
 
     /* sIP, dIP */
     rwRecMemSetSIPv4(rwrec, &ar[24]);
@@ -134,12 +134,12 @@ augroutingioRecordUnpack_V5(
     rwRecMemSetNhIPv4(rwrec, &ar[32]);
 
     /* input, output */
-    rwRecMemSetInput(rwrec,  &ar[36]);
-    rwRecMemSetOutput(rwrec, &ar[38]);
+    rwpackUnpackInput16(rwrec, &ar[36]);
+    rwpackUnpackOutput16(rwrec, &ar[38]);
 
     /* sensor, flow_type from file name/header */
-    rwRecSetSensor(rwrec, stream->hdr_sensor);
-    rwRecSetFlowType(rwrec, stream->hdr_flowtype);
+    rwRecSetSensor(rwrec, stream->silkflow.hdr_sensor);
+    rwRecSetFlowType(rwrec, stream->silkflow.hdr_flowtype);
 
     return SKSTREAM_OK;
 }
@@ -150,14 +150,14 @@ augroutingioRecordUnpack_V5(
  */
 static int
 augroutingioRecordPack_V5(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
     int rv;
 
     /* Start time, TCP Flags, Protocol, TCP State */
-    rv = rwpackPackTimesFlagsProto(rwrec, ar, stream->hdr_starttime);
+    rv = rwpackPackTimesFlagsProto(rwrec, ar, stream->silkflow.hdr_starttime);
     if (rv) {
         return rv;
     }
@@ -173,8 +173,14 @@ augroutingioRecordPack_V5(
     rwRecMemGetElapsed(rwrec, &ar[12]);
 
     /* packets, bytes */
-    rwRecMemGetPkts(rwrec,  &ar[16]);
-    rwRecMemGetBytes(rwrec, &ar[20]);
+    rwpackPackPackets32(rwrec,  &ar[16], &rv);
+    if (rv) {
+        return rv;
+    }
+    rwpackPackBytes32(rwrec, &ar[20], &rv);
+    if (rv) {
+        return rv;
+    }
 
     /* sIP, dIP */
     rwRecMemGetSIPv4(rwrec, &ar[24]);
@@ -184,11 +190,14 @@ augroutingioRecordPack_V5(
     rwRecMemGetNhIPv4(rwrec, &ar[32]);
 
     /* input, output */
-    rwRecMemGetInput(rwrec,  &ar[36]);
-    rwRecMemGetOutput(rwrec, &ar[38]);
+    rwpackPackInput16(rwrec, &ar[36], &rv);
+    rwpackPackOutput16(rwrec, &ar[38], &rv);
+    if (rv) {
+        return rv;
+    }
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         augroutingioRecordSwap_V5(ar);
     }
 
@@ -273,24 +282,25 @@ augroutingioRecordPack_V5(
 static int
 augroutingioRecordUnpack_V4(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         augroutingioRecordSwap_V4(ar);
     }
 
     /* sTime, elapsed, pkts, bytes, proto, tcp-flags, state, application */
-    rwpackUnpackFlagsTimesVolumes(rwrec, ar, stream->hdr_starttime, 16, 0);
+    rwpackUnpackFlagsTimesVolumes(
+        rwrec, ar, stream->silkflow.hdr_starttime, 16, 0);
 
     /* sPort, dPort */
     rwRecMemSetSPort(rwrec, &ar[16]);
     rwRecMemSetDPort(rwrec, &ar[18]);
 
     /* input, output */
-    rwRecMemSetInput(rwrec, &ar[20]);
-    rwRecMemSetOutput(rwrec, &ar[22]);
+    rwpackUnpackInput16(rwrec, &ar[20]);
+    rwpackUnpackOutput16(rwrec, &ar[22]);
 
     /* sIP, dIP, nhIP */
     rwRecMemSetSIPv4(rwrec, &ar[24]);
@@ -298,8 +308,8 @@ augroutingioRecordUnpack_V4(
     rwRecMemSetNhIPv4(rwrec, &ar[32]);
 
     /* sensor, flow_type from file name/header */
-    rwRecSetSensor(rwrec, stream->hdr_sensor);
-    rwRecSetFlowType(rwrec, stream->hdr_flowtype);
+    rwRecSetSensor(rwrec, stream->silkflow.hdr_sensor);
+    rwRecSetFlowType(rwrec, stream->silkflow.hdr_flowtype);
 
     return SKSTREAM_OK;
 }
@@ -310,14 +320,15 @@ augroutingioRecordUnpack_V4(
  */
 static int
 augroutingioRecordPack_V4(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
     int rv = SKSTREAM_OK; /* return value */
 
     /* sTime, elapsed, pkts, bytes, proto, tcp-flags, state, application */
-    rv = rwpackPackFlagsTimesVolumes(ar, rwrec, stream->hdr_starttime, 16);
+    rv = rwpackPackFlagsTimesVolumes(
+        ar, rwrec, stream->silkflow.hdr_starttime, 16);
     if (rv) {
         return rv;
     }
@@ -327,8 +338,11 @@ augroutingioRecordPack_V4(
     rwRecMemGetDPort(rwrec, &ar[18]);
 
     /* input, output */
-    rwRecMemGetInput(rwrec, &ar[20]);
-    rwRecMemGetOutput(rwrec, &ar[22]);
+    rwpackPackInput16(rwrec, &ar[20], &rv);
+    rwpackPackOutput16(rwrec, &ar[22], &rv);
+    if (rv) {
+        return rv;
+    }
 
     /* sIP, dIP, nhIP */
     rwRecMemGetSIPv4(rwrec, &ar[24]);
@@ -336,7 +350,7 @@ augroutingioRecordPack_V4(
     rwRecMemGetNhIPv4(rwrec, &ar[32]);
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         augroutingioRecordSwap_V4(ar);
     }
 
@@ -427,14 +441,14 @@ augroutingioRecordPack_V4(
 static int
 augroutingioRecordUnpack_V1(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     uint32_t msec_flags;
     uint8_t is_tcp, prot_flags;
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         augroutingioRecordSwap_V1(ar);
     }
 
@@ -451,7 +465,7 @@ augroutingioRecordUnpack_V1(
     rwRecMemSetApplication(rwrec, &ar[24]);
 
     /* sTime, pkts, bytes, elapsed, proto, tcp-flags, bpp */
-    rwpackUnpackTimeBytesPktsFlags(rwrec, stream->hdr_starttime,
+    rwpackUnpackTimeBytesPktsFlags(rwrec, stream->silkflow.hdr_starttime,
                                    (uint32_t*)&ar[12], (uint32_t*)&ar[16],
                                    &msec_flags);
 
@@ -462,12 +476,14 @@ augroutingioRecordUnpack_V1(
 
     /* next hop, input & output interfaces */
     rwRecMemSetNhIPv4(rwrec, &ar[28]);
-    rwRecMemSetInput(rwrec, &ar[32]);
-    rwRecMemSetOutput(rwrec, &ar[34]);
+
+    /* input, output */
+    rwpackUnpackInput16(rwrec, &ar[32]);
+    rwpackUnpackOutput16(rwrec, &ar[34]);
 
     /* sensor, flow_type from file name/header */
-    rwRecSetSensor(rwrec, stream->hdr_sensor);
-    rwRecSetFlowType(rwrec, stream->hdr_flowtype);
+    rwRecSetSensor(rwrec, stream->silkflow.hdr_sensor);
+    rwRecSetFlowType(rwrec, stream->silkflow.hdr_flowtype);
 
     return SKSTREAM_OK;
 }
@@ -478,9 +494,9 @@ augroutingioRecordUnpack_V1(
  */
 static int
 augroutingioRecordPack_V1(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
     int rv = SKSTREAM_OK; /* return value */
     uint32_t msec_flags;
@@ -489,7 +505,7 @@ augroutingioRecordPack_V1(
     /* sTime, pkts, bytes, elapsed, proto, tcp-flags, bpp */
     rv = rwpackPackTimeBytesPktsFlags((uint32_t*)&ar[12], (uint32_t*)&ar[16],
                                       &msec_flags,
-                                      rwrec, stream->hdr_starttime);
+                                      rwrec, stream->silkflow.hdr_starttime);
     if (rv) {
         return rv;
     }
@@ -515,13 +531,18 @@ augroutingioRecordPack_V1(
     /* application */
     rwRecMemGetApplication(rwrec, &ar[24]);
 
-    /* next hop, input & output interfaces */
+    /* next hop */
     rwRecMemGetNhIPv4(rwrec, &ar[28]);
-    rwRecMemGetInput(rwrec, &ar[32]);
-    rwRecMemGetOutput(rwrec, &ar[34]);
+
+    /* input, output */
+    rwpackPackInput16(rwrec, &ar[32], &rv);
+    rwpackPackOutput16(rwrec, &ar[34], &rv);
+    if (rv) {
+        return rv;
+    }
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         augroutingioRecordSwap_V1(ar);
     }
 
@@ -584,12 +605,12 @@ augroutingioPrepare(
     /* version check; set values based on version */
     switch (skHeaderGetRecordVersion(hdr)) {
       case 5:
-        stream->rwUnpackFn = &augroutingioRecordUnpack_V5;
-        stream->rwPackFn   = &augroutingioRecordPack_V5;
+        stream->silkflow.unpack = &augroutingioRecordUnpack_V5;
+        stream->silkflow.pack   = &augroutingioRecordPack_V5;
         break;
       case 4:
-        stream->rwUnpackFn = &augroutingioRecordUnpack_V4;
-        stream->rwPackFn   = &augroutingioRecordPack_V4;
+        stream->silkflow.unpack = &augroutingioRecordUnpack_V4;
+        stream->silkflow.pack   = &augroutingioRecordPack_V4;
         break;
       case 3:
       case 2:
@@ -597,8 +618,8 @@ augroutingioPrepare(
         /* V1 and V2 differ only in the padding of the header */
         /* V2 and V3 differ only in that V3 supports compression on
          * read and write; V2 supports compression only on read */
-        stream->rwUnpackFn = &augroutingioRecordUnpack_V1;
-        stream->rwPackFn   = &augroutingioRecordPack_V1;
+        stream->silkflow.unpack = &augroutingioRecordUnpack_V1;
+        stream->silkflow.pack   = &augroutingioRecordPack_V1;
         break;
       case 0:
       default:
@@ -606,22 +627,22 @@ augroutingioPrepare(
         goto END;
     }
 
-    stream->recLen = augroutingioGetRecLen(skHeaderGetRecordVersion(hdr));
+    stream->rec_len = augroutingioGetRecLen(skHeaderGetRecordVersion(hdr));
 
     /* verify lengths */
-    if (stream->recLen == 0) {
+    if (stream->rec_len == 0) {
         skAppPrintErr("Record length not set for %s version %u",
                       FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr));
         skAbort();
     }
-    if (stream->recLen != skHeaderGetRecordLength(hdr)) {
+    if (stream->rec_len != skHeaderGetRecordLength(hdr)) {
         if (0 == skHeaderGetRecordLength(hdr)) {
-            skHeaderSetRecordLength(hdr, stream->recLen);
+            skHeaderSetRecordLength(hdr, stream->rec_len);
         } else {
             skAppPrintErr(("Record length mismatch for %s version %u\n"
                            "\tcode = %" PRIu16 " bytes;  header = %lu bytes"),
                           FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr),
-                          stream->recLen,
+                          stream->rec_len,
                           (unsigned long)skHeaderGetRecordLength(hdr));
             skAbort();
         }

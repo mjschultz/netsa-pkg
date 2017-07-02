@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am f162742a8f51 2014-05-09 18:47:33Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am fe0b1d3b9c8e 2014-05-07 18:05:10Z mthomas $");
 
 # Installed Targets
 
@@ -37,28 +37,10 @@ AM_CFLAGS = $(WARN_CFLAGS) $(SK_CFLAGS)
 AM_LDFLAGS = $(SK_LDFLAGS) $(STATIC_APPLICATIONS)
 LDADD = ../libsilk/libsilk.la $(PCAP_LDFLAGS)
 
-EXTRA_DIST += rwpcut.in rwpcut24.in
-
-if HAVE_PYTHON24
-rwpcut_tmpl = rwpcut24.in
-
-MAKE_RWPCUT24 = $(AM_V_GEN) \
-  rm -f $@ $@.tmp ; \
-  srcdir='' ; \
-  test -f ./$(rwpcut_tmpl) || srcdir=$(srcdir)/ ; \
-  $(make_python_script_edit) $${srcdir}$(rwpcut_tmpl) >$@.tmp && \
-  chmod +x $@.tmp && \
-  mv $@.tmp $@
-
-rwpcut: Makefile $(rwpcut_tmpl)
-	$(MAKE_RWPCUT24)
-
-else
+EXTRA_DIST += rwpcut.in
 
 rwpcut: Makefile rwpcut.in
 	$(MAKE_PYTHON_SCRIPT)
-
-endif
 
 MOSTLYCLEANFILES = rwpcut.tmp
 CLEANFILES = rwpcut

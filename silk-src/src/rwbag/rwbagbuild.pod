@@ -580,11 +580,11 @@ in F<myproto.txt> represent IP addresses:
          0.0.0.6|                 138|
         0.0.0.17|                 131|
 
-Although the B<--integer-keys> switch on B<rwbagcat> forces it to
-print keys as integers, it is generally better to use the
+Although the B<--key-format> switch on B<rwbagcat> may be used to
+choose how the keys are displayed, it is generally better to use the
 B<--key-type> switch when creating the bag.
 
-$ rwbagbuild --bag-input=myproto.txt | rwbagcat --integer-keys
+$ rwbagbuild --bag-input=myproto.txt | rwbagcat --key-format=decimal
          1|                   4|
          6|                 138|
         17|                 131|
@@ -820,7 +820,7 @@ C<sip-country>, C<dip-country>, and C<any-country> key-types.
 
 B<rwbag(1)>, B<rwbagcat(1)>, B<rwbagtool(1)>, B<rwfileinfo(1)>,
 B<rwpmapbuild(1)>, B<rwset(1)>, B<rwsetbuild(1)>, B<rwsetcat(1)>,
-B<rwsettool(1)>, B<silk(7)>, B<ccfilter(3)>, B<zlib(3)>
+B<rwsettool(1)>, B<ccfilter(3)>, B<silk(7)>, B<zlib(3)>, B<cat(1)>
 
 =head1 BUGS
 
@@ -828,7 +828,7 @@ The B<--default-count> switch is poorly named.
 
 =cut
 
-$SiLK: rwbagbuild.pod 62dfd3881f79 2017-03-21 19:33:08Z mthomas $
+$SiLK: rwbagbuild.pod 5036d9fcc2e7 2017-06-26 20:31:01Z mthomas $
 
 Local Variables:
 mode:text

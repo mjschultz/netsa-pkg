@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skdeque-test.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skdeque-test.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skdeque.h>
@@ -32,7 +32,7 @@ static int waitb = 0;
 static int resulta = 0;
 static int resultb = 0;
 
-static skDeque_t da, db, dc, dd;
+static sk_deque_t *da, *db, *dc, *dd;
 
 static const char *xa = "a";
 static const char *xb = "b";
@@ -301,8 +301,6 @@ int main(int UNUSED(argc), char UNUSED(**argv))
     assert(rv == 0);
     rv = sklogSetLevel("debug");
     assert(rv == 0);
-    rv = sklogEnableThreadedLogging();
-    assert(rv == 0);
     rv = sklogSetStampFunction(&log_stamp);
     assert(rv == 0);
 
@@ -452,6 +450,88 @@ int main(int UNUSED(argc), char UNUSED(**argv))
     XASSERT(err == SKDQ_EMPTY);
 
     /* verify 'dc' is empty */
+    CHECK_EMPTY(dc);
+
+    /* add elements of empty 'da' to the back of empty 'db' */
+    err = skDequeJoin(db, da);
+    XASSERT(err == SKDQ_SUCCESS);
+
+    /* verify 'da' and 'db' are empty */
+    CHECK_EMPTY(da);
+    CHECK_EMPTY(db);
+
+    /* push four elements onto 'da' */
+    err = skDequePushBack(da, (void*)xz);
+    XASSERT(err == SKDQ_SUCCESS);
+    err = skDequePushBack(da, (void*)xa);
+    XASSERT(err == SKDQ_SUCCESS);
+    err = skDequePushBack(da, (void*)xb);
+    XASSERT(err == SKDQ_SUCCESS);
+    err = skDequePushBack(da, (void*)xc);
+    XASSERT(err == SKDQ_SUCCESS);
+    XASSERT(4 == skDequeSize(da));
+
+    /* add elements of empty 'dc' to the back da */
+    err = skDequeJoin(da, dc);
+    XASSERT(err == SKDQ_SUCCESS);
+
+    /* check content of 'da' */
+    XASSERT(4 == skDequeSize(da));
+    err = skDequeBack(da, (void**)&v);
+    XASSERT(err == SKDQ_SUCCESS);
+    XASSERT(v == xc);
+    err = skDequeFront(da, (void**)&v);
+    XASSERT(err == SKDQ_SUCCESS);
+    XASSERT(v == xz);
+
+    /* verify 'dc' is empty */
+    CHECK_EMPTY(dc);
+
+    /* push two elements onto 'db' */
+    err = skDequePushBack(db, (void*)xx);
+    XASSERT(err == SKDQ_SUCCESS);
+    err = skDequePushBack(db, (void*)xy);
+    XASSERT(err == SKDQ_SUCCESS);
+    XASSERT(2 == skDequeSize(db));
+
+    /* add elements of 'da' to the back of 'db' */
+    err = skDequeJoin(db, da);
+    XASSERT(err == SKDQ_SUCCESS);
+
+    /* verify that 'da' is empty */
+    CHECK_EMPTY(da);
+
+    /* add elements of 'db' to the back of empty 'dc' */
+    err = skDequeJoin(dc, db);
+    XASSERT(err == SKDQ_SUCCESS);
+
+    /* verify that 'db' is empty */
+    CHECK_EMPTY(db);
+
+    /* pop elements from 'dc' */
+    XASSERT(6 == skDequeSize(dc));
+    err = skDequePopFrontNB(dc, (void**)&v);
+    XASSERT(err == SKDQ_SUCCESS);
+    XASSERT(v == xx);
+    err = skDequePopFrontNB(dc, (void**)&v);
+    XASSERT(err == SKDQ_SUCCESS);
+    XASSERT(v == xy);
+    err = skDequePopFrontNB(dc, (void**)&v);
+    XASSERT(err == SKDQ_SUCCESS);
+    XASSERT(v == xz);
+    err = skDequePopFrontNB(dc, (void**)&v);
+    XASSERT(err == SKDQ_SUCCESS);
+    XASSERT(v == xa);
+    err = skDequePopFrontNB(dc, (void**)&v);
+    XASSERT(err == SKDQ_SUCCESS);
+    XASSERT(v == xb);
+    err = skDequePopFrontNB(dc, (void**)&v);
+    XASSERT(err == SKDQ_SUCCESS);
+    XASSERT(v == xc);
+    err = skDequePopFrontNB(dc, (void**)&v);
+    XASSERT(err == SKDQ_EMPTY);
+
+    /* verify that 'dc' is empty */
     CHECK_EMPTY(dc);
 
     /* create a merged queue from 'da' and 'db' */

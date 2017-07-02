@@ -20,7 +20,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKSITE_H, "$SiLK: sksite.h 87921afb7143 2017-02-14 14:50:58Z mthomas $");
+RCSIDENTVAR(rcsID_SKSITE_H, "$SiLK: sksite.h 2739d95f23a3 2017-06-23 14:05:19Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -117,6 +117,14 @@ sksiteOptionsUsage(
 int
 sksiteConfigure(
     int                 verbose);
+
+/**
+ *   Return 1 if sksiteConfigure() has been called with a 0 return
+ *   value, return 0 otherwise.
+ */
+int
+sksiteIsConfigured(
+    void);
 
 /**
  *    Set the path to the SiLK site configuration file.  Return 0
@@ -1219,9 +1227,9 @@ sksiteSetPackingLogicPath(
 
 /**
  *    Fill in 'buffer', a C-array of size 'bufsize', with the complete
- *    path of the file having the specified 'flowtype_id',
- *    'sensor_id', and 'timestamp'.  The name will be of the form
- *    specified by the current path format.
+ *    path of the file having the specified flowtype_id, sensor_id,
+ *    and timestamp specified by the repository key 'repo_key'.  The
+ *    name will be of the form specified by the current path format.
  *
  *    When 'suffix' is non-NULL and not the empty string, it will be
  *    appended to the name of the generated file.  If 'suffix' does
@@ -1242,25 +1250,24 @@ sksiteSetPackingLogicPath(
  */
 char *
 sksiteGeneratePathname(
-    char               *buffer,
-    size_t              bufsize,
-    sk_flowtype_id_t    flowtype,
-    sk_sensor_id_t      sensor,
-    sktime_t            timestamp,
-    const char         *suffix,
-    char              **reldir_begin,
-    char              **filename_begin);
+    char                       *buffer,
+    size_t                      bufsize,
+    const sksite_repo_key_t    *repo_key,
+    const char                 *suffix,
+    char                      **reldir_begin,
+    char                      **filename_begin);
 
 
 /**
  *    Extract the flowtype, sensor, and timestamp from 'filename', the
  *    name of or a path to a SiLK Flow file in the "%x" format, and
- *    put the values into 'out_flowtype', 'out_sensor' and
- *    'out_timestamp', respectively.  Any of those values may be NULL,
- *    indicating that the caller does not want the value returned.
- *    The function returns the flowtype, or SK_INVALID_FLOWTYPE if the
- *    name is not in the proper form or if the flowtype is not
- *    recognized.  An unrecognized sensor name is allowed.
+ *    put the values into 'out_repo_key'.  The 'out_repo_key' may be
+ *    NULL, indicating that the caller does not want the values
+ *    returned.  The function returns the flowtype, or
+ *    SK_INVALID_FLOWTYPE if the name is not in the proper form or if
+ *    the flowtype is not recognized.  An unrecognized sensor name is
+ *    permitted and causes the function to set the 'sensor' member of
+ *    'out_repo_key' to SK_INVALID_SENSOR.
  *
  *    The standard format for the name of a SiLK flow file is:
  *
@@ -1279,11 +1286,9 @@ sksiteGeneratePathname(
  */
 sk_flowtype_id_t
 sksiteParseFilename(
-    sk_flowtype_id_t   *out_flowtype,
-    sk_sensor_id_t     *out_sensor,
-    sktime_t           *out_timestamp,
-    const char        **out_suffix,
-    const char         *filename);
+    const char         *filename,
+    sksite_repo_key_t  *out_repo_key,
+    const char        **out_suffix);
 
 /**
  *    Extract the flowtype, sensor, and timestamp from 'filename', the
@@ -1813,19 +1818,6 @@ sksiteRepoIteratorParseTimes(
 
 typedef struct sksite_repo_iter_st sksite_repo_iter_t;
 
-typedef struct sksite_fileattr_st {
-    sktime_t            timestamp;
-    sk_sensor_id_t      sensor;
-    sk_flowtype_id_t    flowtype;
-    /* debating whether to include a uint32_t here for "user_data".
-     * On 64bit platform, the struct will be padded by an additional 4
-     * bytes regardless.  The additional value could be used as a
-     * record offset if we ever wanted to provide a pointer to an
-     * individual record in a file, or it could be used for
-     * information about the location of the file. */
-} sksite_fileattr_t;
-
-
 #define RETURN_MISSING (1 << 0)
 
 
@@ -1858,8 +1850,8 @@ typedef struct sksite_fileattr_st {
  *    'end_time' less than 'start_time'; memory allocation error.
  *
  *    The caller may use any combination of
- *    sksiteRepoIteratorGetFileattrs(),
- *    sksiteRepoIteratorRemainingFileattrs(), or the various
+ *    sksiteRepoIteratorGetKeys(),
+ *    sksiteRepoIteratorRemaingKeys(), or the various
  *    sksiteRepoIteratorNext*() functions to iterate over the files.
  *    Note that each call to one of these functions moves the
  *    iterator.
@@ -1888,35 +1880,37 @@ sksiteRepoIteratorDestroy(
 
 
 /**
- *    Fill 'attr_array' with the next 'max_count' file attributes read
- *    from the iterator 'iter'.  Return the number of file attributes
- *    added to 'attr_array'.  A number less than 'max_count' indicates
- *    all files have been iterated over.
+ *    Fill 'repo_key_array' with the next 'repo_key_max_count'
+ *    repository keys read from the repository iterator 'iter'.
+ *    Return the number of repository keys added to 'repo_key_array'.
+ *    A number less than 'max_count' indicates all files have been
+ *    iterated over.
  *
  *    This function does not provide any mechanism for the caller to
- *    determine whether an entry in the 'attr_array' represents a
- *    missing file, when 'iter' is iterating over missing files.
+ *    determine whether an entry in the 'repo_key_array' represents a
+ *    missing file when 'iter' is iterating over missing files.
  */
 size_t
-sksiteRepoIteratorGetFileattrs(
+sksiteRepoIteratorGetKeys(
     sksite_repo_iter_t *iter,
-    sksite_fileattr_t  *attr_array,
-    size_t              attr_max_count);
+    sksite_repo_key_t  *repo_key_array,
+    size_t              repo_key_max_count);
 
 /**
- *    Put the file attributes of the next file from the data store
- *    into the location specified by 'file_attr'.  If 'is_missing' is
- *    not-NULL, it will be set to 0 if the file exists in the data
- *    store, or 1 if the file is missing from the data store.
+ *    Put the repository file attributes (the "key") of the next file
+ *    from the data store into the location specified by 'repo_key'.
+ *    If 'is_missing' is not-NULL, it will be set to 0 if the file
+ *    exists in the data store, or 1 if the file is missing from the
+ *    data store.
  *
  *    Return SK_ITERATOR_OK when a file exists, or
  *    SK_ITERATOR_NO_MORE_ENTRIES when the iterator has visited all
  *    files.
  */
 int
-sksiteRepoIteratorNextFileattr(
+sksiteRepoIteratorNextKey(
     sksite_repo_iter_t *iter,
-    sksite_fileattr_t  *fileattr,
+    sksite_repo_key_t  *repo_key,
     int                *is_missing);
 
 /**
@@ -1962,19 +1956,19 @@ sksiteRepoIteratorNextStream(
     sk_msg_fn_t             err_fn);
 
 /**
- *    Append all remaining file attributes to the 'attr_vec' vector.
- *    'attr_vec' should be a vector where the element size is
- *    sizeof(sksite_fileattr_t).  Return 0 on success, or -1 on
+ *    Append all remaining repository keys to the 'repo_key_vec' vector,
+ *    which must be a vector where the element size is
+ *    sizeof(sksite_repo_key_t).  Return 0 on success, or -1 on
  *    failure.
  *
  *    This function does not provide any mechanism for the caller to
- *    determine whether an entry in the 'attr_vec' represents a
- *    missing file, when 'iter' is iterating over missing files.
+ *    determine whether an entry in the 'repo_key_vec' represents a
+ *    missing file when 'iter' is iterating over missing files.
  */
 int
-sksiteRepoIteratorRemainingFileattrs(
+sksiteRepoIteratorRemainingKeys(
     sksite_repo_iter_t *iter,
-    sk_vector_t        *fileattr_vec);
+    sk_vector_t        *repo_key_vec);
 
 /**
  *    Reset the state of the iterator 'iter' so that all files may be
@@ -1983,65 +1977,6 @@ sksiteRepoIteratorRemainingFileattrs(
 void
 sksiteRepoIteratorReset(
     sksite_repo_iter_t *iter);
-
-
-/*
- *    The following have been renamed and moved to silk_files.h.
- */
-
-int
-sksiteCompmethodCheck(
-    sk_compmethod_t     comp_method)
-    SK_GCC_DEPRECATED;
-
-sk_compmethod_t
-sksiteCompmethodGetBest(
-    void)
-    SK_GCC_DEPRECATED;
-
-sk_compmethod_t
-sksiteCompmethodGetDefault(
-    void)
-    SK_GCC_DEPRECATED;
-
-int
-sksiteCompmethodGetName(
-    char               *buffer,
-    size_t              buffer_size,
-    sk_compmethod_t     comp_method)
-    SK_GCC_DEPRECATED;
-
-int
-sksiteCompmethodSetDefault(
-    sk_compmethod_t     compression_method)
-    SK_GCC_DEPRECATED;
-
-int
-sksiteCompmethodOptionsRegister(
-    sk_compmethod_t    *compression_method)
-    SK_GCC_DEPRECATED;
-
-void
-sksiteCompmethodOptionsUsage(
-    FILE               *fh)
-    SK_GCC_DEPRECATED;
-
-int
-sksiteFileformatGetName(
-    char               *buffer,
-    size_t              buffer_size,
-    sk_file_format_t    format_id)
-    SK_GCC_DEPRECATED;
-
-int
-sksiteFileformatIsValid(
-    sk_file_format_t    format_id)
-    SK_GCC_DEPRECATED;
-
-sk_file_format_t
-sksiteFileformatFromName(
-    const char         *name)
-    SK_GCC_DEPRECATED;
 
 
 

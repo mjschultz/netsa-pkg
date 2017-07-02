@@ -1,28 +1,55 @@
 # -*- makefile -*-
-# RCSIDENT("$SiLK: Makefile-sources 7e6884832fbd 2017-01-20 22:59:46Z mthomas $");
+# RCSIDENT("$SiLK: Makefile-sources 4f871fc9c94c 2016-09-21 17:08:31Z mthomas $");
+
+# Lua files and their compiled versions
+LUA_SOURCE_FILES = lua/silk.lua lua/silk-site.lua lua/silk-schema.lua \
+	           lua/silkutils.lua
+LUA_OUTPUT_FILES = lua/silk.i   lua/silk-site.i   lua/silk-schema.i   \
+	           lua/silkutils.i
 
 # sources for libsilk
-SOURCES_LIBSILK = addrtype.c flowcapio.c hashlib.c \
-	 pmapfilter.c rwascii.c \
+SOURCES_LIBSILK = CERT_IE.h addrtype.c flowcapio.c hashlib.c pmapfilter.c \
 	 rwaugmentedio.c rwaugroutingio.c rwaugsnmpoutio.c rwaugwebio.c \
 	 rwfilterio.c rwgenericio.c rwipv6io.c rwipv6routingio.c \
 	 rwnotroutedio.c rwpack.c rwrec.c rwroutedio.c rwsplitio.c rwwwwio.c \
-	 skaggbag.c skbag.c skbitmap.c skcompmethod.c skcountry.c skdaemon.c \
-	 skdllist.c skfileformat.c skheader.c skheader-legacy.c \
-	 skheader_priv.h skheap.c skiobuf.c skiobuf.h \
-	 skipset.c sklog.c skmempool.c skoptionsctx.c skoptions-notes.c \
-	 skplugin-simple.c skplugin.c skprefixmap.c skprintnets.c skqsort.c \
+	 skbag.c skbitmap.c skcircbuf.c skcmdline.c skcompmethod.c \
+	 skcountry.c skdaemon.c skdeque.c skdllist.c skfileformat.c \
+	 skfglob.c skfglob.h skfixformatter.c skfixplugin.c skfixstream.c \
+	 skflowiter.c skformat.c skformat.h \
+	 skheader.c skheader-legacy.c skheader_priv.h \
+	 skheap.c skipfixcert.c skipfixcert.h skipset.c \
+	 skleb128.c sklog.c \
+	 sklua.h sklua-schema.c sklua-silk.c \
+	 sklua-site.c sklua-utils.c \
+	 skmempool.c skoptionsctx.c skoptions-notes.c \
+	 skplugin-simple.c skplugin.c skpolldir.c skprefixmap.c skprintnets.c \
+	 skqsort.c skredblack.c skschema.c skschema.h \
+	 sksidecar.c sksidecar.h \
 	 sksite.c sksiteconfig.h sksiteconfig_lex.l sksiteconfig_parse.y \
 	 skstream.c skstream-err.c skstream_priv.h skstringmap.c \
-	 sktempfile.c \
+	 sktempfile.c skthread.c sktimer.c \
 	 sku-app.c sku-bigsockbuf.c sku-compat.c sku-filesys.c sku-ips.c \
-	 sku-options.c sku-string.c sku-times.c sku-wrapgetopt.c skvector.c \
-	 redblack/redblack.c
+	 sku-options.c sku-string.c sku-times.c sku-wrapgetopt.c \
+	 skvector.c \
+	 redblack/redblack.c \
+	 $(LUA_SOURCE_FILES)
 
 if HAVE_CYGWIN
 SOURCES_LIBSILK += skcygwin.c skcygwin.h
 endif
 
-# sources for libsilk-thrd
-SOURCES_LIBSILK_THRD = skdeque.c sklog-thrd.c \
-	skpolldir.c skthread.c sktimer.c
+# Build the Lua output files first
+BUILT_SOURCES = $(LUA_OUTPUT_FILES)
+
+sklua-schema.lo: lua/silk-schema.i
+sklua-silk.lo: lua/silk.i
+sklua-site.lo: lua/silk-site.i
+sklua-utils.lo: lua/silkutils.i
+
+
+# Ensure the lua directory exists when building outside of source
+$(LUA_OUTPUT_FILES): lua/$(am__dirstamp)
+
+lua/$(am__dirstamp):
+	@$(MKDIR_P) lua
+	@: > lua/$(am__dirstamp)

@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-app.c 935d889f48a7 2017-03-03 22:58:26Z mthomas $");
+RCSIDENT("$SiLK: sku-app.c b7964f8739ac 2017-06-23 16:30:56Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sksite.h>
@@ -52,6 +52,8 @@ struct skAppContext_st {
     sk_msg_vargs_fn_t   errsys_print_fn;
     /* function used by skAppPrintAbort*() functions */
     sk_msg_fn_t         fatal_print_fn;
+    /* Reference counter */
+    size_t              refcount;
 };
 
 
@@ -67,11 +69,13 @@ static skAppContext_t app_context_static = {
     /* error stream */        NULL,
     /* print err function */  &skAppPrintErrV,
     /* print err function */  &skAppPrintSyserrorV,
-    /* print exit function */ &skAppPrintErr
+    /* print exit function */ &skAppPrintErr,
+    /* reference count */     0
 };
 
 static skAppContext_t *app_context = &app_context_static;
 
+static pthread_mutex_t app_context_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* FUNCTION DEFINITONS */
 
@@ -94,11 +98,10 @@ skAppRegister(
     const char *libtool_prefix = "lt-";
     const char *cp;
 
-    if (app_context->name_argv0
-        && (app_context->name_argv0 != unregistered_app_name))
-    {
+    pthread_mutex_lock(&app_context_mutex);
+    if (app_context->refcount++ != 0) {
         /* been here before */
-        return;
+        goto END;
     }
 
     /* copy 'name' parameter into static buffer */
@@ -162,6 +165,9 @@ skAppRegister(
     skOptionsSetup();
     skHeaderInitialize();
     skStreamInitialize();
+
+  END:
+    pthread_mutex_unlock(&app_context_mutex);
 }
 
 
@@ -169,10 +175,20 @@ void
 skAppUnregister(
     void)
 {
-    skStreamTeardown();
-    skHeaderTeardown();
-    sksiteTeardown();
-    skOptionsTeardown();
+    int teardown = 0;
+    pthread_mutex_lock(&app_context_mutex);
+    if (app_context->refcount > 0
+        &&--app_context->refcount == 0)
+    {
+        teardown = 1;
+    }
+    pthread_mutex_unlock(&app_context_mutex);
+    if (teardown) {
+        skStreamTeardown();
+        skHeaderTeardown();
+        sksiteTeardown();
+        skOptionsTeardown();
+    }
 }
 
 
@@ -462,8 +478,6 @@ skAppVerifyFeatures(
 
     if (FEATURE_COMPARE(struct_version)
         && FEATURE_COMPARE(big_endian)
-        && FEATURE_COMPARE(enable_ipv6)
-        && FEATURE_COMPARE(enable_ipfix)
         && FEATURE_COMPARE(enable_localtime)
         /* && FEATURE_COMPARE(enable_gnutls) */
         )
@@ -488,8 +502,6 @@ skAppVerifyFeatures(
         fprintf(fh, "The %s was built with this set of features:\n", name);
         fprintf(fh, "  feature-set=v%" PRIu64, f->struct_version);
         fprintf(fh, ", %s-endian", (f->big_endian ? "big" : "little"));
-        fprintf(fh, ", %sipv6", (f->enable_ipv6 ? "" : "without-"));
-        fprintf(fh, ", %sipfix", (f->enable_ipfix ? "" : "without-"));
         fprintf(fh, ", %slocaltime", (f->enable_localtime ? "" : "without-"));
         fprintf(fh, "\n");
     }
@@ -814,6 +826,158 @@ skAppPrintOutOfMemoryMsgFunction(
     }
 }
 
+#define ALLOC_TRACE(msg)  skAppPrintErr msg
+#ifndef TRACEMSG
+#  ifdef ALLOC_TRACE_LEVEL
+#    define TRACEMSG(msg) ALLOC_TRACE(msg)
+#  else
+#    define TRACEMSG(msg)
+#  endif
+#endif
+
+void*
+sk_alloc_helper_func(
+    size_t              obj_count,
+    size_t              obj_size,
+    unsigned int        flags,
+    const char         *type_name,
+    const char         *func_name,
+    const char         *file_name,
+    int                 line_num)
+{
+    void *p;
+
+    p = ((flags & SK_ALLOC_FLAG_NO_CLEAR)
+         ? malloc(obj_count * obj_size)
+         : calloc(obj_count, obj_size));
+    if (p) {
+        TRACEMSG(("Allocated %" SK_PRIuZ " %s%s"
+                  " (%" SK_PRIuZ " bytes) at %s:%d",
+                  obj_count, type_name, ((obj_count == 1) ? "" : "'s"),
+                  (obj_count * obj_size), file_name, line_num));
+        return p;
+    }
+    if (flags & SK_ALLOC_FLAG_NO_EXIT) {
+        TRACEMSG(("Failed to allocate %" SK_PRIuZ " %s%s"
+                  " (%" SK_PRIuZ " bytes) at %s:%d",
+                  obj_count, type_name, ((obj_count == 1) ? "" : "'s"),
+                  (obj_count * obj_size), file_name, line_num));
+        return NULL;
+    }
+    if (app_context && app_context->fatal_print_fn) {
+        if (func_name) {
+            app_context->fatal_print_fn(
+                ("Out of memory---unable to allocate %" SK_PRIuZ " %s%s"
+                 " (%" SK_PRIuZ " bytes) in %s() at %s:%d"),
+                obj_count, type_name, ((obj_count == 1) ? "" : "'s"),
+                (obj_count * obj_size), func_name, file_name, line_num);
+        } else {
+            app_context->fatal_print_fn(
+                ("Out of memory---unable to allocate %" SK_PRIuZ " %s%s"
+                 " (%" SK_PRIuZ " bytes) at %s:%d"),
+                obj_count, type_name, ((obj_count == 1) ? "" : "'s"),
+                (obj_count * obj_size), file_name, line_num);
+        }
+    }
+    exit(EXIT_FAILURE);
+}
+
+void *
+sk_alloc_realloc_helper_func(
+    void               *old_array,
+    size_t              obj_new_count,
+    size_t              obj_size,
+    size_t              obj_old_count,
+    unsigned int        flags,
+    const char         *type_name,
+    const char         *func_name,
+    const char         *file_name,
+    int                 line_num)
+{
+    void *p;
+
+    if (NULL == old_array) {
+        return sk_alloc_helper_func(obj_new_count, obj_size, flags,
+                                    type_name, func_name, file_name, line_num);
+    }
+
+    p = realloc(old_array, obj_new_count * obj_size);
+    if (p) {
+        TRACEMSG(("Reallocated %" SK_PRIuZ " %s%s"
+                  " (%" SK_PRIuZ " bytes) at %s:%d",
+                  obj_new_count, type_name, ((obj_new_count == 1) ? "" : "'s"),
+                  (obj_new_count * obj_size), file_name, line_num));
+        if ((obj_old_count < obj_new_count)
+            && !(flags & SK_ALLOC_FLAG_NO_CLEAR))
+        {
+            memset((uint8_t*)p + (obj_old_count * obj_size), 0,
+                   (obj_new_count - obj_old_count) * obj_size);
+        }
+    }
+    if (flags & SK_ALLOC_FLAG_NO_EXIT) {
+        TRACEMSG(("Failed to reallocate %" SK_PRIuZ " %s%s"
+                  " (%" SK_PRIuZ " bytes) at %s:%d",
+                  obj_new_count, type_name, ((obj_new_count == 1) ? "" : "'s"),
+                  (obj_new_count * obj_size), file_name, line_num));
+        return NULL;
+    }
+    if (app_context && app_context->fatal_print_fn) {
+        if (func_name) {
+            app_context->fatal_print_fn(
+                ("Out of memory---unable to reallocate %" SK_PRIuZ " %s%s"
+                 " (%" SK_PRIuZ " bytes) in %s() at %s:%d"),
+                obj_new_count, type_name, ((obj_new_count == 1) ? "" : "'s"),
+                (obj_new_count * obj_size), func_name, file_name, line_num);
+        } else {
+            app_context->fatal_print_fn(
+                ("Out of memory---unable to reallocate %" SK_PRIuZ " %s%s"
+                 " (%" SK_PRIuZ " bytes) at %s:%d"),
+                obj_new_count, type_name, ((obj_new_count == 1) ? "" : "'s"),
+                (obj_new_count * obj_size), file_name, line_num);
+        }
+    }
+    exit(EXIT_FAILURE);
+}
+
+char*
+sk_alloc_strdup_helper_func(
+    const char         *str,
+    unsigned int        flags,
+    const char         *func_name,
+    const char         *file_name,
+    int                 line_num)
+{
+    char *p;
+
+    if (str == NULL) {
+        return NULL;
+    }
+    p = strdup(str);
+    if (p) {
+        TRACEMSG(("Allocated %" SK_PRIuZ " string chars at %s:%d",
+                  strlen(str) + 1, file_name, line_num));
+        return p;
+    }
+    if (flags & SK_ALLOC_FLAG_NO_EXIT) {
+        TRACEMSG(("Failed to allocate %" SK_PRIuZ " chars at %s:%d",
+                  strlen(str) + 1, file_name, line_num));
+        return NULL;
+    }
+    if (app_context && app_context->fatal_print_fn) {
+        if (func_name) {
+            app_context->fatal_print_fn(
+                ("Out of memory---unable to allocate %" SK_PRIuZ " chars"
+                 " in %s() at %s:%d"),
+                strlen(str) + 1, func_name, file_name, line_num);
+        } else {
+            app_context->fatal_print_fn(
+                ("Out of memory---unable to allocate %" SK_PRIuZ " chars"
+                 " at %s:%d"),
+                strlen(str) + 1, file_name, line_num);
+        }
+    }
+    exit(EXIT_FAILURE);
+}
 
 #ifdef TEST_APPNAME
 

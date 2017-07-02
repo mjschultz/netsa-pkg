@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
-# MD5: 0a86c69837180d18cdcb3f646dc2a709
-# TEST: ./rwsort --plugin=flowrate.so --fields=pckts/sec ../../tests/data.rwf | ../rwstats/rwuniq --plugin=flowrate.so --fields=pckts/sec --values=packets --presorted-input
+# MD5: d4c6c4188dfe5c183645a9fdd43d28e6
+# TEST: ./rwsort --plugin=flowrate.so --fields=pckts/sec ../../tests/data.rwf | ../rwuniq/rwuniq --plugin=flowrate.so --fields=pckts/sec --values=packets --presorted-input
 
 use strict;
 use SiLKTests;
@@ -14,6 +14,6 @@ add_plugin_dirs('/src/plugins');
 skip_test('Cannot load flowrate plugin')
     unless check_app_switch($rwsort.' --plugin=flowrate.so', 'fields', qr/payload-rate/);
 my $cmd = "$rwsort --plugin=flowrate.so --fields=pckts/sec $file{data} | $rwuniq --plugin=flowrate.so --fields=pckts/sec --values=packets --presorted-input";
-my $md5 = "0a86c69837180d18cdcb3f646dc2a709";
+my $md5 = "d4c6c4188dfe5c183645a9fdd43d28e6";
 
 check_md5_output($md5, $cmd);

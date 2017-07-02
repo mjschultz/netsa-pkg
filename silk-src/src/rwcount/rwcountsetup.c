@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcountsetup.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
+RCSIDENT("$SiLK: rwcountsetup.c d1637517606d 2017-06-23 16:51:31Z mthomas $");
 
 #include <silk/skstringmap.h>
 #include "rwcount.h"
@@ -41,9 +41,7 @@ static sk_fileptr_t output;
 static char *pager;
 
 /* flags when registering --timestamp-format */
-static const uint32_t time_register_flags =
-    (SK_OPTION_TIMESTAMP_ALWAYS_MSEC | SK_OPTION_TIMESTAMP_OPTION_EPOCH_NAME
-     | SK_OPTION_TIMESTAMP_OPTION_LEGACY);
+static const uint32_t time_register_flags = SK_OPTION_TIMESTAMP_ALWAYS_MSEC;
 
 /* load-schemes */
 static const sk_stringmap_entry_t load_schemes[] = {
@@ -110,33 +108,6 @@ static const char *appHelp[] = {
     (char *)NULL
 };
 
-static const struct option deprecatedOptions[] = {
-    {"start-epoch",         REQUIRED_ARG, 0, OPT_START_TIME},
-    {"end-epoch",           REQUIRED_ARG, 0, OPT_END_TIME},
-    {0,0,0,0}               /* sentinel entry */
-};
-
-static const char *deprecatedHelp[] = {
-    "DEPRECATED. Alias for --start-time",
-    "DEPRECATED. Alias for --end-time",
-    (char *)NULL
-};
-
-/* Allow any abbreviation of "--start-" and "--end-" to work */
-static const struct option deprecatedOptionsShort[] = {
-    {"start-",              REQUIRED_ARG, 0, OPT_START_TIME},
-    {"start",               REQUIRED_ARG, 0, OPT_START_TIME},
-    {"star",                REQUIRED_ARG, 0, OPT_START_TIME},
-    {"sta",                 REQUIRED_ARG, 0, OPT_START_TIME},
-    {"st",                  REQUIRED_ARG, 0, OPT_START_TIME},
-    /* "--s" can be --start-time or --skip-zeroes */
-    {"end-",                REQUIRED_ARG, 0, OPT_END_TIME},
-    {"end",                 REQUIRED_ARG, 0, OPT_END_TIME},
-    {"en",                  REQUIRED_ARG, 0, OPT_END_TIME},
-    /* "--e" can be --end-time or --epoch-slots */
-    {0,0,0,0}               /* sentinel entry */
-};
-
 
 /* LOCAL FUNCTION PROTOTYPES */
 
@@ -187,10 +158,6 @@ appUsageLong(
             fprintf(fh, "%s\n", appHelp[i]);
             break;
         }
-    }
-    for (i = 0; deprecatedOptions[i].name; ++i) {
-        fprintf(fh, "--%s %s. %s\n", deprecatedOptions[i].name,
-                SK_OPTION_HAS_ARG(deprecatedOptions[i]), deprecatedHelp[i]);
     }
 
     skOptionsCtxOptionsUsage(optctx, fh);
@@ -289,10 +256,8 @@ appSetup(
     if (skOptionsCtxCreate(&optctx, optctx_flags)
         || skOptionsCtxOptionsRegister(optctx)
         || skOptionsRegister(appOptions, &appOptionsHandler, NULL)
-        || skOptionsRegister(deprecatedOptions, &appOptionsHandler, NULL)
-        || skOptionsRegister(deprecatedOptionsShort, &appOptionsHandler, NULL)
         || skOptionsTimestampFormatRegister(&flags.timeflags,
-                                            time_register_flags, "epoch-slots")
+                                            time_register_flags)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE))
     {
         skAppPrintErr("Unable to register options");

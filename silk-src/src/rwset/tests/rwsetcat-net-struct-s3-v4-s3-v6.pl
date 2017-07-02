@@ -10,7 +10,6 @@ my $rwsettool = check_silk_app('rwsettool');
 my %file;
 $file{v4set3} = get_data_or_exit77('v4set3');
 $file{v6set3} = get_data_or_exit77('v6set3');
-check_features(qw(ipset_v6));
 my $cmd = "$rwsettool --union $file{v4set3} $file{v6set3} | $rwsetcat --network-structure=v4:8TS";
 my $md5 = "0266117d401fe4325c549002d43fcbff";
 

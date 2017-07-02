@@ -23,7 +23,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKCYGWIN_H, "$SiLK: skcygwin.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_SKCYGWIN_H, "$SiLK: skcygwin.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #ifdef __CYGWIN__
 

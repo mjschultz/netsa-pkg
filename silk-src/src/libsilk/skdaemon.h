@@ -21,7 +21,10 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKDAEMON_H, "$SiLK: skdaemon.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_SKDAEMON_H, "$SiLK: skdaemon.h efd886457770 2017-06-21 18:43:23Z mthomas $");
+
+#include <silk/sklua.h>
+
 
 /**
  *  @file
@@ -62,6 +65,19 @@ skdaemonOptionsVerify(
 
 
 /**
+ *    Configure the daemon parameters by examining the value of the
+ *    global 'daemon' variable (which is a table) in the Lua file that
+ *    was read from 'config_file'.
+ *
+ *    Return 0 on success, or non-zero if errors are encountered.
+ */
+int
+skdaemonParseConfigFile(
+    lua_State          *L,
+    const char         *config_file);
+
+
+/**
  *    Register the options used when running as a daemon.  The
  *    'log_features' value will be passed to sklogSetup().
  *
@@ -72,7 +88,7 @@ int
 skdaemonSetup(
     int                 log_features,
     int                 argc,
-    char   * const     *argv);
+    char * const       *argv);
 
 
 /**
@@ -99,7 +115,7 @@ skdaemonTeardown(
 int
 skdaemonize(
     volatile int       *shutdown_flag,
-    void                (*exit_handler)(void));
+    void              (*exit_handler)(void));
 
 #ifdef __cplusplus
 }

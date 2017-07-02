@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 329106c5d390 2015-10-08 15:38:45Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 6e7673a1a3db 2016-08-15 19:56:54Z mthomas $");
 
 # Installed Targets
 
@@ -20,7 +20,13 @@ silkpython = ../pysilk/libsilkpython.la
 endif
 LDADD =  $(silkpython) ../libsilk/libsilk.la $(PYTHON_LDFLAGS_EMBEDDED)
 
-rwcut_SOURCES = rwcut.c rwcut.h rwcutsetup.c
+rwcut_SOURCES = rwcut.c rwcut.h rwcutsetup.c rwcut.lua
+
+LUA_OUTPUT_FILES = rwcut.i
+rwcutsetup.$(OBJEXT): rwcut.i
+
+BUILT_SOURCES = $(LUA_OUTPUT_FILES)
+CLEANFILES = $(LUA_OUTPUT_FILES)
 
 
 # Global Rules

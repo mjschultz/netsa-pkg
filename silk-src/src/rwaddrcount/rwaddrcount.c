@@ -27,11 +27,12 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaddrcount.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
+RCSIDENT("$SiLK: rwaddrcount.c d1637517606d 2017-06-23 16:51:31Z mthomas $");
 
-#include <silk/iptree.h>
 #include <silk/rwrec.h>
+#include <silk/skflowiter.h>
 #include <silk/skipaddr.h>
+#include <silk/skipset.h>
 #include <silk/sksite.h>
 #include <silk/skstream.h>
 #include <silk/skstringmap.h>
@@ -93,7 +94,7 @@ RCSIDENT("$SiLK: rwaddrcount.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
 
 /* formats for printing records */
 #define FMT_REC_VALUE                                                   \
-    "%*s%c%*" PRIu64 "%c%*" PRIu32 "%c%*" PRIu32 "%c%*s%c%*s%s\n"
+    "%*s%c%*" PRIu64 "%c%*" PRIu64 "%c%*" PRIu32 "%c%*s%c%*s%s\n"
 #define FMT_REC_TITLE  "%*s%c%*s%c%*s%c%*s%c%*s%c%*s%s\n"
 #define FMT_REC_WIDTH  {15, 20, 10, 10, 20, 20}
 
@@ -107,12 +108,12 @@ typedef struct countRecord_st countRecord_t;
 struct countRecord_st {
     /* total number of bytes */
     uint64_t        cr_bytes;
+    /* total number of packets */
+    uint64_t        cr_packets;
     /* Pointer to the next record for collision */
     countRecord_t  *cr_next;
     /* IP address, or whatever we don't consider source or dest here*/
     uint32_t        cr_key;
-    /* total number of packets */
-    uint32_t        cr_packets;
     /* total number of records */
     uint32_t        cr_records;
     /* start time - epoch*/
@@ -136,6 +137,7 @@ typedef enum {
 
 /* for looping over files on the command line */
 static sk_options_ctx_t *optctx;
+static sk_flow_iter_t *flowiter;
 
 /* output mode */
 static rwac_print_mode_t print_mode = RWAC_PMODE_NONE;
@@ -143,8 +145,8 @@ static rwac_print_mode_t print_mode = RWAC_PMODE_NONE;
 /* user-specified limits of bins to print */
 static uint64_t min_bytes = 0;
 static uint64_t max_bytes = UINT64_MAX;
-static uint32_t min_packets = 0;
-static uint32_t max_packets = UINT32_MAX;
+static uint64_t min_packets = 0;
+static uint64_t max_packets = UINT64_MAX;
 static uint32_t min_records = 0;
 static uint32_t max_records = UINT32_MAX;
 
@@ -165,10 +167,6 @@ static uint8_t use_dest = 0;
 static uint32_t ip_format = SKIPADDR_CANONICAL;
 static uint8_t sort_ips_flag = 0;
 
-/* flags when registering --ip-format */
-static const unsigned int ip_format_register_flags =
-    (SK_OPTION_IP_FORMAT_INTEGER_IPS | SK_OPTION_IP_FORMAT_ZERO_PAD_IPS);
-
 /* whether to suppress column titles; default no (i.e. print titles) */
 static uint8_t no_titles = 0;
 
@@ -188,8 +186,7 @@ static char final_delim[] = {'\0', '\0'};
 static uint32_t time_flags = 0;
 
 /* flags when registering --timestamp-format */
-static const uint32_t time_register_flags =
-    (SK_OPTION_TIMESTAMP_NEVER_MSEC | SK_OPTION_TIMESTAMP_OPTION_LEGACY);
+static const uint32_t time_register_flags = SK_OPTION_TIMESTAMP_NEVER_MSEC;
 
 /* where to write output */
 static sk_fileptr_t output;
@@ -260,7 +257,7 @@ static const char *appHelp[] = {
     ("Do not print IPs when sum has more than this many total\n"
      "\tbytes. Def. 18446744073709551615"),
     ("Do not print IPs when sum has more than this many total\n"
-     "\tpackets. Def. 4294967295"),
+     "\tpackets. Def. 18446744073709551615"),
     ("Do not print IPs when sum has more than this many total\n"
      "\trecords. Def. 4294967295"),
     "Write IPs to specified binary IPset file. Def. No",
@@ -273,16 +270,6 @@ static const char *appHelp[] = {
     "Write the output to this stream or file. Def. stdout",
     "Invoke this program to page output. Def. $SILK_PAGER or $PAGER",
     (char *)NULL
-};
-
-static struct option legacyOptions[] = {
-    {"byte-min",            REQUIRED_ARG, 0, OPT_MIN_BYTES},
-    {"packet-min",          REQUIRED_ARG, 0, OPT_MIN_PACKETS},
-    {"rec-min",             REQUIRED_ARG, 0, OPT_MIN_RECORDS},
-    {"byte-max",            REQUIRED_ARG, 0, OPT_MAX_BYTES},
-    {"packet-max",          REQUIRED_ARG, 0, OPT_MAX_PACKETS},
-    {"rec-max",             REQUIRED_ARG, 0, OPT_MAX_RECORDS},
-    {0,0,0,0}               /* sentinel entry */
 };
 
 
@@ -339,13 +326,6 @@ appUsageLong(
     }
     skOptionsCtxOptionsUsage(optctx, fh);
     sksiteOptionsUsage(fh);
-
-    fprintf(fh, "\nDEPRECATED SWITCHES:\n");
-    for (i = 0; legacyOptions[i].name; ++i) {
-        fprintf(fh, "--%s %s. Deprecated alias for --%s\n",
-                legacyOptions[i].name, SK_OPTION_HAS_ARG(legacyOptions[i]),
-                appOptions[legacyOptions[i].val].name);
-    }
 }
 
 
@@ -424,6 +404,7 @@ appTeardown(
         skVectorDestroy(mem_vector);
     }
 
+    sk_flow_iter_destroy(&flowiter);
     skOptionsCtxDestroy(&optctx);
     skAppUnregister();
 }
@@ -471,9 +452,8 @@ appSetup(
     if (skOptionsCtxCreate(&optctx, optctx_flags)
         || skOptionsCtxOptionsRegister(optctx)
         || skOptionsRegister(appOptions, &appOptionsHandler, NULL)
-        || skOptionsRegister(legacyOptions, &appOptionsHandler, NULL)
         || skOptionsTimestampFormatRegister(&time_flags, time_register_flags)
-        || skOptionsIPFormatRegister(&ip_format, ip_format_register_flags)
+        || skOptionsIPFormatRegister(&ip_format)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE))
     {
         skAppPrintErr("Unable to register options");
@@ -492,6 +472,11 @@ appSetup(
     if (rv < 0) {
         skAppUsage();/* never returns */
     }
+
+    /* create flow iterator to read the records from the stream */
+    flowiter = skOptionsCtxCreateFlowIterator(optctx);
+    /* ignore IPv6 flows */
+    sk_flow_iter_set_ipv6_policy(flowiter, SK_IPV6POLICY_ASV4);
 
     /* try to load site config file; if it fails, we will not be able
      * to resolve flowtype and sensor from input file names */
@@ -522,7 +507,7 @@ appSetup(
     }
     if (min_packets > max_packets) {
         skAppPrintErr(("The %s value is greater than %s:"
-                       " %" PRIu32 " > %" PRIu32),
+                       " %" PRIu64 " > %" PRIu64),
                       appOptions[OPT_MIN_PACKETS].name,
                       appOptions[OPT_MAX_PACKETS].name,
                       min_packets, max_packets);
@@ -633,14 +618,14 @@ appOptionsHandler(
         break;
 
       case OPT_MIN_PACKETS:
-        rv = skStringParseUint32(&min_packets, opt_arg, 0, 0);
+        rv = skStringParseUint64(&min_packets, opt_arg, 0, 0);
         if (rv) {
             goto PARSE_ERROR;
         }
         break;
 
       case OPT_MAX_PACKETS:
-        rv = skStringParseUint32(&max_packets, opt_arg, 0, 0);
+        rv = skStringParseUint64(&max_packets, opt_arg, 0, 0);
         if (rv) {
             goto PARSE_ERROR;
         }
@@ -806,30 +791,35 @@ newBin(
 
 
 /*
- *  hashToIPTree(&iptree);
+ *  hashToIPSet(&ipset);
  *
- *    Fills in the 'iptree' with all the IPs in global hash_bins array.
+ *    Fills in the 'ipset' with all the IPs in global hash_bins array.
  */
 static void
-hashToIPTree(
-    skIPTree_t        **ip_tree)
+hashToIPSet(
+    skipset_t         **ipset)
 {
     countRecord_t *bin;
+    skipaddr_t ipaddr;
     uint32_t i;
 
-    skIPTreeCreate(ip_tree);
+    skIPSetCreate(ipset, 0);
 
-    for (i = 0; i < RWAC_ARRAYSIZE; i++) {
+    for (i = 0; i < RWAC_ARRAYSIZE; ++i) {
         if (NULL != hash_bins[i]) {
             bin = hash_bins[i];
             do {
                 if (IS_RECORD_WITHIN_LIMITS(bin)) {
-                    skIPTreeAddAddress((*ip_tree), (bin->cr_key));
+                    /* always insert an IPv4 address (a /32) */
+                    skipaddrSetV4(&ipaddr, &bin->cr_key);
+                    skIPSetInsertAddress(*ipset, &ipaddr, 32);
                 }
                 bin = bin->cr_next;
             } while (bin != hash_bins[i]);
         }
     }
+
+    skIPSetClean(*ipset);
 }
 
 
@@ -909,10 +899,10 @@ dumpRecordsSorted(
     FILE               *outfp)
 {
     int w[] = FMT_REC_WIDTH;
-    uint32_t ip, key;
+    uint32_t ip, prefix, key;
     countRecord_t *bin;
-    skIPTree_t *ipset;
-    skIPTreeIterator_t iter;
+    skipset_t *ipset;
+    skipset_iterator_t iter;
     char ip_st[SK_NUM2DOT_STRLEN];
     char start_st[SKTIMESTAMP_STRLEN];
     char end_st[SKTIMESTAMP_STRLEN];
@@ -922,10 +912,10 @@ dumpRecordsSorted(
         memset(w, 0, sizeof(w));
     }
 
-    hashToIPTree(&ipset);
-    if (skIPTreeIteratorBind(&iter, ipset)) {
-        skAppPrintErr("Unable to bind IPTree iterator");
-        skIPTreeDelete(&ipset);
+    hashToIPSet(&ipset);
+    if (skIPSetIteratorBind(&iter, ipset, 0, SK_IPV6POLICY_IGNORE)) {
+        skAppPrintErr("Unable to bind IPSet iterator");
+        skIPSetDestroy(&ipset);
         return 1;
     }
 
@@ -939,9 +929,11 @@ dumpRecordsSorted(
                 w[5], "End_Time",   final_delim);
     }
 
-    while (skIPTreeIteratorNext(&ip, &iter) == SK_ITERATOR_OK) {
+    while (skIPSetIteratorNext(&iter, &ipaddr, &prefix) == SK_ITERATOR_OK) {
+        assert(32 == prefix);
 
         /* find the ip's entry in the hash table */
+        ip = skipaddrGetV4(&ipaddr);
         key = HASHFUNC(ip);
 
         /* loop through the list of records at this hash table entry
@@ -955,7 +947,6 @@ dumpRecordsSorted(
             assert(bin != hash_bins[key]);
         }
 
-        skipaddrSetV4(&ipaddr, &bin->cr_key);
         fprintf(outfp, FMT_REC_VALUE,
                 w[0], skipaddrString(ip_st, &ipaddr, ip_format), delimiter,
                 w[1], bin->cr_bytes,   delimiter,
@@ -971,7 +962,7 @@ dumpRecordsSorted(
                 final_delim);
     }
 
-    skIPTreeDelete(&ipset);
+    skIPSetDestroy(&ipset);
     return 0;
 }
 
@@ -1024,28 +1015,28 @@ static int
 dumpIPsSorted(
     FILE               *outfp)
 {
-    uint32_t ip;
-    skIPTree_t *ipset;
-    skIPTreeIterator_t iter;
+    uint32_t prefix;
+    skipset_t *ipset;
+    skipset_iterator_t iter;
     char ip_st[SK_NUM2DOT_STRLEN];
     skipaddr_t ipaddr;
 
-    hashToIPTree(&ipset);
-    if (skIPTreeIteratorBind(&iter, ipset)) {
-        skAppPrintErr("Unable to create IPTree iterator");
-        skIPTreeDelete(&ipset);
+    hashToIPSet(&ipset);
+    if (skIPSetIteratorBind(&iter, ipset, 0, SK_IPV6POLICY_IGNORE)) {
+        skAppPrintErr("Unable to create IPSet iterator");
+        skIPSetDestroy(&ipset);
         return 1;
     }
 
     if ( !no_titles) {
         fprintf(outfp, "%15s\n", (use_dest ? "dIP" : "sIP"));
     }
-    while (skIPTreeIteratorNext(&ip, &iter) == SK_ITERATOR_OK) {
-        skipaddrSetV4(&ipaddr, &ip);
+    while (skIPSetIteratorNext(&iter, &ipaddr, &prefix) == SK_ITERATOR_OK) {
+        assert(32 == prefix);
         fprintf(outfp, "%15s\n", skipaddrString(ip_st, &ipaddr, ip_format));
     }
 
-    skIPTreeDelete(&ipset);
+    skIPSetDestroy(&ipset);
     return 0;
 }
 
@@ -1115,7 +1106,7 @@ dumpStats(
 
     /* print qualifying records if limits were given */
     if (0 < min_bytes || max_bytes < UINT64_MAX
-        || 0 < min_packets || max_packets < UINT32_MAX
+        || 0 < min_packets || max_packets < UINT64_MAX
         || 0 < min_records || max_records < UINT32_MAX)
     {
         fprintf(outfp, FMT_STAT_VALUE,
@@ -1140,40 +1131,42 @@ static int
 dumpIPSet(
     const char         *path)
 {
-    skIPTree_t *ipset;
+    skipset_t *ipset;
 
     /* Create the ip tree */
-    hashToIPTree(&ipset);
+    hashToIPSet(&ipset);
 
     /*
      * Okay, now we write to disk.
      */
-    if (skIPTreeSave(ipset, path)) {
+    if (skIPSetSave(ipset, path)) {
         exit(EXIT_FAILURE);
     }
 
-    skIPTreeDelete(&ipset);
+    skIPSetDestroy(&ipset);
     return 0;
 }
 
 
 /*
- *  void countFile(stream)
+ *  status = countFiles()
  *
- *    Read the flow records from stream and fill the hash table with
- *    countRecord_t's.
+ *    Read the flow records from all the input streams and fill the
+ *    hash table with countRecord_t's.
  */
-static void
-countFile(
-    skstream_t         *stream)
+static int
+countFiles(
+    void)
 {
     uint32_t hash_idx;
     countRecord_t *bin;
     rwRec rwrec;
-    int rv;
+    ssize_t rv;
+
+    rwRecInitialize(&rwrec, NULL);
 
     /* Read records */
-    while ((rv = skStreamReadRecord(stream, &rwrec)) == SKSTREAM_OK) {
+    while ((rv = sk_flow_iter_get_next_rec(flowiter, &rwrec)) == 0) {
         hash_idx = HASHFUNC(GETIP(&rwrec));
 
         /*
@@ -1209,27 +1202,19 @@ countFile(
             hash_bins[hash_idx] = bin;
         }
     }
-    if (rv != SKSTREAM_ERR_EOF) {
-        skStreamPrintLastErr(stream, rv, &skAppPrintErr);
-    }
+
+    return ((SKSTREAM_ERR_EOF == rv) ? 0 : -1);
 }
 
 
 int main(int argc, char **argv)
 {
-    skstream_t *stream;
     int rv;
 
     appSetup(argc, argv);                 /* never returns on error */
 
-    /* Read in records from all input files */
-    while ((rv = skOptionsCtxNextSilkFile(optctx, &stream, &skAppPrintErr))
-           == 0)
-    {
-        skStreamSetIPv6Policy(stream, SK_IPV6POLICY_ASV4);
-        countFile(stream);
-        skStreamDestroy(&stream);
-    }
+    /* Process the input */
+    rv = countFiles();
     if (rv < 0) {
         exit(EXIT_FAILURE);
     }

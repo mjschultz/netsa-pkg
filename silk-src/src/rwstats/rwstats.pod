@@ -11,16 +11,15 @@ B<rwstats> - Print top-N or bottom-N lists or summarize data by protocol
         [{--top | --bottom}] [--presorted-input] [--no-percents]
         [--ipv6-policy={ignore,asv4,mix,force,only}]
         [{--bin-time | --bin-time=SECONDS}]
-        [--timestamp-format=FORMAT] [--epoch-time]
-        [--ip-format=FORMAT] [--integer-ips] [--zero-pad-ips]
+        [--timestamp-format=FORMAT] [--ip-format=FORMAT]
         [--integer-sensors] [--integer-tcp-flags]
         [--no-titles] [--no-columns] [--column-separator=CHAR]
         [--no-final-delimiter] [{--delimited | --delimited=CHAR}]
         [--print-filenames] [--copy-input=PATH] [--output-path=PATH]
         [--pager=PAGER_PROG] [--temp-directory=DIR_PATH]
-        [{--legacy-timestamps | --legacy-timestamps={1,0}}]
         [--site-config-file=FILENAME]
         [--plugin=PLUGIN [--plugin=PLUGIN ...]]
+        [--lua-file=PATH [--lua-file=PATH ...]]
         [--python-file=PATH [--python-file=PATH ...]]
         [--pmap-file=MAPNAME:PATH [--pmap-file=MAPNAME:PATH ...]]
         [--pmap-column-width=NUM]
@@ -34,12 +33,12 @@ B<rwstats> - Print top-N or bottom-N lists or summarize data by protocol
         {[--xargs] | [--xargs=FILENAME] | [FILE [FILE ...]]}
 
   rwstats [--pmap-file=MAPNAME:PATH [--pmap-file=MAPNAME:PATH ...]]
-        [--plugin=PLUGIN ...] [--python-file=PATH ...] --help
+        [--plugin=PLUGIN ...] [--lua-file=PATH ...]
+        [--python-file=PATH ...] --help
 
   rwstats [--pmap-file=MAPNAME:PATH [--pmap-file=MAPNAME:PATH ...]]
-        [--plugin=PLUGIN ...] [--python-file=PATH ...] --help-fields
-
-  rwstats --legacy-help
+        [--plugin=PLUGIN ...] [--lua-file=PATH ...]
+        [--python-file=PATH ...] --help-fields
 
   rwstats --version
 
@@ -52,68 +51,64 @@ In either mode, B<rwstats> reads SiLK Flow records from the files
 named on the command line or from the standard input when no file
 names are specified and B<--xargs> is not present.  To read the
 standard input in addition to the named files, use C<-> or C<stdin> as
-a file name.  If an input file name ends in C<.gz>, the file will be
+a file name.  If an input file name ends in C<.gz>, the file is
 uncompressed as it is read.  When the B<--xargs> switch is provided,
 B<rwstats> reads the names of the files to process from the named text
 file or from the standard input if no file name argument is provided
 to the switch.  The input to B<--xargs> must contain one file name per
 line.
 
-=head2 TOP-N DESCRIPTION
+=head2 Top-N Description
 
 B<rwstats> reads SiLK Flow records and groups them by a key composed
 of user-specified attributes of the flows.  For each group (or bin), a
 collection of I<aggregate values> is computed; these values are
 typically related to the volume of the bin, such as the sum of the
-bytes fields for all records that match the key.  Once all the SiLK
-Flow records are read, the bins are sorted by the primary aggregate
-value, and B<rwstats> prints the bins that had the largest values
-(giving a top-N) list or the smallest values (giving a bottom-N list).
-The number of bins printed can be specified as a fixed value (e.g.,
-print 10 bins), as a threshold (print bins whose byte count is less
-than 400), or as a percentage of the total volume across all bins
-(print bins who that contain at least 10% of all the packets).
+bytes fields for all records that match the key.  The first aggregate
+value is called the primary aggregate value.
+
+Once all the SiLK Flow records are read, B<rwstats> sorts the bins by
+the primary aggregate value in either decreasing order (for a top-N
+list) or increasing order (for a bottom-N list).  The ordering of bins
+that have the same primary aggregate value is arbitrary.  The bins are
+printed as text, and the number of bins to print may be specified as a
+fixed value (e.g., print 10 bins), as a threshold (print bins whose
+byte count is greater than 400), or as a percentage of the total
+volume across all bins (print bins that contain at least 10% of all
+the packets).
 
 The user must provide the B<--fields> switch to select the flow
 attribute(s) (or field(s)) that comprise the key for each bin.  The
 available fields are similar to those supported by B<rwcut(1)>; see
 the description of the B<--fields> switch in the L</OPTIONS> section
-below for the details.  The list of fields can be extended by loading
-PySiLK files (see B<silkpython(3)>) or plug-ins (B<silk-plugin(3)>).
-The fields will be printed in the order in which they occur in the
-B<--fields> switch.  The size of the key is limited to 256 octets.  A
-larger key will more quickly use the available the memory leading to
-slower performance.
+below for the details or run B<rwstats> with the B<--help-fields>
+switch.  The list of fields may be extended by loading PySiLK files
+(see B<silkpython(3)>) or plug-ins (B<silk-plugin(3)>).  The fields
+are printed in the order in which they occur in the B<--fields>
+switch.  The size of the key is limited to 256 octets.  A larger key
+more quickly uses the available the memory and results in slower
+performance.
 
 The aggregate value(s) to compute for each bin are also chosen by the
-user.  As with the key fields, the user can extend the list of
+user.  As with the key fields, the user may extend the list of
 aggregate fields by using PySiLK or plug-ins.  The preferred way to
 specify the aggregate fields is to use the B<--values> switch; the
-aggregate fields will be printed in the order they occur in the
+aggregate fields are printed in the order they occur in the
 B<--values> switch.  If the user does not select any aggregate
 value(s), B<rwstats> defaults to computing the number of flow records
 for each bin.  As with the key fields, requesting more aggregate
 values slows performance.
 
-The B<--presorted-input> switch may allow B<rwstats> to process data
-more efficiently by causing B<rwstats> to assume the input has been
-previously sorted with the B<rwsort(1)> command.  With this switch,
-B<rwstats> does not need large amounts of memory during the binning
-stage because it does not bin each flow; instead, it keeps a running
-summation for the bin.  When the key changes, the bin's primary
-aggregate value is compared with those of the current Top-N (or
-Bottom-N) to see if the new bin is a closer to the top (or bottom).
-For the output to be meaningful, B<rwsort> and B<rwstats> I<must> be
-invoked with the same B<--fields> value.  When multiple input files
-are specified and B<--presorted-input> is given, B<rwstats> will
-merge-sort the flow records from the input files.  B<rwstats> will
-usually run faster if you do I<not> include the B<--presorted-input>
-switch when counting distinct IP addresses, even when reading sorted
-input.  Finally, you may get unusual results with B<--presorted-input>
-when the B<--fields> switch contains multiple time-related key fields
-(C<sTime>, C<duration>, C<eTime>), or when the time-related key is not
-the final key listed in B<--fields>; see the L</NOTES> section for
-details.
+In addition to computing the primary aggregate value for the flows in
+each bin, B<rwstats> computes that aggregate value across all flow
+records.  When printing the results, the output for each bin includes
+the ratio of the bin's aggregate value to the total aggregate value
+(displayed as a percentage).  In addition, a cumulative percentage
+column is printed.  The percentage columns contain a question mark
+when the primary aggregate value is either a distinct count or comes
+from a plug-in since B<rwstats> does not know whether summing the
+aggregate values is reasonable.  The display of the percentage columns
+may be suppressed by specifying B<--no-percents>.
 
 B<rwstats> attempts to keep all key and aggregate value data in the
 computer's memory.  If B<rwstats> runs out of memory, the current key
@@ -129,7 +124,27 @@ environment variable, or set the TMPDIR environment variable.
 B<rwstats> may also run out of memory if the requested Top-N is too
 large.
 
-=head2 PROTOCOL STATISTICS DESCRIPTION
+The B<--presorted-input> switch may allow B<rwstats> to process data
+more efficiently by causing B<rwstats> to assume the input has been
+previously sorted with the B<rwsort(1)> command.  With this switch,
+B<rwstats> does not need large amounts of memory during the binning
+stage because it does not bin each flow; instead, it keeps a running
+summation for the bin.  When the key changes, the bin's primary
+aggregate value is compared with those of the current Top-N (or
+Bottom-N) to see if the new bin is a closer to the top (or bottom).
+For the output to be meaningful, B<rwsort> and B<rwstats> I<must> be
+invoked with the same B<--fields> value.  When multiple input files
+are specified and B<--presorted-input> is given, B<rwstats> 
+merge-sorts the flow records from the input files.  B<rwstats>
+usually runs faster if you do I<not> include the B<--presorted-input>
+switch when counting distinct IP addresses, even when reading sorted
+input.  Finally, you may get unusual results with B<--presorted-input>
+when the B<--fields> switch contains multiple time-related key fields
+(C<sTime>, C<duration>, C<eTime>), or when the time-related key is not
+the final key listed in B<--fields>; see the L</NOTES> section for
+details.
+
+=head2 Protocol Statistics Description
 
 Alternatively, B<rwstats> can provide statistics for each of bytes,
 packets, and bytes-per-packet giving minima, maxima, quartile,
@@ -143,19 +158,17 @@ exact match for an option.  A parameter to an option may be specified
 as B<--arg>=I<param> or S<B<--arg> I<param>>, though the first form is
 required for options that take optional parameters.
 
-=head2 TOP-N INVOCATION
+=head2 Top-N Invocation
 
 To compute a Top-N or Bottom-N list, the key field(s) must be
-specified.  Normally the B<--fields> switch is used to specify the key
-field(s), but for backward compatibility the B<--fields> switch is not
-required.
+specified using the the B<--fields> switch.
 
 =over 4
 
 =item B<--fields>=I<KEY>
 
 I<KEY> contains the list of flow attributes (a.k.a. fields or columns)
-that make up the key into which flows are binned.  The columns will be
+that make up the key into which flows are binned.  The columns are
 displayed in the order the fields are specified.  Each field may be
 specified once only.  I<KEY> is a comma separated list of field-names,
 field-integers, and ranges of field-integers; a range is specified by
@@ -186,7 +199,8 @@ source port for TCP and UDP, or equivalent
 
 =item dPort,4
 
-destination port for TCP and UDP, or equivalent.  See note at C<iType>.
+destination port for TCP and UDP, or equivalent.  See note at
+C<iType>.
 
 =item protocol,5
 
@@ -207,8 +221,8 @@ bit-wise OR of TCP flags over all packets
 =item sTime,9
 
 starting time of flow (seconds resolution). When the time-related
-fields C<sTime>,C<duration>,C<eTime> are all in use, B<rwstats> will ignore
-the final time field when binning the records.
+fields C<sTime>,C<duration>,C<eTime> are all in use, B<rwstats>
+ignores the final time field when binning the records.
 
 =item duration,10
 
@@ -227,7 +241,7 @@ name or ID of the sensor where the flow was collected
 class assigned to the flow by B<rwflowpack(8)>.  Binning by C<class>
 and/or C<type> equates to binning by the integer value used internally
 to represent the class/type pair.  When B<--fields> contains C<class>
-but not C<type>, B<rwstats>'s output will have multiple rows with the
+but not C<type>, B<rwstats>'s output may have multiple rows with the
 same value(s) for the key field(s).
 
 =item type,21
@@ -241,34 +255,24 @@ the ICMP type value for ICMP or ICMPv6 flows and empty (numerically
 zero) for non-ICMP flows.  Internally, SiLK stores the ICMP type and
 code in the C<dPort> field.  To avoid getting very odd results, either
 do not use the C<dPort> field when your key includes ICMP field(s) or
-be certain to include the C<protocol> field as part of your key.  This
-field was added in SiLK 3.8.1.
+be certain to include the C<protocol> field as part of your key.
 
 =item iCode
 
 the ICMP code value for ICMP or ICMPv6 flows and empty for non-ICMP
 flows.  See note at C<iType>.
 
-=item icmpTypeCode,25
-
-equivalent to C<iType>,C<iCode> when used in B<--fields>.  This field
-may not be mixed with C<iType> or C<iCode>, and this field is
-deprecated as of SiLK 3.8.1.  As of SiLK 3.8.1, C<icmpTypeCode> may no
-longer be used as the argument to the C<Distinct:> value field; the
-C<dPort> field will provide an equivalent result as long as the input
-is limited to ICMP flow records.
-
 =back
 
 Many SiLK file formats do not store the following fields and their
-values will always be 0; they are listed here for completeness:
+values are always 0; they are listed here for completeness:
 
 =over 4
 
 =item in,13
 
 router SNMP input interface or vlanId if packing tools were
-configured to capture it (see B<sensor.conf(5)>)
+configured to capture it
 
 =item out,14
 
@@ -339,16 +343,16 @@ indicating that it was created as a continuation of an active flow.
 
 =item application,29
 
-guess as to the content of the flow.  Some software that generates flow
-records from packet data, such as B<yaf>, will inspect the contents of
-the packets that make up a flow and use traffic signatures to label
-the content of the flow.  SiLK calls this label the I<application>;
-B<yaf> refers to it as the I<appLabel>.  The application is the port
-number that is traditionally used for that type of traffic (see the
-F</etc/services> file on most UNIX systems).  For example, traffic
-that the flow generator recognizes as FTP will have a value of 21,
-even if that traffic is being routed through the standard HTTP/web
-S<port (80)>.
+guess as to the content of the flow.  Some software that generates
+flow records from packet data, such as B<yaf>, will inspect the
+contents of the packets that make up a flow and use traffic signatures
+to label the content of the flow.  SiLK calls this label the
+I<application>; B<yaf> refers to it as the I<appLabel>.  The
+application is the port number that is traditionally used for that
+type of traffic (see the F</etc/services> file on most UNIX systems).
+For example, traffic that the flow generator recognizes as FTP will
+have a value of 21, even if that traffic is being routed through the
+standard HTTP/web S<port (80)>.
 
 =back
 
@@ -386,26 +390,29 @@ B<a1> anonymous proxy; B<a2> satellite provider; B<o1> other
 
 as B<scc> for the destination IP
 
-=item src-I<MAPNAME>
+=item src-I<map-name>
 
-label determined by passing the source IP or the protocol/source-port
-to the user-defined mapping defined in the prefix map associated with
-I<MAPNAME>.  See the description of the B<--pmap-file> switch below
-and the B<pmapfilter(3)> manual page.
+label contained in the prefix map file associated with I<map-name>.
+If the prefix map is for IP addresses, the label is that associated
+with the source IP address.  If the prefix map is for protocol/port
+pairs, the label is that associated with the protocol and source port.
+See also the description of the B<--pmap-file> switch below and the
+B<pmapfilter(3)> manual page.
 
-=item dst-I<MAPNAME>
+=item dst-I<map-name>
 
-as B<src-I<MAPNAME>> for the destination IP or
-protocol/destination-port.
+as B<src-I<map-name>> for the destination IP address or the protocol
+and destination port.
 
 =item sval
 
+as B<src-I<map-name>> when no map-name is associated with the prefix
+map file
+
 =item dval
 
-These are deprecated field names created by B<pmapfilter> that
-correspond to B<src-I<MAPNAME>> and B<dst-I<MAPNAME>>, respectively.
-These fields are available when a prefix map is used that is
-not associated with a I<MAPNAME>.
+as B<dst-I<map-name>> when no map-name is associated with the prefix
+map file
 
 =back
 
@@ -421,12 +428,11 @@ B<--python-file> and B<--plugin> switches.
 =item B<--values>=I<VALUES>
 
 When computing a Top-N or Bottom-N, all flows that have the same key
-field(s) will be binned together.  For each bin, one or more aggregate
+field(s) are binned together.  For each bin, one or more aggregate
 values are computed as specified by I<VALUES>, a comma separated list
 of names.  Names are case insensitive.  The first entry in I<VALUES>
 is the primary value, and it is used as the basis to compute the Top-N
-or Bottom-N.  If the B<--values> switch is not specified (and no
-legacy switch that sets values is specified), B<rwstats> counts the
+or Bottom-N.  If the B<--values> switch is not specified, B<rwstats> counts the
 number of flow records for each bin.  The aggregate fields are printed
 in the order they occur in I<VALUES>.  The names of the built-in value
 fields follow.  This list can be augmented through the use of PySiLK
@@ -460,11 +466,11 @@ for each bin.
 
 Count the number of distinct values for I<KEY_FIELD>, where
 I<KEY_FIELD> is any field that can be used as an argument to
-B<--fields> except for C<icmpTypeCode>.  For example,
-C<Distinct:sPort> will count the number of
-distinct source ports for each bin.  When this aggregate value field
-is used, the specified I<KEY_FIELD> cannot be present in the argument
-to B<--fields>.
+B<--fields>.  For example,
+C<Distinct:sPort> counts the number of distinct source ports for each
+bin.  When this aggregate value field is used, the specified
+I<KEY_FIELD> may not be present in the argument to B<--fields> (since
+the distinct count ni that case is one).
 
 =back
 
@@ -474,8 +480,8 @@ Augment the list of key fields and/or aggregate value fields by using
 run-time loading of the plug-in (shared object) whose path is
 I<PLUGIN>.  The switch may be repeated to load multiple plug-ins.  The
 creation of plug-ins is described in the B<silk-plugin(3)> manual
-page.  When I<PLUGIN> does not contain a slash (C</>), B<rwstats> will
-attempt to find a file named I<PLUGIN> in the directories listed in
+page.  When I<PLUGIN> does not contain a slash (C</>), B<rwstats>
+attempts to find a file named I<PLUGIN> in the directories listed in
 the L</FILES> section.  If B<rwstats> finds the file, it uses that
 path.  If I<PLUGIN> contains a slash or if B<rwstats> does not find
 the file, B<rwstats> relies on your operating system's B<dlopen(3)>
@@ -483,20 +489,26 @@ call to find the file.  When the SILK_PLUGIN_DEBUG environment
 variable is non-empty, B<rwstats> prints status messages to the
 standard error as it attempts to find and open each of its plug-ins.
 
-=item B<--pmap-file>=I<MAPNAME>:I<PATH>
+=item B<--lua-file>=I<PATH>
+
+Load the Lua code from the file I<PATH>.  This Lua code may define
+additional sidecar fields on each record that may be used as part of
+the key in B<--fields> or as a distinct value in B<--values>.  The
+switch may be repeated to load Lua code from multiple files.
 
 =item B<--pmap-file>=I<PATH>
 
-Instruct B<rwstats> to load the mapping file located at I<PATH> and
-create the src-I<MAPNAME> and dst-I<MAPNAME> fields.  When I<MAPNAME>
-is provided explicitly, it will be used to refer to the fields
-specific to that prefix map.  If I<MAPNAME> is not provided,
-B<rwstats> will check the prefix map file to see if a map-name was
-specified when the file was created.  If no map-name is available,
-B<rwstats> creates the fields sval and dval.  Multiple B<--pmap-file>
-switches are supported as long as each uses a unique value for
-map-name.  The B<--pmap-file> switch(es) must precede the B<--fields>
-switch.  For more information, see B<pmapfilter(3)>.
+=item B<--pmap-file>=I<MAPNAME>:I<PATH>
+
+Load the prefix map file located at I<PATH> and create fields named
+src-I<map-name> and dst-I<map-name> where I<map-name> is either the
+I<MAPNAME> part of the argument or the map-name specified when the
+file was created (see B<rwpmapbuild(1)>).  If no map-name is
+available, B<rwstats> names the fields C<sval> and C<dval>.  Specify
+I<PATH> as C<-> or C<stdin> to read from the standard input.  The
+switch may be repeated to load multiple prefix map files, but each
+prefix map must use a unique map-name.  The B<--pmap-file> switch(es)
+must precede the B<--fields> switch.  See also B<pmapfilter(3)>.
 
 =item B<--pmap-column-width>=I<NUM>
 
@@ -527,7 +539,7 @@ When I<COUNT> is 0, all bins are printed.  If I<COUNT> is 0 and
 B<rwstats> runs out of memory while attempting to sort all bins,
 B<rwstats> prints the Top-N or Bottom-N bins using the amount of
 memory it was able to allocate.  B<rwstats> did not accept a value of
-0 for I<COUNT> prior to SiLK 3.12.0,
+0 for I<COUNT> prior to SiLK 3.12.0.
 
 =item B<--threshold>=I<THESHOLD>
 
@@ -537,19 +549,19 @@ from a plug-in causes B<rwstats> to exit with an error.  If B<rwstats>
 runs out of memory while locating all bins that meet the threshold,
 B<rwstats> prints the Top-N or Bottom-N bins using the amount of
 memory it was able to allocate.  I<rwstats> did not accept a value of
-0 for I<THESHOLD> prior to SiLK 3.12.0,
+0 for I<THESHOLD> prior to SiLK 3.12.0.
 
 =item B<--percentage>=I<PERCENT>
 
 Print the bins where the primary value is greater-than (or less-than)
 I<PERCENT> percent of the sum of the primary values across all bins.
 I<PERCENT> may be a floating point value between 0.0 and 100.0
-inclusive.  To use this switch, the primary value must be C<Bytes>,
-C<Packets>, or C<Records>, and the B<--presorted-input> switch must
-not be present.  If B<rwstats> runs out of memory while locating all
-bins that meet the percentage, B<rwstats> prints the Top-N or Bottom-N
-using the amount of memory it was able to allocate.  The value of
-I<PERCENT> was required to be a positive integer prior to SiLK 3.12.0,
+inclusive.  To use this switch, the B<--presorted-input> switch must
+not be present and the primary value must be C<Bytes>, C<Packets>, or
+C<Records>.  If B<rwstats> runs out of memory
+while locating all bins that meet the percentage, B<rwstats> prints
+the Top-N or Bottom-N using the amount of memory it was able to
+allocate.
 
 =back
 
@@ -561,20 +573,21 @@ assumed:
 
 =item B<--top>
 
-Print the top N keys and their values.  This is the default.
+Sort the bins in order of decreasing primary aggregate value.  This is
+the default behavior.
 
 =item B<--bottom>
 
-Print the bottom N keys and their values.
+Sort the bins in order of increasing primary aggregate value.
 
 =back
 
-=head2 PROTOCOL STATISTICS INVOCATION
+=head2 Protocol Statistics Invocation
 
-The following switches will compute and print, for each of bytes,
+The following switches compute and print, for each of bytes,
 packets, and bytes per packet, the minimum value, the maximum value,
 quartiles, and a count of the number of flows that fall into each of
-one of ten intervals statistics.  These switches cannot be combined
+one of ten intervals statistics.  These switches may not be combined
 with the switches that produce Top-N or Bottom-N lists.
 
 =over 4
@@ -593,7 +606,7 @@ implies B<--overall-stats>.
 
 =back
 
-=head2 MISCELLANEOUS SWITCHES
+=head2 Miscellaneous Switches
 
 The following switches are available when B<rwstats> is running in
 either mode, though many only applicable to the Top-N mode.
@@ -607,7 +620,7 @@ B<rwstats>'s input file(s) were generated by B<rwsort(1)> using the
 I<exact same> value for the B<--fields> switch.  When no distinct
 counts are being computed, B<rwstats> can process its input without
 needing to write temporary files.  When multiple input files are
-specified, B<rwstats> will merge-sort the flow records from the input
+specified, B<rwstats> merge-sorts the flow records from the input
 files.  When using B<--presorted-input> and computing a Top-N or
 Bottom-N, the B<--percentage> limit cannot be used.  See the L</NOTES>
 section for issues that may occur when using B<--presorted-input>.
@@ -615,9 +628,9 @@ section for issues that may occur when using B<--presorted-input>.
 =item B<--no-percents>
 
 For the Top-N invocation, do not print the percent-of-total and
-cumulative-percentage columns.  These columns will contain a question
-mark when the primary key is not one of C<Bytes>, C<Packets>, or
-C<Records>, and this switch allows you to suppress them.
+cumulative-percentage columns.  These columns contain a question mark
+when the primary aggregate value comes from a plug-in, and this switch
+allows you to suppress them.
 
 =item B<--ipv6-policy>=I<POLICY>
 
@@ -714,13 +727,6 @@ Use the TZ environment variable or the local timezone.
 
 =back
 
-=item B<--epoch-time>
-
-Print timestamps as epoch time (number of seconds since midnight GMT
-on 1970-01-01).  This switch is equivalent to
-B<--timestamp-format=epoch>, it is deprecated as of SiLK 3.0.0, and it
-will be removed in the SiLK 4.0 release.
-
 =item B<--ip-format>=I<FORMAT>
 
 Specify how IP addresses are printed.  When this switch is not
@@ -766,19 +772,6 @@ netblock.  The addresses C<127.0.0.1> and C<2001:db8::1> are printed
 as C<::ffff:7f00:1> and C<2001:db8::1>, respectively.
 
 =back
-
-=item B<--integer-ips>
-
-Print IP addresses as integers.  This switch is equivalent to
-B<--ip-format=decimal>, it is deprecated as of SiLK 3.7.0, and it will
-be removed in the SiLK 4.0 release.
-
-=item B<--zero-pad-ips>
-
-Print IP addresses as fully-expanded, zero-padded values in their
-canonical form.  This switch is equivalent to
-B<--ip-format=zero-padded>, it is deprecated as of SiLK 3.7.0, and it
-will be removed in the SiLK 4.0 release.
 
 =item B<--integer-sensors>
 
@@ -866,15 +859,6 @@ When this switch is not provided, B<rwstats> searches for the site
 configuration file in the locations specified in the L</FILES>
 section.
 
-=item B<--legacy-timestamps>
-
-=item B<--legacy-timestamps>=I<NUM>
-
-When I<NUM> is not specified or is 1, this switch is equivalent to
-B<--timestamp-format=m/d/y>.  Otherwise, the switch has no effect.
-This switch is deprecated as of SiLK 3.0.0, and it will be removed in
-the SiLK 4.0 release.
-
 =item B<--xargs>
 
 =item B<--xargs>=I<FILENAME>
@@ -897,75 +881,10 @@ Print the description and alias(es) of each field and value and exit.
 Specifying switches that add new fields before B<--help-fields> will
 allow the output to include descriptions of those fields.
 
-=item B<--legacy-help>
-
-Print help, including legacy switches.  See the L</LEGACY SWITCHES>
-section below for these switches.
-
 =item B<--version>
 
 Print the version number and information about how SiLK was
 configured, then exit the application.
-
-=back
-
-=head2 LEGACY SWITCHES
-
-Use of the following switches has been discouraged since SiLK 2.0.0.
-As of SiLK 3.8.1, the switches are deprecated and they will be removed
-in SiLK 4.0.  For each switch, use the replacement indicated.
-
-=over 4
-
-=item B<--sip>
-
-Use: B<--fields=sip>
-
-=item B<--sip>=I<CIDR>
-
-Use the most significant I<CIDR> bits of the source address as the
-key.  Using this switch with IPv6 data will cause an error.  The user
-should use B<rwnetmask(1)> to mask the data prior to processing it
-with B<rwstats>.
-
-=item B<--dip>
-
-Use: B<--fields=dip>
-
-=item B<--dip>=I<CIDR>
-
-Use the most significant I<CIDR> bits of the destination address as
-the key.  Using this switch with IPv6 data will cause an error.  The
-user should use B<rwnetmask> to mask the data prior to processing
-it with B<rwstats>.
-
-=item B<--sport>
-
-Use: B<--fields=sport>
-
-=item B<--dport>
-
-Use: B<--fields=dport>
-
-=item B<--protocol>
-
-Use: B<--fields=protocol>
-
-=item B<--icmp>
-
-Use: B<--fields=iType,iCode>
-
-=item B<--flows>
-
-Use: C<--values=records>
-
-=item B<--packets>
-
-Use: C<--values=packets>
-
-=item B<--bytes>
-
-Use: C<--values=bytes>
 
 =back
 
@@ -975,6 +894,8 @@ In the following examples, the dollar sign (C<$>) represents the shell
 prompt.  The text after the dollar sign represents the command line.
 Lines have been wrapped for improved readability, and the back slash
 (C<\>) is used to indicate a wrapped line.
+
+=head2 Top-N Examples
 
 Print the top talkers (based on number of flow records, limit to the
 top four):
@@ -1075,7 +996,8 @@ Print the packet and byte counts for the pair of /16s that shared the
 most packets (use B<rwnetmask(1)> on the input to B<rwstats>; limit
 result to top ten):
 
- $ rwstats --fields=sip,dip --values=packets,bytes \
+ $ rwnetmask --4sip-prefix=16 --4dip-prefix=16 data.rw   \
+   | rwstats --fields=sip,dip --values=packets,bytes     \
         --count=10 --no-percent
  INPUT: 250928 Records for 230 Bins and 72279154 Total Packets
  OUTPUT: Top 10 Bins by Packets
@@ -1090,6 +1012,67 @@ result to top ten):
      10.248.0.0|    192.168.0.0|  2160037|   1804446929|
      10.247.0.0|    192.168.0.0|  2000379|   1579214987|
      10.246.0.0|    192.168.0.0|  1878143|   1578321728|
+
+=begin comment
+
+#### This example requires code that has not yet been copied from the
+#### default branch.
+
+Print the number of distinct destination hosts seen for every
+destination port, limiting the result to the ports that saw at least
+3% of the hosts.  The percentage for each bin is relative to the
+number of distinct destination IP addresses seen in the input.
+
+ $ rwstats --fields=dport --values=distinct:dip --percent=3 data.rw
+ INPUT: 243127 Records for 4738 Bins and 122064 Total dIP-Distinct
+ OUTPUT: Top 5 bins by dIP-Distinct (3.0000% == 3661)
+ dPort|dIP-Distin|%dIP-Disti|   cumul_%|
+    80|     26940| 22.070389|   22.0704|
+    25|     15538| 12.729388|   34.7998|
+   443|      7907|  6.477749|   41.2775|
+    22|      7733|  6.335201|   47.6127|
+  8080|      3942|  3.229453|   50.8422|
+
+Print the number of distinct destination ports seen for each protocol.
+When the primary aggregate value is counting the number of distinct
+values, the cumulative percentage may be larger than 100%.
+
+ $ rwstats --fields=proto --values=distinct:dport --count=0 data.rw
+ INPUT: 243127 Records for 2 Bins and 5335 Total dPort-Distinct
+ OUTPUT: Top 2 Bins by dPort-Distinct
+ pro|dPort-Dist|%dPort-Dis|   cumul_%|
+   6|      4672| 87.572634|   87.5726|
+  17|      4669| 87.516401|  175.0890|
+
+=end comment
+
+The following example uses PySiLK to create an aggregate value field
+that computes the average byte count for each bin.  The code for this
+field is shown in the B<silkpython(3)> manual page.  Note that the
+percentage columns are empty.
+
+ $ rwstats --python-file=avg-bytes.py --fields=sport      \
+        --values=avg-bytes,bytes,flow --count=6 data.rw
+ INPUT: 243127 Records for 4738 Bins
+ OUTPUT: Top 6 Bins by avg-bytes
+ sPort|    avg-bytes|         Bytes|   Records|%avg-bytes|   cumul_%|
+    22|   1010658.57|   28292376134|     27994|         ?|         ?|
+  8080|    739703.65|    2918870591|      3946|         ?|         ?|
+    80|    732930.03|   19821359790|     27044|         ?|         ?|
+   443|    731919.66|    5794607921|      7917|         ?|         ?|
+ 25605|     86376.00|         86376|         1|         ?|         ?|
+ 25349|     83556.00|        167112|         2|         ?|         ?|
+
+The B<--threshold> switch is not supported when the primary aggregate
+value is from PySiLK or a plug-in.
+
+ $ rwstats --python-file=avg-bytes.py --fields=sport             \
+        --values=avg-bytes,bytes,flow --threshold=90000 data.rw
+ rwstats: Only the --count limit is supported when the primary \
+        values field is from a plug-in
+ rwstats: Cannot add value field 'avg-bytes' from plugin
+
+=head2 Protocol Statistics Example
 
 Print the interval breakdowns for flow records, packets, and bytes
 across all protocols, and for protocols 6 (TCP) and 17 (UDP):
@@ -1438,34 +1421,34 @@ I<N> is one more than the number of fields passed to B<rwuniq(1)>:
 
 When the B<--bin-time> switch is given and the three time fields
 (starting-time (C<sTime>), ending-time (C<eTime>), and duration
-(C<duration>)) are present in the key, the duration field's value will be
+(C<duration>)) are present in the key, the duration field's value is
 modified to be the difference between the ending and starting times.
 
-When the three time-related key fields (C<sTime>,C<duration>,C<eTime>) are
-all in use, B<rwstats> will ignore the final time field when binning
-the records, but the field will appear in the output.  Due to
-truncation of the milliseconds values, B<rwstats> will generate
-different numbers of bins depending on the order in which those three
-values appear in the B<--fields> switch.
+When the three time-related key fields (C<sTime>,C<duration>,C<eTime>)
+are all in use, B<rwstats> ignores the final time field when binning
+the records, but the field does appear in the output.  Due to
+truncation of the milliseconds values, B<rwstats> generates different
+numbers of bins depending on the order in which those three values
+appear in the B<--fields> switch.
 
 When computing distinct counts over a field, the field may not be part
 of the key; that is, you cannot have C<--fields=sip
---values=sip-distinct>.
+--values=sip-distinct>.  The distinct count in that case is always 1.
 
 Using the B<--presorted-input> switch sometimes introduces more issues
 than it solves, and B<--presorted-input> is less necessary now that
 B<rwstats> can use temporary files while processing input.
 
-When computing distinct IP counts, B<rwstats> will typically run
-faster if you do I<not> use the B<--presorted-input> switch, even if
-the data was previously sorted.
+When computing distinct IP counts, B<rwstats> typically runs faster if
+you do I<not> use the B<--presorted-input> switch, even if the data
+was previously sorted.
 
 When using the B<--presorted-input> switch, it is highly recommended
 that you use no more than one time-related key field (C<sTime>,
-C<duration>, C<eTime>) in the B<--fields> switch and that the time-related
-key appear last in B<--fields>.  The issue is caused by B<rwsort>
-considering the millisecond values on the times when sorting, while
-B<rwstats> truncates the millisecond value.
+C<duration>, C<eTime>) in the B<--fields> switch and that the
+time-related key appear last in B<--fields>.  The issue is caused by
+B<rwsort> considering the millisecond values on the times when
+sorting, while B<rwstats> truncates the millisecond value.
 
 B<rwstats>'s strength is its ability to build arbitrary keys and
 aggregate fields.  For maps of a single key to a single value, see
@@ -1474,14 +1457,13 @@ also B<rwbag(1)>.
 =head1 SEE ALSO
 
 B<rwcut(1)>, B<rwnetmask(1)>, B<rwsort(1)>, B<rwuniq(1)>, B<rwbag(1)>,
-B<addrtype(3)>, B<ccfilter(3)>, B<pmapfilter(3)>, B<pysilk(3)>,
-B<silkpython(3)>, B<silk-plugin(3)>, B<sensor.conf(5)>,
-B<rwflowpack(8)>, B<silk(7)>, B<yaf(1)>, B<dlopen(3)>, B<tzset(3)>,
-B<environ(7)>
+B<rwpmapbuild(1)>, B<addrtype(3)>, B<ccfilter(3)>, B<pmapfilter(3)>,
+B<pysilk(3)>, B<silkpython(3)>, B<silk-plugin(3)>, B<rwflowpack(8)>,
+B<silk(7)>, B<yaf(1)>, B<dlopen(3)>, B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwstats.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwstats.pod 12885affd439 2017-06-26 22:07:47Z mthomas $
 
 Local Variables:
 mode:text

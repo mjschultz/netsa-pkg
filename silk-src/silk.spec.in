@@ -44,13 +44,8 @@ BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 %define sk_analysis_file   analysis-list.txt
 %define sk_analysis_path   $RPM_BUILD_DIR/%{name}-%{version}/%{sk_analysis_file}
 
-# This file is empty or contains the list of packing-logic plug-ins
-# for the silk-rwflopack RPM.  It is created during 'install'.
-%define sk_rwflowpack_file rwflowpack-list.txt
-%define sk_rwflowpack_path $RPM_BUILD_DIR/%{name}-%{version}/%{sk_rwflowpack_file}
-
 #######################################################################
-# RCSIDENT("$SiLK: silk.spec.in 50fdc91dcd28 2014-03-24 13:41:44Z mthomas $")
+# RCSIDENT("$SiLK: silk.spec.in d79db4a1666a 2016-12-07 20:33:19Z mthomas $")
 #######################################################################
 
 %description
@@ -129,7 +124,6 @@ find $RPM_BUILD_ROOT/%{_mandir}/man3 -type f -print | \
     sed "s!$RPM_BUILD_ROOT/*!/!" | \
     sed 's/$/*/' >> %{sk_analysis_path}
 find $RPM_BUILD_ROOT/%{_libdir}/silk -name '*.so' -type f -print | \
-    grep -v packlogic | \
     sed "s!$RPM_BUILD_ROOT/*!/!" >> %{sk_analysis_path}
 
 %if %{with_PYTHON}
@@ -141,13 +135,6 @@ echo '%dir '%{py_sitepkg_silk} >> %{sk_analysis_path}
 echo %{py_sitepkg_silk}'/*' >> %{sk_analysis_path}
 %endif
 
-
-# build the list of plug-ins to use as part of the silk-rwflowpack
-# RPM.  This is empty if static packing logic is used.
-rm -f %{sk_rwflowpack_path}
-touch %{sk_rwflowpack_path}
-find $RPM_BUILD_ROOT/%{_libdir}/silk -name 'packlogic*.so' -type f -print | \
-    sed "s!$RPM_BUILD_ROOT/*!/!" >> %{sk_rwflowpack_path}
 
 %clean
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
@@ -188,8 +175,9 @@ useful utilities.
 %{_mandir}/man5/*
 %{_mandir}/man7/*
 %dir %{_datadir}/silk
-%{_datadir}/silk/*-silk.conf
+%{_datadir}/silk/silk-templ.conf
 %{_datadir}/silk/silk.magic
+%doc LICENSE.txt doc/GPL.txt
 
 %post common
 /sbin/ldconfig
@@ -222,7 +210,6 @@ silk-rwflowpack package) and summarize that data in various ways.
 
 # The file list gets generated at install time.  This list contains
 # almost everything except:
-# -- packlogic-*.so files used by rwflowpack (silk-rwflowpack RPM)
 # -- rwfileinfo (silk-common RPM)
 # -- rwsiteinfo (silk-common RPM)
 # -- silk_config (silk-devel RPM)
@@ -253,18 +240,17 @@ categorizes each flow (e.g., as incoming or outgoing), and stores the
 data in binary flat files within a directory tree, with one file per
 hour-category-sensor tuple.  Use the tools from the silk-analysis
 package to query this data.  rwflowpack may capture the data itself,
-or it may process files that have been created by flowcap (see the
-silk-flowcap package).
+or it may process files that have been created by a previous instance
+of rwflowpack.
 
-%files rwflowpack -f %{sk_rwflowpack_file}
+%files rwflowpack
 %defattr(-,root,root)
 %{_sbindir}/rwflowpack
-%{_sbindir}/rwguess
 %{_sbindir}/rwpackchecker
 %dir %{_mandir}/man8
 %{_mandir}/man8/rwflowpack.8*
-%{_mandir}/man8/rwguess.8*
 %{_mandir}/man8/rwpackchecker.8*
+%{_datadir}/silk/packer-templ.lua
 %config(noreplace) %{_sysconfdir}/sysconfig/rwflowpack.conf
 %attr(755,root,root) %{_sysconfdir}/init.d/rwflowpack
 %attr(750,root,root) %dir %{_localstatedir}/silk
@@ -282,108 +268,6 @@ runlvl rwflowpack
 %preun rwflowpack
 if [ "$1" = 0 ]; then
     /sbin/chkconfig --del rwflowpack
-fi
-
-
-#  ###################################################################
-#  silk-flowcap
-
-%package flowcap
-Group: Applications/System
-Summary: SiLK Toolset: Remote Flow Collection
-Requires: silk-common
-
-%description flowcap
-SiLK, the System for Internet-Level Knowledge, is a collection of
-traffic analysis tools developed by the CERT Network Situational
-Awareness Team (CERT NetSA) to facilitate security analysis of large
-networks. The SiLK tool suite supports the efficient collection,
-storage and analysis of network flow data, enabling network security
-analysts to rapidly query large historical traffic data sets. SiLK is
-ideally suited for analyzing traffic on the backbone or border of a
-large, distributed enterprise or mid-sized ISP.
-
-The silk-flowcap package contains flowcap, a daemon to capture NetFlow
-v5 or IPFIX flows (Internet Protocol Flow Information eXport), to
-store the data temporarily in files on its local disk, and to forward
-these files over the network to a machine where rwflowpack processes
-the data.  flowcap is typically used with an rwsender-rwreceiver pair
-to move the files across the network.
-
-%files flowcap
-%defattr(-,root,root)
-%{_sbindir}/flowcap
-%dir %{_mandir}/man8
-%{_mandir}/man8/flowcap.8*
-%config(noreplace) %{_sysconfdir}/sysconfig/flowcap.conf
-%attr(755,root,root) %{_sysconfdir}/init.d/flowcap
-%attr(750,root,root) %dir %{_localstatedir}/silk
-
-%post flowcap
-function runlvl(){
-    ( /sbin/chkconfig --del $1 || true )
-    /sbin/chkconfig --add $1
-    /sbin/chkconfig --levels 345 $1 on
-    /sbin/chkconfig --levels 016 $1 off
-}
-
-runlvl flowcap
-
-%preun flowcap
-if [ "$1" = 0 ]; then
-    /sbin/chkconfig --del flowcap
-fi
-
-
-#  ###################################################################
-#  silk-rwflowappend
-
-%package rwflowappend
-Group: Applications/System
-Summary: SiLK Toolset: Remote Data Storage Appending Daemon
-Requires: silk-common
-
-%description rwflowappend
-SiLK, the System for Internet-Level Knowledge, is a collection of
-traffic analysis tools developed by the CERT Network Situational
-Awareness Team (CERT NetSA) to facilitate security analysis of large
-networks. The SiLK tool suite supports the efficient collection,
-storage and analysis of network flow data, enabling network security
-analysts to rapidly query large historical traffic data sets. SiLK is
-ideally suited for analyzing traffic on the backbone or border of a
-large, distributed enterprise or mid-sized ISP.
-
-The silk-rwflowappend package is used when the final storage location
-of SiLK data files is on a different machine than that where the files
-are created by the rwflowpack daemon (see the silk-rwflowpack
-package).  rwflowappend watches a directory for SiLK data files and
-appends those files to the final storage location where the SiLK
-analysis tools (from the silk-analysis package) can process them.  To
-move the files from rwflowpack to rwflowappend, an rwsender-rwreceiver
-pair is typically used.
-
-%files rwflowappend
-%defattr(-,root,root)
-%{_sbindir}/rwflowappend
-%dir %{_mandir}/man8
-%{_mandir}/man8/rwflowappend.8*
-%config(noreplace) %{_sysconfdir}/sysconfig/rwflowappend.conf
-%attr(755,root,root) %{_sysconfdir}/init.d/rwflowappend
-%attr(750,root,root) %dir %{_localstatedir}/silk
-
-%post rwflowappend
-function runlvl(){
-    ( /sbin/chkconfig --del $1 || true )
-    /sbin/chkconfig --add $1
-    /sbin/chkconfig --levels 345 $1 on
-    /sbin/chkconfig --levels 016 $1 off
-}
-
-runlvl rwflowappend
-
-%preun rwflowappend
-if [ "$1" = 0 ]; then
-    /sbin/chkconfig --del rwflowappend
 fi
 
 
@@ -407,9 +291,6 @@ large, distributed enterprise or mid-sized ISP.
 
 The silk-rwreceiver package contains a program (rwreceiver) which
 receives files over the network from one or more rwsender programs.
-rwsender-rwreceiver pairs are used to move files from a machine
-running flowcap and one running rwflowpack, or from the rwflowpack
-machine to machine(s) running rwflowappend.
 
 %files rwreceiver
 %defattr(-,root,root)
@@ -456,9 +337,6 @@ large, distributed enterprise or mid-sized ISP.
 
 The silk-rwsender package contains a program (rwsender) which
 transmits files over the network to one or more rwreceiver programs.
-rwsender-rwreceiver pairs are used to move files from a machine
-running flowcap and one running rwflowpack, or from the rwflowpack
-machine to machine(s) running rwflowappend.
 
 %files rwsender
 %defattr(-,root,root)

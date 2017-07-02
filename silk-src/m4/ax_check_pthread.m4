@@ -4,7 +4,7 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in ../LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: ax_check_pthread.m4 275df62a2e41 2017-01-05 17:30:40Z mthomas $")
+dnl RCSIDENT("$SiLK: ax_check_pthread.m4 efd886457770 2017-06-21 18:43:23Z mthomas $")
 
 
 # ---------------------------------------------------------------------------
@@ -139,78 +139,6 @@ if (xp != &x) return 1;
     # restore libs
     LIBS="$sk_save_LIBS"
 ])# AX_CHECK_PTHREAD
-
-
-
-AC_DEFUN([AX_CHECK_PTHREAD_ATFORK],[
-    AC_REQUIRE([AX_CHECK_PTHREAD])
-
-    AC_MSG_CHECKING([for pthread_atfork()])
-
-    # cache current LIBS
-    sk_save_LIBS="$LIBS"
-
-    # add pthread library to the saved LIBS
-    LIBS="$PTHREAD_LDFLAGS $sk_save_LIBS"
-
-    # This is a RUN because Solaris will successfully link the
-    # program and just leave out the pthread calls!
-    AC_RUN_IFELSE([
-        AC_LANG_PROGRAM([
-#include <stdio.h>
-#if HAVE_STDLIB_H
-#include <stdlib.h>
-#endif
-#if HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-#if HAVE_SYS_WAIT_H
-#include <sys/wait.h>
-#endif
-#if HAVE_ERRNO_H
-#include <errno.h>
-#endif
-#if HAVE_PTHREAD_H
-#include <pthread.h>
-#endif
-#define FAILIF(x) ++test; if (x) { fprintf(stderr, "Failed test %d (%s) (rv = %d) on line %d\n", test, #x, rv, __LINE__); return 1; }
-
-pthread_mutex_t lock;
-
-void sk_lock(void) { pthread_mutex_lock(&lock); }
-
-void sk_unlock(void) { pthread_mutex_unlock(&lock); }
-            ],[
-    int rv;
-    int pid;
-    int test;
-    test = 0;
-    rv = pthread_mutex_init(&lock, NULL);
-    FAILIF(rv != 0);
-    rv = pthread_atfork(sk_lock, sk_unlock, sk_unlock);
-    FAILIF(rv != 0);
-    pid = fork();
-    rv = pthread_mutex_destroy(&lock);
-    FAILIF(rv != 0);
-#if HAVE_SYS_WAIT_H
-    if (pid > 0) {
-        waitpid(pid, NULL, 0);
-    }
-#endif
-    return 0;
-            ])],[
-           AC_MSG_RESULT([yes])
-           AC_DEFINE([HAVE_PTHREAD_ATFORK], 1,
-                     [Define to 1 if your system has working a pthread_atfork() function])
-            ],[
-           AC_MSG_RESULT([no])
-        ])
-
-    # restore libs
-    LIBS="$sk_save_LIBS"
-])
-
-
 
 dnl Local Variables:
 dnl mode:autoconf

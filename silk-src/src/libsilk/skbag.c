@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skbag.c 470ce106b096 2017-03-21 19:56:22Z mthomas $");
+RCSIDENT("$SiLK: skbag.c 662aa15979cc 2017-06-23 18:47:10Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/skbag.h>
@@ -91,34 +91,6 @@ RCSIDENT("$SiLK: skbag.c 470ce106b096 2017-03-21 19:56:22Z mthomas $");
 #define BAG_COUNTER_MAX_OCTETS      8
 
 
-#if !SK_ENABLE_IPV6
-
-/*
- *  BAG_KEY_TO_U32_V4(key, value)
- *
- *    Given the skBagTypedKey_t 'key', fill 'value' with a uint32_t
- *    representation of that value.
- */
-#define BAG_KEY_TO_U32_V4(k2int_key, k2int_u32)                 \
-    switch ((k2int_key)->type) {                                \
-      case SKBAG_KEY_U8:                                        \
-        k2int_u32 = (k2int_key)->val.u8;                        \
-        break;                                                  \
-      case SKBAG_KEY_U16:                                       \
-        k2int_u32 = (k2int_key)->val.u16;                       \
-        break;                                                  \
-      case SKBAG_KEY_U32:                                       \
-        k2int_u32 = (k2int_key)->val.u32;                       \
-        break;                                                  \
-      case SKBAG_KEY_IPADDR:                                    \
-        k2int_u32 = skipaddrGetV4(&(k2int_key)->val.addr);      \
-        break;                                                  \
-      default:                                                  \
-        skAbortBadCase((k2int_key)->type);                      \
-    }
-
-#else  /* #if !SK_ENABLE_IPV6 */
-
 /*
  *  BAG_KEY_TO_U32_V6(key, value, is_v6)
  *
@@ -176,8 +148,6 @@ RCSIDENT("$SiLK: skbag.c 470ce106b096 2017-03-21 19:56:22Z mthomas $");
       default:                                                  \
         skAbortBadCase((k2ip_key)->type);                       \
     }
-
-#endif  /* else if #if !SK_ENABLE_IPV6 */
 
 
 /*
@@ -375,11 +345,9 @@ struct skBag_st {
         /* a tree of nodes and counters */
         bagtree_t              *b_tree;
 
-#if SK_ENABLE_IPV6
         /* a struct holding a red-black tree of key/counter pairs and
          * a memory pool for the key/counter pairs */
         bag_redblack_t         *b_rbt;
-#endif  /* SK_ENABLE_IPV6 */
     }                       d;
 
     /* number of octets that make up the key */
@@ -411,14 +379,12 @@ struct skBagIterator_st {
     unsigned            sorted   :1;
 
     union iter_body_un {
-#if SK_ENABLE_IPV6
         struct iter_body_redblack_st {
             /* read one element ahead so we can delete the current
              * node */
             RBLIST                     *rb_iter;
             const bag_keycount128_t    *next;
         }                   i_rbt;
-#endif  /* SK_ENABLE_IPV6 */
         struct iter_body_bagtree_st {
             /* start searching for next entry using this key value */
             uint32_t            key;
@@ -458,11 +424,9 @@ typedef struct sk_hentry_bag_st {
 
 /* LOCAL VARIABLES */
 
-#if SK_ENABLE_IPV6
 static const uint8_t bag_v4inv6[16] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF, 0, 0, 0, 0
 };
-#endif
 
 /* ensure that SKBAG_MAX_FIELD_BUFLEN is larger than maximum name */
 static const bag_field_info_t bag_field_info[] = {
@@ -566,7 +530,6 @@ bagtreeIterNext(
     skBagIterator_t    *iter,
     uint32_t           *key,
     uint64_t           *counter);
-#if SK_ENABLE_IPV6
 static skBagErr_t
 bagOperationRedblack(
     skBag_t                *bag,
@@ -574,7 +537,6 @@ bagOperationRedblack(
     const uint64_t          change_value,
     skBagTypedCounter_t    *result_value,
     bag_operation_t         op);
-#endif  /* SK_ENABLE_IPV6 */
 static sk_header_entry_t *
 bagHentryCreate(
     uint16_t            key_type,
@@ -767,7 +729,6 @@ bagCompareKeys64(
 }
 #endif  /* 0 */
 
-#if SK_ENABLE_IPV6
 static int
 bagCompareKeys128(
     const void         *v_key_a,
@@ -776,7 +737,6 @@ bagCompareKeys128(
 {
     return memcmp(v_key_a, v_key_b, sizeof(bag_v4inv6));
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -787,7 +747,6 @@ bagCompareKeys128(
  *    Given the bag 'bag', update the 'stats' structure with various
  *    statistics about the bag.
  */
-#if SK_ENABLE_IPV6
 static void
 bagComputeStatsRedblack(
     const skBag_t      *bag,
@@ -823,7 +782,6 @@ bagComputeStatsRedblack(
     stats->nodes = stats->unique_keys;
     stats->nodes_size = (stats->nodes * sizeof(bag_keycount128_t));
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 static void
 bagComputeStatsTree(
@@ -887,11 +845,9 @@ bagComputeStats(
       case 4:
         bagComputeStatsTree(bag, stats);
         break;
-#if SK_ENABLE_IPV6
       case 16:
         bagComputeStatsRedblack(bag, stats);
         break;
-#endif  /* SK_ENABLE_IPV6 */
       case 8:
       default:
         skAbortBadCase(bag->key_octets);
@@ -1151,7 +1107,6 @@ bagIterCreate(
  *    success, or SKBAG_ERR_KEY_NOT_FOUND when the iterator has
  *    visited all entries.
  */
-#if SK_ENABLE_IPV6
 static skBagErr_t
 bagIterNextRedblack(
     skBagIterator_t        *iter,
@@ -1216,7 +1171,6 @@ bagIterNextRedblack(
 
     return SKBAG_ERR_KEY_NOT_FOUND;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 static skBagErr_t
 bagIterNextTree(
@@ -1274,7 +1228,6 @@ bagIterNextTree(
  *    Reset the iterator depending on what type of data structure the
  *    bag contains.
  */
-#if SK_ENABLE_IPV6
 static skBagErr_t
 bagIterResetRedblack(
     skBagIterator_t    *iter)
@@ -1287,7 +1240,6 @@ bagIterResetRedblack(
         = (const bag_keycount128_t*)rbreadlist(iter->d.i_rbt.rb_iter);
     return SKBAG_OK;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 static skBagErr_t
 bagIterResetTree(
@@ -1318,7 +1270,6 @@ bagIterResetTree(
  *    modify the current counter.  In addition, if 'result' is
  *    specified, it is set to the new value.
  */
-#if SK_ENABLE_IPV6
 static skBagErr_t
 bagOperationRedblack(
     skBag_t                *bag,
@@ -1428,7 +1379,6 @@ bagOperationRedblack(
 
     return SKBAG_OK;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 static skBagErr_t
 bagOperationTree(
@@ -1879,7 +1829,6 @@ skBagCopy(
         }
         break;
 
-#if SK_ENABLE_IPV6
       case 16:
         {
             RBLIST *rb_iter;
@@ -1911,7 +1860,6 @@ skBagCopy(
             rbcloselist(rb_iter);
         }
         break;
-#endif  /* SK_ENABLE_IPV6 */
 
       case 8:
       default:
@@ -1951,67 +1899,58 @@ skBagCounterAdd(
 {
     uint32_t u32;
     skBagErr_t rv;
+    uint8_t ipv6[16];
+    int is_v6;
+    skBagFieldType_t key_type;
 
     BAG_CHECK_INPUT(bag, key, counter_add);
 
-#if !SK_ENABLE_IPV6
-
-    BAG_KEY_TO_U32_V4(key, u32);
-
-#else
-    {
-        uint8_t ipv6[16];
-        int is_v6;
-        skBagFieldType_t key_type;
-
-        if (16 == bag->key_octets) {
-            /* bag is ipv6, so convert key to ipv6 */
-            BAG_KEY_TO_IPV6(key, ipv6);
-            return bagOperationRedblack(bag, ipv6, counter_add->val.u64,
-                                        out_counter, BAG_OP_ADD);
-        }
-
-        BAG_KEY_TO_U32_V6(key, u32, is_v6);
-
-        if (is_v6) {
-            /* key is IPv6; convert bag unless 'counter_add' is 0 */
-            if (BAG_COUNTER_IS_ZERO(counter_add->val.u64)) {
-                if (out_counter) {
-                    BAG_COUNTER_SET_ZERO(out_counter);
-                }
-                return SKBAG_OK;
-            }
-            if (bag->no_autoconvert) {
-                return SKBAG_ERR_KEY_RANGE;
-            }
-            switch (bag->key_type) {
-              case SKBAG_FIELD_SIPv4:
-                key_type = SKBAG_FIELD_SIPv6;
-                break;
-              case SKBAG_FIELD_DIPv4:
-                key_type = SKBAG_FIELD_DIPv6;
-                break;
-              case SKBAG_FIELD_NHIPv4:
-                key_type = SKBAG_FIELD_NHIPv6;
-                break;
-              case SKBAG_FIELD_ANY_IPv4:
-                key_type = SKBAG_FIELD_ANY_IPv6;
-                break;
-              default:
-                key_type = bag->key_type;
-                break;
-            }
-            rv = skBagModify(bag, key_type, bag->counter_type,
-                             sizeof(ipv6), sizeof(uint64_t));
-            if (rv) {
-                return rv;
-            }
-            BAG_KEY_TO_IPV6(key, ipv6);
-            return bagOperationRedblack(bag, ipv6, counter_add->val.u64,
-                                        out_counter, BAG_OP_ADD);
-        }
+    if (16 == bag->key_octets) {
+        /* bag is ipv6, so convert key to ipv6 */
+        BAG_KEY_TO_IPV6(key, ipv6);
+        return bagOperationRedblack(bag, ipv6, counter_add->val.u64,
+                                    out_counter, BAG_OP_ADD);
     }
-#endif  /* #else of #if !SK_ENABLE_IPV6 */
+
+    BAG_KEY_TO_U32_V6(key, u32, is_v6);
+
+    if (is_v6) {
+        /* key is IPv6; convert bag unless 'counter_add' is 0 */
+        if (BAG_COUNTER_IS_ZERO(counter_add->val.u64)) {
+            if (out_counter) {
+                BAG_COUNTER_SET_ZERO(out_counter);
+            }
+            return SKBAG_OK;
+        }
+        if (bag->no_autoconvert) {
+            return SKBAG_ERR_KEY_RANGE;
+        }
+        switch (bag->key_type) {
+          case SKBAG_FIELD_SIPv4:
+            key_type = SKBAG_FIELD_SIPv6;
+            break;
+          case SKBAG_FIELD_DIPv4:
+            key_type = SKBAG_FIELD_DIPv6;
+            break;
+          case SKBAG_FIELD_NHIPv4:
+            key_type = SKBAG_FIELD_NHIPv6;
+            break;
+          case SKBAG_FIELD_ANY_IPv4:
+            key_type = SKBAG_FIELD_ANY_IPv6;
+            break;
+          default:
+            key_type = bag->key_type;
+            break;
+        }
+        rv = skBagModify(bag, key_type, bag->counter_type,
+                         sizeof(ipv6), sizeof(uint64_t));
+        if (rv) {
+            return rv;
+        }
+        BAG_KEY_TO_IPV6(key, ipv6);
+        return bagOperationRedblack(bag, ipv6, counter_add->val.u64,
+                                    out_counter, BAG_OP_ADD);
+    }
 
     if ((bag->key_octets < 4)
         && (u32 >= (1u << (bag->key_octets * CHAR_BIT))))
@@ -2083,36 +2022,27 @@ skBagCounterGet(
     skBagTypedCounter_t    *out_counter)
 {
     uint32_t u32;
+    uint8_t ipv6[16];
+    int is_v6;
 
     if (NULL == bag || NULL == key || NULL == out_counter) {
         return SKBAG_ERR_INPUT;
     }
 
-#if !SK_ENABLE_IPV6
-
-    BAG_KEY_TO_U32_V4(key, u32);
-
-#else
-    {
-        uint8_t ipv6[16];
-        int is_v6;
-
-        if (16 == bag->key_octets) {
-            /* bag is ipv6, so convert key to ipv6 */
-            BAG_KEY_TO_IPV6(key, ipv6);
-            return bagOperationRedblack((skBag_t*)bag, ipv6, 0,
-                                        out_counter, BAG_OP_GET);
-        }
-
-        BAG_KEY_TO_U32_V6(key, u32, is_v6);
-
-        if (is_v6) {
-            /* key is IPv6; so it is not in this bag */
-            BAG_COUNTER_SET_ZERO(out_counter);
-            return SKBAG_OK;
-        }
+    if (16 == bag->key_octets) {
+        /* bag is ipv6, so convert key to ipv6 */
+        BAG_KEY_TO_IPV6(key, ipv6);
+        return bagOperationRedblack((skBag_t*)bag, ipv6, 0,
+                                    out_counter, BAG_OP_GET);
     }
-#endif  /* #else of #if !SK_ENABLE_IPV6 */
+
+    BAG_KEY_TO_U32_V6(key, u32, is_v6);
+
+    if (is_v6) {
+        /* key is IPv6; so it is not in this bag */
+        BAG_COUNTER_SET_ZERO(out_counter);
+        return SKBAG_OK;
+    }
 
     if ((bag->key_octets < 4)
         && (u32 >= (1u << (bag->key_octets * CHAR_BIT))))
@@ -2135,64 +2065,55 @@ skBagCounterSet(
 {
     uint32_t u32;
     skBagErr_t rv = SKBAG_ERR_INPUT;
+    uint8_t ipv6[16];
+    int is_v6;
+    skBagFieldType_t key_type;
 
     BAG_CHECK_INPUT(bag, key, counter);
 
-#if !SK_ENABLE_IPV6
-
-    BAG_KEY_TO_U32_V4(key, u32);
-
-#else
-    {
-        uint8_t ipv6[16];
-        int is_v6;
-        skBagFieldType_t key_type;
-
-        if (16 == bag->key_octets) {
-            /* bag is ipv6, so convert key to ipv6 */
-            BAG_KEY_TO_IPV6(key, ipv6);
-            return bagOperationRedblack(bag, ipv6, counter->val.u64,
-                                        NULL, BAG_OP_SET);
-        }
-
-        BAG_KEY_TO_U32_V6(key, u32, is_v6);
-
-        if (is_v6) {
-            /* key is IPv6; convert bag unless 'counter' is 0 */
-            if (BAG_COUNTER_IS_ZERO(counter->val.u64)) {
-                return SKBAG_OK;
-            }
-            if (bag->no_autoconvert) {
-                return SKBAG_ERR_KEY_RANGE;
-            }
-            switch (bag->key_type) {
-              case SKBAG_FIELD_SIPv4:
-                key_type = SKBAG_FIELD_SIPv6;
-                break;
-              case SKBAG_FIELD_DIPv4:
-                key_type = SKBAG_FIELD_DIPv6;
-                break;
-              case SKBAG_FIELD_NHIPv4:
-                key_type = SKBAG_FIELD_NHIPv6;
-                break;
-              case SKBAG_FIELD_ANY_IPv4:
-                key_type = SKBAG_FIELD_ANY_IPv6;
-                break;
-              default:
-                key_type = bag->key_type;
-                break;
-            }
-            rv = skBagModify(bag, key_type, bag->counter_type,
-                             sizeof(ipv6), sizeof(uint64_t));
-            if (rv) {
-                return rv;
-            }
-            BAG_KEY_TO_IPV6(key, ipv6);
-            return bagOperationRedblack(bag, ipv6, counter->val.u64,
-                                        NULL, BAG_OP_SET);
-        }
+    if (16 == bag->key_octets) {
+        /* bag is ipv6, so convert key to ipv6 */
+        BAG_KEY_TO_IPV6(key, ipv6);
+        return bagOperationRedblack(bag, ipv6, counter->val.u64,
+                                    NULL, BAG_OP_SET);
     }
-#endif  /* #else of #if !SK_ENABLE_IPV6 */
+
+    BAG_KEY_TO_U32_V6(key, u32, is_v6);
+
+    if (is_v6) {
+        /* key is IPv6; convert bag unless 'counter' is 0 */
+        if (BAG_COUNTER_IS_ZERO(counter->val.u64)) {
+            return SKBAG_OK;
+        }
+        if (bag->no_autoconvert) {
+            return SKBAG_ERR_KEY_RANGE;
+        }
+        switch (bag->key_type) {
+          case SKBAG_FIELD_SIPv4:
+            key_type = SKBAG_FIELD_SIPv6;
+            break;
+          case SKBAG_FIELD_DIPv4:
+            key_type = SKBAG_FIELD_DIPv6;
+            break;
+          case SKBAG_FIELD_NHIPv4:
+            key_type = SKBAG_FIELD_NHIPv6;
+            break;
+          case SKBAG_FIELD_ANY_IPv4:
+            key_type = SKBAG_FIELD_ANY_IPv6;
+            break;
+          default:
+            key_type = bag->key_type;
+            break;
+        }
+        rv = skBagModify(bag, key_type, bag->counter_type,
+                         sizeof(ipv6), sizeof(uint64_t));
+        if (rv) {
+            return rv;
+        }
+        BAG_KEY_TO_IPV6(key, ipv6);
+        return bagOperationRedblack(bag, ipv6, counter->val.u64,
+                                    NULL, BAG_OP_SET);
+    }
 
     if ((bag->key_octets < 4)
         && (u32 >= (1u << (bag->key_octets * CHAR_BIT))))
@@ -2225,40 +2146,31 @@ skBagCounterSubtract(
     skBagTypedCounter_t        *out_counter)
 {
     uint32_t u32;
+    uint8_t ipv6[16];
+    int is_v6;
 
     BAG_CHECK_INPUT(bag, key, counter_sub);
 
-#if !SK_ENABLE_IPV6
-
-    BAG_KEY_TO_U32_V4(key, u32);
-
-#else
-    {
-        uint8_t ipv6[16];
-        int is_v6;
-
-        if (16 == bag->key_octets) {
-            /* bag is ipv6, so convert key to ipv6 */
-            BAG_KEY_TO_IPV6(key, ipv6);
-            return bagOperationRedblack(bag, ipv6, counter_sub->val.u64,
-                                        out_counter, BAG_OP_SUBTRACT);
-        }
-
-        BAG_KEY_TO_U32_V6(key, u32, is_v6);
-
-        if (is_v6) {
-            /* key is IPv6, so it is not in this bag.  subtraction would
-             * underflow unless 'counter_sub' is 0 */
-            if (BAG_COUNTER_IS_ZERO(counter_sub->val.u64)) {
-                if (out_counter) {
-                    BAG_COUNTER_SET_ZERO(out_counter);
-                }
-                return SKBAG_OK;
-            }
-            return SKBAG_ERR_OP_BOUNDS;
-        }
+    if (16 == bag->key_octets) {
+        /* bag is ipv6, so convert key to ipv6 */
+        BAG_KEY_TO_IPV6(key, ipv6);
+        return bagOperationRedblack(bag, ipv6, counter_sub->val.u64,
+                                    out_counter, BAG_OP_SUBTRACT);
     }
-#endif  /* #else of #if !SK_ENABLE_IPV6 */
+
+    BAG_KEY_TO_U32_V6(key, u32, is_v6);
+
+    if (is_v6) {
+        /* key is IPv6, so it is not in this bag.  subtraction would
+         * underflow unless 'counter_sub' is 0 */
+        if (BAG_COUNTER_IS_ZERO(counter_sub->val.u64)) {
+            if (out_counter) {
+                BAG_COUNTER_SET_ZERO(out_counter);
+            }
+            return SKBAG_OK;
+        }
+        return SKBAG_ERR_OP_BOUNDS;
+    }
 
     if ((bag->key_octets < 4)
         && (u32 >= (1u << (bag->key_octets * CHAR_BIT))))
@@ -2346,7 +2258,6 @@ skBagCreateTyped(
         }
         break;
 
-#if SK_ENABLE_IPV6
       case 16:
         {
             bag_redblack_t *brb;
@@ -2370,7 +2281,6 @@ skBagCreateTyped(
             new_bag->d.b_rbt = brb;
         }
         break;
-#endif  /* SK_ENABLE_IPV6 */
 
       case 8:
       default:
@@ -2411,7 +2321,6 @@ skBagDestroy(
                 free(bt);
             }
             break;
-#if SK_ENABLE_IPV6
           case 16:
             if (bag->d.b_rbt) {
                 bag_redblack_t *brb = bag->d.b_rbt;
@@ -2424,7 +2333,6 @@ skBagDestroy(
                 free(brb);
             }
             break;
-#endif  /* SK_ENABLE_IPV6 */
           case 8:
           default:
             skAbortBadCase(bag->key_octets);
@@ -2801,11 +2709,9 @@ skBagIteratorDestroy(
         break;
       case 8:
       case 16:
-#if SK_ENABLE_IPV6
         if (iter->d.i_rbt.rb_iter) {
             rbcloselist(iter->d.i_rbt.rb_iter);
         }
-#endif  /* SK_ENABLE_IPV6 */
         break;
     }
     memset(iter, 0, sizeof(*iter));
@@ -2843,10 +2749,8 @@ skBagIteratorNextTyped(
       case 2:
       case 4:
         return bagIterNextTree(iter, key, counter);
-#if SK_ENABLE_IPV6
       case 16:
         return bagIterNextRedblack(iter, key, counter);
-#endif  /* SK_ENABLE_IPV6 */
       case 8:
       default:
         skAbortBadCase(iter->bag->key_octets);
@@ -2873,7 +2777,6 @@ skBagIteratorReset(
           case 2:
           case 4:
             break;
-#if SK_ENABLE_IPV6
           case 16:
             iter->d.i_rbt.next = NULL;
             if (iter->d.i_rbt.rb_iter) {
@@ -2881,7 +2784,6 @@ skBagIteratorReset(
                 iter->d.i_rbt.rb_iter = NULL;
             }
             break;
-#endif  /* SK_ENABLE_IPV6 */
           case 8:
           default:
             skAbortBadCase(iter->bag->key_octets);
@@ -2899,10 +2801,8 @@ skBagIteratorReset(
       case 2:
       case 4:
         return bagIterResetTree(iter);
-#if SK_ENABLE_IPV6
       case 16:
         return bagIterResetRedblack(iter);
-#endif  /* SK_ENABLE_IPV6 */
       case 8:
       default:
         skAbortBadCase(iter->bag->key_octets);
@@ -3248,14 +3148,6 @@ skBagProcessStreamTyped(
         goto END;
     }
 
-    /* cannot read IPv6 bags in an IPv4-only compile of SiLK */
-#if !SK_ENABLE_IPV6
-    if (key_read_len == 16 || bag->key_octets == 16) {
-        err = SKBAG_ERR_HEADER;
-        goto END;
-    }
-#endif
-
     /* compute size of a complete entry, and double check that sizes
      * are reasonable */
     entry_read_len = key_read_len + counter_read_len;
@@ -3358,13 +3250,11 @@ skBagProcessStreamTyped(
             err = cb_entry_func(bag, &key, &counter, cb_data);
             break;
 
-#if SK_ENABLE_IPV6
           case 16:
             key.type = SKBAG_KEY_IPADDR;
             skipaddrSetV6(&key.val.addr, entrybuf);
             err = cb_entry_func(bag, &key, &counter, cb_data);
             break;
-#endif
 
           case 8:
           default:
@@ -3567,7 +3457,6 @@ skBagWrite(
         skBagIteratorDestroy(iter);
         break;
 
-#if SK_ENABLE_IPV6
       case 16:
         {
             RBLIST *rb_iter;
@@ -3590,7 +3479,6 @@ skBagWrite(
             rbcloselist(rb_iter);
         }
         break;
-#endif  /* SK_ENABLE_IPV6 */
 
       case 8:
       default:
@@ -3603,258 +3491,6 @@ skBagWrite(
     }
 
     return SKBAG_OK;
-}
-
-
-/*    ********************************************************    */
-/*    LEGACY FUNCTIONS    */
-/*    ********************************************************    */
-
-
-#include <silk/bagtree.h>
-
-#define MIN_LEVELS 1
-#define MAX_LEVELS 32
-#define MIN_KEY_SIZE 8
-#define MAX_KEY_SIZE 128
-#define MIN_LEVEL_BITS 1
-#define MAX_LEVEL_BITS 128
-
-
-typedef struct bag_legacy_proc_stream_st {
-    skBagStreamFunc_t   leg_func;
-    void               *leg_data;
-} bag_legacy_proc_stream_t;
-
-
-/*
- *    Callback invoked by skBagProcessStreamTyped() to implement the
- *    callback used by the legacy skBagProcessStream(), which expects a
- *    signature of
- *
- *      static skBagErr_t bagLegacyProcessStream(
- *          const skBagKey_t       *key,
- *          const skBagCounter_t   *counter,
- *          void                   *cb_data);
- *
- */
-static skBagErr_t
-bagLegacyProcessStream(
-    const skBag_t               UNUSED(*fake_bag),
-    const skBagTypedKey_t              *key,
-    const skBagTypedCounter_t          *counter,
-    void                               *cb_data)
-{
-    bag_legacy_proc_stream_t *leg = (bag_legacy_proc_stream_t*)cb_data;
-
-    return leg->leg_func(&key->val.u32, &counter->val.u64, leg->leg_data);
-}
-
-
-skBagErr_t
-skBagAddToCounter(
-    skBag_t                *bag,
-    const skBagKey_t       *key,
-    const skBagCounter_t   *counter_add)
-{
-    skBagTypedKey_t k;
-    skBagTypedCounter_t c;
-
-    k.type = SKBAG_KEY_U32;
-    k.val.u32 = *key;
-    c.type = SKBAG_COUNTER_U64;
-    c.val.u64 = *counter_add;
-
-    return skBagCounterAdd(bag, &k, &c, NULL);
-}
-
-
-/* create a bag */
-skBagErr_t
-skBagAlloc(
-    skBag_t                   **bag,
-    skBagLevel_t                levels,
-    const skBagLevelsize_t     *level_sizes)
-{
-    uint32_t key_bits = 0;
-    uint32_t high_bits;
-    skBagLevel_t lvl;
-
-    /* check the level array */
-    if (levels < MIN_LEVELS || levels > MAX_LEVELS || NULL == level_sizes) {
-        return SKBAG_ERR_INPUT;
-    }
-
-    /* count total number of bits */
-    for (lvl = 0; lvl < levels; ++lvl) {
-        if (level_sizes[lvl] < MIN_LEVEL_BITS ||
-            level_sizes[lvl] > MAX_LEVEL_BITS)
-        {
-            return SKBAG_ERR_INPUT;
-        }
-        key_bits += level_sizes[lvl];
-    }
-    if (key_bits < MIN_KEY_SIZE || key_bits > MAX_KEY_SIZE) {
-        return SKBAG_ERR_INPUT;
-    }
-
-    /* must be a power of 2 */
-    BITS_IN_WORD32(&high_bits, key_bits);
-    if (high_bits != 1) {
-        return SKBAG_ERR_INPUT;
-    }
-
-    return skBagCreateTyped(bag, SKBAG_FIELD_CUSTOM, SKBAG_FIELD_CUSTOM,
-                            key_bits / CHAR_BIT, sizeof(skBagCounter_t));
-}
-
-
-skBagErr_t
-skBagDecrementCounter(
-    skBag_t            *bag,
-    const skBagKey_t   *key)
-{
-    skBagTypedKey_t k;
-
-    k.type = SKBAG_KEY_U32;
-    k.val.u32 = *key;
-
-    return skBagCounterSubtract(bag, &k, skbag_counter_incr, NULL);
-}
-
-
-/* destroy a bag */
-skBagErr_t
-skBagFree(
-    skBag_t            *bag)
-{
-    if (NULL == bag) {
-        return SKBAG_ERR_INPUT;
-    }
-    skBagDestroy(&bag);
-    return SKBAG_OK;
-}
-
-
-skBagErr_t
-skBagGetCounter(
-    skBag_t            *bag,
-    const skBagKey_t   *key,
-    skBagCounter_t     *counter)
-{
-    skBagTypedKey_t k;
-    skBagTypedCounter_t c;
-    skBagErr_t rv;
-
-    k.type = SKBAG_KEY_U32;
-    k.val.u32 = *key;
-
-    rv = skBagCounterGet(bag, &k, &c);
-    if (SKBAG_OK == rv) {
-        *counter = c.val.u64;
-    }
-    return rv;
-}
-
-
-skBagErr_t
-skBagIncrCounter(
-    skBag_t            *bag,
-    const skBagKey_t   *key)
-{
-    skBagTypedKey_t k;
-
-    k.type = SKBAG_KEY_U32;
-    k.val.u32 = *key;
-
-    return skBagCounterAdd(bag, &k, skbag_counter_incr, NULL);
-}
-
-
-/* return next key/counter pair */
-skBagErr_t
-skBagIteratorNext(
-    skBagIterator_t    *iter,
-    skBagKey_t         *key,
-    skBagCounter_t     *counter)
-{
-    skBagTypedKey_t k;
-    skBagTypedCounter_t c;
-    skBagErr_t rv;
-
-    k.type = SKBAG_KEY_U32;
-    c.type = SKBAG_COUNTER_U64;
-    rv = skBagIteratorNextTyped(iter, &k, &c);
-    if (SKBAG_OK == rv) {
-        *key = k.val.u32;
-        *counter = c.val.u64;
-    }
-    return rv;
-}
-
-
-skBagErr_t
-skBagProcessStream(
-    skstream_t         *stream,
-    void               *cb_data,
-    skBagStreamFunc_t   cb_func)
-{
-    bag_legacy_proc_stream_t leg;
-
-    leg.leg_func = cb_func;
-    leg.leg_data = cb_data;
-
-    return skBagProcessStreamTyped(stream, &leg, NULL, bagLegacyProcessStream);
-}
-
-
-skBagErr_t
-skBagRemoveKey(
-    skBag_t            *bag,
-    const skBagKey_t   *key)
-{
-    skBagTypedKey_t k;
-
-    k.type = SKBAG_KEY_U32;
-    k.val.u32 = *key;
-
-    return skBagCounterSet(bag, &k, skbag_counter_zero);
-}
-
-
-skBagErr_t
-skBagSetCounter(
-    skBag_t                *bag,
-    const skBagKey_t       *key,
-    const skBagCounter_t   *counter)
-{
-    skBagTypedKey_t k;
-    skBagTypedCounter_t c;
-
-    k.type = SKBAG_KEY_U32;
-    k.val.u32 = *key;
-    c.type = SKBAG_COUNTER_U64;
-    c.val.u64 = *counter;
-
-    return skBagCounterSet(bag, &k, &c);
-}
-
-
-skBagErr_t
-skBagSubtractFromCounter(
-    skBag_t                *bag,
-    const skBagKey_t       *key,
-    const skBagCounter_t   *counter_sub)
-{
-    skBagTypedKey_t k;
-    skBagTypedCounter_t c;
-
-    k.type = SKBAG_KEY_U32;
-    k.val.u32 = *key;
-    c.type = SKBAG_COUNTER_U64;
-    c.val.u64 = *counter_sub;
-
-    return skBagCounterSubtract(bag, &k, &c, NULL);
 }
 
 

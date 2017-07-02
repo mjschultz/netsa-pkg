@@ -20,14 +20,14 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKDEQUE_H, "$SiLK: skdeque.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_SKDEQUE_H, "$SiLK: skdeque.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 /**
  *  @file
  *
  *    Implementation of a thread-safe, double-ended queue.
  *
- *    This file is part of libsilk-thrd.
+ *    This file is part of libsilk.
  *
  *
  *  A deque maintains a list of void pointers.  It does not know the
@@ -50,10 +50,11 @@ RCSIDENTVAR(rcsID_SKDEQUE_H, "$SiLK: skdeque.h 275df62a2e41 2017-01-05 17:30:40Z
  *    Unlike most SiLK types, the pointer is part of the typedef.
  */
 typedef struct sk_deque_st *skDeque_t;
+typedef struct sk_deque_st sk_deque_t;
 
 
 /**
- *    Return values from skSkdeque functions.
+ *    Return values from skDeque functions.
  */
 typedef enum {
     /** success */
@@ -80,7 +81,7 @@ typedef enum {
 /**
  *    Create a deque.  Return NULL on memory alloation error.
  */
-skDeque_t
+sk_deque_t*
 skDequeCreate(
     void);
 
@@ -89,19 +90,19 @@ skDequeCreate(
  *    Creates a copy of a deque.  Operations on both deques will
  *    affect each other.  Return NULL on error.
  */
-skDeque_t
+sk_deque_t*
 skDequeCopy(
-    skDeque_t           deque);
+    sk_deque_t         *deque);
 
 /**
  *    Creates a new pseudo-deque which acts like a deque with all the
  *    elements of q1 in front of q2.  q1 and q2 continue behaving
  *    normally.  Return NULL on error.
  */
-skDeque_t
+sk_deque_t*
 skDequeCreateMerged(
-    skDeque_t           q1,
-    skDeque_t           q2);
+    sk_deque_t         *q1,
+    sk_deque_t         *q2);
 
 
 /*** Deque destruction ***/
@@ -113,35 +114,42 @@ skDequeCreateMerged(
  */
 skDQErr_t
 skDequeDestroy(
-    skDeque_t           deque);
+    sk_deque_t         *deque);
 
 
 /*** Deque data manipulation functions ***/
 
 /**
- *    Return the status of a deque.
+ *    Return the status of a deque: SKDQ_EMPTY when empty; SKDQ_ERROR
+ *    when 'deque' is internally inconsistent; SKDQ_SUCCESS otherwise.
  */
 skDQErr_t
 skDequeStatus(
-    skDeque_t           deque);
+    sk_deque_t         *deque);
 
 /**
- *    Returns the size of a deque.  Undefined on a bad (destroyed or
- *    error-ridden) deque.
+ *    Return the number of elements in the deque.  Result is undefined
+ *    on a bad (destroyed or error-ridden) deque.
  */
 uint32_t
 skDequeSize(
-    skDeque_t           deque);
+    sk_deque_t         *deque);
 
 /**
  *    Pop an element from the front of 'deque'.  The call will block
  *    until an item is available in 'deque'.  It is the responsibility
  *    of the program using the deque to free any elements popped from
  *    it.
+ *
+ *    Return SKDQ_SUCCESS when an element is popped.  If the deque is
+ *    unblocked (c.f., skDequeUnblock()) when the function is first
+ *    invoked or if an empty deque becomes unblocked while waiting for
+ *    an element, return SKDQ_UNBLOCKED.  Return SKDQ_DESTROYED if the
+ *    deque is destroyed.
  */
 skDQErr_t
 skDequePopFront(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item);
 
 /**
@@ -150,17 +158,17 @@ skDequePopFront(
  */
 skDQErr_t
 skDequePopFrontNB(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item);
 
 /**
  *    Like skDequePopFront() except, when 'deque' is empty, waits
  *    'seconds' seconds for an item to appear in 'deque'.  If 'deque'
- *    is still empty after 'seconds' seconds, returns SKDQ_EMPTY.
+ *    is still empty after 'seconds' seconds, returns SKDQ_TIMEOUT.
  */
 skDQErr_t
 skDequePopFrontTimed(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item,
     uint32_t            seconds);
 
@@ -169,7 +177,7 @@ skDequePopFrontTimed(
  */
 skDQErr_t
 skDequePopBack(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item);
 
 /**
@@ -178,7 +186,7 @@ skDequePopBack(
  */
 skDQErr_t
 skDequePopBackNB(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item);
 
 /**
@@ -187,7 +195,7 @@ skDequePopBackNB(
  */
 skDQErr_t
 skDequePopBackTimed(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item,
     uint32_t            seconds);
 
@@ -198,7 +206,7 @@ skDequePopBackTimed(
  */
 skDQErr_t
 skDequeUnblock(
-    skDeque_t           deque);
+    sk_deque_t         *deque);
 
 /**
  *    Reblock a deque unblocked by skDequeUnblock.  Deques are created
@@ -206,17 +214,17 @@ skDequeUnblock(
  */
 skDQErr_t
 skDequeBlock(
-    skDeque_t           deque);
+    sk_deque_t         *deque);
 
 /**
- *    Return the first element of 'deque' without removing it, or
- *    SKDQ_EMPTY if the deque is empty.  This function does not remove
- *    items from the deque.  Do not free() an item until it has been
- *    popped.
+ *    Return the first element of 'deque' without removing it and
+ *    return SKDQ_SUCCESS, or return SKDQ_EMPTY if the deque is empty.
+ *    This function does not remove items from the deque.  Do not
+ *    free() an item until it has been popped.
  */
 skDQErr_t
 skDequeFront(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item);
 
 /**
@@ -224,7 +232,7 @@ skDequeFront(
  */
 skDQErr_t
 skDequeBack(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item);
 
 /**
@@ -232,10 +240,13 @@ skDequeBack(
  *    pointer only.  In order for the item to be of any use when it is
  *    later popped, it must survive its stay in the queue (not be
  *    freed).
+ *
+ *    Return SKDQ_SUCCESS on success.  Return SKDQ_ERROR on memory
+ *    allocation error or when the deque is in an inconsistent state.
  */
 skDQErr_t
 skDequePushFront(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void               *item);
 
 /**
@@ -243,8 +254,32 @@ skDequePushFront(
  */
 skDQErr_t
 skDequePushBack(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void               *item);
+
+/**
+ *    Join the deques 'front' and 'back' into a single deque by
+ *    appending 'back' to 'front'.  After this call, 'front' contains
+ *    the elements of both 'front' and 'back', and 'back' is empty.
+ *
+ *    When 'front' and 'back' are both merged deques, join the front
+ *    sub-deques of each deque argument and join the back sub-deques
+ *    of each deque argument.
+ *
+ *    When 'front' is a merged deque and 'back' is not, append the
+ *    elements of 'back' to the back sub-deque of 'front'.
+ *
+ *    When 'front' is a standard deque and 'back' is a merged deque,
+ *    first append the front sub-deque of 'back' to 'front' then
+ *    append the back sub-deque of 'back' to 'front'.
+ *
+ *    Return SKDQ_SUCCESS on success, or SKDQ_ERROR if either deque is
+ *    in an inconsistent state.
+ */
+skDQErr_t
+skDequeJoin(
+    sk_deque_t         *head,
+    sk_deque_t         *tail);
 
 #ifdef __cplusplus
 }

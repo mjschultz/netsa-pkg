@@ -35,7 +35,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skheap.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skheap.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/skheap.h>
 
@@ -219,11 +219,11 @@ heapSiftup(
 skheap_t *
 skHeapCreate(
     skheapcmpfn_t       cmpfun,
-    uint32_t            init_count,
+    uint32_t            max_entries,
     uint32_t            entry_size,
     skheapnode_t       *data)
 {
-    return skHeapCreate2((skheapcmp2fn_t)cmpfun, init_count, entry_size,
+    return skHeapCreate2((skheapcmp2fn_t)cmpfun, max_entries, entry_size,
                          data, NULL);
 }
 
@@ -232,14 +232,14 @@ skHeapCreate(
 skheap_t *
 skHeapCreate2(
     skheapcmp2fn_t      cmpfun,
-    uint32_t            init_count,
+    uint32_t            max_entries,
     uint32_t            entry_size,
     skheapnode_t       *data,
     void               *cmp_data)
 {
     skheap_t *heap;
 
-    if (init_count < 1) {
+    if (max_entries < 1) {
         return NULL;
     }
     if (NULL == cmpfun) {
@@ -251,7 +251,7 @@ skHeapCreate2(
         return NULL;
     }
 
-    heap->max_entries = init_count;
+    heap->max_entries = max_entries;
     heap->entry_size = entry_size;
     heap->cmpfun = cmpfun;
     heap->cmp_data = cmp_data;
@@ -267,12 +267,12 @@ skHeapCreate2(
     } else {
         /* allocate an extra space and use that as our scratch
          * space */
-        heap->data = (uint8_t*)calloc(1 + init_count, entry_size);
+        heap->data = (uint8_t*)calloc(1 + max_entries, entry_size);
         if (NULL == heap->data) {
             free(heap);
             return NULL;
         }
-        heap->scratch = HEAP_NODE(heap, init_count);
+        heap->scratch = HEAP_NODE(heap, max_entries);
     }
 
     return heap;

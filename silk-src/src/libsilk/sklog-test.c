@@ -18,7 +18,7 @@
 /* NOTE: pull in the sklog source file */
 #include "sklog.c"
 
-RCSIDENTVAR(rcsID_sklog_c, "$SiLK: sklog-test.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_sklog_c, "$SiLK: sklog-test.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 
 /* LOCAL DEFINES AND TYPEDEFS */
@@ -195,10 +195,6 @@ appSetup(
         skAppPrintErr("The --%s switch is required",
                       appOptions[OPT_TEST_FEATURES].name);
         skAppUsage();
-    }
-
-    if (test_threaded) {
-        sklogEnableThreadedLogging();
     }
 
     /* verify logging */

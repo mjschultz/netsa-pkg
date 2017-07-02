@@ -20,7 +20,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_POLLDIR_H, "$SiLK: skpolldir.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_POLLDIR_H, "$SiLK: skpolldir.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 /**
  *  @file
@@ -28,12 +28,15 @@ RCSIDENTVAR(rcsID_POLLDIR_H, "$SiLK: skpolldir.h 275df62a2e41 2017-01-05 17:30:4
  *    Implementation of a data structure for polling a directory for
  *    newly arrived files.
  *
- *    This file is part of libsilk-thrd.
+ *    This file is part of libsilk.
  *
  *
  *    An skPollDir_t object is created with skPollDirCreate().  The
  *    directory to poll and the interval between polls of that
  *    directory are specified as parameters.
+ *
+ *    The directory polling does not begin until skPollDirStart() is
+ *    called.  (New in SiLK 4).
  *
  *    If during a poll of the directory skPollDir_t notices a new file
  *    (for example, a file has been added to the directory),
@@ -107,7 +110,8 @@ RCSIDENTVAR(rcsID_POLLDIR_H, "$SiLK: skpolldir.h 275df62a2e41 2017-01-05 17:30:4
 typedef struct sk_polldir_st skPollDir_t;
 
 /**
- *    The type of polldir errors.
+ *    The type of polldir errors.  When the error is PDERR_SYSTEM, the
+ *    value of 'errno' should provide additional information.
  */
 typedef enum {
     PDERR_NONE = 0,
@@ -123,11 +127,29 @@ typedef enum {
  *    Creates a polldir object for directory.  The poll_interval is
  *    the number of seconds between polls of the directory for new
  *    files.
+ *
+ *    Return NULL on a memory allocation error or if the 'directory'
+ *    parameter is NULL, is not a directory, or cannot be opened.
  */
 skPollDir_t *
 skPollDirCreate(
     const char         *directory,
     uint32_t            poll_interval);
+
+/**
+ *    Start the thread that polls the directory.
+ *
+ *    Return PDERR_NONE on success.  Return PDERR_SYSTEM if here is a
+ *    problem opening the directory or creating the timer.  Return
+ *    PDERR_MEMORY for a memory allocation error.  Return
+ *    PDERR_STOPPED if the directory is stopped before it can acquire
+ *    a file handle.
+ *
+ *    (Since SiLK 4.0.0.)
+ */
+skPollDirErr_t
+skPollDirStart(
+    skPollDir_t        *pd);
 
 /**
  *    Stop polling a directory.
@@ -207,7 +229,7 @@ skPollDirPutBackFile(
  */
 const char *
 skPollDirStrError(
-    skPollDirErr_t      err);
+    ssize_t             err);
 
 /**
  *    Get the name of the directory being polled by a polldir object.

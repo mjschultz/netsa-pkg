@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skprintnets.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skprintnets.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
@@ -293,13 +293,11 @@ static void
 netStructureInitialize(
     skNetStruct_t      *ns,
     int                 has_count);
-#if SK_ENABLE_IPV6
 static char *
 netStructureNS128ToString(
     const ns128_t      *val,
     char               *buf,
     size_t              buflen);
-#endif  /* SK_ENABLE_IPV6 */
 static void
 netStructurePreparePrint(
     skNetStruct_t      *ns);
@@ -652,7 +650,6 @@ netStructureAddCIDRV4(
     }
 }
 
-#if SK_ENABLE_IPV6
 /* Add a CIDR block to the network-structure */
 static void
 netStructureAddCIDRV6(
@@ -1051,7 +1048,6 @@ netStructureAddCIDRV6(
         }
     }
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 void
 skNetStructureAddCIDR(
@@ -1063,12 +1059,10 @@ skNetStructureAddCIDR(
     if (!ns->parsed_input) {
         skNetStructureParse(ns, NULL);
     }
-#if SK_ENABLE_IPV6
     if (ns->is_ipv6) {
         netStructureAddCIDRV6(ns, base_ipaddr, prefix);
         return;
     }
-#endif  /* SK_ENABLE_IPV6 */
     netStructureAddCIDRV4(ns, base_ipaddr, prefix);
 }
 
@@ -1232,7 +1226,6 @@ netStructureAddKeyCounterV4(
     }
 }
 
-#if SK_ENABLE_IPV6
 /* Add a key/counter to the network-structure */
 static void
 netStructureAddKeyCounterV6(
@@ -1408,7 +1401,6 @@ netStructureAddKeyCounterV6(
                       ns->count_width, *count, ns->count_eol_delim);
     }
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 void
 skNetStructureAddKeyCounter(
@@ -1420,12 +1412,10 @@ skNetStructureAddKeyCounter(
     if (!ns->parsed_input) {
         skNetStructureParse(ns, NULL);
     }
-#if SK_ENABLE_IPV6
     if (ns->is_ipv6) {
         netStructureAddKeyCounterV6(ns, ipaddr, counter);
         return;
     }
-#endif  /* SK_ENABLE_IPV6 */
     netStructureAddKeyCounterV4(ns, ipaddr, counter);
 }
 
@@ -1513,7 +1503,6 @@ netStructureInitialize(
 }
 
 
-#if SK_ENABLE_IPV6
 /*
  *  buf = netStructureNS128ToString(val, buf, buflen);
  *
@@ -1609,12 +1598,8 @@ netStructureNS128ToString(
       default:
         skAbortBadCase(i);
     }
-    if ((size_t)sz >= buflen) {
-        return NULL;
-    }
     return buf;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /* Parse a string to specify the netblocks to print and the netblocks
@@ -1783,7 +1768,6 @@ netStructureParseV4(
     return 0;
 }
 
-#if SK_ENABLE_IPV6
 static int
 netStructureParseV6(
     skNetStruct_t      *ns,
@@ -1948,7 +1932,6 @@ netStructureParseV6(
 
     return 0;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 int
 skNetStructureParse(
@@ -1974,15 +1957,9 @@ skNetStructureParse(
     if ((cp - input) == sizeof(ipv6_prefix)
         && 0 == strncmp(ipv6_prefix, input, sizeof(ipv6_prefix)-1))
     {
-#if !SK_ENABLE_IPV6
-        skAppPrintErr(("Invalid network-structure '%s':"
-                       " SiLK was built without IPv6 support"),
-                      input);
-#else
         /* if input is only 'v6:', use the default netblocks */
         ns->is_ipv6 = 1;
         return netStructureParseV6(ns, (*cp ? cp : NULL));
-#endif
     }
     if ((cp - input) == sizeof(ipv4_prefix)
         && 0 == strncmp(ipv4_prefix, input, sizeof(ipv4_prefix)-1))

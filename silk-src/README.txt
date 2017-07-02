@@ -15,16 +15,28 @@ see source files for details.
 
 In general, you can install SiLK by running
     configure ; make ; make install
-However, there are several different configuration options.
-Descriptions of the configation options and detailed installation
-instructions are available in the SiLK Installation Handbook,
-available in doc/silk-install-handbook.pdf and at
-http://tools.netsa.cert.org/silk/silk-install-handbook.html or
-http://tools.netsa.cert.org/silk/silk-install-handbook.pdf
+For details, see doc/INSTALL.txt.
+
+
+SiLK 4.x is beta software.  The applications have been lightly tested.
+Some applications may change in incompatible ways in future releases.
+
+The analysis tools in SiLK 4.x are largely compatible with those in
+SiLK 3.x, though SiLK 4.x removes command line switches that were
+marked as deprecated in SiLK 3.x.
+
+The configuration of rwflowpack has radically changed from SiLK 3.x.
+The flowcap and rwflowappend tools no longer exist.
+
+Replacing a SiLK 3.x installation with SiLK 4.x is not recommended
+without substantial testing first.
+
+
+SiLK 4.x is beta software.  The applications have been lightly tested.
+Some applications may change in incompatible ways in future releases.
+
 
 Manual pages for each tool are installed when SiLK is installed.
-These manual pages and additional documentation are available from
-http://tools.netsa.cert.org/silk/
 
 The following documents are available in either this directory or in
 the doc/ directory:
@@ -36,11 +48,8 @@ the doc/ directory:
            and the no warranty disclaimer
     GPL.txt
         -- complete text of the GNU General Public License V2
-    silk-install-handbook.pdf
-        -- complete description of installation, including various
-           configurations you may choose
-    silk-acceptance-tests.pdf
-        -- description of tests used to check the integrity of SiLK
+    INSTALL.txt
+        -- a quick-start guide for installing SiLK
     autotools-readme.txt
         -- information for developers on using the AutoTools suite to
            re-create the "configure" script and "Makefile.in" files

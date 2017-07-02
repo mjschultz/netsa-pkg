@@ -9,7 +9,7 @@ B<rwpmaplookup> - Map keys to prefix map entries
   rwpmaplookup { --map-file=MAP_FILE | --address-types[=MAP_FILE]
                  | --country-codes[=MAP_FILE] }
         [--fields=FIELDS] [--ipset-files] [--no-errors]
-        [--ip-format=FORMAT] [--integer-ips] [--zero-pad-ips]
+        [--ip-format=FORMAT]
         [--no-titles] [--no-columns] [--column-separator=CHAR]
         [--no-final-delimiter] [{--delimited | --delimited=CHAR}]
         [{--output-path=PATH | --pager=PAGER_PROG}]
@@ -251,19 +251,6 @@ netblock.  The addresses C<127.0.0.1> and C<2001:db8::1> are printed
 as C<::ffff:7f00:1> and C<2001:db8::1>, respectively.
 
 =back
-
-=item B<--integer-ips>
-
-Print IP addresses as integers.  This switch is equivalent to
-B<--ip-format=decimal>, it is deprecated as of SiLK 3.7.0, and it will
-be removed in the SiLK 4.0 release.
-
-=item B<--zero-pad-ips>
-
-Print IP addresses as fully-expanded, zero-padded values in their
-canonical form.  This switch is equivalent to
-B<--ip-format=zero-padded>, it is deprecated as of SiLK 3.7.0, and it
-will be removed in the SiLK 4.0 release.
 
 =item B<--no-titles>
 
@@ -726,20 +713,16 @@ B<--address-types> switch is specified without an argument.
 
 B<rwpmaplookup> was added in SiLK 3.0.
 
-B<rwpmaplookup> duplicates the functionality of B<rwip2cc(1)>.
-B<rwip2cc> is deprecated, and it will be removed in the SiLK 4.0
-release.  Examples of using B<rwpmaplookup> in place of B<rwip2cc> are
-provided in the latter's manual page.
-
 =head1 SEE ALSO
 
 B<rwpmapbuild(1)>, B<rwpmapcat(1)>, B<ccfilter(3)>, B<addrtype(3)>,
 B<pmapfilter(3)>, B<rwgeoip2ccmap(1)>, B<rwcut(1)>, B<rwset(1)>,
-B<rwsetbuild(1)>, B<rwsetcat(1)>, B<rwsettool(1)>, B<silk(7)>
+B<rwsetbuild(1)>, B<rwsetcat(1)>, B<rwsettool(1)>, B<silk(7)>,
+B<uniq(1)>
 
 =cut
 
-$SiLK: rwpmaplookup.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwpmaplookup.pod 5036d9fcc2e7 2017-06-26 20:31:01Z mthomas $
 
 Local Variables:
 mode:text

@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_STREAM_CACHE_H, "$SiLK: stream-cache.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_STREAM_CACHE_H, "$SiLK: stream-cache.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/skstream.h>
 
@@ -47,19 +47,6 @@ typedef struct stream_cache_st stream_cache_t;
 
 
 /*
- *  The cache_key_t is used as the key to the stream.
- */
-typedef struct cache_key_st {
-    /* the hour that this file is for */
-    sktime_t            time_stamp;
-    /* the sensor that this file is for */
-    sk_sensor_id_t      sensor_id;
-    /* the flowtype (class/type) that this file is for */
-    sk_flowtype_id_t    flowtype_id;
-} cache_key_t;
-
-
-/*
  *  The cache_entry_t contains information about the file, the file
  *  handle, and the number of records in the file.
  *
@@ -69,13 +56,13 @@ typedef struct cache_key_st {
 typedef struct cache_entry_st {
     /* the number of records in the file as of opening or the most
      * recent flush, used for log messages */
-    uint64_t        rec_count;
+    uint64_t            rec_count;
     /* when this entry was last accessed */
-    sktime_t        last_accessed;
+    sktime_t            last_accessed;
     /* the key */
-    cache_key_t     key;
+    sksite_repo_key_t   key;
     /* the open file handle */
-    skstream_t     *stream;
+    skstream_t         *stream;
 } cache_entry_t;
 
 
@@ -92,8 +79,8 @@ typedef struct cache_entry_st {
  *    the file.
  */
 typedef skstream_t *(*cache_open_fn_t)(
-    const cache_key_t  *key,
-    void               *caller_data);
+    const sksite_repo_key_t    *key,
+    void                       *caller_data);
 
 
 /*
@@ -117,10 +104,10 @@ typedef skstream_t *(*cache_open_fn_t)(
  */
 int
 skCacheAdd(
-    stream_cache_t     *cache,
-    skstream_t         *stream,
-    const cache_key_t  *key,
-    cache_entry_t     **entry);
+    stream_cache_t             *cache,
+    skstream_t                 *stream,
+    const sksite_repo_key_t    *key,
+    cache_entry_t             **entry);
 
 
 /*
@@ -223,8 +210,8 @@ skCacheLockAndCloseAll(
  */
 cache_entry_t *
 skCacheLookup(
-    stream_cache_t     *cache,
-    const cache_key_t  *key);
+    stream_cache_t             *cache,
+    const sksite_repo_key_t    *key);
 
 
 /*
@@ -247,10 +234,10 @@ skCacheLookup(
  */
 int
 skCacheLookupOrOpenAdd(
-    stream_cache_t     *cache,
-    const cache_key_t  *key,
-    void               *caller_data,
-    cache_entry_t     **entry);
+    stream_cache_t             *cache,
+    const sksite_repo_key_t    *key,
+    void                       *caller_data,
+    cache_entry_t             **entry);
 
 
 /*

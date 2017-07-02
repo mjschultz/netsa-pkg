@@ -397,6 +397,14 @@ extern "C" {
 #endif
 #endif
 
+/* Allow gcc to check for a mandatory NULL at the end of a vararg
+ * prototype. */
+#ifndef SK_HAVE_COMP_ATTRIBUTE_SENTINEL
+#define SK_CHECK_SENTINEL
+#else
+#define SK_CHECK_SENTINEL __attribute__((sentinel))
+#endif
+
 /*
  *  Macros to check whether the compiler supports #pragma statements
  *  for pushing and popping the state of diagnostic messages.
@@ -498,7 +506,7 @@ extern "C" {
 #define RCSIDENT(id) RCSIDENTVAR(_rcsID, (id))
 
 
-RCSIDENTVAR(rcsID_SILK_H, "$SiLK: silk.h 4ad908b01905 2017-01-19 22:41:56Z mthomas $");
+RCSIDENTVAR(rcsID_SILK_H, "$SiLK: silk.h 0f1642b17775 2017-06-26 14:37:37Z mthomas $");
 
 
 /* Name of environment variable pointing to the root of install */
@@ -575,7 +583,6 @@ skAppPrintBadCaseMsg(
 #define BSWAP64(a)                                              \
     ((((uint64_t)BSWAP32((uint32_t)((a) & 0xffffffff))) << 32)  \
      | BSWAP32((uint32_t)((a) >> 32)))
-
 
 /* provide a network-to-host swapper for 64bit values */
 #if   SK_LITTLE_ENDIAN

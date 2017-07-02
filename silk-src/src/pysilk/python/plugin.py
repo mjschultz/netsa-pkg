@@ -8,37 +8,17 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: plugin.py 275df62a2e41 2017-01-05 17:30:40Z mthomas $
+# $SiLK: plugin.py efd886457770 2017-06-21 18:43:23Z mthomas $
 #######################################################################
 
 ##########################################################################
 # Plugin-related code
 
 import sys
+from functools import reduce
+from struct import Struct
 
 # Differences between versions of Python
-if sys.hexversion >= 0x02060000:
-    # reduce() was moved from base python to functools in 2.6
-    from functools import reduce
-else:
-    # bytes() did not exist prior to 2.6
-    bytes = str
-
-
-if sys.hexversion >= 0x02050000:
-    from struct import Struct
-else:
-    # 2.4 doesn't have struct.Struct, so emulate it
-    import struct
-    class Struct(object):
-        def __init__(self, fmt):
-            self.format = fmt
-            self.size = struct.calcsize(fmt)
-        def pack(self, *args):
-            return struct.pack(self.format, *args)
-        def unpack(self, arg):
-            return struct.unpack(self.format, arg)
-
 if sys.hexversion >= 0x03000000:
     # 3.x doesn't have callable
     def callable(o):
@@ -266,27 +246,14 @@ def setup_struct_map():
 
 setup_struct_map()
 
-if sys.hexversion < 0x02060000:
-    # Python 2.[45] version
-    def Int2String(num, nbytes):
-        bytes = ['\0']*nbytes
-        n, count = num, (nbytes - 1)
-        while n:
-            bytes[count] = chr(n & 0xff)
-            n >>= 8
-            count -= 1
-        str = ''.join(bytes)
-        return str
-else:
-    # Python >= 2.6 version (uses bytearrays)
-    def Int2String(num, nbytes):
-        string = bytearray(nbytes)
-        n, count = num, (nbytes - 1)
-        while n:
-            string[count] = chr(n & 0xff)
-            n >>= 8
-            count -= 1
-        return bytes(string)
+def Int2String(num, nbytes):
+    string = bytearray(nbytes)
+    n, count = num, (nbytes - 1)
+    while n:
+        string[count] = chr(n & 0xff)
+        n >>= 8
+        count -= 1
+    return bytes(string)
 
 def int_to_bin(num, nbytes):
     fn =  struct_map.get(nbytes)

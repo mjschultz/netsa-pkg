@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sktimer-test.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: sktimer-test.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sktimer.h>
@@ -34,7 +34,7 @@ RCSIDENT("$SiLK: sktimer-test.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 typedef struct timer_info_st {
     /* the timer object */
-    skTimer_t           timer;
+    sk_timer_t         *timer;
 
     /* manage access to this struct */
     pthread_mutex_t     mutex;
@@ -506,12 +506,12 @@ int main(int argc, char **argv)
         ti->id = i;
         INFOMSG("Timer #%d being created...", i);
         if (start_time == (sktime_t)(-1)) {
-            rv = skTimerCreate(&ti->timer, interval, timer_callback, ti);
+            rv = skTimerCreate(&ti->timer, interval, timer_callback, ti, 0);
             INFOMSG("Timer #%d started", i);
         } else {
             char buf[256];
-            rv = skTimerCreateAtTime(&ti->timer, interval, start_time,
-                                     timer_callback, ti);
+            rv = skTimerCreate(&ti->timer, interval,
+                               timer_callback, ti, start_time);
             INFOMSG("Timer #%d scheduled to start at %s",
                     i, sktimestamp_r(buf, start_time, SKTIMESTAMP_LOCAL));
         }

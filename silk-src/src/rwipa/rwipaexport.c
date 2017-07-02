@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwipaexport.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwipaexport.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/skstringmap.h>
 #include "rwipa.h"
@@ -261,14 +261,16 @@ export_set(
     IPAContext         *ipa,
     skstream_t         *stream)
 {
-    skIPTree_t            *set = NULL;
+    skipset_t             *set = NULL;
     skIPWildcard_t         ipwild;
-    int                    rv;
+    ssize_t                rv;
     IPAAssoc               assoc;
 
     /* create IPset */
-    if (skIPTreeCreate(&set)) {
-        skAppPrintErr("Error allocating memory for IPset.");
+    rv = skIPSetCreate(&set, 0);
+    if (rv) {
+        skAppPrintErr("Error allocating memory for IPset: %s",
+                      skIPSetStrerror(rv));
         rv = -1;
         goto done;
     }
@@ -283,13 +285,14 @@ export_set(
             rv = -1;
             goto done;
         }
-        skIPTreeAddIPWildcard(set, &ipwild);
+        skIPSetInsertIPWildcard(set, &ipwild);
     }
 
-    rv = skIPTreeWrite(set, stream);
-    if (rv != SKIP_OK) {
+    skIPSetClean(set);
+    rv = skIPSetWrite(set, stream);
+    if (rv != SKIPSET_OK) {
         skAppPrintErr("Error writing IPset to file '%s': %s",
-                      skStreamGetPathname(stream), skIPTreeStrError(rv));
+                      skStreamGetPathname(stream), skIPSetStrerror(rv));
         rv = -1;
         goto done;
     }
@@ -298,7 +301,7 @@ export_set(
     rv = 0;
 
   done:
-    skIPTreeDelete(&set);
+    skIPSetDestroy(&set);
     return rv;
 }
 

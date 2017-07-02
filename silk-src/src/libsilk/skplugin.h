@@ -25,7 +25,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKPLUGIN_H, "$SiLK: skplugin.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_SKPLUGIN_H, "$SiLK: skplugin.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/utils.h>         /* need "struct option" */
@@ -700,41 +700,6 @@ skpinRegOption2(
     void                   *opt_cbdata,
     int                     num_entries,
     ...);
-
-/**
- *  DEPRECATED.  Replace with
- *
- *    skpinRegOption2(option_name, mode, option_help, NULL, opt, data,
- *                    1, fn_mask);
- *
- *    To be removed in SiLK 4.
- */
-skplugin_err_t
-skpinRegOption(
-    skplugin_fn_mask_t      fn_mask,
-    const char             *option_name,
-    skplugin_arg_mode_t     mode,
-    const char             *option_help,
-    skplugin_option_fn_t    opt,
-    void                   *opt_cbdata);
-
-/**
- *  DEPRECATED.  Replace with
- *
- *    skpinRegOption2(option_name, mode, NULL, option_help_fn, opt, data,
- *                    1, fn_mask);
- *
- *    To be removed in SiLK 4.
- */
-skplugin_err_t
-skpinRegOptionWithHelpFn(
-    skplugin_fn_mask_t      fn_mask,
-    const char             *option_name,
-    skplugin_arg_mode_t     mode,
-    skplugin_help_fn_t      option_help_fn,
-    skplugin_option_fn_t    opt,
-    void                   *opt_cbdata);
-
 
 /**
  *    Register a new filter predicate to pass or fail records.

@@ -26,8 +26,9 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfilter.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwfilter.c 373f990778e9 2017-06-22 21:57:36Z mthomas $");
 
+#include <silk/sksidecar.h>
 #include "rwfilter.h"
 
 
@@ -47,20 +48,11 @@ skstream_t *print_stat = NULL;
  * not been provided */
 FILE *dryrun_fp = NULL;
 
-/* where to print output for --print-filenames; NULL when the switch
- * has not been provided */
-FILE *filenames_fp = NULL;
+/* handle command line switches for input files, xargs, fglob */
+sk_options_ctx_t *optctx = NULL;
 
-/* input file specified by --input-pipe */
-const char *input_pipe = NULL;
-
-/* support for the --xargs switch */
-skstream_t *xargs = NULL;
-
-/* index into argv of first option that does not start with a '--'.
- * This assumes getopt rearranges the options, which gnu getopt will
- * do. */
-int arg_index;
+/* handle for looping over the input records or files */
+sk_flow_iter_t *flowiter = NULL;
 
 /* true as long as we are reading records */
 int reading_records = 1;
@@ -75,7 +67,13 @@ uint32_t thread_count = RWFILTER_THREADS_DEFAULT;
 int checker_count = 0;
 
 /* function pointers to handle checking and or processing */
-checktype_t (*checker[MAX_CHECKERS])(rwRec*);
+checktype_t (*checker[MAX_CHECKERS])(const rwRec*);
+
+/* The Lua state */
+lua_State *L = NULL;
+
+/* The fglob state */
+sk_fglob_t *fglob = NULL;
 
 
 
@@ -88,12 +86,13 @@ static char **pargv;
 
 /* FUNCTION DEFINITIONS */
 
+#if 0
 /*
  *  status = writeHeaders(in_stream);
  *
  *    Create and print the header to each output file; include the
- *    current command line invocation in the header.  If 'in_stream' is
- *    non-null, the file history from that file is also included in
+ *    current command line invocation in the header.  If 'in_stream'
+ *    is non-null, the file history from that file is also included in
  *    the header.
  */
 static int
@@ -135,6 +134,10 @@ writeHeaders(
                     rv = skHeaderCopyEntries(out_hdr, in_hdr,
                                              SK_HENTRY_ANNOTATION_ID);
                 }
+                if (rv == SKSTREAM_OK) {
+                    rv = skHeaderCopyEntries(out_hdr, in_hdr,
+                                             SK_HENTRY_SIDECAR_ID);
+                }
             }
             if (rv == SKSTREAM_OK) {
                 rv = skHeaderAddInvocation(out_hdr, 1, pargc, pargv);
@@ -152,10 +155,9 @@ writeHeaders(
         }
     }
 
-    skOptionsNotesTeardown();
-
     return rv;
 }
+#endif  /* 0 */
 
 
 /* Write the stats to the program specified by the SILK_STATISTICS envar */
@@ -482,184 +484,307 @@ closeOneOutput(
 
 
 /*
- *  ok = filterFile(datafile, ipfile_basename, stats);
+ *  status = writeBuffer(thread, dest_id);
  *
- *    This is the actual filtering of the file 'datafile'.  The
- *    function will call the function to write the header if required.
- *    The 'ipfile_basename' parameter is passed to filterCheckFile();
- *    it should be NULL or contain the full-path (minus extension) of the
- *    file that contains Bloom filter or IPset information about the
- *    'datafile'.  The function returns 0 on success; or 1 if the
- *    input file could not be opened.
+ *    Write record buffer on 'thread' that is indexed by 'dest_id'
+ *    (PASS, FAIL, ALL) to the output stream(s) for the destination
+ *    type.  Return SKSTREAM_OK on success, or non-zero on error.
  *
- *    NOTE: There is a similar function, filterFileThreaded(), in
- *    rwfilterthread.c that is used when running with threads.
+ *    If rwfilter is running with multiple threads, the caller must
+ *    use writerBufferThreaded(), in rwfilterthread.c.
  */
 static int
-filterFile(
-    const char         *datafile,
-    const char         *ipfile_basename,
-    filter_stats_t     *stats)
+writeBuffer(
+    filter_thread_t    *thread,
+    int                 dest_id)
 {
-    rwRec rwrec;
-    skstream_t *in_stream;
-    int i;
-    int fail_entire_file = 0;
-    int result = RWF_PASS;
+    recbuf_t *recbuf;
+    destination_t *dest;
+    destination_t *dest_next;
+    const rwRec *recbuf_pos;
+    const rwRec *end_rec;
     int rv = SKSTREAM_OK;
-    int in_rv = SKSTREAM_OK;
 
-    /* print record 'pr_rwrec' to all dest_type streams specified by
-     * 'pr_dest_id' */
-#define PRINT_REC_TO_DEST_ID(pr_rwrec, pr_dest_id)                      \
-    {                                                                   \
-        destination_t *dest = dest_type[pr_dest_id].dest_list;          \
-        destination_t *dest_next;                                       \
-        do {                                                            \
-            dest_next = dest->next;                                     \
-            rv = skStreamWriteRecord(dest->stream, pr_rwrec);           \
-            if (SKSTREAM_ERROR_IS_FATAL(rv)) {                          \
-                if (skStreamGetLastErrno(dest->stream) == EPIPE) {      \
-                    /* close this one stream */                         \
-                    reading_records = closeOneOutput(pr_dest_id, dest); \
-                } else {                                                \
-                    /* print the error and return */                    \
-                    skStreamPrintLastErr(dest->stream, rv, &skAppPrintErr); \
-                    reading_records = 0;                                \
-                    goto END;                                           \
-                }                                                       \
-            }                                                           \
-        } while ((dest = dest_next) != NULL);                           \
+    assert(1 == thread_count);
+
+    recbuf = &thread->recbuf[dest_id];
+
+    /* the list of destinations to write the records to */
+    dest = dest_type[dest_id].dest_list;
+    if (dest == NULL) {
+        assert(dest_type[dest_id].count == 0);
+        return rv;
     }
+    /* find location of our stopping condition */
+    end_rec = recbuf->buf + recbuf->count;
 
-
-    /* nothing to do in dry-run mode but print the file names */
-    if (dryrun_fp) {
-        fprintf(dryrun_fp, "%s\n", datafile);
-        return 0;
-    }
-
-    if (!reading_records) {
-        return 0;
-    }
-
-    /* print filenames if requested */
-    if (filenames_fp) {
-        fprintf(filenames_fp, "%s\n", datafile);
-    }
-
-    /* open the input file */
-    in_rv = skStreamOpenSilkFlow(&in_stream, datafile, SK_IO_READ);
-    if (in_rv) {
-        goto END;
-    }
-
-    ++stats->files;
-
-    if (stats->files == 1) {
-        /* first file, print the headers to the output file(s) */
-        rv = writeHeaders(in_stream);
-        if (rv) {
-            goto END;
-        }
-    }
-
-    /* determine if all the records in the file will fail the checks */
-    if (filterCheckFile(in_stream, ipfile_basename) == 1) {
-        /* all records in the file will fail the user's tests */
-        fail_entire_file = 1;
-        result = RWF_FAIL;
-
-        /* determine if we can more efficiently handle the file */
-        if ((dest_type[DEST_ALL].count == 0)
-            && (dest_type[DEST_FAIL].count == 0))
-        {
-            /* no output is being generated for these records */
-            if (print_stat == NULL) {
-                /* not generating statistics either.  we can move to
-                 * the next file */
-                goto END;
+    do {
+        dest_next = dest->next;
+        for (recbuf_pos = recbuf->buf; recbuf_pos < end_rec; ++recbuf_pos) {
+            rv = skStreamWriteRecord(dest->stream, recbuf_pos);
+            if (SKSTREAM_ERROR_IS_FATAL(rv)) {
+                if (skStreamGetLastErrno(dest->stream) == EPIPE) {
+                    /* close this stream */
+                    reading_records = closeOneOutput(dest_id, dest);
+                    break;
+                } else {
+                    /* print the error and return */
+                    skStreamPrintLastErr(dest->stream, rv, &skAppPrintErr);
+                    reading_records = 0;
+                    goto END;
+                }
             }
-            if (print_volume_stats == 0) {
-                /* all we need to do is to count the records in the
-                 * file, which we can do by skipping them all. */
-                size_t skipped = 0;
-                in_rv = skStreamSkipRecords(in_stream, SIZE_MAX, &skipped);
-                stats->read.flows += skipped;
-                goto END;
-            }
-            /* else computing volume stats, and we need to read each
-             * record to get its byte and packet counts. */
         }
-    }
+    } while ((dest = dest_next) != NULL);
 
-    /* read and process each record */
-    while (reading_records
-           && (SKSTREAM_OK == (in_rv = skStreamReadRecord(in_stream, &rwrec))))
-    {
-        /* increment number of read records */
-        INCR_REC_COUNT(stats->read, &rwrec);
+    rv = SKSTREAM_OK;
 
-        /* the all-dest */
-        if (dest_type[DEST_ALL].count) {
-            PRINT_REC_TO_DEST_ID(&rwrec, DEST_ALL);
-#if 0 /* dest_type[DEST_ALL].max_records is never set */
-            /* close all streams for this destination type if we are
-             * at user's requested max.  If max_records is 0, this
-             * will never be true, and all records will be
-             * processed. */
-            if (stats->read.flows == dest_type[DEST_ALL].max_records) {
-                reading_records = closeOutputDests(DEST_ALL, 0);
-            }
-#endif  /* 0 */
-        }
+    /* adjust the max_count member of 'recbuf' if filling 'recbuf'
+     * would cause us to exceed --max-pass or --max-fail */
+    if (dest_type[dest_id].max_records) {
+        filter_stats_t *stats = &thread->stats;
 
-        if (!fail_entire_file) {
-            /* run all checker()'s until end or one doesn't pass */
-            for (i=0, result=RWF_PASS;
-                 i < checker_count && result == RWF_PASS;
-                 ++i)
+        if (DEST_PASS == dest_id) {
+            if (dest_type[DEST_PASS].max_records
+                < (stats->pass.flows + recbuf->max_count))
             {
-                result = (*(checker[i]))(&rwrec);
-            }
-        }
-
-        switch (result) {
-          case RWF_PASS:
-          case RWF_PASS_NOW:
-            /* increment number of record that pass */
-            INCR_REC_COUNT(stats->pass, &rwrec);
-
-            /* the pass-dest */
-            if (dest_type[DEST_PASS].count) {
-                PRINT_REC_TO_DEST_ID(&rwrec, DEST_PASS);
-                if (stats->pass.flows == dest_type[DEST_PASS].max_records) {
+                assert(dest_type[DEST_PASS].max_records >= stats->pass.flows);
+                recbuf->max_count =
+                    dest_type[DEST_PASS].max_records - stats->pass.flows;
+                if (0 == recbuf->max_count) {
                     /* close all streams for this destination type
                      * since we are at user's specified max. */
                     reading_records = closeOutputDests(DEST_PASS, 0);
                 }
             }
-            break;
-
-          case RWF_FAIL:
-            /* the fail-dest */
-            if (dest_type[DEST_FAIL].count) {
-                PRINT_REC_TO_DEST_ID(&rwrec, DEST_FAIL);
-                if ((stats->read.flows - stats->pass.flows)
-                    == dest_type[DEST_FAIL].max_records)
-                {
-                    /* close all streams for this destination type
-                     * since we are at user's specified max. */
+        } else if (DEST_FAIL == dest_id) {
+            const uint32_t fail_flows = stats->read.flows - stats->pass.flows;
+            if (dest_type[DEST_FAIL].max_records
+                < (fail_flows + recbuf->max_count))
+            {
+                assert(dest_type[DEST_FAIL].max_records >= fail_flows);
+                recbuf->max_count
+                    = dest_type[DEST_FAIL].max_records - fail_flows;
+                if (0 == recbuf->max_count) {
                     reading_records = closeOutputDests(DEST_FAIL, 0);
                 }
             }
-            break;
+        } else {
+            assert(DEST_ALL == dest_id);
+            /* this should never be set */
+            skAbortBadCase(dest_id);
+        }
+    }
 
+  END:
+    recbuf->count = 0;
+    return rv;
+}
+
+
+/*
+ *    Copy the record on 'thread' to the destination buffer on
+ *    'thread' whose index is 'dest_id'.  If the buffer if full after
+ *    copying the record, call the appropriate function (writeBuffer()
+ *    or writeBufferThreaded()) to write the buffer to the output
+ *    stream.  Return 0 if buffer is not full or the result of calling
+ *    the write function.
+ *
+ *    This is a helper for filterFile().
+ */
+static int
+copyRecordToDest(
+    filter_thread_t    *thread,
+    int                 dest_id)
+{
+    recbuf_t *recbuf = &thread->recbuf[dest_id];
+
+    assert(recbuf);
+    assert(recbuf->count < recbuf->max_count);
+    assert(recbuf->max_count <= RECBUF_MAX_RECS);
+
+    rwRecCopy(&recbuf->buf[ recbuf->count ], &thread->rwrec,
+              SK_RWREC_COPY_MOVE);
+    ++recbuf->count;
+    if (recbuf->count < recbuf->max_count) {
+        return 0;
+    }
+#if SK_RWFILTER_THREADED
+    if (thread_count > 1) {
+        return writeBufferThreaded(thread, dest_id);
+    }
+#endif  /* SK_RWFILTER_THREADED */
+    return writeBuffer(thread, dest_id);
+}
+
+
+/*
+ *  ok = filterFile(in_stream, ipfile_basename, thread);
+ *
+ *    Read each record from the file 'in_stream' and copy it to the
+ *    approprate destination buffers on 'thread'.
+ *
+ *    This function is used by both threaded and non-threaded code.
+ *
+ *    The 'ipfile_basename' parameter is passed to filterCheckFile();
+ *    it should be NULL or contain the full-path (minus extension) of
+ *    the file that contains Bloom filter or IPset information about
+ *    the 'in_stream'.
+ *
+ *    The function returns 0 on success; or 1 if the input file could
+ *    not be opened.
+ */
+int
+filterFile(
+    skstream_t         *in_stream,
+    const char         *ipfile_basename,
+    filter_thread_t    *thread)
+{
+    int i;
+    int result;
+    int rv = SKSTREAM_OK;
+    int in_rv = SKSTREAM_OK;
+
+    if (!reading_records) {
+        return 0;
+    }
+    ++thread->stats.files;
+
+    /* determine whether --all-dest is the only output and no
+     * statistics are requested */
+    if (NULL == print_stat
+        && 0 == dest_type[DEST_PASS].count
+        && 0 == dest_type[DEST_FAIL].count)
+    {
+        /* the only output is --all=stream */
+        assert(dest_type[DEST_ALL].count);
+        assert(0 == checker_count);
+        while (reading_records
+               && ((in_rv = skStreamReadRecord(in_stream, &thread->rwrec))
+                   == SKSTREAM_OK))
+        {
+            INCR_REC_COUNT(thread->stats.read, &thread->rwrec);
+            rv = copyRecordToDest(thread, DEST_ALL);
+        }
+        goto END;
+    }
+
+    /* determine whether all of the records in the input stream fail
+     * the checks */
+    if (filterCheckFile(in_stream, ipfile_basename) == 1) {
+        /* all records in this file fail the test */
+        if (dest_type[DEST_ALL].count || dest_type[DEST_FAIL].count) {
+            /* at least one of all-dest or fail-dest is specified */
+            while (reading_records
+                   && ((in_rv = skStreamReadRecord(in_stream, &thread->rwrec))
+                       == SKSTREAM_OK))
+            {
+                INCR_REC_COUNT(thread->stats.read, &thread->rwrec);
+                if (dest_type[DEST_ALL].count) {
+                    rv = copyRecordToDest(thread, DEST_ALL);
+                }
+                if (dest_type[DEST_FAIL].count) {
+                    rv = copyRecordToDest(thread, DEST_FAIL);
+                }
+            }
+        } else if (NULL == print_stat) {
+            /* not writing the record or generating statistics */
+        } else if (print_volume_stats) {
+            /* computing volume stats, read each record to get its
+             * byte and packet counts. */
+            while (reading_records
+                   && ((in_rv = skStreamReadRecord(in_stream, &thread->rwrec))
+                       == SKSTREAM_OK))
+            {
+                INCR_REC_COUNT(thread->stats.read, &thread->rwrec);
+            }
+        } else {
+            /* all we need to do is to count the records in the file,
+             * which we can do by skipping them all */
+            size_t skipped = 0;
+            in_rv = skStreamSkipRecords(in_stream, SIZE_MAX, &skipped);
+            thread->stats.read.flows += skipped;
+        }
+        goto END;
+    }
+
+    /* determine whether only statistics were requested or whether
+     * --pass-dest is the only output */
+    if (0 == dest_type[DEST_FAIL].count
+        && 0 == dest_type[DEST_ALL].count)
+    {
+        if (0 == dest_type[DEST_PASS].count) {
+            while (reading_records
+               && ((in_rv = skStreamReadRecord(in_stream, &thread->rwrec))
+                   == SKSTREAM_OK))
+            {
+                INCR_REC_COUNT(thread->stats.read, &thread->rwrec);
+                /* run all checker() functions, stopping if one fails */
+                for (i = 0, result = RWF_PASS;
+                     i < checker_count && result == RWF_PASS;
+                     ++i)
+                {
+                    result = (*(checker[i]))(&thread->rwrec);
+                }
+                if (RWF_PASS == result || RWF_PASS_NOW == result) {
+                    INCR_REC_COUNT(thread->stats.pass, &thread->rwrec);
+                }
+            }
+        } else {
+            while (reading_records
+               && ((in_rv = skStreamReadRecord(in_stream, &thread->rwrec))
+                   == SKSTREAM_OK))
+            {
+                INCR_REC_COUNT(thread->stats.read, &thread->rwrec);
+                for (i = 0, result = RWF_PASS;
+                     i < checker_count && result == RWF_PASS;
+                     ++i)
+                {
+                    result = (*(checker[i]))(&thread->rwrec);
+                }
+                if (RWF_PASS == result || RWF_PASS_NOW == result) {
+                    INCR_REC_COUNT(thread->stats.pass, &thread->rwrec);
+                    rv = copyRecordToDest(thread, DEST_PASS);
+                }
+            }
+        }
+        goto END;
+    }
+
+    /* read and process each record */
+    while (reading_records
+               && ((in_rv = skStreamReadRecord(in_stream, &thread->rwrec))
+           == SKSTREAM_OK))
+    {
+        INCR_REC_COUNT(thread->stats.read, &thread->rwrec);
+        /* run all checker() functions, stopping if one fails */
+        for (i = 0, result = RWF_PASS;
+             i < checker_count && result == RWF_PASS;
+             ++i)
+        {
+            result = (*(checker[i]))(&thread->rwrec);
+        }
+
+        if (dest_type[DEST_ALL].count) {
+            rv = copyRecordToDest(thread, DEST_ALL);
+        }
+        switch (result) {
+          case RWF_PASS:
+          case RWF_PASS_NOW:
+            INCR_REC_COUNT(thread->stats.pass, &thread->rwrec);
+            if (dest_type[DEST_PASS].count) {
+                rv = copyRecordToDest(thread, DEST_PASS);
+            }
+            break;
+          case RWF_FAIL:
+            if (dest_type[DEST_FAIL].count) {
+                rv = copyRecordToDest(thread, DEST_FAIL);
+            }
+            break;
           default:
             break;
         }
-
-    } /* while (reading_records && skStreamReadRecord()) */
+    }
 
   END:
     if (in_rv == SKSTREAM_OK || in_rv == SKSTREAM_ERR_EOF) {
@@ -668,10 +793,6 @@ filterFile(
         skStreamPrintLastErr(in_stream, in_rv, &skAppPrintErr);
         in_rv = 1;
     }
-
-    /* close input */
-    skStreamDestroy(&in_stream);
-
     if (rv) {
         return -1;
     }
@@ -679,31 +800,108 @@ filterFile(
 }
 
 
+/*
+ *  status = nonthreadedFilter(&stats);
+ *
+ *    The "main" to use when rwfilter is using a single thread.
+ *
+ *    Creates necessary data structures and then processes input
+ *    files.  Returns 0 on success, non-zero on error.
+ */
+static int
+nonthreadedFilter(
+    filter_stats_t     *stats)
+{
+    filter_thread_t self;
+    skstream_t *stream = NULL;
+    int i;
+    int rv_file;
+    int rv = 0;
+
+    filterIgnoreSigPipe();
+
+    memset(&self, 0, sizeof(self));
+
+    self.lua_state = L;
+    rwRecInitialize(&self.rwrec, self.lua_state);
+
+    /* create a buffer for each destination type */
+    for (i = 0; i < DESTINATION_TYPES; ++i) {
+        if (dest_type[i].count) {
+            self.recbuf[i].buf
+                = (rwRec*)malloc(RECBUF_MAX_RECS * sizeof(rwRec));
+            if (self.recbuf[i].buf == NULL) {
+                goto END;
+            }
+            rwRecInitializeArray(
+                self.recbuf[i].buf, self.lua_state, RECBUF_MAX_RECS);
+            if (dest_type[i].max_records
+                && dest_type[i].max_records < RECBUF_MAX_RECS)
+            {
+                self.recbuf[i].max_count = dest_type[i].max_records;
+            } else {
+                self.recbuf[i].max_count = RECBUF_MAX_RECS;
+            }
+        }
+    }
+
+    while ((rv = sk_flow_iter_get_next_stream(flowiter, &stream))
+           != SKSTREAM_ERR_EOF)
+    {
+        if (rv != SKSTREAM_OK) {
+            continue;
+        }
+        rv_file = filterFile(stream, NULL, &self);
+        sk_flow_iter_close_stream(flowiter, stream);
+        if (rv_file < 0) {
+            /* fatal */
+            *stats = self.stats;
+            return EXIT_FAILURE;
+        }
+        /* if (rv_file > 0) there was an error opening/reading
+         * input: ignore */
+    }
+    assert(rv = SKSTREAM_ERR_EOF);
+    rv = SKSTREAM_OK;
+
+    /* write any records still in the buffers */
+    for (i = 0; i < DESTINATION_TYPES; ++i) {
+        if (self.recbuf[i].count) {
+            writeBuffer(&self, i);
+        }
+    }
+
+  END:
+    *stats = self.stats;
+    for (i = 0; i < DESTINATION_TYPES; ++i) {
+        free(self.recbuf[i].buf);
+    }
+    return rv;
+}
+
+
+#if 0
 char *
 appNextInput(
     char               *buf,
     size_t              bufsize)
 {
-    static int first_call = 1;
-    static int i = 0;
-    int lc;
-    int rv;
-
     if (!reading_records) {
         return NULL;
     }
 
-    /* Get the files.  Only one of these should be active */
-    if (fglobValid()) {
-        return fglobNext(buf, bufsize);
-    } else if (input_pipe) {
-        /* file name given via --input-pipe switch */
-        if (first_call) {
-            first_call = 0;
-            strncpy(buf, input_pipe, bufsize);
-            buf[bufsize-1] = '\0';
-            return buf;
+    if (0 == skOptionsCtxNextArgument(optctx, buf, bufsize)) {
+        FILE *filename_fp = skOptionsCtxGetPrintFilenames(optctx);
+        if (filename_fp) {
+            fprintf(filename_fp, "%s\n", buf);
         }
+        return buf;
+    }
+    return NULL;
+
+    /* Get the files.  Only one of these should be active */
+    if (skFGlobValid(fglob)) {
+        return skFGlobNext(fglob, buf, bufsize);
     } else if (xargs) {
         /* file names from stdin */
         if (first_call) {
@@ -751,14 +949,118 @@ appNextInput(
 
     return NULL;
 }
+#endif  /* 0 */
+
+
+static int
+filterProcessFileHeaders(
+    int                 argc,
+    char              **argv)
+{
+    sk_flow_iter_hdr_iter_t *hdr_iter;
+    sk_file_header_t *hdr;
+    sk_sidecar_iter_t sc_iter;
+    const sk_sidecar_elem_t *sc_elem;
+    sk_sidecar_elem_t *new_elem;
+    sk_sidecar_t *hdr_sidecar;
+    sk_sidecar_t *sidecar;
+    sk_file_header_t *out_hdr;
+    destination_t *dest;
+    int rv;
+    int i;
+
+    /* create the sidecar to use for writing */
+    sk_sidecar_create(&sidecar);
+
+    /* process the header of every input file */
+    if (sk_flow_iter_read_silk_headers(flowiter, &hdr_iter)) {
+        sk_sidecar_destroy(&sidecar);
+        return -1;
+    }
+    while ((hdr = sk_flow_iter_hdr_iter_next(hdr_iter)) != NULL) {
+        /* copy annotations and invocation to the each destination
+         * file */
+        for (i = 0; i < DESTINATION_TYPES; ++i) {
+            for (dest = dest_type[i].dest_list; dest !=NULL; dest = dest->next)
+            {
+                out_hdr = skStreamGetSilkHeader(dest->stream);
+
+                skHeaderCopyEntries(out_hdr, hdr, SK_HENTRY_INVOCATION_ID);
+                skHeaderCopyEntries(out_hdr, hdr, SK_HENTRY_ANNOTATION_ID);
+            }
+        }
+
+        /* add sidecar fields to the global sidecar */
+        hdr_sidecar = sk_sidecar_create_from_header(hdr, &rv);
+        if (NULL == hdr_sidecar) {
+            if (rv) {
+                sk_sidecar_destroy(&sidecar);
+                return -1;
+            }
+        } else {
+            sk_sidecar_iter_bind(hdr_sidecar, &sc_iter);
+            while (sk_sidecar_iter_next(&sc_iter, &sc_elem)
+                   == SK_ITERATOR_OK)
+            {
+                rv = sk_sidecar_add_elem(sidecar, sc_elem, &new_elem);
+                if (SK_SIDECAR_E_DUPLICATE == rv) {
+                    /* FIXME: ignore for now */
+                } else if (rv) {
+                    /* FIXME: ignore for now */
+                    /* skAppPrintErr( */
+                    /*     "Cannot add field '%s' from sidecar: %d", */
+                    /*     buf, rv); */
+                } else {
+                }
+            }
+            sk_sidecar_destroy(&hdr_sidecar);
+        }
+    }
+    sk_flow_iter_hdr_iter_destroy(&hdr_iter);
+
+    /* destroy the sidecar if there are no elements */
+    if (0 == sk_sidecar_count_elements(sidecar)) {
+        sk_sidecar_destroy(&sidecar);
+    }
+
+    /* add invocation, any --note arguments, and the sidecar object to
+     * all destinations */
+    for (i = 0; i < DESTINATION_TYPES; ++i) {
+        for (dest = dest_type[i].dest_list; dest != NULL; dest = dest->next) {
+            out_hdr = skStreamGetSilkHeader(dest->stream);
+            if ((rv = skHeaderAddInvocation(out_hdr, 1, argc, argv))
+                || (rv = skOptionsNotesAddToStream(dest->stream)))
+            {
+                skStreamPrintLastErr(dest->stream, rv, &skAppPrintErr);
+                sk_sidecar_destroy(&sidecar);
+                return rv;
+            }
+            if (sidecar && (rv = skStreamSetSidecar(dest->stream, sidecar))) {
+                skStreamPrintLastErr(dest->stream, rv, &skAppPrintErr);
+                sk_sidecar_destroy(&sidecar);
+                return rv;
+            }
+            rv = skStreamWriteSilkHeader(dest->stream);
+            if (rv) {
+                skStreamPrintLastErr(dest->stream, rv, &skAppPrintErr);
+                sk_sidecar_destroy(&sidecar);
+                return rv;
+            }
+        }
+    }
+
+    skOptionsNotesTeardown();
+    sk_sidecar_destroy(&sidecar);
+
+    return SKSTREAM_OK;
+}
+
 
 
 int main(int argc, char **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
-    char datafile[PATH_MAX];
     filter_stats_t stats;
-    int rv_file;
     int rv = 0;
     time_t start_timer;
     time_t end_timer;
@@ -777,42 +1079,41 @@ int main(int argc, char **argv)
     pargc = argc;
     pargv = argv;
 
+    /* nothing to do in dry-run mode but print the file names */
+    if (dryrun_fp) {
+#if SK_RWFILTER_THREADED
+        if (thread_count > 1) {
+            threadedFilter(&stats);
+        } else
+#endif  /* SK_RWFILTER_THREADED */
+        {
+            char flowfile[PATH_MAX];
+
+            while (skOptionsCtxNextArgument(optctx, flowfile, sizeof(flowfile))
+                   == 0)
+            {
+                fprintf(dryrun_fp, "%s\n", flowfile);
+            }
+        }
+        goto PRINT_STATS;
+    }
+
+    /* read the headers from all the input files; this is going to
+     * slow down the multi-threaded code */
+    if (filterProcessFileHeaders(argc, argv)) {
+        return EXIT_FAILURE;
+    }
+
 #if SK_RWFILTER_THREADED
     if (thread_count > 1) {
-        /* must dump the headers first */
-        rv = writeHeaders(NULL);
-        if (rv == SKSTREAM_OK) {
-            rv = threadedFilter(&stats);
-        }
+        rv = threadedFilter(&stats);
     } else
 #endif  /* SK_RWFILTER_THREADED */
     {
-        /* non-threaded */
-        filterIgnoreSigPipe();
-        while (appNextInput(datafile, sizeof(datafile)) != NULL) {
-            rv_file = filterFile(datafile, NULL, &stats);
-            if (rv_file < 0) {
-                /* fatal */
-                return EXIT_FAILURE;
-            }
-            /* if (rv_file > 0) there was an error opening/reading
-             * input: ignore */
-        }
+        rv = nonthreadedFilter(&stats);
     }
 
-    /*
-     * We don't write the header to the destination file(s) until
-     * we've read the first record.  However, if no files were read,
-     * the destination files are empty, so dump the header to them
-     * now.
-     */
-    if (stats.files == 0) {
-        rv_file = writeHeaders(NULL);
-        if (rv_file) {
-            rv = rv_file;
-        }
-    }
-
+  PRINT_STATS:
     /* Print the statistics */
     if (print_stat && !dryrun_fp) {
         printStats(print_stat, &stats);
@@ -822,7 +1123,6 @@ int main(int argc, char **argv)
     logStats(&stats, &start_timer, &end_timer);
 
     appTeardown();
-
     return ((rv == 0) ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 

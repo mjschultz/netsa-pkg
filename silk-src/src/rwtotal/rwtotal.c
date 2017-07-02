@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwtotal.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwtotal.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include "rwtotal.h"
 
@@ -39,9 +39,11 @@ RCSIDENT("$SiLK: rwtotal.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 /* EXPORTED VARIABLES */
 
-sk_options_ctx_t *optctx;
-
+/* which count mode to use */
 int count_mode;
+
+/* for looping over files on the command line */
+sk_flow_iter_t *flowiter;
 
 int  summation = 0;
 int  no_titles = 0;
@@ -90,27 +92,25 @@ static uint32_t count_mode_to_total_bins[] = {
 
 /* FUNCTION DEFINITIONS */
 
-
 /*
- *  countFile(stream);
+ *  status = count_files();
  *
- *    Read the records from 'stream' and add their byte, packet,
- *    and flow counts to the appropriate bin.
+ *    Read the records from all input streams and add their byte,
+ *    packet, and flow counts to the appropriate bins.  Return 0 on
+ *    success; return -1 on error opening a file.
  */
-static void
-countFile(
-    skstream_t         *stream)
+static int
+count_files(
+    void)
 {
     rwRec rwrec;
-    uint32_t key = 0;
-    int rv;
+    uint64_t key = 0;
+    ssize_t rv;
 
-    /* ignore IPv6 flows when keying on address */
-    if (count_mode <= COUNT_MODE_FINAL_ADDR) {
-        skStreamSetIPv6Policy(stream, SK_IPV6POLICY_ASV4);
-    }
+    rwRecInitialize(&rwrec, NULL);
 
-    while ((rv = skStreamReadRecord(stream, &rwrec)) == SKSTREAM_OK) {
+    while ((rv = sk_flow_iter_get_next_rec(flowiter, &rwrec)) == 0) {
+
         switch (count_mode) {
           case OPT_SIP_FIRST_8:
             key = rwRecGetSIPv4(&rwrec) >> 24;
@@ -181,22 +181,18 @@ countFile(
         count_array[key + C_PKTS]  += rwRecGetPkts(&rwrec);
     }
 
-    if (rv != SKSTREAM_ERR_EOF) {
-        skStreamPrintLastErr(stream, rv, &skAppPrintErr);
-    }
-
-    return;
+    return ((SKSTREAM_ERR_EOF == rv) ? 0 : -1);
 }
 
 
 /*
- *  dumpCounts(fh);
+ *  print_bins(fh);
  *
  *    Print the byte, packet, and flow counts to the named file handle
  *    'fh'.
  */
 static void
-dumpCounts(
+print_bins(
     FILE               *outfp)
 {
     /* row-label, records, bytes, packets */
@@ -342,7 +338,6 @@ dumpCounts(
 int main(int argc, char **argv)
 {
     FILE *stream_out;
-    skstream_t *stream;
     int rv;
 
     appSetup(argc, argv);                       /* never returns on error */
@@ -358,13 +353,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    /* process each input stream/file */
-    while ((rv = skOptionsCtxNextSilkFile(optctx, &stream, &skAppPrintErr))
-           == 0)
-    {
-        countFile(stream);
-        skStreamDestroy(&stream);
-    }
+    /* process the records in each input stream/file */
+    rv = count_files();
     if (rv < 0) {
         exit(EXIT_FAILURE);
     }
@@ -373,7 +363,7 @@ int main(int argc, char **argv)
     stream_out = getOutputHandle();
 
     /* Print results */
-    dumpCounts(stream_out);
+    print_bins(stream_out);
 
     /* Done */
     appTeardown();

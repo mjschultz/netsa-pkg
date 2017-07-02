@@ -48,12 +48,12 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-options.c b814c8307c05 2017-03-24 20:22:12Z mthomas $");
+RCSIDENT("$SiLK: sku-options.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
-#include <silk/utils.h>
-#include <silk/sksite.h>
 #include <silk/silk_files.h>
+#include <silk/sksite.h>
 #include <silk/skstringmap.h>
+#include <silk/utils.h>
 
 
 /* TYPEDEFS AND DEFINES */
@@ -189,7 +189,6 @@ printVersion(
     uint8_t default_compmethod;
     uint8_t i;
     char comp_name[SK_MAX_STRLEN_FILE_FORMAT+1];
-    const char *packing_logic;
     const char *python_dir = SILK_PYTHON_SITE_PKG;
 
     fprintf(VERS_FH, "%s: part of %s %s; configuration settings:\n",
@@ -197,17 +196,6 @@ printVersion(
 
     fprintf(VERS_FH, "    * %-32s  %s\n",
             "Root of packed data tree:", sksiteGetDefaultRootDir());
-
-#ifndef SK_PACKING_LOGIC_PATH
-    packing_logic = "Run-time plug-in";
-#else
-    packing_logic = SK_PACKING_LOGIC_PATH;
-    if (strrchr(packing_logic, '/')) {
-        packing_logic = 1 + strrchr(packing_logic, '/');
-    }
-#endif
-    fprintf(VERS_FH, "    * %-32s  %s\n",
-            "Packing logic:", packing_logic);
 
     fprintf(VERS_FH, "    * %-32s  %s\n",
             "Timezone support:",
@@ -247,17 +235,13 @@ printVersion(
 
     fprintf(VERS_FH, "    * %-32s  %s\n",
             "IPv6 flow record support:",
-#if SK_ENABLE_IPV6
             "yes"
-#else
-            "no"
-#endif
             );
 
     fprintf(VERS_FH, "    * %-32s  %s\n",
             "IPset record compatibility:",
 #if !defined(SK_IPSET_DEFAULT_VERSION)
-            "1.0.0"
+            "3.14.0"
 #elif SK_IPSET_DEFAULT_VERSION == 5
             "3.14.0"
 #elif SK_IPSET_DEFAULT_VERSION == 4
@@ -269,11 +253,7 @@ printVersion(
 
     fprintf(VERS_FH, "    * %-32s  %s\n",
             "IPFIX/NetFlow9/sFlow collection:",
-#if   SK_ENABLE_IPFIX
             "ipfix,netflow9,sflow"
-#else
-            "no"
-#endif
             );
 
 
@@ -780,16 +760,8 @@ skOptionsTempDirUsage(
  *    Support for formatting IP addresses
  */
 
-static uint32_t ip_format_flags = 0;
-
-enum ipformat_option_en {
-    OPT_VAL_IP_FORMAT, OPT_VAL_INTEGER_IPS, OPT_VAL_ZERO_PAD_IPS
-};
-
-static const struct option ipformat_option[] = {
-    {"ip-format",           REQUIRED_ARG, 0, OPT_VAL_IP_FORMAT},
-    {"integer-ips",         NO_ARG,       0, OPT_VAL_INTEGER_IPS},
-    {"zero-pad-ips",        NO_ARG,       0, OPT_VAL_ZERO_PAD_IPS},
+static struct option ipformat_option[] = {
+    {"ip-format",           REQUIRED_ARG, 0, 0},
     {0,0,0,0}               /* sentinel */
 };
 
@@ -897,45 +869,21 @@ ipformat_option_handler(
 {
     uint32_t *var_location = (uint32_t*)cData;
 
-    switch ((enum ipformat_option_en)opt_index) {
-      case OPT_VAL_IP_FORMAT:
-        if (ipformat_option_parse(
-                opt_arg, var_location, ipformat_option[opt_index].name))
-        {
-            return 1;
-        }
-        break;
-      case OPT_VAL_INTEGER_IPS:
-        assert(ip_format_flags & SK_OPTION_IP_FORMAT_INTEGER_IPS);
-        if (ipformat_option_parse(
-                "decimal", var_location, ipformat_option[opt_index].name))
-        {
-            skAbort();
-        }
-        break;
-      case OPT_VAL_ZERO_PAD_IPS:
-        assert(ip_format_flags & SK_OPTION_IP_FORMAT_ZERO_PAD_IPS);
-        if (ipformat_option_parse(
-                "zero-padded", var_location, ipformat_option[opt_index].name))
-        {
-            skAbort();
-        }
-        break;
+    assert(0 == opt_index);
+    if (ipformat_option_parse(
+            opt_arg, var_location, ipformat_option[opt_index].name))
+    {
+        return 1;
     }
-
     return 0;
 }
 
 int
 skOptionsIPFormatRegister(
-    uint32_t           *var_location,
-    uint32_t            flags)
+    uint32_t           *var_location)
 {
-    struct option opts[2];
     const char *env;
     uint32_t tmp_val = 0;
-    unsigned int i;
-    int rv = 0;
 
     if (var_location == NULL) {
         return -1;
@@ -947,23 +895,9 @@ skOptionsIPFormatRegister(
         }
     }
 
-    ip_format_flags = flags;
-
-    memset(opts, 0, sizeof(opts));
-
-    for (i = 0; ipformat_option[i].name; ++i) {
-        if ((0 == i) || (ip_format_flags & (1 << (i - 1)))) {
-            memcpy(opts, &ipformat_option[i], sizeof(struct option));
-            rv = skOptionsRegister(opts, ipformat_option_handler,
-                                   (clientData)var_location);
-            if (rv) {
-                return rv;
-            }
-        }
-    }
-    return rv;
+    return skOptionsRegister(ipformat_option, ipformat_option_handler,
+                             (clientData)var_location);
 }
-
 
 /*
  *  skOptionsIPFormatUsage(fh);
@@ -979,24 +913,11 @@ skOptionsIPFormatUsage(
 
     fprintf(fh, ("--%s %s. Print each IP address in the specified format.\n"
                  "\tDef. $" SK_IP_FORMAT_ENVAR " or %s.  Choices:\n"),
-            ipformat_option[OPT_VAL_IP_FORMAT].name,
-            SK_OPTION_HAS_ARG(ipformat_option[OPT_VAL_IP_FORMAT]),
+            ipformat_option[0].name, SK_OPTION_HAS_ARG(ipformat_option[0]),
             ipformat_names[0].name);
     for (e = ipformat_names; e->name; ++e) {
         fprintf(fh, "\t%-12s - %s\n",
                 e->name, (const char*)e->userdata);
-    }
-
-    if (ip_format_flags & SK_OPTION_IP_FORMAT_INTEGER_IPS) {
-        fprintf(fh, "--%s %s. DEPRECATED. Equivalent to --ip-format=decimal\n",
-                ipformat_option[OPT_VAL_INTEGER_IPS].name,
-                SK_OPTION_HAS_ARG(ipformat_option[OPT_VAL_INTEGER_IPS]));
-    }
-    if (ip_format_flags & SK_OPTION_IP_FORMAT_ZERO_PAD_IPS) {
-        fprintf(fh,
-                "--%s %s. DEPRECATED. Equivalent to --ip-format=zero-padded\n",
-                ipformat_option[OPT_VAL_ZERO_PAD_IPS].name,
-                SK_OPTION_HAS_ARG(ipformat_option[OPT_VAL_ZERO_PAD_IPS]));
     }
 }
 
@@ -1007,16 +928,8 @@ skOptionsIPFormatUsage(
 
 static uint32_t time_format_flags = 0;
 
-static char time_format_epoch_name[256];
-
-enum time_format_option_en {
-    OPT_VAL_TIMESTAMP_FORMAT, OPT_VAL_EPOCH_TIME, OPT_VAL_LEGACY_TIMESTAMPS
-};
-
 static const struct option time_format_option[] = {
-    {"timestamp-format",    REQUIRED_ARG, 0, OPT_VAL_TIMESTAMP_FORMAT},
-    {"epoch-time",          NO_ARG,       0, OPT_VAL_EPOCH_TIME},
-    {"legacy-timestamps",   OPTIONAL_ARG, 0, OPT_VAL_LEGACY_TIMESTAMPS},
+    {"timestamp-format",    REQUIRED_ARG, 0, 0},
     {0,0,0,0}               /* sentinel */
 };
 
@@ -1184,49 +1097,11 @@ time_format_option_handler(
 {
     uint32_t *var_location = (uint32_t*)cData;
 
-    switch ((enum time_format_option_en)opt_index) {
-      case OPT_VAL_TIMESTAMP_FORMAT:
-        if (time_format_option_parse(
-                opt_arg, var_location, time_format_option[opt_index].name))
-        {
-            return 1;
-        }
-        break;
-
-      case OPT_VAL_EPOCH_TIME:
-        if (time_format_option_parse(
-                "epoch", var_location, time_format_option[opt_index].name))
-        {
-            skAbort();
-        }
-        break;
-
-      case OPT_VAL_LEGACY_TIMESTAMPS:
-        if ((opt_arg == NULL) || (opt_arg[0] == '\0') || (opt_arg[0] == '1')) {
-            if (time_format_flags & (SK_OPTION_TIMESTAMP_NEVER_MSEC
-                                     | SK_OPTION_TIMESTAMP_ALWAYS_MSEC))
-            {
-                if (time_format_option_parse(
-                        "m/d/y", var_location,
-                        time_format_option[opt_index].name))
-                {
-                    skAbort();
-                }
-            } else {
-                if (time_format_option_parse(
-                        "m/d/y,no-msec", var_location,
-                        time_format_option[opt_index].name))
-                {
-                    skAbort();
-                }
-            }
-        } else if (time_format_option_parse(
-                       time_format_names[0].name, var_location,
-                       time_format_option[opt_index].name))
-        {
-            skAbort();
-        }
-        break;
+    assert(0 == opt_index);
+    if (time_format_option_parse(
+            opt_arg, var_location, time_format_option[opt_index].name))
+    {
+        return 1;
     }
     return 0;
 }
@@ -1234,21 +1109,12 @@ time_format_option_handler(
 int
 skOptionsTimestampFormatRegister(
     uint32_t           *var_location,
-    uint32_t            flags,
-    ...)
+    uint32_t            flags)
 {
-    struct option opts[4];
-    const struct option *tfo;
     const char *env;
     uint32_t tmp_val = 0;
-    unsigned int num_opts;
-    va_list arg;
 
-    assert(sizeof(opts) >= sizeof(time_format_option));
-
-    va_start(arg, flags);
     if (var_location == NULL) {
-        va_end(arg);
         return -1;
     }
 
@@ -1266,43 +1132,7 @@ skOptionsTimestampFormatRegister(
         }
     }
 
-    /* copy --timestamp-format */
-    memset(opts, 0, sizeof(opts));
-    num_opts = 0;
-
-    for (tfo = time_format_option; tfo->name; ++tfo) {
-        assert(num_opts < sizeof(opts)/sizeof(opts[0]));
-        switch ((enum time_format_option_en)tfo->val) {
-          case OPT_VAL_TIMESTAMP_FORMAT:
-            memcpy(&opts[num_opts], tfo, sizeof(opts[0]));
-            ++num_opts;
-            break;
-
-          case OPT_VAL_LEGACY_TIMESTAMPS:
-            if (time_format_flags & SK_OPTION_TIMESTAMP_OPTION_LEGACY){
-                memcpy(&opts[num_opts], tfo, sizeof(opts[0]));
-                ++num_opts;
-            }
-            break;
-
-          case OPT_VAL_EPOCH_TIME:
-            if (time_format_flags & SK_OPTION_TIMESTAMP_OPTION_EPOCH_NAME) {
-                snprintf(time_format_epoch_name,sizeof(time_format_epoch_name),
-                         "%s", va_arg(arg, char *));
-                memcpy(&opts[num_opts], tfo, sizeof(opts[0]));
-                opts[num_opts].name = time_format_epoch_name;
-                ++num_opts;
-            } else if (time_format_flags & SK_OPTION_TIMESTAMP_OPTION_EPOCH) {
-                memcpy(&opts[num_opts], tfo, sizeof(opts[0]));
-                ++num_opts;
-            }
-            break;
-        }
-    }
-
-    va_end(arg);
-
-    return skOptionsRegister(opts, time_format_option_handler,
+    return skOptionsRegister(time_format_option, time_format_option_handler,
                              (clientData)var_location);
 }
 
@@ -1314,7 +1144,6 @@ skOptionsTimestampFormatUsage(
     const sk_stringmap_entry_t *e;
     const char *label;
     const char *sss;
-    const struct option *tfo;
 
     /* whether to include milliseconds in timestamp help */
     if (time_format_flags & SK_OPTION_TIMESTAMP_NEVER_MSEC) {
@@ -1323,69 +1152,35 @@ skOptionsTimestampFormatUsage(
         sss = ".sss";
     }
 
-    for (tfo = time_format_option; tfo->name; ++tfo) {
-        switch ((enum time_format_option_en)tfo->val) {
-          case OPT_VAL_TIMESTAMP_FORMAT:
-            fprintf(
-                fh,
-                ("--%s %s. Print each timestamp in this format and timezone.\n"
-                 "\tDef. $" SK_TIMESTAMP_FORMAT_ENVAR " or %s,%s.  Choices:\n"),
-                tfo->name, SK_OPTION_HAS_ARG(*tfo),
-                time_format_names[0].name,
-                time_format_zones[(SK_ENABLE_LOCALTIME != 0)].name);
-            label = "Format:";
-            for (e = time_format_names; e->name; ++e) {
-                if (SKTIMESTAMP_EPOCH == e->id) {
-                    sss = "";
-                }
-                fprintf(fh, "\t%-10s%-8s - %s%s\n",
-                        label, e->name, (const char*)e->userdata, sss);
-                label = "";
-            }
-            label = "Timezone:";
-            for (e = time_format_zones; e->name; ++e) {
-                fprintf(fh, "\t%-10s%-8s - %s\n",
-                        label, e->name, (const char*)e->userdata);
-                label = "";
-            }
-            if (0 == (time_format_flags & (SK_OPTION_TIMESTAMP_NEVER_MSEC
-                                           | SK_OPTION_TIMESTAMP_ALWAYS_MSEC)))
-            {
-                label = "Misc:";
-                for (e = time_format_misc; e->name; ++e) {
-                    fprintf(fh, "\t%-10s%-8s - %s\n",
-                            label, e->name, (const char*)e->userdata);
-                    label = "";
-                }
-            }
-            break;
-
-          case OPT_VAL_EPOCH_TIME:
-            if (time_format_flags & SK_OPTION_TIMESTAMP_OPTION_EPOCH_NAME) {
-                fprintf(fh, ("--%s %s. DEPRECATED."
-                             " Equivalent to --%s=epoch\n"),
-                        time_format_epoch_name, SK_OPTION_HAS_ARG(*tfo),
-                        time_format_option[OPT_VAL_TIMESTAMP_FORMAT].name);
-            } else if (time_format_flags & SK_OPTION_TIMESTAMP_OPTION_EPOCH) {
-                fprintf(fh, ("--%s %s. DEPRECATED."
-                             " Equivalent to --%s=epoch\n"),
-                        tfo->name, SK_OPTION_HAS_ARG(*tfo),
-                        time_format_option[OPT_VAL_TIMESTAMP_FORMAT].name);
-            }
-            break;
-
-          case OPT_VAL_LEGACY_TIMESTAMPS:
-            if (time_format_flags & SK_OPTION_TIMESTAMP_OPTION_LEGACY) {
-                fprintf(
-                    fh, "--%s %s. DEPRECATED. Equivalent to --%s=m/d/y%s\n",
-                    tfo->name, SK_OPTION_HAS_ARG(*tfo),
-                    time_format_option[OPT_VAL_TIMESTAMP_FORMAT].name,
-                    ((time_format_flags & (SK_OPTION_TIMESTAMP_NEVER_MSEC
-                                           | SK_OPTION_TIMESTAMP_ALWAYS_MSEC))
-                     ? ""
-                     : ",no-msec"));
-            }
-            break;
+    fprintf(
+        fh, ("--%s %s. Print each timestamp in this format and timezone.\n"
+             "\tDef. $" SK_TIMESTAMP_FORMAT_ENVAR " or %s,%s.  Choices:\n"),
+        time_format_option[0].name, SK_OPTION_HAS_ARG(time_format_option[0]),
+        time_format_names[0].name,
+        time_format_zones[(SK_ENABLE_LOCALTIME != 0)].name);
+    label = "Format:";
+    for (e = time_format_names; e->name; ++e) {
+        if (SKTIMESTAMP_EPOCH == e->id) {
+            sss = "";
+        }
+        fprintf(fh, "\t%-10s%-8s - %s%s\n",
+                label, e->name, (const char*)e->userdata, sss);
+        label = "";
+    }
+    label = "Timezone:";
+    for (e = time_format_zones; e->name; ++e) {
+        fprintf(fh, "\t%-10s%-8s - %s\n",
+                label, e->name, (const char*)e->userdata);
+        label = "";
+    }
+    if (0 == (time_format_flags & (SK_OPTION_TIMESTAMP_NEVER_MSEC
+                                   | SK_OPTION_TIMESTAMP_ALWAYS_MSEC)))
+    {
+        label = "Misc:";
+        for (e = time_format_misc; e->name; ++e) {
+            fprintf(fh, "\t%-10s%-8s - %s\n",
+                    label, e->name, (const char*)e->userdata);
+            label = "";
         }
     }
 }

@@ -7,7 +7,7 @@
 */
 
 /*
-**  skunqiue.h
+**  skunique.h
 **
 **    A library used by rwuniq and rwstats to bin records by a key and
 **    compute aggregate values (e.g., sum of bytes) for each bin.
@@ -21,9 +21,10 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKUNIQUE_H, "$SiLK: skunique.h 9d04be8e27ff 2017-01-05 19:09:17Z mthomas $");
+RCSIDENTVAR(rcsID_SKUNIQUE_H, "$SiLK: skunique.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/silk_types.h>
+#include <silk/skflowiter.h>
 
 
 /* LOCAL DEFINES AND TYPEDEFS */
@@ -65,12 +66,21 @@ typedef struct sk_fieldlist_iterator_st sk_fieldlist_iterator_t;
 
 /*
  *    The following specify the signature of the callback functions
- *    the must be specified when adding an SK_FIELD_CALLER field to an
- *    sk_fieldlist_t.
+ *    the must be specified in the sk_fieldlist_entrydata_t structure
+ *    when adding an SK_FIELD_CALLER field to an sk_fieldlist_t.
  */
 
 /*
- *    Callback for adding/converting a record to a binary value.
+ *    Callback that serves two purposes:
+ *
+ *    When used as the 'rec_to_bin' member, it takes the record 'rec'
+ *    and stores on 'dest' the binary value used by the other callback
+ *    functions that operate on a binary file.
+ *
+ *    When used as the 'add_rec_to_bin' member, it takes the record
+ *    'rec', computes the binary value for that record, and then adds
+ *    that value to the aggregate binary value already present in
+ *    'dest'.
  *
  *    -- if we want this to work with the existing plug-in API, do we
  *       need to include the "extra" value here?
@@ -80,20 +90,23 @@ typedef void (*sk_fieldlist_rec_to_bin_fn_t)(
     uint8_t            *dest,
     void               *ctx);
 
-/*    Callback for comparing two binary values */
+/*
+ *    Callback used as the 'bin_compare' member for comparing two
+ *    aggregate binary values.
+ */
 typedef int (*sk_fieldlist_bin_cmp_fn_t)(
     const uint8_t      *bin1,
     const uint8_t      *bin2,
     void               *ctx);
 
-/*    Callback for initializing a binary value */
+/*    Callback for initializing a binary value.  Currently unused. */
 typedef void (*sk_fieldlist_bin_init_fn_t)(
     uint8_t            *bin,
     void               *ctx);
 
-/*    Callback for merging (for example, adding) two binary
- *    values--used for aggregate values (and maybe distinct
- *    fields?) */
+/*    Callback used as the 'bin_merge' member for merging (for
+ *    example, adding) two aggregate binary values--used for aggregate
+ *    values (and maybe distinct fields?) */
 typedef void (*sk_fieldlist_bin_merge_fn_t)(
     uint8_t            *bin1,
     const uint8_t      *bin2,
@@ -107,6 +120,19 @@ typedef void (*sk_fieldlist_output_fn_t)(
     void               *ctx);
 
 /*
+ *    Callback used as the 'bin_get_data' member.  This is used when a
+ *    key field contains a pointer to the actual data to be used when
+ *    hashing a fieldlist.  May be NULL when the key field is not a
+ *    pointer.
+ */
+typedef uint8_t (*sk_fieldlist_bin_get_data_fn_t)(
+    const uint8_t      *bin,
+    uint8_t             out_data[],
+    uint8_t             bin_len,
+    void               *ctx);
+
+
+/*
  *    The sk_fieldlist_entrydata_t structure is used when the caller
  *    wants to create a custom field.  This structure holds pointers
  *    to the above callback functions.
@@ -116,15 +142,17 @@ typedef void (*sk_fieldlist_output_fn_t)(
  *    should be initialized to.  If 'initial_value' is not provided,
  *    the field is memset() to 0.
  */
-typedef struct sk_fieldlist_entrydata_st {
+struct sk_fieldlist_entrydata_st {
     sk_fieldlist_rec_to_bin_fn_t    rec_to_bin;
     sk_fieldlist_bin_cmp_fn_t       bin_compare;
     sk_fieldlist_rec_to_bin_fn_t    add_rec_to_bin;
     sk_fieldlist_bin_merge_fn_t     bin_merge;
     sk_fieldlist_output_fn_t        bin_output;
+    sk_fieldlist_bin_get_data_fn_t  bin_get_data;
     const uint8_t                  *initial_value;
     size_t                          bin_octets;
-} sk_fieldlist_entrydata_t;
+};
+typedef struct sk_fieldlist_entrydata_st sk_fieldlist_entrydata_t;
 
 
 /*
@@ -177,15 +205,6 @@ skFieldListAddKnownField(
     void               *ctx);
 
 /*
- *  count = skFieldListGetFieldCount(field_list);
- *
- *    Return the number of fields that 'field_list' contains.
- */
-size_t
-skFieldListGetFieldCount(
-    const sk_fieldlist_t   *field_list);
-
-/*
  *  size = skFieldListGetBufferSize(field_list);
  *
  *    Return the number of octets required to hold all the fields in
@@ -194,86 +213,6 @@ skFieldListGetFieldCount(
 size_t
 skFieldListGetBufferSize(
     const sk_fieldlist_t   *field_list);
-
-/*
- *  skFieldListInitializeBuffer(field_list, all_fields_buffer);
- *
- *    Set 'all_fields_buffer' to the initial value for each field in
- *    the 'field_list'.
- */
-void
-skFieldListInitializeBuffer(
-    const sk_fieldlist_t   *field_list,
-    uint8_t                *all_fields_buffer);
-
-/*
- *  skFieldListMergeBuffers(field_list, all_fields_buffer1,all_fields_buffer2);
- *
- *    Given two buffers for the 'field_list', call the merge function
- *    to merge (e.g., add) the buffers.  The value in
- *    'all_fields_buffer2' will be added to the value in
- *    'all_fields_buffer1'.
- */
-void
-skFieldListMergeBuffers(
-    const sk_fieldlist_t   *field_list,
-    uint8_t                *all_fields_buffer1,
-    const uint8_t          *all_fields_buffer2);
-
-/*
- *  cmp=skFieldListCompareBuffers(all_fields_buf1,all_fields_buf2,field_list);
- *
- *    Compare two buffers for 'field_list', and return -1, 0, 1, if
- *    'all_fields_buf1' is <, ==, > 'all_fields_buf2'.
- *
- *    Note that the field list is the final parameter, allowing it be
- *    be easily used directly with skQSort_r().
- *
- *    See also skFieldListEntryCompareBuffers()
- */
-int
-skFieldListCompareBuffers(
-    const uint8_t          *all_fields_buffer1,
-    const uint8_t          *all_fields_buffer2,
-    const sk_fieldlist_t   *field_list);
-
-/*
- *  skFieldListRecToBinary(field_list, rwrec, all_fields_buffer);
- *
- *    For each field in 'field_list', get the binary value of that
- *    field from 'rwrec' and set the corresponding value in the
- *    'all_fields_buffer'.
- */
-void
-skFieldListRecToBinary(
-    const sk_fieldlist_t   *field_list,
-    const rwRec            *rwrec,
-    uint8_t                *all_fields_buffer);
-
-/*
- *  skFieldListAddRecToBinary(field_list, rwrec, all_fields_buffer);
- *
- *    For each field in 'field_list', get the binary value of that
- *    field from 'rwrec' and merge (e.g., add) that value to the
- *    corresponding value in the 'all_fields_buffer'.
- */
-void
-skFieldListAddRecToBuffer(
-    const sk_fieldlist_t   *field_list,
-    const rwRec            *rwrec,
-    uint8_t                *all_fields_buffer);
-
-/*
- *  skFieldListAddRecToBinary(field_list, rwrec, all_fields_buffer);
- *
- *    For each field in 'field_list', call the output callback
- *    function for each field.
- */
-void
-skFieldListOutputBuffer(
-    const sk_fieldlist_t   *field_list,
-    const uint8_t          *all_fields_buffer);
-
 
 /*
  *    The following functions work with the handle that was returned
@@ -323,26 +262,6 @@ skFieldListExtractFromBuffer(
     sk_fieldentry_t        *field_entry,
     uint8_t                *one_field_buf);
 
-/*
- *  cmp = skFieldListEntryCompareBuffers(field_buf1, field_buf2, field_entry);
- *
- *    Compare two buffers for a single 'field_entry', and return -1,
- *    0, 1, if 'field_buf1' is <, ==, > 'field_buf2'.
- *
- *    The function assumes 'field_buf1' and 'field_buf2' are pointing
- *    at the start of the bytes for 'field_entry'
- *
- *    Note that the field entry is the final parameter, allowing it be
- *    be easily used directly with skQSort_r().
- *
- *    See also skFieldListCompareBuffers()
- */
-int
-skFieldListEntryCompareBuffers(
-    const uint8_t          *field_buffer1,
-    const uint8_t          *field_buffer2,
-    const sk_fieldentry_t  *field_entry);
-
 
 
 /*
@@ -360,23 +279,11 @@ struct sk_fieldlist_iterator_st {
 /*
  *  skFieldListIteratorBind(field_list, *iter);
  *
- *    Bind the field list iterator 'iter' to 'field_list'.  This
- *    function also calls skFieldListIteratorReset() to prepare the
- *    iterator for visiting each field.
+ *    Bind the field list iterator 'iter' to 'field_list'.
  */
 void
 skFieldListIteratorBind(
     const sk_fieldlist_t       *field_list,
-    sk_fieldlist_iterator_t    *iter);
-
-/*
- *  skFieldListIteratorReset(iter);
- *
- *    Reset the field list iterator 'iter' so it may iteratate over
- *    the list of fields again.
- */
-void
-skFieldListIteratorReset(
     sk_fieldlist_iterator_t    *iter);
 
 /*
@@ -392,88 +299,11 @@ skFieldListIteratorNext(
 
 
 /*
- *    The following are pre-defined functions provided for the
- *    caller's convenience when filling-in the
- *    sk_fieldlist_entrydata_t structure.
- */
-
-/*
- *  cmp = skFieldCompareMemcmp(a, b, &len);
- *
- *    Comparison function the caller may use.  This function performs
- *    memcmp() on the values 'a' and 'b'.  The number of bytes in the
- *    'a' and 'b' should be passed in as the context.
- */
-int
-skFieldCompareMemcmp(
-    const void         *a,
-    const void         *b,
-    void               *len);
-
-/*
- *  cmp = skFieldCompareUintXX(a, b);
- *
- *    Comparison function the caller may use.  These functions
- *    compares 'a' and 'b' as containing unsigned uintXX_t's in native
- *    byte order.  The context is ignored.
- */
-int
-skFieldCompareUint8(
-    const void         *a,
-    const void         *b,
-    void               *ctx);
-int
-skFieldCompareUint16(
-    const void         *a,
-    const void         *b,
-    void               *ctx);
-int
-skFieldCompareUint32(
-    const void         *a,
-    const void         *b,
-    void               *ctx);
-int
-skFieldCompareUint64(
-    const void         *a,
-    const void         *b,
-    void               *ctx);
-
-/*
- *  skFieldMergeUintXX(a, b);
- *
- *    Merging functions the caller may use.  These functions treat 'a'
- *    and 'b' as containing unsigned uintXX_t's in native byte order.
- *    The two values are summed and the result it put into 'a'.  The
- *    context is ignored.
- */
-void
-skFieldMergeUint8(
-    void               *a,
-    const void         *b,
-    void               *ctx);
-void
-skFieldMergeUint16(
-    void               *a,
-    const void         *b,
-    void               *ctx);
-void
-skFieldMergeUint32(
-    void               *a,
-    const void         *b,
-    void               *ctx);
-void
-skFieldMergeUint64(
-    void               *a,
-    const void         *b,
-    void               *ctx);
-
-
-/*
  *    As noted above, the sk_fieldid_t enumeration lists all the
  *    fields that can be added to an sk_fieldlist_t.
  */
 typedef enum sk_fieldid_en {
-    /* the following correspond to values in rwascii.h */
+    /* the following correspond to values in rwrec.h */
     SK_FIELD_SIPv4,             /*  0 */
     SK_FIELD_DIPv4,
     SK_FIELD_SPORT,
@@ -500,26 +330,22 @@ typedef enum sk_fieldid_en {
     SK_FIELD_FTYPE_CLASS,
 
     SK_FIELD_FTYPE_TYPE,        /* 20 */
-    SK_FIELD_STARTTIME_MSEC,
-    SK_FIELD_ENDTIME_MSEC,
-    SK_FIELD_ELAPSED_MSEC,
-
-    SK_FIELD_ICMP_TYPE,         /* 24 */
+    SK_FIELD_ICMP_TYPE,
     SK_FIELD_ICMP_CODE,
-    /* the above correspond to values in rwascii.h */
+    /* the above correspond to values in rwrec.h */
 
     SK_FIELD_SIPv6,
-    SK_FIELD_DIPv6,
+    SK_FIELD_DIPv6,             /* 24 */
 
-    SK_FIELD_NHIPv6,            /* 28 */
+    SK_FIELD_NHIPv6,
     SK_FIELD_RECORDS,
     SK_FIELD_SUM_PACKETS,
-    SK_FIELD_SUM_BYTES,
+    SK_FIELD_SUM_BYTES,         /* 28 */
 
-    SK_FIELD_SUM_ELAPSED,       /* 32 */
+    SK_FIELD_SUM_ELAPSED,
     SK_FIELD_MIN_STARTTIME,
     SK_FIELD_MAX_ENDTIME,
-    SK_FIELD_CALLER
+    SK_FIELD_CALLER             /* 32 */
 } sk_fieldid_t;
 
 
@@ -694,7 +520,7 @@ skUniquePrepareForInput(
  *  ok = skUniquePrepareForOutput(uniq);
  *
  *    Tell the unique object 'uniq' that all records have been added,
- *    and the unqiue object can now do whatever it needs to do before
+ *    and the unique object can now do whatever it needs to do before
  *    the caller requests get the binned records.
  *
  *    Return 0 on success.  Return -1 if skUniquePrepareForInput() has
@@ -730,7 +556,7 @@ skUniquePrepareForOutput(
 int
 skUniqueAddRecord(
     sk_unique_t        *uniq,
-    const rwRec        *rwrec);
+    rwRec              *rwrec);
 
 /*
  *  ok = skUniqueIteratorCreate(uniq, &iter);
@@ -862,11 +688,8 @@ struct sk_unique_iterator_st {
  *      skPresortedUniqueCreate(&u);
  *      skPresortedUniqueSetFields(u, key, distinct, value);
  *      skPresortedUniqueSetTempDirectory(u);        //optional
- *      skPresortedUniqueSetPostOpenFn(u, open_cb);  //optional
  *      skPresortedUniqueSetReadFn(u, read_cb);      //optional
- *      foreach (input_file) {
- *        skPresortedUniqueAddInputFile(rec, input_file[i]);
- *      }
+ *      skPresortedUniqueSetFlowIterator(rec, flowiter);
  *      skPresortedUniqueProcess(u, output_cb);
  *      skPresortedUniqueDestroy(&u);
  *
@@ -951,43 +774,23 @@ skPresortedUniqueSetFields(
     const sk_fieldlist_t   *agg_value_fields);
 
 /*
- *  ok = skPresortedUniqueAddInputFile(ps_uniq, filename);
+ *  ok = skPresortedUniqueSetFlowIterator(ps_uniq, flowiter);
  *
- *    Specify that 'ps_uniq' should process the SiLK Flow records in
- *    'filename'.  'ps_uniq' will assume the records in 'filename'
- *    have been sorted using the same key as specified in the call to
- *    skPresortedUniqueSetFields().
+ *    Specify that 'ps_uniq' should process the SiLK Flow streams that
+ *    the flow iterator 'flowiter' holds.  'ps_uniq' assumes the
+ *    records in each of those streams have been sorted using the same
+ *    key as specified in the call to skPresortedUniqueSetFields().
  *
- *    This function makes a copy of name of the filename and adds the
- *    copy to a list of inputs.  The function does no other processing
- *    of the file.  The function returns 0 on success, or -1 if there
- *    was an error allocating memory.
+ *    The function returns 0 on success, or -1 if there was an error
+ *    allocating memory.
  *
  *    It is an error to call this function once
  *    skPresortedUniqueProcess() has been called.
  */
 int
-skPresortedUniqueAddInputFile(
-    sk_sort_unique_t   *ps_uniq,
-    const char         *filename);
-
-/*
- *  ok = int skPresortedUniqueSetPostOpenFn(ps_uniq, post_open_func);
- *
- *    Specify that the 'post_open_func' callback should be invoked
- *    each time a new input file is opened.  The callback is passed a
- *    reference to the newly opened stream, an skstream_t*.
- *
- *    If 'post_open_func' is NULL, any previously set callback will be
- *    cleared.
- *
- *    It is an error to call this function once
- *    skPresortedUniqueProcess() has been called.
- */
-int
-skPresortedUniqueSetPostOpenFn(
-    sk_sort_unique_t   *ps_uniq,
-    int               (*stream_post_open)(skstream_t *));
+skPresortedUniqueSetFlowIterator(
+    sk_sort_unique_t   *uniq,
+    sk_flow_iter_t     *flowiter);
 
 /*
  *  ok = skPresortedUniqueSetReadFn(ps_uniq, read_rec_func);
@@ -1036,10 +839,8 @@ typedef int (*sk_unique_output_fn_t)(
  *  ok = skPresortedUniqueProcess(ps_uniq, output_fn, callback_data);
  *
  *    Tell 'ps_uniq' that it should process the input files that were
- *    specified in the calls to skPresortedUniqueAddInputFile().
+ *    specified in the call to skPresortedUniqueSetFlowIterator().
  *
- *    The input files are opened with skStreamOpenSilkFlow().  If
- *    specified, the 'post_open_func' callback is invoked on the file.
  *    Records are read from the files using the 'read_rec_func'
  *    callback, or skStreamReadRecord() if that callback is NULL.
  *
@@ -1049,7 +850,7 @@ typedef int (*sk_unique_output_fn_t)(
  *    the callback returns.  If the 'output_fn' returns a non-zero
  *    value, processing stops.
  *
- *    The 'callback_data' parameter is an user-specified value that
+ *    The 'callback_data' parameter is a user-specified value that
  *    gets passed to each invocation of the 'output_fn'; this
  *    parameter may be NULL.
  *

@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcount.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwcount.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include "rwcount.h"
 
@@ -70,13 +70,13 @@ sk_options_ctx_t *optctx;
 /* FUNCTION DEFINITIONS */
 
 /*
- *  status = initBins(start_time);
+ *  initBins(start_time);
  *
- *    Allocates time bins based on an initial 'start_time'.
+ *    Allocate time bins based on an initial 'start_time'.
  *
- *    Returns 0 on success, or -1 for failure.
+ *    Return on success.  Exit the application on failure.
  */
-static int
+static void
 initBins(
     sktime_t            start_time)
 {
@@ -85,7 +85,7 @@ initBins(
 
     /* do not call twice */
     if (bins.data) {
-        return 0;
+        return;
     }
 
     /* If start_time and end_time are given, do a single allocation
@@ -101,20 +101,24 @@ initBins(
         assert((bins.start_time + (sktime_t)(bins.size * bin_count))
                == bins.end_time);
         if (bin_count > BIN_COUNT_MAX) {
-            return -1;
+            skAppPrintErr(
+                "Cannot allocate space for bins. Try a larger bin size");
+            exit(EXIT_FAILURE);
         }
 
         /* Allocate */
         bins.data = (count_bin_t*)calloc(bin_count, sizeof(count_bin_t));
         if (NULL == bins.data) {
-            return -1;
+            skAppPrintErr(
+                "Cannot allocate space for bins. Try a larger bin size");
+            exit(EXIT_FAILURE);
         }
 
         bins.window_min = bins.start_time;
         bins.window_max = bins.end_time;
         bins.count = bin_count;
 
-        return 0;
+        return;
     }
 
     /* If the user specified the start_time (but not end_time), use
@@ -159,7 +163,9 @@ initBins(
                                                      sizeof(count_bin_t))))
     {
         if (bin_count <= BIN_COUNT_MIN) {
-            return -1;
+            skAppPrintErr(
+                "Cannot allocate space for bins. Try a larger bin size");
+            exit(EXIT_FAILURE);
         }
         bin_count /= 2;
     }
@@ -167,8 +173,6 @@ initBins(
     bins.window_min = start_time;
     bins.window_max = (sktime_t)start_time + bin_count * bins.size;
     bins.count = bin_count;
-
-    return 0;
 }
 
 
@@ -311,17 +315,18 @@ reallocBins(
 
 
 /*
- *  startAdd(rwrec);
+ *  startAdd(stime, bytes, packets);
  *
  *    Add the record and its byte and packet counts to the first bin
  *    relevant to the record.
  */
 static void
 startAdd(
-    const rwRec        *rwrec)
+    sktime_t            t,
+    uint64_t            bytes,
+    uint64_t            packets)
 {
     uint64_t bin;
-    sktime_t t = rwRecGetStartTime(rwrec);
 
     if (IGNORE_FLOW(t, t)) {
         /* user not interested in this flow */
@@ -333,51 +338,35 @@ startAdd(
     }
     bin = GET_BIN(t);
     bins.data[bin].flows++;
-    bins.data[bin].bytes += rwRecGetBytes(rwrec);
-    bins.data[bin].pkts += rwRecGetPkts(rwrec);
+    bins.data[bin].bytes += bytes;
+    bins.data[bin].pkts += packets;
 }
 
 
 /*
- *  endAdd(rwrec);
+ *  endAdd(etime, bytes, packets);
  *
  *    Add the record and its byte and packet counts to the final bin
  *    relevant to the record.
  */
-static void
-endAdd(
-    const rwRec        *rwrec)
-{
-    uint64_t bin;
-    sktime_t t = rwRecGetEndTime(rwrec);
-
-    if (IGNORE_FLOW(t, t)) {
-        /* user not interested in this flow */
-        return;
-    }
-
-    if (TIME_OUT_OF_RANGE(t)) {
-        reallocBins(t);
-    }
-    bin = GET_BIN(t);
-    bins.data[bin].flows++;
-    bins.data[bin].bytes += rwRecGetBytes(rwrec);
-    bins.data[bin].pkts += rwRecGetPkts(rwrec);
-}
+#define endAdd startAdd
 
 
 /*
- *  middleAdd(rwrec);
+ *  middleAdd(stime, etime, bytes, packets);
  *
  *    Add the record and its byte and packet counts to the middle bin
  *    relevant to the flow.
  */
 static void
 middleAdd(
-    const rwRec        *rwrec)
+    sktime_t            sTime,
+    sktime_t            eTime,
+    uint64_t            bytes,
+    uint64_t            packets)
 {
     uint64_t bin;
-    sktime_t t = rwRecGetStartTime(rwrec) + (rwRecGetElapsed(rwrec) / 2);
+    sktime_t t = (sTime + eTime) / 2;
 
     if (IGNORE_FLOW(t, t)) {
         /* user not interested in this flow */
@@ -389,13 +378,13 @@ middleAdd(
     }
     bin = GET_BIN(t);
     bins.data[bin].flows++;
-    bins.data[bin].bytes += rwRecGetBytes(rwrec);
-    bins.data[bin].pkts += rwRecGetPkts(rwrec);
+    bins.data[bin].bytes += bytes;
+    bins.data[bin].pkts += packets;
 }
 
 
 /*
- *  meanAdd(rwrec);
+ *  meanAdd(stime, etime, bytes, packets);
  *
  *    Equally distribute the record among all the BINs by adding the
  *    mean of the bytes and packets to each bin.  Note that a
@@ -404,13 +393,14 @@ middleAdd(
  */
 static void
 meanAdd(
-    const rwRec        *rwrec)
+    sktime_t            sTime,
+    sktime_t            eTime,
+    uint64_t            bytes,
+    uint64_t            packets)
 {
     uint64_t start_bin, end_bin, i;
     uint64_t extra_bins = 0;
-    sktime_t sTime = rwRecGetStartTime(rwrec);
-    sktime_t eTime = rwRecGetEndTime(rwrec);
-    double flows, bytes, pkts;
+    count_bin_t d;
 
     if (IGNORE_FLOW(sTime, eTime)) {
         /* user not interested in this flow */
@@ -451,8 +441,8 @@ meanAdd(
     if ((start_bin == end_bin) && (0 == extra_bins)) {
         /* handle simple case where everything is in one bin */
         bins.data[start_bin].flows++;
-        bins.data[start_bin].bytes += rwRecGetBytes(rwrec);
-        bins.data[start_bin].pkts += rwRecGetPkts(rwrec);
+        bins.data[start_bin].bytes += bytes;
+        bins.data[start_bin].pkts += packets;
         return;
     }
 
@@ -463,20 +453,20 @@ meanAdd(
      *
      *     1 / (end_bin - start_bin + extra_bins + 1)
      */
-    flows = (1.0 / ((double)(end_bin - start_bin + extra_bins + 1.0)));
-    bytes = (double)rwRecGetBytes(rwrec) * flows;
-    pkts = (double)rwRecGetPkts(rwrec) * flows;
+    d.flows = (1.0 / ((double)(end_bin - start_bin + extra_bins + 1.0)));
+    d.bytes = (double)bytes * d.flows;
+    d.pkts = (double)packets * d.flows;
 
     for (i = start_bin; i <= end_bin; ++i) {
-        bins.data[i].flows += flows;
-        bins.data[i].bytes += bytes;
-        bins.data[i].pkts += pkts;
+        bins.data[i].flows += d.flows;
+        bins.data[i].bytes += d.bytes;
+        bins.data[i].pkts += d.pkts;
     }
 }
 
 
 /*
- *  durationAdd(rwrec);
+ *  durationAdd(stime, etime, bytes, packets);
  *
  *    Divide the flow evenly across each millisecond in the flow, and
  *    then apply that value to each bin according to the number of
@@ -484,12 +474,13 @@ meanAdd(
  */
 static void
 durationAdd(
-    const rwRec        *rwrec)
+    sktime_t            sTime,
+    sktime_t            eTime,
+    uint64_t            bytes,
+    uint64_t            packets)
 {
     uint64_t start_bin, end_bin, i;
-    sktime_t sTime = rwRecGetStartTime(rwrec);
-    sktime_t eTime = rwRecGetEndTime(rwrec);
-    double flows, bytes, pkts;
+    count_bin_t d;
     double ratio;
 
     if (IGNORE_FLOW(sTime, eTime)) {
@@ -525,17 +516,17 @@ durationAdd(
         && (eTime < bins.end_time))
     {
         bins.data[start_bin].flows++;
-        bins.data[start_bin].bytes += rwRecGetBytes(rwrec);
-        bins.data[start_bin].pkts += rwRecGetPkts(rwrec);
+        bins.data[start_bin].bytes += bytes;
+        bins.data[start_bin].pkts += packets;
         return;
     }
 
     /* calculate the amount of data in a fully covered bin by
      * calculating the data per millisecond and multiplying that by
      * the bin size */
-    flows = (double)bins.size / (double)(1 + eTime - sTime);
-    bytes = (double)rwRecGetBytes(rwrec) * flows;
-    pkts = (double)rwRecGetPkts(rwrec) * flows;
+    d.flows = (double)bins.size / (double)(1 + eTime - sTime);
+    d.bytes = (double)bytes * d.flows;
+    d.pkts = (double)packets * d.flows;
 
 
     if (sTime >= bins.start_time) {
@@ -548,9 +539,9 @@ durationAdd(
          */
         ratio = ((double)start_bin + 1.0
                  - ((double)(sTime - bins.window_min) / (double)bins.size));
-        bins.data[start_bin].flows += ratio * flows;
-        bins.data[start_bin].bytes += ratio * bytes;
-        bins.data[start_bin].pkts += ratio * pkts;
+        bins.data[start_bin].flows += ratio * d.flows;
+        bins.data[start_bin].bytes += ratio * d.bytes;
+        bins.data[start_bin].pkts += ratio * d.pkts;
 
         /* move start_bin to first complete bin */
         ++start_bin;
@@ -563,9 +554,9 @@ durationAdd(
          * active in this bin. */
         ratio = (((double)(eTime + 1 - bins.window_min) / (double)bins.size)
                  - (double)(end_bin));
-        bins.data[end_bin].flows += ratio * flows;
-        bins.data[end_bin].bytes += ratio * bytes;
-        bins.data[end_bin].pkts += ratio * pkts;
+        bins.data[end_bin].flows += ratio * d.flows;
+        bins.data[end_bin].bytes += ratio * d.bytes;
+        bins.data[end_bin].pkts += ratio * d.pkts;
 
         /* don't move end_bin; we'll stop when we get to it */
     }
@@ -577,15 +568,15 @@ durationAdd(
 
     /* Handle the bins that had complete coverage */
     for (i = start_bin; i < end_bin; ++i) {
-        bins.data[i].flows += flows;
-        bins.data[i].bytes += bytes;
-        bins.data[i].pkts += pkts;
+        bins.data[i].flows += d.flows;
+        bins.data[i].bytes += d.bytes;
+        bins.data[i].pkts += d.pkts;
     }
 }
 
 
 /*
- *  maximumAdd(rwrec);
+ *  maximumAdd(stime, etime, bytes, packets);
  *
  *    Add the flow record and its complete packet and byte count to
  *    EVERY bin where the flow is active.  This will allow one to see
@@ -594,11 +585,12 @@ durationAdd(
  */
 static void
 maximumAdd(
-    const rwRec        *rwrec)
+    sktime_t            sTime,
+    sktime_t            eTime,
+    uint64_t            bytes,
+    uint64_t            packets)
 {
     uint64_t start_bin, end_bin, i;
-    sktime_t sTime = rwRecGetStartTime(rwrec);
-    sktime_t eTime = rwRecGetEndTime(rwrec);
 
     if (IGNORE_FLOW(sTime, eTime)) {
         /* user not interested in this flow */
@@ -633,14 +625,14 @@ maximumAdd(
     /* add everything to all bins */
     for (i = start_bin; i <= end_bin; ++i) {
         bins.data[i].flows++;
-        bins.data[i].bytes += rwRecGetBytes(rwrec);
-        bins.data[i].pkts += rwRecGetPkts(rwrec);
+        bins.data[i].bytes += bytes;
+        bins.data[i].pkts += packets;
     }
 }
 
 
 /*
- *  minimumAdd(rwrec);
+ *  minimumAdd(stime, etime, bytes, packets);
  *
  *    Add the flow record to EVERY bin where it is active.  Only add
  *    the flow's packet and byte counts to a bin if the flow is
@@ -650,11 +642,12 @@ maximumAdd(
  */
 static void
 minimumAdd(
-    const rwRec        *rwrec)
+    sktime_t            sTime,
+    sktime_t            eTime,
+    uint64_t            bytes,
+    uint64_t            packets)
 {
     uint64_t start_bin, end_bin, i;
-    sktime_t sTime = rwRecGetStartTime(rwrec);
-    sktime_t eTime = rwRecGetEndTime(rwrec);
 
     if (IGNORE_FLOW(sTime, eTime)) {
         /* user not interested in this flow */
@@ -692,8 +685,8 @@ minimumAdd(
         && (eTime < bins.end_time))
     {
         bins.data[start_bin].flows++;
-        bins.data[start_bin].bytes += rwRecGetBytes(rwrec);
-        bins.data[start_bin].pkts += rwRecGetPkts(rwrec);
+        bins.data[start_bin].bytes += bytes;
+        bins.data[start_bin].pkts += packets;
         return;
     }
 
@@ -706,102 +699,72 @@ minimumAdd(
 
 
 /*
- *  ok = countFile(stream);
+ *  ok = countFileSilk(stream, rwrec);
  *
- *    Process the records in 'stream'.  Return 0 on success, or
- *    non-zero on error reading the file.
+ *    Process the SiLK Flow records in 'stream' and fill the
+ *    appropriate bins.  Return 1 on success, or -1 on error.
+ *
+ *    'rwrec' is the first record that exists on 'stream'
  */
 static int
-countFile(
-    skstream_t         *stream)
+countFileSilk(
+    skstream_t         *stream,
+    rwRec              *rwrec)
 {
-    /* protect initBins from multiple calls */
-    static int initialized = 0;
-    rwRec rwrec;
+    static int initialized_bins = 0;
     int rv = 0;
 
-    /* initialize bins if necessary */
-    if (!initialized) {
-        initialized = 1;
-        rv = skStreamReadRecord(stream, &rwrec);
-        if (rv) {
-            goto END;
-        }
-        if (initBins(rwRecGetStartTime(&rwrec))) {
-            skAppPrintErr("Cannot allocate space for bins. "
-                          "Try a larger bin size or fewer records");
-            return 1;
-        }
-        switch (flags.load_scheme) {
-          case LOAD_START:
-            startAdd(&rwrec);
-            break;
-          case LOAD_END:
-            endAdd(&rwrec);
-            break;
-          case LOAD_MIDDLE:
-            middleAdd(&rwrec);
-            break;
-          case LOAD_MEAN:
-            meanAdd(&rwrec);
-            break;
-          case LOAD_DURATION:
-            durationAdd(&rwrec);
-            break;
-          case LOAD_MAXIMUM:
-            maximumAdd(&rwrec);
-            break;
-          case LOAD_MINIMUM:
-            minimumAdd(&rwrec);
-            break;
-        }
+    if (!initialized_bins) {
+        initialized_bins = 1;
+        initBins(rwRecGetStartTime(rwrec));
     }
 
     switch (flags.load_scheme) {
       case LOAD_START:
-        while ((rv = skStreamReadRecord(stream, &rwrec)) == SKSTREAM_OK) {
-            startAdd(&rwrec);
-        }
+        do {
+            startAdd(rwRecGetStartTime(rwrec),
+                     rwRecGetBytes(rwrec), rwRecGetPkts(rwrec));
+        } while ((rv = skStreamReadRecord(stream, rwrec)) == 0);
         break;
       case LOAD_END:
-        while ((rv = skStreamReadRecord(stream, &rwrec)) == SKSTREAM_OK) {
-            endAdd(&rwrec);
-        }
+        do {
+            endAdd(rwRecGetEndTime(rwrec),
+                   rwRecGetBytes(rwrec), rwRecGetPkts(rwrec));
+        } while ((rv = skStreamReadRecord(stream, rwrec)) == 0);
         break;
       case LOAD_MIDDLE:
-        while ((rv = skStreamReadRecord(stream, &rwrec)) == SKSTREAM_OK) {
-            middleAdd(&rwrec);
-        }
+        do {
+            middleAdd(rwRecGetStartTime(rwrec), rwRecGetEndTime(rwrec),
+                      rwRecGetBytes(rwrec), rwRecGetPkts(rwrec));
+        } while ((rv = skStreamReadRecord(stream, rwrec)) == 0);
         break;
       case LOAD_MEAN:
-        while ((rv = skStreamReadRecord(stream, &rwrec)) == SKSTREAM_OK) {
-            meanAdd(&rwrec);
-        }
+        do {
+            meanAdd(rwRecGetStartTime(rwrec), rwRecGetEndTime(rwrec),
+                    rwRecGetBytes(rwrec), rwRecGetPkts(rwrec));
+        } while ((rv = skStreamReadRecord(stream, rwrec)) == 0);
         break;
       case LOAD_DURATION:
-        while ((rv = skStreamReadRecord(stream, &rwrec)) == SKSTREAM_OK) {
-            durationAdd(&rwrec);
-        }
+        do {
+            durationAdd(rwRecGetStartTime(rwrec), rwRecGetEndTime(rwrec),
+                        rwRecGetBytes(rwrec), rwRecGetPkts(rwrec));
+        } while ((rv = skStreamReadRecord(stream, rwrec)) == 0);
         break;
       case LOAD_MAXIMUM:
-        while ((rv = skStreamReadRecord(stream, &rwrec)) == SKSTREAM_OK) {
-            maximumAdd(&rwrec);
-        }
+        do {
+            maximumAdd(rwRecGetStartTime(rwrec), rwRecGetEndTime(rwrec),
+                       rwRecGetBytes(rwrec), rwRecGetPkts(rwrec));
+        } while ((rv = skStreamReadRecord(stream, rwrec)) == 0);
         break;
       case LOAD_MINIMUM:
-        while ((rv = skStreamReadRecord(stream, &rwrec)) == SKSTREAM_OK) {
-            minimumAdd(&rwrec);
-        }
+        do {
+            minimumAdd(rwRecGetStartTime(rwrec), rwRecGetEndTime(rwrec),
+                       rwRecGetBytes(rwrec), rwRecGetPkts(rwrec));
+        } while ((rv = skStreamReadRecord(stream, rwrec)) == 0);
         break;
     }
 
-  END:
-    if (rv == SKSTREAM_ERR_EOF) {
-        rv = 0;
-    } else {
-        skStreamPrintLastErr(stream, rv, &skAppPrintErr);
-    }
-    return rv;
+    return ((SKSTREAM_ERR_EOF == rv) ? 1 : -1);
 }
 
 
@@ -1009,22 +972,67 @@ printBins(
 
 int main(int argc, char ** argv)
 {
-    skstream_t *stream;
     FILE *stream_out;
-    int rv = 0;
+    FILE *print_filenames;
+    skstream_t *copy_stream;
+    skstream_t *stream;
+    rwRec rwrec;
+    char filename[PATH_MAX];
+    ssize_t rv;
 
     appSetup(argc, argv);
 
-    /* process input */
-    while ((rv = skOptionsCtxNextSilkFile(optctx, &stream, &skAppPrintErr))
+    print_filenames = skOptionsCtxGetPrintFilenames(optctx);
+    copy_stream = skOptionsCtxGetCopyStream(optctx);
+
+    rwRecInitialize(&rwrec, NULL);
+
+    /* Get the name of each input file from the options context */
+    while ((rv = skOptionsCtxNextArgument(optctx, filename, sizeof(filename)))
            == 0)
     {
-        rv = countFile(stream);
-        skStreamDestroy(&stream);
+        if (print_filenames) {
+            fprintf(print_filenames, "%s\n", filename);
+        }
+
+        /* Open the file as an unknown stream of flow records. */
+        if ((rv = skStreamCreate(&stream, SK_IO_READ, SK_CONTENT_SILK_FLOW))
+            || (rv = skStreamBind(stream, filename))
+            || (rv = skStreamOpen(stream)))
+        {
+            skStreamPrintLastErr(stream, rv, skAppPrintErr);
+            skStreamDestroy(&stream);
+            continue;
+        }
+
+        if (copy_stream) {
+            rv = skStreamSetCopyInput(stream, copy_stream);
+            if (rv) {
+                skStreamPrintLastErr(stream, rv, skAppPrintErr);
+                skStreamDestroy(&stream);
+                continue;
+            }
+        }
+
+        /* Get first record */
+        rv = skStreamReadRecord(stream, &rwrec);
         if (rv) {
-            exit(EXIT_FAILURE);
+            if (SKSTREAM_ERR_EOF != rv) {
+                skStreamPrintLastErr(stream, rv, &skAppPrintErr);
+            }
+            skStreamDestroy(&stream);
+            continue;
+        }
+
+        /* Go to function to read from the stream. */
+        rv = countFileSilk(stream, &rwrec);
+        skStreamDestroy(&stream);
+        if (rv != 1) {
+            break;
         }
     }
+
+    /* process input */
     if (rv < 0) {
         exit(EXIT_FAILURE);
     }

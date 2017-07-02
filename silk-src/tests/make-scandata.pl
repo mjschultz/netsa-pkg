@@ -1,12 +1,9 @@
 #! /usr/bin/perl -w
 #
-
 #######################################################################
-## Copyright (C) 2009-2017 by Carnegie Mellon University.
-##
-## @OPENSOURCE_LICENSE_START@
-## See license information in ../LICENSE.txt
-## @OPENSOURCE_LICENSE_END@
+#  Copyright (C) 2009-2017 by Carnegie Mellon University.
+#
+#  See end of file
 #######################################################################
 #  make-scandata.pl
 #
@@ -23,7 +20,7 @@
 #  Mark Thomas
 #  March 2009
 #######################################################################
-#  RCSIDENT("$SiLK: make-scandata.pl 275df62a2e41 2017-01-05 17:30:40Z mthomas $")
+#  RCSIDENT("$SiLK: make-scandata.pl efd886457770 2017-06-21 18:43:23Z mthomas $")
 #######################################################################
 
 
@@ -479,3 +476,11 @@ EOF
 }
 
 __END__
+
+#######################################################################
+# Copyright (C) 2009-2017 by Carnegie Mellon University.
+#
+# @OPENSOURCE_LICENSE_START@
+# See license information in ../LICENSE.txt
+# @OPENSOURCE_LICENSE_END@
+#######################################################################

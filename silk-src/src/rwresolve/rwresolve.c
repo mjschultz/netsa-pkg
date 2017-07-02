@@ -59,7 +59,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwresolve.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
+RCSIDENT("$SiLK: rwresolve.c d1637517606d 2017-06-23 16:51:31Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/skipaddr.h>
@@ -286,9 +286,7 @@ static char delim_str[2];
 
 /* hash tables to cache DNS results for IPv4 and IPv6 lookups */
 static HashTable *hash4 = NULL;
-#if SK_ENABLE_IPV6
 static HashTable *hash6 = NULL;
-#endif
 
 /* value that indicates the cache failed to allocate memory */
 #define RWRES_CACHE_FAIL UINT32_MAX
@@ -899,12 +897,10 @@ reallocCache(
         hashlib_free_table(hash4);
         hash4 = NULL;
     }
-#if SK_ENABLE_IPV6
     if (hash6) {
         hashlib_free_table(hash6);
         hash6 = NULL;
     }
-#endif
 
     if (recreate) {
         hash4 = hashlib_create_table(sizeof(uint32_t), sizeof(uint32_t),
@@ -915,7 +911,6 @@ reallocCache(
             PERROR_MEM;
             exit(EXIT_FAILURE);
         }
-#if SK_ENABLE_IPV6
         if (resolver == RESOLVE_GETNAMEINFO
             || resolver == RESOLVE_CARES_SUBMIT)
         {
@@ -929,7 +924,6 @@ reallocCache(
                 exit(EXIT_FAILURE);
             }
         }
-#endif  /* SK_ENABLE_IPV6 */
     }
 }
 
@@ -965,9 +959,6 @@ cacheName(
     static uint32_t vector_idx = 0;
     size_t len = 1 + strlen(name);
     uint32_t rv;
-
-    /* if namebuf is NULL, then namebuf_avail must be zero */
-    assert(NULL != namebuf || 0 == namebuf_avail);
 
     if (len > namebuf_avail) {
         if ((0 == namebuf_size) || (NAMEBUF_MAX_SIZE == namebuf_size)) {
@@ -1254,7 +1245,6 @@ getLine(
             if (skStringParseIP(&line->part[i].ip, cp)) {
                 /* parsing failed, print as any other text */
                 line->part[i].has_addr = 0;
-#if SK_ENABLE_IPV6
             } else if (skipaddrIsV6(&line->part[i].ip)) {
                 if ((resolver == RESOLVE_GETNAMEINFO)
                     || (resolver == RESOLVE_CARES_SUBMIT))
@@ -1266,7 +1256,6 @@ getLine(
                      * v6 addresses.  Print as text */
                     line->part[i].has_addr = 0;
                 }
-#endif  /* SK_ENABLE_IPV6 */
             } else {
                 /* IP is v4 */
                 line->part[i].has_addr = 1;
@@ -1451,7 +1440,6 @@ resolve_getnameinfo(
     struct sockaddr_in sa4;
     int rv;
 
-#if SK_ENABLE_IPV6
     struct sockaddr_in6 sa6;
 
     memset(&sa6, 0, sizeof(sa6));
@@ -1459,7 +1447,6 @@ resolve_getnameinfo(
 #ifdef SIN6_LEN
     sa6.sin6_len = sizeof(struct sockaddr_in6);
 #endif
-#endif  /* SK_ENABLE_IPV6 */
 
     memset(&sa4, 0, sizeof(sa4));
     sa4.sin_family = AF_INET;
@@ -1476,7 +1463,6 @@ resolve_getnameinfo(
                 continue;
             }
 
-#if SK_ENABLE_IPV6
             if (skipaddrIsV6(&line->part[i].ip)) {
                 skipaddrGetV6(&line->part[i].ip, sa6.sin6_addr.s6_addr);
                 rv = hashlib_insert(hash6, (uint8_t*)sa6.sin6_addr.s6_addr,
@@ -1530,7 +1516,6 @@ resolve_getnameinfo(
                 /* get the next part */
                 continue;
             }
-#endif  /* SK_ENABLE_IPV6 */
 
             /* address is IPv4 */
             sa4.sin_addr.s_addr = htonl(skipaddrGetV4(&line->part[i].ip));
@@ -1953,14 +1938,11 @@ rwres_callback(
     }
 
     /* update value in the hash */
-#if SK_ENABLE_IPV6
     if (skipaddrIsV6(&line_part->ip)) {
         char ipv6[16];
         skipaddrGetV6(&line_part->ip, ipv6);
         rv = hashlib_insert(hash6, (uint8_t*)ipv6, (uint8_t**)&cache_id);
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         uint32_t ipv4;
         ipv4 = htonl(skipaddrGetV4(&line_part->ip));
         rv = hashlib_insert(hash4, (uint8_t*)&ipv4, (uint8_t**)&cache_id);
@@ -2015,8 +1997,6 @@ resolve_cares_submit(
     int rv;
     struct ares_options ares_opts;
     int ares_optmask = 0;
-
-#if SK_ENABLE_IPV6
     struct sockaddr_in6 sa6;
 
     memset(&sa6, 0, sizeof(sa6));
@@ -2024,7 +2004,6 @@ resolve_cares_submit(
 #ifdef SIN6_LEN
     sa6.sin6_len = sizeof(struct sockaddr_in6);
 #endif
-#endif  /* SK_ENABLE_IPV6 */
 
     memset(&sa4, 0, sizeof(sa4));
     sa4.sin_family = AF_INET;
@@ -2095,7 +2074,6 @@ resolve_cares_submit(
                 if (line->part[i].cache_id != RWRES_WAITING) {
                     cache_id = &line->part[i].cache_id;
 
-#if SK_ENABLE_IPV6
                 } else if (skipaddrIsV6(&line->part[i].ip)) {
                     skipaddrGetV6(&line->part[i].ip, sa6.sin6_addr.s6_addr);
                     if (hashlib_lookup(hash6, (uint8_t*)sa6.sin6_addr.s6_addr,
@@ -2103,7 +2081,6 @@ resolve_cares_submit(
                     {
                         skAbort();
                     }
-#endif  /* SK_ENABLE_IPV6 */
 
                 } else {
                     sa4.sin_addr.s_addr
@@ -2211,7 +2188,6 @@ resolve_cares_submit(
                 continue;
             }
 
-#if SK_ENABLE_IPV6
             if (skipaddrIsV6(&line->part[i].ip)) {
                 skipaddrGetV6(&line->part[i].ip, sa6.sin6_addr.s6_addr);
                 rv = hashlib_insert(hash6, (uint8_t*)sa6.sin6_addr.s6_addr,
@@ -2242,9 +2218,7 @@ resolve_cares_submit(
                                      rwres_callback, &line->part[i]);
                     break;
                 }
-            } else
-#endif  /* SK_ENABLE_IPV6 */
-            {
+            } else {
                 /* address is IPv4 */
                 sa4.sin_addr.s_addr = htonl(skipaddrGetV4(&line->part[i].ip));
                 rv = hashlib_insert(hash4, (uint8_t*)&sa4.sin_addr.s_addr,

@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_INTDICT_H, "$SiLK: intdict.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_INTDICT_H, "$SiLK: intdict.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 /*
 **  intdict.h

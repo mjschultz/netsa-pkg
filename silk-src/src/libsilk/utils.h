@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
+RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h b08fbf516b99 2017-06-29 20:56:50Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -54,14 +54,14 @@ RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h 6ed7bbd25102 2017-03-21 20:57:52Z mth
 #define SK_TEMPDIR_DEFAULT "/tmp"
 
 /**
- *    Name of primary envionment variable that holds name of temp
+ *    Name of primary environment variable that holds name of temp
  *    directory.  This is consulted when the --temp-dir switch is not
  *    given.
  */
 #define SK_TEMPDIR_ENVAR1 "SILK_TMPDIR"
 
 /**
- *    Name of alternate envionment variable that holds name of temp
+ *    Name of alternate environment variable that holds name of temp
  *    directory.  Used when the --temp-dir switch is not given and the
  *    variable named by SK_TMPDIR_ENVAR1 is not set.
  */
@@ -800,19 +800,15 @@ skAppStandardUsage(
 typedef struct silk_features_st {
     uint64_t struct_version;
     uint8_t  big_endian;
-    uint8_t  enable_ipv6;
     uint8_t  enable_gnutls;
-    uint8_t  enable_ipfix;
     uint8_t  enable_localtime;
 } silk_features_t;
 
 #define SILK_FEATURES_DEFINE_STRUCT(var_name)   \
     const silk_features_t var_name = {          \
-        2,                                      \
+        3,                                      \
         SK_BIG_ENDIAN,                          \
-        SK_ENABLE_IPV6,                         \
         SK_ENABLE_GNUTLS,                       \
-        SK_ENABLE_IPFIX,                        \
         SK_ENABLE_LOCALTIME                     \
     }
 
@@ -955,7 +951,7 @@ skTraceMsg(
  */
 int
 skAppSetSignalHandler(
-    void (*sig_handler)(int signal));
+    void              (*sig_handler)(int signal));
 
 
 /**
@@ -1033,6 +1029,273 @@ skAppPrintOutOfMemoryMsgFunction(
     const char         *file_name,
     int                 line_number,
     const char         *object_name);
+
+
+/**
+ *    Value to be used in the 'flags' value to sk_alloc_flags(),
+ *    sk_alloc_memory(), and sk_alloc_helper_func() that indicates the
+ *    allocator does not need to free the memory.
+ */
+#define SK_ALLOC_FLAG_NO_CLEAR  (1u << 0)
+
+/**
+ *    Value to be used in the 'flags' value to sk_alloc_flags(),
+ *    sk_alloc_memory(), and sk_alloc_helper_func() that indicates the
+ *    allocator should return NULL on memory allocation error.
+ */
+#define SK_ALLOC_FLAG_NO_EXIT   (1u << 1)
+
+
+/*
+ *    Internal helper macro for sk_alloc(), sk_alloc_array(),
+ *    sk_alloc_flags(), and sk_alloc_memory() that calls
+ *    sk_alloc_helper_func() with the appriopriate values and casts
+ *    the return value to the appropriate type.
+ */
+#ifdef SK_HAVE_C99___FUNC__
+#define sk_alloc_helper(ah_ret_type, ah_sz_type, ah_count, ah_flags)  \
+    ((ah_ret_type *)sk_alloc_helper_func(                             \
+        ah_count, sizeof(ah_sz_type), ah_flags,          \
+        #ah_sz_type, __func__, __FILE__, __LINE__))
+#else
+#define sk_alloc_helper(ah_ret_type, ah_sz_type, ah_count, ah_flags)  \
+    ((ah_ret_type *)sk_alloc_helper_func(                             \
+        ah_count, sizeof(ah_sz_type), ah_flags,          \
+        #ah_sz_type, NULL, __FILE__, __LINE__))
+#endif
+
+/*
+ *    Internal helper macro for sk_alloc_realloc() and
+ *    sk_alloc_realloc_noclear() that calls
+ *    sk_alloc_realloc_helper_func() with the appropriate values.
+ */
+#ifdef SK_HAVE_C99___FUNC__
+#define sk_alloc_realloc_helper(ah_obj, ah_ret_type, ah_sz_type, ah_new, ah_old, ah_flags) \
+    ((ah_ret_type *)sk_alloc_realloc_helper_func(                       \
+        ah_obj, ah_new, sizeof(ah_sz_type), ah_old, ah_flags,           \
+        #ah_sz_type, __func__, __FILE__, __LINE__))
+#else
+#define sk_alloc_realloc_helper(ah_obj, ah_ret_type, ah_sz_type, ah_new, ah_old, ah_flags) \
+    ((ah_ret_type *)sk_alloc_realloc_helper_func(                       \
+        ah_obj, ah_new, sizeof(ah_sz_type), ah_old, ah_flags,           \
+        #ah_sz_type, NULL, __FILE__, __LINE__))
+#endif
+
+/*
+ *    Internal helper macro for sk_alloc_strdup() and
+ *    sk_alloc_strdup_flags() that calls sk_alloc_strdup_helper_func()
+ *    with the appriopriate values.
+ */
+#ifdef SK_HAVE_C99___FUNC__
+#define sk_alloc_strdup_helper(ah_str, ah_flags)                        \
+    sk_alloc_strdup_helper_func(ah_str, ah_flags, __func__, __FILE__, __LINE__)
+#else
+#define sk_alloc_strdup_helper(ah_str, ah_flags)                        \
+    sk_alloc_strdup_helper_func(ah_str, ah_flags, NULL, __FILE__, __LINE__)
+#endif
+
+
+/**
+ *    Allocate a single 'skalloc_type_name' object, bzero() the
+ *    memory, and cast the result to an 'skalloc_type_name *'.  Exit
+ *    on allocation failure.
+ */
+#define sk_alloc(skalloc_type_name)             \
+    sk_alloc_helper(skalloc_type_name, skalloc_type_name, 1, 0)
+
+/**
+ *    Allocate an array of 'skalloc_count' 'skalloc_type_name'
+ *    objects, bzero() the memory, and cast the memory to an
+ *    'skalloc_type_name *'.  Exit on allocation failure.
+ */
+#define sk_alloc_array(skalloc_type_name, skalloc_count)        \
+    sk_alloc_helper(skalloc_type_name, skalloc_type_name, (skalloc_count), 0)
+
+/**
+ *    Allocate 'skalloc_count' bytes of memory and return a 'void *'.
+ *    The 'skalloc_flags' argument is passed as the 'flags' argument
+ *    to sk_alloc_helper_func().
+ */
+#define sk_alloc_bytes(skalloc_count, skalloc_flags)            \
+    sk_alloc_helper(void, char, (skalloc_count), skalloc_flags)
+
+/**
+ *    Allocate a single 'skalloc_type_name' object and cast the result
+ *    to an 'skalloc_type_name *'.  The 'skalloc_flags' argument is
+ *    passed as the 'flags' argument to sk_alloc_helper_func().
+ */
+#define sk_alloc_flags(skalloc_type_name, skalloc_flags)        \
+    sk_alloc_helper(skalloc_type_name, skalloc_type_name, 1, (skalloc_flags))
+
+/**
+ *    Allocate an array of 'skalloc_count' 'skalloc_type_name' objects
+ *    and cast the result to an 'skalloc_type_name *'.  The
+ *    'skalloc_flags' argument is passed as the 'flags' argument to
+ *    sk_alloc_helper_func().
+ */
+#define sk_alloc_memory(skalloc_type_name, skalloc_count, skalloc_flags) \
+    sk_alloc_helper(skalloc_type_name, skalloc_type_name,               \
+                    (skalloc_count), (skalloc_flags))
+
+/**
+ *    Reallocate the array 'skalloc_obj' that contains 'skalloc_type'
+ *    objects.  The array is reallocated to hold 'skalloc_new_count'
+ *    count elements.  The return value is cast to an
+ *    'skalloc_type_name *'.
+ *
+ *    When 'skalloc_old_count' is provided and it is smaller than
+ *    'skalloc_new_count', the new allocated memory is cleared unless
+ *    SK_ALLOC_FLAG_NO_CLEAR is specified in 'skalloc_flags;.
+ *
+ *    On allocation failure, the program exits unless 'skalloc_flags'
+ *    contains SK_ALLOC_FLAG_NO_EXIT.  For that case, NULL is
+ *    returned.
+ *
+ *    If 'skalloc_obj' is NULL, the result is the same as if
+ *    sk_alloc_memory() had been called.
+ */
+#define sk_alloc_realloc(skalloc_obj, skalloc_type, skalloc_new_count, skalloc_old_count, skalloc_flags) \
+    sk_alloc_realloc_helper(skalloc_obj, skalloc_type, skalloc_type,    \
+                            skalloc_new_count, skalloc_old_count,       \
+                            skalloc_flags)
+
+/**
+ *    Reallocate the array 'skalloc_obj' that contains 'skalloc_type'
+ *    objects.  The array is reallocated to hold 'skalloc_new_count'
+ *    count elements.  The return value is cast to an
+ *    'skalloc_type_name *'.
+ *
+ *    Do not clear the newly allocated part of the array.  Exit on
+ *    memory allocation error.
+ */
+#define sk_alloc_realloc_noclear(skalloc_obj, skalloc_type, skalloc_new_count) \
+    sk_alloc_realloc_helper(skalloc_obj, skalloc_type, skalloc_type,    \
+                            skalloc_new_count, SIZE_MAX,                \
+                            SK_ALLOC_FLAG_NO_CLEAR)
+
+/**
+ *    Allocate a string of the same size as 'str' (including the
+ *    terminating '\0'), and copy the contents of 'str' to the new
+ *    string.  The 'skalloc_flags' argument is passed as the 'flags'
+ *    argument to sk_alloc_strdup_helper_func().
+ */
+#define sk_alloc_strdup_flags(str, skalloc_flags) \
+    sk_alloc_strdup_helper((str), (flags))
+
+/**
+ *    Allocate a string of the same size as 'str' (including the
+ *    terminating '\0'), and copy the contents of 'str' to the new
+ *    string.  Exit on allocation failure.
+ */
+#define sk_alloc_strdup(str) sk_alloc_strdup_helper((str), 0)
+
+/**
+ *    Please do not call this function directly.  Use the above macros
+ *    instead.
+ *
+ *    This is a helper function to support sk_alloc(),
+ *    sk_alloc_array(), sk_alloc_bytes(), sk_alloc_flags(), and
+ *    sk_alloc_memory().
+ *
+ *    Allocate 'obj_count' objects of size 'obj_size' and return a
+ *    pointer to the newly allocated memory.
+ *
+ *    The memory is cleared (bzero()'ed) unless 'flags' includes
+ *    SK_ALLOC_FLAG_NO_CLEAR.
+ *
+ *    Failure to allocate the memory causes the function to write an
+ *    error message---using skAppPrintErr() or the function set by
+ *    skAppSetFuncPrintFatalErr()---and exit(3) the application unless
+ *    'flags' includes SK_ALLOC_FLAG_NO_EXIT.  When that flag is
+ *    specified, no message is printed and the function returns NULL.
+ *
+ *    The remaining parameters are used to generate the error message.
+ *    'type_name' is the name of the type begin allocated; 'func_name'
+ *    names the function doing the allocation; 'file_name' and
+ *    'line_num' specify the file and line of source code where this
+ *    function was called.
+ */
+void *
+sk_alloc_helper_func(
+    size_t              obj_count,
+    size_t              obj_size,
+    unsigned int        flags,
+    const char         *type_name,
+    const char         *func_name,
+    const char         *file_name,
+    int                 line_num);
+
+/**
+ *    Please do not call this function directly.  Use the above macros
+ *    instead.
+ *
+ *    This is a helper function to support sk_alloc_realloc() and
+ *    sk_alloc_realloc_noclear().
+ *
+ *    Reallocate the current array 'old_array' to instead hold
+ *    'obj_new_count' objects of size 'obj_size' and return a pointer
+ *    to the newly reallocated memory.
+ *
+ *    If 'old_array' is NULL, call sk_alloc_helper_func() to allocate
+ *    the array.
+ *
+ *    When 'flags' does not include SK_ALLOC_FLAG_NO_CLEAR and
+ *    'obj_old_count' is less than 'obj_new_count', the newly
+ *    allocated part of the array is cleared (bzero()'ed).
+ *
+ *    Failure to reallocate the memory causes the function to write an
+ *    error message---using skAppPrintErr() or the function set by
+ *    skAppSetFuncPrintFatalErr()---and exit(3) the application unless
+ *    'flags' includes SK_ALLOC_FLAG_NO_EXIT.  When that flag is
+ *    specified, no message is printed and the function returns NULL.
+ *
+ *    The remaining parameters are used to generate the error message.
+ *    'type_name' is the name of the type begin reallocated; 'func_name'
+ *    names the function doing the reallocation; 'file_name' and
+ *    'line_num' specify the file and line of source code where this
+ *    function was called.
+ */
+void *
+sk_alloc_realloc_helper_func(
+    void               *old_array,
+    size_t              obj_new_count,
+    size_t              obj_size,
+    size_t              obj_old_count,
+    unsigned int        flags,
+    const char         *type_name,
+    const char         *func_name,
+    const char         *file_name,
+    int                 line_num);
+
+/**
+ *    Please do not call this function directly.  Use the above macros
+ *    instead.
+ *
+ *    This is a helper function to support sk_alloc_strdup() and
+ *    sk_alloc_strdup_flags().
+ *
+ *    Allocate a string of the same size as 'str' (including the
+ *    terminating '\0'), and return a pointer to the newly allocated
+ *    memory.
+ *
+ *    Failure to allocate the memory causes the function to write an
+ *    error message---using skAppPrintErr() or the function set by
+ *    skAppSetFuncPrintFatalErr()---and exit(3) the application unless
+ *    'flags' includes SK_ALLOC_FLAG_NO_EXIT.  When that flag is
+ *    specified, no message is printed and the function returns NULL.
+ *
+ *    The remaining parameters are used to generate the error message.
+ *    'func_name' names the function doing the allocation; 'file_name'
+ *    and 'line_num' specify the file and line of source code where
+ *    this function was called.
+ */
+char *
+sk_alloc_strdup_helper_func(
+    const char         *str,
+    unsigned int        flags,
+    const char         *func_name,
+    const char         *file_name,
+    int                 line_num);
 
 
 /*
@@ -1304,22 +1567,13 @@ skOptionsTempDirUsage(
 /**
  *    Registers an --ip-format switch for the application that allows
  *    the user to specify how IP addresses will be displayed.
+ *    Use skOptionsIPFormatUsage() to print the usage for
+ *    these switches.
  *
  *    The parameter 'var_location' must be specified.  The variable at
  *    that location will be set to the value the user specifies in the
  *    various switches.  This value will be one of the values defined
  *    in skipaddr_flags_t.
- *
- *    Use skOptionsIPFormatUsage() to print the usage for these
- *    switches.
- *
- *    The 'settings' parameter registers additional switches.
- *
- *    When SK_OPTION_IP_FORMAT_INTEGER_IPS is specified, an
- *    --integer-ips switch is also registered.
- *
- *    When SK_OPTION_IP_FORMAT_ZERO_PAD_IPS is specified, a
- *    --zero-pad-ips switch is also registered.
  *
  *    The variable at 'var_location' is only modified if the user
  *    specifies the --ip-format switch.
@@ -1328,13 +1582,10 @@ skOptionsTempDirUsage(
  *    'var_location' is initialized with the result of parsing that
  *    variable's value as if it was an argument to the --ip-format
  *    switch.
- *
- *    The 'settings' parameter was added in SiLK 3.15.0.
  */
 int
 skOptionsIPFormatRegister(
-    uint32_t           *var_location,
-    uint32_t            settings);
+    uint32_t           *var_location);
 
 /**
  *    Print the usage information for the switches registered by
@@ -1343,20 +1594,6 @@ skOptionsIPFormatRegister(
 void
 skOptionsIPFormatUsage(
     FILE               *fp);
-
-/**
- *    A bit to include in the 'settings' argument to
- *    skOptionsIPFormatRegister() that indicates an --integer-ips
- *    switch should be included.  Since SiLK 3.15.0.
- */
-#define SK_OPTION_IP_FORMAT_INTEGER_IPS     (1 << 0)
-
-/**
- *    A bit to include in the 'settings' argument to
- *    skOptionsIPFormatRegister() that indicates an --zero-pad-ips
- *    switch should be included.  Since SiLK 3.15.0.
- */
-#define SK_OPTION_IP_FORMAT_ZERO_PAD_IPS    (1 << 1)
 
 
 /**
@@ -1382,16 +1619,6 @@ skOptionsIPFormatUsage(
  *    in 'var_location' never has the SKTIMESTAMP_NOMSEC bit set and
  *    --timestamp-format does not support 'no-msec'.
  *
- *    When SK_OPTION_TIMESTAMP_OPTION_LEGACY is specified, a
- *    --legacy-timestamps switch is also registered.
- *
- *    When SK_OPTION_TIMESTAMP_OPTION_EPOCH is specified, an
- *    --epoch-timestamps switch is also registered.
- *
- *    When SK_OPTION_TIMESTAMP_OPTION_EPOCH_NAME is specified, the
- *    first string in the variable options is used as the name of a
- *    switch that has the same effect as '--epoch-timestamps'.
- *
  *    If the SILK_TIMESTAMP_FORMAT environment variable is set, the
  *    value in 'var_location' is initialized with the result of
  *    parsing that variable's value as if it was an argument to the
@@ -1402,8 +1629,7 @@ skOptionsIPFormatUsage(
 int
 skOptionsTimestampFormatRegister(
     uint32_t           *var_location,
-    uint32_t            settings,
-    ...);
+    uint32_t            settings);
 
 /**
  *    Print the usage information for the switches registered by
@@ -1423,7 +1649,7 @@ skOptionsTimestampFormatUsage(
  *    SKTIMESTAMP_NOMSEC flag is always set on the result, and
  *    "no-msec" is not allowed in --timestamp-format.
  */
-#define SK_OPTION_TIMESTAMP_NEVER_MSEC          (1 << 0)
+#define SK_OPTION_TIMESTAMP_NEVER_MSEC          (1u << 0)
 
 /**
  *    A bit to include in the 'settings' argument to
@@ -1431,29 +1657,7 @@ skOptionsTimestampFormatUsage(
  *    application only supports fractional seconds.  The "no-msec"
  *    is not allowed in --timestamp-format.
  */
-#define SK_OPTION_TIMESTAMP_ALWAYS_MSEC         (1 << 1)
-
-/**
- *    A bit to include in the 'settings' argument to
- *    skOptionsTimestampFormatRegister() that indicates an
- *    --epoch-time switch should be included.
- */
-#define SK_OPTION_TIMESTAMP_OPTION_EPOCH        (1 << 2)
-
-/**
- *    Similar to SK_OPTION_TIMESTAMP_OPTION_EPOCH except this
- *    indicates the name for the switch is included as one of the
- *    var-args values.  This takes precedence when
- *    SK_OPTION_TIMESTAMP_OPTION_EPOCH is also specified.
- */
-#define SK_OPTION_TIMESTAMP_OPTION_EPOCH_NAME   (1 << 3)
-
-/**
- *    A bit to include in the 'settings' argument to
- *    skOptionsTimestampFormatRegister() that indicates a
- *    --legacy-timestamps switch should be included.
- */
-#define SK_OPTION_TIMESTAMP_OPTION_LEGACY       (1 << 4)
+#define SK_OPTION_TIMESTAMP_ALWAYS_MSEC         (1u << 1)
 
 
 
@@ -1475,10 +1679,6 @@ skOptionsTimestampFormatUsage(
  *        skOptionsCtxCreate()
  *        skOptionsCtxOptionsRegister()
  *        skOptionsCtxOptionsParse()
- *        // use one of these two while() loops
- *        while (0==skOptionsCtxNextSilkFile()) {
- *            // process file
- *        }
  *        while (0==skOptionsCtxNextArgument()) {
  *            // process argument
  *        }
@@ -1499,7 +1699,8 @@ typedef struct sk_options_ctx_st sk_options_ctx_t;
 #define SK_OPTIONS_CTX_XARGS            (1u <<  3)
 #define SK_OPTIONS_CTX_INPUT_SILK_FLOW  (1u <<  4)
 #define SK_OPTIONS_CTX_INPUT_BINARY     (1u <<  5)
-#define SK_OPTIONS_CTX_INPUT_PIPE       (1u << 30)
+#define SK_OPTIONS_CTX_FGLOB            (1u <<  6)
+#define SK_OPTIONS_CTX_IPV6_POLICY      (1u << 29)
 #define SK_OPTIONS_CTX_SWITCHES_ONLY    (1u << 31)
 
 
@@ -1546,13 +1747,13 @@ skOptionsCtxCountArgs(
  *    'flags' is an OR of:
  *
  *    SK_OPTIONS_CTX_PRINT_FILENAMES -- Cause a --print-filenames
- *    switch to be registered and, when the switch is specified, have
- *    skOptionsCtxNextSilkFile() print the filenames as the files are
- *    opened.
+ *    switch to be registered. Get the status of the switch via
+ *    skOptionsCtxGetPrintFilenames().
  *
  *    SK_OPTIONS_CTX_COPY_INPUT -- Cause a --copy-input switch to be
- *    registered and, when the switch is specified, have
- *    skOptionsCtxNextSilkFile() copy their records to the named file.
+ *    registered.  Get the stream to which input is to be copied via
+ *    skOptionsCtxGetCopyStream().  Imples
+ *    SK_OPTIONS_CTX_INPUT_SILK_FLOW
  *
  *    SK_OPTIONS_CTX_ALLOW_STDIN -- Have the application default to
  *    reading from the standard input when no other input is
@@ -1562,6 +1763,11 @@ skOptionsCtxCountArgs(
  *    and, when the switch is specified, read the names of the input
  *    files from the named stream (or from the standard input when no
  *    argument is give to the switch).
+ *
+ *    SK_OPTIONS_CTX_FGLOB -- Cause the fglobbing switches to be
+ *    registered and, when one of the switches is specified, generate
+ *    the names of files that exist in the SiLK data repository.
+ *    Implies SK_OPTIONS_CTX_INPUT_SILK_FLOW.
  *
  *    SK_OPTIONS_CTX_INPUT_SILK_FLOW -- Whether the input to the
  *    application is SiLK Flow records.  When set, prevents the
@@ -1573,13 +1779,12 @@ skOptionsCtxCountArgs(
  *    reading from standard input when standard input is connected to
  *    a terminal.
  *
- *    SK_OPTIONS_CTX_INPUT_PIPE -- Cause an --input-pipe switch to be
- *    registered and, when the switch is specified, read input from
- *    the file, stream, or pipe.
+ *    SK_OPTIONS_CTX_IPV6_POLICY -- Cause a --ipv6-policy switch to be
+ *    registered.  Get the policy via skOptionsCtxGetIPv6Policy().
  *
  *    SK_OPTIONS_CTX_SWITCHES_ONLY -- Cause the application to
  *    complain when any non-switched argument appears on the command
- *    line.
+ *    line.  Cannot be used with ANY other flag.
  */
 int
 skOptionsCtxCreate(
@@ -1597,6 +1802,36 @@ skOptionsCtxDestroy(
     sk_options_ctx_t  **arg_ctx);
 
 /**
+ *    Return the current copy stream or NULL if --copy-input is not
+ *    active.
+ */
+skstream_t*
+skOptionsCtxGetCopyStream(
+    const sk_options_ctx_t *arg_ctx);
+
+/**
+ *    Simulate a call to skFGlobSetFilters() when the options context
+ *    is configured to provide fglob support.  Invoking this function
+ *    transfers ownership of the bitmaps to the caller.
+ */
+int
+skOptionsCtxGetFGlobFilters(
+    sk_options_ctx_t   *arg_ctx,
+    sk_bitmap_t       **sensor_bitmap,
+    sk_bitmap_t       **flowtype_bitmap);
+
+
+/**
+ *    Return the current IPv6 policy.  If the 'flags' parameter to
+ *    skOptionsCtxCreate() did not contain SK_OPTIONS_CTX_IPV6_POLICY,
+ *    the return value is SK_IPV6POLICY_MIX.  If the user did not set
+ *    a policy, the default policy is SK_IPV6POLICY_MIX.
+ */
+sk_ipv6policy_t
+skOptionsCtxGetIPv6Policy(
+    const sk_options_ctx_t *arg_ctx);
+
+/**
  *    When --print-filenames has been specified, return the file
  *    handle to which the file names are being printed.  If
  *    --print-filenames has not been specified, this function returns
@@ -1607,58 +1842,21 @@ skOptionsCtxGetPrintFilenames(
     const sk_options_ctx_t *arg_ctx);
 
 /**
- *    Set the value in 'arg' to point to the next input.  Return 0 if
- *    there is more input, 1 if there is no more input, or -1 when
- *    getting input from --xargs and there is a read error.  The
- *    caller should not modify the value in 'arg'; calling this
- *    function may invalidate any previous 'arg' value.
+ *    Copy the name of the next input into the buffer 'buf'.  The
+ *    caller must specify the size of buffer in 'bufsize'.  Return 0
+ *    if there is more input, 1 if there is no more input, or -1 when
+ *    getting input from --xargs and there is a read error.
  *
  *    Depending on the value of 'flags' when the context was created,
- *    the next argument may be (1)the value specified to the
- *    --input-pipe switch, (2)a name read from --xargs, (3)a file
- *    listed on the command line, (4)the value "-" for the standard
- *    input.
+ *    the next argument may be (1)a name read from --xargs, (2)a file
+ *    in the SiLK data repository, (3)a file listed on the command
+ *    line, (4)the value "-" for the standard input.
  */
 int
 skOptionsCtxNextArgument(
     sk_options_ctx_t   *arg_ctx,
-    char              **arg);
-
-/**
- *    A wrapper for skOptionsCtxNextArgument() that treats the string
- *    as a file name and attempts to open it as a SiLK Flow file.
- *    Return 0 on success, 1 if no more files, or -1 on error.  When
- *    'err_fn' is specified, any error opening a file is reported
- *    using that function.
- *
- *    If the skOptionsCtxSetOpenCallback() function was used to set a
- *    callback function, that function will be called with the stream
- *    as an argument.  If the callback returns 0, the stream is
- *    returned to the caller.  If the callback returns 1, the stream
- *    is skipped.  If the callback returns -1, the processing of all
- *    input stops.
- *
- *    The function will print the name of the file if
- *    --print-filenames was specified.  Will set the SiLK flow records
- *    to be copied to the --copy-input stream.
- */
-int
-skOptionsCtxNextSilkFile(
-    sk_options_ctx_t   *arg_ctx,
-    skstream_t        **stream,
-    sk_msg_fn_t         err_fn);
-
-typedef int (*sk_options_ctx_open_cb_t)(
-    skstream_t *stream);
-
-
-/**
- *    Specify a callback for skOptionsCtxNextSilkFile().
- */
-void
-skOptionsCtxSetOpenCallback(
-    sk_options_ctx_t           *arg_ctx,
-    sk_options_ctx_open_cb_t    open_callback_fn);
+    char               *buf,
+    size_t              bufsize);
 
 /**
  *    Call skOptionsParse() and arrange for any non-switched arguments
@@ -1678,7 +1876,7 @@ skOptionsCtxOptionsParse(
  */
 int
 skOptionsCtxOptionsRegister(
-    const sk_options_ctx_t *arg_ctx);
+    sk_options_ctx_t   *arg_ctx);
 
 /**
  *    Print usage information according to flags specified when the
@@ -1698,6 +1896,10 @@ int
 skOptionsCtxOpenStreams(
     sk_options_ctx_t   *arg_ctx,
     sk_msg_fn_t         err_fn);
+
+/*
+ *    skOptionsCtxCreateFlowIterator() is declared in skflowiter.h
+ */
 
 
 /*
@@ -2261,32 +2463,6 @@ skFileptrOpenPager(
 
 
 /**
- *    DEPRECATED.  Use skFileptrOpen() instead.
- *
- *    Open 'file' as a pipe or as a regular file depending on whether
- *    it is a gzipped file or not.  A file is considered gzipped if
- *    its name contains the string ".gz\0" or ".gz.".
- *
- *    The name of the file is given in the C-string 'file'; 'mode'
- *    determines whether to open 'file' for reading (mode==0) or
- *    writing (mode==1).
- *
- *    The file pointer to the newly opened file is put into 'fp'.  The
- *    value pointed to by 'isPipe' is set to 0 if fopen() was used to
- *    open the file, or 1 if popen() was used.  The caller is
- *    responsible for calling fclose() or pclose() as appropriate.
- *
- *    The function returns 0 on success, or 1 on failure.
- */
-int
-skOpenFile(
-    const char         *FName,
-    int                 mode,
-    FILE              **fp,
-    int                *isPipe);
-
-
-/**
  *    Make the complete directory path to 'directory', including
  *    parent(s) if required.  A return status of 0 indicates that
  *    'directory' exists---either this function created it or it
@@ -2344,57 +2520,6 @@ skTempDir(
 
 
 /**
- *    DEPRECATED.  Use skFileptrOpenPager() instead.
- *
- *    Attempts to redirect the '*output_stream' to the paging program
- *    '*pager.'
- *
- *    If output changed so that it goes to a pager, 1 is returned; if
- *    the output is unchanged, 0 is returned.  If an error occurred in
- *    invoking the pager, -1 is returned.
- *
- *    If the '*output_stream' is NULL, it is assumed that the output
- *    was being sent to stdout.  If the '*output_stream' is not stdout
- *    or not a terminal, no paging is preformed and 0 is returned.
- *
- *    If '*pager' is NULL, the environment variable SILK_PAGER is
- *    checked for the paging program; if that is NULL, the PAGER
- *    environment variable is checked.  If that is also NULL, no
- *    paging is performed and 0 is returned.
- *
- *    If there was a problem invoking the pager, an error is printed
- *    and -1 is returned.
- *
- *    If the pager was started, the *output_stream value is set to the
- *    pager stream, and *pager is set to the name of the pager (if the
- *    user's environment was consulted), and 1 is returned.  To close
- *    the pager, use the skClosePager() function, or call pclose() on
- *    the *output_stream.
- *
- *    Due to the race condition of checking the status of the child
- *    process, it is possible for 1 to be returned even though the
- *    pager has exited.  In this case the tool's output will be lost.
- */
-int
-skOpenPagerWhenStdoutTty(
-    FILE              **output_stream,
-    char              **pager);
-
-
-/**
- *    DEPRECATED
- *
- *    If skOpenPagerWhenStdoutTty() returns a positive value, use this
- *    function to close the pager stream.  Prints an error if the
- *    close fails.
- */
-void
-skClosePager(
-    FILE               *output_stream,
-    const char         *pager);
-
-
-/**
  *    Fill 'out_buffer' with the next non-blank, non-comment line read
  *    from 'stream'.  The caller should supply 'out_buffer' and pass
  *    its size in the 'buf_size' variable.  The return value is the
@@ -2444,6 +2569,90 @@ skwriten(
     int                 fd,
     const void         *buf,
     size_t              count);
+
+
+/**
+ *    Verify that the command string specified in 'cmd_string'
+ *    contains only the conversions specified in 'conversion_chars'.
+ *
+ *    Specifically, search 'cmd_string' for the character '%', and
+ *    verify that the character that follows '%' is either another '%'
+ *    or one of the characters specified in 'conversion_chars'.  In
+ *    addition, verify that the command does not contain a single '%'
+ *    at the end of the string.
+ *
+ *    If 'cmd_string' is the empty string or does not contain any
+ *    invalid conversions, return 0.
+ *
+ *    If 'cmd_string' is not valid, return the offset into
+ *    'cmd_string' of the invalid character that followed '%'.
+ */
+size_t
+skSubcommandStringCheck(
+    const char         *cmd_string,
+    const char         *conversion_chars);
+
+/**
+ *    Allocate and return a new string that contains 'cmd_string' with
+ *    any %-conversions expanded.
+ *
+ *    Specifically, create a new string and copy 'cmd_string' into it,
+ *    where the string "%%" is replaced with a single '%' and where
+ *    any other occurence of '%' and a character by is replaced by
+ *    finding the offset of that character in 'conversion_chars' and
+ *    using that offset as the index into the variable argument list
+ *    to get the string to use in place of that conversion.  If the
+ *    conversion character is not present in 'conversion_chars' or is
+ *    the '\0' character, return NULL.
+ *
+ *    Return the new string.  Return NULL on an allocation error or an
+ *    invalid conversion.  The caller is responsible for freeing the
+ *    returned string.
+ */
+char *
+skSubcommandStringFill(
+    const char         *cmd_string,
+    const char         *conversion_chars,
+    ...);
+
+/**
+ *    Execute 'cmd_array[0]' in a subprocess with the remaining
+ *    members of 'cmd_array[]' as the arguments to the program.  The
+ *    final member of cmd_array[] must be NULL.  The value in
+ *    'cmd_array[0]' should be the full path to the program since this
+ *    function does not search for the command in PATH.
+ *
+ *    See also skSubcommandExecuteShell().
+ *
+ *    This function calls fork() twice to ensure that the parent
+ *    process does not wait for the subprocess to terminate.
+ *
+ *    Return the process id of the first child if the parent
+ *    successfully forks and waits for that child.
+ *
+ *    Return -1 if there is an allocate error or if the parent is
+ *    unable to fork().  Return -2 if the wait() call fails.  In all
+ *    cases, errno is set.
+ *
+ *    The child and grandchild only call a non-reentrant function on
+ *    error: when either the child process is unable to fork() or
+ *    grandchild process encounters an error in the execve() call.  In
+ *    these cases, an error is reported by calling skAppPrintErr().
+ */
+long int
+skSubcommandExecute(
+    char * const        cmd_array[]);
+
+/**
+ *    Execute 'cmd_string' in a subprocess.
+ *
+ *    This is identical to skSubcommandExecute() execept the command
+ *    'cmd_string' is invoked as the argument to "/bin/sh -c" in the
+ *    grandchild process.
+ */
+long int
+skSubcommandExecuteShell(
+    const char         *cmd_string);
 
 
 
@@ -2626,15 +2835,9 @@ struct skIPWildcard_st {
      *    m_blocks[0], m_min[0], m_max[0] represent the values for the
      *    most significant octet/hexadectet.
      */
-#if !SK_ENABLE_IPV6
-    uint32_t            m_blocks[4][256/32];
-    uint16_t            m_min[4];
-    uint16_t            m_max[4];
-#else
     uint32_t            m_blocks[8][65536/32];
     uint16_t            m_min[8];
     uint16_t            m_max[8];
-#endif
     uint8_t             num_blocks;
 };
 
@@ -2646,15 +2849,8 @@ typedef struct skIPWildcardIterator_st {
     unsigned                force_ipv4      :1;
 } skIPWildcardIterator_t;
 
-
 #define _IPWILD_BLOCK_IS_SET(ipwild, block, val)                        \
     ((ipwild)->m_blocks[(block)][_BMAP_INDEX(val)] & _BMAP_OFFSET(val))
-
-#define _IPWILD_IPv4_IS_SET(ipwild, ipaddr)                             \
-    (_IPWILD_BLOCK_IS_SET((ipwild), 0, 0xFF&(skipaddrGetV4(ipaddr) >> 24))&& \
-     _IPWILD_BLOCK_IS_SET((ipwild), 1, 0xFF&(skipaddrGetV4(ipaddr) >> 16))&& \
-     _IPWILD_BLOCK_IS_SET((ipwild), 2, 0xFF&(skipaddrGetV4(ipaddr) >>  8))&& \
-     _IPWILD_BLOCK_IS_SET((ipwild), 3, 0xFF&(skipaddrGetV4(ipaddr))))
 
 
 /**
@@ -2664,14 +2860,7 @@ void
 skIPWildcardClear(
     skIPWildcard_t     *ipwild);
 
-
-
-#if !SK_ENABLE_IPV6
-#  define skIPWildcardIsV6(ipwild)   0
-#  define skIPWildcardCheckIp(ipwild, ipaddr) \
-    _IPWILD_IPv4_IS_SET(ipwild, ipaddr)
-#else
-#  define skIPWildcardIsV6(ipwild) (8 == (ipwild)->num_blocks)
+#define skIPWildcardIsV6(ipwild)   (8 == (ipwild)->num_blocks)
 /**
  *    Return 1 if 'ip' is represented in by 'ipwild'; 0 otherwise.
  */
@@ -2679,7 +2868,6 @@ int
 skIPWildcardCheckIp(
     const skIPWildcard_t   *ipwild,
     const skipaddr_t       *ip);
-#endif
 
 
 /**
@@ -2701,7 +2889,6 @@ skIPWildcardIteratorBind(
     const skIPWildcard_t   *ipwild);
 
 
-#if SK_ENABLE_IPV6
 /**
  *    Bind the iterator 'iter' to iterate over the entries in the
  *    skIPWildcard_t 'ipwild'.  Similar to skIPWildcardIteratorBind(),
@@ -2726,9 +2913,6 @@ int
 skIPWildcardIteratorBindV4(
     skIPWildcardIterator_t *out_iter,
     const skIPWildcard_t   *ipwild);
-#else  /* SK_ENABLE_IPV6 */
-#define skIPWildcardIteratorBindV4 skIPWildcardIteratorBind
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /**
@@ -2837,7 +3021,7 @@ num2dot0_r(
     char               *outbuf);
 
 
-#define SK_PADDED_FLAGS (1 << 0)
+#define SK_PADDED_FLAGS (1u << 0)
 
 
 #define SK_TCPFLAGS_STRLEN 9
@@ -2877,29 +3061,6 @@ skTCPStateString(
 
 
 /**
- *    Return an 8 character string denoting which TCP flags are set.
- *    If all flags are on, FSRPAUEC is returned.  For any flag that is
- *    off, a space (' ') appears in place of the character.  Returns a
- *    pointer to a static buffer.
- *
- *    Deprecated.  Please use skTCPFlagsString instead.
- */
-char *
-tcpflags_string(
-    uint8_t             flags);
-
-
-/**
- *    Thread-safe version of tcpflags_string().  The 'outbuf' should
- *    be at least SK_TCPFLAGS_STRLEN characters long.
- *
- *    Deprecated.  Please use skTCPFlagsString instead.
- */
-#define tcpflags_string_r(flags, outbuf)                        \
-    skTCPFlagsString(flags, outbuf, SK_PADDED_FLAGS)
-
-
-/**
  *    Strips all leading and trailing whitespace from 'line'.
  *    Modifies line in place.
  */
@@ -2929,6 +3090,8 @@ skToUpper(
 /**
  *    Return a string describing the last error that occurred when
  *    invoking the skStringParse* functions.
+ *
+ *    The 'errcode' value is expected to be an silk_utils_errcode_t.
  */
 const char *
 skStringParseStrerror(
@@ -3000,6 +3163,65 @@ skStringParseNumberListToBitmap(
     sk_bitmap_t        *out_bitmap,
     const char         *input);
 
+
+#if 0
+typedef struct sk_token_iter_st sk_token_iter_t;
+
+/**
+ *    Tokenize the C-string 'input_string' using each individual
+ *    character in 'separators' as a separator between tokens.  Create
+ *    a token iterator and store it in the location referenced by
+ *    'iter'.
+ *
+ *    By default, tokens that are the empty string are removed.  To
+ *    keep them, set the KEEP_EMPTIES bit in 'flags.  FIXME: Leading
+ *    and trailing whitespace.
+ */
+int
+skStringParseTokenize(
+    const char         *input_string,
+    const char         *separators,
+    sk_token_iter_t   **iter,
+    unsigned            flags);
+
+/**
+ *    Return the number tokens contained in the token iterator
+ *    'iter'.
+ */
+size_t
+skTokenIterGetCount(
+    sk_token_iter_t    *iter);
+
+
+/**
+ *    Destroy the iterator pointed at by 'iter'.
+ */
+void
+skTokenIterDestroy(
+    sk_token_iter_t    *iter);
+
+
+/**
+ *    If more tokens are available in the token iterator 'iter', set
+ *    the memory at 'token' to point to the next token and return
+ *    SK_ITERATOR_OK; otherwise, return SK_ITERATOR_NO_MORE_ENTRIES.
+ *
+ *    The caller should not modify nor free the returned token.
+ */
+int
+skTokenIterNext(
+    sk_token_iter_t    *iter,
+    const char        **token);
+
+
+/**
+ *    Reset the token iterator 'iter' so it may loop over the tokens
+ *    again.
+ */
+void
+skTokenIterReset(
+    sk_token_iter_t    *iter);
+#endif  /* 0 */
 
 /**
  *    Parses a C-string containing an IPv4 or IPv6 address in the
@@ -3103,6 +3325,12 @@ skStringParseCIDR(
 /* typedef union sk_sockaddr_un sk_sockaddr_t;              // silk_types.h */
 /* typedef struct sk_sockaddr_array_st sk_sockaddr_array_t; // silk_types.h */
 
+/**
+ *    Constant returned by skSockaddrArrayGetHostname() when the
+ *    string that created the sk_sockaddr_array_t did not contain a
+ *    hostname or host address.
+ */
+extern const char *sk_sockaddr_array_anyhostname;
 
 /* It seems that solaris does not define SUN_LEN (yet) */
 #ifndef SUN_LEN
@@ -3117,38 +3345,42 @@ skStringParseCIDR(
 #endif
 
 /**
- *    Returns the size of sk_sockaddr_t object, suitable for passing
+ *    Return the size of sk_sockaddr_t object, suitable for passing
  *    as the addrlen in functions such as connect(2) and bind(2).
+ *
+ *    Prior to SiLK 3.16.0, this was called skSockaddrLen().
  */
 #if 0
 size_t
-skSockaddrLen(
+skSockaddrGetLen(
     const sk_sockaddr_t    *s);
 #endif  /* 0 */
-#define skSockaddrLen(s)                                                \
+#define skSockaddrGetLen(s)                                             \
     (((s)->sa.sa_family == AF_INET) ? sizeof((s)->v4) :                 \
      (((s)->sa.sa_family == AF_INET6) ? sizeof((s)->v6) :               \
       (((s)->sa.sa_family == AF_UNIX) ? SUN_LEN(&(s)->un) : 0)))
 
 
 /**
- *    Returns the port portion of a sk_sockaddr_t object, as an
- *    integer in host-byte-order.  Returns -1 for sockaddr types
- *    without ports.
+ *    Return the port portion of a sk_sockaddr_t object, as an integer
+ *    in host-byte-order.  Return -1 for sockaddr types without
+ *    ports.
+ *
+ *    Prior to SiLK 3.16.0, this was called skSockaddrPort().
  */
 #if 0
 int
-skSockaddrPort(
+skSockaddrGetPort(
     const sk_sockaddr_t    *s);
 #endif  /* 0 */
-#define skSockaddrPort(s)                                               \
+#define skSockaddrGetPort(s)                                            \
     (((s)->sa.sa_family == AF_INET) ? ntohs((s)->v4.sin_port) :         \
      (((s)->sa.sa_family == AF_INET6) ? ntohs((s)->v6.sin6_port) : -1))
 
 
 /**
- *    Destroys a sk_sockaddr_array_t structure allocated by
- *    skStringParseHostPortPair().  Does nothing if the parameter is
+ *    Destroy a sk_sockaddr_array_t structure previously created by
+ *    skStringParseHostPortPair().  Do nothing if the argument is
  *    NULL.
  */
 #if 0
@@ -3159,59 +3391,77 @@ skSockaddrArrayDestroy(
 #define skSockaddrArrayDestroy(s)               \
     do {                                        \
         if (s) {                                \
-            if ((s)->name) {                    \
-                free((s)->name);                \
-            }                                   \
-            if ((s)->addrs) {                   \
-                free((s)->addrs);               \
-            }                                   \
+            free((s)->name);                    \
+            free((s)->host_port_pair);          \
+            free((s)->addrs);                   \
             free(s);                            \
         }                                       \
     } while (0)
 
+
 /**
- *    Returns the name of a sk_sockaddr_array_t structure.
- *    Specifically, returns the host or IP address portion of the
- *    'host_port' parameter of skStringParseHostPortPair().  May
- *    return NULL.  See also skSockaddrArrayNameSafe() and
- *    skSockaddrString().
+ *    Return the hostname or host address portion of a
+ *    sk_sockaddr_array_t structure as a C character array.  That is,
+ *    return the host or IP address portion of the 'host_port'
+ *    parameter of skStringParseHostPortPair().
+ *
+ *    If no hostname was specified when the sk_sockaddr_array_t was
+ *    created, return the string specified by the global
+ *    sk_sockaddr_array_anyhostname constant---the string "*".
+ *
+ *    To determine whether a hostname was provided, the caller may
+ *    compare the result of this macro with the
+ *    sk_sockaddr_array_anyhostname constant.
+ *
+ *    Prior to SiLK 3.16.0, this was called skSockaddrArrayNameSafe().
  */
 #if 0
 const char *
-skSockaddrArrayName(
+skSockaddrArrayGetHostname(
     const sk_sockaddr_array_t  *s);
 #endif  /* 0 */
-#define skSockaddrArrayName(s)     ((s)->name)
+#define skSockaddrArrayGetHostname(s)                           \
+    ((s)->name ? (s)->name : sk_sockaddr_array_anyhostname)
+
 
 /**
- *    Returns the name of a sk_sockaddr_array_t structure.  Does not
- *    return NULL.  See also skSockaddrArrayName() and
- *    skSockaddrString().
+ *    Return the host-port pair string that created the
+ *    sk_sockaddr_array_t structure.  The return value is nearly the
+ *    string that was passed to skStringParseHostPortPair() except the
+ *    string uses a "*" or "[*]" to represent the host when no
+ *    host-name/-address was provided to skStringParseHostPortPair()
+ *    and the HOST_PROHIBITED flag was not set.
+ *
+ *    Since SiLK 3.16.0.
  */
 #if 0
 const char *
-skSockaddrArrayNameSafe(
+skSockaddrArrayGetHostPortPair(
     const sk_sockaddr_array_t  *s);
 #endif  /* 0 */
-#define skSockaddrArrayNameSafe(s) ((s)->name ? (s)->name : "*")
+#define skSockaddrArrayGetHostPortPair(s)   ((s)->host_port_pair)
+
 
 /**
- *    Returns the number of addresses in a sk_sockaddr_array_t
+ *    Return the number of addresses in a sk_sockaddr_array_t
  *    structure.
+ *
+ *    Prior to SiLK 3.16.0, this was called skSockaddrArraySize().
  */
 #if 0
 uint32_t
-skSockaddrArraySize(
+skSockaddrArrayGetSize(
     const sk_sockaddr_array_t  *s);
 #endif  /* 0 */
-#define skSockaddrArraySize(s)     ((s)->num_addrs)
+#define skSockaddrArrayGetSize(s)           ((s)->num_addrs)
 
 
 /**
- *    Returns the address (sk_sockaddr_t *) at position 'n' in the
- *    sk_sockaddr_array_t structure 's'.  The first address is at position
- *    0.  The value 'n' must be less than skSockaddrArraySize(s),
- *    otherwise the return value is indeterminate.
+ *    Return the address (sk_sockaddr_t *) at position 'n' in the
+ *    sk_sockaddr_array_t structure 's'.  The first address is at
+ *    position 0.  The value 'n' must be less than
+ *    skSockaddrArrayGetSize(s), otherwise the return value is
+ *    indeterminate.
  */
 #if 0
 const sk_sockaddr_t *
@@ -3219,27 +3469,27 @@ skSockaddrArrayGet(
     const sk_sockaddr_array_t  *s,
     uint32_t                    n);
 #endif  /* 0 */
-#define skSockaddrArrayGet(s, n)   (&((s)->addrs[n]))
+#define skSockaddrArrayGet(s, n)            (&((s)->addrs[n]))
 
 
 /**
  *    Ignore the port value when comparing two sk_sockaddr_t objects
  *    with skSockaddrCompare() or skSockaddrArrayMatches().
  */
-#define SK_SOCKADDRCOMP_NOPORT       (1u << 0)
+#define SK_SOCKADDRCOMP_NOPORT       1
 
 /**
  *    Ignore the address when comparing two sk_sockaddr_t objects
  *    with skSockaddrCompare() or skSockaddrArrayMatches().
  */
-#define SK_SOCKADDRCOMP_NOADDR       (1u << 1)
+#define SK_SOCKADDRCOMP_NOADDR       2
 
 /**
  *    Treat IPv4 and IPv6 addresses as different when comparing two
  *    sk_sockaddr_t objects with skSockaddrCompare() or
  *    skSockaddrArrayMatches().
  */
-#define SK_SOCKADDRCOMP_NOT_V4_AS_V6 (1u << 2)
+#define SK_SOCKADDRCOMP_NOT_V4_AS_V6 4
 
 
 /**
@@ -3259,17 +3509,17 @@ skSockaddrArrayGet(
  *    would have written if 'outbuf' had been large enough to hold the
  *    entire string, not including the terminating NUL.
  */
-int
+ssize_t
 skSockaddrString(
     char                   *outbuf,
-    int                     size,
+    size_t                  size,
     const sk_sockaddr_t    *addr);
 
 /**
- *    Compares two sk_sockaddr_t objects.
+ *    Compare two sk_sockaddr_t objects.
  *
- *    Returns -1 if 'a' is "less than" 'b', 1 if 'a' is "greater than"
- *    'b', and 0 if the two are equal.
+ *    Return -1 if a is "less than" b, 1 if a is "greater than" b,
+ *    and 0 if the two are equal.
  *
  *    The 'flags' parameter may contain any of the following bits:
  *
@@ -3290,8 +3540,8 @@ skSockaddrCompare(
     unsigned int            flags);
 
 /**
- *    Determines whether 'array' contains 'addr', according to
- *    'flags'.  Returns 1 if true, 0 if false.
+ *    Determine whether 'array' contains 'addr', according to
+ *    'flags'.  Return 1 if true, 0 if false.
  *
  *    Addresses are compared using the skSockaddrCompare() function.
  *    The 'flags' argument will be passed to that function.
@@ -3305,7 +3555,7 @@ skSockaddrArrayContains(
     unsigned int                flags);
 
 /**
- *    Determines whether two sk_sockaddr_array_t objects are
+ *    Determine whether two sk_sockaddr_array_t objects are
  *    identical, according to 'flags'.
  *
  *    Two sk_sockaddr_array_t objects are considered equal if they
@@ -3323,7 +3573,7 @@ skSockaddrArrayEqual(
 
 
 /**
- *    Decides whether two sk_sockaddr_array_t objects match.  Returns
+ *    Decide whether two sk_sockaddr_array_t objects match.  Return
  *    1 if they match, 0 otherwise.
  *
  *    Two sk_sockaddr_array_t objects are considered to match if any
@@ -3341,12 +3591,12 @@ skSockaddrArrayMatches(
 
 
 /* Flags which can be passed to skStringParseHostPortPair() */
-#define PORT_REQUIRED    1
-#define PORT_PROHIBITED  (1 << 1)
-#define HOST_REQUIRED    (1 << 2)
-#define HOST_PROHIBITED  (1 << 3)
-#define IPV6_REQUIRED    (1 << 4)
-#define IPV6_PROHIBITED  (1 << 5)
+#define PORT_REQUIRED    (1u << 0)
+#define PORT_PROHIBITED  (1u << 1)
+#define HOST_REQUIRED    (1u << 2)
+#define HOST_PROHIBITED  (1u << 3)
+#define IPV6_REQUIRED    (1u << 4)
+#define IPV6_PROHIBITED  (1u << 5)
 
 
 /**
@@ -3709,21 +3959,41 @@ skStringParseHumanUint64(
     unsigned int        parse_flags);
 
 
-/* Following are used by skStringParseRange32() */
+/* Following are used by skStringParseRange64() and
+ * skStringParseRange32() */
 
-/** Allow single values '3' and open-ended ranges '3-' */
+/**
+ *    Allow a fully specified range "3-5", a single value "3"
+ *    (range_upper is set to range_lower), or an open-ended range "3-"
+ *    (range_upper is set to max_val).
+ */
 #define SKUTILS_RANGE_SINGLE_OPEN   0
 
-/** Force the value to be a range, but allow open-ended ranges */
+/**
+ *    Allow a fully specified range "3-5" or an open-ended range "3-";
+ *    i.e., the argument must contain a hyphen.  A single value is not
+ *    allowed.
+ */
 #define SKUTILS_RANGE_NO_SINGLE     (1u << 0)
 
-/** Allow single values '3' or complete ranges '3-5'; i.e., force an
- * upper bound on any range */
+/**
+ *    Allow a fully specified range "3-5" or a single value "3"
+ *    (range_upper is set to range_lower).
+ */
 #define SKUTILS_RANGE_NO_OPEN       (1u << 1)
 
-/** Only support ranges, and force the range to have both bounds */
+/**
+ *    Only support a fully specified range "3-5"; i.e., the range must
+ *    have both bounds.
+ */
 #define SKUTILS_RANGE_ONLY_RANGE    (SKUTILS_RANGE_NO_SINGLE \
                                      | SKUTILS_RANGE_NO_OPEN)
+
+/**
+ *    When a single value "3" is parsed, set range_upper to max_val as
+ *    if an open-ended range had been specified.
+ */
+#define SKUTILS_RANGE_MAX_SINGLE    (1u << 2)
 
 /**
  *    Attempts to parse the C-string 'range_string' as a range of two
@@ -3751,6 +4021,10 @@ skStringParseHumanUint64(
  *    UINT32_MAX if 'max_val' is 0.  SKUTILS_ERR_SHORT is returned
  *    when an open-ended range is given and SKUTILS_RANGE_NO_OPEN is
  *    specified.
+ *
+ *    If flags contains 'SKUTILS_RANGE_MAX_SINGLE', the function sets
+ *    range_upper to 'max_val' (or to UINT32_MAX if 'max_val' is 0)
+ *    when a single value is parsed (as for an open-ended range).
  *
  *    Whitespace around the range will be ignored.  Whitespace within
  *    the range will result in SKUTILS_ERR_BAD_CHAR being returned.
@@ -3912,14 +4186,14 @@ skStringParseTCPFlagsHighMask(
 /*
  * flag definitions.
  */
-#define CWR_FLAG (1 << 7)         /* 128 */
-#define ECE_FLAG (1 << 6)         /*  64 */
-#define URG_FLAG (1 << 5)         /*  32 */
-#define ACK_FLAG (1 << 4)         /*  16 */
-#define PSH_FLAG (1 << 3)         /*   8 */
-#define RST_FLAG (1 << 2)         /*   4 */
-#define SYN_FLAG (1 << 1)         /*   2 */
-#define FIN_FLAG (1)              /*   1 */
+#define CWR_FLAG (1u << 7)      /* 128 */
+#define ECE_FLAG (1u << 6)      /*  64 */
+#define URG_FLAG (1u << 5)      /*  32 */
+#define ACK_FLAG (1u << 4)      /*  16 */
+#define PSH_FLAG (1u << 3)      /*   8 */
+#define RST_FLAG (1u << 2)      /*   4 */
+#define SYN_FLAG (1u << 1)      /*   2 */
+#define FIN_FLAG (1u << 0)      /*   1 */
 
 
 /**

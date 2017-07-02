@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpollexec.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwpollexec.c 21315f05de74 2017-06-26 20:03:25Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skthread.h>
@@ -205,7 +205,6 @@ static const char *appHelp[] = {
 static int  appOptionsHandler(clientData cData, int opt_index, char *opt_arg);
 static int  signal_compare(const void *a, const void *b);
 static int  command_compare(const void *a, const void *b, const void *ctx);
-static int  verify_command_string(const char *command);
 static int  parse_timeout_option(const char *opt_arg);
 static int  test_shell(const char *shell);
 static void use_shell(const char *sh);
@@ -528,6 +527,7 @@ appOptionsHandler(
     char               *opt_arg)
 {
     int rv;
+    size_t pos;
 
     switch ((appOptionsEnum)opt_index) {
 
@@ -539,7 +539,21 @@ appOptionsHandler(
         break;
 
       case OPT_COMMAND:
-        if (verify_command_string(opt_arg)) {
+        if (!*opt_arg) {
+            skAppPrintErr("Invalid %s: Empty string",
+                          appOptions[opt_index].name);
+            return 1;
+        }
+        pos = skSubcommandStringCheck(opt_arg, "s");
+        if (pos) {
+            if (opt_arg[pos]) {
+                skAppPrintErr("Invalid %s '%s': Unknown conversion '%%%c'",
+                              appOptions[opt_index].name,opt_arg,opt_arg[pos]);
+            } else {
+                skAppPrintErr(("Invalid %s '%s':"
+                               " '%%' appears at end of string"),
+                              appOptions[opt_index].name, opt_arg);
+            }
             return 1;
         }
         command = opt_arg;
@@ -697,42 +711,6 @@ test_shell(
     }
 
     return -1;
-}
-
-
-/*
- *  status = verify_command_string(command);
- *
- *    Verify that the command string specified in 'command' does not
- *    contain unknown conversions.  If 'command' is valid, return 0.
- *
- *    If 'command' is not valid, print an error and return -1.
- */
-static int
-verify_command_string(
-    const char         *cmd)
-{
-    const char *cp = cmd;
-
-    while (NULL != (cp = strchr(cp, '%'))) {
-        ++cp;
-        switch (*cp) {
-          case '%':
-          case 's':
-            ++cp;
-            break;
-          case '\0':
-            skAppPrintErr(("Invalid %s '%s':"
-                           " '%%' appears at end of string"),
-                          appOptions[OPT_COMMAND].name, cmd);
-            return -1;
-          default:
-            skAppPrintErr("Invalid %s '%s': Unknown conversion '%%%c'",
-                          appOptions[OPT_COMMAND].name, cmd, *cp);
-            return -1;
-        }
-    }
-    return 0;
 }
 
 
@@ -1077,8 +1055,8 @@ executeCommand(
         return pid;
     }
 
-    /* Disable/Ignore locking of the log file; disable log rotation */
-    sklogSetLocking(NULL, NULL, NULL, NULL);
+    /* Disable log locking and log rotation in child */
+    sklogDisableLocking();
     sklogDisableRotation();
 
     /* Unmask signals */
@@ -1335,14 +1313,13 @@ handle_incoming_directory(
 
 int main(int argc, char **argv)
 {
+    skPollDirErr_t pderr;
     int rv;
 
     appSetup(argc, argv);                       /* never returns on error */
 
     /* Start the logger and become a daemon */
-    if (skdaemonize(&shuttingdown, NULL) == -1
-        || sklogEnableThreadedLogging() == -1)
-    {
+    if (skdaemonize(&shuttingdown, NULL) == -1) {
         exit(EXIT_FAILURE);
     }
     daemonized = 1;
@@ -1356,7 +1333,15 @@ int main(int argc, char **argv)
     /* Set up directory polling */
     polldir = skPollDirCreate(incoming_dir, polling_interval);
     if (NULL == polldir) {
-        CRITMSG("Could not initiate polling for %s", incoming_dir);
+        CRITMSG("Could not initiate polling for '%s'", incoming_dir);
+        exit(EXIT_FAILURE);
+    }
+    pderr = skPollDirStart(polldir);
+    if (PDERR_NONE != pderr) {
+        CRITMSG("Failed to start polling for directory '%s': %s",
+                skPollDirGetDir(polldir), ((PDERR_SYSTEM == pderr)
+                                           ? strerror(errno)
+                                           : skPollDirStrError(pderr)));
         exit(EXIT_FAILURE);
     }
 

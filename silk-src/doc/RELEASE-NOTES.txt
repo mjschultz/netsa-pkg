@@ -1,54 +1,146 @@
-SiLK-3.15.0 Release, 2017-Mar-24
+SiLK-4.0.0 Beta 4 Release, 2017-Jun-29
 
-* rwaggbag
-  -- Create a new tool similar to rwbag: a tool to bin SiLK Flow
-     records using a key and counter that support multiple fields and
-     store the results in a binary Aggregate Bag file.
-* rwaggbagbuild
-  -- Create a new tool to create an Aggregate Bag file from text.
-* rwaggbagcat
-  -- Create a new tool to print the contents of an Aggregate Bag file
-     as text.
-* rwaggbagtool
-  -- Create a new tool to manipulate binary Aggregate Bag files and
-     create a new Aggregate Bag file.
-* flowkey
-  -- Add a new plug-in that uses the same algorithm as YAF to compute
-     a 32-bit flow key hash.
-* rwpmapcat
-  -- Add the --output-path switch to specify the output file.
-  -- POTENTIAL INCOMPATIBILITY. Note that the shortest unique prefix
-     for the --output-type switch is now "--output-t".
+* SiLK Flow files support Sidecar data
+  -- Allow SiLK Flow files to augment the traditional SiLK Flow record
+     with "sidecar" data.  Sidecar data is represented as a Lua table
+     of key-value pairs.
+  -- When writing a file where the SiLK Flow records have sidecar
+     fields, only sidecar fields that are described in the file's
+     header are written to the file.
+  -- Note: SiLK Flow files created by SiLK 4.x cannot be read by
+     releases of SiLK prior to 3.10.0.
+  -- Note: SiLK Flow files that contain sidecar fields cannot be read
+     by any release of SiLK 3.
+* rwfilter
+  -- Add a --lua-file switch to specify a file of Lua code to use when
+     partitioning data into pass and fail destinations.  The Lua file
+     must use register_filter() to specifying the partition function.
+  -- Add a --lua-expression switch to specify a Lua expression to use
+     when partitioning data into pass and fail destinations.
+  -- Remove the --input-pipe switch.  Users may specify the path to
+     the named pipe on the command line or use the argument "-" to
+     tell rwfilter to read from the standard input.
+* rwcut
+  -- Add support for printing sidecar fields.
+  -- Add a --lua-file switch to load Lua code that adds or manipulates
+     the sidecar fields on the records.
+  -- Remove fields 22, 23, 24, 25, sTime+msec, eTime+msec, dur+msec,
+     and icmpTypeCode.  Users must use sTime, eTime, duration, iType,
+     and iCode instead.
+  -- Remove the --integer-ips and --zero-pad-ips switches.  Users must
+     use the --ip-format switch instead.
+  -- Remove the --epoch-time and --legacy-timestamps switches.  Users
+     must use the --timestamp-format switch instead.
+  -- Remove the --icmp-type-and-code switch.  Users must use the iType
+     and iCode fields instead.
+* rwstats
+  -- Add support for using sidecar fields in the grouping key.
+  -- Add a --lua-file switch to load Lua code that adds or manipulates
+     the sidecar fields on the records.
+  -- Remove fields 22, 23, 24, 25, sTime+msec, eTime+msec, dur+msec,
+     and icmpTypeCode.  Users must use sTime, eTime, duration, iType,
+     and iCode instead.
+  -- Remove the --integer-ips and --zero-pad-ips switches.  Users must
+     use the --ip-format switch instead.
+  -- Remove the --epoch-time and --legacy-timestamps switches.  Users
+     must use the --timestamp-format switch instead.
+  -- Remove the legacy switches:--legacy-help, --sip, --dip, --sport,
+     --dport, --protocol, --icmp, --flows, --packets, and --bytes.
+     Users must use the --fields and --values switches instead.
+* rwuniq
+  -- Add support for using sidecar fields in the grouping key.
+  -- Add a --lua-file switch to load Lua code that adds or manipulates
+     the sidecar fields on the records.
+  -- Remove fields 22, 23, 24, 25, sTime+msec, eTime+msec, dur+msec,
+     and icmpTypeCode.  Users must use sTime, eTime, duration, iType,
+     and iCode instead.
+  -- Remove the --integer-ips and --zero-pad-ips switches.  Users must
+     use the --ip-format switch instead.
+  -- Remove the --epoch-time and --legacy-timestamps switches.  Users
+     must use the --timestamp-format switch instead.
+* rwsort
+  -- Add support for using sidecar fields in the sorting key.
+  -- Remove fields 22, 23, 24, 25, sTime+msec, eTime+msec, dur+msec,
+     and icmpTypeCode.  Users must use sTime, eTime, duration, iType,
+     and iCode instead.
+  -- Remove the --input-pipe switch.  Users may specify the path to
+     the named pipe on the command line.
+* rwgroup
+  -- Add support for using sidecar fields in the grouping key.
+  -- Remove fields 22, 23, 24, 25, sTime+msec, eTime+msec, dur+msec,
+     and icmpTypeCode.  Users must use sTime, eTime, duration, iType,
+     and iCode instead.
 * rwfileinfo
-  -- Add the --xargs switch to read input file names from a file.
+  -- Add support for printing sidecar fields present in a file.
+  -- Add support for printing the IPFIX templates in an IPFIX file.
+* rwsilk2ipfix
+  -- Add support for exporting SiLK sidecar fields in the IPFIX
+     output.
+  -- Add a switch --no-sidecar to prevent export of the sidecar
+     fields.
+* rwcat
+  -- Add a --no-sidecar switch to prevent copying the sidecar fields
+     from the input file(s) to the output file.
+* rwcount
+  -- Remove the --epoch-time and --legacy-timestamps switches.  Users
+     must use the --timestamp-format switch instead.
+  -- Remove the --start-epoch and --end-epoch switches.  Users must
+     use --start-time and --end-time instead.
+* rwaddrcount
+  -- Remove the --integer-ips and --zero-pad-ips switches.  Users must
+     use the --ip-format switch instead.
+  -- Remove the --legacy-timestamps switch.  Users must use the
+     --timestamp-format switch instead.
+  -- Remove the switches --byte-min, --byte-max, --packet-min,
+     --packet-max, --rec-min, and --rec-max.  Users must instead use
+     --min-bytes, --max-bytes, --min-packets, --max-packets,
+     --min-records, and --max-records, respectively.
 * rwsetcat
-  -- Add the --output-path switch to specify the output file.
-  -- Do not use the the pager when the output contains only the count
-     of the number of IPs in a singe IPset.
-* rwsiteinfo
-  -- Add the --output-path switch to specify the output file.
+  -- Remove the --integer-ips and --zero-pad-ips switches.  Users must
+     use the --ip-format switch instead.
+* rwpmapcat
+  -- Remove the --integer-ips and --zero-pad-ips switches.  Users must
+     use the --ip-format switch instead.
+* rwpmaplookup
+  -- Remove the --integer-ips and --zero-pad-ips switches.  Users must
+     use the --ip-format switch instead.
 * rwtuc
-  -- Add the --xargs switch to read input file names from a file.
-  -- Allow multiple fields in the input to be ignored.
-  -- At shutdown, print the number of input lines that were not parsed
-     unless --verbose is given or an error occurs.
-  -- Remove the --bad-input-lines file when it is empty (in accordance
-     with the manual page).
-  -- Fix a bug that treated white space after the final delimiter as
-     another field.
-  -- Fix issues in parsing the title line when --fields is given.
-* rwbagcat
-  -- Add the --site-config-file switch to select the silk.conf file.
-  -- Do not invoke the pager when --print-statistics is the only
-     output and a destination argument is given to the switch.
+  -- Remove fields 22, 23, 24, 25, sTime+msec, eTime+msec, and
+     dur+msec.  Users must use sTime, eTime, and duration instead.
+  -- Remove the switches --stime+msec, --etime+msec, and
+     --duration+msec.  Users must use --stime, --etime, and --duration
+     instead.
+* rwrecgenerator
+  -- Remove the --integer-ips and --zero-pad-ips switches.  Users must
+     use the --ip-format switch instead.
+  -- Remove the --epoch-time switch.  Users must use the
+     --timestamp-format switch instead.
+* mapsid
+  -- Remove mapsid. Users must use rwsiteinfo instead.
 * rwip2cc
-  -- Do not use the pager when the --output-path switch is given.
-* rwscanquery
-  -- Fix a bug that prevented use of the SQLite database driver on a
-     case-sensitive file system and caused "make check" to fail.
+  -- Remove rwip2cc. Users must use rwpmaplookup instead.
+* rwflowpack
+  -- Change how rwflowpack is configured and invoked: A Lua
+     configuration file replaces the command line switches and the
+     sensor.conf file.
+  -- Incorporate the functionality previously found in flowcap and
+     rwflowappend.
+* flowcap
+  -- Remove flowcap.  Users must use rwflowpack instead.
+* rwflowappend
+  -- Remove rwflowappend.  Users must use rwflowpack instead.
+* sensor.conf
+  -- Remove sensor.conf.  Users must use rwflowpack's Lua
+     configuration file instead.
+* rwguess
+  -- Remove rwguess.  Uses must use rwpdu2silk and rwstats instead.
 * Building
-  -- Fix a compilation error in rwsiteinfo on Ubuntu.
-  -- Remove support for fixbuf releases prior to libfixbuf-1.7.0.
+  -- Remove ability to build without IPFIX support and require
+     libfixbuf-1.7.0 or later.
+  -- For optional PySiLK support, require Python 2.6 or later.
+  -- Use IPset file formats 4 and 5 by default unless the
+     --enable-ipset-compatibility switch is provided to configure.
+  -- Merge the libsilk-thrd library into libsilk.
 
 
 SiLK-3.14.0 Release, 2016-Nov-17

@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwgenericio.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwgenericio.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include "skstream_priv.h"
 
@@ -29,38 +29,38 @@ RCSIDENT("$SiLK: rwgenericio.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 /*
 **  RWGENERIC VERSION 5
 **
-**    int64_t       sTime;           //  0- 7  Flow start time as milliseconds
-**                                   //        since UNIX epoch
+**    int64_t       sTime;       //  0- 7  Flow start time as milliseconds
+**                               //        since UNIX epoch
 **
-**    uint32_t      elapsed;         //  8-11  Duration of flow in milliseconds
-**                                   //        (Allows for a 49 day flow)
+**    uint32_t      elapsed;     //  8-11  Duration of flow in milliseconds
+**                               //        (Allows for a 49 day flow)
 **
-**    uint16_t      sPort;           // 12-13  Source port
-**    uint16_t      dPort;           // 14-15  Destination port
+**    uint16_t      sPort;       // 12-13  Source port
+**    uint16_t      dPort;       // 14-15  Destination port
 **
-**    uint8_t       proto;           // 16     IP protocol
-**    uint8_t       flow_type;       // 17     Class & Type info
-**    uint16_t      sID;             // 18-19  Sensor ID
+**    uint8_t       proto;       // 16     IP protocol
+**    uint8_t       flow_type;   // 17     Class & Type info
+**    uint16_t      sID;         // 18-19  Sensor ID
 **
-**    uint8_t       flags;           // 20     OR of all flags (Netflow flags)
-**    uint8_t       init_flags;      // 21     TCP flags in first packet
-**                                   //        or blank for "legacy" data
-**    uint8_t       rest_flags;      // 22     TCP flags on non-initial packet
-**                                   //        or blank for "legacy" data
-**    uint8_t       tcp_state;       // 23     TCP state machine info (below)
+**    uint8_t       flags;       // 20     OR of all flags (Netflow flags)
+**    uint8_t       init_flags;  // 21     TCP flags in first packet
+**                               //        or blank for "legacy" data
+**    uint8_t       rest_flags;  // 22     TCP flags on non-initial packet
+**                               //        or blank for "legacy" data
+**    uint8_t       tcp_state;   // 23     TCP state machine info (below)
 **
-**    uint16_t      application;     // 24-25  Indication of type of traffic
-**    uint16_t      memo;            // 26-27  Application specific field
+**    uint16_t      application; // 24-25  Indication of type of traffic
+**    uint16_t      memo;        // 26-27  Application specific field
 **
-**    uint16_t      input;           // 28-29  Router incoming SNMP interface
-**    uint16_t      output;          // 30-31  Router outgoing SNMP interface
+**    uint16_t      input;       // 28-29  Router incoming SNMP interface
+**    uint16_t      output;      // 30-31  Router outgoing SNMP interface
 **
-**    uint32_t      pkts;            // 32-35  Count of packets
-**    uint32_t      bytes;           // 36-39  Count of bytes
+**    uint32_t      pkts;        // 32-35  Count of packets
+**    uint32_t      bytes;       // 36-39  Count of bytes
 **
-**    uint32_t      sIP;             // 40-43  Source IP
-**    uint32_t      dIP;             // 44-47  Destination IP
-**    uint32_t      nhIP;            // 48-51  Router Next Hop IP
+**    uint32_t      sIP;         // 40-43  Source IP
+**    uint32_t      dIP;         // 44-47  Destination IP
+**    uint32_t      nhIP;        // 48-51  Router Next Hop IP
 **
 **
 **  52 bytes on disk.
@@ -100,17 +100,14 @@ RCSIDENT("$SiLK: rwgenericio.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 static int
 genericioRecordUnpack_V5(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         genericioRecordSwap_V5(ar);
     }
 
-#if  !SK_ENABLE_IPV6
-    memcpy(rwrec, ar, RECLEN_RWGENERIC_V5);
-#else
     rwRecMemSetStartTime(rwrec, &ar[0]);
     rwRecMemSetElapsed(rwrec, &ar[8]);
     rwRecMemSetSPort(rwrec, &ar[12]);
@@ -124,14 +121,16 @@ genericioRecordUnpack_V5(
     rwRecMemSetTcpState(rwrec, &ar[23]);
     rwRecMemSetApplication(rwrec, &ar[24]);
     rwRecMemSetMemo(rwrec, &ar[26]);
-    rwRecMemSetInput(rwrec, &ar[28]);
-    rwRecMemSetOutput(rwrec, &ar[30]);
-    rwRecMemSetPkts(rwrec, &ar[32]);
-    rwRecMemSetBytes(rwrec, &ar[36]);
+
+    rwpackUnpackInput16(rwrec, &ar[28]);
+    rwpackUnpackOutput16(rwrec, &ar[30]);
+
+    rwpackUnpackPackets32(rwrec, &ar[32]);
+    rwpackUnpackBytes32(rwrec, &ar[36]);
+
     rwRecMemSetSIPv4(rwrec, &ar[40]);
     rwRecMemSetDIPv4(rwrec, &ar[44]);
     rwRecMemSetNhIPv4(rwrec, &ar[48]);
-#endif
 
     RWREC_MAYBE_CLEAR_TCPSTATE_EXPANDED(rwrec);
 
@@ -144,13 +143,29 @@ genericioRecordUnpack_V5(
  */
 static int
 genericioRecordPack_V5(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
-#if  !SK_ENABLE_IPV6
-    memcpy(ar, rwrec, RECLEN_RWGENERIC_V5);
-#else
+    int rv = 0;
+
+    /* input, output */
+    rwpackPackInput16(rwrec, &ar[28], &rv);
+    rwpackPackOutput16(rwrec, &ar[30], &rv);
+    if (rv) {
+        return rv;
+    }
+
+    /* bytes, packets */
+    rwpackPackPackets32(rwrec, &ar[32], &rv);
+    if (rv) {
+        return rv;
+    }
+    rwpackPackBytes32(rwrec, &ar[36], &rv);
+    if (rv) {
+        return rv;
+    }
+
     rwRecMemGetStartTime(rwrec, &ar[0]);
     rwRecMemGetElapsed(rwrec, &ar[8]);
     rwRecMemGetSPort(rwrec, &ar[12]);
@@ -164,16 +179,13 @@ genericioRecordPack_V5(
     rwRecMemGetTcpState(rwrec, &ar[23]);
     rwRecMemGetApplication(rwrec, &ar[24]);
     rwRecMemGetMemo(rwrec, &ar[26]);
-    rwRecMemGetInput(rwrec, &ar[28]);
-    rwRecMemGetOutput(rwrec, &ar[30]);
-    rwRecMemGetPkts(rwrec, &ar[32]);
-    rwRecMemGetBytes(rwrec, &ar[36]);
+
     rwRecMemGetSIPv4(rwrec, &ar[40]);
     rwRecMemGetDIPv4(rwrec, &ar[44]);
     rwRecMemGetNhIPv4(rwrec, &ar[48]);
-#endif
+
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         genericioRecordSwap_V5(ar);
     }
 
@@ -262,25 +274,27 @@ genericioRecordPack_V5(
 static int
 genericioRecordUnpack_V3(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     uint32_t quot;
     uint16_t rem;
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         genericioRecordSwap_V3(ar);
     }
 
-    /* sIP, dIP, sPort, dPort, nhIP, input, output */
+    /* sIP, dIP, sPort, dPort, nhIP */
     rwRecMemSetSIPv4(rwrec, &ar[0]);
     rwRecMemSetDIPv4(rwrec, &ar[4]);
     rwRecMemSetSPort(rwrec, &ar[8]);
     rwRecMemSetDPort(rwrec, &ar[10]);
     rwRecMemSetNhIPv4(rwrec, &ar[12]);
-    rwRecMemSetInput(rwrec, &ar[16]);
-    rwRecMemSetOutput(rwrec, &ar[18]);
+
+    /* input, output */
+    rwpackUnpackInput16(rwrec, &ar[16]);
+    rwpackUnpackOutput16(rwrec, &ar[18]);
 
     /* sTime, sTime_msec */
     memcpy(&quot, &ar[20], 4);
@@ -293,8 +307,8 @@ genericioRecordUnpack_V3(
     rwRecSetElapsed(rwrec, (1000 * quot + rem));
 
     /* pkts, bytes */
-    rwRecMemSetPkts(rwrec, &ar[28]);
-    rwRecMemSetBytes(rwrec, &ar[32]);
+    rwpackUnpackPackets32(rwrec, &ar[28]);
+    rwpackUnpackBytes32(rwrec, &ar[32]);
 
     /* proto, flowtype, sensor, flags, init_flags, rest_flags, tcp_state */
     rwRecMemSetProto(rwrec, &ar[36]);
@@ -322,22 +336,28 @@ genericioRecordUnpack_V3(
  */
 static int
 genericioRecordPack_V3(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
     imaxdiv_t idiv;
     uint32_t quot;
     uint16_t rem;
+    int rv = 0;
 
-    /* sIP, dIP, sPort, dPort, nhIP, input, output */
+    /* sIP, dIP, sPort, dPort, nhIP */
     rwRecMemGetSIPv4(rwrec, &ar[0]);
     rwRecMemGetDIPv4(rwrec, &ar[4]);
     rwRecMemGetSPort(rwrec, &ar[8]);
     rwRecMemGetDPort(rwrec, &ar[10]);
     rwRecMemGetNhIPv4(rwrec, &ar[12]);
-    rwRecMemGetInput(rwrec, &ar[16]);
-    rwRecMemGetOutput(rwrec, &ar[18]);
+
+    /* input, output */
+    rwpackPackInput16(rwrec, &ar[16], &rv);
+    rwpackPackOutput16(rwrec, &ar[18], &rv);
+    if (rv) {
+        return rv;
+    }
 
     /* sTime, sTime_msec */
     idiv = imaxdiv(rwRecGetStartTime(rwrec), 1000);
@@ -354,8 +374,14 @@ genericioRecordPack_V3(
     memcpy(&ar[50], &rem, 2);
 
     /* pkts, bytes */
-    rwRecMemGetPkts(rwrec, &ar[28]);
-    rwRecMemGetBytes(rwrec, &ar[32]);
+    rwpackPackPackets32(rwrec, &ar[28], &rv);
+    if (rv) {
+        return rv;
+    }
+    rwpackPackBytes32(rwrec, &ar[32], &rv);
+    if (rv) {
+        return rv;
+    }
 
     /* proto, flowtype, sensor, flags, init_flags, rest_flags, tcp_state */
     rwRecMemGetProto(rwrec, &ar[36]);
@@ -378,7 +404,7 @@ genericioRecordPack_V3(
     memset(&ar[54], 0, 2);
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         genericioRecordSwap_V3(ar);
     }
 
@@ -457,24 +483,26 @@ genericioRecordPack_V3(
 static int
 genericioRecordUnpack_V2(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     uint32_t tmp32;
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         genericioRecordSwap_V2(ar);
     }
 
-    /* sIP, dIP, sPort, dPort, nhIP, input, output */
+    /* sIP, dIP, sPort, dPort, nhIP */
     rwRecMemSetSIPv4(rwrec, &ar[0]);
     rwRecMemSetDIPv4(rwrec, &ar[4]);
     rwRecMemSetSPort(rwrec, &ar[8]);
     rwRecMemSetDPort(rwrec, &ar[10]);
     rwRecMemSetNhIPv4(rwrec, &ar[12]);
-    rwRecMemSetInput(rwrec, &ar[16]);
-    rwRecMemSetOutput(rwrec, &ar[18]);
+
+    /* input, output */
+    rwpackUnpackInput16(rwrec, &ar[16]);
+    rwpackUnpackOutput16(rwrec, &ar[18]);
 
     /* sTime, elapsed */
     memcpy(&tmp32, &ar[20], 4);
@@ -483,8 +511,8 @@ genericioRecordUnpack_V2(
     rwRecSetElapsed(rwrec, (1000 * tmp32));
 
     /* pkts, bytes */
-    rwRecMemSetPkts(rwrec, &ar[28]);
-    rwRecMemSetBytes(rwrec, &ar[32]);
+    rwpackUnpackPackets32(rwrec, &ar[28]);
+    rwpackUnpackBytes32(rwrec, &ar[32]);
 
     /* proto, flow_type, sID, flags, init_flags, rest_flags, tcp_state */
     rwRecMemSetProto(rwrec, &ar[36]);
@@ -508,20 +536,26 @@ genericioRecordUnpack_V2(
  */
 static int
 genericioRecordPack_V2(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
     uint32_t tmp32;
+    int rv = SKSTREAM_OK;
 
-    /* sIP, dIP, sPort, dPort, nhIP, input, output */
+    /* sIP, dIP, sPort, dPort, nhIP */
     rwRecMemGetSIPv4(rwrec, &ar[0]);
     rwRecMemGetDIPv4(rwrec, &ar[4]);
     rwRecMemGetSPort(rwrec, &ar[8]);
     rwRecMemGetDPort(rwrec, &ar[10]);
     rwRecMemGetNhIPv4(rwrec, &ar[12]);
-    rwRecMemGetInput(rwrec, &ar[16]);
-    rwRecMemGetOutput(rwrec, &ar[18]);
+
+    /* input, output */
+    rwpackPackInput16(rwrec, &ar[16], &rv);
+    rwpackPackOutput16(rwrec, &ar[18], &rv);
+    if (rv) {
+        return rv;
+    }
 
     /* sTime, elapsed */
     tmp32 = (uint32_t)(rwRecGetStartTime(rwrec) / 1000);
@@ -530,8 +564,14 @@ genericioRecordPack_V2(
     memcpy(&ar[24], &tmp32, 4);
 
     /* pkts, bytes */
-    rwRecMemGetPkts(rwrec, &ar[28]);
-    rwRecMemGetBytes(rwrec, &ar[32]);
+    rwpackPackPackets32(rwrec, &ar[28], &rv);
+    if (rv) {
+        return rv;
+    }
+    rwpackPackBytes32(rwrec, &ar[32], &rv);
+    if (rv) {
+        return rv;
+    }
 
     /* proto, flow_type, sID, flags, init_flags, rest_flags, tcp_state */
     rwRecMemGetProto(rwrec, &ar[36]);
@@ -546,7 +586,7 @@ genericioRecordPack_V2(
     memset(&ar[44], 0, 4);
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         genericioRecordSwap_V2(ar);
     }
 
@@ -613,13 +653,13 @@ genericioRecordPack_V2(
 static int
 genericioRecordUnpack_V1(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     uint32_t tmp32;
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         genericioRecordSwap_V1(ar);
     }
 
@@ -643,8 +683,8 @@ genericioRecordUnpack_V1(
     rwRecSetStartTime(rwrec, sktimeCreate(tmp32, 0));
 
     /* pkts, bytes */
-    rwRecMemSetPkts(rwrec, &ar[24]);
-    rwRecMemSetBytes(rwrec, &ar[28]);
+    rwpackUnpackPackets32(rwrec, &ar[24]);
+    rwpackUnpackBytes32(rwrec, &ar[28]);
 
     /* elapsed */
     memcpy(&tmp32, &ar[32], 4);
@@ -662,18 +702,19 @@ genericioRecordUnpack_V1(
  */
 static int
 genericioRecordPack_V1(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
     uint32_t tmp32;
+    int rv = SKSTREAM_OK;
 
     /* Check sizes of fields we've expanded in later versions */
-    if (rwRecGetInput(rwrec) > 255 || rwRecGetOutput(rwrec) > 255) {
+    if (rwRecGetInput(rwrec) > 0xFF || rwRecGetOutput(rwrec) > 0xFF) {
         return SKSTREAM_ERR_SNMP_OVRFLO;
     }
     /* Check sizes of fields we've expanded in later versions */
-    if (rwRecGetSensor(rwrec) > 255) {
+    if (rwRecGetSensor(rwrec) > 0xFF) {
         return SKSTREAM_ERR_SENSORID_OVRFLO;
     }
 
@@ -697,8 +738,14 @@ genericioRecordPack_V1(
     memcpy(&ar[20], &tmp32, 4);
 
     /* pkts, bytes */
-    rwRecMemGetPkts(rwrec, &ar[24]);
-    rwRecMemGetBytes(rwrec, &ar[28]);
+    rwpackPackPackets32(rwrec, &ar[24], &rv);
+    if (rv) {
+        return rv;
+    }
+    rwpackPackBytes32(rwrec, &ar[28], &rv);
+    if (rv) {
+        return rv;
+    }
 
     /* elapsed */
     tmp32 = rwRecGetElapsed(rwrec) / 1000;
@@ -708,12 +755,12 @@ genericioRecordPack_V1(
     ar[36] = (uint8_t)rwRecGetSensor(rwrec);
 
     /* clear padding if present (for consistent output) */
-    if (stream->recLen == 40) {
+    if (stream->rec_len == 40) {
         memset(&ar[37], 0, 3);
     }
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         genericioRecordSwap_V1(ar);
     }
 
@@ -778,19 +825,19 @@ genericioPrepare(
     /* version check; set values based on version */
     switch (skHeaderGetRecordVersion(hdr)) {
       case 5:
-        stream->rwUnpackFn = &genericioRecordUnpack_V5;
-        stream->rwPackFn   = &genericioRecordPack_V5;
+        stream->silkflow.unpack = &genericioRecordUnpack_V5;
+        stream->silkflow.pack   = &genericioRecordPack_V5;
         break;
       case 4:
       case 3:
         /* V3 and V4 differ only in that V4 supports compression on
          * read and write; V3 supports compression only on read */
-        stream->rwUnpackFn = &genericioRecordUnpack_V3;
-        stream->rwPackFn   = &genericioRecordPack_V3;
+        stream->silkflow.unpack = &genericioRecordUnpack_V3;
+        stream->silkflow.pack   = &genericioRecordPack_V3;
         break;
       case 2:
-        stream->rwUnpackFn = &genericioRecordUnpack_V2;
-        stream->rwPackFn   = &genericioRecordPack_V2;
+        stream->silkflow.unpack = &genericioRecordUnpack_V2;
+        stream->silkflow.pack   = &genericioRecordPack_V2;
         break;
       case 1:
       case 0:
@@ -798,30 +845,30 @@ genericioPrepare(
          * on-disk Version 0 records included the 3 bytes of in-core
          * padding; the on-disk Version 1 records do not include these
          * 3 bytes. */
-        stream->rwUnpackFn = &genericioRecordUnpack_V1;
-        stream->rwPackFn   = &genericioRecordPack_V1;
+        stream->silkflow.unpack = &genericioRecordUnpack_V1;
+        stream->silkflow.pack   = &genericioRecordPack_V1;
         break;
       default:
         rv = SKSTREAM_ERR_UNSUPPORT_VERSION;
         goto END;
     }
 
-    stream->recLen = genericioGetRecLen(skHeaderGetRecordVersion(hdr));
+    stream->rec_len = genericioGetRecLen(skHeaderGetRecordVersion(hdr));
 
     /* verify lengths */
-    if (stream->recLen == 0) {
+    if (stream->rec_len == 0) {
         skAppPrintErr("Record length not set for %s version %u",
                       FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr));
         skAbort();
     }
-    if (stream->recLen != skHeaderGetRecordLength(hdr)) {
+    if (stream->rec_len != skHeaderGetRecordLength(hdr)) {
         if (0 == skHeaderGetRecordLength(hdr)) {
-            skHeaderSetRecordLength(hdr, stream->recLen);
+            skHeaderSetRecordLength(hdr, stream->rec_len);
         } else {
             skAppPrintErr(("Record length mismatch for %s version %u\n"
                            "\tcode = %" PRIu16 " bytes;  header = %lu bytes"),
                           FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr),
-                          stream->recLen,
+                          stream->rec_len,
                           (unsigned long)skHeaderGetRecordLength(hdr));
             skAbort();
         }

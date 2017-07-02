@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am a0de5ee69dff 2015-02-18 21:42:47Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 9715abfb0c17 2015-02-19 15:56:56Z mthomas $");
 
 # Installed Targets
 
@@ -30,7 +30,7 @@ EXTRA_DIST += doc/db-mysql.sql doc/db-oracle.sql doc/db-postgres.sql
 AM_CPPFLAGS = $(SK_SRC_INCLUDES) $(SK_CPPFLAGS)
 AM_CFLAGS = $(WARN_CFLAGS) $(SK_CFLAGS)
 AM_LDFLAGS = $(SK_LDFLAGS) $(STATIC_APPLICATIONS)
-LDADD = ../libsilk/libsilk.la $(PTHREAD_LDFLAGS)
+LDADD = ../libsilk/libsilk.la
 
 rwscan_SOURCES = rwscan.c rwscan.h rwscan_db.c rwscan_db.h \
 	 rwscan_icmp.c rwscan_tcp.c rwscan_udp.c rwscan_utils.c \

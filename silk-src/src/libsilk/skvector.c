@@ -13,14 +13,17 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skvector.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skvector.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/skvector.h>
+#include <silk/utils.h>
 
 
 /* LOCAL DEFINES AND TYPEDEFS */
 
-/* vector type */
+/*
+ *    The sk_vector_t type
+ */
 struct sk_vector_st {
     uint8_t    *list;
     size_t      element_size;
@@ -28,6 +31,7 @@ struct sk_vector_st {
     size_t      count;
     size_t      max_capacity;
 };
+/* sk_vector_t */
 
 
 /* get address of the item at position 'pos' in the vector 'v' */
@@ -61,15 +65,17 @@ static const double growth_factor[] = {
 
 
 /*
- *  status = skVectorAlloc(v, new_cap);
+ *  status = vector_alloc(v, new_cap, no_exit);
  *
  *    Grow or shink the element list in 'v' to hold 'new_cap'
- *    elements.
+ *    elements.  On allocation failure, exit the application unless
+ *    'no_exit' is true.
  */
 static int
-skVectorAlloc(
+vector_alloc(
     sk_vector_t        *v,
-    size_t              new_cap)
+    size_t              new_cap,
+    int                 no_exit)
 {
     size_t old_cap;
     uint8_t *old_list;
@@ -100,7 +106,11 @@ skVectorAlloc(
     if (!v->list) {
         v->capacity = old_cap;
         v->list = old_list;
-        return -1;
+        if (no_exit) {
+            return -1;
+        }
+        skAppPrintOutOfMemory("vector");
+        exit(EXIT_FAILURE);
     }
 
     return 0;
@@ -108,14 +118,14 @@ skVectorAlloc(
 
 
 /*
- *  status = skVectorGrow(v);
+ *  status = vector_grow(v);
  *
  *    Grow the vector to hold more elements.  If the current capacity
  *    is zero, grow to SKVECTOR_INIT_CAPACITY elements; otherwise grow
  *    the current capacity using the global growth_factor array.
  */
 static int
-skVectorGrow(
+vector_grow(
     sk_vector_t        *v)
 {
     double dbl_cap;
@@ -126,7 +136,7 @@ skVectorGrow(
 
     /* initial allocation */
     if (v->capacity == 0) {
-        return skVectorAlloc(v, SKVECTOR_INIT_CAPACITY);
+        return vector_alloc(v, SKVECTOR_INIT_CAPACITY, 0);
     }
 
     /* grow the array */
@@ -139,17 +149,18 @@ skVectorGrow(
         } else {
             cap = (size_t)dbl_cap;
         }
-        if (0 == skVectorAlloc(v, cap)) {
+        if (0 == vector_alloc(v, cap, 1)) {
             return 0;
         }
     }
 
-    return -1;
+    skAppPrintOutOfMemory("vector");
+    exit(EXIT_FAILURE);
 }
 
 
 sk_vector_t *
-skVectorNew(
+sk_vector_create(
     size_t              element_size)
 {
     sk_vector_t *v;
@@ -158,7 +169,7 @@ skVectorNew(
         return NULL;
     }
 
-    v = (sk_vector_t*)calloc(1, sizeof(sk_vector_t));
+    v = sk_alloc(sk_vector_t);
     if (!v) {
         return NULL;
     }
@@ -170,20 +181,15 @@ skVectorNew(
 
 
 sk_vector_t *
-skVectorClone(
+sk_vector_clone(
     const sk_vector_t  *v)
 {
     sk_vector_t *nv;
-    int          rv;
 
-    nv = skVectorNew(v->element_size);
-    if (nv == NULL) {
-        return NULL;
-    }
+    nv = sk_vector_create(v->element_size);
 
-    rv = skVectorAlloc(nv, v->count);
-    if (0 != rv) {
-        skVectorDestroy(nv);
+    if (0 != vector_alloc(nv, v->count, 0)) {
+        sk_vector_destroy(nv);
         return NULL;
     }
 
@@ -195,7 +201,7 @@ skVectorClone(
 
 
 sk_vector_t *
-skVectorNewFromArray(
+sk_vector_create_from_array(
     size_t              element_size,
     const void         *array,
     size_t              count)
@@ -203,18 +209,15 @@ skVectorNewFromArray(
     sk_vector_t *v;
 
     /* create the new vector */
-    v = skVectorNew(element_size);
-    if (v == NULL) {
-        return NULL;
-    }
+    v = sk_vector_create(element_size);
 
     /* make certain we have data with which to fill it */
     if (array == NULL || count == 0) {
         return v;
     }
 
-    if (0 != skVectorAlloc(v, count)) {
-        skVectorDestroy(v);
+    if (0 != vector_alloc(v, count, 0)) {
+        sk_vector_destroy(v);
         return NULL;
     }
 
@@ -225,7 +228,7 @@ skVectorNewFromArray(
 
 
 void
-skVectorDestroy(
+sk_vector_destroy(
     sk_vector_t        *v)
 {
     if (v) {
@@ -241,7 +244,7 @@ skVectorDestroy(
 
 
 int
-skVectorSetCapacity(
+sk_vector_set_capacity(
     sk_vector_t        *v,
     size_t              capacity)
 {
@@ -262,12 +265,12 @@ skVectorSetCapacity(
     }
 
     /* must realloc or malloc */
-    return skVectorAlloc(v, capacity);
+    return vector_alloc(v, capacity, 0);
 }
 
 
 void
-skVectorClear(
+sk_vector_clear(
     sk_vector_t        *v)
 {
     if (v) {
@@ -277,7 +280,7 @@ skVectorClear(
 
 
 size_t
-skVectorGetElementSize(
+sk_vector_get_element_size(
     const sk_vector_t  *v)
 {
     assert(v);
@@ -286,7 +289,7 @@ skVectorGetElementSize(
 
 
 size_t
-skVectorGetCapacity(
+sk_vector_get_capacity(
     const sk_vector_t  *v)
 {
     assert(v);
@@ -295,7 +298,7 @@ skVectorGetCapacity(
 
 
 size_t
-skVectorGetCount(
+sk_vector_get_count(
     const sk_vector_t  *v)
 {
     assert(v);
@@ -304,14 +307,14 @@ skVectorGetCount(
 
 
 int
-skVectorAppendValue(
+sk_vector_append_value(
     sk_vector_t        *v,
     const void         *value)
 {
     assert(v);
 
     if (v->capacity == v->count) {
-        if (skVectorGrow(v) != 0) {
+        if (vector_grow(v) != 0) {
             return -1;
         }
     }
@@ -322,7 +325,7 @@ skVectorAppendValue(
 
 
 int
-skVectorAppendVector(
+sk_vector_append_vector(
     sk_vector_t        *dst,
     const sk_vector_t  *src)
 {
@@ -330,7 +333,10 @@ skVectorAppendVector(
 
     assert(dst);
     assert(src);
-    assert(dst->element_size == src->element_size);
+
+    if (dst->element_size != src->element_size) {
+        return -1;
+    }
 
     /* is there space in 'dst' for all the elements from 'src'? */
     if ((dst->max_capacity - dst->count) < src->count) {
@@ -339,7 +345,7 @@ skVectorAppendVector(
     total = dst->count + src->count;
 
     if (dst->capacity < total) {
-        if (0 != skVectorAlloc(dst, total)) {
+        if (0 != vector_alloc(dst, total, 0)) {
             return -1;
         }
     }
@@ -350,7 +356,7 @@ skVectorAppendVector(
 }
 
 int
-skVectorAppendFromArray(
+sk_vector_append_from_array(
     sk_vector_t        *v,
     const void         *array,
     size_t              count)
@@ -367,7 +373,7 @@ skVectorAppendFromArray(
     total = v->count + count;
 
     if (v->capacity < total) {
-        if (0 != skVectorAlloc(v, total)) {
+        if (0 != vector_alloc(v, total, 0)) {
             return -1;
         }
     }
@@ -379,35 +385,7 @@ skVectorAppendFromArray(
 
 
 int
-skVectorGetValue(
-    void               *out_element,
-    const sk_vector_t  *v,
-    size_t              position)
-{
-    assert(v);
-    if (position >= v->count) {
-        return -1;
-    }
-    VA_GET(out_element, v, position);
-    return 0;
-}
-
-
-void *
-skVectorGetValuePointer(
-    const sk_vector_t  *v,
-    size_t              position)
-{
-    assert(v);
-    if (position >= v->count) {
-        return NULL;
-    }
-    return (void*)VA_PTR(v, position);
-}
-
-
-int
-skVectorSetValue(
+sk_vector_set_value(
     sk_vector_t        *v,
     size_t              position,
     const void         *value)
@@ -430,7 +408,7 @@ skVectorSetValue(
 
 
 int
-skVectorInsertValue(
+sk_vector_insert_value(
     sk_vector_t        *v,
     size_t              position,
     const void         *value)
@@ -438,10 +416,10 @@ skVectorInsertValue(
     assert(v);
 
     if (position >= v->count) {
-        return skVectorSetValue(v, position, value);
+        return sk_vector_set_value(v, position, value);
     }
     if (v->capacity == v->count) {
-        if (skVectorGrow(v) != 0) {
+        if (vector_grow(v) != 0) {
             return -1;
         }
     }
@@ -454,7 +432,7 @@ skVectorInsertValue(
 
 
 int
-skVectorRemoveValue(
+sk_vector_remove_value(
     sk_vector_t        *v,
     size_t              position,
     void               *out_element)
@@ -480,26 +458,26 @@ skVectorRemoveValue(
 
 /**
  *    Copies the data from 'new_value' to vector 'v' at 'position'
- *    similar to skVectorSetValue() except it first copies the value
+ *    similar to sk_vector_set_value() except it first copies the value
  *    being replaced to the location referenced by 'replaced_element'
  *    when 'replaced_element' is not NULL and 'position' is less than
- *    skVectorGetCount().  The value at 'replaced_element' is left
- *    unchanged when 'position' is not less than skVectorGetCount().
+ *    sk_vector_get_count().  The value at 'replaced_element' is left
+ *    unchanged when 'position' is not less than sk_vector_get_count().
  *
  *    Returns 0 on success.  Returns -1 if 'position' is not less than
- *    skVectorGetCapacity(v).
+ *    sk_vector_get_capacity(v).
  *
  *    Since SiLK x.y.z.
  */
 int
-skVectorReplaceValue(
+sk_vector_replace_value(
     sk_vector_t        *v,
     size_t              position,
     const void         *new_value,
     void               *replaced_element);
 
 int
-skVectorReplaceValue(
+sk_vector_replace_value(
     sk_vector_t        *v,
     size_t              position,
     const void         *new_value,
@@ -508,16 +486,44 @@ skVectorReplaceValue(
     if (out_element && position < v->count) {
         VA_GET(out_element, v, position);
     }
-    return skVectorSetValue(v, position, new_value);
+    return sk_vector_set_value(v, position, new_value);
 }
 #endif  /* 0 */
 
 
+int
+sk_vector_get_value(
+    const sk_vector_t  *v,
+    size_t              position,
+    void               *out_element)
+{
+    assert(v);
+    if (position >= v->count) {
+        return -1;
+    }
+    VA_GET(out_element, v, position);
+    return 0;
+}
+
+
+void *
+sk_vector_get_value_pointer(
+    const sk_vector_t  *v,
+    size_t              position)
+{
+    assert(v);
+    if (position >= v->count) {
+        return NULL;
+    }
+    return (void*)VA_PTR(v, position);
+}
+
+
 size_t
-skVectorGetMultipleValues(
-    void               *out_array,
+sk_vector_get_multiple_values(
     const sk_vector_t  *v,
     size_t              start_position,
+    void               *out_array,
     size_t              num_elements)
 {
     uint8_t *p;
@@ -538,9 +544,9 @@ skVectorGetMultipleValues(
 
 
 void
-skVectorToArray(
-    void               *out_array,
-    const sk_vector_t  *v)
+sk_vector_to_array(
+    const sk_vector_t  *v,
+    void               *out_array)
 {
     assert(v);
     assert(out_array);
@@ -552,7 +558,7 @@ skVectorToArray(
 
 
 void *
-skVectorToArrayAlloc(
+sk_vector_to_array_alloc(
     const sk_vector_t  *v)
 {
     void *array;
@@ -563,10 +569,7 @@ skVectorToArrayAlloc(
         return NULL;
     }
 
-    array = malloc(v->count * v->element_size);
-    if (NULL == array) {
-        return NULL;
-    }
+    array = sk_alloc_bytes(v->count * v->element_size, SK_ALLOC_FLAG_NO_CLEAR);
     memcpy(array, v->list, (v->count * v->element_size));
     return array;
 }

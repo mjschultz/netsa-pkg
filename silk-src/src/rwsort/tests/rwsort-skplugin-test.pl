@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 # MD5: 6d5de2000d6473006117de73bb698329
-# TEST: ./rwsort --plugin=skplugin-test.so --fields=copy-bytes ../../tests/data.rwf | ../rwstats/rwuniq --plugin=skplugin-test.so --ipv6-policy=ignore --fields=copy-bytes --values=bytes,packets,records --presorted-input
+# TEST: ./rwsort --plugin=skplugin-test.so --fields=copy-bytes ../../tests/data.rwf | ../rwuniq/rwuniq --plugin=skplugin-test.so --ipv6-policy=ignore --fields=copy-bytes --values=bytes,packets,records --presorted-input
 
 use strict;
 use SiLKTests;

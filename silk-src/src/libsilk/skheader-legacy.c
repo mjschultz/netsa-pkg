@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skheader-legacy.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skheader-legacy.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include "skheader_priv.h"
 #include "skstream_priv.h"
@@ -464,15 +464,14 @@ legacyHeaderPackedfile(
 {
     sk_header_entry_t *hentry;
     uint32_t start_time;
-    sk_flowtype_id_t flow_type;
-    sk_sensor_id_t sensor_id;
+    sksite_repo_key_t repo_key;
     ssize_t saw;
 
     assert(stream);
     assert(hdr);
     assert(bytes_read);
 
-    /* read the start time */
+    /* read the start time from the file's header */
     saw = skStreamRead(stream, &start_time, sizeof(start_time));
     if (saw == -1) {
         return -1;
@@ -486,17 +485,16 @@ legacyHeaderPackedfile(
     }
 
     /* set the flow_type and sensor_id from the file name */
-    if (sksiteParseFilename(&flow_type, &sensor_id, NULL, NULL,
-                            skStreamGetPathname(stream))
+    if (sksiteParseFilename(skStreamGetPathname(stream), &repo_key, NULL)
         == SK_INVALID_FLOWTYPE)
     {
-        flow_type = SK_INVALID_FLOWTYPE;
-        sensor_id = SK_INVALID_SENSOR;
+        repo_key.flowtype_id = SK_INVALID_FLOWTYPE;
+        repo_key.sensor_id = SK_INVALID_SENSOR;
     }
+    repo_key.timestamp = sktimeCreate(start_time, 0);
 
     /* create the header entry */
-    hentry = skHentryPackedfileCreate(sktimeCreate(start_time, 0),
-                                      flow_type, sensor_id);
+    hentry = skHentryPackedfileCreate(&repo_key);
     if (hentry == NULL) {
         return SKHEADER_ERR_ALLOC;
     }

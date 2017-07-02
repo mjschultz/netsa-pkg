@@ -11,12 +11,11 @@ B<rwaddrcount> - count activity by IP address
         [--min-records=RECMIN] [--max-records=RECMAX]
         [--min-packets=PACKMIN] [--max-packets=PACKMAX]
         [--set-file=PATHNAME] [--sort-ips] [--timestamp-format=FORMAT]
-        [--ip-format=FORMAT] [--integer-ips] [--zero-pad-ips]
+        [--ip-format=FORMAT]
         [--no-titles] [--no-columns] [--column-separator=CHAR]
         [--no-final-delimiter] [{--delimited | --delimited=CHAR}]
         [--print-filenames] [--copy-input=PATH] [--output-path=PATH]
         [--pager=PAGER_PROG] [--site-config-file=FILENAME]
-        [{--legacy-timestamps | --legacy-timestamps=NUM}]
         {[--xargs] | [--xargs=FILENAME] | [FILE [FILE ...]]}
 
   rwaddrcount --help
@@ -206,19 +205,6 @@ netblock.  The address C<127.0.0.1> is printed as C<::ffff:7f00:1>.
 
 =back
 
-=item B<--integer-ips>
-
-Print IP addresses as integers.  This switch is equivalent to
-B<--ip-format=decimal>, it is deprecated as of SiLK 3.7.0, and it will
-be removed in the SiLK 4.0 release.
-
-=item B<--zero-pad-ips>
-
-Print IP addresses as fully-expanded, zero-padded values in their
-canonical form.  This switch is equivalent to
-B<--ip-format=zero-padded>, it is deprecated as of SiLK 3.7.0, and it
-will be removed in the SiLK 4.0 release
-
 =item B<--sort-ips>
 
 For the B<--print-recs> and B<--print-ips> output formats, the results
@@ -290,15 +276,6 @@ When this switch is not provided, B<rwaddrcount> searches for the site
 configuration file in the locations specified in the L</FILES>
 section.
 
-=item B<--legacy-timestamps>
-
-=item B<--legacy-timestamps>=I<NUM>
-
-When I<NUM> is not specified or is 1, this switch is equivalent to
-B<--timestamp-format=m/d/y>.  Otherwise, the switch has no effect.
-This switch is deprecated as of SiLK 3.0.0, and it will be removed in
-the SiLK 4.0 release.
-
 =item B<--xargs>
 
 =item B<--xargs>=I<FILENAME>
@@ -317,39 +294,6 @@ Print the available options and exit.
 
 Print the version number and information about how SiLK was
 configured, then exit the application.
-
-=back
-
-=head2 Deprecated Switches
-
-The following switches are deprecated.  They will be removed in
-SiLK 4.0.
-
-=over 4
-
-=item B<--byte-min>=I<BYTEMIN>
-
-Deprecated alias for B<--min-bytes>.
-
-=item B<--packet-min>=I<PACKMIN>
-
-Deprecated alias for B<--min-packets>.
-
-=item B<--rec-min>=I<RECMIN>
-
-Deprecated alias for B<--min-records>.
-
-=item B<--byte-max>=I<BYTEMAX>
-
-Deprecated alias for B<--max-bytes>.
-
-=item B<--packet-max>=I<PACKMAX>
-
-Deprecated alias for B<--max-packets>.
-
-=item B<--rec-max>=I<RECMAX>
-
-Deprecated alias for B<--max-records>.
 
 =back
 
@@ -496,7 +440,7 @@ B<rwset(1)>.
 
 =cut
 
-$SiLK: rwaddrcount.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwaddrcount.pod d1637517606d 2017-06-23 16:51:31Z mthomas $
 
 Local Variables:
 mode:text

@@ -20,9 +20,8 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWGROUP_H, "$SiLK: rwgroup.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_RWGROUP_H, "$SiLK: rwgroup.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
-#include <silk/rwascii.h>
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
 #include <silk/skplugin.h>
@@ -74,8 +73,8 @@ typedef struct key_field_st {
 extern uint32_t num_fields;
 
 /* IDs of the fields to group by; skStringMapParse() sets it; values
- * are from the rwrec_printable_fields_t enum and from values that
- * come from plugins. */
+ * are from the rwrec_field_id_t enum and from values that come from
+ * plugins. */
 extern uint32_t *id_fields;
 
 /* the size of a "node".  Because the output from rwgroup is SiLK

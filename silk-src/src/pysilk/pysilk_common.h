@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_PYSILK_COMMON_H, "$SiLK: pysilk_common.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_PYSILK_COMMON_H, "$SiLK: pysilk_common.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 /*
 **  pysilk_common.h
@@ -47,18 +47,6 @@ RCSIDENTVAR(rcsID_PYSILK_COMMON_H, "$SiLK: pysilk_common.h 275df62a2e41 2017-01-
 #  define BUILTINS "builtins"
 typedef void *cmpfunc;
 #else  /* PY_MAJOR_VERSION < 3 */
-#  if PY_VERSION_HEX < 0x02060000
-/* Python 2.[45] version */
-#    define PyBytes_AS_STRING PyString_AS_STRING
-#    define PyBytes_AsString PyString_AsString
-#    define PyBytes_Check PyString_Check
-#    define PyBytes_GET_SIZE PyString_GET_SIZE
-#    define PyBytes_FromStringAndSize PyString_FromStringAndSize
-#    define PyUnicode_FromString string_to_unicode
-#    define PyUnicode_FromFormat format_to_unicode
-#    define Py_TYPE(o) ((o)->ob_type)
-#    define PyVarObject_HEAD_INIT(a, b) PyObject_HEAD_INIT(a) b,
-#  endif  /* PY_VERSION_HEX < 0x02060000 */
 /* Python 2.x version */
 #  define IS_STRING(o) (PyBytes_Check(o) || PyUnicode_Check(o))
 #  define IS_INT(o) ((PyInt_Check(o) && !PyBool_Check(o)) || PyLong_Check(o))
@@ -83,15 +71,6 @@ bytes_from_string(
 PyObject *
 bytes_from_wchar(
     const wchar_t      *wc);
-#if PY_VERSION_HEX < 0x02060000
-PyObject *
-string_to_unicode(
-    const char         *s);
-PyObject *
-format_to_unicode(
-    const char         *s,
-    ...);
-#endif
 
 /*
  *    declarations for DLL input/export changed between Python 2 and

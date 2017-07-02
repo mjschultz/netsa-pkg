@@ -24,7 +24,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipset.c ef5b2378ee80 2017-02-27 21:48:55Z mthomas $");
+RCSIDENT("$SiLK: skipset.c 85a5bdc03947 2017-06-23 15:56:12Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
@@ -441,11 +441,7 @@ RCSIDENT("$SiLK: skipset.c ef5b2378ee80 2017-02-27 21:48:55Z mthomas $");
     (IPSET_NUM_CHILDREN * (1 + ((IPSET_LEN_V4 * CHAR_BIT) / NUM_BITS)))
 #define  IPSET_MAX_DEPTH_V6                                             \
     (IPSET_NUM_CHILDREN * (1 + ((IPSET_LEN_V6 * CHAR_BIT) / NUM_BITS)))
-#if SK_ENABLE_IPV6
-#  define IPSET_MAX_DEPTH  IPSET_MAX_DEPTH_V6
-#else
-#  define IPSET_MAX_DEPTH  IPSET_MAX_DEPTH_V4
-#endif  /* SK_ENABLE_IPV6 */
+#define IPSET_MAX_DEPTH    IPSET_MAX_DEPTH_V6
 
 /* Index of first leaf when iterating over the leaves in a clean IPset */
 #define IPSET_LINK_LIST_ANCHOR         1
@@ -1022,12 +1018,8 @@ struct ipset_node_v6_st {
     uint8_t         reserved2;
     uint8_t         reserved1;
 
-#if SK_ENABLE_IPV6
     uint32_t        pad_align;
     ipset_ipv6_t    ip;
-#else
-    uint32_t        ip;
-#endif  /* SK_ENABLE_IPV6 */
 };
 
 /* A generic "node" pointer */
@@ -1058,12 +1050,8 @@ struct ipset_leaf_v6_st {
     uint8_t         reserved2;
     uint8_t         reserved1;
 
-#if SK_ENABLE_IPV6
     uint32_t        pad_align;
     ipset_ipv6_t    ip;
-#else
-    uint32_t        ip;
-#endif
 };
 
 /* A generic "leaf" pointer */
@@ -1303,14 +1291,12 @@ ipsetFindV4(
     const uint32_t      ipv4,
     const uint32_t      prefix,
     ipset_find_t       *find_state);
-#if SK_ENABLE_IPV6
 static int
 ipsetFindV6(
     const skipset_t    *ipset,
     const ipset_ipv6_t *ipv6,
     const uint32_t      prefix,
     ipset_find_t       *find_state);
-#endif
 static sk_header_entry_t *
 ipsetHentryCreate(
     uint32_t            child_node,
@@ -1508,7 +1494,6 @@ ipsetCheckIPSetCallbackV4(
     return SKIPSET_OK;
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetCheckIPSetCallbackV6(
     skipaddr_t         *ipaddr,
@@ -1528,7 +1513,6 @@ ipsetCheckIPSetCallbackV6(
     }
     return SKIPSET_OK;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -1789,7 +1773,6 @@ ipsetCombineSubtreeV4(
     NODEIDX_FREE(ipset, node_idx);
 }
 
-#if SK_ENABLE_IPV6
 static void
 ipsetCombineSubtreeV6(
     skipset_t          *ipset,
@@ -1954,7 +1937,6 @@ ipsetCombineSubtreeV6(
     }
     NODEIDX_FREE(ipset, node_idx);
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -1970,13 +1952,10 @@ ipsetCombineAdjacentCIDR(
     skipset_t          *ipset)
 {
     if (!IPSET_ROOT_IS_LEAF(ipset)) {
-#if SK_ENABLE_IPV6
         if (ipset->is_ipv6) {
             ipsetCombineSubtreeV6(ipset, IPSET_NO_PARENT,
                                   IPSET_ROOT_INDEX(ipset), IPSET_NUM_CHILDREN);
-        } else
-#endif  /* SK_ENABLE_IPV6 */
-        {
+        } else {
             ipsetCombineSubtreeV4(ipset, IPSET_NO_PARENT,
                                   IPSET_ROOT_INDEX(ipset), IPSET_NUM_CHILDREN);
         }
@@ -2171,7 +2150,6 @@ ipsetCompact(
 }
 
 
-#if SK_ENABLE_IPV6
 /*
  *  status = ipsetConvertIPTreetoV6(ipset);
  *
@@ -2465,7 +2443,6 @@ ipsetConvertV6toV4(
 
     return SKIPSET_OK;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -2558,7 +2535,6 @@ ipsetCountCallbackV4(
     return 0;
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetCountCallbackV6(
     const ipset_ipv6_t  UNUSED(*ipv6),
@@ -2592,7 +2568,6 @@ ipsetCountCallbackV6(
     }
     return 0;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -2680,7 +2655,6 @@ ipsetCountStreamCallbackV4(
     return ipsetCountCallbackV4(0, prefix, v_count_state);
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetCountStreamCallbackV6(
     skipaddr_t  UNUSED(*ipaddr),
@@ -2689,7 +2663,6 @@ ipsetCountStreamCallbackV6(
 {
     return ipsetCountCallbackV6(NULL, prefix, v_count_state);
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -3193,7 +3166,6 @@ ipsetFindV4(
     return rv;
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetFindV6(
     const skipset_t    *ipset,
@@ -3353,7 +3325,6 @@ ipsetFindV6(
     }
     return rv;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -3432,7 +3403,6 @@ ipsetFixNodeSingleChild(
             /* cannot call ipsetFindVx() with a prefix of 0, but that
              * can only happen at the root */
             find_state.parent_idx = IPSET_NO_PARENT;
-#if SK_ENABLE_IPV6
         } else if (ipset->is_ipv6) {
 #ifndef NDEBUG
             int rv =
@@ -3440,7 +3410,6 @@ ipsetFixNodeSingleChild(
                 ipsetFindV6(ipset, &node->v6.ip, node->v6.prefix, &find_state);
             assert(SKIPSET_OK == rv || SKIPSET_ERR_SUBSET == rv);
             assert(find_state.node_idx == node_idx && !find_state.node_is_leaf);
-#endif  /* SK_ENABLE_IPV6 */
         } else {
 #ifndef NDEBUG
             int rv =
@@ -4132,7 +4101,6 @@ ipsetInsertAddressV4(
     return SKIPSET_OK;
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetInsertAddressV6(
     skipset_t          *ipset,
@@ -4451,7 +4419,7 @@ ipsetInsertAddressV6(
 
     return SKIPSET_OK;
 }
-#endif  /* SK_ENABLE_IPV6 */
+
 
 /*
  *  status = ipsetInsertIPAddrIPTree(ipaddr, prefix, ipset);
@@ -4484,7 +4452,6 @@ ipsetInsertIPAddrV4(
                                 prefix, NULL);
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetInsertIPAddrV6(
     skipaddr_t         *ipaddr,
@@ -4495,7 +4462,6 @@ ipsetInsertIPAddrV6(
     IPSET_IPV6_FROM_ADDRV6(&ipv6, ipaddr);
     return ipsetInsertAddressV6((skipset_t*)v_ipset, &ipv6, prefix, NULL);
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -4525,25 +4491,19 @@ ipsetInsertRangeIPTree(
     assert(skipaddrCompare(ipaddr_start, ipaddr_end) < 0);
     assert(!skipaddrIsV6(ipaddr_start) && !skipaddrIsV6(ipaddr_end));
 
-#if  SK_ENABLE_IPV6
     if (skipaddrIsV6(ipaddr_start)) {
         if (skipaddrV6toV4(ipaddr_start, &ipaddr4_start)) {
             return SKIPSET_ERR_IPV6;
         }
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         skipaddrCopy(&ipaddr4_start, ipaddr_start);
     }
 
-#if  SK_ENABLE_IPV6
     if (skipaddrIsV6(ipaddr_end)) {
         if (skipaddrV6toV4(ipaddr_end, &ipaddr4_end)) {
             return SKIPSET_ERR_IPV6;
         }
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         skipaddrCopy(&ipaddr4_end, ipaddr_end);
     }
 
@@ -5022,10 +4982,8 @@ ipsetIteratorNextIPTree(
         skAbortBadCase(iter->v6policy);
 
       case SK_IPV6POLICY_FORCE:
-#if SK_ENABLE_IPV6
         skipaddrSetV6FromUint32(ipaddr, &ipv4);
         *prefix += 96;
-#endif  /* #if SK_ENABLE_IPV6 */
         break;
 
       case SK_IPV6POLICY_MIX:
@@ -5063,7 +5021,6 @@ ipsetIteratorNextRangeV4(
     }
 }
 
-#if SK_ENABLE_IPV6
 static void
 ipsetIteratorNextRangeV6(
     skipset_iterator_t *iter)
@@ -5108,7 +5065,6 @@ ipsetIteratorNextRangeV6(
         iter->it.v3.data[3] = UINT64_MAX;
     }
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -5135,7 +5091,6 @@ ipsetLeafCompareV4(
     return (a > b);
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetLeafCompareV6(
     const void         *va,
@@ -5154,7 +5109,6 @@ ipsetLeafCompareV6(
     }
     return (a->ip[1] > b->ip[1]);
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -5201,7 +5155,6 @@ ipsetMaskAddLeavesV4(
     return SKIPSET_OK;
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetMaskAddLeavesV6(
     skipset_t          *ipset,
@@ -5297,7 +5250,6 @@ ipsetMaskAddLeavesV6(
 
     return SKIPSET_OK;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -5616,7 +5568,6 @@ ipsetMaskV4(
     return SKIPSET_OK;
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetMaskV6(
     skipset_t          *ipset,
@@ -5849,7 +5800,6 @@ ipsetMaskV6(
 
     return SKIPSET_OK;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -6143,7 +6093,6 @@ ipsetMaskAndFillV4(
     return SKIPSET_OK;
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetMaskAndFillV6(
     skipset_t          *ipset,
@@ -6349,7 +6298,6 @@ ipsetMaskAndFillV6(
 
     return SKIPSET_OK;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -6822,7 +6770,6 @@ ipsetProcessStreamBmapSlash24(
     return rv;
 }
 
-#if SK_ENABLE_IPV6
 /* an IPv6 version of previous function */
 static int
 ipsetProcessStreamBmapSlash120(
@@ -6923,7 +6870,6 @@ ipsetProcessStreamBmapSlash120(
   END:
     return rv;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -6951,10 +6897,8 @@ ipsetProcessStreamCallback(
     uint32_t            prefix,
     ipset_walk_t       *proc_stream_state)
 {
-#if SK_ENABLE_IPV6
     ipset_ipv6_t tmp_ipv6;
     uint32_t tmp_ipv4;
-#endif
     skipaddr_t ipaddr;
     int rv;
 
@@ -6966,7 +6910,6 @@ ipsetProcessStreamCallback(
         || (v4_start &&  32 == prefix)
         || (v6_start && 128 == prefix))
     {
-#if SK_ENABLE_IPV6
         if (v6_start) {
             assert(prefix <= 128);
             assert(NULL == v4_start);
@@ -6984,9 +6927,7 @@ ipsetProcessStreamCallback(
             assert(v4_start);
             skipaddrSetV6FromUint32(&ipaddr, v4_start);
             prefix += 96;
-        } else
-#endif  /* SK_ENABLE_IPV6 */
-        {
+        } else {
             assert(prefix <= 32);
             assert(NULL == v6_start);
             assert(v4_start);
@@ -7006,20 +6947,14 @@ ipsetProcessStreamCallback(
 
       case SK_IPV6POLICY_IGNORE:
         assert(NULL == v6_start);
-#if SK_ENABLE_IPV6
         skAbort();
-#endif
         break;
 
       case SK_IPV6POLICY_ONLY:
         assert(NULL == v4_start);
-#if !SK_ENABLE_IPV6
-        skAbort();
-#endif
         break;
 
       case SK_IPV6POLICY_ASV4:
-#if SK_ENABLE_IPV6
         if (v6_start) {
             assert(prefix >= 96 && prefix <= 128);
             prefix -= 96;
@@ -7028,13 +6963,9 @@ ipsetProcessStreamCallback(
             v4_start = &tmp_ipv4;
             v6_start = NULL;
         }
-#endif  /* SK_ENABLE_IPV6 */
         break;
 
       case SK_IPV6POLICY_FORCE:
-#if !SK_ENABLE_IPV6
-        skAbort();
-#else
         if (v4_start) {
             assert(prefix <= 32);
             skipaddrSetV4(&ipaddr, v4_start);
@@ -7042,11 +6973,9 @@ ipsetProcessStreamCallback(
             v6_start = &tmp_ipv6;
             v4_start = NULL;
         }
-#endif  /* SK_ENABLE_IPV6 */
         break;
     }
 
-#if SK_ENABLE_IPV6
     if (v6_start) {
         ipset_ipv6_t ipv6;
         ipset_ipv6_t fin6;
@@ -7089,9 +7018,7 @@ ipsetProcessStreamCallback(
                 break;
             }
         }
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         uint64_t num_ips;
 
         assert(prefix <= 32);
@@ -7216,7 +7143,6 @@ ipsetProcessStreamCidrbmapV4(
     return rv;
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetProcessStreamCidrbmapV6(
     skstream_t         *stream,
@@ -7346,7 +7272,6 @@ ipsetProcessStreamCidrbmapV6(
   END:
     return rv;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -7401,11 +7326,9 @@ ipsetProcessStreamCidrbmap(
     if (sizeof(uint32_t) == ipsetHentryGetLeafSize(hentry)) {
         return ipsetProcessStreamCidrbmapV4(stream, hdr, proc_stream_state);
     }
-#if SK_ENABLE_IPV6
     if (IPSET_LEN_V6 == ipsetHentryGetLeafSize(hentry)) {
         return ipsetProcessStreamCidrbmapV6(stream, hdr, proc_stream_state);
     }
-#endif
 
     /* Unrecognized record size */
     skAbort();
@@ -7587,9 +7510,7 @@ ipsetProcessStreamRadix(
     sk_file_header_t   *hdr,
     ipset_walk_t       *proc_stream_state)
 {
-#if SK_ENABLE_IPV6
     int is_ipv6;
-#endif
     sk_header_entry_t *hentry;
     ssize_t bytes;
     ssize_t b;
@@ -7624,14 +7545,12 @@ ipsetProcessStreamRadix(
     if (sizeof(ipset_leaf_v4_t) == ipsetHentryGetLeafSize(hentry)
         && sizeof(ipset_node_v4_t) == ipsetHentryGetNodeSize(hentry))
     {
-#if SK_ENABLE_IPV6
         is_ipv6 = 0;
     }
     else if (sizeof(ipset_leaf_v6_t) == ipsetHentryGetLeafSize(hentry)
              && sizeof(ipset_node_v6_t) == ipsetHentryGetNodeSize(hentry))
     {
         is_ipv6 = 1;
-#endif  /* SK_ENABLE_IPV6 */
     } else {
         /* Unrecognized record sizes */
         return SKIPSET_ERR_FILEHEADER;
@@ -7664,7 +7583,6 @@ ipsetProcessStreamRadix(
     }
     ++count;
 
-#if SK_ENABLE_IPV6
     if (is_ipv6) {
         ipset_leaf_v6_t leaf;
         uint32_t ipv4;
@@ -7712,9 +7630,7 @@ ipsetProcessStreamRadix(
             }
 #endif  /* NDEBUG */
         }
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         ipset_leaf_v4_t leaf;
         while ((b = skStreamRead(stream, &leaf, bytes)) == bytes) {
             ++count;
@@ -7746,7 +7662,6 @@ ipsetProcessStreamRadix(
 }
 
 
-#if SK_ENABLE_IPV6
 /*
  *  status = ipsetProcessStreamSlash64(stream, hdr, proc_stream_state);
  *
@@ -7943,7 +7858,6 @@ ipsetProcessStreamSlash64(
   END:
     return rv;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -8043,7 +7957,6 @@ ipsetReadCidrbmapIntoRadixV4(
     return rv;
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetReadCidrbmapIntoRadixV6(
     skipset_t         **ipset_out,
@@ -8079,7 +7992,6 @@ ipsetReadCidrbmapIntoRadixV6(
     }
     return rv;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -8326,6 +8238,7 @@ ipsetReadRadixIntoRadix(
     IPSET_ROOT_INDEX_SET(ipset, ipsetHentryGetRootIndex(hentry),
                          (ipsetHentryGetNodeCount(hentry) <= 1));
 
+#if 0
     if (skStreamIsSeekable(stream)
         && skHeaderIsNativeByteOrder(hdr)
         && (SK_COMPMETHOD_NONE == skHeaderGetCompressionMethod(hdr)))
@@ -8384,6 +8297,7 @@ ipsetReadRadixIntoRadix(
             }
         }
     }
+#endif  /* 0 */
 
     if (NULL == ipset->s.v3->mapped_file) {
         /* Allocate and read the nodes */
@@ -8408,7 +8322,6 @@ ipsetReadRadixIntoRadix(
         /* now, if the data is not in native byte order, we need to
          * byte-swap the values */
         if (!skHeaderIsNativeByteOrder(hdr)) {
-#if SK_ENABLE_IPV6
             if (ipset->is_ipv6) {
                 ipset_node_v6_t *node;
                 for (i = 0, node = (ipset_node_v6_t*)ipset->s.v3->nodes.buf;
@@ -8420,9 +8333,7 @@ ipsetReadRadixIntoRadix(
                     node->ip.ip[0] = BSWAP64(node->ip.ip[0]);
                     node->ip.ip[1] = BSWAP64(node->ip.ip[1]);
                 }
-            } else
-#endif  /* SK_ENABLE_IPV6 */
-            {
+            } else {
                 ipset_node_v4_t *node;
                 for (i = 0, node = (ipset_node_v4_t*)ipset->s.v3->nodes.buf;
                      i < ipset->s.v3->nodes.entry_count;
@@ -8457,7 +8368,6 @@ ipsetReadRadixIntoRadix(
         /* now, if the data is not in native byte order, we need to
          * byte-swap the values */
         if (!skHeaderIsNativeByteOrder(hdr)) {
-#if SK_ENABLE_IPV6
             if (ipset->is_ipv6) {
                 ipset_leaf_v6_t *leaf;
                 for (i = 0, leaf = (ipset_leaf_v6_t*)ipset->s.v3->leaves.buf;
@@ -8467,9 +8377,7 @@ ipsetReadRadixIntoRadix(
                     leaf->ip.ip[0] = BSWAP64(leaf->ip.ip[0]);
                     leaf->ip.ip[1] = BSWAP64(leaf->ip.ip[1]);
                 }
-            } else
-#endif  /* SK_ENABLE_IPV6 */
-            {
+            } else {
                 ipset_leaf_v4_t *leaf;
                 for (i = 0, leaf = (ipset_leaf_v4_t*)ipset->s.v3->leaves.buf;
                      i < ipset->s.v3->leaves.entry_count;
@@ -8498,7 +8406,6 @@ ipsetReadRadixIntoRadix(
 }
 
 
-#if SK_ENABLE_IPV6
 /*
  *  status = ipsetReadSlash64(&ipset, stream, hdr);
  *
@@ -8548,7 +8455,6 @@ ipsetReadSlash64(
     }
     return rv;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -8683,12 +8589,6 @@ ipsetReadStreamHeader(
         skAppPrintErr("Unknown header version %d", record_version);
         skAbort();
     }
-#if  !SK_ENABLE_IPV6
-    if (*is_ipv6) {
-        /* IPv6 IPSet not supported by this build of SiLK */
-        return SKIPSET_ERR_IPV6;
-    }
-#endif  /* SK_ENABLE_IPV6 */
 
     return SKIPSET_OK;
 }
@@ -8970,7 +8870,6 @@ ipsetRemoveAddressV4(
     return SKIPSET_OK;
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetRemoveAddressV6(
     skipset_t          *ipset,
@@ -9159,7 +9058,6 @@ ipsetRemoveAddressV6(
     ipsetFixNodeSingleChild(ipset, find_state->parent_idx, 0);
     return SKIPSET_OK;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -9298,13 +9196,10 @@ ipsetSortLeaves(
     }
 
     /* sort the leaves, ignoring the entry at position 0 */
-#if SK_ENABLE_IPV6
     if (ipset->is_ipv6) {
         skQSort(ipset->s.v3->leaves.buf + ipset->s.v3->leaves.entry_size,
                 child_idx, ipset->s.v3->leaves.entry_size, ipsetLeafCompareV6);
-    } else
-#endif
-    {
+    } else {
         skQSort(ipset->s.v3->leaves.buf + ipset->s.v3->leaves.entry_size,
                 child_idx, ipset->s.v3->leaves.entry_size, ipsetLeafCompareV4);
     }
@@ -9330,7 +9225,6 @@ ipsetSubtractCallbackV4(
     return ipsetRemoveAddressV4((skipset_t*)v_ipset, ipv4, prefix, NULL);
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetSubtractCallbackV6(
     const ipset_ipv6_t *ipv6,
@@ -9339,7 +9233,6 @@ ipsetSubtractCallbackV6(
 {
     return ipsetRemoveAddressV6((skipset_t*)v_ipset, ipv6, prefix, NULL);
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 static int
 ipsetSubtractCallback(
@@ -9421,7 +9314,6 @@ ipsetUnionCallbackV4(
     return ipsetInsertAddressV4((skipset_t*)v_ipset, ipv4, prefix, NULL);
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetUnionCallbackV6(
     const ipset_ipv6_t *ipv6,
@@ -9430,7 +9322,6 @@ ipsetUnionCallbackV6(
 {
     return ipsetInsertAddressV6((skipset_t*)v_ipset, ipv6, prefix, NULL);
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 static int
 ipsetUnionCallback(
@@ -9876,7 +9767,6 @@ ipsetWalkInternalV4(
     return rv;
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetWalkInternalV6(
     const skipset_t    *ipset,
@@ -9939,7 +9829,6 @@ ipsetWalkInternalV6(
     }
     return rv;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -10010,14 +9899,11 @@ ipsetWalkV4(
             } else {
                 /* handle a leaf node */
                 leaf = LEAF_PTR_V4(ipset, to_visit[depth]);
-#if SK_ENABLE_IPV6
                 if (SK_IPV6POLICY_FORCE == walk_state->v6policy) {
                     skipaddrSetV6FromUint32(&ipaddr, &leaf->ip);
                     rv = walk_state->callback(&ipaddr, 96 + leaf->prefix,
                                               walk_state->cb_data);
-                } else
-#endif  /* SK_ENABLE_IPV6 */
-                {
+                } else {
                     skipaddrSetV4(&ipaddr, &leaf->ip);
                     rv = walk_state->callback(&ipaddr, leaf->prefix,
                                               walk_state->cb_data);
@@ -10045,7 +9931,6 @@ ipsetWalkV4(
                 }
             }
 
-#if SK_ENABLE_IPV6
         } else if (SK_IPV6POLICY_FORCE == walk_state->v6policy) {
             /* handle a leaf node where IPv6 addresses are to be
              * returned */
@@ -10067,7 +9952,6 @@ ipsetWalkV4(
             if (0 != rv) {
                 break;
             }
-#endif  /* SK_ENABLE_IPV6 */
 
         } else {
             /* handle a leaf node */
@@ -10093,7 +9977,6 @@ ipsetWalkV4(
     return rv;
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetWalkV6(
     const skipset_t    *ipset,
@@ -10269,7 +10152,6 @@ ipsetWalkV6(
 
     return rv;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -10609,7 +10491,6 @@ ipsetWriteCidrbmapFromRadixV4(
     return SKIPSET_OK;
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetWriteCidrbmapFromRadixV6(
     const skipset_t    *ipset,
@@ -10775,7 +10656,6 @@ ipsetWriteCidrbmapFromRadixV6(
 
     return SKIPSET_OK;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -10824,11 +10704,9 @@ ipsetWriteCidrbmap(
     if (ipset->is_iptree) {
         return ipsetWriteCidrbmapFromIPTree(ipset, stream);
     }
-#if SK_ENABLE_IPV6
     if (ipset->is_ipv6) {
         return ipsetWriteCidrbmapFromRadixV6(ipset, stream);
     }
-#endif
     return ipsetWriteCidrbmapFromRadixV4(ipset, stream);
 }
 
@@ -10991,7 +10869,6 @@ ipsetWriteClasscFromRadixCallbackV4(
     return SKIPSET_OK;
 }
 
-#if SK_ENABLE_IPV6
 static int
 ipsetWriteClasscFromRadixCallback(
     skipaddr_t         *ipaddr,
@@ -11006,7 +10883,6 @@ ipsetWriteClasscFromRadixCallback(
     }
     return ipsetWriteClasscFromRadixCallbackV4(ipv4, prefix, v_state);
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -11043,14 +10919,11 @@ ipsetWriteClasscFromRadix(
     memset(&write_state, 0, sizeof(write_state));
     write_state.stream = stream;
 
-#if SK_ENABLE_IPV6
     if (ipset->is_ipv6) {
         rv = skIPSetWalk(ipset, 1, SK_IPV6POLICY_ASV4,
                          &ipsetWriteClasscFromRadixCallback,
                          (void*)&write_state);
-    } else
-#endif
-    {
+    } else {
         rv = ipsetWalkInternalV4(ipset, ipsetWriteClasscFromRadixCallbackV4,
                                  (void*)&write_state);
     }
@@ -11239,7 +11112,6 @@ ipsetWriteRadix(
 }
 
 
-#if SK_ENABLE_IPV6
 /*
  *  status = ipsetWriteSlash64(&ipset, stream, hdr);
  *
@@ -11441,7 +11313,6 @@ ipsetWriteSlash64(
 
     return SKIPSET_OK;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /* ****  PUBLIC FUNCTION DEFINITIONS BEGIN HERE  **** */
@@ -11477,22 +11348,18 @@ skIPSetCheckAddress(
     uint32_t ipv4;
 
     if (ipset->is_iptree) {
-#if SK_ENABLE_IPV6
         if (skipaddrIsV6(ipaddr)) {
             /* attempt to convert to IPv4 */
             if (skipaddrGetAsV4(ipaddr, &ipv4)) {
                 /* conversion failed; this IP is not in the IPSet */
                 return 0;
             }
-        } else
-#endif
-        {
+        } else {
             ipv4 = skipaddrGetV4(ipaddr);
         }
         return IPTREE_CHECK_ADDRESS(ipset->s.v2, ipv4);
     }
 
-#if SK_ENABLE_IPV6
     if (ipset->is_ipv6) {
         ipset_ipv6_t ipv6;
 
@@ -11506,9 +11373,7 @@ skIPSetCheckAddress(
             /* conversion failed; this IP is not in the IPSet */
             return 0;
         }
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         ipv4 = skipaddrGetV4(ipaddr);
     }
 
@@ -11575,13 +11440,10 @@ skIPSetCheckIPSet(
     }
 
     /* visit the IPs on the walk_set */
-#if SK_ENABLE_IPV6
     if (search_set->is_ipv6) {
         rv = skIPSetWalk(walk_set, 1, SK_IPV6POLICY_FORCE,
                          &ipsetCheckIPSetCallbackV6, (void*)search_set);
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         rv = skIPSetWalk(walk_set, 1, SK_IPV6POLICY_ASV4,
                          &ipsetCheckIPSetCallbackV4, (void*)search_set);
     }
@@ -11617,7 +11479,6 @@ skIPSetCheckIPWildcard(
     }
 
     /* Iterate over the IPs from the wildcard */
-#if SK_ENABLE_IPV6
     if (ipset->is_ipv6) {
         ipset_ipv6_t ipv6;
 
@@ -11656,9 +11517,7 @@ skIPSetCheckIPWildcard(
     if (skIPWildcardIsV6(ipwild)) {
         /* only visit the ::ffff:0:0/96 netblock and return as IPv4 */
         skIPWildcardIteratorBindV4(&iter, ipwild);
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         /* both wildcard and IPset are IPv4 */
         skIPWildcardIteratorBind(&iter, ipwild);
     }
@@ -11704,7 +11563,6 @@ skIPSetCheckRecord(
 {
     uint32_t ipv4;
 
-#if SK_ENABLE_IPV6
     if (ipset->is_ipv6) {
         ipset_ipv6_t ipv6;
 
@@ -11749,9 +11607,7 @@ skIPSetCheckRecord(
             /* conversion failed; this IP is not in the IPSet */
             return 0;
         }
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         /* neither IPSet nor rwRec are V6 */
         switch (src_dst_nh) {
           case 1:
@@ -11819,13 +11675,6 @@ int
 skIPSetContainsV6(
     const skipset_t    *ipset)
 {
-#if !SK_ENABLE_IPV6
-    if (ipset->is_ipv6) {
-        skAbort();
-    }
-    return 0;
-#else  /* SK_ENABLE_IPV6 */
-
     if (!ipset->is_ipv6) {
         return 0;
     }
@@ -11858,7 +11707,6 @@ skIPSetContainsV6(
         return (node->ip.ip[0] != 0
                 || ((node->ip.ip[1] >> 32) != 0x0000ffff));
     }
-#endif  /* SK_ENABLE_IPV6 */
 }
 
 
@@ -11871,18 +11719,6 @@ skIPSetConvert(
     if (!ipset) {
         return SKIPSET_ERR_BADINPUT;
     }
-
-#if !SK_ENABLE_IPV6
-    if (4 != target_ip_version) {
-        return SKIPSET_ERR_IPV6;
-    }
-    if (1 == ipset->is_ipv6) {
-        skAbort();
-    }
-    return SKIPSET_OK;
-
-#else  /* SK_ENABLE_IPV6 */
-
     switch (target_ip_version) {
       case 4:
         if (!ipset->is_ipv6) {
@@ -11919,7 +11755,6 @@ skIPSetConvert(
         return ipsetConvertV6toV4(ipset);
     }
     return ipsetConvertV4toV6(ipset);
-#endif  /* SK_ENABLE_IPV6 */
 }
 
 
@@ -11946,12 +11781,9 @@ skIPSetCountIPs(
 
     memset(&count_state, 0, sizeof(ipset_count_t));
 
-#if SK_ENABLE_IPV6
     if (ipset->is_ipv6) {
         ipsetWalkInternalV6(ipset, ipsetCountCallbackV6, (void*)&count_state);
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         ipsetWalkInternalV4(ipset, ipsetCountCallbackV4, (void*)&count_state);
     }
 
@@ -11981,7 +11813,6 @@ skIPSetCountIPsString(
     double   d_count;
     ssize_t sz;
 
-#if SK_ENABLE_IPV6
     if (ipset && ipset->is_ipv6) {
         ipset_count_t count_state;
 
@@ -11989,7 +11820,6 @@ skIPSetCountIPsString(
         ipsetWalkInternalV6(ipset, ipsetCountCallbackV6, (void*)&count_state);
         return ipsetCountToString(&count_state, buf, buflen);
     }
-#endif  /* SK_ENABLE_IPV6 */
 
     i_count = skIPSetCountIPs(ipset, &d_count);
     if (i_count == UINT64_MAX) {
@@ -12013,12 +11843,6 @@ skIPSetCreate(
     if (!ipset) {
         return SKIPSET_ERR_BADINPUT;
     }
-
-#if !SK_ENABLE_IPV6
-    if (support_ipv6) {
-        return SKIPSET_ERR_IPV6;
-    }
-#endif  /* SK_ENABLE_IPV6 */
 
     if (IPSET_USE_IPTREE) {
         return ipsetCreate(ipset, support_ipv6, 0);
@@ -12082,7 +11906,6 @@ skIPSetInsertAddress(
     uint32_t ipv4;
     int rv;
 
-#if  SK_ENABLE_IPV6
     /* handle auto-conversion */
     if (skipaddrIsV6(ipaddr) && !ipset->is_ipv6) {
         if (skipaddrGetAsV4(ipaddr, &ipv4)
@@ -12159,9 +11982,7 @@ skIPSetInsertAddress(
             /* apply mask */
             ipv4 &= ~(UINT32_MAX >> prefix);
         }
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         /* both set and address are V4 */
         ipv4 = skipaddrGetV4(ipaddr);
         if (prefix == 32) {
@@ -12206,7 +12027,6 @@ skIPSetInsertIPWildcard(
     uint32_t prefix;
     int rv = SKIPSET_OK;
 
-#if  SK_ENABLE_IPV6
     /* handle auto-conversion */
     if (skIPWildcardIsV6(ipwild) && !ipset->is_ipv6) {
         if (ipset->no_autoconvert) {
@@ -12217,7 +12037,6 @@ skIPSetInsertIPWildcard(
             return rv;
         }
     }
-#endif  /* SK_ENABLE_IPV6 */
 
     if (ipset->is_iptree) {
         ipset->is_dirty = 1;
@@ -12226,12 +12045,9 @@ skIPSetInsertIPWildcard(
     }
 
     /* Insert the netblocks contained in the wildcard */
-#if  SK_ENABLE_IPV6
     if (ipset->is_ipv6 && !skIPWildcardIsV6(ipwild)) {
         skIPWildcardIteratorBindV6(&iter, ipwild);
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         skIPWildcardIteratorBind(&iter, ipwild);
     }
 
@@ -12288,9 +12104,6 @@ skIPSetInsertRange(
     }
 
     if (ipset->is_iptree) {
-#if !SK_ENABLE_IPV6
-        return ipsetInsertRangeIPTree(ipset, ipaddr_start, ipaddr_end);
-#else
         if (!skipaddrIsV6(ipaddr_start) && !skipaddrIsV6(ipaddr_end)) {
             return ipsetInsertRangeIPTree(ipset, ipaddr_start, ipaddr_end);
         }
@@ -12301,7 +12114,6 @@ skIPSetInsertRange(
         if (rv) {
             return rv;
         }
-#endif  /* #else of #if !SK_ENABLE_IPV6 */
     }
 
     /* get a modifiable version of the beginning IP */
@@ -12474,7 +12286,6 @@ skIPSetIteratorNext(
     }
     assert(0 == iter->ipset->is_dirty);
 
-#if SK_ENABLE_IPV6
     if (iter->ipset->is_ipv6) {
         ipset_leaf_v6_t *leaf6;
         ipset_ipv6_t *ipv6;
@@ -12556,7 +12367,6 @@ skIPSetIteratorNext(
         }
         return SK_ITERATOR_OK;
     }
-#endif  /* SK_ENABLE_IPV6 */
 
     if (iter->cidr_blocks) {
         leaf4 = LEAF_PTR_V4(iter->ipset, iter->it.v3.cur);
@@ -12613,7 +12423,6 @@ skIPSetIteratorReset(
         return;
     }
 
-#if SK_ENABLE_IPV6
     if (iter->ipset->is_ipv6) {
         if (iter->v6policy == SK_IPV6POLICY_IGNORE) {
             /* caller wants only IPv4 addresses, and there are none in
@@ -12669,17 +12478,6 @@ skIPSetIteratorReset(
         return;
     }
 
-#else  /* #if SK_ENABLE_IPV6 */
-
-    if (iter->v6policy > SK_IPV6POLICY_MIX) {
-        /* caller wants IPv6 addresses, which are not supported in
-         * IPv4-only SiLK. */
-        iter->it.v3.cur = iter->ipset->s.v3->leaves.entry_count;
-        return;
-    }
-
-#endif  /* #else of #if SK_ENABLE_IPV6 */
-
     assert(iter->it.v3.cur < iter->ipset->s.v3->leaves.entry_count);
     if (!iter->cidr_blocks) {
         ipsetIteratorNextRangeV4(iter);
@@ -12730,7 +12528,6 @@ skIPSetMask(
         return SKIPSET_ERR_BADINPUT;
     }
 
-#if SK_ENABLE_IPV6
     if (ipset->is_ipv6) {
         /* verify mask_prefix value is valid */
         if (mask_prefix >= 128 || mask_prefix == 0) {
@@ -12744,7 +12541,6 @@ skIPSetMask(
 
         return ipsetMaskV6(ipset, mask_prefix);
     }
-#endif  /* SK_ENABLE_IPV6 */
 
     /* verify mask_prefix value is valid */
     if (mask_prefix >= 32 || mask_prefix == 0) {
@@ -12775,7 +12571,6 @@ skIPSetMaskAndFill(
         return SKIPSET_ERR_BADINPUT;
     }
 
-#if SK_ENABLE_IPV6
     if (ipset->is_ipv6) {
         /* verify mask_prefix value is valid */
         if (mask_prefix >= 128 || mask_prefix == 0) {
@@ -12789,7 +12584,6 @@ skIPSetMaskAndFill(
 
         return ipsetMaskAndFillV6(ipset, mask_prefix);
     }
-#endif  /* SK_ENABLE_IPV6 */
 
     /* verify mask_prefix value is valid */
     if (mask_prefix >= 32 || mask_prefix == 0) {
@@ -12998,7 +12792,6 @@ ipsetDebugPrintAddrV4(
     fprintf(stderr, "%2u]", prefix);
 }
 
-#if SK_ENABLE_IPV6
 static void
 ipsetDebugPrintAddrV6(
     const ipset_ipv6_t *ipv6,
@@ -13019,7 +12812,6 @@ ipsetDebugPrintAddrV6(
     }
     fprintf(stderr, "%3u]", prefix);
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -13064,9 +12856,7 @@ ipsetDebugPrintLeaf(
     const ipset_leaf_t *leaf)
 {
     if (ipset->is_ipv6) {
-#if SK_ENABLE_IPV6
         ipsetDebugPrintAddrV6(&leaf->v6.ip, leaf->v6.prefix);
-#endif  /* SK_ENABLE_IPV6 */
         fprintf(stderr, "\n");
     } else {
         ipsetDebugPrintAddrV4(leaf->v4.ip, leaf->v4.prefix);
@@ -13091,13 +12881,10 @@ ipsetDebugPrintNode(
         width = 2 + (int)log10(ipset->s.v3->leaves.entry_count);
     }
 
-#if SK_ENABLE_IPV6
     if (ipset->is_ipv6) {
         ipsetDebugPrintAddrV6(&node->v6.ip, node->v6.prefix);
         fprintf(stderr, "  ");
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         ipsetDebugPrintAddrV4(node->v4.ip, node->v4.prefix);
         fprintf(stderr, "  ");
     }
@@ -13217,12 +13004,9 @@ skIPSetDebugPrint(
     for (node_idx = 0; node_idx < ipset->s.v3->nodes.entry_count; ++node_idx) {
         node = NODE_PTR(ipset, node_idx);
         fprintf(stderr, "** %*uN  ", width, node_idx);
-#if SK_ENABLE_IPV6
         if (ipset->is_ipv6) {
             ipsetDebugPrintAddrV6(&node->v6.ip, node->v6.prefix);
-        } else
-#endif
-        {
+        } else {
             ipsetDebugPrintAddrV4(node->v4.ip, node->v4.prefix);
         }
 
@@ -13250,12 +13034,9 @@ skIPSetDebugPrint(
     for (node_idx = 0; node_idx < ipset->s.v3->leaves.entry_count; ++node_idx) {
         leaf = LEAF_PTR(ipset, node_idx);
         fprintf(stderr, "** %*uL  ", width, node_idx);
-#if SK_ENABLE_IPV6
         if (ipset->is_ipv6) {
             ipsetDebugPrintAddrV6(&leaf->v6.ip, leaf->v6.prefix);
-        } else
-#endif
-        {
+        } else {
             ipsetDebugPrintAddrV4(leaf->v4.ip, leaf->v4.prefix);
         }
         /* note whether this entry is on free-list */
@@ -13347,11 +13128,7 @@ skIPSetProcessStream(
         return ipsetProcessStreamCidrbmap(stream, hdr, &proc_stream_state);
     }
     if (skHeaderGetRecordVersion(hdr) == IPSET_REC_VERSION_SLASH64) {
-#if !SK_ENABLE_IPV6
-        skAbort();
-#else
         return ipsetProcessStreamSlash64(stream, hdr, &proc_stream_state);
-#endif  /* SK_ENABLE_IPV6 */
     }
 
     skAbort();
@@ -13365,16 +13142,11 @@ ipsetProcessStreamCountInit(
     void                        UNUSED(*init_func_ctx),
     skipset_procstream_parm_t          *param)
 {
-#if !SK_ENABLE_IPV6
-    /* unused param */
-    (void)ipset;
-#else
     if (ipset->is_ipv6) {
         param->v6_policy = SK_IPV6POLICY_FORCE;
         param->cb_entry_func = ipsetCountStreamCallbackV6;
         return 0;
     }
-#endif  /* SK_ENABLE_IPV6 */
     param->v6_policy = SK_IPV6POLICY_ASV4;
     param->cb_entry_func = ipsetCountStreamCallbackV4;
     return 0;
@@ -13461,11 +13233,9 @@ skIPSetRead(
         return ipsetReadRadixIntoRadix(ipset_out, stream, hdr, is_ipv6);
     }
     if (skHeaderGetRecordVersion(hdr) == IPSET_REC_VERSION_CIDRBMAP) {
-#if SK_ENABLE_IPV6
         if (is_ipv6) {
             return ipsetReadCidrbmapIntoRadixV6(ipset_out, stream, hdr);
         }
-#endif
         if (IPSET_USE_IPTREE) {
             /* Read IPv4-only file into the IPTree format */
             return ipsetReadCidrbmapIntoIPTree(ipset_out, stream, hdr);
@@ -13473,12 +13243,10 @@ skIPSetRead(
         return ipsetReadCidrbmapIntoRadixV4(ipset_out, stream, hdr);
     }
     if (skHeaderGetRecordVersion(hdr) == IPSET_REC_VERSION_SLASH64) {
-#if SK_ENABLE_IPV6
         if (!is_ipv6) {
             skAbort();
         }
         return ipsetReadSlash64(ipset_out, stream, hdr);
-#endif  /* SK_ENABLE_IPV6 */
     }
 
     skAbort();
@@ -13507,7 +13275,6 @@ skIPSetRemoveAddress(
     uint32_t ipv4;
     int rv;
 
-#if  SK_ENABLE_IPV6
     if (ipset->is_ipv6) {
         ipset_ipv6_t ipv6;
 
@@ -13572,9 +13339,7 @@ skIPSetRemoveAddress(
             /* apply mask */
             ipv4 &= ~(UINT32_MAX >> prefix);
         }
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         /* both set and address are V4 */
         ipv4 = skipaddrGetV4(ipaddr);
         if (prefix == 32) {
@@ -13658,12 +13423,9 @@ skIPSetRemoveIPWildcard(
     int rv = SKIPSET_OK;
 
     /* Remove the netblocks contained in the wildcard */
-#if  SK_ENABLE_IPV6
     if (ipset->is_ipv6 && !skIPWildcardIsV6(ipwild)) {
         skIPWildcardIteratorBindV6(&iter, ipwild);
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         skIPWildcardIteratorBind(&iter, ipwild);
     }
 
@@ -13809,7 +13571,6 @@ skIPSetSubtract(
 
     IPSET_COPY_ON_WRITE(result_ipset);
 
-#if SK_ENABLE_IPV6
     if (result_ipset->is_ipv6) {
         if (ipset->is_ipv6) {
             /* both are IPv6 */
@@ -13822,9 +13583,7 @@ skIPSetSubtract(
     } else if (ipset->is_ipv6) {
         rv = skIPSetWalk(ipset, 1, SK_IPV6POLICY_ASV4,
                          &ipsetSubtractCallback, (void*)result_ipset);
-    } else
-#endif
-    {
+    } else {
         /* both are IPv4 */
         rv = ipsetWalkInternalV4(ipset, ipsetSubtractCallbackV4,
                                  (void*)result_ipset);
@@ -13866,10 +13625,6 @@ skIPSetUnion(
     }
     if (result_ipset->is_iptree) {
         /* only the result_ipset is in SiLK-2 format */
-#if !SK_ENABLE_IPV6
-        return ipsetWalkInternalV4(ipset, ipsetUnionCallbackIPTree,
-                                   (void*)result_ipset);
-#else
         if (!skIPSetContainsV6(ipset)) {
             if (ipset->is_ipv6) {
                 return skIPSetWalk(ipset, 1, SK_IPV6POLICY_ASV4,
@@ -13885,7 +13640,6 @@ skIPSetUnion(
         if (rv) {
             return rv;
         }
-#endif  /* #else of #if !SK_ENABLE_IPV6 */
     }
 
     if (result_ipset->no_autoconvert && !result_ipset->is_ipv6
@@ -13895,7 +13649,6 @@ skIPSetUnion(
     }
     IPSET_COPY_ON_WRITE(result_ipset);
 
-#if SK_ENABLE_IPV6
     if (result_ipset->is_ipv6 || ipset->is_ipv6) {
         if (result_ipset->is_ipv6 == ipset->is_ipv6) {
             /* both are IPv6 */
@@ -13905,9 +13658,7 @@ skIPSetUnion(
             rv = skIPSetWalk(ipset, 1, SK_IPV6POLICY_FORCE,
                              &ipsetUnionCallback, (void*)result_ipset);
         }
-    } else
-#endif
-    {
+    } else {
         /* both are IPv4 */
         rv = ipsetWalkInternalV4(ipset, ipsetUnionCallbackV4,
                                  (void*)result_ipset);
@@ -13962,7 +13713,6 @@ skIPSetWalk(
     walk_state.callback    = callback;
     walk_state.cb_data     = cb_data;
 
-#if SK_ENABLE_IPV6
     if (ipset->is_ipv6) {
         if (v6_policy == SK_IPV6POLICY_IGNORE) {
             /* caller wants only IPv4 addresses, and there are none in
@@ -13977,21 +13727,6 @@ skIPSetWalk(
         return SKIPSET_OK;
     }
     return ipsetWalkV4(ipset, &walk_state);
-
-#else  /* #if SK_ENABLE_IPV6 */
-
-    if (ipset->is_ipv6) {
-        /* impossible to have an IPv6 set */
-        skAbort();
-    }
-    if (v6_policy > SK_IPV6POLICY_MIX) {
-        /* caller wants IPv6 addresses, which are not supported in
-         * IPv4-only SiLK */
-        return SKIPSET_OK;
-    }
-    return ipsetWalkV4(ipset, &walk_state);
-
-#endif  /* #else of #if SK_ENABLE_IPV6 */
 }
 
 
@@ -14096,11 +13831,7 @@ skIPSetWrite(
         return ipsetWriteCidrbmap(ipset, stream);
     }
     if (IPSET_REC_VERSION_SLASH64 == record_version) {
-#if !SK_ENABLE_IPV6
-        skAbort();
-#else
         return ipsetWriteSlash64(ipset, stream);
-#endif  /* SK_ENABLE_IPV6 */
     }
 
     skAbort();

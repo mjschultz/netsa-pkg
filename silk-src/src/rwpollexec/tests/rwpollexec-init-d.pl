@@ -1,7 +1,7 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: rwpollexec-init-d.pl d6cdb4ca495b 2016-03-01 19:22:48Z mthomas $")
+# RCSIDENT("$SiLK: rwpollexec-init-d.pl 764b1c384201 2016-09-08 19:10:18Z mthomas $")
 
 use strict;
 use SiLKTests;

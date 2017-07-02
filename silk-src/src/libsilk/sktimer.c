@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sktimer.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: sktimer.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sktimer.h>
@@ -108,7 +108,7 @@ struct sk_timer_st {
     /** whether the timer thread has stopped */
     unsigned         stopped : 1;
 };
-typedef struct sk_timer_st sk_timer_t; /* skTimer_t */
+/* sk_timer_t */
 
 
 /* FUNCTION DEFINITIONS */
@@ -263,25 +263,8 @@ skTimerCreate(
     sk_timer_t        **new_timer,
     uint32_t            interval,
     skTimerFn_t         callback_fn,
-    void               *callback_data)
-{
-    struct timeval current_time;
-
-    gettimeofday(&current_time, NULL);
-    current_time.tv_sec += interval;
-    return skTimerCreateAtTime(new_timer, interval,
-                               sktimeCreateFromTimeval(&current_time),
-                               callback_fn, callback_data);
-}
-
-
-int
-skTimerCreateAtTime(
-    sk_timer_t        **new_timer,
-    uint32_t            interval,
-    sktime_t            start,
-    skTimerFn_t         callback_fn,
-    void               *callback_data)
+    void               *callback_data,
+    sktime_t            start)
 {
 #if TRACEMSG_LEVEL > 0
     char tstamp[SKTIMESTAMP_STRLEN];
@@ -289,6 +272,11 @@ skTimerCreateAtTime(
     sk_timer_t *timer;
     pthread_t   thread;
     int         err;
+
+    if (0 == start) {
+        /* set start time to one interval after now */
+        start = sktimeNow() + 1000 * interval;
+    }
 
     timer = (sk_timer_t *)calloc(1, sizeof(sk_timer_t));
     if (NULL == timer) {

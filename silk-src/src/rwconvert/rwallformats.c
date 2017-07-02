@@ -7,17 +7,18 @@
 */
 
 /*
- *  Read rwrec input and write the output to every known SiLK Flow
- *  record file format.
- *
- */
+**  Read rwrec input and write the output to every known stream file
+**  format.
+**
+*/
 
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwallformats.c 5129c94db905 2017-01-19 22:25:14Z mthomas $");
+RCSIDENT("$SiLK: rwallformats.c c29e851274ef 2017-06-22 14:26:23Z mthomas $");
 
 #include <silk/rwrec.h>
+#include <silk/skflowiter.h>
 #include <silk/sksite.h>
 #include <silk/skstream.h>
 #include <silk/utils.h>
@@ -49,6 +50,7 @@ static FILE *tmpf = NULL;
 
 /* support for input files */
 static sk_options_ctx_t *optctx = NULL;
+static sk_flow_iter_t *flowiter = NULL;
 
 /* reference to argc and argv for filter output */
 static int g_argc;
@@ -122,8 +124,24 @@ appUsageLong(
      "\tbe prefixed by \"<basename>-\" when --basename is given.\n")
 
     FILE *fh = USAGE_FH;
+    int i;
 
-    skAppStandardUsage(fh, USAGE_MSG, appOptions, appHelp);
+    fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
+    fprintf(fh, "\nSWITCHES:\n");
+    skOptionsDefaultUsage(fh);
+
+    for (i = 0; appOptions[i].name; i++ ) {
+        fprintf(fh, "--%s %s. ", appOptions[i].name,
+                SK_OPTION_HAS_ARG(appOptions[i]));
+        switch (i) {
+          default:
+            /* Simple help text from the appHelp array */
+            assert(appHelp[i]);
+            fprintf(fh, "%s\n", appHelp[i]);
+            break;
+        }
+    }
+
     skOptionsCtxOptionsUsage(optctx, fh);
     skOptionsTempDirUsage(fh);
     sksiteOptionsUsage(fh);
@@ -154,6 +172,7 @@ appTeardown(
         tmpf = NULL;
     }
 
+    sk_flow_iter_destroy(&flowiter);
     skOptionsCtxDestroy(&optctx);
     skAppUnregister();
 }
@@ -214,6 +233,10 @@ appSetup(
     if (rv < 0) {
         skAppUsage();
     }
+
+    /* create flow iterator to read the records from the stream */
+    flowiter = skOptionsCtxCreateFlowIterator(optctx);
+    sk_flow_iter_set_max_readers(flowiter, 1);
 
     /* ensure the site config is available */
     if (sksiteConfigure(1)) {
@@ -342,6 +365,7 @@ openOutput(
     int rv = SKSTREAM_OK;
     char path[PATH_MAX];
     char format_name[SK_MAX_STRLEN_FILE_FORMAT+1];
+    sksite_repo_key_t repo_key;
 
     if (num_compmethod == 0) {
         /* need to initialize */
@@ -429,10 +453,10 @@ openOutput(
                         rv = skHeaderAddProbename(hdr, "DUMMY_PROBE");
                     }
                     if ( !rv) {
-                        rv=skHeaderAddPackedfile(hdr,
-                                                 rwRecGetStartTime(first_rec),
-                                                 rwRecGetFlowType(first_rec),
-                                                 rwRecGetSensor(first_rec));
+                        repo_key.timestamp = rwRecGetStartTime(first_rec);
+                        repo_key.sensor_id = rwRecGetSensor(first_rec);
+                        repo_key.flowtype_id = rwRecGetFlowType(first_rec);
+                        rv = skHeaderAddPackedfile(hdr, &repo_key);
                     }
                     if ( !rv && !no_invocation) {
                         rv = skHeaderAddInvocation(hdr, 1, g_argc, g_argv);
@@ -550,47 +574,34 @@ writeOutputs(
  *    Append the contents of input_path to the temporary file.
  */
 static int
-readFileToTemp(
-    skstream_t         *in_stream)
+readFilesToTemp(
+    void)
 {
     rwRec rwrec;
     int rv;
 
-    while ((rv = skStreamReadRecord(in_stream, &rwrec)) == SKSTREAM_OK) {
+    rwRecInitialize(&rwrec, NULL);
+
+    while ((rv = sk_flow_iter_get_next_rec(flowiter, &rwrec)) == SKSTREAM_OK) {
         if (!fwrite(&rwrec, sizeof(rwRec), 1, tmpf)) {
             skAppPrintSyserror("Cannot write to temp file");
             return -1;
         }
     }
-    if (SKSTREAM_ERR_EOF != rv) {
-        skStreamPrintLastErr(in_stream, rv, &skAppPrintErr);
-    }
 
-    return 0;
+    return ((SKSTREAM_ERR_EOF == rv) ? 0 : -1);
 }
 
 
 int main(int argc, char **argv)
 {
-    skstream_t *stream;
-    int rv = 0;
-
     g_argc = argc;
     g_argv = argv;
 
     appSetup(argc, argv);                       /* never returns on error */
 
     /* process input */
-    while ((rv = skOptionsCtxNextSilkFile(optctx, &stream, &skAppPrintErr))
-           == 0)
-    {
-        if (readFileToTemp(stream)) {
-            skStreamDestroy(&stream);
-            exit(EXIT_FAILURE);
-        }
-        skStreamDestroy(&stream);
-    }
-    if (rv < 0) {
+    if (readFilesToTemp()) {
         exit(EXIT_FAILURE);
     }
 

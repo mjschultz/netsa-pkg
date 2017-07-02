@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsetcat.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
+RCSIDENT("$SiLK: rwsetcat.c fc8761f1d6b8 2017-06-23 16:42:19Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skipset.h>
@@ -69,10 +69,6 @@ static const char *pager = NULL;
 
 /* how to print IPs from silk_types.h: enum skipaddr_flags_t */
 static uint32_t ip_format = SKIPADDR_CANONICAL;
-
-/* flags when registering --ip-format */
-static const unsigned int ip_format_register_flags =
-    (SK_OPTION_IP_FORMAT_INTEGER_IPS | SK_OPTION_IP_FORMAT_ZERO_PAD_IPS);
 
 /* option flags */
 static struct opt_flags_st {
@@ -289,7 +285,7 @@ appSetup(
 
     /* register the options */
     if (skOptionsRegister(appOptions, &appOptionsHandler, NULL)
-        || skOptionsIPFormatRegister(&ip_format, ip_format_register_flags))
+        || skOptionsIPFormatRegister(&ip_format))
     {
         skAppPrintErr("Unable to register options");
         exit(EXIT_FAILURE);
@@ -669,7 +665,6 @@ printRangesSingle(
     char ip1[SK_NUM2DOT_STRLEN+1];
     char ip2[SK_NUM2DOT_STRLEN+1];
 
-#if SK_ENABLE_IPV6
     if (state->count[0]) {
         char countbuf[64];
         uint64_t count[2];
@@ -695,7 +690,6 @@ printRangesSingle(
                       state->final_delim);
         return;
     }
-#endif  /* SK_ENABLE_IPV6 */
 
     skStreamPrint(outstream, ("%*" PRIu64 "%c%*s%c%*s%s\n"),
                   state->widths[0], state->count[1], output_delimiter,
@@ -708,7 +702,6 @@ printRangesSingle(
 }
 
 
-#if SK_ENABLE_IPV6
 /*
  *    Callback function for printRanges().  This is invoked either by
  *    skIPSetWalk() or skIPSetProcessStream().
@@ -762,7 +755,6 @@ printRangesCallbackV6(
     }
     return SKIPSET_OK;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -823,13 +815,10 @@ printRangesInitialize(
     (void)cb_init_func_ctx;
 
     /* choose callback function based on type of IPset */
-#if SK_ENABLE_IPV6
     if (skIPSetIsV6(ipset)) {
         proc_stream_settings->v6_policy = SK_IPV6POLICY_FORCE;
         proc_stream_settings->cb_entry_func = printRangesCallbackV6;
-    } else
-#endif
-    {
+    } else {
         proc_stream_settings->v6_policy = SK_IPV6POLICY_ASV4;
         proc_stream_settings->cb_entry_func = printRangesCallbackV4;
     }
@@ -920,7 +909,6 @@ printRanges(
 }
 
 
-#if SK_ENABLE_IPV6
 /*
  *  printStatisticsV6
  *
@@ -1048,7 +1036,6 @@ printStatisticsV6(
                       d_count);
     }
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -1167,12 +1154,10 @@ static void
 printStatistics(
     const skipset_t    *ipset)
 {
-#if SK_ENABLE_IPV6
     if (skIPSetIsV6(ipset)) {
         printStatisticsV6(ipset);
         return;
     }
-#endif  /* SK_ENABLE_IPV6 */
     printStatisticsV4(ipset);
 }
 

@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 4dba2416c3d6 2015-09-10 19:03:20Z mthomas $")
+# RCSIDENT("$SiLK: Makefile.am 2b1e6827bdd5 2015-10-30 15:02:48Z mthomas $")
 
 # Installed Targets
 
@@ -10,7 +10,7 @@ pkgpython_LTLIBRARIES = pysilk.la
 
 # Python files to install
 pkgpython_PYTHON = python/__init__.py python/fglob.py \
-		   python/plugin.py python/site.py 
+		   python/plugin.py python/site.py
 
 # netsa-silk compatibility layer
 pkgpython_PYTHON += python/_netsa_silk.py
@@ -46,9 +46,9 @@ pysilk_la_LDFLAGS     = -module -avoid-version -shrext $(PYTHON_SO_EXTENSION) \
 pysilk_la_LIBADD      = ../libsilk/libsilk.la
 
 # The static library loaded as "plug-in" by rwfilter, rwcut, ...
-libsilkpython_la_SOURCES = silkpython.c pysilk_common.c pysilk_common.h pysilk.c
+libsilkpython_la_SOURCES = $(pysilk_la_SOURCES) silkpython.c silkpython.h
 libsilkpython_la_LIBADD  =
-libsilkpython_la_LDFLAGS = 
+libsilkpython_la_LDFLAGS =
 
 MAKE_PYSILK_TEST = $(AM_V_GEN) \
   rm -f $@ $@.tmp ; \

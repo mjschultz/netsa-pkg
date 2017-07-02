@@ -13,9 +13,10 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWTOTAL_H, "$SiLK: rwtotal.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_RWTOTAL_H, "$SiLK: rwtotal.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/rwrec.h>
+#include <silk/skflowiter.h>
 #include <silk/sksite.h>
 #include <silk/skstream.h>
 #include <silk/utils.h>
@@ -79,7 +80,8 @@ typedef enum {
 /* which count mode to use */
 extern int count_mode;
 
-extern sk_options_ctx_t *optctx;
+/* for looping over files on the command line */
+extern sk_flow_iter_t *flowiter;
 
 extern int  summation;
 extern int  no_titles;

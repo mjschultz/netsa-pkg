@@ -72,7 +72,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skprefixmap.c 9dd70c6ccd3b 2017-03-14 15:42:18Z mthomas $");
+RCSIDENT("$SiLK: skprefixmap.c 8754ed5d083c 2017-06-23 19:06:08Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/rwrec.h>
@@ -197,12 +197,10 @@ typedef struct sk_hentry_prefixmap_st {
 
 /* LOCAL VARIABLES */
 
-#if SK_ENABLE_IPV6
 static const uint8_t min_ip128[16] = {0,0,0,0,0,0,0,0,
                                       0,0,0,0,0,0,0,0};
 static const uint8_t max_ip128[16] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
                                       0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
-#endif
 
 
 /* LOCAL FUNCTION PROTOTYPES */
@@ -361,7 +359,6 @@ prefixMapAdd32(
     return SKPREFIXMAP_OK;
 }
 
-#if SK_ENABLE_IPV6
 /*
  *  err = prefixMapAdd128(map, low, high, dict_val, node_idx, bit);
  *
@@ -474,7 +471,6 @@ prefixMapAdd128(
     }
     return SKPREFIXMAP_OK;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -620,7 +616,6 @@ prefixMapFind(
     uint32_t node = 0;          /* Start at the root node */
 
     switch (map->content_type) {
-#if SK_ENABLE_IPV6
       case SKPREFIXMAP_CONT_ADDR_V6:
         {
             uint8_t key128[16];
@@ -646,20 +641,15 @@ prefixMapFind(
             }
             return SKPMAP_LEAF_VALUE(node);
         }
-#endif  /* SK_ENABLE_IPV6 */
 
       case SKPREFIXMAP_CONT_PROTO_PORT:
         key32 = SKPMAP_KEY_FROM_PROTO_PORT(key);
         break;
 
       case SKPREFIXMAP_CONT_ADDR_V4:
-#if !SK_ENABLE_IPV6
-        key32 = skipaddrGetV4((const skipaddr_t*)key);
-#else
         if (skipaddrGetAsV4((const skipaddr_t*)key, &key32)) {
             return SKPREFIXMAP_NOT_FOUND;
         }
-#endif
         break;
 
       default:
@@ -731,7 +721,8 @@ prefixMapHentryCreate(
         return NULL;
     }
     pn_hdr->he_spec.hes_id  = SK_HENTRY_PREFIXMAP_ID;
-    pn_hdr->he_spec.hes_len = sizeof(sk_hentry_prefixmap_t) + len;
+    pn_hdr->he_spec.hes_len = (sizeof(sk_header_entry_spec_t)
+                               + sizeof(pn_hdr->version) + len);
 
     pn_hdr->version = 1;
     pn_hdr->mapname = strdup(mapname);
@@ -761,10 +752,8 @@ prefixMapHentryFree(
     if (pn_hdr) {
         assert(skHeaderEntryGetTypeId(pn_hdr) == SK_HENTRY_PREFIXMAP_ID);
         pn_hdr->he_spec.hes_id = UINT32_MAX;
-        if (pn_hdr->mapname) {
-            free(pn_hdr->mapname);
-            pn_hdr->mapname = NULL;
-        }
+        free(pn_hdr->mapname);
+        pn_hdr->mapname = NULL;
         free(pn_hdr);
     }
 }
@@ -1030,280 +1019,7 @@ prefixMapGrowTree(
 }
 
 
-/*
- *    Given an input stream 'in' positioned at the beginning of the
- *    dictionary section of a prefix map file (specifically at the
- *    byte-length of the dictionary), create all the dictionary
- *    structures and read the dictionary entries into those
- *    structures.  The 'swap_flag' is true if the data in the stream
- *    is not in native byte order.
- */
-static skPrefixMapErr_t
-prefixMapReadDictionary(
-    skPrefixMap_t      *map,
-    skstream_t         *in,
-    int                 swap_flag)
-{
-    char errbuf[2 * PATH_MAX];
-    char *current;
-    char *start;
-    char *end;
-    uint32_t i;
-    ssize_t rv;
-
-    /* Get number of bytes in the dictionary */
-    rv = skStreamRead(in, &(map->dict_buf_size), sizeof(uint32_t));
-    if (rv != (ssize_t)sizeof(uint32_t)) {
-        if (-1 == rv) {
-            skStreamLastErrMessage(in, rv, errbuf, sizeof(errbuf));
-        } else {
-            snprintf(errbuf, sizeof(errbuf),
-                     "read %" SK_PRIdZ " bytes of %" SK_PRIuZ " expected",
-                     rv, sizeof(map->dict_buf_size));
-        }
-        skAppPrintErr("Failed to read dictionary entry count (%s)", errbuf);
-        return SKPREFIXMAP_ERR_IO;
-    }
-    if (swap_flag) {
-        map->dict_buf_size = BSWAP32(map->dict_buf_size);
-    }
-    if (0 == map->dict_buf_size) {
-        /* odd, but allow it */
-        return SKPREFIXMAP_OK;
-    }
-
-    map->dict_buf = (char*)malloc(map->dict_buf_size * sizeof(char));
-    if (NULL == map->dict_buf) {
-        skAppPrintErr("Failed to allocate prefix map dictionary");
-        return SKPREFIXMAP_ERR_MEMORY;
-    }
-
-    /* Dictionary is allocated; now read the data. */
-    rv = skStreamRead(in, map->dict_buf, map->dict_buf_size);
-    if (rv != (ssize_t)map->dict_buf_size) {
-        if (-1 == rv) {
-            skStreamLastErrMessage(in, rv, errbuf, sizeof(errbuf));
-        } else {
-            snprintf(errbuf, sizeof(errbuf),
-                     "read %" SK_PRIdZ " bytes of %" PRIu32 " expected",
-                     rv, map->dict_buf_size);
-        }
-        skAppPrintErr("Failed to read dictionary entries (%s)", errbuf);
-        return SKPREFIXMAP_ERR_IO;
-    }
-    map->dict_buf_end = map->dict_buf_size;
-    map->dict_buf_used = map->dict_buf_size;
-
-    /* Index the dictionary data */
-
-    /* First pass: count the words */
-    end = map->dict_buf + map->dict_buf_end;
-    map->dict_words_used = 0;
-    for (current = map->dict_buf; current < end; ++current) {
-        current = strchr(current, '\0');
-        if (!current || current >= end) {
-            break;
-        }
-        ++map->dict_words_used;
-    }
-    map->dict_words_size = map->dict_words_used;
-
-    /* Allocate space for the words and the index */
-    map->dict_words = (char**)malloc(map->dict_words_size * sizeof(char*));
-    if (NULL == map->dict_words) {
-        skAppPrintErr("Failed to allocate prefix map index");
-        return SKPREFIXMAP_ERR_MEMORY;
-    }
-    if (0 != skMemoryPoolCreate(&map->word_map_pool,
-                                sizeof(skPrefixMapDictNode_t),
-                                SKPMAP_WORDS_COUNT_GROW))
-    {
-        skAppPrintErr("Failed to allocate prefix map index memory pool");
-        return SKPREFIXMAP_ERR_MEMORY;
-    }
-    map->word_map = rbinit(prefixMapWordCompare, NULL);
-    if (map->word_map == NULL) {
-        skAppPrintErr("Failed to allocate prefix map index tree");
-        return SKPREFIXMAP_ERR_MEMORY;
-    }
-
-    /* Now build index */
-    start = map->dict_buf;
-    end = start + map->dict_buf_used;
-    for (i = 0; i < map->dict_words_used; ++i) {
-        if ('\0' == start) {
-            if (start > end) {
-                skAbort();
-            }
-            map->dict_words[i] = NULL;
-            ++start;
-        } else {
-            skPrefixMapDictNode_t *node;
-            const skPrefixMapDictNode_t *found;
-
-            map->dict_words[i] = start;
-
-            current = strchr(start, '\0');
-            if (NULL == current || current >= end) {
-                skAppPrintErr("Corrupt data while processing dictionary");
-                skAbort();
-            }
-            assert(current > start);
-
-            if ((uint32_t)(current - start) > map->dict_max_wordlen) {
-                map->dict_max_wordlen = (current - start);
-            }
-
-            node = ((skPrefixMapDictNode_t*)
-                    skMemPoolElementNew(map->word_map_pool));
-            if (node == NULL) {
-                return SKPREFIXMAP_ERR_MEMORY;
-            }
-            node->word = start;
-            node->value = i;
-
-            found = ((const skPrefixMapDictNode_t*)
-                     rbsearch(node, map->word_map));
-            if (found != node) {
-                if (found == NULL) {
-                    return SKPREFIXMAP_ERR_MEMORY;
-                }
-                return SKPREFIXMAP_ERR_DUPLICATE;
-            }
-            start = current + 1;
-        }
-    }
-
-    return SKPREFIXMAP_OK;
-}
-
-
-/*
- *    Ensure that 'map' is a valid prefix map and adjust the
- *    'tree_used' member of 'map' to number of valid nodes in the
- *    tree.
- */
-static skPrefixMapErr_t
-prefixMapValidate(
-    skPrefixMap_t      *map,
-    uint32_t            record_count)
-{
-#define MAX_DEPTH 128
-    uint32_t path[MAX_DEPTH];
-    uint8_t lr[MAX_DEPTH];
-    int depth;
-    int max_seen;
-    uint32_t branch;
-    uint32_t max_key_used;
-    uint32_t i;
-
-    /*
-     * Make certain that no node points to locatation beyond the first
-     * node that contains an invalid child.  To determine this, visit
-     * the nodes until we find one that points beyond the end of the
-     * tree, while keeping track of the highest key in use.  If the
-     * highest key points beyond the invalid node, the tree is
-     * invalid.
-     *
-     * (Some prefix map files include extra data at the end of valid
-     * nodes, and this ensures that extra the data is not included as
-     * part of the tree.)
-     */
-    max_key_used = 0;
-    for (i = 0; i < record_count; ++i) {
-        uint32_t L = map->tree[i].left;
-        uint32_t R = map->tree[i].right;
-        if (SKPMAP_IS_NODE(L)) {
-            if (L > max_key_used) {
-                if (L >= record_count) {
-                    break;
-                }
-                max_key_used = L;
-            }
-        }
-        if (SKPMAP_IS_NODE(R)) {
-            if (R > max_key_used) {
-                if (R >= record_count) {
-                    break;
-                }
-                max_key_used = R;
-            }
-        }
-    }
-    if (i < record_count) {
-        if (max_key_used >= i) {
-            skAppPrintErr("Prefix map is malformed (contains invalid child)");
-            return SKPREFIXMAP_ERR_IO;
-        }
-        map->tree_used = i;
-        record_count = i;
-    }
-
-    /* Traverse the tree to find chains that are longer than 32 or 128
-     * steps. depth is current level in tree (number of steps from
-     * root); max_seen is the maximum depth that has been seen */
-    depth = max_seen = 0;
-
-    /* path[] contains the indexes of the nodes from the root to our
-     * current location */
-    path[depth] = 0;
-
-    /* lr[i] is 0 to visit the 'left' branch of the node at depth==i,
-     * 1 to visit the 'right' branch, and 2 when done */
-    lr[depth] = 0;
-
-    while (depth >= 0) {
-        if (lr[depth] > 1) {
-            /* visited both children on this level */
-            --depth;
-        } else {
-            if (0 == lr[depth]) {
-                branch = map->tree[path[depth]].left;
-            } else {
-                branch = map->tree[path[depth]].right;
-            }
-            ++lr[depth];
-            if (SKPMAP_IS_NODE(branch)) {
-                if (branch >= record_count) {
-                    skAppPrintErr("Prefix map is malformed"
-                                  " (contains invalid child)");
-                    return SKPREFIXMAP_ERR_IO;
-                }
-                /* goto to next level */
-                ++depth;
-                if (depth > max_seen) {
-                    max_seen = depth;
-                    if (depth >= MAX_DEPTH) {
-                        skAppPrintErr("Prefix map is malformed"
-                                      " (contains invalid depth)");
-                        return SKPREFIXMAP_ERR_IO;
-                    }
-                }
-                /* initialize the level */
-                lr[depth] = 0;
-                path[depth] = branch;
-            }
-        }
-    }
-    if (max_seen > 31) {
-        switch (map->content_type) {
-          case SKPREFIXMAP_CONT_ADDR_V6:
-            break;
-          case SKPREFIXMAP_CONT_PROTO_PORT:
-          case SKPREFIXMAP_CONT_ADDR_V4:
-            skAppPrintErr("Prefix map is malformed"
-                          " (contains invalid depth for content type)");
-            return SKPREFIXMAP_ERR_IO;
-        }
-    }
-    return SKPREFIXMAP_OK;
-}
-
-
-/*
- *    Comparator function for the 'word_map' red black tree member of
- *    the prefix map that compares skPrefixMapDictNode_t objects.
- */
+/* Compare two skPrefixMapDictNode_t's.  Used by the rbtree. */
 static int
 prefixMapWordCompare(
     const void         *va,
@@ -1332,7 +1048,6 @@ skPrefixMapAddRange(
     }
 
     switch (map->content_type) {
-#if SK_ENABLE_IPV6
       case SKPREFIXMAP_CONT_ADDR_V6:
         {
             uint8_t low128[16];
@@ -1348,7 +1063,6 @@ skPrefixMapAddRange(
             return prefixMapAdd128(map, low128, high128,
                                    SKPMAP_MAKE_LEAF(dict_val), 0, 127);
         }
-#endif  /* SK_ENABLE_IPV6 */
 
       case SKPREFIXMAP_CONT_PROTO_PORT:
         low32 = SKPMAP_KEY_FROM_PROTO_PORT(low_val);
@@ -1356,17 +1070,12 @@ skPrefixMapAddRange(
         break;
 
       case SKPREFIXMAP_CONT_ADDR_V4:
-#if !SK_ENABLE_IPV6
-        low32 = skipaddrGetV4((const skipaddr_t*)low_val);
-        high32 = skipaddrGetV4((const skipaddr_t*)high_val);
-#else
         if (skipaddrGetAsV4((const skipaddr_t*)low_val, &low32)) {
             return SKPREFIXMAP_ERR_ARGS;
         }
         if (skipaddrGetAsV4((const skipaddr_t*)high_val, &high32)) {
             return SKPREFIXMAP_ERR_ARGS;
         }
-#endif  /* SK_ENABLE_IPV6 */
         break;
 
       default:
@@ -1418,7 +1127,7 @@ skPrefixMapDelete(
     if (NULL == map) {
         return;
     }
-    if (map->tree != NULL) {
+    if ( map->tree != NULL ) {
         if (map->mapname) {
             free(map->mapname);
         }
@@ -1749,7 +1458,6 @@ skPrefixMapIteratorNext(
     assert(out_key_end);
     assert(out_value);
 
-#if SK_ENABLE_IPV6
     if (SKPREFIXMAP_CONT_ADDR_V6 == iter->map->content_type) {
         uint8_t key128[16];
         unsigned int i;
@@ -1804,7 +1512,6 @@ skPrefixMapIteratorNext(
         *out_value = old_val;
         return SK_ITERATOR_OK;
     }
-#endif  /* SK_ENABLE_IPV6 */
 
     /* check for the stoping condition */
     if (iter->end.u32 == UINT32_MAX) {
@@ -1892,13 +1599,10 @@ skPrefixMapIteratorReset(
     assert(iter);
 
     /* starting condition is end < start */
-#if SK_ENABLE_IPV6
     if (SKPREFIXMAP_CONT_ADDR_V6 == iter->map->content_type) {
         skipaddrSetV6(&iter->end.addr, min_ip128);
         skipaddrSetV6(&iter->start.addr, max_ip128);
-    } else
-#endif
-    {
+    } else {
         iter->end.u32 = 0;
         iter->start.u32 = 1;
     }
@@ -1916,11 +1620,11 @@ skPrefixMapLoad(
     int rv;
 
     /* Check arguments for sanity */
-    if (NULL == map) {
+    if ( NULL == map ) {
         skAppPrintErr("No place was provided to store new prefix map.");
         return SKPREFIXMAP_ERR_ARGS;
     }
-    if (NULL == path) {
+    if ( NULL == path ) {
         skAppPrintErr("No input file provided from which to read prefix map.");
         return SKPREFIXMAP_ERR_ARGS;
     }
@@ -1945,34 +1649,34 @@ skPrefixMapLoad(
 /* Allocate new prefix map and read contents from 'in' */
 skPrefixMapErr_t
 skPrefixMapRead(
-    skPrefixMap_t     **map_parm,
+    skPrefixMap_t     **map,
     skstream_t         *in)
 {
-    char errbuf[2 * PATH_MAX];
     sk_file_header_t *hdr;
     sk_file_version_t vers;
     sk_header_entry_t *hentry;
-    skPrefixMap_t *map;
     int has_dictionary;
-    size_t tree_size;
     uint32_t record_count;
+    uint32_t max_key_used;
     uint32_t swap_flag;
     uint32_t i;
+    char *current;
+    char *start;
+    char *end;
     skPrefixMapErr_t err;
-    ssize_t rv;
+    int rv;
 
     /* Check arguments for sanity */
-    if (NULL == map_parm) {
-        skAppPrintErr("No place was provided to store new prefix map");
+    if ( NULL == map ) {
+        skAppPrintErr("No place was provided to store new prefix map.");
         return SKPREFIXMAP_ERR_ARGS;
     }
-    if (NULL == in) {
+    if ( NULL == in ) {
         skAppPrintErr("No input stream provided from which to read prefix map");
         return SKPREFIXMAP_ERR_ARGS;
     }
 
-    *map_parm = NULL;
-    map = NULL;
+    *map = NULL;
 
     rv = skStreamReadSilkHeader(in, &hdr);
     if (rv) {
@@ -1985,144 +1689,286 @@ skPrefixMapRead(
     }
     vers = skHeaderGetRecordVersion(hdr);
 
-    if (SK_COMPMETHOD_NONE != skHeaderGetCompressionMethod(hdr)) {
-        skAppPrintErr("Unrecognized prefix map compression method");
+    if (SK_COMPMETHOD_NONE != skHeaderGetCompressionMethod(hdr) ) {
+        skAppPrintErr("Unrecognized prefix map compression method.");
         return SKPREFIXMAP_ERR_HEADER;
     }
 
     swap_flag = !skHeaderIsNativeByteOrder(hdr);
 
     /* Read record count */
-    rv = skStreamRead(in, &record_count, sizeof(record_count));
-    if (rv != (ssize_t)sizeof(record_count)) {
-        if (-1 == rv) {
-            skStreamLastErrMessage(in, rv, errbuf, sizeof(errbuf));
-        } else {
-            snprintf(errbuf, sizeof(errbuf),
-                     "read %" SK_PRIdZ " bytes of %" SK_PRIuZ " expected",
-                     rv, sizeof(record_count));
-        }
-        skAppPrintErr("Failed to read record count (%s)", errbuf);
+    if (skStreamRead(in, &(record_count), sizeof(record_count))
+        != sizeof(record_count))
+    {
+        skAppPrintErr("Error reading header from input file (short read).");
         return SKPREFIXMAP_ERR_IO;
     }
 
-    if (swap_flag) {
+    if ( swap_flag ) {
         record_count = BSWAP32(record_count);
     }
-    if (record_count < 1) {
-        skAppPrintErr(
-            "Input file contains invalid prefix map (record count is 0)");
+
+    if ( record_count < 1 ) {
+        skAppPrintErr("Input file contains invalid prefix map (no data).");
         return SKPREFIXMAP_ERR_HEADER;
     }
-    tree_size = record_count * sizeof(skPrefixMapRecord_t);
 
     /* Allocate a prefix map, and a storage buffer */
-    map = (skPrefixMap_t*)calloc(1, sizeof(skPrefixMap_t));
-    if (NULL == map) {
-        skAppPrintErr("Failed to allocate prefix map");
+    *map = (skPrefixMap_t*)calloc(1, sizeof(skPrefixMap_t));
+    if (NULL == *map) {
+        skAppPrintErr("Failed to allocate memory for prefix map.");
         return SKPREFIXMAP_ERR_MEMORY;
     }
-    map->tree = (skPrefixMapRecord_t*)malloc(tree_size);
-    if (NULL == map->tree) {
-        skAppPrintErr("Failed to allocate prefix map data");
-        err = SKPREFIXMAP_ERR_MEMORY;
-        goto ERROR;
-    }
-    map->tree_size = record_count;
-    map->tree_used = record_count;
 
     /* most files have a dictionary */
     has_dictionary = 1;
 
     switch (vers) {
       case 3:
-        map->content_type = SKPREFIXMAP_CONT_PROTO_PORT;
+        (*map)->content_type = SKPREFIXMAP_CONT_PROTO_PORT;
         break;
       case 1:
         /* IPv4 country code map (no dictionary) */
         has_dictionary = 0;
-        map->content_type = SKPREFIXMAP_CONT_ADDR_V4;
+        (*map)->content_type = SKPREFIXMAP_CONT_ADDR_V4;
         break;
       case 2:
         /* IPv4 general prefix map */
-        map->content_type = SKPREFIXMAP_CONT_ADDR_V4;
+        (*map)->content_type = SKPREFIXMAP_CONT_ADDR_V4;
         break;
-#if !SK_ENABLE_IPV6
-      case 4:
-      case 5:
-        skAppPrintErr("Support for IPv6 prefix maps not included"
-                      " in this installation");
-        err = SKPREFIXMAP_ERR_HEADER;
-        goto ERROR;
-#else
       case 4:
         /* IPv6 general prefix map */
-        map->content_type = SKPREFIXMAP_CONT_ADDR_V6;
+        (*map)->content_type = SKPREFIXMAP_CONT_ADDR_V6;
         break;
       case 5:
         /* IPv6 country code map (no dictionary) */
         has_dictionary = 0;
-        map->content_type = SKPREFIXMAP_CONT_ADDR_V6;
+        (*map)->content_type = SKPREFIXMAP_CONT_ADDR_V6;
         break;
-#endif  /* SK_ENABLE_IPV6 */
       default:
         skAbortBadCase(vers);
     }
+
+    (*map)->tree = ((skPrefixMapRecord_t*)
+                    malloc(record_count * sizeof(skPrefixMapRecord_t)));
+    if (NULL == (*map)->tree) {
+        skAppPrintErr("Failed to allocate memory for prefix map data.");
+        err = SKPREFIXMAP_ERR_MEMORY;
+        goto ERROR;
+    }
+    (*map)->tree_size = record_count;
+    (*map)->tree_used = record_count;
 
     /* Get the mapname from the header if it was specified and if the
      * header-entry version is 1. */
     hentry = skHeaderGetFirstMatch(hdr, SK_HENTRY_PREFIXMAP_ID);
     if ((hentry) && (1 == prefixMapHentryGetVersion(hentry))) {
-        map->mapname = strdup(prefixMapHentryGetMapmame(hentry));
-        if (NULL == map->mapname) {
-            skAppPrintErr("Failed to allocate prefix map name");
+        (*map)->mapname = strdup(prefixMapHentryGetMapmame(hentry));
+        if (NULL == (*map)->mapname) {
+            skAppPrintErr("Failed to allocate memory for prefix map name.");
             err = SKPREFIXMAP_ERR_MEMORY;
             goto ERROR;
         }
     }
 
     /* Allocation completed successfully, read in the records. */
-    rv = skStreamRead(in, map->tree, tree_size);
-    if (rv != (ssize_t)(tree_size)) {
-        if (-1 == rv) {
-            skStreamLastErrMessage(in, rv, errbuf, sizeof(errbuf));
-        } else {
-            snprintf(errbuf, sizeof(errbuf),
-                     "read %" SK_PRIdZ " bytes of %" SK_PRIuZ " expected",
-                     rv, tree_size);
-        }
-        skAppPrintErr("Failed to read record data (%s)", errbuf);
+    if (skStreamRead(in, (*map)->tree,
+                     (record_count * sizeof(skPrefixMapRecord_t)))
+        != (ssize_t)(record_count * sizeof(skPrefixMapRecord_t)))
+    {
+        skAppPrintErr("Failed to read all records from input file.");
         err = SKPREFIXMAP_ERR_IO;
         goto ERROR;
     }
 
     /* Swap the byte order of the data if needed. */
-    if (swap_flag) {
-        for (i = 0; i < record_count; i++) {
-            map->tree[i].left = BSWAP32(map->tree[i].left);
-            map->tree[i].right = BSWAP32(map->tree[i].right);
+    if ( swap_flag ) {
+        for ( i = 0; i < record_count; i++ ) {
+            (*map)->tree[i].left = BSWAP32((*map)->tree[i].left);
+            (*map)->tree[i].right = BSWAP32((*map)->tree[i].right);
         }
     }
 
     /* Allocate and read the dictionary. */
-    if (has_dictionary) {
-        err = prefixMapReadDictionary(map, in, swap_flag);
-        if (err) {
+    if ( has_dictionary ) {
+        /* Get number of entries */
+        if (skStreamRead(in, &((*map)->dict_buf_size), sizeof(uint32_t))
+            != (ssize_t)sizeof(uint32_t))
+        {
+            skAppPrintErr("Error reading dictionary from input file.");
+            err = SKPREFIXMAP_ERR_IO;
             goto ERROR;
+        }
+        if (swap_flag) {
+            (*map)->dict_buf_size = BSWAP32((*map)->dict_buf_size);
+        }
+
+        (*map)->dict_buf = (char*)malloc((*map)->dict_buf_size * sizeof(char));
+        if ( NULL == (*map)->dict_buf ) {
+            skAppPrintErr("Failed to allocate memory for prefix map dict.");
+            err = SKPREFIXMAP_ERR_MEMORY;
+            goto ERROR;
+        }
+
+        /* Dictionary is allocated; now read in data. */
+        if (skStreamRead(in, (*map)->dict_buf, (*map)->dict_buf_size)
+            != (ssize_t)(*map)->dict_buf_size)
+        {
+            skAppPrintErr("Failed to read dictionary from input file.");
+            err = SKPREFIXMAP_ERR_IO;
+            goto ERROR;
+        }
+        (*map)->dict_buf_end = (*map)->dict_buf_size;
+        (*map)->dict_buf_used = (*map)->dict_buf_size;
+
+        /* Index the dictionary data */
+
+        /* First pass: count the words */
+        start = (*map)->dict_buf;
+        end = (*map)->dict_buf + (*map)->dict_buf_end;
+        (*map)->dict_words_used = 0;
+        for ( current = start; current < end; current++ ) {
+            if ( (*current) == '\0' ) {
+                (*map)->dict_words_used++;
+            }
+        }
+        (*map)->dict_words_size = (*map)->dict_words_used;
+
+        /* Allocate space for index */
+        (*map)->dict_words
+            = (char**)malloc((*map)->dict_words_size * sizeof(char*));
+        if ((*map)->dict_words == NULL) {
+            skAppPrintErr("Failed to allocated memory for prefix map index.");
+            err = SKPREFIXMAP_ERR_MEMORY;
+            goto ERROR;
+        }
+        if (0 != skMemoryPoolCreate(&(*map)->word_map_pool,
+                                    sizeof(skPrefixMapDictNode_t),
+                                    SKPMAP_WORDS_COUNT_GROW))
+        {
+            skAppPrintErr("Failed to allocated memory for prefix map "
+                          "index memory pool.");
+            err = SKPREFIXMAP_ERR_MEMORY;
+            goto ERROR;
+        }
+        (*map)->word_map = rbinit(prefixMapWordCompare, NULL);
+        if ((*map)->word_map == NULL) {
+            skAppPrintErr("Failed to allocated memory for prefix map "
+                          "index tree.");
+            err = SKPREFIXMAP_ERR_MEMORY;
+            goto ERROR;
+        }
+
+        /* Now build index */
+        current = (*map)->dict_buf;
+        start = current;
+        end = current + (*map)->dict_buf_used;
+        for ( i = 0; i < (*map)->dict_words_used; ++i ) {
+            while ( (*current != '\0') && (current < end) ) {
+                current++;
+            }
+            (*map)->dict_words[i] = ((current == start) ? NULL : start);
+            if (current != start) {
+                skPrefixMapDictNode_t *node;
+                const skPrefixMapDictNode_t *found;
+
+                node = ((skPrefixMapDictNode_t*)
+                        skMemPoolElementNew((*map)->word_map_pool));
+                if (node == NULL) {
+                    err = SKPREFIXMAP_ERR_MEMORY;
+                    goto ERROR;
+                }
+                node->word = start;
+                node->value = i;
+                found = ((const skPrefixMapDictNode_t*)
+                         rbsearch(node, (*map)->word_map));
+                if (found == NULL) {
+                    err = SKPREFIXMAP_ERR_MEMORY;
+                    goto ERROR;
+                }
+                if (found != node) {
+                    err = SKPREFIXMAP_ERR_DUPLICATE;
+                    goto ERROR;
+                }
+            }
+
+            if ((uint32_t)(current - start) > (*map)->dict_max_wordlen) {
+                (*map)->dict_max_wordlen = (current - start);
+            }
+
+            current++;
+            start = current;
         }
     }
 
-    /* Validate the prefix map */
-    err = prefixMapValidate(map, record_count);
-    if (err) {
-        goto ERROR;
+    /*
+     * Check the invariants that ensure that the prefixmap is a total
+     * mapping (every input maps to a single output.)
+     *
+     * In theory, the invariants are:
+     *
+     * 1) No node may point to a non-existent child (>= record_count).
+     * See note below.
+     *
+     * 2) No node may point to a node earlier than itself (prevents
+     * cycles)
+     *
+     *
+     * The first invariant as written is too strict as there is
+     * sometimes extra data at the end of the map.  Instead, we make
+     * certain that no node points to locatation beyond the first node
+     * that contains an invalid child.  To determine this, visit the
+     * nodes until we find one that points beyond the end of the tree,
+     * while keeping track of the highest key in use.  If the highest
+     * key points beyond the invalid node, the tree is invalid.
+     *
+     * The second invariant assumes the nodes were created in a
+     * top-down manner, which may not be true, so the rule that
+     * implements the second invariant is commented out below.
+     */
+    max_key_used = 0;
+    for ( i = 0; i < record_count; ++i ) {
+        uint32_t L = (*map)->tree[i].left;
+        uint32_t R = (*map)->tree[i].right;
+        if (SKPMAP_IS_NODE(L)) {
+            if (L >= record_count /* || L <= i */) {
+                break;
+            }
+            if (L > max_key_used) {
+                max_key_used = L;
+            }
+        }
+        if (SKPMAP_IS_NODE(R)) {
+            if (R >= record_count /* || R <= i */) {
+                break;
+            }
+            if (R > max_key_used) {
+                max_key_used = R;
+            }
+        }
+    }
+    if (i < record_count) {
+        if (max_key_used >= i) {
+            skAppPrintErr("Prefix map is malformed (contains invalid child).");
+            free((*map)->tree);
+            free(*map);
+            *map = NULL;
+            return SKPREFIXMAP_ERR_IO;
+        }
+        (*map)->tree_used = i;
     }
 
-    *map_parm = map;
+    /* Hrm.  We should also try to look for chains longer than 32
+     * steps.  What's a good way to do that?
+     */
+
     return SKPREFIXMAP_OK;
 
   ERROR:
-    skPrefixMapDelete(map);
+    if (*map) {
+        skPrefixMapDelete(*map);
+        *map = NULL;
+    }
     return err;
 }
 

@@ -156,10 +156,7 @@ attempt to add a SiLK data file as an annotation.
 
 =item B<--compression-method>=I<COMP_METHOD>
 
-Specify the compression library to use when writing output files.  If
-this switch is not given, the value in the SILK_COMPRESSION_METHOD
-environment variable is used if the value names an available
-compression method.  When no compression method is specified,
+Specify how to compress the output.  When this switch is not given,
 output to the standard output or to named pipes is not compressed, and
 output to files is compressed using the default chosen when SiLK was
 compiled.  The valid values for I<COMP_METHOD> are determined by which
@@ -231,12 +228,6 @@ configured, then exit the application.
 The SiLK tools normally refuse to overwrite existing files.  Setting
 SILK_CLOBBER to a non-empty value removes this restriction.
 
-=item SILK_COMPRESSION_METHOD
-
-This environment variable is used as the value for
-B<--compression-method> when that switch is not provided.  I<Since
-SiLK 3.13.0.>
-
 =back
 
 =head1 SEE ALSO
@@ -250,7 +241,7 @@ B<rwpdu2silk> cannot read from the standard input.
 
 =cut
 
-$SiLK: rwpdu2silk.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwpdu2silk.pod d1637517606d 2017-06-23 16:51:31Z mthomas $
 
 Local Variables:
 mode:text

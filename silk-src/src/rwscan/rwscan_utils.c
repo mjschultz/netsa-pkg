@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwscan_utils.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
+RCSIDENT("$SiLK: rwscan_utils.c d1637517606d 2017-06-23 16:51:31Z mthomas $");
 
 #include "rwscan.h"
 
@@ -121,12 +121,12 @@ appUsageLong(
      "\twith rwsort(1) by sip, proto, and dip.\n")
 
     FILE *fh = USAGE_FH;
-    unsigned int i;
+    int   i;
 
     fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
     fprintf(fh, "\nSWITCHES:\n");
     skOptionsDefaultUsage(fh);
-    for (i = 0; appOptions[i].name; ++i) {
+    for (i = 0; appOptions[i].name; i++) {
         fprintf(fh, "--%s %s. ", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]));
         switch ((appOptionsEnum)appOptions[i].val) {
@@ -430,8 +430,8 @@ appSetup(
             exit(EXIT_FAILURE);
         }
         skStreamDestroy(&stream);
-        skIPTreeCreate(&(trw_data.benign));
-        skIPTreeCreate(&(trw_data.scanners));
+        skIPSetCreate(&(trw_data.benign), 0);
+        skIPSetCreate(&(trw_data.scanners), 0);
     }
 
     if ((options.worker_threads > 1) && options.verbose_results) {
@@ -480,10 +480,10 @@ appTeardown(
     }
 
     if (trw_data.benign != NULL) {
-        skIPTreeDelete(&(trw_data.benign));
+        skIPSetDestroy(&(trw_data.benign));
     }
     if (trw_data.scanners != NULL) {
-        skIPTreeDelete(&(trw_data.scanners));
+        skIPSetDestroy(&(trw_data.scanners));
     }
 
     if (trw_data.existing != NULL) {
@@ -627,26 +627,22 @@ print_flow(
     sktimestamp_r(timestr, rwRecGetStartTime(rwcurr), 0);
     switch (rwRecGetProto(rwcurr)) {
       case IPPROTO_ICMP:
-      {
-          uint8_t type = 0, code = 0;
-
-          type = rwRecGetIcmpType(rwcurr);
-          code = rwRecGetIcmpCode(rwcurr);
-
-          fprintf(RWSCAN_VERBOSE_FH,
-                  "%-4d %16s -> %16s icmp(%03u,%03u) %-24s %6u %3u %6u %8s\n",
-                  rwRecGetProto(rwcurr), sipstr, dipstr, type, code, timestr,
-                  rwRecGetBytes(rwcurr), rwRecGetPkts(rwcurr),
-                  (rwRecGetBytes(rwcurr) / rwRecGetPkts(rwcurr)),
-                  skTCPFlagsString(rwRecGetFlags(rwcurr), flag_string,
-                                   SK_PADDED_FLAGS));
-      }
+        fprintf(RWSCAN_VERBOSE_FH,
+                ("%-4d %16s -> %16s icmp(%03u,%03u) %-24s"
+                 " %6" PRIu64 " %3" PRIu64 " %6" PRIu64 " %8s\n"),
+                rwRecGetProto(rwcurr), sipstr, dipstr,
+                rwRecGetIcmpType(rwcurr), rwRecGetIcmpCode(rwcurr), timestr,
+                rwRecGetBytes(rwcurr), rwRecGetPkts(rwcurr),
+                (rwRecGetBytes(rwcurr) / rwRecGetPkts(rwcurr)),
+                skTCPFlagsString(rwRecGetFlags(rwcurr), flag_string,
+                                 SK_PADDED_FLAGS));
         break;
 
       case IPPROTO_TCP:
       case IPPROTO_UDP:
         fprintf(RWSCAN_VERBOSE_FH,
-                "%-4d %16s:%5d -> %16s:%5d %-24s %6u %3u %6u %8s\n",
+                ("%-4d %16s:%5d -> %16s:%5d %-24s"
+                 " %6" PRIu64 " %3" PRIu64 " %6" PRIu64 " %8s\n"),
                 rwRecGetProto(rwcurr), sipstr, rwRecGetSPort(rwcurr),
                 dipstr, rwRecGetDPort(rwcurr), timestr,
                 rwRecGetBytes(rwcurr), rwRecGetPkts(rwcurr),

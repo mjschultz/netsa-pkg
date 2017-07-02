@@ -13,9 +13,8 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWSCAN_H, "$SiLK: rwscan.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_RWSCAN_H, "$SiLK: rwscan.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
-#include <silk/iptree.h>
 #include <silk/rwrec.h>
 #include <silk/skipset.h>
 #include <silk/skprefixmap.h>
@@ -210,8 +209,8 @@ typedef struct event_metrics_st {
     uint32_t  unique_dips;
     uint32_t  unique_ports;
 
-    uint32_t  bytes;
-    uint32_t  pkts;
+    uint64_t  bytes;
+    uint64_t  pkts;
 
     uint32_t  unique_sp_count;
 
@@ -271,8 +270,8 @@ typedef struct trw_counters_st {
 typedef struct trw_data_st {
     pthread_mutex_t mutex;
     skipset_t      *existing;
-    skIPTree_t     *benign;     /* holds benign sources */
-    skIPTree_t     *scanners;   /* holds scanning sources */
+    skipset_t      *benign;     /* holds benign sources */
+    skipset_t      *scanners;   /* holds scanning sources */
 } trw_data_t;
 
 typedef struct scan_info_st {
@@ -282,8 +281,8 @@ typedef struct scan_info_st {
     uint32_t etime;
     uint32_t uniq_dsts;
     uint32_t flows;
-    uint32_t pkts;
-    uint32_t bytes;
+    uint64_t pkts;
+    uint64_t bytes;
     uint8_t  proto;
     double   scan_prob;
     enum ScanModel model;

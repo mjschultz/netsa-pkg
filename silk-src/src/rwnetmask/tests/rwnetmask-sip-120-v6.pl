@@ -1,5 +1,5 @@
 #! /usr/bin/perl -w
-# MD5: 002e9ee9323ae990451cf91baada0e3b
+# MD5: 6b69018675a8c904fbcfc6cd9d70b104
 # TEST: ./rwnetmask --6sip-prefix-length=120 ../../tests/data-v6.rwf | ../rwcat/rwcat --compression-method=none --byte-order=little
 
 use strict;
@@ -11,6 +11,6 @@ my %file;
 $file{v6data} = get_data_or_exit77('v6data');
 check_features(qw(ipv6));
 my $cmd = "$rwnetmask --6sip-prefix-length=120 $file{v6data} | $rwcat --compression-method=none --byte-order=little";
-my $md5 = "002e9ee9323ae990451cf91baada0e3b";
+my $md5 = "6b69018675a8c904fbcfc6cd9d70b104";
 
 check_md5_output($md5, $cmd);

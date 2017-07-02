@@ -17,8 +17,9 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfiltersetup.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwfiltersetup.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
+#include <silk/sklua.h>
 #include <silk/silkpython.h>
 #include <silk/skprefixmap.h>
 #include "rwfilter.h"
@@ -28,6 +29,24 @@ RCSIDENT("$SiLK: rwfiltersetup.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 
 /* LOCAL VARIABLES */
+
+/* Lua initialization code; this is binary code compiled from
+ * rwfilter.lua */
+static const uint8_t rwfilter_lua[] = {
+#include "rwfilter.i"
+};
+
+/* Lua registry index to the table of functions */
+static int ref_export = LUA_NOREF;
+
+/* Lua registry index to the filter function */
+static int ref_run_filter = LUA_NOREF;
+
+/* the number of --lua-file arguments */
+static unsigned int count_lua_file = 0;
+
+/* the number of --lua-expression arguments */
+static unsigned int count_lua_expression = 0;
 
 /* the compression method to use when writing the file.
  * skCompMethodOptionsRegister() will set this to the default or
@@ -49,9 +68,6 @@ static const struct app_static_plugins_st {
 
 /* names of plug-ins to attempt to load at startup */
 static const char *app_plugin_names[] = {
-    /* keep python last in this list so all other filtering happens
-     * first.  since python is a full (albeit slow) programming
-     * environment, it should have the benefit of being last. */
     SK_PLUGIN_ADD_SUFFIX("ipafilter"),
     NULL /* sentinel */
 };
@@ -68,10 +84,12 @@ typedef enum {
     OPT_THREADS,
 #endif
     OPT_MAX_PASS_RECORDS, OPT_MAX_FAIL_RECORDS,
-    OPT_PRINT_FILE, OPT_PLUGIN,
-    OPT_INPUT_PIPE, OPT_XARGS,
+    OPT_PLUGIN, OPT_LUA_FILE,
+
     OPT_PASS_DEST, OPT_FAIL_DEST, OPT_ALL_DEST,
-    OPT_PRINT_STAT, OPT_PRINT_VOLUME
+    OPT_PRINT_STAT, OPT_PRINT_VOLUME,
+
+    OPT_LUA_EXPRESSION
 } appOptionsEnum;
 
 static struct option appOptions[] = {
@@ -81,16 +99,16 @@ static struct option appOptions[] = {
 #endif
     {"max-pass-records",        REQUIRED_ARG, 0, OPT_MAX_PASS_RECORDS},
     {"max-fail-records",        REQUIRED_ARG, 0, OPT_MAX_FAIL_RECORDS},
-    {"print-filenames",         NO_ARG,       0, OPT_PRINT_FILE},
     {"plugin",                  REQUIRED_ARG, 0, OPT_PLUGIN},
+    {"lua-file",                REQUIRED_ARG, 0, OPT_LUA_FILE},
 
-    {"input-pipe",              REQUIRED_ARG, 0, OPT_INPUT_PIPE},
-    {"xargs",                   OPTIONAL_ARG, 0, OPT_XARGS},
     {"pass-destination",        REQUIRED_ARG, 0, OPT_PASS_DEST},
     {"fail-destination",        REQUIRED_ARG, 0, OPT_FAIL_DEST},
     {"all-destination",         REQUIRED_ARG, 0, OPT_ALL_DEST},
     {"print-statistics",        OPTIONAL_ARG, 0, OPT_PRINT_STAT},
     {"print-volume-statistics", OPTIONAL_ARG, 0, OPT_PRINT_VOLUME},
+
+    {"lua-expression",          REQUIRED_ARG, 0, OPT_LUA_EXPRESSION},
     {0,0,0,0}                   /* sentinel entry */
 };
 
@@ -103,14 +121,10 @@ static const char *appHelp[] = {
      "\tthe pass-destination; 0 for all.  Def. 0"),
     ("Write at most this many records to\n"
      "\tthe fail-destination; 0 for all.  Def. 0"),
-    "Print names of input files during processing. Def. No",
     ("Augment processing with the specified plug-in.\n"
      "\tSwitch may be repeated to load multiple plug-ins. No default"),
-    ("Read SiLK flow records from a pipe: 'stdin' or\n"
-     "\tpath to named pipe. No default. UNNEEDED AND DEPRECATED: Simply\n"
-     "\tprovide 'stdin' or the named pipe as an ordinary argument"),
-    ("Read list of input file names from a file or pipe\n"
-     "\tpathname or 'stdin'. No default"),
+    ("Load the named Lua file during set-up.  Switch may be\n"
+     "\trepeated to load multiple files. No default"),
     ("Destination for records which pass the filter(s):\n"
      "\tpathname or 'stdout'. If pathname, it must not exist. No default"),
     ("Destination for records which fail the filter(s):\n"
@@ -121,6 +135,8 @@ static const char *appHelp[] = {
      "\tIf no pathname provided, use stderr. No default"),
     ("Print count of flows/packets/bytes read\n"
      "\tto named file. If no pathname provided, use stderr. No default"),
+    ("Use the return value of given Lua expression as the\n"
+     "\tpass/fail determiner (flow record is called \"rec\").  Repeatable."),
     (char *)NULL
 };
 
@@ -128,11 +144,20 @@ static const char *appHelp[] = {
 /* LOCAL FUNCTION PROTOTYPES */
 
 static int  appOptionsHandler(clientData cData, int opt_index, char *opt_arg);
-static int  filterCheckInputs(int argc);
 static int  filterCheckOutputs(void);
 static int  filterOpenOutputs(void);
-static checktype_t filterPluginCheck(rwRec *rec);
+static checktype_t filterPluginCheck(const rwRec *rec);
+static checktype_t filterLuaFiltersCheck(const rwRec *rec);
 static int  filterSetCheckers(void);
+static int  filterLuaFiltersInitialize(void);
+static int  filterLuaFiltersFinalize(void);
+#if 0
+static void
+filterCopyFileHeaderCallback(
+    sk_flow_iter_t     *f_iter,
+    skstream_t         *stream,
+    void               *data);
+#endif  /* 0 */
 
 
 /* FUNCTION DEFINITIONS */
@@ -166,8 +191,8 @@ appUsageLong(
     fprintf(fh, "\nGENERAL SWITCHES:\n\n");
     skOptionsDefaultUsage(fh);
 
-    /* print everything before --input-pipe */
-    for (i = 0; appOptions[i].name && appOptions[i].val < OPT_INPUT_PIPE; ++i){
+    /* print general options (everything before --pass-destination) */
+    for (i = 0; appOptions[i].name && appOptions[i].val < OPT_PASS_DEST; ++i) {
         fprintf(fh, "--%s %s. %s\n", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]), appHelp[i]);
     }
@@ -175,21 +200,32 @@ appUsageLong(
     skOptionsNotesUsage(fh);
     skCompMethodOptionsUsage(fh);
 
-    /* print remaining options */
-    fprintf(fh, ("\nINPUT/OUTPUT SWITCHES."
-                 " An input switch or a SELECTION switch (below) is\n"
-                 "\trequired.  At least one output switch is required:\n\n"));
-    for ( ; appOptions[i].name; ++i) {
+    /* print output options (everything before --lua-expression) */
+    fprintf(fh, ("\nOUTPUT SWITCHES."
+                 " At least one output switch is required:\n\n"));
+    for ( ; appOptions[i].name && appOptions[i].val < OPT_LUA_EXPRESSION; ++i){
         fprintf(fh, "--%s %s. %s\n", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]), appHelp[i]);
     }
 
-    /* selection switches */
-    fglobUsage(fh);
+    /* print input option (everything before --lua-expression) */
+    fprintf(fh, ("\nINPUT SWITCH."
+                 " Exactly one type of input is required:"
+                 " this input switch; one or\n"
+                 "\tmore arguments specifying filenames, named pipes,"
+                 " or '-' or 'stdin'\n"
+                 "\tfor standard input; one or more"
+                 " FILE SELECTION SWITCHES (next group):\n\n"));
+    skOptionsCtxOptionsUsage(optctx, fh);
 
     /* partitioning switches */
     filterUsage(fh);
     tupleUsage(fh);
+    /* print local partitioning option (remaining options) */
+    for ( ; appOptions[i].name; ++i) {
+        fprintf(fh, "--%s %s. %s\n", appOptions[i].name,
+                SK_OPTION_HAS_ARG(appOptions[i]), appHelp[i]);
+    }
 
     /* switches from plug-ins */
     skPluginOptionsUsage(fh);
@@ -212,9 +248,10 @@ appSetup(
     int                 argc,
     char              **argv)
 {
-    int j;
-    int input_count;
+    unsigned int optctx_flags;
     int output_count;
+    int rv;
+    int j;
 
     /* verify same number of options and help strings */
     assert((sizeof(appHelp)/sizeof(char*)) ==
@@ -227,28 +264,29 @@ appSetup(
     /* initialize variables */
     memset(&dest_type, 0, sizeof(dest_type));
 
-    /* load fglob module */
-    if (fglobSetup()) {
-        skAppPrintErr("Unable to setup fglob module");
-        exit(EXIT_FAILURE);
-    }
+    optctx_flags = (SK_OPTIONS_CTX_INPUT_SILK_FLOW | SK_OPTIONS_CTX_XARGS
+                    | SK_OPTIONS_CTX_PRINT_FILENAMES | SK_OPTIONS_CTX_FGLOB);
 
     /* load filter module */
     if (filterSetup()) {
         skAppPrintErr("Unable to setup filter module");
         exit(EXIT_FAILURE);
     }
-
     /* load tuple module */
     if (tupleSetup()) {
         skAppPrintErr("Unable to setup tuple module");
         exit(EXIT_FAILURE);
     }
 
+    /* Initialize plugin library */
     skPluginSetup(1, SKPLUGIN_APP_FILTER);
 
+    L = filterLuaCreateState();
+
     /* register the options */
-    if (skOptionsRegister(appOptions, &appOptionsHandler, NULL)
+    if (skOptionsCtxCreate(&optctx, optctx_flags)
+        || skOptionsCtxOptionsRegister(optctx)
+        || skOptionsRegister(appOptions, &appOptionsHandler, NULL)
         || skOptionsNotesRegister(NULL)
         || skCompMethodOptionsRegister(&comp_method))
     {
@@ -295,9 +333,29 @@ appSetup(
     }
 
     /* parse options */
-    arg_index = skOptionsParse(argc, argv);
-    if (arg_index < 0) {
-        skAppUsage();
+    rv = skOptionsCtxOptionsParse(optctx, argc, argv);
+    if (rv < 0) {
+        skAppUsage();         /* never returns */
+    }
+
+    /* Try to load site config file; if it fails, we will not be able
+     * to resolve flowtype and sensor from input file names.  If fglob
+     * is active, it will require the configuration file. */
+    sksiteConfigure(0);
+
+    /* Can only use Lua in a single thread */
+    if ((thread_count > 1) && (count_lua_file || count_lua_expression)) {
+        skAppPrintErr("May not use multiple threads with --%s or %s",
+                      appOptions[OPT_LUA_FILE].name,
+                      appOptions[OPT_LUA_EXPRESSION].name);
+        exit(EXIT_FAILURE);
+    }
+
+    if (thread_count == 1) {
+        /* Call the initialization functions defined in Lua */
+        if (filterLuaFiltersInitialize()) {
+            exit(EXIT_FAILURE);
+        }
     }
 
     /* initialize the plug-ins */
@@ -312,27 +370,6 @@ appSetup(
         thread_count = 1;
     }
 #endif  /* SK_RWFILTER_THREADED */
-
-    /* Check that there is one and only one source of input to process */
-    input_count = filterCheckInputs(argc);
-    if (input_count < 0) {
-        /* fatal error. msg already printed */
-        exit(EXIT_FAILURE);
-    } else if (input_count > 1) {
-        skAppPrintErr("Multiple input sources were specified\n"
-                      "\tInput must come from only one of --input-pipe,"
-                      " --xargs, file names on\n"
-                      "\tthe command line,"
-                      " or a combination of the file selection switches");
-        skAppUsage();
-    } else if (input_count == 0) {
-        skAppPrintErr("No input was specified.\n"
-                      "\tNo file selection switches were given,"
-                      " neither --input-pipe nor --xargs\n"
-                      "\twas specified, and no files are present on the"
-                      " command line");
-        skAppUsage();
-    }
 
     /* check that the user asked for some output */
     output_count = filterCheckOutputs();
@@ -376,18 +413,23 @@ appSetup(
     }
 
 
-    /* open the output streams, unless this is a "dry-run" */
-    if (NULL == dryrun_fp) {
-        if (filterOpenOutputs()) {
-            /* fatal error. msg already printed */
-            exit(EXIT_FAILURE);
-        }
+    /* if this is a dry-run, there is nothing else to do */
+    if (dryrun_fp) {
+        return;
     }
 
-    /* Try to load site config file; if it fails, we will not be able
-     * to resolve flowtype and sensor from input file names.  If fglob
-     * is active, it will require the configuration file. */
-    sksiteConfigure(0);
+    /* create flow iterator to read the records from the inputs */
+    flowiter = skOptionsCtxCreateFlowIterator(optctx);
+
+    /* ignore errors opening files */
+    sk_flow_iter_set_stream_error_cb(flowiter, SK_FLOW_ITER_CB_ERROR_OPEN,
+                                     sk_flow_iter_ignore_error_open_cb, NULL);
+
+    /* open the output streams */
+    if (filterOpenOutputs()) {
+        /* fatal error. msg already printed */
+        exit(EXIT_FAILURE);
+    }
 
     return;                     /* OK */
 }
@@ -463,19 +505,6 @@ appOptionsHandler(
         break;
 #endif  /* SK_RWFILTER_THREADED */
 
-      case OPT_INPUT_PIPE:
-        /*
-         *  input-pipe. Delay check for multiple inputs sources till all
-         *  options have been parsed
-         */
-        if (input_pipe) {
-            skAppPrintErr("Invalid %s: Switch used multiple times",
-                          appOptions[opt_index].name);
-            return 1;
-        }
-        input_pipe = opt_arg;
-        break;
-
       case OPT_PLUGIN:
         if (skPluginLoadPlugin(opt_arg, 1)) {
             skAppPrintErr("Fatal error loading plugin '%s'", opt_arg);
@@ -485,10 +514,6 @@ appOptionsHandler(
 
       case OPT_DRY_RUN:
         dryrun_fp = DRY_RUN_FH;
-        break;
-
-      case OPT_PRINT_FILE:
-        filenames_fp = PRINT_FILENAMES_FH;
         break;
 
       case OPT_PRINT_VOLUME:
@@ -528,22 +553,39 @@ appOptionsHandler(
         }
         break;
 
-      case OPT_XARGS:
-        /* a file containing a list of file names */
-        if (xargs) {
-            skAppPrintErr("Invalid %s: Switch used multiple times",
-                          appOptions[opt_index].name);
+      case OPT_LUA_FILE:
+        /* get the 'export' table from the registry, get the
+         * 'load_lua_file' function from 'export', remove 'export'
+         * from the stack, push the argument, and run the function */
+        ++count_lua_file;
+        lua_rawgeti(L, LUA_REGISTRYINDEX, ref_export);
+        lua_getfield(L, -1, "load_lua_file");
+        lua_remove(L, -2);
+        lua_pushstring(L, opt_arg);
+        rv = lua_pcall(L, 1, 0, 0);
+        if (rv != LUA_OK) {
+            skAppPrintErr("%s", lua_tostring(L, -1));
+            lua_pop(L, 1);
+            assert(0 == lua_gettop(L));
             return 1;
         }
-        if ((rv = skStreamCreate(&xargs, SK_IO_READ, SK_CONTENT_TEXT))
-            || (rv = skStreamBind(xargs, (opt_arg ? opt_arg : "stdin"))))
-        {
-            skStreamPrintLastErr(xargs, rv, &skAppPrintErr);
-            skStreamDestroy(&xargs);
-            skAppPrintErr("Invalid %s '%s'",
-                          appOptions[opt_index].name, opt_arg);
+        assert(0 == lua_gettop(L));
+        break;
+
+      case OPT_LUA_EXPRESSION:
+        ++count_lua_expression;
+        lua_rawgeti(L, LUA_REGISTRYINDEX, ref_export);
+        lua_getfield(L, -1, "parse_lua_expression");
+        lua_remove(L, -2);
+        lua_pushstring(L, opt_arg);
+        rv = lua_pcall(L, 1, 0, 0);
+        if (rv != LUA_OK) {
+            skAppPrintErr("Invalid %s", lua_tostring(L, -1));
+            lua_pop(L, 1);
+            assert(0 == lua_gettop(L));
             return 1;
         }
+        assert(0 == lua_gettop(L));
         break;
     } /* switch */
 
@@ -583,9 +625,17 @@ appTeardown(
     tupleTeardown();
     filterTeardown();
     skOptionsNotesTeardown();
-    fglobTeardown();
+
+    if (L) {
+        if (thread_count == 1) {
+            filterLuaFiltersFinalize();
+        }
+    }
 
     closeAllDests();
+
+    sk_lua_closestate(L);
+    L = NULL;
 
     /* close stats */
     if (print_stat) {
@@ -607,10 +657,8 @@ appTeardown(
         skStreamDestroy(&print_stat);
     }
 
-    /* close xargs stream */
-    if (xargs) {
-        skStreamDestroy(&xargs);
-    }
+    skOptionsCtxDestroy(&optctx);
+    sk_flow_iter_destroy(&flowiter);
 
 
     skAppUnregister();
@@ -639,75 +687,109 @@ filterIgnoreSigPipe(
 
 
 /*
- *  stream_count = filterCheckInputs(argc)
- *
- *    Do basic checks for the input, and return the number of inputs
- *    selected from among: command-line files, fglob options, piped
- *    input, or xargs.  Returns -1 on error, such as trying to read
- *    binary records from a TTY.
+ *    Create a Lua state and load the (compiled) contents of
+ *    "rwfilter.lua" into that state.
  */
-static int
-filterCheckInputs(
-    int                 argc)
+lua_State *
+filterLuaCreateState(
+    void)
 {
-    unsigned int count = 0;
+    lua_State *S;
     int rv;
 
-    /* Check for file names on command line */
-    if (arg_index < argc) {
-        ++count;
-    }
+    /* initialize Lua */
+    S = sk_lua_newstate();
 
-    /* the input-pipe must be 'stdin' or it must be an existing FIFO.
-     * If 'stdin', stdin must not be a TTY, since we expect binary. */
-    if (input_pipe) {
-        ++count;
-        if ((0 == strcmp(input_pipe, "stdin"))
-            || (0 == strcmp(input_pipe, "-")))
-        {
-            if (FILEIsATty(stdin)) {
-                skAppPrintErr(("Invalid %s '%s':"
-                               " Will not read binary data from a terminal"),
-                              appOptions[OPT_INPUT_PIPE].name, input_pipe);
-                return -1;
-            }
-        } else if ( !skFileExists(input_pipe)) {
-            skAppPrintErr(("Invalid %s '%s':"
-                           " File does not exist"),
-                          appOptions[OPT_INPUT_PIPE].name, input_pipe);
-            return -1;
-        } else if ( !isFIFO(input_pipe)) {
-            skAppPrintErr(("Invalid %s '%s':"
-                           " File is not named pipe"),
-                          appOptions[OPT_INPUT_PIPE].name, input_pipe);
-            return -1;
-        }
+    /* load and run the the initialization code in rwfilter.lua.  The
+     * return value is a table of functions. */
+    rv = luaL_loadbufferx(S, (const char*)rwfilter_lua,
+                          sizeof(rwfilter_lua), "rwfilter.lua", "b");
+    if (LUA_OK == rv) {
+        rv = lua_pcall(S, 0, 1, 0);
     }
+    if (rv != LUA_OK) {
+        skAppPrintErr("Lua initialization failed: %s", lua_tostring(S, -1));
+        exit(EXIT_FAILURE);
+    }
+    assert(LUA_TTABLE == lua_type(S, -1));
 
-    /* check if an --xargs value was given */
-    if (xargs) {
-        ++count;
-    }
+    /* Get the filtering function from that table and store it in the
+     * registry. */
+    lua_getfield(S, -1, "run_filter");
+    assert(LUA_TFUNCTION == lua_type(S, -1));
+    ref_run_filter = luaL_ref(S, LUA_REGISTRYINDEX);
 
-    if (count == 1) {
-        /* Let any traditional fglob options work as filters. */
-        if (filterGetFGlobFilters()) {
-            return -1;
-        }
-    }
+    /* Get the 'register_filter' function from that table and store it
+     * in the global namespace so the --lua-file may access it. */
+    lua_getfield(S, -1, "register_filter");
+    assert(LUA_TFUNCTION == lua_type(S, -1));
+    lua_setglobal(S, "register_filter");
 
-    /* Check if fglob args were given */
-    rv = fglobValid();
-    if (rv == -1) {
-        /* error with fglob options */
-        return -1;
-    }
-    if (rv) {
-        ++count;
-    }
+    /* Store the table of functions in the registry. */
+    ref_export = luaL_ref(S, LUA_REGISTRYINDEX);
+    assert(0 == lua_gettop(S));
 
-    return (int)count;
+    return S;
 }
+
+
+#if 0
+/*
+ *    Copy the annotation and command line entries from the header of
+ *    the input stream 'stream' to the global output stream
+ *    'out_stream'.
+ *
+ *    This is a callback function registered with the global
+ *    sk_flow_iter_t 'flowiter' and it may be invoked by
+ *    sk_flow_iter_get_next_rec().
+ */
+static void
+filterCopyFileHeaderCallback(
+    sk_flow_iter_t     *f_iter,
+    skstream_t         *stream,
+    void               *data)
+{
+    const sk_sidecar_t *in_sidecar;
+    const sk_sidecar_elem_t *elem;
+    sk_sidecar_iter_t iter;
+    ssize_t rv;
+
+    (void)f_iter;
+    (void)data;
+
+    if ((rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_stream),
+                                  skStreamGetSilkHeader(stream),
+                                  SK_HENTRY_INVOCATION_ID))
+        || (rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_stream),
+                                     skStreamGetSilkHeader(stream),
+                                     SK_HENTRY_ANNOTATION_ID)))
+    {
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+    }
+
+    in_sidecar = skStreamGetSidecar(stream);
+    if (NULL == in_sidecar) {
+        return;
+    }
+    sk_sidecar_iter_bind(in_sidecar, &iter);
+    while (sk_sidecar_iter_next(&iter, &elem) == SK_ITERATOR_OK) {
+        rv = sk_sidecar_add_elem(sidecar, elem, NULL);
+        if (rv) {
+            if (SK_SIDECAR_E_DUPLICATE == rv) {
+                /* FIXME: ignore for now */
+            } else {
+                skAppPrintErr("Cannot add field from sidecar: %" SK_PRIdZ, rv);
+            }
+        }
+    }
+
+/*
+**    if (print_filenames) {
+**        fprintf(PRINT_FILENAMES_FH, "%s\n", skStreamGetPathname(stream));
+**    }
+*/
+}
+#endif  /* 0 */
 
 
 /*
@@ -812,8 +894,7 @@ filterOpenOutputs(
              dest = dest->next)
         {
             /* set compression level */
-            rv = (skHeaderSetCompressionMethod(
-                      skStreamGetSilkHeader(dest->stream), comp_method));
+            rv = skStreamSetCompressionMethod(dest->stream, comp_method);
             if (rv) {
                 goto DEST_ERROR;
             }
@@ -850,7 +931,7 @@ filterSetCheckers(
     int rv;
 
     if (filterGetCheckCount() > 0) {
-        checker[count] = (checktype_t (*)(rwRec*))filterCheck;
+        checker[count] = filterCheck;
         ++count;
     }
 
@@ -859,7 +940,20 @@ filterSetCheckers(
         return -1;
     }
     if (rv) {
-        checker[count] = (checktype_t (*)(rwRec*))tupleCheck;
+        checker[count] = tupleCheck;
+        ++count;
+    }
+
+    lua_rawgeti(L, LUA_REGISTRYINDEX, ref_export);
+    lua_getfield(L, -1, "count_filters");
+    lua_call(L, 0, 1);
+    rv = lua_tointeger(L, -1);
+    lua_pop(L, 2);
+    assert(0 == lua_gettop(L));
+    assert(rv >= 0);
+    if (rv > 0) {
+        assert(1 == thread_count);
+        checker[count] = &filterLuaFiltersCheck;
         ++count;
     }
 
@@ -880,7 +974,7 @@ filterSetCheckers(
  */
 static checktype_t
 filterPluginCheck(
-    rwRec              *rec)
+    const rwRec        *rec)
 {
     skplugin_err_t err = skPluginRunFilterFn(rec, NULL);
     switch (err) {
@@ -898,6 +992,79 @@ filterPluginCheck(
     }
 }
 
+
+/*
+ *    Helper function for filterLuaFiltersInitialize() and
+ *    filterLuaFiltersFinalize().
+ */
+static int
+filterLuaFiltersRun(
+    const char         *func_name)
+{
+    int rv;
+
+    assert(1 == thread_count);
+
+    lua_rawgeti(L, LUA_REGISTRYINDEX, ref_export);
+    assert(LUA_TTABLE == lua_type(L, -1));
+    lua_getfield(L, -1, func_name);
+    lua_remove(L, -2);
+    rv = lua_pcall(L, 0, 0, 0);
+    if (LUA_OK != rv) {
+        skAppPrintErr("%s", lua_tostring(L, -1));
+        lua_pop(L, 1);
+    }
+    assert(0 == lua_gettop(L));
+    return ((LUA_OK == rv) - 1);
+}
+
+static int
+filterLuaFiltersInitialize(
+    void)
+{
+    return filterLuaFiltersRun("run_initialize");
+}
+
+static int
+filterLuaFiltersFinalize(
+    void)
+{
+    return filterLuaFiltersRun("run_finalize");
+}
+
+/*
+ *  result = filterLuaCheck(rec);
+ *
+ *    Run Lua-based filter functions.
+ */
+static checktype_t
+filterLuaFiltersCheck(
+    const rwRec        *const_rec)
+{
+    static int printed_error = 0;
+    checktype_t ct;
+    int rv;
+
+    assert(1 == thread_count);
+
+    lua_rawgeti(L, LUA_REGISTRYINDEX, ref_run_filter);
+    sk_lua_push_rwrec(L, const_rec);
+    rv = lua_pcall(L, 1, 1, 0);
+    if (LUA_OK == rv) {
+        ct = lua_toboolean(L, -1) ? RWF_PASS : RWF_FAIL;
+        lua_pop(L, 1);
+        assert(0 == lua_gettop(L));
+        return ct;
+    }
+    if (!printed_error) {
+        printed_error = 1;
+        skAppPrintErr("Lua-based filter failed with error %s",
+                      lua_tostring(L, -1));
+    }
+    lua_pop(L, 1);
+    assert(0 == lua_gettop(L));
+    return RWF_IGNORE;
+}
 
 /*
  *  status = filterOpenInputData(&stream, content_type, filename);

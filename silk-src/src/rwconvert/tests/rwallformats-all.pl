@@ -10,6 +10,8 @@ use File::Find;
 my $NAME = $0;
 $NAME =~ s,.*/,,;
 
+skip_test("rwallformats currently not working");
+
 my $rwallformats = check_silk_app('rwallformats');
 my $rwfilter = check_silk_app('rwfilter');
 my $rwfileinfo = check_silk_app('rwfileinfo');
@@ -121,7 +123,6 @@ sub check_file
 {
     # skip anything that is not a file
     return unless -f $_;
-    return if m,/-silktests-$,;
     my $path = $_;
     my $tail_name = $_;
     # set $tail_name to be the varying part of the filename; that is,

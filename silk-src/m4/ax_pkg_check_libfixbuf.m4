@@ -4,7 +4,7 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in ../LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: ax_pkg_check_libfixbuf.m4 d8ee22371cf3 2017-03-23 22:39:48Z mthomas $")
+dnl RCSIDENT("$SiLK: ax_pkg_check_libfixbuf.m4 efd886457770 2017-06-21 18:43:23Z mthomas $")
 
 
 # ---------------------------------------------------------------------------
@@ -14,7 +14,6 @@ dnl RCSIDENT("$SiLK: ax_pkg_check_libfixbuf.m4 d8ee22371cf3 2017-03-23 22:39:48Z
 #    minimum allowed version and too-new version.
 #
 #    Output variables:  FIXBUF_CFLAGS, FIXBUF_LDFLAGS,
-#                       ENABLE_IPFIX
 #
 AC_DEFUN([AX_PKG_CHECK_LIBFIXBUF],[
     AC_SUBST([FIXBUF_CFLAGS])
@@ -51,7 +50,7 @@ AC_DEFUN([AX_PKG_CHECK_LIBFIXBUF],[
 
     if test "x${sk_pkg_config}" = "xno"
     then
-        AC_MSG_NOTICE([(${PACKAGE}) Building without IPFIX support at user request])
+        AC_MSG_ERROR([(${PACKAGE}) Building without IPFIX support is not supported])
     else
         # prepend any argument to PKG_CONFIG_PATH
         if test "x${sk_pkg_config}" != "x"
@@ -61,14 +60,16 @@ AC_DEFUN([AX_PKG_CHECK_LIBFIXBUF],[
             export PKG_CONFIG_PATH
         fi
 
-        # use pkg-config to check for libfixbuf existence
+        # use pkg-config to check for libfixbuf existence; this will
+        # cause configure to exit if the package is not found
         PKG_CHECK_MODULES([LIBFIXBUF],
             [${version_check}],
-            [ENABLE_IPFIX=1],[ENABLE_IPFIX=0])
+            [ENABLE_IPFIX=1])
 
         if test "x${ENABLE_IPFIX}" = "x0"
         then
-            AC_MSG_NOTICE([(${PACKAGE}) Building without IPFIX support since pkg-config failed to find ${report_version}])
+            # should never happen since PKG_CHECK_MODULES() should exit
+            AC_MSG_ERROR([unable to build with required IPFIX support since pkg-config failed to find ${report_version}])
         else
             # verify that libfixbuf has any packages it depends on
             libfixbuf_reported_version=`${PKG_CONFIG} --modversion libfixbuf 2>/dev/null`
@@ -90,7 +91,7 @@ AC_DEFUN([AX_PKG_CHECK_LIBFIXBUF],[
                     AC_MSG_RESULT([yes])
                 else
                     AC_MSG_RESULT([no])
-                    AC_MSG_NOTICE([(${PACKAGE}) Building without IPFIX support due to missing dependencies for libfixbuf. Details in config.log])
+                    AC_MSG_FAILURE([unable to build with required IPFIX support due to missing dependencies for libfixbuf. Details in config.log])
                     ENABLE_IPFIX=0
                 fi
             fi
@@ -123,18 +124,28 @@ AC_DEFUN([AX_PKG_CHECK_LIBFIXBUF],[
         AC_LINK_IFELSE(
             [AC_LANG_PROGRAM([
 #include <fixbuf/public.h>
+
+void
+tmpl_cb(
+    fbSession_t            *session,
+    uint16_t                tid,
+    fbTemplate_t           *tmpl,
+    void                   *app_ctx,
+    void                  **tmpl_ctx,
+    fbTemplateCtxFree2_fn  *fn)
+{
+    *tmpl_ctx = malloc(1);
+}
                 ],[
 fbInfoModel_t *m = fbInfoModelAlloc();
-fbCollector_t *c = NULL;
-GError *e = NULL;
-
-fbCollectorSetSFlowTranslator(c, &e);
+fbSession_t *s = fbSessionAlloc(m);
+fbSessionAddTemplateCtxCallback2(s, tmpl_cb, NULL);
                  ])],[ENABLE_IPFIX=1],[ENABLE_IPFIX=0])
 
         if test "x${ENABLE_IPFIX}" = "x0"
         then
             AC_MSG_RESULT([no])
-            AC_MSG_NOTICE([(${PACKAGE}) Building without IPFIX support since unable to compile program using libfixbuf. Details in config.log])
+            AC_MSG_FAILURE([unable to build with required IPFIX support since unable to compile program using libfixbuf. Details in config.log])
         else
             AC_MSG_RESULT([yes])
             AC_CHECK_DECLS([FB_ENABLE_SCTP, HAVE_OPENSSL, HAVE_SPREAD])
@@ -151,16 +162,8 @@ fbCollectorSetSFlowTranslator(c, &e);
 
     if test "x${ENABLE_IPFIX}" = "x0"
     then
-        FIXBUF_LDFLAGS=
-        FIXBUF_CFLAGS=
+        AC_MSG_ERROR([(${PACKAGE}) Building without IPFIX support is not supported])
     fi
-
-    AM_CONDITIONAL(HAVE_FIXBUF, [test "x${ENABLE_IPFIX}" = "x1"])
-
-    AC_DEFINE_UNQUOTED([ENABLE_IPFIX],[${ENABLE_IPFIX}],
-        [Define to 1 to build with support for IPFIX.  Define to 0 otherwise.
-         Requires libfixbuf-1.7.0 or later support and the
-         <fixbuf/public.h> header file.])
 
 ])# AX_PKG_CHECK_LIBFIXBUF
 

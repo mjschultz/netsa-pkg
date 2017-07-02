@@ -57,9 +57,8 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwrecgenerator-threaded.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwrecgenerator-threaded.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
-#include <silk/rwascii.h>
 #include <silk/rwrec.h>
 #include <silk/skdllist.h>
 #include <silk/skipaddr.h>
@@ -69,6 +68,7 @@ RCSIDENT("$SiLK: rwrecgenerator-threaded.c 275df62a2e41 2017-01-05 17:30:40Z mth
 #include <silk/sksite.h>
 #include <silk/skstream.h>
 #include <silk/utils.h>
+#include "rwascii.h"
 #include "stream-cache.h"
 #include "skheap-rwrec.h"
 
@@ -225,8 +225,8 @@ parseFlowtype(
 static void emptyIncrementalDirectory(void);
 static skstream_t *
 openIncrementalFile(
-    const cache_key_t  *key,
-    void               *v_file_format);
+    const sksite_repo_key_t    *key,
+    void                       *v_file_format);
 static int generateDns(recgen_state_t *state);
 static int generateFtp(recgen_state_t *state);
 static int generateHttp(recgen_state_t *state);
@@ -424,9 +424,6 @@ typedef enum {
     OPT_FLOWTYPE_OUT,
     OPT_FLOWTYPE_OUTWEB,
     OPT_SEED,
-    OPT_EPOCH_TIME,
-    OPT_INTEGER_IPS,
-    OPT_ZERO_PAD_IPS,
     OPT_INTEGER_SENSORS,
     OPT_NO_TITLES,
     OPT_NO_COLUMNS,
@@ -450,9 +447,6 @@ static const struct option appOptions[] = {
     {"flowtype-out",            REQUIRED_ARG, 0, OPT_FLOWTYPE_OUT},
     {"flowtype-outweb",         REQUIRED_ARG, 0, OPT_FLOWTYPE_OUTWEB},
     {"seed",                    REQUIRED_ARG, 0, OPT_SEED},
-    {"epoch-time",              NO_ARG,       0, OPT_EPOCH_TIME},
-    {"integer-ips",             NO_ARG,       0, OPT_INTEGER_IPS},
-    {"zero-pad-ips",            NO_ARG,       0, OPT_ZERO_PAD_IPS},
     {"integer-sensors",         NO_ARG,       0, OPT_INTEGER_SENSORS},
     {"no-titles",               NO_ARG,       0, OPT_NO_TITLES},
     {"no-columns",              NO_ARG,       0, OPT_NO_COLUMNS},
@@ -477,7 +471,6 @@ static const char *appHelp[] = {
     "Specify flowtype to use for outgoing web records. Def. 'all/out'",
     "Specify flowtype to use for outgoing web records. Def. 'all/outweb'",
     "Specify seed to use for random number generator",
-    "Print times in UNIX epoch seconds. Def. No",
     "Print IP numbers as integers. Def. Canonical form",
     "Print IP numbers in zero-padded canonical form. Def. No",
     "Print sensor as an integer. Def. Sensor name",
@@ -726,7 +719,7 @@ appSetup(
     /* get default sensor is sensor prefix map is not specified */
     if (NULL == sensor_pmap) {
         char class_name[256];
-        sensor_iter_t iter;
+        sk_sensor_iter_t iter;
 
         sksiteClassSensorIterator(
             sksiteFlowtypeGetClassID(flowtype[FLOWTYPE_IN]),
@@ -818,7 +811,6 @@ appSetup(
     }
 
     /* Set up and open the logger */
-    sklogEnableThreadedLogging();
     sklogDisableRotation();
     sklogOpen();
     sklogCommandLine(argc, argv);
@@ -1111,18 +1103,6 @@ appOptionsHandler(
         }
         break;
 
-      case OPT_EPOCH_TIME:
-        rwAsciiSetTimestampFlags(text_output_path, SKTIMESTAMP_EPOCH);
-        break;
-
-      case OPT_INTEGER_IPS:
-        rwAsciiSetIntegerIps(text_output_path);
-        break;
-
-      case OPT_ZERO_PAD_IPS:
-        rwAsciiSetZeroPadIps(text_output_path);
-        break;
-
       case OPT_INTEGER_SENSORS:
         rwAsciiSetIntegerSensors(text_output_path);
         break;
@@ -1265,8 +1245,8 @@ emptyIncrementalDirectory(
  */
 static skstream_t *
 openIncrementalFile(
-    const cache_key_t  *key,
-    void               *v_file_format)
+    const sksite_repo_key_t    *key,
+    void                       *v_file_format)
 {
     char filename[PATH_MAX];
     char tmpbuf[PATH_MAX];
@@ -1280,9 +1260,7 @@ openIncrementalFile(
     /* generate path to the file in the data repository, then replace
      * everything excpet the filename with the incremental
      * directory */
-    sksiteGeneratePathname(tmpbuf, sizeof(tmpbuf),
-                           key->flowtype_id, key->sensor_id,
-                           key->time_stamp, "", NULL, &fname);
+    sksiteGeneratePathname(tmpbuf, sizeof(tmpbuf), key, "", NULL, &fname);
     snprintf(filename, sizeof(filename), "%s/%s",
              incremental_directory, fname);
 
@@ -1313,8 +1291,7 @@ openIncrementalFile(
         hdr = skStreamGetSilkHeader(stream);
         if ((rv = skHeaderSetFileFormat(hdr, format))
             || (rv = skHeaderSetCompressionMethod(hdr, comp_method))
-            || (rv = skHeaderAddPackedfile(hdr, key->time_stamp,
-                                           key->flowtype_id, key->sensor_id))
+            || (rv = skHeaderAddPackedfile(hdr, key))
             || (rv = skStreamWriteSilkHeader(stream)))
         {
             goto END;
@@ -1475,12 +1452,12 @@ writeRecord(
 
     if (output_directory) {
         cache_entry_t *entry;
-        cache_key_t key;
+        sksite_repo_key_t key;
 
         key.flowtype_id = ft;
         key.sensor_id = sensor;
-        key.time_stamp = (rwRecGetStartTime(rec)
-                          - (rwRecGetStartTime(rec) % MILLISEC_PER_HOUR));
+        key.timestamp = (rwRecGetStartTime(rec)
+                         - (rwRecGetStartTime(rec) % MILLISEC_PER_HOUR));
 
         if (skCacheLookupOrOpenAdd(cache, &key, &format, &entry)) {
             WARNINGMSG("Unable to open file");

@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-string.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: sku-string.c 64d7ed05a614 2017-06-26 16:36:15Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skipaddr.h>
@@ -401,16 +401,6 @@ num2dot0_r(
 }
 
 
-/* Convert integer to FSRPAUEC string; space (' ') represents unset flags. */
-char *
-tcpflags_string(
-    uint8_t             flags)
-{
-    static char flag_string[SK_TCPFLAGS_STRLEN];
-    return tcpflags_string_r(flags, flag_string);
-}
-
-
 /* Convert integer to FSRPAUEC string.  Uses caller's buffer. */
 char *
 skTCPFlagsString(
@@ -424,7 +414,7 @@ skTCPFlagsString(
     int i;
     char *c = outbuf;
 
-    for (i = 0; i < 8; i++) {
+    for (i = 0; i < 8; ++i) {
         if (flags & bits[i]) {
             *c = characters[i];
             ++c;
@@ -454,7 +444,7 @@ skTCPStateString(
     int i;
     char *c = outbuf;
 
-    for (i = 0; i < SKTCPSTATE_NUM_BITS; i++) {
+    for (i = 0; i < SKTCPSTATE_NUM_BITS; ++i) {
         if (state & bits[i]) {
             *c = characters[i];
             ++c;
@@ -464,7 +454,7 @@ skTCPStateString(
         }
     }
     if (print_flags & SK_PADDED_FLAGS) {
-        for (/*empty*/; i < 8; i++) {
+        for (/*empty*/; i < 8; ++i) {
             *c = ' ';
             ++c;
         }
@@ -484,7 +474,7 @@ skStrip(
 
     sp  = line;
     while ( *sp && isspace((int)*sp) ) {
-        sp++;
+        ++sp;
     }
     /* at first non-space char OR at end of line */
     if (*sp == '\0') {
@@ -496,10 +486,10 @@ skStrip(
     /* figure out where to stop the line */
     ep = sp + strlen(sp) - 1;
     while ( isspace((int)*ep) && (ep > sp) ) {
-        ep--;
+        --ep;
     }
     /* ep at last non-space char. Nail after */
-    ep++;
+    ++ep;
     *ep = '\0';
 
     len = (int)(ep - sp);
@@ -522,7 +512,7 @@ skToLower(
         if (isupper((int)*cp)) {
             *cp = *cp + 32;
         }
-        cp++;
+        ++cp;
     }
     return;
 }
@@ -537,7 +527,7 @@ skToUpper(
         if (islower((int)*cp)) {
             *cp = *cp - 32;
         }
-        cp++;
+        ++cp;
     }
     return;
 }
@@ -1037,8 +1027,155 @@ skStringParseNumberListToBitmap(
 }
 
 
+#if 0
+struct sk_token_iter_st {
+    const char         *string;
+    sk_vector_t        *tokens;
+    size_t              count;
+    size_t              pos;
+};
+
+int
+skStringParseTokenize(
+    const char         *input_string,
+    const char         *separators,
+    sk_token_iter_t   **iter,
+    unsigned            flags)
+{
+    sk_token_iter_t *token_iter;
+    const char *csp, *cep;
+    char *sp, *ep;
+
+    if (input_string == NULL) {
+        return parseError(SKUTILS_ERR_INVALID, PE_NULL);
+    }
+
+    /* eat leading whitespace */
+    csp = input_string;
+    while (*sp && isspace((int)*csp)) {
+        ++csp;
+    }
+    if ('\0' == *csp) {
+        /* whitespace only or empty string */
+        return parseError(SKUTILS_ERR_EMPTY, PE_NULL);
+    }
+
+    /* remove trailing whitespace */
+    cep = input_string + strlen(input_string);
+    while (isspace((int)*(cep-1))) {
+        --cep;
+    }
+    len = cep - csp;
+    copy = sk_alloc_array(char, (len + 1));
+    memcpy(copy, csp, len);
+
+    token_iter = sk_alloc(sk_token_iter_t);
+
+    token_iter->string = copy;
+    token_iter->tokens = sk_vector_create(sizeof(char*));
+
+    sp = copy;
+    while (*sp) {
+        ep = strpbrk(sp, separators);
+        if (ep == sp) {
+            if (flags & KEEP_EMPTIES) {
+                sk_vector_append_value(token_iter->tokens, sp);
+            }
+            ++sp;
+            continue;
+        }
+        if (ep) {
+            /* set char at 'ep' to '\0' and move ep to the start of
+             * next token */
+            *ep = '\0';
+            ++ep;
+        } else {
+            /* put 'ep' on the final '\0' in the string */
+            ep = &copy[len];
+        }
+        sk_vector_append_value(token_iter->tokens, sp);
+        sp = ep;
+    }
+
+    token_iter->count = sk_vector_get_count(token_iter->tokens);
+
+    *iter = token_iter;
+    return 0;
+}
+
+
+/**
+ *    Return the number tokens contained in the token iterator
+ *    'iter'.
+ */
+size_t
+skTokenIterGetCount(
+    sk_token_iter_t    *iter)
+{
+    if (iter) {
+        return iter->count;
+    }
+    return 0;
+}
+
+
+/**
+ *    Destroy the iterator pointed at by 'iter'.
+ */
+void
+skTokenIterDestroy(
+    sk_token_iter_t    *iter)
+{
+    if (iter) {
+        sk_vector_destroy(iter->tokens);
+        free(iter->string);
+        free(iter);
+    }
+}
+
+
+/**
+ *    If more tokens are available in the token iterator 'iter', set
+ *    the memory at 'token' to point to the next token and return
+ *    SK_ITERATOR_OK; otherwise, return SK_ITERATOR_NO_MORE_ENTRIES.
+ *
+ *    The caller should not modify nor free the returned token.
+ */
+int
+skTokenIterNext(
+    sk_token_iter_t    *iter,
+    const char        **token)
+{
+    assert(iter);
+    assert(token);
+
+    if (iter->pos < iter->count) {
+        sk_vector_get_value(iter->tokens, iter->pos, token);
+        ++iter->pos;
+        return SK_ITERATOR_OK;
+    }
+    return SK_ITERATOR_NO_MORE_ENTRIES;
+}
+
+
+/**
+ *    Reset the token iterator 'iter' so it may loop over the tokens
+ *    again.
+ */
+void
+skTokenIterReset(
+    sk_token_iter_t    *iter)
+{
+    if (iter) {
+        iter->pos = 0;
+    }
+}
+
+
+#endif  /* 0 */
+
 /*
- *  status = _parseIPv4(&ip_value, ip_string);
+ *  status = parseIPv4(&ip_value, ip_string);
  *
  *    A helper function for skStringParseIP().
  *
@@ -1049,16 +1186,17 @@ skStringParseNumberListToBitmap(
  *    characters that were parsed.
  */
 static int
-_parseIPv4(
+parseIPv4(
     uint32_t           *ip,
     const char         *ip_string)
 {
-    /* IPv4 address */
     unsigned long final = 0;
     unsigned long val;
     const char *sp = ip_string;
     char *ep;
     int i;
+
+    *ip = 0;
 
     /* number that begins with '-' is not unsigned */
     if ('-' == *sp) {
@@ -1147,6 +1285,189 @@ _parseIPv4(
     return (sp - ip_string);
 }
 
+/*
+ *  status = parseIPv6(&ipaddr, ip_string);
+ *
+ *    A helper function for skStringParseIP().
+ *
+ *    Parse the IPv6 address at 'ip_string' and put the result--in
+ *    native byte order--into the memory pointed at by 'ip_value'.
+ *    Return a negative (silk_utils_errcode_t) value on error;
+ *    otherwise return a positive value specifying the number of
+ *    characters that were parsed.
+ */
+static int
+parseIPv6(
+    skipaddr_t         *ipaddr,
+    const char         *ip_string)
+{
+    uint8_t ipv6[16];
+    unsigned int double_colon = UINT_MAX;
+    unsigned long val;
+    unsigned int i;
+    const char *sp = ip_string;
+    char *ep;
+
+    /* handle a "::" at the start of the address */
+    if (':' == *sp) {
+        if (':' != *(sp + 1)) {
+            /* address cannot begin with single ':' */
+            return parseError(SKUTILS_ERR_BAD_CHAR,
+                              "IP address cannot begin with single ':'");
+        }
+        if (':' == *(sp + 2)) {
+            /* triple colon */
+            return parseError(SKUTILS_ERR_BAD_CHAR,
+                              "Unexpected character :::");
+        }
+        double_colon = 0;
+        sp += 2;
+    }
+
+    for (i = 0; i < 8; ++i) {
+        /* expecting a base-16 number */
+        if (!isxdigit((int)*sp)) {
+            if (double_colon != UINT_MAX) {
+                /* treat as end of string */
+                break;
+            }
+            if (*sp == '\0') {
+                return parseError(SKUTILS_ERR_SHORT,
+                                  "Too few IP sections given");
+            }
+            return parseError(SKUTILS_ERR_BAD_CHAR, "%s '%c'",
+                              PARSE_ERRORCODE_MSG(SKUTILS_ERR_BAD_CHAR),
+                              *sp);
+        }
+
+        /* parse the number */
+        errno = 0;
+        val = strtoul(sp, &ep, 16);
+        if (sp == ep) {
+            if (double_colon != UINT_MAX) {
+                /* treat as end of string */
+                break;
+            }
+            /* parse error */
+            return parseError(SKUTILS_ERR_BAD_CHAR, "%s '%c'",
+                              PARSE_ERRORCODE_MSG(SKUTILS_ERR_BAD_CHAR),
+                              *sp);
+        }
+        if (val == ULONG_MAX && errno == ERANGE) {
+            /* overflow */
+            return parseError(SKUTILS_ERR_OVERFLOW, PE_NULL);
+        }
+        if (val > UINT16_MAX) {
+            /* value too big for octet */
+            return parseError(SKUTILS_ERR_MAXIMUM,
+                              "Value in IP section %u is too large",
+                              i + 1);
+        }
+
+        /* if a dot follows the number we just parsed, treat that
+         * number as the start of an embedded IPv4 address. */
+        if (*ep == '.') {
+            unsigned int j;
+            uint32_t ipv4;
+            int rv;
+
+            if (i > 6) {
+                return parseError(SKUTILS_ERR_BAD_CHAR,
+                                  ("Too many sections before"
+                                   " embedded IPv4"));
+            }
+            /* IPv4 address */
+            rv = parseIPv4(&ipv4, sp);
+            if (rv < 0) {
+                return rv;
+            }
+
+            for (j = 0; j < 4; ++j) {
+                ipv6[2*i+j] = ((ipv4 >> (8 * (3 - j))) & 0xFF);
+            }
+            sp += rv;
+            i += 2;
+            if (*sp == ':') {
+                /* Must not have more IPv6 after the IPv4 addr */
+                return parseError(SKUTILS_ERR_BAD_CHAR,
+                                  "Found '%c' after final section", *sp);
+            }
+            break;
+        }
+
+        ipv6[2*i] = ((val >> 8) & 0xFF);
+        ipv6[2*i+1] = (val & 0xFF);
+        sp = ep;
+
+        /* handle section separator */
+        if (*sp != ':') {
+            if (i != 7) {
+                if (double_colon != UINT_MAX) {
+                    /* treat as end of string */
+                    ++i;
+                    break;
+                }
+                if (*sp == '\0') {
+                    return parseError(SKUTILS_ERR_SHORT,
+                                      "Too few IP sections given");
+                }
+                /* need a ':' between sections */
+                return parseError(SKUTILS_ERR_BAD_CHAR, "%s '%c'",
+                                  PARSE_ERRORCODE_MSG(SKUTILS_ERR_BAD_CHAR),
+                                  *sp);
+            }
+            /* else i == 7 and we've finished parsing */
+        } else if (i == 7) {
+            return parseError(SKUTILS_ERR_BAD_CHAR,
+                              "Found '%c' after final section", *sp);
+        } else {
+            /* move to start of next section */
+            ++sp;
+            if (':' == *sp) {
+                if (double_colon != UINT_MAX) {
+                    /* parse error */
+                    return parseError(SKUTILS_ERR_BAD_CHAR,
+                                      "Only one :: instance allowed");
+                }
+                if (':' == *(sp + 1)) {
+                    /* triple colon */
+                    return parseError(SKUTILS_ERR_BAD_CHAR,
+                                      "Unexpected character :::");
+                }
+                double_colon = i + 1;
+                ++sp;
+            } else if (*sp == '\0') {
+                return parseError(SKUTILS_ERR_SHORT,
+                                  "Expecting IP section value after ':'");
+            } else if (!isxdigit((int)*sp)) {
+                /* number must follow lone ':' */
+                return
+                    parseError(SKUTILS_ERR_BAD_CHAR, "%s '%c'",
+                               PARSE_ERRORCODE_MSG(SKUTILS_ERR_BAD_CHAR),
+                               *sp);
+            }
+        }
+    }
+
+    if (double_colon != UINT_MAX) {
+        if (i == 8) {
+            /* error */
+            return parseError(SKUTILS_ERR_BAD_CHAR,
+                              "Cannot have '::' in IP with 8 sections");
+        }
+        memmove(&ipv6[2*(8+double_colon-i)], &ipv6[2*double_colon],
+                2*(i-double_colon));
+        memset(&ipv6[2*double_colon], 0, 2*(8-i));
+    } else if (i != 8) {
+        /* error */
+        return parseError(SKUTILS_ERR_SHORT,
+                          "Only %u/8 IP sections specified", i);
+    }
+
+    skipaddrSetV6(ipaddr, ipv6);
+    return (sp - ip_string);
+}
+
 
 /* Parse a string as an IPv4 or IPv6 address.  If the string is a
  * single integer, treat is an an IPv4 address. */
@@ -1158,9 +1479,7 @@ skStringParseIP(
     const char *sp;
     const char *dot;
     const char *colon;
-    uint32_t ipv4 = 0;
     int rv;
-    unsigned int i;
 
     /* verify input */
     if (!ip_string) {
@@ -1193,194 +1512,35 @@ skStringParseIP(
     }
 
     /* parse the address */
-    if (colon == NULL) {
+    if (NULL == colon) {
         /* an IPv4 address */
-        rv = _parseIPv4(&ipv4, sp);
+        uint32_t ipv4;
+
+        rv = parseIPv4(&ipv4, sp);
         if (rv < 0) {
             return rv;
         }
-
-        sp += rv;
         skipaddrSetV4(out_val, &ipv4);
     } else {
         /* an IPv6 address */
-#if !SK_ENABLE_IPV6
-        return parseError(SKUTILS_ERR_BAD_CHAR,
-                          "%s ':'--IPv6 addresses not supported",
-                          PARSE_ERRORCODE_MSG(SKUTILS_ERR_BAD_CHAR));
-#else
-        uint8_t ipv6[16];
-        unsigned int double_colon = UINT_MAX;
-        unsigned long val;
-        char *ep;
-
-        /* handle a "::" at the start of the address */
-        if (':' == *sp) {
-            if (':' != *(sp + 1)) {
-                /* address cannot begin with single ':' */
-                return parseError(SKUTILS_ERR_BAD_CHAR,
-                                  "IP address cannot begin with single ':'");
-            }
-            if (':' == *(sp + 2)) {
-                /* triple colon */
-                return parseError(SKUTILS_ERR_BAD_CHAR,
-                                  "Unexpected character :::");
-            }
-            double_colon = 0;
-            sp += 2;
+        rv = parseIPv6(out_val, sp);
+        if (rv < 0) {
+            return rv;
         }
-
-        for (i = 0; i < 8; ++i) {
-            /* expecting a base-16 number */
-            if (!isxdigit((int)*sp)) {
-                if (double_colon != UINT_MAX) {
-                    /* treat as end of string */
-                    break;
-                }
-                if (*sp == '\0') {
-                    return parseError(SKUTILS_ERR_SHORT,
-                                      "Too few IP sections given");
-                }
-                return parseError(SKUTILS_ERR_BAD_CHAR, "%s '%c'",
-                                  PARSE_ERRORCODE_MSG(SKUTILS_ERR_BAD_CHAR),
-                                  *sp);
-            }
-
-            /* parse the number */
-            errno = 0;
-            val = strtoul(sp, &ep, 16);
-            if (sp == ep) {
-                if (double_colon != UINT_MAX) {
-                    /* treat as end of string */
-                    break;
-                }
-                /* parse error */
-                return parseError(SKUTILS_ERR_BAD_CHAR, "%s '%c'",
-                                  PARSE_ERRORCODE_MSG(SKUTILS_ERR_BAD_CHAR),
-                                  *sp);
-            }
-            if (val == ULONG_MAX && errno == ERANGE) {
-                /* overflow */
-                return parseError(SKUTILS_ERR_OVERFLOW, PE_NULL);
-            }
-            if (val > UINT16_MAX) {
-                /* value too big for octet */
-                return parseError(SKUTILS_ERR_MAXIMUM,
-                                  "Value in IP section %u is too large",
-                                  i + 1);
-            }
-
-            /* if a dot follows the number we just parsed, treat that
-             * number as the start of an embedded IPv4 address. */
-            if (*ep == '.') {
-                unsigned int j;
-
-                if (i > 6) {
-                    return parseError(SKUTILS_ERR_BAD_CHAR,
-                                      ("Too many sections before"
-                                       " embedded IPv4"));
-                }
-                /* IPv4 address */
-                rv = _parseIPv4(&ipv4, sp);
-                if (rv < 0) {
-                    return rv;
-                }
-                for (j = 0; j < 4; ++j) {
-                    ipv6[2*i+j] = ((ipv4 >> (8 * (3 - j))) & 0xFF);
-                }
-                sp += rv;
-                i += 2;
-                if (*sp == ':') {
-                    /* Must not have more IPv6 after the IPv4 addr */
-                    return parseError(SKUTILS_ERR_BAD_CHAR,
-                                      "Found '%c' after final section", *sp);
-                }
-                break;
-            }
-
-            ipv6[2*i] = ((val >> 8) & 0xFF);
-            ipv6[2*i+1] = (val & 0xFF);
-            sp = ep;
-
-            /* handle section separator */
-            if (*sp != ':') {
-                if (i != 7) {
-                    if (double_colon != UINT_MAX) {
-                        /* treat as end of string */
-                        ++i;
-                        break;
-                    }
-                    if (*sp == '\0') {
-                        return parseError(SKUTILS_ERR_SHORT,
-                                      "Too few IP sections given");
-                    }
-                    /* need a ':' between sections */
-                    return parseError(SKUTILS_ERR_BAD_CHAR, "%s '%c'",
-                                      PARSE_ERRORCODE_MSG(SKUTILS_ERR_BAD_CHAR),
-                                      *sp);
-                }
-                /* else i == 7 and we've finished parsing */
-            } else if (i == 7) {
-                return parseError(SKUTILS_ERR_BAD_CHAR,
-                                  "Found '%c' after final section", *sp);
-            } else {
-                /* move to start of next section */
-                ++sp;
-                if (':' == *sp) {
-                    if (double_colon != UINT_MAX) {
-                        /* parse error */
-                        return parseError(SKUTILS_ERR_BAD_CHAR,
-                                          "Only one :: instance allowed");
-                    }
-                    if (':' == *(sp + 1)) {
-                        /* triple colon */
-                        return parseError(SKUTILS_ERR_BAD_CHAR,
-                                          "Unexpected character :::");
-                    }
-                    double_colon = i + 1;
-                    ++sp;
-                } else if (*sp == '\0') {
-                    return parseError(SKUTILS_ERR_SHORT,
-                                      "Expecting IP section value after ':'");
-                } else if (!isxdigit((int)*sp)) {
-                    /* number must follow lone ':' */
-                    return
-                        parseError(SKUTILS_ERR_BAD_CHAR, "%s '%c'",
-                                   PARSE_ERRORCODE_MSG(SKUTILS_ERR_BAD_CHAR),
-                                   *sp);
-                }
-            }
-        }
-
-        if (double_colon != UINT_MAX) {
-            if (i == 8) {
-                /* error */
-                return parseError(SKUTILS_ERR_BAD_CHAR,
-                                  "Cannot have '::' in IP with 8 sections");
-            }
-            memmove(&ipv6[2*(8+double_colon-i)], &ipv6[2*double_colon],
-                    2*(i-double_colon));
-            memset(&ipv6[2*double_colon], 0, 2*(8-i));
-        } else if (i != 8) {
-            /* error */
-            return parseError(SKUTILS_ERR_SHORT,
-                              "Only %u/8 IP sections specified", i);
-        }
-
-        skipaddrSetV6(out_val, ipv6);
-#endif /* SK_ENABLE_IPV6 */
     }
+
+    sp += rv;
 
     /* ignore trailing whitespace, but only if we reach the end of the
      * string.  cache the current position. */
-    i = (sp - ip_string);
+    rv = (sp - ip_string);
     while (isspace((int)*sp)) {
         ++sp;
     }
 
     if ('\0' != *sp) {
         /* text after IP, return the cached position */
-        return (int)i;
+        return rv;
     }
     return SKUTILS_OK;
 }
@@ -1412,9 +1572,7 @@ skStringParseIPWildcard(
     uint32_t cidr = 0;
     const char *sp;
     int rv;
-#if SK_ENABLE_IPV6
     const char *v4_in_v6 = NULL;
-#endif
 
     /* try to parse as an ordinary IP address */
     rv = skStringParseIP(&ipaddr, ip_string);
@@ -1462,10 +1620,8 @@ skStringParseIPWildcard(
                               "%s '%c' embedded whitespace is not allowed",
                               PARSE_ERRORCODE_MSG(SKUTILS_ERR_BAD_CHAR),
                               *sp);
-#if SK_ENABLE_IPV6
         } else if (skipaddrIsV6(&ipaddr) && (*sp == 'x' || *sp == 'X')) {
             /* try to parse as wildcard */
-#endif /* SK_ENABLE_IPV6 */
         } else if (*sp != '-' && *sp != ',') {
             return parseError(SKUTILS_ERR_BAD_CHAR, "%s '%c'",
                               PARSE_ERRORCODE_MSG(SKUTILS_ERR_BAD_CHAR),
@@ -1477,7 +1633,6 @@ skStringParseIPWildcard(
     skIPWildcardClear(ipwild);
 
     if (rv == SKUTILS_OK) {
-#if SK_ENABLE_IPV6
         if (skipaddrIsV6(&ipaddr)) {
             uint8_t ip6[16];
 
@@ -1495,9 +1650,7 @@ skStringParseIPWildcard(
                 ipwild->m_min[block] = val;
                 ipwild->m_max[block] = val;
             }
-        } else
-#endif /* SK_ENABLE_IPV6 */
-        {
+        } else {
             ipwild->num_blocks = 4;
 
             /* set each block as if no CIDR */
@@ -1547,12 +1700,6 @@ skStringParseIPWildcard(
     }
 
     if (strchr(sp, ':')) {
-#if !SK_ENABLE_IPV6
-        return parseError(SKUTILS_ERR_BAD_CHAR,
-                          "%s '%c'--IPv6 addresses not supported",
-                          PARSE_ERRORCODE_MSG(SKUTILS_ERR_BAD_CHAR),
-                          *sp);
-#else
         ipwild->num_blocks = 8;
         block_sep = ":";
         num_blocks = 8;
@@ -1576,7 +1723,6 @@ skStringParseIPWildcard(
                                   "Found ':' after '.' in IPv6 address");
             }
         }
-#endif /* SK_ENABLE_IPV6 */
     } else {
         block_sep = ".";
         ipwild->num_blocks = 4;
@@ -1628,7 +1774,6 @@ skStringParseIPWildcard(
                               block_sep);
         }
 
-#if SK_ENABLE_IPV6
         /* determine if we are at beginning of an embedded IPv4 address */
         if (sp == v4_in_v6) {
             skIPWildcard_t ipwv4;
@@ -1689,7 +1834,6 @@ skStringParseIPWildcard(
             /* done */
             break;
         }
-#endif /* SK_ENABLE_IPV6 */
 
         if (*sp == 'x' || *sp == 'X') {
             /* all ones */
@@ -2000,26 +2144,25 @@ skStringParseHostPortPair(
         port = NULL;
     }
 
-    /* copy the hostname or IP so we can lop off the port */
-    if (ep != sp) {
+    if (ep == sp) {
+        /* no host */
+        host = NULL;
+    } else if (flags & HOST_PROHIBITED) {
+        return parseError(SKUTILS_ERR_OTHER,
+                          "Found a host name when host was prohibited");
+    } else {
+        /* copy the hostname or IP so we can lop off the port */
         host = (char*)malloc((ep - sp + 1u) * sizeof(char));
         if (NULL == host) {
             return parseError(SKUTILS_ERR_ALLOC, PE_NULL);
         }
         memcpy(host, sp, (ep - sp + 1u) * sizeof(char));
         host[ep - sp] = '\0';
-    } else {
-        host = NULL;
     }
 
-    if (host && (flags & HOST_PROHIBITED)) {
-        free(host);
-        return parseError(SKUTILS_ERR_OTHER,
-                          "Found a host name when host was prohibited");
-    }
-
-    /* attempt to parse as an IP address.  If that fails, perform name
-     * resolution. */
+    /* fill an sk_vector_t with sk_sockaddr_t structures that are
+     * obtained by using either getaddrinfo() to parse the host:port
+     * pair or gethostbyname() to parse the host */
     {
         sk_vector_t *vec;
 #if USE_GETADDRINFO
@@ -2031,7 +2174,7 @@ skStringParseHostPortPair(
         char *port_str;
 
         memset(&hints, 0, sizeof(hints));
-        if (!SK_ENABLE_INET6_NETWORKING || (flags & IPV6_PROHIBITED)) {
+        if (!SK_ENABLE_INET6_NETWORKING || flags & IPV6_PROHIBITED) {
             resolv_constraint = " as an IPv4 address";
             hints.ai_family = AF_INET;
         } else if (flags & IPV6_REQUIRED) {
@@ -2073,9 +2216,6 @@ skStringParseHostPortPair(
         vec = skVectorNew(sizeof(addr));
         if (vec == NULL) {
             freeaddrinfo(addrinfo);
-            if (host) {
-                free(host);
-            }
             return parseError(SKUTILS_ERR_ALLOC, PE_NULL);
         }
 
@@ -2145,7 +2285,7 @@ skStringParseHostPortPair(
                     skVectorDestroy(vec);
                     return parseError(SKUTILS_ERR_ALLOC, PE_NULL);
                 }
-                current++;
+                ++current;
             }
         }
 #endif  /* USE_GETADDRINFO */
@@ -2165,6 +2305,27 @@ skStringParseHostPortPair(
             skSockaddrArrayDestroy(sa);
             return parseError(SKUTILS_ERR_ALLOC, PE_NULL);
         }
+
+        if (host || (flags & HOST_PROHIBITED)) {
+            /* grab the value that was provided */
+            sa->host_port_pair = strdup(host_port);
+            if (!sa->host_port_pair) {
+                skSockaddrArrayDestroy(sa);
+                return parseError(SKUTILS_ERR_ALLOC, PE_NULL);
+            }
+        } else {
+            const size_t buf_size = 12;
+            sa->host_port_pair = sk_alloc_array(char, buf_size);
+            if (flags & IPV6_PROHIBITED) {
+                rv = snprintf(sa->host_port_pair,buf_size, "*:%u", port_val);
+            } else {
+                rv = snprintf(sa->host_port_pair,buf_size, "[*]:%u", port_val);
+            }
+            if ((size_t)rv > buf_size) {
+                skAbort();
+            }
+        }
+
         *sockaddr = sa;
     }
 
@@ -3412,6 +3573,10 @@ skStringParseRange64(
     const char *cp;
     int rv;
 
+    assert(range_lower);
+    assert(range_upper);
+    assert(range_string);
+
     /* parse first part of range; rv, if positive, will be location of
      * the first non-digit following the value---should be a hyphen */
     rv = skStringParseUint64(range_lower, range_string, min_val, max_val);
@@ -3428,9 +3593,14 @@ skStringParseRange64(
                               ("Range is missing hyphen"
                                " (single value is not supported)"));
         }
-        /* single value ok.  set range_upper to the same value and
-         * return */
-        *range_upper = *range_lower;
+        /* single value ok; set upper and return */
+        if (flags & SKUTILS_RANGE_MAX_SINGLE) {
+            /* a missing range_upper is always the maximum */
+            *range_upper = ((max_val == 0) ? UINT64_MAX : max_val);
+        } else {
+            /* set range_upper to the same value as lower */
+            *range_upper = *range_lower;
+        }
         return SKUTILS_OK;
     }
 

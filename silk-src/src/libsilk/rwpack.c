@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWPACK_C, "$SiLK: rwpack.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_RWPACK_C, "$SiLK: rwpack.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #ifndef RWPACK_BYTES_PACKETS
 #if defined(RWPACK_FLAGS_TIMES_VOLUMES) || defined(RWPACK_SBB_PEF)
@@ -31,14 +31,14 @@ RCSIDENTVAR(rcsID_RWPACK_C, "$SiLK: rwpack.c 275df62a2e41 2017-01-05 17:30:40Z m
  *  skstream_priv.h. */
 static int
 rwpackPackBytesPackets(
-    uint32_t               *bpp_out,
-    uint32_t               *pkts_out,
-    uint32_t               *pflag_out,
-    const rwGenericRec_V5  *rwrec)
+    uint32_t           *bpp_out,
+    uint32_t           *pkts_out,
+    uint32_t           *pflag_out,
+    const rwRec        *rwrec)
 {
     imaxdiv_t bpp;
-    uint32_t packets;
-    uint32_t bytes;
+    uint64_t packets;
+    uint64_t bytes;
 
     assert(bpp_out);
     assert(pkts_out);
@@ -60,10 +60,13 @@ rwpackPackBytesPackets(
 
     /* Set packets field; check for overflow */
     if (packets < MAX_PKTS) {
-        *pkts_out = packets;
+        *pkts_out = (uint32_t)packets;
         *pflag_out = 0;
+    } else if (packets >= DBL_MAX_PKTS) {
+        /* Double overflow in pkts */
+        return SKSTREAM_ERR_PKTS_OVRFLO;
     } else {
-        *pkts_out = packets / PKTS_DIVISOR;
+        *pkts_out = (uint32_t)(packets / PKTS_DIVISOR);
         if (*pkts_out >= MAX_PKTS) {
             /* Double overflow in pkts */
             return SKSTREAM_ERR_PKTS_OVRFLO;
@@ -91,7 +94,7 @@ rwpackPackBytesPackets(
  *  values that were read from disk.  See skstream_priv.h for details. */
 static void
 rwpackUnpackBytesPackets(
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint32_t            bpp,
     uint32_t            pkts,
     uint32_t            pflag)
@@ -123,11 +126,11 @@ rwpackUnpackBytesPackets(
 /* Pack the protocol, flags, and TCP state fields.  See skstream_priv.h */
 static void
 rwpackPackProtoFlags(
-    uint8_t                *is_tcp_out,
-    uint8_t                *prot_flags_out,
-    uint8_t                *tcp_state_out,
-    uint8_t                *rest_flags_out,
-    const rwGenericRec_V5  *rwrec)
+    uint8_t            *is_tcp_out,
+    uint8_t            *prot_flags_out,
+    uint8_t            *tcp_state_out,
+    uint8_t            *rest_flags_out,
+    const rwRec        *rwrec)
 {
     *tcp_state_out = rwRecGetTcpState(rwrec);
     if (rwRecGetProto(rwrec) != IPPROTO_TCP) {
@@ -157,7 +160,7 @@ rwpackPackProtoFlags(
  * skstream_priv.h */
 static void
 rwpackUnpackProtoFlags(
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t             is_tcp,
     uint8_t             prot_flags,
     uint8_t             tcp_state,
@@ -199,10 +202,10 @@ rwpackUnpackProtoFlags(
  *  See skstream_priv.h. */
 static int
 rwpackPackSbbPef(
-    uint32_t               *sbb_out,
-    uint32_t               *pef_out,
-    const rwGenericRec_V5  *rwrec,
-    sktime_t                file_start_time)
+    uint32_t           *sbb_out,
+    uint32_t           *pef_out,
+    const rwRec        *rwrec,
+    sktime_t            file_start_time)
 {
     int rv = SKSTREAM_OK; /* return value */
     sktime_t start_time;
@@ -246,7 +249,7 @@ rwpackPackSbbPef(
  * exist in the packed file formats.  See skstream_priv.h for details. */
 static void
 rwpackUnpackSbbPef(
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     sktime_t            file_start_time,
     const uint32_t     *sbb,
     const uint32_t     *pef)
@@ -271,11 +274,11 @@ rwpackUnpackSbbPef(
 #ifdef RWPACK_TIME_BYTES_PKTS_FLAGS
 static int
 rwpackPackTimeBytesPktsFlags(
-    uint32_t               *pkts_stime_out,
-    uint32_t               *bbe_out,
-    uint32_t               *msec_flags_out,
-    const rwGenericRec_V5  *rwrec,
-    sktime_t                file_start_time)
+    uint32_t           *pkts_stime_out,
+    uint32_t           *bbe_out,
+    uint32_t           *msec_flags_out,
+    const rwRec        *rwrec,
+    sktime_t            file_start_time)
 {
     int rv = SKSTREAM_OK; /* return value */
     sktime_t start_time;
@@ -327,8 +330,8 @@ rwpackPackTimeBytesPktsFlags(
      *             is_tcp:1; pad:2; prot_flags:8;*/
     *msec_flags_out = (((MASKARRAY_10 & (uint32_t)stime_div.rem) << 22)
                        | ((MASKARRAY_10 & (uint32_t)elapsed_div.rem) << 12)
-                       | (pflag ? (1 << 11) : 0)
-                       | (is_tcp ? (1 << 10) : 0)
+                       | (pflag ? (1u << 11) : 0)
+                       | (is_tcp ? (1u << 10) : 0)
                        | prot_flags);
 
   END:
@@ -338,7 +341,7 @@ rwpackPackTimeBytesPktsFlags(
 
 static void
 rwpackUnpackTimeBytesPktsFlags(
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     sktime_t            file_start_time,
     const uint32_t     *pkts_stime,
     const uint32_t     *bbe,
@@ -390,10 +393,10 @@ rwpackUnpackTimeBytesPktsFlags(
 #ifdef RWPACK_FLAGS_TIMES_VOLUMES
 static int
 rwpackPackFlagsTimesVolumes(
-    uint8_t                *ar,
-    const rwGenericRec_V5  *rwrec,
-    sktime_t                file_start_time,
-    size_t                  len)
+    uint8_t            *ar,
+    const rwRec        *rwrec,
+    sktime_t            file_start_time,
+    size_t              len)
 {
     uint32_t bpp, tmp, pkts, pflag;
     uint8_t tcp_state;
@@ -488,10 +491,10 @@ rwpackPackFlagsTimesVolumes(
     } else {
         if (tcp_state & SK_TCPSTATE_EXPANDED) {
             tmp |= ((rwRecGetInitFlags(rwrec) << 24)
-                    | (1 << 22));
+                    | (1u << 22));
         } else {
             tmp |= ((rwRecGetFlags(rwrec) << 24)
-                    | (1 << 22));
+                    | (1u << 22));
         }
     }
     memcpy(&ar[8], &tmp, sizeof(tmp));
@@ -503,7 +506,7 @@ rwpackPackFlagsTimesVolumes(
 
 static void
 rwpackUnpackFlagsTimesVolumes(
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     const uint8_t      *ar,
     sktime_t            file_start_time,
     size_t              len,
@@ -595,9 +598,9 @@ rwpackUnpackFlagsTimesVolumes(
 #ifdef RWPACK_TIMES_FLAGS_PROTO
 static int
 rwpackPackTimesFlagsProto(
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar,
-    sktime_t                file_start_time)
+    const rwRec        *rwrec,
+    uint8_t            *ar,
+    sktime_t            file_start_time)
 {
     sktime_t start_time;
     uint32_t tmp;
@@ -639,13 +642,13 @@ rwpackPackTimesFlagsProto(
 
     } else if (rwRecGetTcpState(rwrec) & SK_TCPSTATE_EXPANDED) {
         tmp = ((rwRecGetRestFlags(rwrec) << 24)
-               | (1 << 23)
+               | (1u << 23)
                | (MASKARRAY_22 & (uint32_t)start_time));
         memcpy(&ar[ 0], &tmp, sizeof(tmp));
         rwRecMemGetInitFlags(rwrec, &ar[ 4]);
 
     } else {
-        tmp = ((1 << 23)
+        tmp = ((1u << 23)
                | (MASKARRAY_22 & (uint32_t)start_time));
         memcpy(&ar[ 0], &tmp, sizeof(tmp));
         rwRecMemGetFlags(rwrec, &ar[ 4]);
@@ -660,7 +663,7 @@ rwpackPackTimesFlagsProto(
 
 static void
 rwpackUnpackTimesFlagsProto(
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     const uint8_t      *ar,
     sktime_t            file_start_time)
 {

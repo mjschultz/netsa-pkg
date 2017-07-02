@@ -18,7 +18,7 @@
 #define SKCOMPMETHOD_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skcompmethod.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skcompmethod.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/silk_files.h>
 #include <silk/skstringmap.h>
@@ -402,60 +402,59 @@ skCompMethodOptionsUsage(
 }
 
 
-
-/** DEPRECATED FUNCTIONS **********************************************/
-
-#include <silk/sksite.h>
-
 int
-sksiteCompmethodCheck(
-    sk_compmethod_t     comp_method)
+skCompMethodSetFromConfigFile(
+    const char         *config_file,
+    const char         *key_name,
+    const char         *comp_method_name,
+    sk_compmethod_t    *out_comp_method)
 {
-    return skCompMethodCheck(comp_method);
-}
+    sk_compmethod_t cm = SK_COMPMETHOD_DEFAULT;
+    size_t count;
 
-sk_compmethod_t
-sksiteCompmethodGetBest(
-    void)
-{
-    return skCompMethodGetBest();
-}
+    if (NULL == out_comp_method) {
+        return -1;
+    }
+    if (NULL == comp_method_name) {
+        const char *env = NULL;
 
-sk_compmethod_t
-sksiteCompmethodGetDefault(
-    void)
-{
-    return skCompMethodGetDefault();
-}
+        if (0 == compmethod_opts_ignore_envar) {
+            env = getenv(SK_COMP_METHOD_ENVAR);
+            if (env && env[0]) {
+                compMethodParse(env, &cm, SK_COMP_METHOD_ENVAR);
+            }
+        }
+        *out_comp_method = cm;
+        return 0;
+    }
 
-int
-sksiteCompmethodGetName(
-    char               *buffer,
-    size_t              buffer_size,
-    sk_compmethod_t     comp_method)
-{
-    return skCompMethodGetName(buffer, buffer_size, comp_method);
-}
+    count = compMethodGetCount();
 
-int
-sksiteCompmethodSetDefault(
-    sk_compmethod_t     compression_method)
-{
-    return skCompMethodSetDefault(compression_method);
-}
+    if (0 == strcmp(comp_method_name, COMPMETHOD_STRING_BEST)) {
+        *out_comp_method = SK_COMPMETHOD_BEST;
+        return 0;
+    }
+    for (cm = 0; cm < count; ++cm) {
+        if (0 == strcmp(comp_method_name, sk_compmethod_names[cm])) {
+            if (skCompMethodCheck(cm) == SK_COMPMETHOD_IS_AVAIL) {
+                *out_comp_method = cm;
+                return 0;
+            }
+            if (config_file && key_name) {
+                skAppPrintErr(("Error in configuration '%s':"
+                               " %s names an unavailable compression method"),
+                              config_file, key_name);
+            }
+            return -1;
+        }
+    }
 
-int
-sksiteCompmethodOptionsRegister(
-    sk_compmethod_t    *compression_method)
-{
-    return skCompMethodOptionsRegister(compression_method);
-}
-
-void
-sksiteCompmethodOptionsUsage(
-    FILE               *fh)
-{
-    skCompMethodOptionsUsage(fh);
+    if (config_file && key_name) {
+        skAppPrintErr(("Error in configuration '%s':"
+                       " %s names an invalid compression method"),
+                      config_file, key_name);
+    }
+    return -1;
 }
 
 

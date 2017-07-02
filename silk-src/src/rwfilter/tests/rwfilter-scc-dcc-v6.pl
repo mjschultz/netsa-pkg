@@ -1,5 +1,5 @@
 #! /usr/bin/perl -w
-# MD5: 17cda13997907b0693feb84c9fcf0829
+# MD5: 4610ffe9718a606483bbc7f7a164d29b
 # TEST: ./rwfilter --scc=xz --dcc=xz --pass=stdout ../../tests/data-v6.rwf | ../rwcat/rwcat --compression-method=none --byte-order=little
 
 use strict;
@@ -13,6 +13,6 @@ $file{v6_fake_cc} = get_data_or_exit77('v6_fake_cc');
 $ENV{SILK_COUNTRY_CODES} = "$SiLKTests::PWD/$file{v6_fake_cc}";
 check_features(qw(ipv6));
 my $cmd = "$rwfilter --scc=xz --dcc=xz --pass=stdout $file{v6data} | $rwcat --compression-method=none --byte-order=little";
-my $md5 = "17cda13997907b0693feb84c9fcf0829";
+my $md5 = "4610ffe9718a606483bbc7f7a164d29b";
 
 check_md5_output($md5, $cmd);

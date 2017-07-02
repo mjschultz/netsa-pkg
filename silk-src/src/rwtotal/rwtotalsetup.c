@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwtotalsetup.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
+RCSIDENT("$SiLK: rwtotalsetup.c d1637517606d 2017-06-23 16:51:31Z mthomas $");
 
 #include "rwtotal.h"
 
@@ -26,6 +26,9 @@ RCSIDENT("$SiLK: rwtotalsetup.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
 
 
 /* LOCAL VARIABLES */
+
+/* for setting up the options */
+static sk_options_ctx_t *optctx;
 
 /* where to write output */
 static sk_fileptr_t output;
@@ -200,6 +203,7 @@ appTeardown(
     /* close copy-input stream */
     skOptionsCtxCopyStreamClose(optctx, &skAppPrintErr);
 
+    sk_flow_iter_destroy(&flowiter);
     skOptionsCtxDestroy(&optctx);
     skAppUnregister();
 }
@@ -270,6 +274,13 @@ appSetup(
     rv = skOptionsCtxOptionsParse(optctx, argc, argv);
     if (rv < 0) {
         skAppUsage();         /* never returns */
+    }
+
+    /* create flow iterator to read the records from the stream */
+    flowiter = skOptionsCtxCreateFlowIterator(optctx);
+    /* ignore IPv6 flows when keying on address */
+    if (count_mode <= COUNT_MODE_FINAL_ADDR) {
+        sk_flow_iter_set_ipv6_policy(flowiter, SK_IPV6POLICY_ASV4);
     }
 
     /* try to load site config file; if it fails, we will not be able

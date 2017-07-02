@@ -23,9 +23,10 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKHEADER_H, "$SiLK: skheader.h 7e6884832fbd 2017-01-20 22:59:46Z mthomas $");
+RCSIDENTVAR(rcsID_SKHEADER_H, "$SiLK: skheader.h 373f990778e9 2017-06-22 21:57:36Z mthomas $");
 
 #include <silk/silk_types.h>
+#include <silk/silk_files.h>
 
 /**
  *  @file
@@ -125,12 +126,17 @@ typedef uint32_t sk_hentry_type_id_t;
  *    The maximum file version that may be specified to
  *    skHeaderSetFileVersion().
  */
-#define SK_FILE_VERSION_MAXIMUM SK_FILE_VERSION_MINIMUM
+#define SK_FILE_VERSION_MAXIMUM 17
 
 /**
  *    The file version to use as the default.
  */
-#define SK_FILE_VERSION_DEFAULT SK_FILE_VERSION_MINIMUM
+#define SK_FILE_VERSION_DEFAULT 16
+
+/**
+ *    The file version where all data blocks have a header.
+ */
+#define SK_FILE_VERSION_BLOCK_HEADER  17
 
 /**
  *    Values returned by the skHeader*() functions.
@@ -721,10 +727,8 @@ typedef struct sk_hentry_packedfile_st {
 
 int
 skHeaderAddPackedfile(
-    sk_file_header_t   *hdr,
-    sktime_t            start_time,
-    sk_flowtype_id_t    flowtype_id,
-    sk_sensor_id_t      sensor_id);
+    sk_file_header_t           *hdr,
+    const sksite_repo_key_t    *repo_key);
 
 sk_header_entry_t *
 skHentryPackedfileCopy(
@@ -732,13 +736,21 @@ skHentryPackedfileCopy(
 
 sk_header_entry_t *
 skHentryPackedfileCreate(
-    sktime_t            start_time,
-    sk_flowtype_id_t    flowtype_id,
-    sk_sensor_id_t      sensor_id);
+    const sksite_repo_key_t    *repo_key);
 
 void
 skHentryPackedfileFree(
     sk_header_entry_t  *hentry);
+
+/**
+ *    Fill the 'repo_key' parameter with the start time, sensor id,
+ *    and flowtype id values from packed-file header entry 'hentry'.
+ *    Return the 'repo_key' parameter.
+ */
+sksite_repo_key_t *
+skHentryPackedfileGetRepositoryKey(
+    const sk_hentry_packedfile_t   *hentry,
+    sksite_repo_key_t              *repo_key);
 
 ssize_t
 skHentryPackedfilePacker(
@@ -1002,6 +1014,18 @@ skHentryProbenameUnpacker(
 #define SK_HENTRY_AGGBAG_ID        8
 
 
+
+
+/*
+ *    **********************************************************************
+ *
+ *    The 'sidecar' header entry type is used to store information
+ *    about additional fields available for each record.
+ *
+ *    **********************************************************************
+ */
+
+#define SK_HENTRY_SIDECAR_ID      9
 
 #ifdef __cplusplus
 }

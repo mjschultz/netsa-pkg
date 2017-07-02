@@ -8,7 +8,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: daemon_test.py 275df62a2e41 2017-01-05 17:30:40Z mthomas $
+# $SiLK: daemon_test.py efd886457770 2017-06-21 18:43:23Z mthomas $
 #######################################################################
 from __future__ import print_function
 import numbers
@@ -103,11 +103,12 @@ class Dirobject(object):
 
 
 class PduSender(object):
-    def __init__(self, max_recs, port, log, address="localhost"):
+    def __init__(self, max_recs, port, log, address="localhost", usleep=None):
         self._port = port
         self._max_recs = max_recs
         self._log = log
         self._address = ("[%s]" % address)
+        self._usleep = usleep
         self.process = None
 
     def start(self):
@@ -115,6 +116,8 @@ class PduSender(object):
         args = [config_vars["PERL"], prog,
                 "--pdu-network", self._address + ":" + str(self._port),
                 "--max-records", str(self._max_recs)]
+        if self._usleep is not None:
+            args = args + ["--usleep", str(self._usleep)]
         self._log("Starting: %s" % args)
         self.process = subprocess.Popen(args)
         return self.process

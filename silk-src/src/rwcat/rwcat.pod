@@ -8,7 +8,8 @@ B<rwcat> - Concatenate SiLK Flow files into single stream
 
   rwcat [--output-path=PATH] [--note-add=TEXT] [--note-file-add=FILE]
         [--print-filenames] [--byte-order={big | little | native}]
-        [--ipv4-output] [--compression-method=COMP_METHOD]
+        [--ipv4-output] [--no-sidecar]
+        [--compression-method=COMP_METHOD]
         [--site-config-file=FILENAME]
         {[--xargs] | [--xargs=FILENAME] | [FILE [FILE...]]}
 
@@ -104,6 +105,11 @@ is specified, IPv6 flow records that contain addresses in the
 and all other IPv6 records are ignored.  When SiLK has not been
 compiled with IPv6 support, B<rwcat> acts as if this switch were
 always in effect.
+
+=item B<--no-sidecar>
+
+Do not copy sidecar fields from the source file(s) to the output
+file.  The default is to copy the sidecar fields.
 
 =item B<--compression-method>=I<COMP_METHOD>
 
@@ -281,7 +287,7 @@ resulting in corrupt output.
 
 =cut
 
-$SiLK: rwcat.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwcat.pod d1637517606d 2017-06-23 16:51:31Z mthomas $
 
 Local Variables:
 mode:text

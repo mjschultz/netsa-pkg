@@ -1,22 +1,13 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: rwflowpack-init-d.pl d6cdb4ca495b 2016-03-01 19:22:48Z mthomas $")
+# RCSIDENT("$SiLK: rwflowpack-init-d.pl 23e62811e29c 2016-11-16 15:30:29Z mthomas $")
 
 use strict;
 use SiLKTests;
 
 my $NAME = $0;
 $NAME =~ s,.*/,,;
-
-# set the environment variables required for rwflowpack to find its
-# packing logic plug-in
-add_plugin_dirs('/site/twoway');
-
-# Skip this test if we cannot load the packing logic
-check_exit_status("./rwflowpack --sensor-conf=$srcdir/tests/sensor77.conf"
-                  ." --verify-sensor-conf")
-    or skip_test("Cannot load packing logic");
 
 # create our tempdir
 my $tmpdir = make_tempdir();
@@ -44,7 +35,9 @@ $ENV{SCRIPT_CONFIG_LOCATION} = $tmpdir;
 # directories
 my $log_dir = "$tmpdir/log";
 my $data_dir = "$tmpdir/data";
-my $netflow_dir = "$tmpdir/netflow";
+
+# pid file
+my $pidfile = $log_dir ."/$DAEMON.pid";
 
 # create the data directory and copy the silk.conf file
 if (-f $ENV{SILK_CONFIG_FILE}) {
@@ -53,50 +46,103 @@ if (-f $ENV{SILK_CONFIG_FILE}) {
     system "cp", $ENV{SILK_CONFIG_FILE}, "$data_dir/silk.conf";
 }
 
-# create an incoming directory for netflow-v5 files
-mkdir $netflow_dir, 0700
-    or die "$NAME: Unable to create directory '$netflow_dir': $!\n";
+# create directories
+for my $d (qw(error log netflow processing)) {
+    my $dd = $tmpdir."/".$d;
+    mkdir $dd, 0700
+        or die "$NAME: Unable to create directory '$dd': $!\n";
+}
 
 # receive data to this port and host
 my $host = '127.0.0.1';
 my $port = get_ephemeral_port($host, 'udp');
 
-# create the sensor.conf
-my $sensor_conf = "$tmpdir/sensor.conf";
-open SENSOR_OUT, ">$sensor_conf"
-    or die "$NAME: Cannot open '$sensor_conf': $!\n";
-print SENSOR_OUT <<EOF;
-probe S0 netflow-v5
-    protocol udp
-    listen-on-port $port
-    listen-as-host $host
-end probe
+# create the packer.lua configuration file
+my $packer_lua = "$tmpdir/packer.lua";
+open LUACONF_OUT, ">$packer_lua"
+    or die "$NAME: Cannot open '$packer_lua': $!\n";
+print LUACONF_OUT <<EOF;
+if not silk.site.have_site_config() then
+  if not silk.site.init_site(nil, nil, true) then
+    error("The silk.conf file was not found")
+  end
+end
 
-sensor S0
-    netflow-v5-probes S0
-    source-network external
-    destination-network internal
-end sensor
+local file_info = {
+  record_format = silk.file_format_id("FT_RWSPLIT"),
+}
 
-probe S1 netflow-v5
-    poll-directory $netflow_dir
-end probe
+-- Given a probe definition and an rwrec, write the rwRec to
+-- appropriate outputs.
+local function pack_function (probe, rec)
+  -- Set flowtype and sensor
+  rec.classtype_id = probe.flowtype
+  rec.sensor_id = probe.sensor
 
-sensor S1
-    netflow-v5-probes S1
-    source-network internal
-    destination-network external
-end sensor
+  -- Write record
+  write_rwrec(rec, file_info)
+end
+
+local tmpdir = "${tmpdir}"
+input = {
+    mode = "stream",
+    probes = {
+        S0 = {
+            name = "S0",
+            type = "netflow-v5",
+            source = {
+                listen = "${host}:${port}",
+                protocol = "udp",
+            },
+            packing_function = pack_function,
+            vars = {
+                flowtype = silk.site.flowtype_id("int2int"),
+                sensor = silk.site.sensor_id("S0"),
+            },
+        },
+        S1 = {
+            name = "S1",
+            type = "netflow-v5",
+            source = {
+                directory = tmpdir .. "/netflow",
+                interval = 5,
+                error_directory = tmpdir .. "/error",
+            },
+            packing_function = pack_function,
+            vars = {
+                flowtype = silk.site.flowtype_id("ext2ext"),
+                sensor = silk.site.sensor_id("S1"),
+            },
+        },
+    },
+}
+output = {
+    mode = "local-storage",
+    flush_interval = 10,
+    processing = {
+        directory = tmpdir .. "/processing",
+        error_directory = tmpdir .. "/error",
+    },
+    root_directory = "${data_dir}",
+}
+log = {
+    directory = "${log_dir}",
+    level = "debug",
+}
+daemon = {
+    pid_file = "${pidfile}",
+}
 EOF
-close SENSOR_OUT
-    or die "$NAME: Cannot close '$sensor_conf': $!\n";
+close LUACONF_OUT
+    or die "$NAME: Cannot close '$packer_lua': $!\n";
 
 # open the template file for $DAEMON.conf
 open SRC, $daemon_src
     or die "$NAME: Cannot open template file '$daemon_src': $!\n";
 
-# create the $DAEMON.conf file using text of template file
-my $daemon_conf_text = "";
+# create $DAEMON.conf
+open CONF, ">$daemon_conf"
+    or die "$NAME: Cannot create configuration file '$daemon_conf': $!\n";
 while (<SRC>) {
     chomp;
     s/\#.*//;
@@ -104,51 +150,27 @@ while (<SRC>) {
 
     if (/^(BIN_DIR=).*/) {
         my $pwd = `pwd`;
-        $daemon_conf_text .= $1 . $pwd;
+        print CONF $1, $pwd;
         next;
     }
-    if (/^(CREATE_DIRECTORIES=).*/) {
-        $daemon_conf_text .= $1 . "yes\n";
+    if (/^(PACKER_LUA=).*/) {
+        print CONF $1, $packer_lua, "\n";
         next;
     }
-    if (/^(ENABLED=).*/) {
-        $daemon_conf_text .= $1 . "yes\n";
-        next;
-    }
-    if (/^(LOG_TYPE=).*/) {
-        $daemon_conf_text .= $1 . "legacy\n";
-        next;
-    }
-    if (/^(LOG_LEVEL=).*/ && $ENV{SK_TESTS_LOG_DEBUG}) {
-        $daemon_conf_text .= $1 . "debug\n";
-        next;
-    }
-    if (/^(statedirectory=).*/) {
-        $daemon_conf_text .= $1 . $tmpdir . "\n";
+    if (/^(PID_DIR=).*/) {
+        print CONF $1, $log_dir, "\n";
         next;
     }
     if (/^(USER=).*/) {
-        $daemon_conf_text .= $1 . '`whoami`' . "\n";
+        print CONF $1, '`whoami`', "\n";
         next;
     }
 
-    if (/^(DATA_ROOTDIR=).*/) {
-        $daemon_conf_text .= $1 . $data_dir . "\n";
-        next;
-    }
-    if (/^(SENSOR_CONFIG=).*/) {
-        $daemon_conf_text .= $1 . $sensor_conf . "\n";
-        next;
-    }
-    if (/^(FLAT_ARCHIVE=).*/) {
-        $daemon_conf_text .= $1 . "1\n";
-        next;
-    }
-
-    $daemon_conf_text .= $_ . "\n";
+    print CONF $_,"\n";
 }
+close CONF
+    or die "$NAME: Cannot close '$daemon_conf': $!\n";
 close SRC;
-make_config_file($daemon_conf, \$daemon_conf_text);
 
 
 my $cmd;
@@ -158,18 +180,17 @@ my $pid;
 
 # run "daemon.init.d status"; it should not be running
 $expected_status = 'stopped';
-$cmd = "./$daemon_init status";
+$cmd = "/bin/sh -x ./$daemon_init status";
 run_command($cmd, \&init_d);
 exit 1
     unless $good;
 
 # run "daemon.init.d start"
 $expected_status = 'starting';
-$cmd = "./$daemon_init start";
+$cmd = "/bin/sh -x ./$daemon_init start";
 run_command($cmd, \&init_d);
 
 # get the PID from the pidfile
-my $pidfile = "$log_dir/$DAEMON.pid";
 if (-f $pidfile) {
     open PID, $pidfile
         or die "$NAME: Cannot open '$pidfile': $!\n";
@@ -198,20 +219,20 @@ sleep 2;
 
 # run "daemon.init.d stutus"; it should be running
 $expected_status = 'running';
-$cmd = "./$daemon_init status";
+$cmd = "/bin/sh -x ./$daemon_init status";
 run_command($cmd, \&init_d);
 
 sleep 2;
 
 $expected_status = 'stopping';
-$cmd = "./$daemon_init stop";
+$cmd = "/bin/sh -x ./$daemon_init stop";
 run_command($cmd, \&init_d);
 
 sleep 2;
 
 # run "daemon.init.d status"; it should not be running
 $expected_status = 'stopped';
-$cmd = "./$daemon_init status";
+$cmd = "/bin/sh -x ./$daemon_init status";
 run_command($cmd, \&init_d);
 
 if ($pid) {
@@ -342,21 +363,9 @@ sub check_log_stopped
     open LOG, $log
         or die "$NAME: Cannot open log file '$log': $!\n";
     my $last_line;
-
-    if ($ENV{SK_TESTS_VERBOSE}) {
-        print STDERR ">> START OF FILE '$log' >>>>>>>>>>\n";
-        while (defined(my $line = <LOG>)) {
-            print STDERR $line;
-            $last_line = $line;
-        }
-        print STDERR "<< END OF FILE '$log' <<<<<<<<<<<<\n";
+    while (defined(my $line = <LOG>)) {
+        $last_line = $line;
     }
-    else {
-        while (defined(my $line = <LOG>)) {
-            $last_line = $line;
-        }
-    }
-
     close LOG;
     unless (defined $last_line) {
         die "$NAME: Log file '$log' is empty\n";

@@ -372,8 +372,7 @@ In the following examples, the dollar sign (C<$>) represents the shell
 prompt.  The text after the dollar sign represents the command line.
 Lines have been wrapped for improved readability, and the back slash
 (C<\>) is used to indicate a wrapped line.  The output from these
-examples is based on the sample F<silk.conf> as distributed for the
-twoway site (c.f. B<packlogic-twoway(3)>).
+examples is based on the sample F<silk.conf>.
 
 The following prints all known sensor names, one name per line:
 
@@ -421,8 +420,7 @@ This shows the numeric sensor IDs:
 
 The following prints four columns: (1) the sensor identifier, (2) the
 sensor name, (3) the list of classes for that sensor, and (4) a
-description of the sensor.  This output mimics the output of the
-deprecated B<mapsid(1)> tool.
+description of the sensor.
 
  $ rwsiteinfo --fields=id-sensor,sensor,class:list,describe-sensor
  Sensor-ID|Sensor|Class:list|                Sensor-Description|
@@ -468,7 +466,7 @@ and the second the list of default types for that class:
    all|  in,inweb,inicmp|
 
 The following prints the default types.  (The output contains the
-default type for each class, but twoway site has a single class.)
+default type for each class, but the default site has a single class.)
 
  $ rwsiteinfo --fields=default-type --no-titles --delimited
  in
@@ -645,19 +643,14 @@ added in SiLK 3.11.0.
 
 B<rwsiteinfo> was added in SiLK 3.0.
 
-B<rwsiteinfo> duplicates the functionality found in B<mapsid(1)>.
-B<mapsid> is deprecated, and it will be removed in the SiLK 4.0
-release.  Examples of using B<rwsiteinfo> in place of B<mapsid> are
-provided in the latter's manual page.
-
 =head1 SEE ALSO
 
-B<silk.conf(5)>, B<mapsid(1)>, B<rwfilter(1)>, B<rwfglob(1)>,
-B<packlogic-twoway(3)>, B<silk(7)>, B<tzset(3)>, B<environ(7)>
+B<silk.conf(5)>, B<rwfilter(1)>, B<rwfglob(1)>,
+B<silk(7)>, B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwsiteinfo.pod 4a14e7ea8fe2 2017-03-13 20:17:43Z mthomas $
+$SiLK: rwsiteinfo.pod fc8761f1d6b8 2017-06-23 16:42:19Z mthomas $
 
 Local Variables:
 mode:text

@@ -50,7 +50,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwstatsproto.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwstatsproto.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include "rwstats.h"
 #include "interval.h"
@@ -144,7 +144,6 @@ RCSIDENT("$SiLK: rwstatsproto.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 */
 
 
-
 /*
  * Statistics (min, max, quartiles, intervals) for "continuous" values
  * (bytes, packets, bpp) can be computed over all protocols, and the
@@ -158,6 +157,10 @@ RCSIDENT("$SiLK: rwstatsproto.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 #define PKT 1
 #define BPP 2
 
+
+
+/* the final delimiter on each line; assume none */
+static char final_delim[] = {'\0', '\0'};
 
 /* These arrays hold the statistics.  Position 0 is for the
  * combination of all statistics. */
@@ -174,6 +177,19 @@ static uint32_t **interval_defn;
  * arrays.  If the value for a protocol is 0, the user did not request
  * detailed specs on that protocol. */
 static int16_t proto_to_stats_idx[256];
+
+/* names for the columns */
+enum width_type {
+    WIDTH_KEY, WIDTH_VAL, WIDTH_INTVL, WIDTH_PCT
+};
+
+/* output column widths.  mapped to width_type */
+static int width[] = {
+    15, /* WIDTH_KEY:   key */
+    20, /* WIDTH_VAL:   count */
+    10, /* WIDTH_INTVL: interval maximum */
+    10  /* WIDTH_PCT:   percentage value */
+};
 
 
 /* LOCAL FUNCTION PROTOTYPES */
@@ -321,38 +337,6 @@ protoStatsTeardown(
 
 
 /*
- *  ok = protoStatsProcessFile(stream);
- *
- *    Read SiLK Flow records from the stream and update the counters.
- */
-static int
-protoStatsProcessFile(
-    skstream_t         *stream)
-{
-    rwRec rwrec;
-    int proto_idx;
-    int rv;
-
-    while ((rv = skStreamReadRecord(stream, &rwrec)) == SKSTREAM_OK) {
-        /* Statistics across ALL protocols */
-        protoStatsUpdateStatistics(0, &rwrec);
-
-        /* Compute statistics for specific protocol if requested */
-        proto_idx = proto_to_stats_idx[rwRecGetProto(&rwrec)];
-        if (proto_idx) {
-            protoStatsUpdateStatistics(proto_idx, &rwrec);
-        }
-
-    } /* while skStreamReadRecord() */
-    if (SKSTREAM_ERR_EOF != rv) {
-        skStreamPrintLastErr(stream, rv, &skAppPrintErr);
-    }
-
-    return 0;
-}
-
-
-/*
  * protoStatsUpdateStatistics:
  *      Update the minima, maxima, and intervals for bytes, packets,
  *      and bytes-per-packet for the specified protocol.
@@ -379,8 +363,12 @@ protoStatsUpdateStatistics(
     /* Update count */
     ++count[proto_idx];
 
-    stat_src[BYTE] = rwRecGetBytes(rwrec);
-    stat_src[PKT]  = rwRecGetPkts(rwrec);
+    stat_src[BYTE] = (uint32_t)((rwRecGetBytes(rwrec) < UINT32_MAX)
+                                ? rwRecGetBytes(rwrec)
+                                : UINT32_MAX);
+    stat_src[PKT]  = (uint32_t)((rwRecGetPkts(rwrec) < UINT32_MAX)
+                                ? rwRecGetPkts(rwrec)
+                                : UINT32_MAX);
     stat_src[BPP]  = rwRecGetBytes(rwrec) / rwRecGetPkts(rwrec);
 
     /* Find min/max/intervals for bytes, packets, bpp */
@@ -540,23 +528,39 @@ int
 protoStatsMain(
     void)
 {
-    skstream_t *stream;
+    rwRec rwrec;
+    int proto_idx;
     int rv = 0;
+
+    if (app_flags.no_columns) {
+        memset(width, 0, sizeof(width));
+    }
+    /* set final delimeter */
+    if (!app_flags.no_final_delimiter) {
+        final_delim[0] = delimiter;
+    }
 
     rv = protoStatsSetup();
     if (rv) {
         return rv;
     }
 
-    while ((rv = appNextInput(&stream)) == 0) {
-        rv = protoStatsProcessFile(stream);
-        skStreamDestroy(&stream);
+    rwRecInitialize(&rwrec, NULL);
+
+    while ((rv = sk_flow_iter_get_next_rec(flowiter, &rwrec)) == 0) {
+        /* Statistics across ALL protocols */
+        protoStatsUpdateStatistics(0, &rwrec);
+
+        /* Compute statistics for specific protocol if requested */
+        proto_idx = proto_to_stats_idx[rwRecGetProto(&rwrec)];
+        if (proto_idx) {
+            protoStatsUpdateStatistics(proto_idx, &rwrec);
+        }
+
     }
-    if (rv > 0) {
-        /* processed all files */
+    if (SKSTREAM_ERR_EOF == rv) {
         rv = 0;
     } else {
-        /* error opening file */
         rv = 1;
     }
 

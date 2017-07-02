@@ -135,10 +135,11 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sksiteconfig_parse.y 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: sksiteconfig_parse.y 21315f05de74 2017-06-26 20:03:25Z mthomas $");
 
 #include "sksiteconfig.h"
 #include <silk/sksite.h>
+#include <silk/utils.h>
 
 /* TYPEDEFS AND MACROS */
 
@@ -253,14 +254,14 @@ static void do_err_args_none(const char *cmd);
 
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 typedef union YYSTYPE
-#line 115 "sksiteconfig_parse.y"
+#line 116 "sksiteconfig_parse.y"
 {
     int integer;
     char *str;
     sk_vector_t *str_list;
 }
 /* Line 193 of yacc.c.  */
-#line 264 "sksiteconfig_parse.c"
+#line 265 "sksiteconfig_parse.c"
 	YYSTYPE;
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
@@ -273,7 +274,7 @@ typedef union YYSTYPE
 
 
 /* Line 216 of yacc.c.  */
-#line 277 "sksiteconfig_parse.c"
+#line 278 "sksiteconfig_parse.c"
 
 #ifdef short
 # undef short
@@ -595,16 +596,16 @@ static const yytype_int8 yyrhs[] =
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint16 yyrline[] =
 {
-       0,   143,   143,   145,   146,   150,   151,   154,   156,   157,
-     161,   162,   165,   167,   168,   174,   175,   176,   177,   178,
-     179,   180,   181,   182,   186,   187,   188,   189,   193,   194,
-     200,   201,   202,   203,   204,   206,   210,   211,   212,   213,
-     214,   215,   216,   217,   218,   219,   220,   222,   226,   227,
-     228,   229,   230,   231,   232,   233,   234,   235,   236,   240,
-     246,   250,   256,   257,   261,   262,   266,   267,   271,   272,
-     273,   277,   278,   282,   283,   287,   288,   292,   293,   297,
-     298,   302,   303,   304,   308,   309,   314,   320,   321,   322,
-     326,   327
+       0,   144,   144,   146,   147,   151,   152,   155,   157,   158,
+     162,   163,   166,   168,   169,   175,   176,   177,   178,   179,
+     180,   181,   182,   183,   187,   188,   189,   190,   194,   195,
+     201,   202,   203,   204,   205,   207,   211,   212,   213,   214,
+     215,   216,   217,   218,   219,   220,   221,   223,   227,   228,
+     229,   230,   231,   232,   233,   234,   235,   236,   237,   241,
+     247,   251,   257,   258,   262,   263,   267,   268,   272,   273,
+     274,   278,   279,   283,   284,   288,   289,   293,   294,   298,
+     299,   303,   304,   305,   309,   310,   315,   321,   322,   323,
+     327,   328
 };
 #endif
 
@@ -1633,315 +1634,315 @@ yyreduce:
   switch (yyn)
     {
         case 6:
-#line 151 "sksiteconfig_parse.y"
+#line 152 "sksiteconfig_parse.y"
     { do_err_args("class"); }
     break;
 
   case 11:
-#line 162 "sksiteconfig_parse.y"
+#line 163 "sksiteconfig_parse.y"
     { do_err_args("group"); }
     break;
 
   case 30:
-#line 200 "sksiteconfig_parse.y"
+#line 201 "sksiteconfig_parse.y"
     { do_err_ctx("top level", "end class"); }
     break;
 
   case 31:
-#line 201 "sksiteconfig_parse.y"
+#line 202 "sksiteconfig_parse.y"
     { do_err_ctx("top level", "end group"); }
     break;
 
   case 32:
-#line 202 "sksiteconfig_parse.y"
+#line 203 "sksiteconfig_parse.y"
     { do_err_ctx("top level", "sensors"); }
     break;
 
   case 33:
-#line 203 "sksiteconfig_parse.y"
+#line 204 "sksiteconfig_parse.y"
     { do_err_ctx("top level", "type"); }
     break;
 
   case 34:
-#line 204 "sksiteconfig_parse.y"
+#line 205 "sksiteconfig_parse.y"
     { do_err("Unknown command '%s'", (yyvsp[(1) - (3)].str));
                                     free((yyvsp[(1) - (3)].str)); }
     break;
 
   case 35:
-#line 206 "sksiteconfig_parse.y"
+#line 207 "sksiteconfig_parse.y"
     { do_err("Unrecognizable command"); }
     break;
 
   case 36:
-#line 210 "sksiteconfig_parse.y"
+#line 211 "sksiteconfig_parse.y"
     { do_err_ctx("group", "class"); }
     break;
 
   case 37:
-#line 211 "sksiteconfig_parse.y"
+#line 212 "sksiteconfig_parse.y"
     { do_err_ctx("group", "default-class"); }
     break;
 
   case 38:
-#line 212 "sksiteconfig_parse.y"
+#line 213 "sksiteconfig_parse.y"
     { do_err_ctx("group", "end class"); }
     break;
 
   case 39:
-#line 213 "sksiteconfig_parse.y"
+#line 214 "sksiteconfig_parse.y"
     { do_err_ctx("group", "group"); }
     break;
 
   case 40:
-#line 214 "sksiteconfig_parse.y"
+#line 215 "sksiteconfig_parse.y"
     { do_err_ctx("group", "include"); }
     break;
 
   case 41:
-#line 215 "sksiteconfig_parse.y"
+#line 216 "sksiteconfig_parse.y"
     { do_err_ctx("group", "path-format"); }
     break;
 
   case 42:
-#line 216 "sksiteconfig_parse.y"
+#line 217 "sksiteconfig_parse.y"
     {do_err_ctx("group", "packing-logic"); }
     break;
 
   case 43:
-#line 217 "sksiteconfig_parse.y"
+#line 218 "sksiteconfig_parse.y"
     { do_err_ctx("group", "sensor"); }
     break;
 
   case 44:
-#line 218 "sksiteconfig_parse.y"
+#line 219 "sksiteconfig_parse.y"
     { do_err_ctx("group", "type"); }
     break;
 
   case 45:
-#line 219 "sksiteconfig_parse.y"
+#line 220 "sksiteconfig_parse.y"
     { do_err_ctx("group", "version"); }
     break;
 
   case 46:
-#line 220 "sksiteconfig_parse.y"
+#line 221 "sksiteconfig_parse.y"
     { do_err("Unknown command '%s'", (yyvsp[(1) - (3)].str));
                                     free((yyvsp[(1) - (3)].str)); }
     break;
 
   case 47:
-#line 222 "sksiteconfig_parse.y"
+#line 223 "sksiteconfig_parse.y"
     { do_err("Unrecognizable command"); }
     break;
 
   case 48:
-#line 226 "sksiteconfig_parse.y"
+#line 227 "sksiteconfig_parse.y"
     { do_err_ctx("class", "class"); }
     break;
 
   case 49:
-#line 227 "sksiteconfig_parse.y"
+#line 228 "sksiteconfig_parse.y"
     { do_err_ctx("class", "default-class"); }
     break;
 
   case 50:
-#line 228 "sksiteconfig_parse.y"
+#line 229 "sksiteconfig_parse.y"
     { do_err_ctx("class", "end group"); }
     break;
 
   case 51:
-#line 229 "sksiteconfig_parse.y"
+#line 230 "sksiteconfig_parse.y"
     { do_err_ctx("class", "group"); }
     break;
 
   case 52:
-#line 230 "sksiteconfig_parse.y"
+#line 231 "sksiteconfig_parse.y"
     { do_err_ctx("class", "include"); }
     break;
 
   case 53:
-#line 231 "sksiteconfig_parse.y"
+#line 232 "sksiteconfig_parse.y"
     { do_err_ctx("class", "path-format"); }
     break;
 
   case 54:
-#line 232 "sksiteconfig_parse.y"
+#line 233 "sksiteconfig_parse.y"
     {do_err_ctx("class","packing-logic");}
     break;
 
   case 55:
-#line 233 "sksiteconfig_parse.y"
+#line 234 "sksiteconfig_parse.y"
     { do_err_ctx("class", "sensor"); }
     break;
 
   case 56:
-#line 234 "sksiteconfig_parse.y"
+#line 235 "sksiteconfig_parse.y"
     { do_err_ctx("class", "version"); }
     break;
 
   case 57:
-#line 235 "sksiteconfig_parse.y"
+#line 236 "sksiteconfig_parse.y"
     { do_err("Unknown command '%s'", (yyvsp[(1) - (3)].str)); }
     break;
 
   case 58:
-#line 236 "sksiteconfig_parse.y"
+#line 237 "sksiteconfig_parse.y"
     { do_err("Unrecognizable command"); }
     break;
 
   case 59:
-#line 240 "sksiteconfig_parse.y"
+#line 241 "sksiteconfig_parse.y"
     { do_class((yyvsp[(2) - (3)].str)); }
     break;
 
   case 60:
-#line 246 "sksiteconfig_parse.y"
+#line 247 "sksiteconfig_parse.y"
     { do_default_class((yyvsp[(2) - (3)].str)); }
     break;
 
   case 61:
-#line 250 "sksiteconfig_parse.y"
+#line 251 "sksiteconfig_parse.y"
     { do_group((yyvsp[(2) - (3)].str)); }
     break;
 
   case 62:
-#line 256 "sksiteconfig_parse.y"
+#line 257 "sksiteconfig_parse.y"
     { do_include((yyvsp[(2) - (3)].str)); }
     break;
 
   case 63:
-#line 257 "sksiteconfig_parse.y"
+#line 258 "sksiteconfig_parse.y"
     { do_err_args("include"); }
     break;
 
   case 64:
-#line 261 "sksiteconfig_parse.y"
+#line 262 "sksiteconfig_parse.y"
     { do_path_format((yyvsp[(2) - (3)].str)); }
     break;
 
   case 65:
-#line 262 "sksiteconfig_parse.y"
+#line 263 "sksiteconfig_parse.y"
     { do_err_args("path-format"); }
     break;
 
   case 66:
-#line 266 "sksiteconfig_parse.y"
+#line 267 "sksiteconfig_parse.y"
     { do_packing_logic((yyvsp[(2) - (3)].str)); }
     break;
 
   case 67:
-#line 267 "sksiteconfig_parse.y"
+#line 268 "sksiteconfig_parse.y"
     { do_err_args("packing-logic"); }
     break;
 
   case 68:
-#line 271 "sksiteconfig_parse.y"
+#line 272 "sksiteconfig_parse.y"
     { do_sensor((yyvsp[(2) - (4)].integer), (yyvsp[(3) - (4)].str), NULL); }
     break;
 
   case 69:
-#line 272 "sksiteconfig_parse.y"
+#line 273 "sksiteconfig_parse.y"
     { do_sensor((yyvsp[(2) - (5)].integer), (yyvsp[(3) - (5)].str), (yyvsp[(4) - (5)].str)); }
     break;
 
   case 70:
-#line 273 "sksiteconfig_parse.y"
+#line 274 "sksiteconfig_parse.y"
     { do_err_args("sensor"); }
     break;
 
   case 71:
-#line 277 "sksiteconfig_parse.y"
+#line 278 "sksiteconfig_parse.y"
     { if (do_version((yyvsp[(2) - (3)].integer))) { YYABORT; } }
     break;
 
   case 72:
-#line 278 "sksiteconfig_parse.y"
+#line 279 "sksiteconfig_parse.y"
     { do_err_args("version"); }
     break;
 
   case 73:
-#line 282 "sksiteconfig_parse.y"
+#line 283 "sksiteconfig_parse.y"
     { do_group_sensors((yyvsp[(2) - (3)].str_list)); }
     break;
 
   case 74:
-#line 283 "sksiteconfig_parse.y"
+#line 284 "sksiteconfig_parse.y"
     { do_err_args("sensors"); }
     break;
 
   case 75:
-#line 287 "sksiteconfig_parse.y"
+#line 288 "sksiteconfig_parse.y"
     { do_end_group(); }
     break;
 
   case 76:
-#line 288 "sksiteconfig_parse.y"
+#line 289 "sksiteconfig_parse.y"
     { do_err_args_none("end group"); }
     break;
 
   case 77:
-#line 292 "sksiteconfig_parse.y"
+#line 293 "sksiteconfig_parse.y"
     { do_class_default_types((yyvsp[(2) - (3)].str_list)); }
     break;
 
   case 78:
-#line 293 "sksiteconfig_parse.y"
+#line 294 "sksiteconfig_parse.y"
     { do_err_args("default-types"); }
     break;
 
   case 79:
-#line 297 "sksiteconfig_parse.y"
+#line 298 "sksiteconfig_parse.y"
     { do_class_sensors((yyvsp[(2) - (3)].str_list)); }
     break;
 
   case 80:
-#line 298 "sksiteconfig_parse.y"
+#line 299 "sksiteconfig_parse.y"
     { do_err_args("sensors"); }
     break;
 
   case 81:
-#line 302 "sksiteconfig_parse.y"
+#line 303 "sksiteconfig_parse.y"
     { do_class_type((yyvsp[(2) - (4)].integer), (yyvsp[(3) - (4)].str), NULL); }
     break;
 
   case 82:
-#line 303 "sksiteconfig_parse.y"
+#line 304 "sksiteconfig_parse.y"
     { do_class_type((yyvsp[(2) - (5)].integer), (yyvsp[(3) - (5)].str), (yyvsp[(4) - (5)].str)); }
     break;
 
   case 83:
-#line 304 "sksiteconfig_parse.y"
+#line 305 "sksiteconfig_parse.y"
     { do_err_args("type"); }
     break;
 
   case 84:
-#line 308 "sksiteconfig_parse.y"
+#line 309 "sksiteconfig_parse.y"
     { do_end_class(); }
     break;
 
   case 85:
-#line 309 "sksiteconfig_parse.y"
+#line 310 "sksiteconfig_parse.y"
     { do_err_args_none("end class"); }
     break;
 
   case 86:
-#line 314 "sksiteconfig_parse.y"
+#line 315 "sksiteconfig_parse.y"
     { (yyval.integer) = atoi((yyvsp[(1) - (1)].str)); free((yyvsp[(1) - (1)].str)); }
     break;
 
   case 90:
-#line 326 "sksiteconfig_parse.y"
+#line 327 "sksiteconfig_parse.y"
     { (yyval.str_list) = skVectorNew(sizeof(char*)); }
     break;
 
   case 91:
-#line 327 "sksiteconfig_parse.y"
+#line 328 "sksiteconfig_parse.y"
     { skVectorAppendValue((yyvsp[(1) - (2)].str_list), &(yyvsp[(2) - (2)].str)); (yyval.str_list) = (yyvsp[(1) - (2)].str_list); }
     break;
 
 
 /* Line 1267 of yacc.c.  */
-#line 1945 "sksiteconfig_parse.c"
+#line 1946 "sksiteconfig_parse.c"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -2155,7 +2156,7 @@ yyreturn:
 }
 
 
-#line 330 "sksiteconfig_parse.y"
+#line 331 "sksiteconfig_parse.y"
 
 
 /* SUPPORTING CODE */
@@ -2239,35 +2240,30 @@ static void
 do_path_format(
     char               *fmt)
 {
-    const char *cp;
-    int final_x = 0;
+    size_t pos;
 
     if ( sksiteconfig_testing ) {
         fprintf(stderr, "path-format \"%s\"\n", fmt);
     }
-    cp = fmt;
-    while (NULL != (cp = strchr(cp, '%'))) {
-        ++cp;
-        if (!*cp) {
+    pos = skSubcommandStringCheck(fmt, path_format_conversions);
+    if (pos) {
+        if ('\0' == fmt[pos]) {
             sksiteconfigErr("The path-format '%s' ends with a single '%%'",
                             fmt);
-            break;
-        }
-        if (NULL == strchr(path_format_conversions, *cp)) {
+        } else {
             sksiteconfigErr(
                 "The path-format '%s' contains an unknown conversion '%%%c'",
-                fmt, *cp);
-        } else if ('x' == *cp && '\0' == *(cp+1)) {
-            /* Found %x at the end; confirm that either the entire fmt
-             * is "%x" or that "%x" is preceeded by '/'  */
-            if ((cp-1 == fmt) || ('/' == *(cp-2))) {
-                final_x = 1;
-            }
+                fmt, fmt[pos]);
         }
-        ++cp;
     }
-    if (!final_x) {
-        sksiteconfigErr("The path-format '%s' does not end with '/%%x'", fmt);
+
+    /* Ensure 'fmt' either ends with '/%x' or is exactly '%x' */
+    if (0 != strcmp(fmt, "%x")) {
+        pos = strlen(fmt);
+        if (pos < 3 || 0 != strcmp(&fmt[pos-3], "/%x")) {
+            sksiteconfigErr("The path-format '%s' does not end with '/%%x'",
+                            fmt);
+        }
     }
     if ( sksiteSetPathFormat(fmt) ) {
         sksiteconfigErr("Failed to set path-format");
@@ -2601,8 +2597,6 @@ do_default_class(
     char               *name)
 {
     sk_class_id_t class_id;
-    sk_flowtype_iter_t ft_iter;
-    sk_flowtype_id_t ft_id;
 
     if ( sksiteconfig_testing ) {
         fprintf(stderr, "default-class \"%s\"\n", name);
@@ -2612,12 +2606,7 @@ do_default_class(
         sksiteconfigErr("Cannot set default class: class '%s' is not defined",
                         name);
     } else {
-        sksiteClassFlowtypeIterator(class_id, &ft_iter);
-        if (!sksiteFlowtypeIteratorNext(&ft_iter, &ft_id)) {
-            sksiteconfigErr(
-                "Cannot set default class: class '%s' contains no types",
-                name);
-        } else if (sksiteClassSetDefault(class_id)) {
+        if ( sksiteClassSetDefault(class_id) ) {
             sksiteconfigErr("Failed to set default class");
         }
     }

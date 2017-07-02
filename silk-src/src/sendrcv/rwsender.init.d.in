@@ -1,14 +1,23 @@
 #!/bin/sh
 
 #######################################################################
-# RCSIDENT("$SiLK: rwsender.init.d.in 02367a659674 2016-05-05 20:17:43Z mthomas $")
+# RCSIDENT("$SiLK: rwsender.init.d.in 6de71b57495d 2017-06-23 19:55:24Z mthomas $")
 #######################################################################
 
 # rwsender start/control script
 #
 # /etc/init.d/@myprog@
 # chkconfig: - 20 95
-# description: Start @myprog@ program
+# description: SiLK network transfer sending daemon
+# processname: @myprog@
+### BEGIN INIT INFO
+# Provides: @myprog@
+# Required-Start: $local_fs $remote_fs $network $named $syslog $time
+# Required-Stop: $local_fs $remote_fs $network $named $syslog $time
+# Short-Description: start and stop SiLK @myprog@ daemon
+# Description: SiLK daemon to watch a directory for files and transfer the
+#              files across the network to one or more rwreceiver processes
+### END INIT INFO
 
 MYNAME=@myprog@
 
@@ -446,13 +455,18 @@ case "$1" in
     RETVAL=$?
     ;;
 
+  force-reload)
+    (restart)
+    RETVAL=$?
+    ;;
+
   status)
     (status)
     RETVAL=$?
     ;;
 
   *)
-    echo $"Usage: $0 {start|stop|status|restart}"
+    echo $"Usage: $0 {start|stop|status|restart|force-reload}"
     RETVAL=1
     ;;
 esac
@@ -461,7 +475,7 @@ exit $RETVAL
 
 
 #######################################################################
-# @OPENSOURCE_LICENSE_START@
+# @OPENSOURCE_HEADER_START@
 #
 # Use of the SILK system and related source code is subject to the terms
 # of the following licenses:
@@ -507,5 +521,5 @@ exit $RETVAL
 # Government purposes only pursuant to the copyright license under the
 # contract clause at 252.227.7013.
 #
-# @OPENSOURCE_LICENSE_END@
+# @OPENSOURCE_HEADER_END@
 #######################################################################

@@ -21,11 +21,12 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKSTREAM_H, "$SiLK: skstream.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_SKSTREAM_H, "$SiLK: skstream.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/silk_types.h>
-#include <silk/silk_files.h>
 #include <silk/skheader.h>
+#include <silk/sksidecar.h>
+
 
 /**
  *  @file
@@ -36,13 +37,6 @@ RCSIDENTVAR(rcsID_SKSTREAM_H, "$SiLK: skstream.h 275df62a2e41 2017-01-05 17:30:4
  *    This file is part of libsilk.
  */
 
-
-/**
- * Default (uncompressed) block size used when writing/reading: 64k
- */
-#define SKSTREAM_DEFAULT_BLOCKSIZE  0x10000
-
-
 /*
  *    skstream_t, skstream_mode_t, skcontent_t are defined in
  *    silk_types.h.
@@ -50,237 +44,9 @@ RCSIDENTVAR(rcsID_SKSTREAM_H, "$SiLK: skstream.h 275df62a2e41 2017-01-05 17:30:4
 
 
 /**
- *    Return values that most skStream*() functions return
+ * Default (uncompressed) block size used when writing/reading: 64k
  */
-typedef enum {
-    /** The last command was completed successfully. */
-    SKSTREAM_OK = 0,
-
-    /* The following often represent programmer errors */
-
-    /** Memory could not be allocated. */
-    SKSTREAM_ERR_ALLOC = -64,
-
-    /** Attempt to operate on a file that is already closed.  Once
-     * closed, a stream can only be destroyed; re-opening is not (yet)
-     * supported. */
-    SKSTREAM_ERR_CLOSED = -65,
-
-    /** An argument to a function is invalid: passing skStreamFDOpen()
-     * a value of -1, passing too long a pathname ti skStreamBind(),
-     * using an supported SiLK file format. */
-    SKSTREAM_ERR_INVALID_INPUT = -66,
-
-    /** Attempt to open a stream that is not bound to a pathname. */
-    SKSTREAM_ERR_NOT_BOUND = -67,
-
-    /** Attempt to read or write from a stream that has not yet been
-     * opened. */
-    SKSTREAM_ERR_NOT_OPEN = -68,
-
-    /** An argument to the function is NULL or empty */
-    SKSTREAM_ERR_NULL_ARGUMENT = -69,
-
-    /** The stream is already bound to a pathname. */
-    SKSTREAM_ERR_PREV_BOUND = -70,
-
-    /** Attempt to operate on a stream in a way that is not support
-     * since data has already been written-to/read-from the stream. */
-    SKSTREAM_ERR_PREV_DATA = -71,
-
-    /** The stream is already open. */
-    SKSTREAM_ERR_PREV_OPEN = -72,
-
-    /** The file's content type does not support the action: attempt to
-     * skStreamRead() on a SK_CONTENT_TEXT stream, attempt to
-     * skStreamPrint() to a binary or SiLK stream, etc. */
-    SKSTREAM_ERR_UNSUPPORT_CONTENT = -73,
-
-    /** The skStreamSetCopyInput() function has already been called on
-     * this stream. */
-    SKSTREAM_ERR_PREV_COPYINPUT = -74,
-
-
-    /* Errors due to missing or outdated libraries */
-
-    /** The stream is compressed with a compression method that SiLK
-     * does not recognize. */
-    SKSTREAM_ERR_COMPRESS_INVALID = -80,
-
-    /** The stream is compressed with a unavailable compression mode;
-     * for example, you're operating on a gzipped file but SiLK was
-     * not linked with gzip. */
-    SKSTREAM_ERR_COMPRESS_UNAVAILABLE = -81,
-
-
-    /* User errors when creating a new stream */
-
-    /** The file's header does not contain the SiLK magic number---for
-     * files that contain SK_CONTENT_SILK. */
-    SKSTREAM_ERR_BAD_MAGIC = -16,
-
-    /** Attempt to open a stream for writing that is bound to a file
-     * name that already exists. */
-    SKSTREAM_ERR_FILE_EXISTS = -17,
-
-    /** Attempt to read or write binary data on a terminal (tty) */
-    SKSTREAM_ERR_ISTERMINAL = -18,
-
-    /** Attempt to invoke the paging program failed. */
-    SKSTREAM_ERR_NOPAGER = -19,
-
-    /** Could not get a read lock on the stream. */
-    SKSTREAM_ERR_RLOCK = -20,
-
-    /** The call to fdopen() failed. */
-    SKSTREAM_ERR_SYS_FDOPEN = -21,
-
-    /** The call to lseek() failed. */
-    SKSTREAM_ERR_SYS_LSEEK = -22,
-
-    /** The call to open() failed. */
-    SKSTREAM_ERR_SYS_OPEN = -23,
-
-    /** The call to mkstemp() failed. */
-    SKSTREAM_ERR_SYS_MKSTEMP = -24,
-
-    /** The file's read/write status does not support the action: an
-     * attempt to write to "stdin", an attempt to append to a FIFO or
-     * a gzipped file. */
-    SKSTREAM_ERR_UNSUPPORT_IOMODE = -25,
-
-    /** Could not get a read lock on the stream. */
-    SKSTREAM_ERR_WLOCK = -26,
-
-    /** The call to fork() failed. */
-    SKSTREAM_ERR_SYS_FORK = -27,
-
-    /** The call to pipe() failed. */
-    SKSTREAM_ERR_SYS_PIPE = -28,
-
-    /** The call to mkdir() failed. */
-    SKSTREAM_ERR_SYS_MKDIR = -29,
-
-    /** The call to fcntl(fd, F_GETFL) failed. */
-    SKSTREAM_ERR_SYS_FCNTL_GETFL = -30,
-
-    /* Errors that may occur while processing the stream that
-     * typically indicate a fatal condition. */
-
-    /** Value returned skStreamRead() and skStreamWrite() when an error
-     * has occured. */
-    SKSTREAM_ERR_IO = -1,
-
-    /** Error with internal buffering. */
-    SKSTREAM_ERR_IOBUF = -2,
-
-    /** There was an error writing to the stream. */
-    SKSTREAM_ERR_WRITE = -3,
-
-    /** There was an error reading from the stream. */
-    SKSTREAM_ERR_READ = -4,
-
-    /** Value returned when the input is exhausted.  Note that reaching
-     * the end of a file is not really an "error". */
-    SKSTREAM_ERR_EOF = -5,
-
-    /** Error occurred in a gz* function */
-    SKSTREAM_ERR_ZLIB = -6,
-
-    /** The read returned fewer bytes than required for a complete
-     * record. */
-    SKSTREAM_ERR_READ_SHORT = -7,
-
-    /** The operation requires the stream to be bound to a seekable
-     * file, and the stream is not. */
-    SKSTREAM_ERR_NOT_SEEKABLE = -8,
-
-    /** The call to ftruncate() failed. */
-    SKSTREAM_ERR_SYS_FTRUNCATE = -9,
-
-
-    /* The following set of errors are general errors that occur when
-     * opening a SiLK file for read, write, or append. */
-
-    /** The file has a format that does not support this operation.
-     * See also the next error code. */
-    SKSTREAM_ERR_UNSUPPORT_FORMAT = 32,
-
-    /** An operation that requires SiLK Flow data is attempting to open
-     * a SiLK file that does not contain flows. */
-    SKSTREAM_ERR_REQUIRE_SILK_FLOW = 33,
-
-    /** The file or record has a version that this version of libsilk
-     * does not know how to handle */
-    SKSTREAM_ERR_UNSUPPORT_VERSION = 34,
-
-
-    /* The following set of errors affect only the current record;
-     * they occur when trying to write a record to a stream.  These
-     * are considered non-fatal.  Use the SKSTREAM_ERROR_IS_FATAL()
-     * macro below. */
-
-    /** The record's start time is less than the file's start time */
-    SKSTREAM_ERR_STIME_UNDRFLO = 64,
-
-    /** The record's start time at least an hour greater than the
-     * file's start time */
-    SKSTREAM_ERR_STIME_OVRFLO = 65,
-
-    /** The record's elapsed time is greater than space allocated for
-     * duration in this file format */
-    SKSTREAM_ERR_ELPSD_OVRFLO = 66,
-
-    /** The record contains more than the number of packets allowed in
-     * this file format */
-    SKSTREAM_ERR_PKTS_OVRFLO = 67,
-
-    /** The record contains a 0 value in the packets field. */
-    SKSTREAM_ERR_PKTS_ZERO = 68,
-
-    /** The byte-per-packet value is too large to fit into the space
-     * provided by this file format. */
-    SKSTREAM_ERR_BPP_OVRFLO = 69,
-
-    /** The records contains an SNMP value too large to fit into the
-     * space allocated in this file format. */
-    SKSTREAM_ERR_SNMP_OVRFLO = 70,
-
-    /** The records contains a SensorID too large to fit into the space
-     * allocated in this file format. */
-    SKSTREAM_ERR_SENSORID_OVRFLO = 71,
-
-    /** The record's IP protocol is not supported by the file's format;
-     * for example, trying to store a non-TCP record in a FT_RWWWW
-     * file. */
-    SKSTREAM_ERR_PROTO_MISMATCH = 72,
-
-    /** The record's "packets" value is greater than the "bytes" value. */
-    SKSTREAM_ERR_PKTS_GT_BYTES = 73,
-
-    /** The record is an IPv6 record which is not supported. */
-    SKSTREAM_ERR_UNSUPPORT_IPV6 = 74,
-
-    /** The record contains more than the number of bytes (octets)
-     * allowed in this file format */
-    SKSTREAM_ERR_BYTES_OVRFLO = 75,
-
-    /* Errors that may occur which indicate an error with one
-     * line/record, but which are normally not fatal */
-
-    /** Returned by skStreamGetLine() when an input line is longer than
-     * the specified buffer size. */
-    SKSTREAM_ERR_LONG_LINE = 96
-
-} skstream_err_t;
-
-
-/**
- *  SKSTREAM_ERROR_IS_FATAL(err);
- *
- *    Evaluates to a true value if error is a fatal error, false otherwise.
- */
-#define SKSTREAM_ERROR_IS_FATAL(err) ((err) != SKSTREAM_OK && (err) < 64)
+#define SKSTREAM_DEFAULT_BLOCKSIZE  0x10000
 
 
 /**
@@ -353,7 +119,6 @@ skStreamCheckSilkHeader(
  *    SKSTREAM_ERR_CLOSED
  *    SKSTREAM_ERR_NOT_OPEN
  *    SKSTREAM_ERR_WRITE
- *    SKSTREAM_ERR_IOBUF
  *    SKSTREAM_ERR_ZLIB
  */
 int
@@ -379,8 +144,8 @@ skStreamCreate(
 
 
 /**
- *    Closes the stream at '*stream', if open, destroys the stream
- *    pointed at by 'stream' and sets '*stream' to NULL.  If 'stream'
+ *    Close the stream at '*stream', if open, destroy the stream
+ *    pointed at by 'stream' and set '*stream' to NULL.  If 'stream'
  *    is NULL or its value is NULL, no action is taken and the
  *    function returns.  Return SKSTREAM_OK on success, or any of the
  *    error codes listed by skStreamClose().
@@ -415,7 +180,6 @@ skStreamFDOpen(
  *    a stream open for reading.  Return SKSTREAM_OK on success, or
  *    one of these error codes:
  *
- *    SKSTREAM_ERR_IOBUF
  *    SKSTREAM_ERR_NULL_ARGUMENT
  *    SKSTREAM_ERR_NOT_OPEN
  *    SKSTREAM_ERR_WRITE
@@ -427,6 +191,8 @@ skStreamFlush(
 
 /**
  *    Return the type of content associated with the stream.
+ *
+ *    See also skStreamDetermineContentType().
  */
 skcontent_t
 skStreamGetContentType(
@@ -600,6 +366,22 @@ skStreamGetPathname(
 uint64_t
 skStreamGetRecordCount(
     const skstream_t   *stream);
+
+
+/**
+ *    Return the description of the sidecar fields that are supported
+ *    on 'stream'.  The function reads the file's header if it has not
+ *    been read yet.  If 'stream' was opened as an unknown flow
+ *    stream, part of the file is read to determine the type of the
+ *    stream.
+ *
+ *    Return NULL if 'stream' is NULL, if 'stream' does not contain
+ *    SiLK Flow records, or if no sidecar field header was read from
+ *    'stream'.
+ */
+const sk_sidecar_t *
+skStreamGetSidecar(
+    skstream_t         *stream);
 
 
 /**
@@ -987,6 +769,22 @@ skStreamSetIPv6Policy(
 
 
 /**
+ *    Set 'sidecar' as the description of the potential sidecar fields
+ *    available in 'stream'.
+ *
+ *    'stream' must an SK_IO_WRITE stream whose header has not yet
+ *    been written.  Any previous sidecar description set on 'stream'
+ *    is removed from the stream.
+ *
+ *    The stream makes a copy of the 'sidecar' structure.
+ */
+int
+skStreamSetSidecar(
+    skstream_t         *stream,
+    const sk_sidecar_t *sidecar);
+
+
+/**
  *    Do not use buffering on this stream.  This must be called prior
  *    to opening the stream.
  */
@@ -1137,6 +935,261 @@ skStreamWriteRecord(
 int
 skStreamWriteSilkHeader(
     skstream_t         *stream);
+
+
+/**
+ *    Return values that most skStream*() functions return
+ */
+typedef enum {
+    /** The last command was completed successfully. */
+    SKSTREAM_OK = 0,
+
+    /* The following often represent programmer errors */
+
+    /** Memory could not be allocated. */
+    SKSTREAM_ERR_ALLOC = -64,
+
+    /** Attempt to operate on a file that is already closed.  Once
+     * closed, a stream can only be destroyed; re-opening is not (yet)
+     * supported. */
+    SKSTREAM_ERR_CLOSED = -65,
+
+    /** An argument to a function is invalid: passing skStreamFDOpen()
+     * a value of -1, passing too long a pathname ti skStreamBind(),
+     * using an supported SiLK file format. */
+    SKSTREAM_ERR_INVALID_INPUT = -66,
+
+    /** Attempt to open a stream that is not bound to a pathname. */
+    SKSTREAM_ERR_NOT_BOUND = -67,
+
+    /** Attempt to read or write from a stream that has not yet been
+     * opened. */
+    SKSTREAM_ERR_NOT_OPEN = -68,
+
+    /** An argument to the function is NULL or empty */
+    SKSTREAM_ERR_NULL_ARGUMENT = -69,
+
+    /** The stream is already bound to a pathname. */
+    SKSTREAM_ERR_PREV_BOUND = -70,
+
+    /** Attempt to operate on a stream in a way that is not support
+     * since data has already been written-to/read-from the stream. */
+    SKSTREAM_ERR_PREV_DATA = -71,
+
+    /** The stream is already open. */
+    SKSTREAM_ERR_PREV_OPEN = -72,
+
+    /** The file's content type does not support the action: attempt to
+     * skStreamRead() on a SK_CONTENT_TEXT stream, attempt to
+     * skStreamPrint() to a binary or SiLK stream, etc. */
+    SKSTREAM_ERR_UNSUPPORT_CONTENT = -73,
+
+    /** The skStreamSetCopyInput() function has already been called on
+     * this stream. */
+    SKSTREAM_ERR_PREV_COPYINPUT = -74,
+
+
+    /* Errors due to missing or outdated libraries */
+
+    /** The stream is compressed with a compression method that SiLK
+     * does not recognize. */
+    SKSTREAM_ERR_COMPRESS_INVALID = -80,
+
+    /** The stream is compressed with a unavailable compression mode;
+     * for example, you're operating on a gzipped file but SiLK was
+     * not linked with gzip. */
+    SKSTREAM_ERR_COMPRESS_UNAVAILABLE = -81,
+
+
+    /* User errors when creating a new stream */
+
+    /** The file's header does not contain the SiLK magic number---for
+     * files that contain SK_CONTENT_SILK. */
+    SKSTREAM_ERR_BAD_MAGIC = -16,
+
+    /** Attempt to open a stream for writing that is bound to a file
+     * name that already exists. */
+    SKSTREAM_ERR_FILE_EXISTS = -17,
+
+    /** Attempt to read or write binary data on a terminal (tty) */
+    SKSTREAM_ERR_ISTERMINAL = -18,
+
+    /** Attempt to invoke the paging program failed. */
+    SKSTREAM_ERR_NOPAGER = -19,
+
+    /** Could not get a read lock on the stream. */
+    SKSTREAM_ERR_RLOCK = -20,
+
+    /** The call to fdopen() failed. */
+    SKSTREAM_ERR_SYS_FDOPEN = -21,
+
+    /** The call to lseek() failed. */
+    SKSTREAM_ERR_SYS_LSEEK = -22,
+
+    /** The call to open() failed. */
+    SKSTREAM_ERR_SYS_OPEN = -23,
+
+    /** The call to mkstemp() failed. */
+    SKSTREAM_ERR_SYS_MKSTEMP = -24,
+
+    /** The file's read/write status does not support the action: an
+     * attempt to write to "stdin", an attempt to append to a FIFO or
+     * a gzipped file. */
+    SKSTREAM_ERR_UNSUPPORT_IOMODE = -25,
+
+    /** Could not get a read lock on the stream. */
+    SKSTREAM_ERR_WLOCK = -26,
+
+    /** The call to fork() failed. */
+    SKSTREAM_ERR_SYS_FORK = -27,
+
+    /** The call to pipe() failed. */
+    SKSTREAM_ERR_SYS_PIPE = -28,
+
+    /** The call to mkdir() failed. */
+    SKSTREAM_ERR_SYS_MKDIR = -29,
+
+    /** The call to fcntl(fd, F_GETFL) failed. */
+    SKSTREAM_ERR_SYS_FCNTL_GETFL = -30,
+
+    /* Errors that may occur while processing the stream that
+     * typically indicate a fatal condition. */
+
+    /** Value returned skStreamRead() and skStreamWrite() when an error
+     * has occured. */
+    SKSTREAM_ERR_IO = -1,
+
+    /** There was an error writing to the stream. */
+    SKSTREAM_ERR_WRITE = -3,
+
+    /** There was an error reading from the stream. */
+    SKSTREAM_ERR_READ = -4,
+
+    /** Value returned when the input is exhausted.  Note that reaching
+     * the end of a file is not really an "error". */
+    SKSTREAM_ERR_EOF = -5,
+
+    /** Error occurred in a gz* function */
+    SKSTREAM_ERR_ZLIB = -6,
+
+    /** The read returned fewer bytes than required for a complete
+     * record. */
+    SKSTREAM_ERR_READ_SHORT = -7,
+
+    /** The operation requires the stream to be bound to a seekable
+     * file, and the stream is not. */
+    SKSTREAM_ERR_NOT_SEEKABLE = -8,
+
+    /** The call to ftruncate() failed. */
+    SKSTREAM_ERR_SYS_FTRUNCATE = -9,
+
+    /** Error generated by fixbuf */
+    SKSTREAM_ERR_GERROR = -10,
+
+    /** Error generated by sk_schema */
+    SKSTREAM_ERR_SCHEMA = -11,
+
+    /** The length specified in a compressed block header is
+     * invalid (too large) */
+    SKSTREAM_ERR_BAD_COMPRESSION_SIZE = -12,
+
+
+    /* The following set of errors are general errors that occur when
+     * opening a SiLK file for read, write, or append. */
+
+    /** The file has a format that does not support this operation.
+     * See also the next error code. */
+    SKSTREAM_ERR_UNSUPPORT_FORMAT = 32,
+
+    /** An operation that requires SiLK Flow data is attempting to open
+     * a SiLK file that does not contain flows. */
+    SKSTREAM_ERR_REQUIRE_SILK_FLOW = 33,
+
+    /** The file or record has a version that this version of libsilk
+     * does not know how to handle */
+    SKSTREAM_ERR_UNSUPPORT_VERSION = 34,
+
+    SKSTREAM_ERR_BLOCK_SHORT_HDR = 48,
+
+    SKSTREAM_ERR_BLOCK_INCOMPLETE = 49,
+
+    SKSTREAM_ERR_BLOCK_UNCOMPRESS = 50,
+
+    SKSTREAM_ERR_BLOCK_INVALID_LEN = 51,
+
+    SKSTREAM_ERR_BLOCK_UNKNOWN_ID = 52,
+
+    SKSTREAM_ERR_BLOCK_WANTED_ID = 53,
+
+
+    /* The following set of errors affect only the current record;
+     * they occur when trying to write a record to a stream.  These
+     * are considered non-fatal.  Use the SKSTREAM_ERROR_IS_FATAL()
+     * macro below. */
+
+    /** The record's start time is less than the file's start time */
+    SKSTREAM_ERR_STIME_UNDRFLO = 64,
+
+    /** The record's start time at least an hour greater than the
+     * file's start time */
+    SKSTREAM_ERR_STIME_OVRFLO = 65,
+
+    /** The record's elapsed time is greater than space allocated for
+     * duration in this file format */
+    SKSTREAM_ERR_ELPSD_OVRFLO = 66,
+
+    /** The record contains more than the number of packets allowed in
+     * this file format */
+    SKSTREAM_ERR_PKTS_OVRFLO = 67,
+
+    /** The record contains a 0 value in the packets field. */
+    SKSTREAM_ERR_PKTS_ZERO = 68,
+
+    /** The byte-per-packet value is too large to fit into the space
+     * provided by this file format. */
+    SKSTREAM_ERR_BPP_OVRFLO = 69,
+
+    /** The records contains an SNMP value too large to fit into the
+     * space allocated in this file format. */
+    SKSTREAM_ERR_SNMP_OVRFLO = 70,
+
+    /** The records contains a SensorID too large to fit into the space
+     * allocated in this file format. */
+    SKSTREAM_ERR_SENSORID_OVRFLO = 71,
+
+    /** The record's IP protocol is not supported by the file's format;
+     * for example, trying to store a non-TCP record in a FT_RWWWW
+     * file. */
+    SKSTREAM_ERR_PROTO_MISMATCH = 72,
+
+    /** The record's "packets" value is greater than the "bytes" value. */
+    SKSTREAM_ERR_PKTS_GT_BYTES = 73,
+
+    /** The record is an IPv6 record which is not supported. */
+    SKSTREAM_ERR_UNSUPPORT_IPV6 = 74,
+
+    /** The record contains more than the number of bytes (octets)
+     * allowed in this file format */
+    SKSTREAM_ERR_BYTES_OVRFLO = 75,
+
+    /* Errors that may occur which indicate an error with one
+     * line/record, but which are normally not fatal */
+
+    /** Returned by skStreamGetLine() when an input line is longer than
+     * the specified buffer size. */
+    SKSTREAM_ERR_LONG_LINE = 96
+
+} skstream_err_t;
+
+
+/**
+ *  SKSTREAM_ERROR_IS_FATAL(err);
+ *
+ *    Evaluates to a true value if error is a fatal error, false otherwise.
+ */
+#define SKSTREAM_ERROR_IS_FATAL(err) ((err) != SKSTREAM_OK && (err) < 64)
+
+
 
 
 #ifdef __cplusplus

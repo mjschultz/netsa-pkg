@@ -14,10 +14,11 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sksiteconfig_parse.y 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: sksiteconfig_parse.y 21315f05de74 2017-06-26 20:03:25Z mthomas $");
 
 #include "sksiteconfig.h"
 #include <silk/sksite.h>
+#include <silk/utils.h>
 
 /* TYPEDEFS AND MACROS */
 
@@ -410,35 +411,30 @@ static void
 do_path_format(
     char               *fmt)
 {
-    const char *cp;
-    int final_x = 0;
+    size_t pos;
 
     if ( sksiteconfig_testing ) {
         fprintf(stderr, "path-format \"%s\"\n", fmt);
     }
-    cp = fmt;
-    while (NULL != (cp = strchr(cp, '%'))) {
-        ++cp;
-        if (!*cp) {
+    pos = skSubcommandStringCheck(fmt, path_format_conversions);
+    if (pos) {
+        if ('\0' == fmt[pos]) {
             sksiteconfigErr("The path-format '%s' ends with a single '%%'",
                             fmt);
-            break;
-        }
-        if (NULL == strchr(path_format_conversions, *cp)) {
+        } else {
             sksiteconfigErr(
                 "The path-format '%s' contains an unknown conversion '%%%c'",
-                fmt, *cp);
-        } else if ('x' == *cp && '\0' == *(cp+1)) {
-            /* Found %x at the end; confirm that either the entire fmt
-             * is "%x" or that "%x" is preceeded by '/'  */
-            if ((cp-1 == fmt) || ('/' == *(cp-2))) {
-                final_x = 1;
-            }
+                fmt, fmt[pos]);
         }
-        ++cp;
     }
-    if (!final_x) {
-        sksiteconfigErr("The path-format '%s' does not end with '/%%x'", fmt);
+
+    /* Ensure 'fmt' either ends with '/%x' or is exactly '%x' */
+    if (0 != strcmp(fmt, "%x")) {
+        pos = strlen(fmt);
+        if (pos < 3 || 0 != strcmp(&fmt[pos-3], "/%x")) {
+            sksiteconfigErr("The path-format '%s' does not end with '/%%x'",
+                            fmt);
+        }
     }
     if ( sksiteSetPathFormat(fmt) ) {
         sksiteconfigErr("Failed to set path-format");
@@ -772,8 +768,6 @@ do_default_class(
     char               *name)
 {
     sk_class_id_t class_id;
-    sk_flowtype_iter_t ft_iter;
-    sk_flowtype_id_t ft_id;
 
     if ( sksiteconfig_testing ) {
         fprintf(stderr, "default-class \"%s\"\n", name);
@@ -783,12 +777,7 @@ do_default_class(
         sksiteconfigErr("Cannot set default class: class '%s' is not defined",
                         name);
     } else {
-        sksiteClassFlowtypeIterator(class_id, &ft_iter);
-        if (!sksiteFlowtypeIteratorNext(&ft_iter, &ft_id)) {
-            sksiteconfigErr(
-                "Cannot set default class: class '%s' contains no types",
-                name);
-        } else if (sksiteClassSetDefault(class_id)) {
+        if ( sksiteClassSetDefault(class_id) ) {
             sksiteconfigErr("Failed to set default class");
         }
     }

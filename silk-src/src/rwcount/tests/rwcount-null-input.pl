@@ -1,5 +1,5 @@
 #! /usr/bin/perl -w
-# STATUS: ERR
+# STATUS: OK
 # TEST: ./rwcount </dev/null
 
 use strict;
@@ -8,4 +8,4 @@ use SiLKTests;
 my $rwcount = check_silk_app('rwcount');
 my $cmd = "$rwcount </dev/null";
 
-exit (check_exit_status($cmd) ? 1 : 0);
+exit (check_exit_status($cmd) ? 0 : 1);

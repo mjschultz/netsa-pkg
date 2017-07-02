@@ -16,7 +16,6 @@ Selection switches, input switches, or input files are required:
          [--sensors=SENSOR[,SENSOR ...]]
          [--start-date=YYYY/MM/DD[:HH] [--end-date=YYYY/MM/DD[:HH]]]
          [--data-rootdir=ROOT_DIRECTORY] [--print-missing-files] }
-        | [--input-pipe=INPUT_PATH]
         | [--xargs] | [--xargs=INPUT_PATH]
         | [INPUT_PATH [INPUT_PATH...]]
 
@@ -56,6 +55,8 @@ One or more partitioning switches are required:
         [--input-index=INTEGER_LIST] [--ip-version=INTEGER_LIST]
         [--ipa-src-expr=IPA_EXPR] [--ipa-dst-expr=IPA_EXPR]
         [--ipa-any-expr=IPA_EXPR]
+        [--lua-expression=LUA_EXPR [--lua-expression=LUA_EXPR ...]]
+        [--lua-file=FILENAME [--lua-file=FILENAME ...]]
         [{--next-hop-id=IP_WILDCARD | --not-next-hop-id=IP_WILDCARD}]
         [{--nhcidr=IP_OR_CIDR_LIST | --not-nhcidr=IP_OR_CIDR_LIST}]
         [{--nhipset=IP_SET_FILENAME | --not-nhipset=IP_SET_FILENAME}]
@@ -144,12 +145,6 @@ from the standard input.
 
 =item *
 
-use the B<--input-pipe> switch to specify a named pipe, or specify
-C<stdin> or C<-> as the argument to this switch to have B<rwfilter>
-read flow records from the standard input.
-
-=item *
-
 use the B<--xargs> switch to specify a file that contains the names of
 the input files to process.  When B<--xargs> is used without an
 argument, B<rwfilter> attempts to read the names of the file from the
@@ -182,8 +177,8 @@ required for options that take optional parameters.
 
 To read files from the data store, use the following options to
 specify which files to process.  When B<rwfilter> gets its input from
-files listed on the command line or from the B<--xargs> or
-B<--input-pipe> switches, the first four switches (B<--class>,
+files listed on the command line or from the B<--xargs>
+switch, the first four switches (B<--class>,
 B<--type>, B<--flowtypes>, and B<--sensors>) act as partitioning
 switches, and specifying any other selection switch produces an
 error.
@@ -343,8 +338,7 @@ Instead of using the L</Selection Switches> to read flow records from
 files in the data store, you can tell B<rwfilter> to process files
 named on the command line or use one (and only one) of the following
 switches.  To have B<rwfilter> read flow records from the standard
-input, specify C<stdin> or C<-> as the name of an input file or use
-the (deprecated) B<--input-pipe> switch.
+input, specify C<stdin> or C<-> as the name of an input file.
 
 =over 4
 
@@ -357,15 +351,6 @@ standard input if I<INPUT_PATH> is not provided.  The input is
 expected to have one filename per line.  B<rwfilter> opens each named
 file in turn and reads records from it as if the filenames had been
 listed on the command line.
-
-=item B<--input-pipe>=I<INPUT_PATH>
-
-Specify a source for SiLK Flow records, where I<INPUT_PATH> is a named
-pipe or the string C<stdin> or C<-> to represent the standard input.
-You do not need to use this switch, you can simply specify the named
-pipe or the strings C<stdin> or C<-> on the command line.  B<NOTE:>
-This switch is deprecated, and it will be removed in the SiLK 4.0
-release.
 
 =back
 
@@ -996,8 +981,7 @@ Pass the record if its C<in> field is in this I<INTEGER_LIST>, which
 is a comma separated list of integers from 0 to 65535, inclusive, and
 ranges of those integers.  When present, the C<in> field normally
 contains the incoming SNMP interface, but it may contain the vlanId if
-the packing tools were configured to capture it (see
-B<sensor.conf(5)>).
+the packing tools were configured to capture it.
 
 =item B<--output-index>=I<INTEGER_LIST>
 
@@ -1019,8 +1003,8 @@ B<Selection Switches Acting as Partitioning Switches>
 The following four switches are normally file selection switches, that
 is they select which files B<rwfilter> reads within the data
 repository.  However, when B<rwfilter> gets input without querying the
-data repository (that is, from files listed on the command line, from
-files specified by B<--xargs>, or from the B<--input-pipe>), these
+data repository (that is, from files listed on the command line or from
+files specified by B<--xargs>), these
 switches become partitioning switches and determine whether a record
 is written to the pass-destination or fail-destination.
 
@@ -1067,45 +1051,44 @@ mapping file.
 
 =over 4
 
-=item B<--pmap-file>=I<MAPNAME>:I<PATH>
-
 =item B<--pmap-file>=I<PATH>
 
-Instruct B<rwfilter> to load the mapping file located at I<PATH> and
-create new switches B<--pmap-src-I<MAPNAME>>,
-B<--pmap-dst-I<MAPNAME>>, and B<--pmap-any-I<MAPNAME>>.  When
-I<MAPNAME> is provided, it is used to refer to the switches
-specific to that prefix map.  If I<MAPNAME> is not provided,
-B<rwfilter> checks the prefix map file to see if a map-name was
-specified when the file was created.  If no map-name is available,
-B<rwfilter> creates legacy switches as described below.  Multiple
-B<--pmap-file> switches are supported as long as each uses a unique
-map-name.  The B<--pmap-file> switch(es) must precede all other
+=item B<--pmap-file>=I<MAPNAME>:I<PATH>
+
+Load the prefix map file located at I<PATH> and create partitioning
+switches named B<--pmap-src-I<map-name>>, B<--pmap-dst-I<map-name>>,
+and B<--pmap-any-I<map-name>> where I<map-name> is either the
+I<MAPNAME> part of the argument or the map-name specified when the
+file was created (see B<rwpmapbuild(1)>).  If no map-name is
+available, B<rwfilter> creates switch names as described below
+(B<--pmap-saddress>, B<--pmap-sport-proto>, etc).  Specify I<PATH> as
+C<-> or C<stdin> to read from the standard input.  The switch may be
+repeated to load multiple prefix map files; each file must have a
+unique map-name.  The B<--pmap-file> switch(es) must precede all other
 B<--pmap-*> switches.  For more information, see B<pmapfilter(3)>.
 
-=item B<--pmap-src-I<MAPNAME>>=I<LABELS>
+=item B<--pmap-src-I<map-name>>=I<LABELS>
 
-If the prefix map associated with I<MAPNAME> is an IP prefix map, this
-matches records with a source IPv4 address that maps to a label
+If the prefix map associated with I<map-name> is an IP prefix map,
+this matches records with a source IPv4 address that maps to a label
 contained in the list of labels in I<LABELS>.
-
-If the prefix map associated with I<MAPNAME> is a proto-port prefix
+If the prefix map associated with I<map-name> is a proto-port prefix
 map, this matches records with a protocol and source port combination
 that maps to a label contained in the list of labels in I<LABELS>.
 
-=item B<--pmap-dst-I<MAPNAME>>=I<LABELS>
+=item B<--pmap-dst-I<map-name>>=I<LABELS>
 
-Similar to B<--pmap-src-I<MAPNAME>>, but uses the destination IP or
+Similar to B<--pmap-src-I<map-name>>, but uses the destination IP or
 the protocol and destination port.
 
-=item B<--pmap-any-I<MAPNAME>>=I<LABELS>
+=item B<--pmap-any-I<map-name>>=I<LABELS>
 
-If the prefix map associated with I<MAPNAME> is an IP prefix map, this
-matches records with a source IP address or a destination IP address
-that maps to a label contained in the list of labels in I<LABELS>.
-
-If the prefix map associated with I<MAPNAME> is a port/protocol prefix
-map, this matches records with a protocol and source port or
+If the prefix map associated with I<map-name> is an IP prefix map,
+this matches records with a source IP address or a destination IP
+address that maps to a label contained in the list of labels in
+I<LABELS>.
+If the prefix map associated with I<map-name> is a port/protocol
+prefix map, this matches records with a protocol and source port or
 destination port combination that maps to a label contained in the
 list of labels in I<LABELS>.
 
@@ -1116,10 +1099,9 @@ list of labels in I<LABELS>.
 =item B<--pmap-any-address>=I<LABELS>
 
 These are deprecated switches created by B<pmapfilter> that correspond
-to B<--pmap-src-I<MAPNAME>>, B<--pmap-dst-I<MAPNAME>>, and
-B<--pmap-any-I<MAPNAME>>, respectively.  These switches are available
-when an IP prefix map is used that is not associated with a
-I<MAPNAME>.
+to B<--pmap-src-I<map-name>>, B<--pmap-dst-I<map-name>>, and
+B<--pmap-any-I<map-name>>, respectively.  These switches are available
+when an IP prefix map is used that is not associated with a map-name.
 
 =item B<--pmap-sport-proto>=I<LABELS>
 
@@ -1128,10 +1110,10 @@ I<MAPNAME>.
 =item B<--pmap-any-port-proto>=I<LABELS>
 
 These are deprecated switches created by B<pmapfilter> that correspond
-to B<--pmap-src-I<MAPNAME>>, B<--pmap-dst-I<MAPNAME>>, and
-B<--pmap-any-I<MAPNAME>>, respectively.  These switches are available
+to B<--pmap-src-I<map-name>>, B<--pmap-dst-I<map-name>>, and
+B<--pmap-any-I<map-name>>, respectively.  These switches are available
 when a proto-port prefix map is used that is not associated with a
-I<MAPNAME>.
+map-name.
 
 =item B<--scc>=I<COUNTRY_CODE_LIST>
 
@@ -1303,6 +1285,38 @@ is not provided, the default of C<|> is used.
 
 =back
 
+
+B<Partitioning Switches that use Lua>
+
+=over 4
+
+=item B<--lua-file>=I<FILENAME>
+
+Load and run the Lua code in the file named I<FILENAME> during set-up.
+The switch may be repeated to load multiple files.  The user's Lua
+code may call the B<register_filter()> function whose first argument
+is a filtering function.  The filtering function should accept a
+single argument that is a Lua B<rwrec> object (see B<silklua(1)>).
+The filtering function is called for every record unless a previous
+partitioning rule determines that the record has failed.  The record
+is still considered a pass candidate unless the filtering function
+returns a value of B<false> or B<nil>.
+
+The B<register_filter()> function accepts a second optional argument
+that is a table.  The table may have a C<initialize> key and function
+value; this function is called after argument processing and before
+processing records.  The table may also have a C<finalize> key and a
+function value; this function is called during shutdown.
+
+=item B<--lua-expression>=I<LUA_EXPR>
+
+Use the return value of I<LUA_EXPR> as a potential pass/fail
+determiner.  The current flow record is bound to the variable C<rec>
+prior to invoking the expression.  The record is still considered a
+pass candidate unless I<LUA_EXPR> evaluates to B<false> or B<nil>.
+This switch may be repeated.
+
+=back
 
 B<Partitioning Switches that use the PySiLK Plug-in>
 
@@ -1747,6 +1761,59 @@ Outgoing TCP traffic other than that on ports 25, 80, and 443
 Expert users can create even more complicated chains of B<rwfilter>
 commands using named pipes.
 
+A Lua expression may be used to partition records.  The following
+example reads the file F<data.rw> and reports the number of TCP
+records whose source port is less than 1024.
+
+ $ rwfilter --lua-expression='rec.protocol==6 and rec.sport<1024' \
+         --print-statistics data.rw
+ Files     1.  Read     501876.  Pass     157444. Fail      344432.
+
+The contents of the F<filter.lua> file does the same thing:
+
+ $ cat filter.lua
+ local pass = 0
+ local fail = 0
+
+ function report_pass ()
+   print(string.format("Read %10d. Pass %10d. Fail %10d.",
+                       pass + fail, pass, fail))
+ end
+ function check_port (r)
+   if r.protocol == 6 and r.sport < 1024 then
+     pass = pass + 1
+   else
+     fail = fail + 1
+   end
+ end
+
+ register_filter(check_port, {finalize = report_pass})
+
+The B<register_filter()> function is used to register a function that
+gets called for each record, and a finalize function is used to report
+the results.  B<rwfilter> requires that an output switch be specified,
+and the B<--print-statistics> is used, but since the Lua function does
+not return a value, B<--print-statistics> reports that no records
+pass.
+
+ $ rwfilter --lua-file=filter.lua --print-stat tests/data.rwf
+ Files     1.  Read     501876.  Pass          0. Fail      501876.
+ Read     501876. Pass     157444. Fail     344432.
+
+The following Lua file registers a function that passes records where
+the record has sidecar data that includes a C<dnsQName> field whose
+value includes the string C<google>.  Since not every record has
+sidecar data, the function must check whether the record has a
+sidecar, since otherwise Lua complains about an attempt to index a nil
+value.  Another check is made to ensure the sidecar data includes the
+C<dnsQName> field.
+
+ register_filter(function (r)
+   if r.sidecar and r.sidecar.dnsQName then
+     return string.find(r.sidecar.dnsQName, "google")
+   end
+ end)
+
 
 =head1 ENVIRONMENT
 
@@ -1972,6 +2039,13 @@ Directories that B<rwfilter> checks when attempting to load a plug-in.
 
 =head1 NOTES
 
+Prior to SiLK 4.0, B<rwfilter> supported an B<--input-pipe> switch whose
+argument was either the path to a named pipe from which B<rwfilter> read
+records or the strings C<stdin> or C<-> to tell B<rwfilter> to read from
+the standard input.  The switch was removed since it was unnecessary.
+Instead simply specify the path to the named pipe or the string
+C<stdin> or C<-> as a command-line argument.
+
 B<rwfilter> is the most commonly used application in the suite.  It
 provides access to the data files and performs all the basic
 queries.
@@ -2006,16 +2080,17 @@ information.
 =head1 SEE ALSO
 
 B<rwcut(1)>, B<rwfglob(1)>, B<rwfileinfo(1)>, B<rwset(1)>,
-B<rwtuc(1)>, B<rwsetbuild(1)>, B<rwsiteinfo(1)>, B<addrtype(3)>,
-B<ccfilter(3)>, B<flowrate(3)>, B<ipafilter(3)>, B<pmapfilter(3)>,
-B<pysilk(3)>, B<silkpython(3)>, B<silk-plugin(3)>, B<silk.conf(5)>,
-B<sensor.conf(5)>, B<silk(7)>, B<rwflowpack(8)>, B<yaf(1)>,
-B<applabel(1)>, B<zlib(3)>, B<dlopen(3)>, B<tzset(3)>, B<environ(7)>,
+B<rwtuc(1)>, B<rwsetbuild(1)>, B<rwsiteinfo(1)>, B<silklua(1)>,
+B<rwpmapbuild(1)>, B<addrtype(3)>, B<ccfilter(3)>, B<flowrate(3)>,
+B<ipafilter(3)>, B<pmapfilter(3)>, B<pysilk(3)>, B<silkpython(3)>,
+B<silk-plugin(3)>, B<silk.conf(5)>, B<silk(7)>, B<rwflowpack(8)>,
+B<yaf(1)>, B<applabel(1)>, B<zlib(3)>, B<dlopen(3)>, B<tzset(3)>,
+B<environ(7)>,
 I<Analysts' Handbook: Using SiLK for Network Traffic Analysis>
 
 =cut
 
-$SiLK: rwfilter.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwfilter.pod 6ced2b9cf93b 2017-06-26 21:15:05Z mthomas $
 
 Local Variables:
 mode:text

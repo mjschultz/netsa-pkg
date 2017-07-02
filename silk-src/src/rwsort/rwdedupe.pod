@@ -156,7 +156,7 @@ name or ID of sensor at the collection point
 =item in,13
 
 router SNMP input interface or vlanId if packing tools were
-configured to capture it (see B<sensor.conf(5)>)
+configured to capture it
 
 =item out,14
 
@@ -475,12 +475,12 @@ Directory in which to create temporary files.
 
 =head1 SEE ALSO
 
-B<rwfilter(1)>, B<rwfileinfo(1)>, B<sensor.conf(5)>, B<silk(7)>,
+B<rwfilter(1)>, B<rwfileinfo(1)>, B<silk(7)>,
 B<yaf(1)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwdedupe.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwdedupe.pod d1637517606d 2017-06-23 16:51:31Z mthomas $
 
 Local Variables:
 mode:text

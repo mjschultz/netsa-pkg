@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 # MD5: 6b25fe527045c15ce14f2c6864c107e1
-# TEST: ./rwsort --plugin=int-ext-fields.so --fields=int-ip,int-port ../../tests/data-v6.rwf | ../rwstats/rwuniq --plugin=int-ext-fields.so --delimited --fields=int-ip,int-port --presorted-input
+# TEST: ./rwsort --plugin=int-ext-fields.so --fields=int-ip,int-port ../../tests/data-v6.rwf | ../rwuniq/rwuniq --plugin=int-ext-fields.so --delimited --fields=int-ip,int-port --presorted-input
 
 use strict;
 use SiLKTests;
@@ -9,8 +9,8 @@ my $rwsort = check_silk_app('rwsort');
 my $rwuniq = check_silk_app('rwuniq');
 my %file;
 $file{v6data} = get_data_or_exit77('v6data');
-$ENV{OUTGOING_FLOWTYPES} = 'all/out,all/outweb';
 $ENV{INCOMING_FLOWTYPES} = 'all/in,all/inweb';
+$ENV{OUTGOING_FLOWTYPES} = 'all/out,all/outweb';
 add_plugin_dirs('/src/plugins');
 check_features(qw(ipv6));
 

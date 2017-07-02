@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWCUT_H, "$SiLK: rwcut.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_RWCUT_H, "$SiLK: rwcut.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 /*
 **  cut.h
@@ -23,8 +23,9 @@ RCSIDENTVAR(rcsID_RWCUT_H, "$SiLK: rwcut.h 275df62a2e41 2017-01-05 17:30:40Z mth
 **
 */
 
-#include <silk/rwascii.h>
 #include <silk/rwrec.h>
+#include <silk/skflowiter.h>
+#include <silk/skformat.h>
 #include <silk/sksite.h>
 #include <silk/skstream.h>
 #include <silk/utils.h>
@@ -33,10 +34,11 @@ RCSIDENTVAR(rcsID_RWCUT_H, "$SiLK: rwcut.h 275df62a2e41 2017-01-05 17:30:40Z mth
 /* TYPEDEFS AND DEFINES */
 
 /* The object to convert the record to text */
-extern rwAsciiStream_t *ascii_str;
+extern sk_formatter_t *fmtr;
 
 /* handle input streams */
 extern sk_options_ctx_t *optctx;
+extern sk_flow_iter_t *flowiter;
 
 /* number records to print */
 extern uint64_t num_recs;
@@ -50,8 +52,11 @@ extern uint64_t tail_recs;
 /* buffer used for storing 'tail_recs' records */
 extern rwRec *tail_buf;
 
-/* how to handle IPv6 flows */
-extern sk_ipv6policy_t ipv6_policy;
+/* The output stream: where to print the records */
+extern sk_fileptr_t output;
+
+extern lua_State *L;
+
 
 void
 appTeardown(
@@ -60,6 +65,12 @@ void
 appSetup(
     int                 argc,
     char              **argv);
+void
+printTitle(
+    void);
+void
+addPluginFields(
+    rwRec              *rwrec);
 
 
 #ifdef __cplusplus

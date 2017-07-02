@@ -1,12 +1,12 @@
-# RCSIDENT("$SiLK: Makefile.am 006bf6dc14e3 2013-01-22 20:56:29Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am b4e13b124488 2014-12-12 00:09:11Z mwd $");
 
 # Installed Targets
 
-bin_PROGRAMS = mapsid rwsiteinfo
+bin_PROGRAMS = rwsiteinfo
 
-EXTRA_DIST = mapsid.pod rwsiteinfo.pod
+EXTRA_DIST = rwsiteinfo.pod
 if HAVE_POD2MAN
-man1_MANS = mapsid.1 rwsiteinfo.1
+man1_MANS = rwsiteinfo.1
 endif
 
 
@@ -17,8 +17,6 @@ AM_CFLAGS = $(WARN_CFLAGS) $(SK_CFLAGS)
 AM_LDFLAGS = $(SK_LDFLAGS) $(STATIC_APPLICATIONS)
 LDADD = ../libsilk/libsilk.la
 
-mapsid_SOURCES = mapsid.c
-
 rwsiteinfo_SOURCES = rwsiteinfo.c
 
 
@@ -27,23 +25,16 @@ include $(top_srcdir)/build.mk
 include $(top_srcdir)/lib-deps.mk
 
 
+CLEANFILES = mapsid mapsid.1
+
 # Tests
 
 # Required files; variables defined in ../../build.mk
 check_DATA = $(SILK_TESTSDIR) $(SILK_TESTDATA)
 
 EXTRA_DIST += $(TESTS)
-EXTRA_DIST += tests/rwsiteinfo-site.conf
 
 TESTS = \
-	tests/mapsid-bad-id.pl \
-	tests/mapsid-by-name-or-id.pl \
-	tests/mapsid-classes.pl \
-	tests/mapsid-help.pl \
-	tests/mapsid-lone-command.pl \
-	tests/mapsid-no-such-id.pl \
-	tests/mapsid-no-such-name.pl \
-	tests/mapsid-version.pl \
 	tests/rwsiteinfo-all-fields.pl \
 	tests/rwsiteinfo-class-default-class.pl \
 	tests/rwsiteinfo-class-default-type.pl \

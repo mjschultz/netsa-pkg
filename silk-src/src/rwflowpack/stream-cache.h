@@ -13,23 +13,24 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_STREAM_CACHE_H, "$SiLK: stream-cache.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_STREAM_CACHE_H, "$SiLK: stream-cache.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/skthread.h>
 #include <silk/skstream.h>
+#include <silk/skvector.h>
 
 /*
- *  stream-cache.h
- *
- *    A simple interface for maintaining a list of open file handles
- *    so we can avoid a lot of open/close cycles.  File handles are
- *    indexed by the timestamp of the file, the sensor_id, and the
- *    flowtype (class/type) of the data they contain.
- *
- *    Files have individual locks (mutexes) associated with them to
- *    prevent multiple threads from writing to the same stream.  In
- *    addition, the entire cache is locked whenever it is modified.
- */
+**  stream-cache.h
+**
+**    A simple interface for maintaining a list of open file handles
+**    so we can avoid a lot of open/close cycles.  File handles are
+**    indexed by the timestamp of the file, the sensor_id, and the
+**    flowtype (class/type) of the data they contain.
+**
+**    Files have individual locks (mutexes) associated with them to
+**    prevent multiple threads from writing to the same stream.  In
+**    addition, the entire cache is locked whenever it is modified.
+*/
 
 
 /**
@@ -38,131 +39,148 @@ RCSIDENTVAR(rcsID_STREAM_CACHE_H, "$SiLK: stream-cache.h 275df62a2e41 2017-01-05
  */
 #define STREAM_CACHE_MINIMUM_SIZE 2
 
-/**
- *    When skStreamFlush() is called, streams that have not been
- *    written to in the last STREAM_CACHE_INACTIVE_TIMEOUT
- *    milliseconds are closed and removed from the cache.
- *
- *    TODO: Change this to a multiple of the flush timeout.
- */
-#define STREAM_CACHE_INACTIVE_TIMEOUT  (5 * 60 * 1000)
-
 
 /**
  *     The stream cache object.
  */
+struct stream_cache_st;
 typedef struct stream_cache_st stream_cache_t;
 
 
 /**
  *    The cache_entry_t contains information about an active file in
- *    the stream cache.  Calling skCacheLookupOrOpenAdd() fills a
- *    cache_entry_t object.  The caller has a lock on that stream
- *    until skCacheEntryRelease() is called.  The caller may use
- *    skCacheEntryGetStream() to get the stream object from the entry.
+ *    the stream cache.  The structure contains the file key, the
+ *    number of records in the file, and the open file handle.
+ *
+ *    Users of the stream-cache should view the cache_entry_t as
+ *    opaque.  Use the macros and functions to access its members.
  */
 typedef struct cache_entry_st cache_entry_t;
-
-
-/**
- *    cache_file_iter_t is an iterator over the files that have been
- *    returned by skCacheLookupOrOpenAdd() since the previous call to
- *    skCacheCloseAll() or skCacheFlush().
- *
- *    The caller may request an iterator by providing a non-null value
- *    as the second argument to skCacheFlush() and skCacheCloseAll().
- *
- *    The iterator allows the caller to report the number of records
- *    written to each file since the file was opened or the previous
- *    flush, whichever is more recent.
- */
-typedef struct cache_file_iter_st cache_file_iter_t;
-
-
-/**
- *    cache_key_t is used as the key to the stream.  The caller fills
- *    this structure and passes it to skCacheLookupOrOpenAdd().
- */
-struct cache_key_st {
-    /* the hour that this file is for */
-    sktime_t            time_stamp;
-    /* the sensor that this file is for */
-    sk_sensor_id_t      sensor_id;
-    /* the flowtype (class/type) that this file is for */
-    sk_flowtype_id_t    flowtype_id;
+struct cache_entry_st {
+    /** The mutex associated with this entry */
+    pthread_mutex_t     mutex;
+    /** the key */
+    sksite_repo_key_t   key;
+    /** the number of records written to the file since it was added
+     * to the cache */
+    uint64_t            total_rec_count;
+    /** the number of records in the file when it was opened */
+    uint64_t            opened_rec_count;
+    /** when this entry was last accessed */
+    sktime_t            last_accessed;
+    /** the name of the file */
+    const char         *filename;
+    /** the open file handle */
+    skstream_t         *stream;
 };
-typedef struct cache_key_st cache_key_t;
+/* cache_entry_t */
 
 
 /**
- *  stream = cache_open_fn_t(key, caller_data, filename);
+ *    The cache_closed_file_t contains information about a file that
+ *    previously existed in the stream cache.  The structure contains
+ *    the file's key, name, and the number of records written to the file
+ *    since it was added to the cache.
+ *
+ *    A vector of pointers to these structures may be returned by
+ *    skCacheCloseAll().  The caller is responsible for freeing these
+ *    structures, either by calling cache_closed_file_destroy() or by
+ *    calling free() on the 'filename' member and then free() on the
+ *    structure itself.
+ *
+ *    Since the caller owns the structures returned by
+ *    skCacheCloseAll(), she is free to manipulate them as she wishes.
+ */
+typedef struct cache_closed_file_st cache_closed_file_t;
+struct cache_closed_file_st {
+    /* the key for this closed file */
+    sksite_repo_key_t   key;
+    /* the number of records in the file as of opening or the most
+     * recent flush, used for log messages */
+    uint64_t            rec_count;
+    /* the name of the file */
+    const char         *filename;
+};
+/*  cache_closed_file_t */
+
+
+/**
+ *    Destroy the cache_closed_file_t argument.
+ */
+void
+cache_closed_file_destroy(
+    cache_closed_file_t    *closed);
+
+
+/**
+ *  stream = cache_open_fn_t(key, caller_data);
  *
  *    A callback function with this signature must be registered as
  *    the 'open_callback' parameter to to skCacheCreate() function.
  *
  *    This function is used by skCacheLookupOrOpenAdd() when the
- *    stream associated with 'key' is either not in the cache or not
- *    currently open.  If the file represented by 'key' has not been
- *    handled by the cache recently, the 'filename' parameter is NULL.
- *    If the file having 'key' is known to the cache but is currently
- *    closed, the 'filename' parameter is the complete path that was
- *    used the previous time this callback was invoked.
+ *    stream associated with 'key' is not in the cache.  This function
+ *    should open an existing file or create a new file as
+ *    appriopriate.  The 'caller_data' is for the caller to use as she
+ *    sees fit.  The stream cache does nothing with this value.
  *
- *    This callback function should open an existing file or create a
- *    new file as appriopriate.  The 'caller_data' parameter here is
- *    the same 'caller_data' parameter to skCacheLookupOrOpenAdd() and
- *    it is for the caller's use as she sees fit.  The stream cache
- *    does nothing with this value.
- *
- *    This callback function should return NULL if there was an error
- *    opening the file.
+ *    This function should return NULL if there was an error opening
+ *    the file.
  */
 typedef skstream_t *
 (*cache_open_fn_t)(
-    const cache_key_t  *key,
-    void               *caller_data,
-    const char         *filename);
+    const sksite_repo_key_t    *key,
+    void                       *caller_data);
 
 
 /**
- *    Close all the streams in the cache and remove them from the
- *    cache.
+ *  status = skCacheCloseAll(cache, vector);
  *
- *    Return 0 if all streams were successfully flushed and closed.
- *    Return -1 if calling skStreamClose() for any stream returns
- *    non-zero, though all streams will still be closed and destroyed.
+ *    Close all open streams in the cache and remove all knowledge of
+ *    opened and closed streams from the cache.
  *
- *    When 'file_iter' is non-NULL, its referent is set to a newly
- *    created iterator.  The iterator may be used to see the files
- *    which were accessed, and the number of records written, since
- *    the previous call to skCacheCloseAll() or skCacheFlush().
+ *    If the 'vector' parameter is not null, an sk_vector_t of
+ *    pointers is created.  Each pointer references a
+ *    'cache_closed_file_t' structure that contains the file's name
+ *    and the number of records that were written to the stream while
+ *    the cache owned the stream.  The address of the newly created
+ *    vector is put into 'vector'.  The caller should call
+ *    cache_closed_file_destroy() on each entry in the vector and then
+ *    skVectorDestroy() on the vector itself.
  *
- *    The caller must use skCacheFileIterDestroy() to destroy the
- *    iterator.
+ *    If 'vector' is NULL, all record of the streams handled by the
+ *    stream cache is lost.
+ *
+ *    Return zero if all streams were successfully flushed and closed.
+ *    Return -1 if calling the skStreamClose() function for any stream
+ *    returns non-zero, though all streams will still be closed and
+ *    destroyed.
  */
 int
 skCacheCloseAll(
     stream_cache_t     *cache,
-    cache_file_iter_t **iter);
+    sk_vector_t       **vector);
 
 
 /**
- *    Create a stream cache capable of keeping 'max_open_count' files
- *    open.  The 'open_callback' is the function that the stream cache
- *    invokes when skCacheLookupOrOpenAdd() is called on a key that
- *    either the cache has not seen or is that is currently closed.
+ *  cache = skCacheCreate(max_open_count, open_callback);
  *
- *    Returns NULL if memory cannot be allocated, if the
- *    'open_callback' is NULL, or if 'max_open_count' is less than
- *    STREAM_CACHE_MINIMUM_SIZE.
+ *    Create a stream_cache capable of keeping 'max_open_count' files
+ *    open.  The 'open_callback' is the function that the stream_cache
+ *    will invoke when skCacheLookupOrOpenAdd() is called on a key
+ *    that the stream cache has not seen before.
+ *
+ *    Returns NULL if memory cannot be allocated.
  */
-stream_cache_t *
+stream_cache_t*
 skCacheCreate(
-    size_t              max_open_count,
+    int                 max_open_count,
     cache_open_fn_t     open_callback);
 
 
 /**
+ *  status = skCacheDestroy(cache);
+ *
  *    Close all streams and free all memory associated with the
  *    streams.  Free the memory associated with the cache.  The cache
  *    pointer is invalid after a call to this function.
@@ -177,127 +195,61 @@ skCacheDestroy(
 
 
 /**
- *    Return the stream associated with a cache entry.  A locked cache
- *    entry is obtained by calling skCacheLookupOrOpenAdd().
- */
-skstream_t *
-skCacheEntryGetStream(
-    const cache_entry_t    *entry);
-
-
-/**
- *    Release (unlock) a cache entry.  A locked cache entry is
- *    obtained by calling skCacheLookupOrOpenAdd().
- */
-void
-skCacheEntryRelease(
-    cache_entry_t  *entry);
-
-
-/**
- *    Return the number of entries in the iterator returned by
- *    skCacheCloseAll() or skCacheFlush().
- */
-size_t
-skCacheFileIterCountEntries(
-    const cache_file_iter_t    *iter);
-
-
-/**
- *    Destroy an iterator returned by skCacheCloseAll() or
- *    skCacheFlush().
- */
-void
-skCacheFileIterDestroy(
-    cache_file_iter_t  *iter);
-
-
-/**
- *    Move the iterator returned by skCacheCloseAll() or
- *    skCacheFlush() to the next (or first) entry, set the referent of
- *    'filename' to the complete pathname of the file, set the
- *    referent of 'record_count' to the number of records written to
- *    the file since the previous call to skCacheCloseAll() or
- *    skCacheFlush(), and return SK_ITERATOR_OK.
+ *  stream = skCacheEntryGetStream(entry);
  *
- *    If no more files are in the iterator, leave the 'filename' and
- *    'record_count' values unchanged and return
- *    SK_ITERATOR_NO_MORE_ENTRIES.
+ *    Returns the stream associated with a stream entry.
  */
-int
-skCacheFileIterNext(
-    cache_file_iter_t  *iter,
-    const char        **filename,
-    uint64_t           *record_count);
+#define skCacheEntryGetStream(entry) ((entry)->stream)
 
 
 /**
- *    Flush all the streams in the cache.  Remove entries from the
- *    cache that have not been accessed in the previous
- *    STREAM_CACHE_INACTIVE_TIMEOUT milliseconds.
+ *  skCacheEntryRelease(entry);
  *
- *    Return 0 if all streams were successfully flushed.  Return -1 on
- *    memory allocation error or if calling skStreamFlush() for any
- *    stream returns non-zero, though all streams will still be
- *    flushed.
- *
- *    The 'file_iter' argument must be non-NULL.  Its referent is set
- *    to a newly created iterator.  The iterator may be used to see
- *    the files which were accessed, and the number of records
- *    written, since the previous call to skCacheFlush() or
- *    skCacheCloseAll().
- *
- *    The caller must use skCacheFileIterDestroy() to destroy the
- *    iterator.
+ *    Releases (unlocks) a stream entry.
  */
-int
-skCacheFlush(
-    stream_cache_t     *cache,
-    cache_file_iter_t **file_iter);
+#define skCacheEntryRelease(entry)  MUTEX_UNLOCK(&(entry)->mutex)
 
 
 /**
+ *  status = skCacheLookupOrOpenAdd(cache, key, caller_data, &entry);
+ *
  *    Fill 'entry' with the stream cache entry whose key is 'key'.
- *    The entry is returned in a locked state.  The caller must call
+ *    The entry is returned in a locked state.  The caller should call
  *    skCacheEntryRelease() to unlock the entry once processing is
  *    complete.
  *
  *    Specifically, if a stream entry associated with 'key' already
  *    exists in the cache and if the stream is open, lock the entry,
- *    set 'entry' to the entry's location. and return 0.
+ *    set 'entry' to the entry's location and return 0.
+ *
+ *    If the stream entry exists in the cache but the stream is
+ *    closed, then open the stream, lock the entry, fill 'entry' with
+ *    its location, and return 0.
  *
  *    If there is no entry with 'key' in the cache, call the
- *    'open_callback' function (having signature cache_open_fn_t) that
- *    was registered with skCacheCreate().  The arguments to the
- *    callback are the 'key' and the 'caller_data' specified to this
- *    function and NULL as the third parameter.  Once the callback
- *    returns, put the 'key' and the stream returned by the callback
- *    in a new stream cache entry, lock the entry, set 'entry' to
- *    location, and return 0.
+ *    'open_callback' function that was registered with
+ *    skCacheCreate().  The arguments to that function are the 'key'
+ *    and the 'caller_data' specified to this function.  If the
+ *    'open_callback' returns NULL, this function returns -1.
  *
- *    If a stream entry exists in the cache but the stream is closed,
- *    call the 'open_callback' function with the 'key', the
- *    'caller_data', and the full path to the file that was returned
- *    the previous time the open_callback was invoked.  Once the
- *    callback returns, lock the entry, fill 'entry' with its
- *    location, and return 0.
+ *    Otherwise, create use the stream returned by the 'open_callback'
+ *    to create an entry keyed by 'key'.  Lock the entry, put it into
+ *    the locatation pointed at by 'entry', and return 0.
  *
- *    If the 'open_callback' returns NULL, this function returns -1.
- *
- *    After a call to this function, the cache owns the stream
- *    returned by 'open_callback' and frees it when the cache is
- *    full or when skCacheCloseAll() or skCacheDestroy() is called.
+ *    After this call, the cache owns the stream returned by
+ *    'open_callback' and will free it when the cache is full or when
+ *    skCacheCloseAll() or skCacheDestroy() is called.
  *
  *    If the stream cache is at the max_open_count when a new stream
  *    is inserted or an existing entry is re-opened, the least
- *    recently opened stream is closed.
+ *    recently opened stream will be closed.
  */
 int
 skCacheLookupOrOpenAdd(
-    stream_cache_t     *cache,
-    const cache_key_t  *key,
-    void               *caller_data,
-    cache_entry_t     **entry);
+    stream_cache_t             *cache,
+    const sksite_repo_key_t    *key,
+    void                       *caller_data,
+    cache_entry_t             **entry);
 
 
 #ifdef __cplusplus

@@ -6,63 +6,9 @@ B<rwflowpack> - Collect flow data and store it in binary SiLK Flow files
 
 =head1 SYNOPSIS
 
-  rwflowpack [--input-mode=MODE] INPUT_MODE_SPECIFIC_SWITCHES
-        [--output-mode=MODE] OUTPUT_MODE_SPECIFIC_SWITCHES
-        { --log-destination=DESTINATION
-          | --log-pathname=FILE_PATH
-          | --log-directory=DIR_PATH [--log-basename=LOG_BASENAME]
-            [--log-post-rotate=COMMAND] }
-        [--no-file-locking] [--flush-timeout=VAL]
-        [--file-cache-size=VAL] [--pack-interfaces]
-        [--byte-order=ENDIAN] [--compression-method=COMP_METHOD]
-        [--error-directory=DIR_PATH] [--archive-directory=DIR_PATH]
-        [--flat-archive] [--post-archive-command=COMMAND]
-        [--site-config-file=FILENAME] [--log-level=LEVEL]
-        [--log-sysfacility=NUMBER] [--pidfile=FILE_PATH]
-        [--no-chdir] [--no-daemon]
-
-To collect flow data over the network or directory polling (default):
-
-  rwflowpack [--input-mode=stream] --sensor-configuration=FILE_PATH
-        [--packing-logic=PLUGIN] [--sensor-name=SENSOR]
-        [--polling-interval=NUMBER] ...
-
-To collect from local files containing flows created by B<flowcap(8)>:
-
-  rwflowpack --input-mode=fcfiles --incoming-directory=DIR_PATH
-        --sensor-configuration=FILE_PATH [--packing-logic=PLUGIN]
-        [--polling-interval=NUMBER] ...
-
-To collect from a single file containing NetFlow v5 PDUs:
-
-  rwflowpack --input-mode=pdufile --netflow-file=FILE_PATH
-        --sensor-configuration=FILE_PATH [--packing-logic=PLUGIN]
-        [--sensor-name=SENSOR] ...
-
-To respool SiLK Flows without modifying the class, type, or sensor:
-
-  rwflowpack --input-mode=respool --incoming-directory=DIR_PATH
-        [--polling-interval=NUMBER] ...
-
-To store the SiLK Flow files on the local machine (default):
-
-  rwflowpack ... [--output-mode=local-storage]
-        --root-directory=DIR_PATH ...
-
-To create incremental files to be processed by B<rwflowappend(8)>:
-
-  rwflowpack ... --output-mode=incremental-files
-        --incremental-directory=DIR_PATH ...
-
-To create incremental files to be processed by B<rwflowappend> (deprecated):
-
-  rwflowpack ... --output-mode=sending --sender-directory=DIR_PATH
-        --incremental-directory=DIR_PATH ...
+  rwflowpack CONFIG_FILE
 
 Help options:
-
-  rwflowpack --sensor-configuration=FILE_PATH [--packing-logic=PLUGIN]
-        { --verify-sensor-config | --verify-sensor-config=VERBOSE }
 
   rwflowpack --help
 
@@ -71,638 +17,507 @@ Help options:
 =head1 DESCRIPTION
 
 B<rwflowpack> is a daemon that runs as part of the SiLK flow
-collection and packing tool-chain.  The primary job of B<rwflowpack>
-is to convert each incoming flow record to the SiLK Flow format,
-categorize each incoming flow record (e.g., as incoming or outgoing),
-set the sensor value for the record, and determine which hourly file
-will ultimately store the record.
+collection and packing tool-chain.
+
+The capabilities of B<rwflowpack> include:
+
+=over 4
+
+=item *
+
+listening on a network socket for IPFIX data, for NetFlow v9 data, or
+for NetFlow v5 data
+
+=item *
+
+polling a directoy for files containing NetFlow v5 records, IPFIX
+records, or SiLK Flow records
+
+=item *
+
+converting NetFlow or IPFIX data to the SiLK record format
+
+=item *
+
+categorizing each collected flow record by its source and/or
+destination IP addresses and its protocol
+
+=item *
+
+setting the sensor value for each incoming record
+
+=item *
+
+storing the flow records in a flat directory for processing by some
+other tool or another invocation of B<rwflowpack>
+
+=item *
+
+storing the flow records in a data repository where they can be
+queried by B<rwfilter(1)>
+
+=back
+
+In SiLK 4.0, B<rwflowpack> performs the tasks of B<flowcap>,
+B<rwflowpack>, and B<rwflowappend> from previous releases of SiLK.
+The B<flowcap> and B<rwflowappend> tools are not included in SiLK 4.0.
 
 The settings that B<rwflowpack> uses to categorize each flow record
-are determined by two textual configuration files and compiled code
-that is referred to as I<packing logic>.
+are determined by two textual configuration files.
 
 The first of the configuration files is B<silk.conf(5)> which
 specifies the classes, types, and sensors to use at your site.  There
 are several different ways to specify the location of this file as
 detailed in the L</FILES> section below.
 
-The second configuration file is the B<sensor.conf(5)> file, whose
-location is specified via the B<--sensor-configuration> switch.  This
-file contains multiple B<sensor> blocks, where each block contains
-information used to categorize flow records captured at that
-particular sensor.  This file also contains B<probe> blocks which
-specify how to collect NetFlow v5, IPFIX, and/or NetFlow v9 flow
-records, and a mapping of probes to sensors.  See the
-B<sensor.conf(5)> manual page for details.
+The second configuration file is written in the Lua programming
+language (L<http://www.lua.org/>), and the name of this file is
+specified on the B<rwflowpack> command line.  An explanation of the
+required contents of this file is provided in the next section.
 
-The packing logic uses the information from the B<silk.conf> and
-B<sensor.conf> files to I<categorize> each flow record.  By
-categorizing a flow record, we mean determine whether the record is
-incoming or outgoing and assign a class/type pair (also called a
-I<flowtype>) to the record.  The flowtype along with the starting hour
-of the record and the sensor where the record was collected form a
-triple which determines into which file a flow record is stored.  The
-files that B<rwflowpack> produces have the form
-I<flowType>-I<sensorName>_YYYYMMDD.HH where I<flowType> encodes the
-class/type pair, I<sensorName> is the sensor where the flows were
-collected, and I<YYYYMMDD.HH> is the year, month, day, and hour when
-the flow started.
+=head1 CONFIGURATION FILE
 
-For more information on how B<rwflowpack> categorizes each flow record
-and converts data to the SiLK Flow format, see the I<SiLK Installation
-Handbook>, the B<sensor.conf(5)> manual page, and the manual page for
-the packing logic plug-in that B<rwflowpack> is using (e.g.,
-B<packlogic-twoway(3)> is the default, B<packlogic-generic(3)>).
+The B<rwflowpack> configuration file is written in the Lua programming
+language.  For general help on Lua, see
+L<http://www.lua.org/docs.html>.  (The Lua reference manual is also
+included in the SiLK source tree.)
 
-The compiled code for the packing-logic is normally loaded into
-B<rwflowpack> as a run-time.  (The administrator may choose to compile
-the packing logic into B<rwflowpack> when building SiLK.  See the
-I<SiLK Installation Handbook> for details.)  The name of this
-plug-in is specified in the B<packing-logic> statement in the
-F<silk.conf> file.  A different location may be specified using the
-B<--packing-logic> switch.
+For help on Lua functions defined in the B<silk> module, see the
+B<silklua(1)> manual page.
 
-=head2 Input Modes
-
-There are several ways to input data to B<rwflowpack>, and the method
-to use is determined by the B<--input-mode> switch, with C<stream>
-being the default when the switch is not provided.
+B<rwflowpack> expects the configuration file to define three specific
+global variables.  They are:
 
 =over 4
 
-=item C<stream>
+=item log
 
-In C<stream> input-mode, B<rwflowpack> processes the B<probe>
-statements in the B<sensor.conf(5)> file which specify how
-B<rwflowpack> is to capture data from one or more sources.  The data
-is assigned to a sensor based on the probe-sensor mapping in the
-F<sensor.conf> file.  B<rwflowpack> then categorizes the records,
-converts them to the SiLK Flow format, and writes them to files.
+specifies where to write log files
 
-The sources of data that B<rwflowpack> supports are:
+=item output
 
-=over 4
+specifies the type of output that rwflowpack is to create and where to
+write those files
 
-=item *
+=item input
 
-listening for NetFlow v5 packets on a UDP socket
-
-=item *
-
-listening for IPFIX (Internet Protocol Flow Information eXport)
-packets on a TCP or a UDP socket
-
-=item *
-
-listening for NetFlow v9 packets on a UDP socket
-
-=item *
-
-listening for sFlow v5 packets on a UDP socket
-
-=item *
-
-polling a directory for files containing NetFlow v5 records (see the
-description of the C<pdufile> input-mode for the required format of
-these files)
-
-=item *
-
-polling a directory for files containing IPFIX records (as generated
-by B<yaf(1)>)
-
-=item *
-
-polling a directory for files containing SiLK Flow records (compare to
-the C<respool> input-mode)
+specifies where rwflowpack gets its data and how to modify that data
+to produce the output
 
 =back
 
-Multiple sources may be specified.
-
-Processing of IPFIX, NetFlow v9, or sFlow is only available when SiLK is
-compiled with support for libfixbuf-1.7.0 or later.  Processing of
-sFlow records was added in SiLK 3.9.0.  libfixbuf is available from
-L<http://tools.netsa.cert.org/fixbuf/>.
-
-Configuration of C<stream> input-mode is specified in the L</Stream
-Collection Switches (--input-mode=stream)> section below.
-
-=item C<fcfiles>
-
-Instead of having B<rwflowpack> capture data itself, you may configure
-B<rwflowpack> to work in conjunction with one or more B<flowcap(8)>
-daemons by specifying C<fcfiles> as the input-mode.
-
-In this configuration, each B<flowcap> uses the B<probe> statements in
-the B<sensor.conf(5)> file to determine how to collect the data.
-B<flowcap> supports the network-based capture methods specified for
-the C<stream> input-mode---i.e., B<flowcap> does not support directory
-polling.  B<flowcap> writes the data it captures into small files and
-includes the probe name in each file's header.
-
-Typically, the B<flowcap> processes run on separate machines near the
-router or flow meter that is generating the records.  The
-B<rwsender(8)> and B<rwreceiver(8)> daemons are often used to move the
-files from the B<flowcap> machines to the B<rwflowpack> machine.
-
-B<rwflowpack> polls a directory for the files created by B<flowcap>.
-Once it finds a file, it assigns those records a sensor based on the
-probe-sensor mapping in the F<sensor.conf> file, it categorizes the
-records, and it writes the records to one or more output files.
-
-Since B<rwflowpack> does not capture data in C<fcfiles> input-mode,
-B<rwflowpack> does not use the B<probe> statements in the
-F<sensor.conf> file, and the statements do not need to be present.
-
-The switches that B<rwflowpack> uses in C<fcfiles> input-mode are
-given below (L</Flowcap Files Collection Switches
-(--input-mode=fcfiles)>).
-
-=item C<pdufile>
-
-Setting the input-mode to C<pdufile> tells B<rwflowpack> to read a
-single file containing NetFlow v5 PDU records and then exit.
-B<rwflowpack> will not become a daemon in this input-mode; instead it
-will remain in the foreground, process the NetFlow file, and exit.
-
-The file must be in the format created by NetFlow Collector: The
-file's size must be an integer multiple of 1464, where each 1464 byte
-chunk contains a 24-byte NetFlow v5 header and space for thirty
-48-byte NetFlow records.  The number of valid records per chunk is
-specified in the chunk's header.  (This is also the format that
-B<rwflowpack> requires in C<stream> input-mode when it is polling a
-directory for NetFlow v5 files.)
-
-To convert single PDU file to a stream of SiLK Flow records, consider
-using B<rwpdu2silk(1)>.
-
-In C<pdufile> input-mode, the F<sensor.conf> file must define a sensor
-that maps to a probe that uses the B<read-from-file> statement.
-However, the argument to that statement is ignored, and the argument
-is typically set to F</dev/null>.  The NetFlow v5 file's location must
-be specified with the B<--netflow-file> switch.  If F<sensor.conf>
-contains multiple sensor blocks, the B<--sensor-name> switch is
-required to tell B<rwflowpack> which sensor to use.
-
-See the L</PDU File Collection Switches (--input-mode=pdufile)>
-section below for additional configuration information.
-
-=item C<respool>
-
-Sometimes it is desirable to pull existing SiLK Flow records from one
-data repository and use them to create a "mini" data repository (for
-example, for testing).  The C<respool> input-mode is one way to
-accomplish this.
-
-In this configuration, B<rwflowpack> polls a directory for SiLK flow
-files and it uses the I<existing> class/type pair and sensor values to
-determine where to store the flow record.  That is, B<rwflowpack> puts
-the data into appropriate hourly file, but it does not change any
-other settings on the flow records.
-
-To contrast C<respool> input-mode with B<rwflowpack> processing SiLK
-Flow files in C<stream> input-mode: In C<respool> input-mode, the
-existing class, type, and sensor values are used to determine each
-record's destination.  In the latter, B<rwflowpack> treats the records
-as it would any other newly arrived data, assigning the data to a
-sensor and re-categorizing the records to assign a class/type pair to
-them.
-
-Since no categorization occurs in C<respool> input-mode, the
-B<--sensor-configuration> and B<--packing-logic> switches are not
-required, and their use will cause B<rwflowpack> to exit with an error
-code.
-
-=back
-
-=head2 Output Modes
-
-As mentioned above, after B<rwflowpack> categorizes a flow record
-(that is, determines the sensor, class/type, and starting hour for the
-record), it uses those values to generate the name of the hourly file
-that will contain that record, and it writes the record to that file.
-
-In order for the record in that file to be retrievable by
-B<rwfilter(1)>, the file must be stored in a SiLK data repository,
-which is a directory tree of binary SiLK Flow files.  The root of this
-directory tree is called the SILK_DATA_ROOTDIR.  The structure of the
-tree under the root is determined by the B<path-format> setting in the
-B<silk.conf(5)> file.
-
-There are two ways to get the files into the SILK_DATA_ROOTDIR; which
-method is used is determined by B<rwflowpack>'s B<--output-mode>
-switch.  This switch supports the following values:
+Two optional variables may also be defined:
 
 =over 4
 
-=item C<local-storage>
+=item options
 
-In C<local-storage> output-mode, B<rwflowpack> creates the hourly SiLK
+specifies global settings, such as the number of file handles to use
+or how to compress the output files
+
+=item daemon
+
+specifies whether B<rwflowpack> becomes a daemon
+
+=back
+
+Each of those variables must be a table.  For each table, some keys
+are generally required.  Most keys take strings as their value, and
+the string must be quoted using a matching set of either single or
+double quotes.
+
+=head2 The log Variable
+
+B<rwflowpack> requires that the configuration file define a variable
+named C<log>, and B<rwflowpack> exists with an error if the variable
+is not defined.  The C<log> table must contain one and only one of the
+following keys:
+
+=over 4
+
+=item directory
+
+names the complete path to a directory in which log files are written.
+The names of the log files include a date stamp and the files are
+rotated every day.
+
+=item pathname
+
+names the complete path to a single file in which all log messages are
+written.
+
+=item destination
+
+is one of: the string C<syslog> to write messages to the system log
+(e.g., F</var/log/messages>), the string C<none> to disable output of
+log messages, the string C<stdout> to send messages to the standard
+output, the string C<stderr> to send messages to the standard error,
+or the complete path to a single file in which all log messages are
+written.
+
+=back
+
+The following keys are optional in the C<log> table:
+
+=over 4
+
+=item level
+
+specifies the lowest level of log messages to write to the log.  From
+most verbose to least, the levels are C<debug>, C<info>, C<notice>,
+C<warning>, C<err>, C<crit>, C<alert>, C<emerg>.  When this key is not
+specified, the level is C<info>.
+
+=item post_rotate
+
+specifies a string that is treated as a shell command to run on the
+file after it is rotated.  When this key is not specified, the
+previous day's log file is compressed with B<gzip(1)>.  When the key's
+value is the empty string, no action is taken on the log file.  Each
+occurrence of C<%s> in the command is replaced with the full path to
+the log file, and each occurrence of C<%%> is replaced with C<%>.  If
+any other character follows C<%>, B<rwflowpack> exits with an error.
+B<rwflowpack> exits with an error when this key is specified and the
+C<directory> key is not.
+
+=item basename
+
+specifies the basename to use for log files in the directory.  The
+default is the name of the application.  B<rwflowpack> exits with an
+error when this key is specified and the C<directory> key is not.
+
+=item sysfacility
+
+sets the facility that B<syslog(3)> uses for logging messages.  The
+facility describes the part of the system generating the message.
+This key takes as its value either a number or one of the strings
+C<user>, C<local0>, C<local1>, C<local2>, C<local3>, C<local4>,
+C<local5>, C<local6>, C<local7>, or C<daemon>.  The default is a value
+that corresponds to C<LOG_USER> on the system where B<rwflowpack> is
+running.  B<rwflowpack> exits with an error when this key is specified
+unless the C<destination> key is provided and is set to C<syslog>.
+
+=back
+
+An example log table is:
+
+ log = {
+   directory = "/var/rwflowpack/log",
+   level = "debug",
+   sysfacility = "daemon",
+   -- Do not save old log files
+   post_rotate = "rm %s",
+   basename = "rwflowpack-silk4",
+ }
+
+=head2 The daemon Variable
+
+The C<daemon> variable is optional.  If it is defined, its value is a
+table that controls B<rwflowpack>'s behavior regarding being a daemon.
+The table supports the following keys:
+
+=over 4
+
+=item fork
+
+controls whether B<rwflowpack> runs in the foreground (when this key's
+value is B<false>) or detaches itself from the terminal and becomes a
+daemon. Running in the foreground may be useful when debugging
+B<rwflowpack>.  The default behavior is to become a daemon.
+
+=item pid_file
+
+specifies the complete path to the file in which B<rwflowpack> writes
+its process ID (PID) when it is running as a daemon.  A PID file is
+not written when the C<fork> key in this table is B<false>.  When this
+key is not specified, the PID file is written to the log directory and
+its name is the application name with a suffix of F<.pid>.  If the
+configuration file does not specify a log directory or a pid_file
+value, then no PID file is written.
+
+=item chdir
+
+controls whether B<rwflowpack> remains in the directory where the
+application was invoked (when this key's value is B<false>) or changes
+directories to the root of the directory tree (the F</> directory).
+B<rwflowpack> does not change its directory when the C<fork> key in
+this table is B<false>.  Running in the current directory may be
+useful when debugging B<rwflowpack>.
+
+=back
+
+An example daemon table is:
+
+ daemon = {
+   -- Use the same directory as the for the log files, but
+   -- change the basename of the file
+   pid_file = log.directory .. "/rwflowpack-silk4.pid"
+   fork = true,
+   chdir = true,
+ }
+
+=head2 The options Variable
+
+The C<options> variable is not required.  If it is defined, its value
+is a table that modifies global defaults, and it supports the
+following keys:
+
+=over 4
+
+=item file_cache_size
+
+sets the maximum number of data files to have open for writing at any
+one time.  If not specified, the default is 128 files.  The minimum
+file cache size is 4.  This value also determines how many files
+B<rwflowpack> reads from simultaneously when using probes that poll
+directories for files.  The maximum number of input files open at any
+one time is limited to one eighth of the cache size (with a minimum of
+2).  The number of directory polling operations B<rwflowpack> performs
+simultaneously is limited to one sixteenth of the cache size (minimum
+is 1).
+
+=item file_locking
+
+controls the use of advisory write locks.  Unless this key is
+specified and has a value of B<false>, B<rwflowpack> obtains a write
+lock on an hourly data file in the repository prior to writing records
+to it.  The write lock prevents two instances of B<rwflowpack> from
+writing to the same data file simultaneously.  Attempting to use a
+write lock on some file systems causes B<rwflowpack> to exit with an
+error, and setting this key to B<false> disables locking on those file
+systems.
+
+=back
+
+An example options table is:
+
+ options = {
+   file_cache_size = 128,
+   file_locking = true,
+ }
+
+=head2 The output Variable
+
+B<rwflowpack> requires that the configuration file define a variable
+named C<output>, and B<rwflowpack> exists with an error if the
+variable is not defined.  The value of C<output> is a table, and it
+specifies what B<rwflowpack> does with its input.  The following key
+is required:
+
+=over 4
+
+=item mode
+
+specifies the type of output that B<rwflowpack> creates.  Its value is
+a string and it must have one of the following values:
+
+=over 4
+
+=item local-storage
+
+In C<local-storage> output mode, B<rwflowpack> creates the hourly SiLK
 Flow files directly in the data repository, and it writes the records
-into these files.  B<rwflowpack> uses C<local-storage> output-mode
-when the B<--output-mode> switch is not provided.
+into these files.
 
-=item C<incremental-files>
+=item incremental-files
 
-When the output-mode is C<incremental-files>, B<rwflowpack> does not
+When the output mode is C<incremental-files>, B<rwflowpack> does not
 create hourly data files directly.  Instead, B<rwflowpack> creates
 smaller files (called I<incremental files>), and B<rwflowpack> relies
-on the B<rwflowappend(8)> daemon to combine the incremental files into
-hourly files in the final data repository.
+on another invocation of B<rwflowpack> (running in
+C<append-incremental> input mode) to combine the incremental files
+into hourly files in the final data repository.
 
-In C<incremental-files> output-mode, B<rwflowpack> uses a single
-destination directory whose location is specified by the
-B<--incremental-directory> switch.  In this directory, B<rwflowpack>
-creates a zero-byte I<place holder file> and a corresponding I<working
-file>.  The name of the place holder file has a unique, random suffix,
-and the name of the working file is a dot (C<.>) followed by the name
-of the place holder file.
+=item flowcap
 
-B<rwflowpack> first writes records to the working files.  Periodically
-(as determined by the value specified to B<--flush-timeout>),
-B<rwflowpack> closes all the working files and moves them over the
-place holder files.  Once B<rwflowpack> has closed and moved a working
-file, it no longer takes responsibility for it.
+C<flowcap> output mode is similar to C<incremental-files> output mode
+in that all files are created in a single directory.  The C<stream>
+input mode is the only valid input mode that may be paired with
+C<flowcap> output mode.  In C<flowcap> output mode, the flow records
+are stored according to when they arrive, not the time stamps on the
+individual records.  Flow records that are stored by an instance of
+B<rwflowpack> running in C<flowcap> output mode maybe processed by
+another instance of B<rwflowpack> running in C<fcfiles> input mode.
 
-The B<rwflowappend> process can poll the incremental-directory itself,
-or another process can poll that directory and pass the files to
-B<rwflowappend>.  If B<rwflowpack> and B<rwflowappend> are on
-different machines, an B<rwsender(8)>/B<rwreceiver(8)> pair can move
-the files between the machines.
+=item one-destination
 
-Additional reasons one may want to use C<incremental-files>
-output-mode are to support having multiple data repositories or to
-allow additional processing of the SiLK Flow records (such as by the
-Analysis Pipeline (L<http://tools.netsa.cert.org/analysis-pipeline/>).
-
-B<Note:> This output-mode was introduced in SiLK 3.6.0.  This mode is
-similar to the C<sending> output-mode and is meant to replace it.  In
-C<incremental-files> output-mode, all writing occurs within the
-incremental-directory, while the C<sending> output-mode uses two
-directories.
-
-=item C<sending>
-
-This output-mode works similarly to C<incremental-files>.  The
-difference is that when B<rwflowpack> flushes the open files, it moves
-the files from the incremental-directory and to the directory
-specified by the B<--sender-directory> switch.  Once a file is
-moved to the sender-directory, B<rwflowpack> no longer takes
-responsibility for it.
-
-As of SiLK 3.6.0, the C<sending> output-mode is deprecated.
+The C<one-destination> output mode stores all flow records in a single
+file.
 
 =back
 
-=head1 OPTIONS
+=back
 
-Option names may be abbreviated if the abbreviation is unique or is an
-exact match for an option.  A parameter to an option may be specified
-as B<--arg>=I<param> or B<--arg> I<param>, though the first form is
-required for options that take optional parameters.
-
-=head2 Input and Output Mode
-
-As described in the L</Input Modes> section above, B<rwflowpack> has
-multiple ways of getting data, and that data may be stored in one of
-two methods (c.f., L</Output Modes>).  Choosing the modes and
-configuring each mode are described in the sections below.
+The C<output> table supports the following keys.  Some of these keys
+may be required depending on the setting of C<mode>.  In most cases,
+if a key is specified that is not needed, B<rwflowpack> prints a
+warning message but it does not exit.
 
 =over 4
 
-=item B<--input-mode>=I<MODE>
+=item root_directory
 
-Determine how B<rwflowpack> will gather data.  The default input
-I<MODE> is C<stream>.  The available input-modes are C<stream>,
-C<fcfiles>, C<pdufile>, and C<respool>.
+specifies the full path of the directory in which to write the hourly
+files when the output mode is C<local-storage>.
 
-=item B<--output-mode>=I<MODE>
+=item output_directory
 
-Determines what B<rwflowpack> will do with the data as it is packed
-into SiLK binary files.  The default output I<MODE> is
-C<local-storage>.  The available output-modes are C<local-storage>,
-C<incremental-files> and C<sending>.
+specifies the full path of the directory in which to write output
+files when the output mode is C<flowcap> or C<incremental-files>.
+
+=item destination_file
+
+specifies the full path of the file where flow records are written in
+C<one-destination> output mode.  Either the file must not exist or the
+SILK_CLOBBER environment variable must be set (in which case the file
+is overwritten).
+
+=item processing
+
+specifies a table that names a directory to use for temporary files in
+C<local-storage> and C<incremental-files> output modes.  When the
+table is present, it must contain the following keys:
+
+=over 4
+
+=item directory
+
+names the full path to the processing directory, which must exist
+
+=item error_directory
+
+names the full path to an existing directory.  The value is not used
+currently; in a future release, it will be a directory in which to
+store temporary files that are invalid.
 
 =back
 
-=head2 Stream Collection Switches (--input-mode=stream)
+=item file_info
 
-In C<stream> input-mode, B<rwflowpack> uses the B<probe> statements in
-the F<sensor.conf> file to capture data, and then B<rwflowpack>
-categorizes the data.  The C<stream> input-mode is the default when
-the B<--input-mode> switch is not provided.  This input-mode accepts
-the following switches; the B<--sensor-configuration> switch is
-required, and all other switches are optional.
+specifies the format and other characteristics of the file created by
+B<rwflowpack> when it is running in C<one-destination> output mode.
+(In other output modes, this information is provided in other
+locations.)  If this key is not specified, default values are used and
+no sidecar fields are stored.  The value is a table that supports the
+following keys:
 
 =over 4
 
-=item B<--sensor-configuration>=I<FILE_PATH>
+=item record_format
 
-Give the path to the configuration file that specifies how
-B<rwflowpack> is to capture data and that tells B<rwflowpack> whether
-a record represents an incoming or outgoing flow.  The complete syntax
-of the configuration file is described in the B<sensor.conf(5)> manual
-page; see also the I<SiLK Installation Handbook>.
+specifies the format to use when creating destination files.  The
+value may be a string representing the name of a format or an integer.
+If the value is a string, B<rwflowpack> uses the Lua function
+B<silk.file_format_id()> to convert the name to an integer.  Common
+file formats are:
 
-=item B<--packing-logic>=I<PLUGIN>
+=over 4
 
-Specify the plug-in that B<rwflowpack> should load, where the plug-in
-provides functions that determine into which class and type each flow
-record will be categorized and the format of the files that
-B<rwflowpack> will write.  When SiLK has been configured with
-hard-coded packing logic (i.e., when B<--enable-packing-logic> was
-specified to the B<configure> script), this switch will not be present
-on B<rwflowpack>.  A default value for this switch may be specified in
-the B<silk.conf(5)> site configuration file (see the description of
-the B<--site-config-file> switch).  When I<PLUGIN> does not contain a
-slash (C</>), B<rwflowpack> will attempt to find a file named
-I<PLUGIN> in the directories listed in the L</FILES> section.  If
-B<rwflowpack> finds the file, it uses that path.  If I<PLUGIN>
-contains a slash or if B<rwflowpack> does not find the file,
-B<rwflowpack> relies on your operating system's B<dlopen(3)> call to
-find the file.  When the SILK_PLUGIN_DEBUG environment variable is
-non-empty, B<rwflowpack> prints status messages to the standard error
-as it attempts to find and open each of its plug-ins.  B<rwflowpack>
-will exit if it does not have access to the packing logic functions.
+=item FT_RWIPV6ROUTING
 
-=item B<--sensor-name>=I<SENSOR>
+Capable of holding all SiLK fields and either IPv4 or IPv6 addresses.
+Does not use bit shaving to reduce record size.
 
-Cause B<rwflowpack> to ignore all probes in the sensor configuration
-file except the probes for I<SENSOR>.  Only data for this sensor will
-be collected.  This allows a common configuration file to be used by
-multiple B<rwflowpack> invocations, yet also allow each B<rwflowpack>
-instance only collect data for a single sensor.  There must be a
-sensor definition for I<SENSOR> in the configuration file.  When this
-switch is not present, B<rwflowpack> will collect and pack data for
-all sensors.
+=item FT_RWIPV6
 
-=item B<--polling-interval>=I<NUMBER>
+Similar to FT_RWIPV6ROUTING but omits the next hop IP address and the
+SNMP fields (the SiLK fields C<in> and C<out> that hold the
+ingressInterface and egressInterface)
 
-Specify the number of seconds B<rwflowpack> will wait between queries
-of the C<poll-directory>s.  This defaults to 15 seconds.
+=item FT_RWGENERIC
+
+Capable of holding all SiLK fields and only IPv4 addresses.  Does not
+use bit shaving to reduce record size.
+
+=item FT_RWAUGROUTING
+
+Similar to FT_RWGENERIC but expects the sensor value, class,type pair,
+and the starting hour to be stored in the file's header.  Stores an
+individual start time as seconds after the starting hour.  Uses
+reduced bit-widths for some fields.
+
+=item FT_RWAUGMENTED
+
+Similar to FT_RWAUGROUTING but omits the next hop IP address and the
+SNMP fields
+
+=item FT_RWAUGWEB
+
+Similar to FT_RWAUGMENTED but sets the protocol of all records to TCP
+and limits either the source port or the destination port to one of
+80, 443, or 8080
+
+=item FT_RWROUTED
+
+Similar to FT_RWAUGROUTING but does not store attributes, application
+label, initial TCP flags, and session TCP flags
+
+=item FT_RWSPLIT
+
+Similar to FT_RWROUTED but omits the next hop IP address and the
+SNMP fields
+
+=item FT_RWWWW
+
+Similar to FT_RWSPLIT but sets the protocol of all records to TCP and
+limits either the source port or the destination port to one of 80,
+443, or 8080
+
+=item FT_FLOWCAP
+
+Similar to FT_RWGENERIC but does not include sensor, class, and type
+values since it assumes those values have not been assigned.  Uses
+reduced bit-widths for some fields.
 
 =back
 
-=head2 Flowcap Files Collection Switches (--input-mode=fcfiles)
+=item record_version
 
-As described in the L</Input Modes> section above, in C<fcfiles>
-input-mode, B<rwflowpack> processes files created by the B<flowcap(8)>
-daemon.  In C<fcfiles> input-mode, the B<--sensor-configuration> and
-B<--incoming-directory> switches are required.
+is an integer that specifies a particular version for the record
+format.  If this key is not specified, the default version of the
+record_format is used.  The supported record versions are only
+documented in the source code.
 
-=over 4
+=item sidecar
 
-=item B<--sensor-configuration>=I<FILE_PATH>
+specifies the sidecar description header to be written to the file's
+header so that the records may include sidecar data.  This sidecar
+object must hold all fields that may potentially be included on the
+record.  If a sidecar field is added to a record but there is no
+description of that field in the header, the field is not included in
+the output.  See the L</EXAMPLES> section below for a couple of
+examples.
 
-Give the path to the configuration file that B<rwflowpack> will
-consult to determine whether a record represents an incoming or
-outgoing flow.  The complete syntax of the configuration file is
-described in the B<sensor.conf(5)> manual page; see also the I<SiLK
-Installation Handbook>.
+=item byte_order
 
-=item B<--incoming-directory>=I<DIR_PATH>
-
-Name the full path of the directory which B<rwflowpack> will monitor
-for files created by B<flowcap>.  Once processed by B<rwflowpack>,
-files are moved from this directory to the archive-directory, if it
-has been specified.
-
-=item B<--packing-logic>=I<PLUGIN>
-
-Specify the plug-in that B<rwflowpack> should load for the packing
-logic.  For more detail, see the description above.
-
-=item B<--polling-interval>=I<NUMBER>
-
-Specify the number of seconds B<rwflowpack> will wait between polls of
-the incoming-directory for new files created by B<flowcap>.  If not
-given, the default value is 15 seconds.
-
-=back
-
-=head2 PDU File Collection Switches (--input-mode=pdufile)
-
-In this input-mode, B<rwflowpack> stays in the foreground, processes a
-single file of NetFlow v5 data, and exits.  The
-B<--sensor-configuration> and B<--netflow-file> switches are required.
-The B<--sensor-name> switch is also required when the F<sensor.conf>
-file contains more than one sensor.  The following switches are
-available in C<pdufile> input-mode:
+specifies the byte order to use for newly created SiLK Flow files.
+When appending records to an existing file, the byte order of the file
+is maintained.  The argument is a string and must have one of the
+following values:
 
 =over 4
 
-=item B<--sensor-configuration>=I<FILE_PATH>
-
-Give the path to the configuration file that B<rwflowpack> will
-consult to determine whether a record represents an incoming or
-outgoing flow.
-
-=item B<--netflow-file>=I<FILE_PATH>
-
-Name the full path of the file from which B<rwflowpack> reads NetFlow
-v5 PDUs.  This switch is required in PDU File input-mode.
-
-=item B<--sensor-name>=I<SENSOR>
-
-Cause B<rwflowpack> to ignore all probes in the sensor configuration
-file except the probes for I<SENSOR>.  There must be a sensor
-definition for I<SENSOR> in the configuration file.  This switch is
-required in this input-mode unless the F<sensor.conf> file only
-defines a single sensor.
-
-=item B<--packing-logic>=I<PLUGIN>
-
-Specify the plug-in that B<rwflowpack> should load for the packing
-logic.  For more detail, see the description of this switch in the
-C<stream> input-mode.
-
-=back
-
-=head2 Respooling Switches (--input-mode=respool)
-
-When the B<--input-mode>=C<respool> switch is provided, B<rwflowpack>
-polls a directory for SiLK Flow files, and writes the records it finds
-into new hourly files, leaving the sensor and class/type values
-unchanged in the records.  (See L</Input Modes> above for additional
-details.)  The first of the following switches is required:
-
-=over 4
-
-=item B<--incoming-directory>=I<DIR_PATH>
-
-Name the full path of the directory which B<rwflowpack> will monitor
-for SiLK Flow files.  Once processed by B<rwflowpack>, files are moved
-from this directory to the archive-directory, if it has been
-specified.
-
-=item B<--polling-interval>=I<NUMBER>
-
-Specify the number of seconds B<rwflowpack> will wait between polls of
-the incoming-directory.  If not given, the default value is 15
-seconds.
-
-=back
-
-=head2 Local Storage Switches (--output-mode=local-storage)
-
-In C<local-storage> output-mode, B<rwflowpack> stores SiLK Flow
-records directly in the data repository.  This is the default when the
-B<--output-mode> switch is not provided.  When operating in this
-output-mode, the following switch is required:
-
-=over 4
-
-=item B<--root-directory>=I<DIR_PATH>
-
-Name the full path of the SILK_DATA_ROOTDIR; that is, the directory
-under which the files containing the packed SiLK Flow records will be
-stored.  B<rwflowpack> will create subdirectories below I<DIR_PATH>
-based on the data received and the B<path-format> setting in the
-B<silk.conf(5)> file.
-
-=back
-
-=head2 Incremental-Files Switches (--output-mode=incremental-files)
-
-As described in the L</Output Modes> section above, the
-C<incremental-files> output-mode tells B<rwflowpack> to write
-incremental-files.  The B<rwflowappend(8)> daemon combines these
-incremental-files to create a SiLK data repository.  When running in
-C<incremental-files> output-mode, the following switch must be
-provided:
-
-=over 4
-
-=item B<--incremental-directory>=I<DIR_PATH>
-
-Name the full path of the destination directory where
-incremental-files are both created and stored to await action by
-another process such as B<rwflowappend> or B<rwsender>.  It is
-recommended that only a single B<rwflowpack> process write to this
-directory.
-
-=back
-
-=head2 Sending Mode Switches (--output-mode=sending)
-
-This output-mode is deprecated as of SiLK 3.6.0.  This output-mode
-works similarly to the C<incremental-files> output-mode, except
-B<rwflowpack> moves the files to a second directory periodically.
-Both the following switches are required in C<sending> output-mode:
-
-=over 4
-
-=item B<--incremental-directory>=I<DIR_PATH>
-
-Name the full path of the working directory under which
-incremental-files are initially created.  Periodically (as determined
-by the B<--flush-timeout> switch), B<rwflowpack> closes the files in
-this directory and moves them to the sender-directory.  An
-B<rwflowpack> invocation assumes it has full control over the files in
-this directory.  When B<rwflowpack> starts, any files in this
-directory are moved to the sender-directory.
-
-=item B<--sender-directory>=I<DIR_PATH>
-
-Name the full path of the destination directory where
-incremental-files are moved to await action by another process such as
-B<rwflowappend> or B<rwsender>.  Once B<rwflowpack> moves files to
-this directory, it no longer takes responsibility for them.  The other
-process (e.g., B<rwsender>) is responsible for removing files from
-this directory.  Multiple B<rwflowpack> invocations may use a single
-sender-directory.
-
-=back
-
-=head2 General Configuration
-
-The following switches are optional:
-
-=over 4
-
-=item B<--no-file-locking>
-
-Do not use advisory write locks.  Normally, B<rwflowpack> obtains a
-write lock on an data file prior to writing records to it.  The write
-lock prevents two instances of B<rwflowpack> from writing to the same
-data file simultaneously.  However, attempting to use a write lock on
-some file systems causes B<rwflowpack> to exit with an error, and this
-switch can be use when writing data to these file systems.
-
-=item B<--flush-timeout>=I<VAL>
-
-Set the timeout for flushing any in-memory records to disk to I<VAL>
-seconds.  If not specified, the default is 2 minutes (120 seconds).
-When the output-mode is C<local-storage>, this value specifies how
-often the files are flushed to disk to ensure that any records in
-memory are written to disk.  When using the C<incremental-files> or
-C<sending> output-mode, this value specifies how often to close and
-move the incremental files.  See the L</Output Modes> section for
-details.
-
-=item B<--file-cache-size>=I<VAL>
-
-Set the maximum number of data files to have open for writing at any
-one time to I<VAL>.  If not specified, the default is 128 files.  The
-minimum file cache size is 4.  This switch also determines how many
-files B<rwflowpack> will read from simultaneously when using probes
-that poll directories for files (see B<sensor.conf(5)>).  The maximum
-number of input files open at any one time is limited to one eighth of
-I<VAL> (with a minimum of 2), and the number of directory polling
-operations to perform simultaneously is limited to one sixteenth of
-I<VAL> (minimum is 1).
-
-=item B<--pack-interfaces>
-
-Allow one to override the default file output formats of the packed
-SiLK Flow files that B<rwflowpack> writes.  When this switch is
-present, B<rwflowpack> writes additional information into the packed
-files: the router's SNMP input and output interfaces and the next-hop
-IP address.  (When the F<sensor.conf> file contains an
-C<interface-values> attribute whose value is C<vlan>, the input and
-output fields contain the vlan IDs instead of SNMP interface values.)
-The extra data produced by this switch is useful for determining why
-traffic is being stored in certain files.  Note that this switch will
-only affect newly created files.  New records will always be appended
-to an existing file in the file's current output format to maintain
-file integrity.
-
-=item B<--byte-order>=I<ENDIAN>
-
-Set the byte order for newly created SiLK Flow files.  When appending
-records to an existing file, the byte order of the file is maintained.
-The argument is one of the following:
-
-=over 4
-
-=item C<native>
+=item native
 
 Use the byte order of the machine where B<rwflowpack> is running.
-This is the default.
+This is the default when the key is not specified.
 
-=item C<big>
+=item big
 
 Use network byte order (big endian) for the flow files.
 
-=item C<little>
+=item little
 
-Write the flow files in little endian format.
+Use non-network byte order (little endian) format.
 
 =back
 
-=item B<--compression-method>=I<COMP_METHOD>
+=item compression_method
 
-Specify the compression library to use when creating new files.  When
-this switch is not
-given, newly created files are compressed using the default chosen
-when SiLK was compiled.  When appending records to an existing file,
-the compression method of the file is maintained.  The valid values
-for I<COMP_METHOD> are determined by which external libraries were
-found when SiLK was compiled.  To see the available compression
-methods and the default method, use the B<--help> or B<--version>
-switch. SiLK can support the following I<COMP_METHOD> values when the
-required libraries are available.
+specifies the compression method to use for newly created SiLK flow
+files.  When appending records to an existing file, the compression
+method of the file is maintained.  The argument is a string and must
+have one of the following values:
 
 =over 4
 
@@ -723,9 +538,9 @@ memory and CPU overhead.
 
 =item snappy
 
-Use the I<snappy> library for compression, and always compress the
-output regardless of the destination.  This compression provides good
-compression with less memory and CPU overhead.  I<Since SiLK 3.13.0.>
+Use the I<snappy> library for compression.  This compression provides
+good compression with less memory and CPU overhead.  I<Since SiLK
+3.13.0.>
 
 =item best
 
@@ -734,230 +549,1639 @@ use zlib if available.
 
 =back
 
-=item B<--site-config-file>=I<FILENAME>
-
-Read the SiLK site configuration from the named file I<FILENAME>.
-When this switch is not provided, B<rwflowpack> searches for the site
-configuration file in the locations specified in the L</FILES>
-section.
+The compression methods may not include all items in this list if the
+required external library was not found when SiLK was compiled.  To
+see the available compression methods and the default method. use the
+B<--help> or B<--version> switch.
 
 =back
 
-=head2 Disposal of Input Flow Files
+=item flush_interval
 
-The following switches determine how B<rwflowpack> handles input files
-once it has processed them.  These switches have no effect when
-B<rwflowpack> reads all of its data directly from the network.
-Otherwise, the switches affect the named B<--netflow-file> in
-C<pdufile> input-mode, the files read from the B<--incoming-directory>
-in C<fcfiles> and C<respool> input-mode, and files read from probes
-that have a C<poll-directory> statement (c.f. B<sensor.conf(5)>) in
-C<stream> input-mode.
+specifies how often output files are flushed, as a number of seconds.
+When not specified, output files are flushed every 120 seconds.
+
+=item hour_file_command
+
+provides a shell command to run on an hourly file whenever the file is
+first created in C<local-storage> output mode.  Each occurrence of
+C<%s> in the command is replaced with the full path to the log file,
+and each occurrence of C<%%> is replaced with C<%>.  If any other
+character follows C<%>, B<rwflowpack> exits with an error.
+
+=item repository_writer_threads
+
+is the number of threads that take files from the processing directory
+and append them to the hourly files in the root_directory when the
+output mode is C<local-storage>.  The default number of threads is 1.
+
+=item reject_hours_past
+
+causes B<rwflowpack> to ignore files that contain flow records whose
+start times occurred more than this number of hours in the past when
+running in C<local-storage> output mode.  The default is to process
+all files.
+
+=item reject_hours_future
+
+causes B<rwflowpack> to ignore files that contain flow records whose
+start times occur more than this number of hours in the future when
+running in C<local-storage> output mode.  The default is to process
+all files.
+
+=item synchronize_flush
+
+indicates that that files should be flushed at particular offsets from
+the top of the hour when the output mode is C<flowcap>.  The value is
+the number of seconds.  When this value is not specified, files are
+closed flush_interval seconds after being opened without regard to the
+current time of day.
+
+=item usedspace_maximum_percent
+
+specifies the maximum percentage of the disk to use when running in
+C<flowcap> output mode.  This setting includes all files on disk, not
+only those owned by B<rwflowpack>.  The value may be specified as a
+floating point value from 0.0 to 99.0.  When not specified,
+B<rwflowpack> may fill the disk.
+
+=item freespace_minimum_bytes
+
+specifies the minimum number of bytes of space to leave free when
+running in C<flowcap> output mode.  The value may be specified as a
+string with a C<k>, C<m>, C<g>, or C<t> suffix to signify kilo-,
+mega-, giga-, or tera-bytes, respectively.  When not specified,
+B<rwflowpack> may fill the disk.
+
+=item max_file_size
+
+gives the maximum sized file to create when the output mode is
+C<flowcap>.  This setting accepts the same suffix as
+freespace_minimum_bytes.  When not specified, the default is "10m".
+
+=back
+
+Examples output tables are:
+
+ output = {
+   mode = "local-storage",
+   root_directory = "/data",
+   processing = {
+     directory = "/var/rwflowpack/processing",
+     directory = "/var/rwflowpack/error",
+   },
+   -- flush files every minute
+   flush_interval = 60,
+   -- ignore files far outside of current time window
+   reject_hours_past = 3,
+   reject_hours_future = 1,
+ }
+
+ output = {
+   mode = "incremental-files",
+   output_directory = "/var/rwflowpack/incremental",
+   processing = {
+     directory = "/var/rwflowpack/processing",
+     directory = "/var/rwflowpack/error",
+   },
+   flush_interval = 120,
+ }
+
+ output = {
+   mode = "flowcap",
+   output_directory = "/var/rwflowpack/flowcap",
+   -- flush files every five minutes
+   flush_interval = 300,
+   -- ensure all files close at same time and
+   -- close exactly on the 5-minute mark
+   synchronize_flush = 0,
+   usedspace_maximum_percent = 95,
+   freespace_minimum_bytes = "2g",
+ }
+
+ output = {
+   mode = "one-destination",
+   destination_file = "/tmp/my_flows.rw",
+   file_info = {
+     record_format = silk.file_format_id("FT_RWGENERIC"),
+     byte_order = "big",
+     compression = "snappy",
+   }
+ }
+
+=head2 The input Variable
+
+B<rwflowpack> requires that the configuration file define a variable
+named C<input>, and B<rwflowpack> exists with an error if the
+variable is not defined.
+
+The value of C<input> is a table, and it specifies where B<rwflowpack>
+gets its input and how to translate that input into the SiLK Flow
+record format.  It may also specify how to assign a sensor value and a
+class and type pair to each flow record.  The following key is
+required:
 
 =over 4
 
-=item B<--error-directory>=I<DIR_PATH>
+=item mode
 
-Move input files that cannot be opened, have an unexpected format,
-contain an unrecognized probe name in C<fcfiles> input-mode, or are
-not successfully processed into the directory I<DIR_PATH>.
-I<DIR_PATH> must be a complete directory path.  If this switch is not
-provided, problem files remain in place and cause B<rwflowpack> to
-exit.
-
-=item B<--archive-directory>=I<DIR_PATH>
-
-Move input files that B<rwflowpack> processes successfully into the
-directory I<DIR_PATH>.  I<DIR_PATH> must be a complete directory path.
-When this switch is not provided and the input-mode is C<pdufile>, the
-original NetFlow source file is not modified, moved, or deleted.  In
-all other input-modes, no B<--archive-directory> switch causes
-B<rwflowpack> to delete each input file after successfully processing
-it.  When the B<--flat-archive> switch is also provided, incoming
-files are moved into the top of I<DIR_PATH>; when B<--flat-archive> is
-not given, each file is moved to a subdirectory based on the current
-UTC time: I<DIR_PATH>/I<YEAR>/I<MONTH>/I<DAY>/I<HOUR>/.  Removing
-files from the archive-directory is not the job of B<rwflowpack>; the
-system administrator should implement a separate process to clean this
-directory.  This switch is required when the B<--post-archive-command>
-switch is present.
-
-=item B<--flat-archive>
-
-When archiving input files via the B<--archive-directory> switch, move
-the files into the top of the archive-directory, not into
-subdirectories of the archive-directory.  This switch has no effect if
-B<--archive-directory> is not also specified.  This switch can be used
-to allow another process to watch for new files appearing in the
-archive-directory.
-
-=item B<--post-archive-command>=I<COMMAND>
-
-Run I<COMMAND> on each input file after B<rwflowpack> has successfully
-processed the file and moved the file into the archive-directory.
-Each occurrence of the string C<%s> in I<COMMAND> will be replaced
-with the full path to the input file in the archive-directory, and
-each occurrence of C<%%> will be replaced with C<%>.  If any other
-character follows C<%>, B<rwflowpack> exits with an error.  When using
-this feature, the B<--archive-directory> switch must be specified.
-See also the B<rwpollexec(8)> daemon.
-
-=back
-
-=head2 Logging and Daemon Configuration
-
-One of the following mutually-exclusive switches is required:
+specifies the type of input that B<rwflowpack> should expect.  Its
+value is a string and it must have one of the following values:
 
 =over 4
 
-=item B<--log-destination>=I<DESTINATION>
+=item stream
 
-Specify the destination where logging messages are written.  When
-I<DESTINATION> begins with a slash C</>, it is treated as a file
-system path and all log messages are written to that file; there is no
-log rotation.  When I<DESTINATION> does not begin with C</>, it must
-be one of the following strings:
+In C<stream> input mode, B<rwflowpack> may read IPFIX or NetFlow data
+from the network and/or poll one or more directories to find and read
+files containing IPFIX records, NetFlow v5 records, or SiLK Flow
+records.
+
+=item single-file
+
+B<rwflowpack> reads records from a single file and exits once that
+file has been processed in C<single-file> input mode.  The file may
+contain IPFIX records, NetFlow v5 records, or SiLK Flow records.
+
+=item fcfiles
+
+In C<fcfiles> input mode, B<rwflowpack> polls a single directory for
+files created by a previous invocation of B<rwflowpack> that was
+running in C<flowcap> output mode.
+
+=item append-incremental
+
+In C<append-incremental> input mode, B<rwflowpack> polls a single
+directory for files created by a previous invocation of B<rwflowpack>
+that was running in C<incremental-files> output mode.  B<rwflowpack>
+copies the records from the input files to the root directory
+maintaining the sensor value and class/type pair that exists on the
+records.  When B<rwflowpack> creates a new hourly file to hold the
+records, the byte-order and compression method of the hourly file are
+taken from those settings of the input file.
+
+=back
+
+=back
+
+The C<input> table supports the following keys.  Some of these keys
+may be required depending on the setting of C<mode>.  In most cases,
+if a key is specified that is not needed, B<rwflowpack> prints a
+warning message but it does not exit.
 
 =over 4
 
-=item C<none>
+=item incoming
 
-Messages are not written anywhere.
-
-=item C<stdout>
-
-Messages are written to the standard output.
-
-=item C<stderr>
-
-Messages are written to the standard error.
-
-=item C<syslog>
-
-Messages are written using the B<syslog(3)> facility.
-
-=item C<both>
-
-Messages are written to the syslog facility and to the standard error
-(this option is not available on all platforms).
-
-=back
-
-=item B<--log-directory>=I<DIR_PATH>
-
-Use I<DIR_PATH> as the directory where the log files are written.
-I<DIR_PATH> must be a complete directory path.  The log files have the
-form
-
- DIR_PATH/LOG_BASENAME-YYYYMMDD.log
-
-where I<YYYYMMDD> is the current date and I<LOG_BASENAME> is the
-application name or the value passed to the B<--log-basename> switch
-when provided.  The log files are rotated: At midnight local time, a
-new log is opened, the previous file is closed, and the command
-specified by B<--log-post-rotate> is invoked on the previous day's log
-file.  (Old log files are not removed by B<rwflowpack>; the
-administrator should use another tool to remove them.)  When this
-switch is provided, a process-ID file (PID) is also written in this
-directory unless the B<--pidfile> switch is provided.
-
-=item B<--log-pathname>=I<FILE_PATH>
-
-Use I<FILE_PATH> as the complete path to the log file.  The log file
-is not rotated.
-
-=back
-
-The following set of switches is optional:
+contains a table that names the directory where incoming files are to
+found for the C<append-incremental> and C<fcfiles> input modes.  The
+keys of this table are:
 
 =over 4
 
-=item B<--log-level>=I<LEVEL>
+=item directory
 
-Set the severity of messages that will be logged.  The levels from
-most severe to least are: C<emerg>, C<alert>, C<crit>, C<err>,
-C<warning>, C<notice>, C<info>, C<debug>.  The default is C<info>.
+gives the full path to an existing directory that B<rwflowpack> should
+poll periodically to find files to process.  This key is required.
+As B<rwflowpack> scans I<DIR_PATH>, it ignores a file if its name
+begins with a dot (C<.>) or if its size is 0 bytes.  When a file is
+first detected, B<rwflowpack> records its size, and the file must have
+the same size for two consecutive scans before B<rwflowpack> processes
+it.  After the file is successfully processed, B<rwflowpack> either
+moves it to the archive directory or deletes it.  The interval between
+scans is set by B<interval>.
 
-=item B<--log-sysfacility>=I<NUMBER>
+=item error_directory
 
-Set the facility that B<syslog(3)> uses for logging messages.  This
-switch takes a number as an argument.  The default is a value that
-corresponds to C<LOG_USER> on the system where B<rwflowpack> is
-running.  This switch produces an error unless
-B<--log-destination>=syslog is specified.
+gives the full path to an existing directory where B<rwflowpack> moves
+files found in C<directory> that could not be processed or that had
+errors during processing.  This key is required.
 
-=item B<--log-basename>=I<LOG_BASENAME>
+=item interval
 
-Use I<LOG_BASENAME> in place of the application name in the name of
-I<log> files in the log directory.  See the description of the
-B<--log-directory> switch.  This switch does B<not> affect the name of
-the process-ID file.
+specifies how may seconds to wait between polls of the directory.
 
-=item B<--log-post-rotate>=I<COMMAND>
+=item archive_directory
 
-Run I<COMMAND> on the previous day's log file after log rotation.
-When this switch is not specified, the previous day's log file is
-compressed with B<gzip(1)>.  When the switch is specified and
-I<COMMAND> is the empty string, no action is taken on the log file.
-Each occurrence of the string C<%s> in I<COMMAND> will be replaced
-with the full path to the log file, and each occurrence of C<%%> will
-be replaced with C<%>.  If any other character follows C<%>,
-B<rwflowpack> exits with an error.  Specifying this switch without
-also using B<--log-directory> is an error.
+gives the full path to an existing directory where B<rwflowpack> moves
+files found in C<directory> that were successfully processed.  If this
+key is not given, B<rwflowpack> deletes files that are successfully
+processed.
 
-=item B<--pidfile>=I<FILE_PATH>
+=item archive_policy
 
-Set the complete path to the file in which B<rwflowpack> writes its
-process ID (PID) when it is running as a daemon.  No PID file is
-written when B<--no-daemon> is given.  When this switch is not
-present, no PID file is written unless the B<--log-directory> switch
-is specified, in which case the PID is written to
-F<I<LOGPATH>/rwflowpack.pid>.
+determines whether archived files are stored in the top level of the
+C<archive_directory> (when the value is C<flat>) or in subdirectories
+of the C<archive_directory> (when the value is C<y/m/d/h>).  The
+subdirectories are named by the current year, month, day, and hour.
+If this key is not specified, the default policy is C<y/m/d/h>.  If
+this key is specified, C<archive_directory> must also be specified.
 
-=item B<--no-chdir>
+=item post_archive_command
 
-Do not change directory to the root directory.  When B<rwflowpack>
-becomes a daemon process, it changes its current directory to the root
-directory so as to avoid potentially running on a mounted file system.
-Specifying B<--no-chdir> prevents this behavior, which may be useful
-during debugging.  The application does not change its directory when
-B<--no-daemon> is given.
-
-=item B<--no-daemon>
-
-Force B<rwflowpack> to run in the foreground---it does not become a
-daemon process.  This may be useful during debugging.
+names a shell command to run on each file after it is archived.  Each
+occurrence of C<%s> in the command is replaced with the full path to
+the log file, and each occurrence of C<%%> is replaced with C<%>.  If
+any other character follows C<%>, B<rwflowpack> exits with an error.
+If this key is specified, C<archive_directory> must also be specified.
 
 =back
 
-=head2 Help Options
+=item probes
+
+is either a table of tables or a list of tables, where each inner
+table represents a single probe.  The keys in the outermost table are
+only uesd for error reporting and they may be omitted.  The C<probes>
+key is used in C<stream>, C<single-file>, and C<fcfiles> input modes.
+It is not needed in C<append-incremental> input mode.
+
+Each inner table specifies how B<rwflowpack> is to read the incoming
+data, how to covert the data to the SiLK Flow record format, and
+typically how to assign a sensor value and class and type pair to each
+flow record.  The structure of each of these inner tables is described
+next in the section L</An Individual Probe>.
+
+=back
+
+Example C<input> variables are shown here.  These assume the variable
+C<my_probes> has been set to the table or list of probes to use.
+
+ input = {
+   mode = "stream",
+   probes = my_probes,
+ }
+
+ input = {
+   mode = "single-file",
+   probes = my_probes,
+ }
+
+ input = {
+   mode = "fcfiles",
+   probes = my_probes,
+   incoming = {
+     directory = "/var/rwflowpack/fcfiles",
+     error_directory = "/var/rwflowpack/fcfiles-error",
+     interval = 10,
+   },
+ }
+
+ input = {
+   mode = "append-incremental",
+   incoming = {
+     directory = "/var/rwflowpack/incremental",
+     error_directory = "/var/rwflowpack/error",
+     archive_directory = "/var/rwflowpack/archive",
+     archive_policy = "flat",
+   },
+ }
+
+=head2 An Individual Probe
+
+As stated above, the C<probes> key in the C<input> table contains one
+or more tables, where each table represents an individual probe.
+
+The table for each of these individual probes supports the following
+keys:
 
 =over 4
 
-=item B<--verify-sensor-config>
+=item name
 
-=item B<--verify-sensor-config>=I<VERBOSE>
+sets the name for the probe.  The name must be unique among all
+probes.  The name must begin with a letter, and it may not contain
+whitespace characters or the slash character (C</>).  This key is
+required.
 
-Verify that the syntax of the sensor configuration file is correct and
-then exit B<rwflowpack>.  If the file is incorrect or if it does not
-define any sensors, an error message is printed and B<rwflowpack>
-exits abnormally.  If the file is correct and no argument is provided
-to the B<--verify-sensor-config> switch, B<rwflowpack> simply exits
-with status 0.  If an argument (other than the empty string and C<0>)
-is provided to the switch, the names of the probes and sensors found
-in the sensor configuration file are printed to the standard output,
-and then B<rwflowpack> exits.
+=item type
 
-=item B<--help>
+sets the type of data this probe processes.  This key is required.
+Its value must be one of the following strings:
 
-Print the available options and exit.
+=over 4
 
-=item B<--version>
+=item ipfix
 
-Print the version number and information about how SiLK was
-configured, then exit the application.
+The probe processes Internal Protocol Flow Information eXchange
+records.
+
+=item netflow-v9
+
+The probe processes NetFlow v9 protocol data units (PDU).
+
+=item netflow-v5
+
+The probe processes NetFlow v5 protocol data units (PDU).
+
+=item sflow
+
+The probe processes sFlow v5 records.
+
+=item silk
+
+The probe processes SiLK Flow records.  (This probe type is not
+supported when the output-mode (the C<mode> in the C<output> table) is
+C<flowcap>.)
 
 =back
+
+=item source
+
+specifies where data for this probe comes from.  For the C<stream>
+input mode, the C<source> key is required and its value is a table
+that may specify a network socket to listen on or a directory to poll
+for files.  For the C<single-file> input mode, the C<source> key is
+required and its value is a table that specifies the file to process.
+The C<source> key is not required in other input modes.
+
+B<Listen on network socket>
+
+All data types except for C<silk> may be read on a network socket.
+When the source of data is a network socket, the following keys are
+supported:
+
+=over 4
+
+=item listen
+
+specifies where to listen for data as a lone port, a hostname and port
+pair, or an IP address and port pair.  The port must be separated from
+the hostname or address by a colon.  When an IPv6 address is
+specified, the address must be surrounded by square brackets, e.g.,
+C<[::1]:4739>.  This key is required.
+
+=item protocol
+
+specifies the protocol for the port specified in C<listen>.  When the
+C<type> is C<ipfix> the C<protocol> may be the string C<tcp> or
+C<udp>; otherwise the value must be C<udp>.  This key is required.
+
+=item accept
+
+specifies a list of hostnames and/or IP addresses that are allowed to
+connect to the listen port.  A connection from any other host is
+dropped.  This key is optional, but when it is specified its value
+must be a list, even when only one address is given.  When this key is
+not given, any host is allowed to connect.
+
+=back
+
+B<Poll a directory for files>
+
+B<rwflowpack> may poll a directory for files containing C<ipfix>
+records, C<netflow-v5> records, or C<silk> records.  (All files in a
+directory must be of the same type.)  The supported keys are the same
+as those for the C<incoming> directory described above.  The key names
+and a short description are included here for quick reference:
+
+=over 4
+
+=item directory
+
+The full path of the directory to poll.  Required.
+
+=item error_directory
+
+The full path of a directory where files are moved if the file is not
+successfully processed.  Required.
+
+=item interval
+
+specifies how may seconds to wait between polls of the directory.
+
+=item archive_directory
+
+The full path of a directory where successfully process files are
+moved.  If not specified, the files are removed.
+
+=item archive_policy
+
+The policy for storing files in the archive directory, either
+C<y/m/d/h> (the default) or C<flat>.
+
+=item post_archive_command
+
+A command to run on files after archiving them.
+
+=back
+
+B<Process a single file>
+
+In C<single-file> input mode, B<rwflowpack> reads a single file
+containing C<ipfix> records, C<netflow-v5> records, or C<silk>
+records.  The supported keys are:
+
+=over 4
+
+=item file
+
+gives the full path to the file to process.  This key is required and
+the file must exist.
+
+=item error_directory
+
+is currently ignored, but if a value is specified for this key it must
+name an existing directory.
+
+=item archive_directory
+
+is currently ignored, but if a value is specified for this key it must
+name an existing directory.
+
+=item post_archive_command
+
+is currently ignored, but if a value is specified for this key a value
+must also be specified for C<archive_directory>.
+
+=back
+
+=item output_file_info
+
+specifies the format and other characteristics of the output files
+holding flow records collected by this probe when the output mode is
+C<flowcap>.  (In other output modes, this information is provided in
+other locations.)  If this key is not specified, default values are
+used and no sidecar fields are stored.  The supported keys are the
+same as those for the C<file_info> key in the C<output> table (c.f.,
+L</The output Variable>).
+
+=item vars
+
+may hold any value.  Whatever value is specified here is passed as the
+first argumnet to the function specified by the C<packing_function>
+key, which is described next.
+
+=item packing_function
+
+specifies a function which is called for every record that is received
+by this probe.  The duties of the function and the arguments that are
+passed to it vary depending on the input mode, the output mode, and
+the type of the probe.  The packing function is not used in the
+C<append-incremental> input mode since that mode reads SiLK Flow
+records and use the input records as they are.  The function is
+optional in C<flowcap> mode, and it only needs to be provided if data
+from the incoming record should be stored with additional sidecar
+data.
+
+The detailed description of the packing function appears in the L</The
+Packing Function> section below.
+
+=item log_flags_initial
+
+overwrites the default set of flags that warn about missing or invalid
+packets.  This key is optional.  If the key is specified, its value
+must be a list of strings that represent logging flags.  The following
+logging flags are supported:
+
+=over 4
+
+=item I<all>
+
+Log everything.
+
+=item I<bad>
+
+Write messages about an individual NetFlow v5 record where the packet
+or octet count is zero, the packet count is larger than the octet
+count, or the duration of the flow is larger than 45 days.
+
+=item I<firewall-event>
+
+Write messages about records that are ignored because the firewall
+event information element on the record is something other than flow
+deleted or flow denied.
+
+=item I<missing>
+
+Examine the sequence numbers of NetFlow v5 packets and write messages
+about missing and out-of-sequence packets.  (You may suppress messages
+regarding out-of-sequence NetFlow v9 or IPFIX packets for B<all>
+probes by setting the SILK_LIBFIXBUF_SUPPRESS_WARNINGS environment
+variable.)
+
+=item I<none>
+
+Log nothing.  It is an error to combine this value with any other.
+
+=item I<record-timestamps>
+
+Log the timestamps that appear on each record.  This produces a lot of
+output, and it is primarily used for debugging.
+
+=item I<sampling>
+
+Write messages constructed by parsing the NetFlow v9 Options Templates
+that specify the sampling algorithm (when samplingAlgorithm and
+samplingInterval IEs are present) or flow sampler mode (when
+flowSamplerMode and flowSamplerRandomInterval IEs are present).
+
+=back
+
+When C<log_flags_initial> is not specified, the default set of flags
+are: B<bad>, B<missing>, B<sampling>.
+
+=item log_flags_add
+
+adds logging flags to the default set.  See the description of
+C<log_flags_initial> for the format of the value and the names of the
+flags.
+
+=item log_flags_remove
+
+removes logging flags to the default set.  See the description of
+C<log_flags_initial> for the format of the value and the names of the
+flags.
+
+=back
+
+Here are the example C<input> variables from above with the C<probes>
+variable expanded.  These examples assume the sidecar description
+object C<my_sidecar> and the function C<pack_fun> exist elsewhere in
+the configuration file.
+
+ input = {
+   -- reads from network, output mode is flowcap
+   mode = "stream",
+   probes = {
+     {
+       name = "P0",
+       type = "ipfix",
+       source = {
+         protocol = "tcp",
+         listen = 4740,
+         accept = {"198.51.100.1"},
+       },
+       output_file_info = {
+         record_format = silk.file_format_id("FT_RWIPV6"),
+         sidecar = my_sidecar,
+       },
+       packing_function = pack_fun,
+       log_flags_add = { "firewall-event" }
+       log_flags_remove = { "sampling" }
+     },
+     {
+       name = "P1",
+       type = "netflow-v5",
+       source = {
+         protocol = "udp",
+         listen = "203.0.113.200:4755",
+         accept = {"198.51.100.3"},
+       },
+       output_file_info = {
+         record_format = silk.file_format_id("FT_RWGENERIC"),
+         sidecar = my_sidecar,
+       },
+       packing_function = pack_fun,
+       log_flags_remove = { "missing" },
+     },
+   },
+ }
+
+ input = {
+   -- reads from directories, output mode is local-storage
+   mode = "stream",
+   probes = {
+     x = {
+       name = "P4",
+       type = "ipfix",
+       source = {
+         directory = "/var/rwflowpack/p4",
+         error_directory = "/var/rwflowpack/error",
+       },
+       packing_function = pack_fun,
+     },
+     y = {
+       name = "P5",
+       type = "silk",
+       source = {
+         directory = "/var/rwflowpack/p5",
+         error_directory = "/var/rwflowpack/error",
+       },
+       packing_function = pack_fun,
+     }
+   },
+ }
+
+ input = {
+   mode = "single-file",
+   -- When processing a single file, there must be a single
+   -- probe and that probe must have a source that is a file
+   probes = {
+     {
+       name = "P0",
+       type = "netflow-v5",
+       source = {
+         file = "/tmp/my-netflow.dat",
+         -- an error_directory is required but it is not used
+         error_directory = "/tmp",
+       },
+       packing_function = pack_fun,
+     }
+   }
+ }
+
+ input = {
+   mode = "fcfiles",
+   probes = my_probes,
+   incoming = {
+     directory = "/var/rwflowpack/fcfiles",
+     error_directory = "/var/rwflowpack/fcfiles-error",
+     interval = 10,
+   },
+   probes = {
+     P0 = {
+       name = "P0",
+       packing_function = pack_fun,
+       vars = {
+         internal = silk.ipwildcard("203.0.113.0/26"),
+       },
+     },
+     probe1 = {
+       name = "P1",
+       packing_function = pack_fun,
+       vars = {
+         internal = silk.ipwildcard("192.0.2.64/27"),
+       },
+     },
+   }
+ }
+
+=head2 The Packing Function
+
+In most input modes, each probe in the C<probes> table on the C<input>
+table (c.f. L</The input Variable>) has a C<packing_function> key that
+specifies a function to call for every record that is received by the
+probe.
+
+The primary tasks of the packing function are:
+
+=over 4
+
+=item 1
+
+to customize how each incoming record is converted to the SiLK Flow
+record format,
+
+=item 2
+
+to categorize each flow record (that is, assign a class, type, and
+sensor value to the record), and
+
+=item 3
+
+to specify a format for the output file that holds the record.
+
+=back
+
+However, these tasks may change depending on the input and output
+modes of B<rwflowpack>.
+
+When the input mode is C<stream> or C<single-file> and the output mode
+is C<local-storage> or C<incremental-files>, the packing function is
+expected to perform all those tasks.
+
+When the input mode is C<stream> or C<single-file> and the output mode
+is C<one-destination>, the packing function must do tasks 1 and 2.
+The format of the single output file is described in a separate
+configuration variable (the C<file_info> setting in the C<output>
+table).
+
+When the output mode is C<flowcap>, the packing function is only
+responsible for task 1, and B<rwflowpack> uses a default packing
+function if one is not provided.  These files are normally processed
+by another instance of B<rwflowpack> running in C<fcfiles> input mode.
+The packing function in the second instance of B<rwflowpack> is
+responsible for tasks 2 and 3 (or only task 2 when the output mode is
+C<one-destination>).
+
+The first argument to the packing function is always the value of the
+C<vars> key in the probe table.
+
+The second argument is a SiLK Flow record representation of the
+incoming record as a B<silk.rwrec> object.  When the input mode is
+C<fcfiles> or when the type of the probe is C<silk>, this
+representation is what was read from the input file.  If the type is
+C<ipfix>, C<netflow-v9>, or C<netflow-v5>, this argument contains the
+SiLK Flow record as it existed in older versions of SiLK.
+
+When the input mode is C<fcfiles>, these are the only two arguments to
+the packing function.
+
+When the type is C<netflow-v5>, the third argument is a B<silk.nfv5>
+object that represents the NetFlow v5 record read from the network or
+from a file.  The B<nfv5> object can be used to add sidecar fields to
+the B<rwrec> object or to modify the B<rwrec> object in some way.
+
+When the type is C<ipfix> or C<netflow-v9>, it is possible the
+incoming IPFIX record represents a bidirectional flow (a I<bi-flow>).
+For these probe types, the second argument to the packing function
+represents the forward flow record and the the third argument
+represents the reverse flow record.  The third argument is a
+B<silk.rwrec> object for a bi-flow or B<nil> for a unidirectional flow
+record (a I<uni-flow>).  For these probe types, there is a fourth
+argument to the packing fucntion which is a B<silk.fixrec> object that
+represents the IPFIX record read from the network or from a file.
+(NetFlow v9 records are translated to IPFIX by SiLK.)
+
+As IPFIX or NetFlow data arrives, SiLK converts the records to the
+SiLK Flow record format and passes the SiLK records and the original
+data to the packing function.  If the output mode is C<local-storage>,
+C<incremental-files>, or C<one-destination>, the packing function is
+expected to set the C<sensor> and C<classtype> fields on the SiLK
+records.  The packing function may choose to modify other values on
+the SiLK Flow records.  In addition, the packing function may add
+Sidecar data to the SiLK records.
+
+Once the packing function has performed any modification to a SiLK
+record, it must call the B<write_rwrec()> function so the record is
+written to the output file.  If two SiLK records were passed into the
+packing function, the function should call B<write_rwrec()> for both.
+If the packing function does not call B<write_rwrec()>, the record is
+not stored.  The packing function may choose to call B<write_rwrec()>
+multiple times to write the record to multiple output files (probably
+with a different class, type, or sensor values in each file).
+
+There are either one or two arguments to B<write_rwrec()> depending on
+the output mode.  The first argument is always the record to write
+(the B<silk.rwrec> object).  For the C<flowcap> and C<one-destination>
+output modes, there is only one argument.  For other output mode, the
+B<write_rwrec()> function takes an additional argument that is a table
+describing the format of the file in which to store the record, and
+that table has the same keys as the C<file_info> table in the
+C<output> table described above (see L</The output Variable>).  If the
+second argument is not provided to the B<write_rwrec()> function,
+default values are used.
+
+=head1 EXAMPLES
+
+=head2 Read From Network and Pack to Repository
+
+This example reads IPFIX and NetFlow v5 data from the network,
+categorizes that data by IP address, and stores the data (including
+the value of the type of service field) in files in the data
+repository.
+
+ --  Define a variable to the top level directory
+ local topdir = "/home/silk4"
+
+ --  Define a variable giving the location of the data repository
+ local rootdir = topdir .. "/data"
+
+ --  The rwflowpack configuration requires a table named 'log'
+ log = {
+   directory = topdir .. "/log",
+   level = "debug",
+ }
+ --  The rwflowpack configuration supports a table named 'daemon'
+ daemon = {
+   pid_file = topdir .. "/run/rwflowpack.pid",
+ }
+ --  The rwflowpack configuration supports a table named 'options'
+ options = {
+   file_cache_size = 256,
+ }
+
+ --  The rwflowpack configuration requires a table named 'output'
+ --  that specifies the final location of flow records.
+ output = {
+   mode = "local-storage",
+   flush_interval = 300,
+   processing = {
+     directory = topdir .. "/processing",
+     error_directory = topdir .. "/error",
+   },
+   root_directory = rootdir,
+ }
+
+ --  Ensure the silk.conf file is available.  This checks for
+ --  it in "rootdir/silk.conf"
+ if not silk.site.have_site_config() then
+   if not silk.site.init_site(nil, rootdir, true) then
+     error("The silk.conf file was not found")
+   end
+ end
+
+ --  Define variables for the flowtypes that are used; we do
+ --  this to avoid having to look them up for each record
+ local ft_inweb = silk.site.flowtype_id("iw"),
+ local ft_in_nonweb = silk.site.flowtype_id("in"),
+ local ft_outweb = silk.site.flowtype_id("ow"),
+ local ft_out_nonweb = silk.site.flowtype_id("out"),
+ local ft_ext2ext = silk.site.flowtype_id("ext2ext"),
+ local ft_int2int = silk.site.flowtype_id("int2int"),
+ local ft_other = silk.site.flowtype_id("other"),
+
+ --  Define variables that determine what goes into the files that
+ --  rwflowpack creates.
+ --
+ local file_info_v6 = {
+   file_format = silk.file_format_id("FT_RWIPV6"),
+ }
+ local file_info_web = {
+   file_format = silk.file_format_id("FT_RWAUGWEB"),
+ }
+ local file_info_nonweb = {
+   file_format = silk.file_format_id("FT_RWAUGMENTED"),
+ }
+
+ --  Create a sidecar description to hold the Type of Service
+ --  field (IPFIX name is ipClassOfService, IE 5), and add it to all
+ --  the file_info tables.
+ --
+ do
+   local sidecar_desc = silk.sidecar_create()
+   sidecar_desc["ipClassOfService"] = {
+     type = "uint8", element_id = 5,
+   }
+   silk.sidecar_freeze(sidecar_desc)
+   file_info_v6.sidecar = sidecar_desc
+   file_info_web.sidecar = sidecar_desc
+   file_info_nonweb.sidecar = sidecar_desc
+ end
+
+ --  This is a helper function.  It determines the forward and
+ --  reverse flowtypes and the repository file format for the
+ --  reverse flowtypes record 'rec' that was collected from probe
+ --  'probe'.  Each call to this function returns three values.
+ --
+ local function determine_flowtype (probe, rec)
+   -- get IP addresses
+   local saddr = rec.sip
+   local daddr = rec.dip
+
+   if silk.rwrec_is_ipv6(rec) then
+     -- My sample data is almost completely IPv4, and any IPv6 data I
+     -- have goes into the "other" type.
+     return ft_other, ft_other, file_info_v6
+   end
+
+   -- Compare the source and destination IP addresses on each
+   -- record to the list of IPs defined on the probe to
+   -- determine whether the data is incoming or outgoing.
+   if not probe.internal[saddr] then
+     -- Flow came from an external address and...
+     if probe.internal[daddr] then
+       -- ...went to an internal address (incoming)
+       if silk.rwrec_is_web(rec) then
+         return ft_inweb, ft_outweb, file_info_web
+       else
+         return ft_in_nonweb, ft_out_nonweb, file_info_nonweb
+       end
+     else
+       -- ...went back to an external address (external to external)
+       return ft_ext2ext, ft_ext2ext, file_info_nonweb
+     end
+   elseif probe.internal[saddr] then
+     -- Flow came from an internal address and...
+     if not probe.internal[daddr] then
+       -- ...went to an external address (outgoing)
+       if silk.rwrec_is_web(rec) then
+         return ft_outweb, ft_inweb, file_info_web
+       else
+         return ft_out_nonweb, ft_in_nonweb, file_info_nonweb
+       end
+     else
+       -- ...went to another internal address (internal to internal)
+       return ft_int2int, ft_int2int, file_info_nonweb
+     end
+   end
+   -- This should never occur.
+   return ft_other, ft_other, file_info_v6
+ end
+
+ --  For packing IPFIX data; arguments are the 'vars' setting
+ --  on the probe, the forward SiLK record, reverse SiLK record,
+ --  and the IPFIX record.
+ --
+ function ipfix_packer (probe, fwd_rec, rev_rec, fixrec)
+   --  Determine the flowtypes and file info
+   local fwd_ft, rev_ft, finfo = determine_flowtypes(probe, fwd_rec)
+
+   --  Set flowtype (also called classtype) and sensor on the
+   --  forward record.  The sensor we get from the 'probe'.
+   fwd_rec.classtype_id = fwd_ft
+   fwd_rec.sensor_id = probe.sensor
+
+   --  Get the ipClassOfService (Type Of Service) value from
+   --  the IPFIX record, or use nil if that value does not exist
+   --  on the record; if found set value on records
+   local tos = silk.fixrec_get_value(fixrec, "ipClassOfService", nil)
+   if tos
+     fwd_rec.sidecar = { ipClassOfService = tos }
+   end
+
+   -- Write the forward record
+   write_rwrec(fwd_rec, finfo)
+
+   if rev_rec then
+     -- Set flowtype and sensor on the reverse record.
+     rev_rec.classtype_id = rev_ft
+     rev_rec.sensor_id = probe.sensor
+
+     tos = silk.fixrec_get_value(fixrec, "reverseIpClassOfService", nil)
+     if tos
+       rev_rec.sidecar = { ipClassOfService = tos }
+     end
+
+     write_rwrec(rev_rec, finfo)
+   end
+ end
+
+ --  Similar to the previous, but for NetFlow v5 data which only has
+ --  the forward direction.
+ function netflow_packer (probe, fwd_rec, pdu)
+   --  Determine the flowtypes and file info
+   local fwd_ft, rev_ft, finfo = determine_flowtypes(probe, fwd_rec)
+
+   fwd_rec.classtype_id = fwd_ft
+   fwd_rec.sensor_id = probe.sensor
+   fwd_rec.sidecar = { ipClassOfService = pdu.tos }
+
+   -- Write the forward record
+   write_rwrec(fwd_rec, finfo)
+ end
+
+ --  The rwflowpack configuration requires a table named 'input' that
+ --  specifies the source of flow records
+ input = {
+   mode = "stream",
+   probes = {
+     P0 = {
+       name = "P0",
+       type = "ipfix",
+       packing_function = ipfix_packer,
+       --  Data that appears in 'vars' is pass to the packing
+       --  function as the 'probe' parameter
+       vars = {
+         --  specify internal IP space.  this is used in the
+         --  determine_flowtypes function above.
+         internal = silk.ipwildcard("192.0.2.0/25"),
+         sensor = silk.site.sensor_id("S0"),
+       },
+       source = {
+         protocol = "tcp",
+         listen = 4740,
+         accept = {"198.51.100.1"},
+       },
+       packing_function = pack_fun,
+       log_flags_add = { "firewall-event" }
+       log_flags_remove = { "sampling" }
+     },
+     P1 = {
+       name = "P1",
+       type = "netflow-v5",
+       packing_function = netflow_packer,
+       vars = {
+         internal = silk.ipwildcard("192.0.2.128/25"),
+         sensor = silk.site.sensor_id("S1"),
+       },
+       source = {
+         protocol = "udp",
+         listen = "203.0.113.200:4755",
+         accept = {"198.51.100.3"},
+       },
+     },
+   },
+ }
+
+
+=head2 Read IPFIX Files and Store in Local Repository
+
+This is a simpler version of the previous example, without the
+annotations.
+
+B<rwflowpack> processes IPFIX files in the F</home/silk/incoming>
+directory.  The records are categorized by their IP addresses and
+stored in the repository located at F</home/silk/root>.
+
+The deep packet inspection (DPI) data from YAF for SSL and DNS records
+is stored with the SiLK Flow records.
+
+ local basedir = "/home/silk"
+ local rootdir = basedir .. "/root"
+
+ --  Ensure the silk.conf file is available.
+ if not silk.site.have_site_config() then
+   if not silk.site.init_site(nil, rootdir, true) then
+     error("The silk.conf file was not found")
+   end
+ end
+
+ local ft_inweb = silk.site.flowtype_id("iw"),
+ local ft_in_nonweb = silk.site.flowtype_id("in"),
+ local ft_innull = silk.site.flowtype_id("innull"),
+ local ft_outweb = silk.site.flowtype_id("ow"),
+ local ft_out_nonweb = silk.site.flowtype_id("out"),
+ local ft_outnull = silk.site.flowtype_id("outnull"),
+ local ft_ext2ext = silk.site.flowtype_id("ext2ext"),
+ local ft_int2int = silk.site.flowtype_id("int2int"),
+ local ft_other = silk.site.flowtype_id("other"),
+
+ --  'file_info' is used for files that do NOT include sidecar fields
+ --
+ local file_info = {
+   file_format = silk.file_format_id("FT_RWIPV6"),
+ }
+
+ --  'file_info_sc' is used for files that DO include sidecar fields
+ --
+ local file_info_sc = {
+   file_format = file_info.file_format
+ }
+ do
+   -- YAF exports fields with this enterprise_id
+   local CERT_PEN = 6871
+
+   -- Create the sidecar description; this needs to be added to the
+   -- header of the files that rwflowpack creates
+   local sidecar = silk.sidecar_create()
+
+   -- Add some fields to hold the DNS data that YAF exports (see the
+   -- yafdpi man page http://tools.netsa.cert.org/yaf/yafdpi.html)
+   sidecar["dnsQName"] = {
+     type = "string", enterprise_id = CERT_PEN, element_id = 179,
+   }
+   sidecar["dnsTTL"] = {
+     type = "uint32", enterprise_id = CERT_PEN, element_id = 199,
+   }
+   sidecar["dnsQRType"] = {
+     type = "uint16", enterprise_id = CERT_PEN, element_id = 175,
+   }
+   sidecar["dnsQueryResponse"] = {
+     type = "boolean", enterprise_id = CERT_PEN, element_id = 174,
+   }
+   sidecar["dnsAuthoritative"] = {
+     type = "boolean", enterprise_id = CERT_PEN, element_id = 176,
+   }
+   sidecar["dnsNXDomain"] = {
+     type = "uint8", enterprise_id = CERT_PEN, element_id = 177,
+   }
+   sidecar["dnsRRSection"] = {
+     type = "uint8", enterprise_id = CERT_PEN, element_id = 178,
+   }
+   sidecar["dnsID"] = {
+     type = "uint16", enterprise_id = CERT_PEN, element_id = 226,
+   }
+
+   -- Add some fields to hold the SSL data that YAF exports
+   sidecar["sslServerCipher"] = {
+     type = "uint32", enterprise_id = CERT_PEN, element_id = 187,
+   }
+   sidecar["sslClientVersion"] = {
+     type = "uint8", enterprise_id = CERT_PEN, element_id = 186,
+   }
+   sidecar["sslRecordVersion"] = {
+     type = "uint16", enterprise_id = CERT_PEN, element_id = 288,
+   }
+   sidecar["sslCertSignature"] = {
+     type = "binary", enterprise_id = CERT_PEN, element_id = 190,
+   }
+   sidecar["sslCertSerialNumber"] = {
+     type = "binary", enterprise_id = CERT_PEN, element_id = 244,
+   }
+   sidecar["sslCertValidityNotBefore"] = {
+     type = "string", enterprise_id = CERT_PEN, element_id = 247,
+   }
+   sidecar["sslCertValidityNotAfter"] = {
+     type = "string", enterprise_id = CERT_PEN, element_id = 248,
+   }
+   sidecar["sslPublicKeyAlgorithm"] = {
+     type = "binary", enterprise_id = CERT_PEN, element_id = 249,
+   }
+   sidecar["sslPublicKeyLength"] = {
+     type = "uint16", enterprise_id = CERT_PEN, element_id = 250,
+   }
+   sidecar["sslCertVersion"] = {
+     type = "uint8", enterprise_id = CERT_PEN, element_id = 189,
+   }
+
+   -- Freeze the sidecar and add it to file_info_sc table
+   silk.sidecar_freeze(sidecar)
+   file_info_sc.sidecar = sidecar
+ end
+
+ --  When examining the YAF data, we search for particular Template IDs
+ --  in the subTemplateMultiList that contains the DPI data.
+ --
+ --  To be more generic, we ought to examine the incoming IPFIX
+ --  templates (called schemas in SiLK), find the template that contain
+ --  the fields we want, make a note of that template's ID, and then
+ --  search for that ID.
+ --
+ --  Schema (IPFIX Template) ID for DNS data
+ local dns_id = 0xce00
+ --
+ --  Schema (IPFIX Template) ID for SSL data
+ local ssl_id = 0xca0a
+
+ --  Define a helper function used by the pack_function() below.
+ --
+ --  Look for DNS deep packet inspection data in the IPFIX record and,
+ --  if found, create a table and set the appropriate fields.
+ --
+ --  If this is a bi-flow, we probably should be setting the DNS query
+ --  in the forward record and the DNS response on the reverse record,
+ --  but we are not doing that yet.  Instead, we grab the first entry
+ --  of DNS data and store that on both the forward and reverse
+ --  records.
+ --
+ function get_sidecar_DNS (fixrec)
+   local stml = silk.fixrec_get_value(fixrec, "subTemplateMultiList", nil)
+   if not stml then return nil end
+
+   --  Go through the STML to the DNS DPI data.
+   local i = 1
+   local p = stml[i]
+   while (p and
+          silk.schema_get_template_id(silk.fixrec_get_schema(p)) ~= dns_id) do
+     i = i + 1
+     p = stml[i]
+   end
+   if not p then return nil end
+
+   local stl = silk.fixrec_get_value(p, "subTemplateList", nil)
+   if not stl then return nil end
+
+   i = 1
+   local q = stl[i]
+   if q then
+     local s = {}
+     s.dnsQName = silk.fixrec_get_value(q, "dnsQName", nil)
+     s.dnsTTL = silk.fixrec_get_value(q, "dnsTTL", nil)
+     s.dnsQRType = silk.fixrec_get_value(q, "dnsQRType", nil)
+     s.dnsQueryResponse = silk.fixrec_get_value(q, "dnsQueryResponse", nil)
+     s.dnsAuthoritative = silk.fixrec_get_value(q, "dnsAuthoritative", nil)
+     s.dnsNXDomain = silk.fixrec_get_value(q, "dnsNXDomain", nil)
+     s.dnsRRSection = silk.fixrec_get_value(q, "dnsRRSection", nil)
+     s.dnsID = silk.fixrec_get_value(q, "dnsID", nil)
+     return s
+   end
+
+   return nil
+ end
+
+ --  Define a helper function used by the pack_function() below.
+ --
+ --  Look for SSL deep packet inspection data in the IPFIX record and,
+ --  if found, create a table and set the appropriate fields.
+ --
+ function get_sidecar_SSL (fixrec)
+   local stml = silk.fixrec_get_value(fixrec, "subTemplateMultiList", nil)
+   if not stml then return nil end
+
+   --  Go through the STML to the SSL DPI data.
+   local i = 1
+   local ssl = stml[i]
+   while (ssl and
+          silk.schema_get_template_id(silk.fixrec_get_schema(ssl)) ~= ssl_id) do
+     i = i + 1
+     ssl = stml[i]
+   end
+   if not ssl then return nil end
+
+   local s = {}
+   s.sslServerCipher = silk.fixrec_get_value(ssl, "sslServerCipher", nil)
+   s.sslClientVersion = silk.fixrec_get_value(ssl, "sslClientVersion", nil)
+   s.sslRecordVersion = silk.fixrec_get_value(ssl, "sslRecordVersion", nil)
+
+   local stl = silk.fixrec_get_value(ssl, "subTemplateList", nil)
+   if not stl or 0 == #stl then return s end
+
+   -- pull information for the first ssl certificate
+   s.sslCertSignature = stl[1]["sslCertSignature"]
+   s.sslCertSerialNumber = stl[1]["sslCertSerialNumber"]
+   s.sslCertValidityNotBefore = stl[1]["sslCertValidityNotBefore"]
+   s.sslCertValidityNotAfter = stl[1]["sslCertValidityNotAfter"]
+   s.sslPublicKeyAlgorithm = stl[1]["sslPublicKeyAlgorithm"]
+   s.sslPublicKeyLength = stl[1]["sslPublicKeyLength"]
+   s.sslCertVersion = stl[1]["sslCertVersion"]
+
+   -- handle the issuer and subject, which are STLs containing key-value
+   -- pairs.  The "_1" and "_2" suffix return the first and second
+   -- STLs.  The issuer is first, then the subject.
+   local IS = {
+     issuer = {stl_suffix = "_1", sidecar_prefix = "sslIssuer" },
+     subject = {stl_suffix = "_2", sidecar_prefix = "sslSubject" },
+   }
+   for k,v in pairs(IS) do
+     local iss_snd = stl[1]["subTemplateList" .. v.stl_suffix]
+
+     for j = 1, #iss_snd do
+       if iss_snd[j].sslObjectType == 3 then
+         s[v.sidecar_prefix .. "CommonName"] = iss_snd[j].sslObjectValue
+       elseif iss_snd[j].sslObjectType == 6 then
+         s[v.sidecar_prefix .. "Country"] = iss_snd[j].sslObjectValue
+       elseif iss_snd[j].sslObjectType == 8 then
+         s[v.sidecar_prefix .. "State"] = iss_snd[j].sslObjectValue
+       elseif iss_snd[j].sslObjectType == 9 then
+         s[v.sidecar_prefix .. "StreetAddress"] = iss_snd[j].sslObjectValue
+       elseif iss_snd[j].sslObjectType == 10 then
+         s[v.sidecar_prefix .. "OrganizationName"] = iss_snd[j].sslObjectValue
+       end
+     end
+   end
+
+   return s
+ end
+
+ --  Define a helper function used by the pack_function() below.
+ --
+ --  This function determines the forward and reverse flowtypes and the
+ --  repository file format for the record 'rec' that was collected
+ --  from probe 'probe'.  Each call to this function returns three
+ --  values.
+ --
+ local function determine_flowtype (probe, rec)
+   local saddr = rec.sip
+   local daddr = rec.dip
+
+   -- Compare the source and destination IP addresses on each record to
+   -- the list of IPs defined on the probe to determine whether the
+   -- data is incoming or outgoing.
+   --
+   if not probe.internal[saddr] then
+     -- Flow came from an external address and...
+     if probe.internal[daddr] then
+       -- ...went to an internal address (incoming)
+       if silk.rwrec_is_web(rec) then
+         return ft_inweb, ft_outweb, file_info
+       else
+         return ft_in_nonweb, ft_out_nonweb, file_info_sc
+       end
+     else
+       -- ...went back to an external address (external to external)
+       return ft_ext2ext, ft_ext2ext, file_info_sc
+     end
+   elseif probe.internal[saddr] then
+     -- Flow came from an internal address and...
+     if not probe.internal[daddr] then
+       -- ...went to an external address (outgoing)
+       if silk.rwrec_is_web(rec) then
+         return ft_outweb, ft_inweb, file_info
+       else
+         return ft_out_nonweb, ft_in_nonweb, file_info_sc
+       end
+     else
+       -- ...went to another internal address (internal to internal)
+       return ft_int2int, ft_int2int, file_info_sc
+     end
+   end
+   -- This should never occur.
+   return ft_other, ft_other, file_info
+ end
+
+ --  Define the packing function.  This function is one of the values
+ --  that is set on the probe when it is defined.
+ --
+ --  Given a probe definition where a record was collected, a SiLK
+ --  rwrec representation of the fowrard record, a SiLK rwrec
+ --  representation of the reverse record (or nil for a uni-flow), and
+ --  the source IPFIX record as a fixrec object, write the SiLK
+ --  record(s) to the appropriate output(s).  This function must call
+ --  write_rwrec() to store the record in the SiLK data repository.
+ --
+ function pack_function (probe, fwd_rec, rev_rec, fixrec)
+   --  Determine the flowtypes and file format
+   local flowtype, rflowtype, fformat = determine_flowtype(probe, fwd_rec)
+
+   --  Set flowtype and sensor on the forward record.  The sensor we
+   --  get from the 'probe'.
+   fwd_rec.classtype_id = flowtype
+   fwd_rec.sensor_id = probe.sensor
+
+   local s = nil
+   if 53 == fwd_rec.application then
+     s = get_sidecar_DNS(fixrec)
+   elseif 6 == fwd_rec.protocol then
+     s = get_sidecar_SSL(fixrec)
+   end
+   if s then
+     fwd_rec.sidecar = s
+   end
+
+   -- Write the forward record
+   write_rwrec(fwd_rec, fformat)
+
+   if rev_rec then
+     -- Set flowtype and sensor on the reverse record.
+     rev_rec.classtype_id = rflowtype
+     rev_rec.sensor_id = probe.sensor
+
+     if s then
+       rev_rec.sidecar = s
+     end
+
+     -- Write the reverse record
+     write_rwrec(rev_rec, fformat)
+   end
+ end
+
+ --  An IPset holding internal addresses
+ local set = silk.ipset_create_v4()
+ silk.ipset_add(set, silk.ipwildcard("203.0.113.0/24"))
+
+ input = {
+   mode = "stream",
+   probes = {
+     P0 = {
+       name = "P0",
+       type = "ipfix",
+       packing_function = pack_function,
+       vars = {
+         internal = set,
+         sensor = silk.site.sensor_id("S0"),
+       },
+       source = {
+         directory = basedir .. "/incoming",
+         interval = 5,
+         archive_directory = basedir .. "/archive",
+         error_directory = basedir .. "/error",
+         archive_policy = "flat",
+       },
+     },
+   },
+ }
+ output = {
+   mode = "local-storage",
+   processing = {
+     directory = basedir .. "/processing",
+     error_directory = basedir .. "/error",
+   },
+   root_directory = rootdir,
+ }
+ log = {
+   directory = basedir .. "/log",
+   level = "debug",
+ }
+ daemon = {
+   pid_file = basedir .. "/run/rwflowpack.pid",
+ }
+
+
+=head2 Read NetFlow v9 From Network and Write to Incremental Files
+
+In this example, B<rwflowpack> listens on port 33445 for NetFlow v9
+records, categorizes the records by their IP addresses, and stores in
+the incremental files in F</home/silk/incremental>.  Another instance
+of B<rwflowpack> is required to process the incremental files and
+create a data repository.
+
+ local basedir = "/home/silk"
+ local silk_conf = basedir .. "/share/silk/silk.conf"
+
+ --  Ensure the silk.conf file is available
+ if not silk.site.have_site_config() then
+   if not silk.site.init_site(silk_conf, nil, true) then
+     error("The silk.conf file was not found")
+   end
+ end
+
+ --  Assume there is a single sensor
+ local sid = silk.site.sensor_id("S1")
+
+ --  File formats for web and non-web data
+ local ff_web = {
+   record_format = silk.file_format_id("FT_RWWWW"),
+   compression_method = "best",
+   byte_order = "big",
+ }
+ local ff_nonweb = {
+   record_format = silk.file_format_id("FT_RWSPLIT"),
+   compression_method = "best",
+   byte_order = "big",
+ }
+
+ -- Create variables to address blocks
+ local ip_internal = { "192.168.x.x" }
+ local ip_external = { "10.0.0.0/8" }
+ local ip_null     = { "172.16.0.0/13" }
+
+ -- The packing function; we do not care about the raw
+ -- netflow record and there is no parameter for it.  In
+ -- addition, we know all record are unidirection for this
+ -- router.
+ local function packing_fun (probe, fwd_rec)
+   -- get IP addresses
+   local saddr = fwd_rec.sip
+   local daddr = fwd_rec.dip
+
+   -- assume a non-web record format
+   local fmt = ff_nonweb
+
+   -- determine the file
+   if ip_external[saddr] then
+     -- Flow came from an external address and...
+     if ip_internal[daddr] then
+       -- ...went to an internal address (incoming)
+       if silk.rwrec_is_web(fwd_rec) then
+         fwd_rec.classtype_id = silk.site.flowtype_id("iw")
+         fmt = ff_web
+       else
+         fwd_rec.classtype_id = silk.site.flowtype_id("in")
+       end
+     elseif ip_external[daddr] then
+       -- ...went back to an external address (external to external)
+       fwd_rec.classtype_id = silk.site.flowtype_id("ext2ext")
+     elseif ip_null[daddr] then
+       -- ...went to the null address (innull)
+       fwd_rec.classtype_id = silk.site.flowtype_id("innull")
+     else
+       -- ...web to an unknown address
+       fwd_rec.classtype_id = silk.site.flowtype_id("other")
+     end
+   elseif ip_internal[saddr] then
+     -- Flow came from an internal address and...
+     if ip_external[daddr] then
+       -- ...went to an external address (outgoing)
+       if silk.rwrec_is_web(fwd_rec) then
+         fwd_rec.classtype_id = silk.site.flowtype_id("ow")
+         fmt = ff_web
+       else
+         fwd_rec.classtype_id = silk.site.flowtype_id("out")
+       end
+     elseif ip_internal[daddr] then
+       -- ...went to another internal address (internal to internal)
+       fwd_rec.classtype_id = silk.site.flowtype_id("int2int")
+     elseif ip_null[daddr] then
+       -- ...went to the null address (outnull)
+       fwd_rec.classtype_id = silk.site.flowtype_id("outnull")
+     else
+       -- ...web to an unknown address
+       fwd_rec.classtype_id = silk.site.flowtype_id("other")
+     end
+   else
+     -- Flow came from an unknown address
+     fwd_rec.classtype_id = silk.site.flowtype_id("other")
+   end
+
+   fwd_rec.sensor_id = sid
+   write_rwrec(fwd_rec, fmt)
+ end
+
+ input = {
+   mode = "stream",
+   probes = {
+     P0 = {
+       name = "P0",
+       type = "netflow-v9",
+       packing_function = packing_fun,
+       source = {
+         listen = 33445,
+         protocol = "udp",
+       },
+     },
+   },
+ }
+ output = {
+   mode = "incremental-files",
+   output_directory = basedir .. "/incremental",
+   processing = {
+     directory = basedir .. "/processing",
+     error_directory = basedir .. "/error",
+   },
+ }
+ log = {
+   directory = basedir .. "/log",
+ }
+ daemon = {
+   pid_file = basedir .. "/run/rwflowpack.pod",
+ }
+
+
+=head2 Respool SiLK Flow Records
+
+In this example, the user wants to take a file of SiLK Flow records
+and create a repository from them, using the existing class, type, and
+sensor information that exists on each record.  (This is similar to
+the C<respool> input mode that existed in SiLK 3.)
+
+ local basedir = "/home/silk"
+ local rootdir = basedir .. "/root"
+
+ if not silk.site.have_site_config() then
+   if not silk.site.init_site(nil, rootdir, true) then
+     error("The silk.conf file was not found")
+   end
+ end
+
+ --  Note the types that represent web data
+ local type_is_web = {}
+ type_is_web[silk.site.flowtype_id("iw")] = true
+ type_is_web[silk.site.flowtype_id("ow")] = true
+
+ local format_web = {
+   record_format = silk.file_format_id("FT_RWAUGWEB"),
+ }
+ local format_other = {
+   record_format = silk.file_format_id("FT_RWAUGMENTED"),
+ }
+
+ --  The packing function only needs to provide a
+ --  record_format; there is no need to modify the
+ --  record's current sensor, class, or type values.
+ local function pack_fun (probe, rwrec)
+   if type_is_web[rwrec.classtype_id] then
+     write_rwrec(rwrec, format_web)
+   else
+     write_rwrec(rwrec, format_other)
+   end
+ end
+
+ input = {
+   mode = "single-file",
+   probes = {
+     {
+       name = "respool",
+       type = "silk",
+       source = {
+         file = "/tmp/my-silk-data.rw",
+         error_directory = "/tmp",
+       },
+       packing_function = pack_fun,
+     }
+   }
+ }
+ output = {
+   mode = "local-storage",
+   processing = {
+     directory = basedir .. "/processing",
+     error_directory = basedir .. "/error",
+   },
+   root_directory = rootdir,
+ }
+ log = {
+   directory = basedir .. "/log",
+ }
+
+
+=head2 Replace flowcap
+
+This shows how to replace flowcap with rwflowpack.
+
+flowcap was bound to TCP port 50530 on the IPv6 localhost (::1) to
+listen for IPFIX flow records.  Files are written to the
+F</home/silk/destination> directory.
+
+ local basedir = "/home/silk"
+ input = {
+   mode = "stream",
+   probes = {
+     P0 = {
+       name = "P0",
+       type = "ipfix",
+       source = {
+         protocol = "tcp",
+         listen = "[::1]:50530",
+         accept = { "::1" },
+       },
+     },
+   },
+ }
+ output = {
+   mode = "flowcap",
+   flush_interval = 10,
+   output_directory = basedir .. "/destination",
+   max_file_size = "100k",
+ }
+ log = {
+   directory = basedir .. "/log",
+ }
+
+
+=head2 Replace rwflowappend.
+
+This shows how to replace rwflowappend with rwflowpack.
+
+Incremental files are read from the F</home/silk/incoming> directory
+and the repository is created in the F</home/silk/root> directory.
+Files that are older than 13 hours or have dates 2 or more hours in
+the future are ignored.
+
+ local basedir = "/home/silk"
+ input = {
+   mode = "append-incremental",
+   incoming = {
+     directory = basedir .. "/incoming",
+     archive_directory = basedir .. "/archive",
+     error_directory = basedir .. "/error",
+     interval = 5,
+   }
+ }
+ output = {
+   mode = "local-storage",
+   flush_interval = 10,
+   processing = {
+     directory = basedir .. "/processing",
+     error_directory = basedir .. "/error",
+   },
+   root_directory = basedir .. "/root",
+   repository_writer_threads = 3,
+   reject_hours_past = 13,
+   reject_hours_future = 2,
+ }
+ log = {
+   directory = basedir .. "/log",
+ }
 
 =head1 ENVIRONMENT
 
@@ -1070,52 +2294,14 @@ packing-logic plug-in.
 =head1 SEE ALSO
 
 I<SiLK Installation Handbook>, B<sensor.conf(5)>, B<silk.conf(5)>,
-B<packlogic-twoway(3)>, B<packlogic-generic(3)>, B<flowcap(8)>,
-B<rwfilter(1)>, B<rwflowappend(8)>, B<rwreceiver(8)>, B<rwsender(8)>,
+B<packlogic-twoway(3>), B<packlogic-generic(3)>,
+B<rwfilter(1)>, B<rwreceiver(8)>, B<rwsender(8)>,
 B<rwpollexec(8)>, B<rwpdu2silk(1)>, B<rwpackchecker(8)>, B<silk(7)>,
 B<gzip(1)>, B<yaf(1)>, B<dlopen(3)>, B<zlib(3)>, B<syslog(3)>
 
-=head1 NOTES
-
-As SiLK 3.6.0, the C<incremental-files> output-mode should be used in
-place of the C<sending> output-mode that existed in prior releases of
-B<rwflowpack>.  See L</Output Modes> for details.
-
-For administrators that use the C<sending> output-mode in SiLK 3.5 or
-older and upgrade to SiLK 3.6 or later: Any incremental files that the
-older version of B<rwflowpack> leaves in the incremental-directory
-will B<not> be moved to the sender-directory by the new version of
-B<rwflowpack>.  Those files will need to be moved by hand.
-
-B<rwflowpack> does not check the integrity of the data file before
-appending records to it.
-
-When the disk becomes full or other write errors occur, B<rwflowpack>
-may leave partially written records or partially written compressed
-blocks in the files it has open.  For each file where a partially
-written compressed block remains and additional compressed blocks are
-appended, the newly appended compressed blocks are not readable by
-other SiLK tools.  For each file where a partially written record
-remains and additional records are appended, other SiLK tools will
-read the unaligned data as if it were aligned and produce garbage
-records.  Partially writes may also occur if B<rwflowpack> is
-suddenly killed (e.g., by C<kill -9>).
-
-When a write error occurs, B<rwflowpack> may leave a zero byte file
-in the data repository.  Such files do affect the exit status of
-B<rwfilter(1)>, though B<rwfilter> warns about being unable to read
-the header from the file.
-
-B<rwflowpack> obtains an advisory write lock on the hourly file it is
-writing, allowing multiple B<rwflowpack> processes to write to the
-same hourly file.  File locking may be disabled by using the
-B<--no-file-locking> switch.  If this switch is enabled, the
-administrator must ensure that multiple B<rwflowpack> processes do not
-attempt to write to the same hourly file simultaneously.
-
 =cut
 
-$SiLK: rwflowpack.pod d8ee22371cf3 2017-03-23 22:39:48Z mthomas $
+$SiLK: rwflowpack.pod 39640844546c 2017-06-23 19:19:42Z mthomas $
 
 Local variables:
 mode:text

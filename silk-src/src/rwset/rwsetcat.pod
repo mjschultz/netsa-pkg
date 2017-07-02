@@ -9,8 +9,7 @@ B<rwsetcat> - Print the IP addresses in a binary IPset file
   rwsetcat [--count-ips] [--print-statistics] [--print-ips]
         [--cidr-blocks | --cidr-blocks=0 | --cidr-blocks=1]
         [--network-structure | --network-structure=STRUCTURE]
-        [--ip-ranges]
-        [--ip-format=FORMAT] [--integer-ips] [--zero-pad-ips]
+        [--ip-ranges] [--ip-format=FORMAT]
         [--no-columns] [--column-separator=C] [--no-final-delimiter]
         [{--delimited | --delimited=C}]
         [--print-filenames | --print-filenames=0 | --print-filenames=1]
@@ -37,7 +36,8 @@ as the number of IPs they contain, the number of IPs at the /8, /16,
 To create an IPset file from SiLK Flow records, use B<rwset(1)>.
 B<rwsetbuild(1)> creates an IPset from textual input.  The
 B<--coverset> switch on B<rwbagtool(1)> creates an IPset from a binary
-SiLK Bag.
+SiLK Bag.  To determine whether an IPset file contains an IP address,
+use B<rwsetmember(1)>.
 
 =head1 OPTIONS
 
@@ -208,19 +208,6 @@ netblock.  The addresses C<127.0.0.1> and C<2001:db8::1> are printed
 as C<::ffff:7f00:1> and C<2001:db8::1>, respectively.
 
 =back
-
-=item B<--integer-ips>
-
-Print IP addresses as integers.  This switch is equivalent to
-B<--ip-format=decimal>, it is deprecated as of SiLK 3.7.0, and it will
-be removed in the SiLK 4.0 release.
-
-=item B<--zero-pad-ips>
-
-Print IP addresses as fully-expanded, zero-padded values in their
-canonical form.  This switch is equivalent to
-B<--ip-format=zero-padded>, it is deprecated as of SiLK 3.7.0, and it
-will be removed in the SiLK 4.0 release.
 
 =item B<--no-columns>
 
@@ -751,7 +738,7 @@ B<rwbagtool(1)>, B<rwcut(1)>, B<silk(7)>, B<cut(1)>
 
 =cut
 
-$SiLK: rwsetcat.pod 4a14e7ea8fe2 2017-03-13 20:17:43Z mthomas $
+$SiLK: rwsetcat.pod 5036d9fcc2e7 2017-06-26 20:31:01Z mthomas $
 
 Local Variables:
 mode:text

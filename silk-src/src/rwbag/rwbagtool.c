@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagtool.c be27ed2dac34 2017-03-14 15:39:34Z mthomas $");
+RCSIDENT("$SiLK: rwbagtool.c e2965439f28d 2017-06-23 17:47:57Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skipaddr.h>
@@ -268,11 +268,6 @@ appUsageLong(
 
     FILE *fh = USAGE_FH;
     int i;
-#if SK_ENABLE_IPV6
-    const char *v4_or_v6 = "v6";
-#else
-    const char *v4_or_v6 = "v4";
-#endif
 
     fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
     fprintf(fh, "\nSWITCHES:\n");
@@ -284,18 +279,16 @@ appUsageLong(
           case OPT_MINKEY:
             fprintf(fh,
                     ("Output records whose key is at least VALUE,"
-                     " an IP%s address\n\tor an integer between"
+                     " an IPv6 address\n\tor an integer between"
                      " %" PRIu64 " and %" PRIu64 ", inclusive."
                      " Def. Records with\n\tnon-zero counters\n"),
-                    v4_or_v6,
                     (uint64_t)SKBAG_KEY_MIN, (uint64_t)SKBAG_KEY_MAX);
             break;
           case OPT_MAXKEY:
             fprintf(fh,
                     ("Output records whose key is not more than VALUE,"
-                     " an IP%s\n\taddress or an integer."
-                     " Def. Records with non-zero counters\n"),
-                    v4_or_v6);
+                     " an IPv6\n\taddress or an integer."
+                     " Def. Records with non-zero counters\n"));
             break;
           case OPT_MINCOUNTER:
             fprintf(fh,

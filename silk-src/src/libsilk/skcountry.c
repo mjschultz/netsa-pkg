@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skcountry.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skcountry.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skcountry.h>
@@ -58,7 +58,7 @@ skCountryNameToCode(
 {
     sk_countrycode_t code;
 
-    if ('\0' == name[0] || '\0' == name[1] || '\0' != name[2]) {
+    if (strlen(name) < 2) {
         return SK_COUNTRYCODE_INVALID;
     }
 
@@ -349,7 +349,7 @@ skCountryAddFields(
     uint16_t            minor_version,
     void        UNUSED(*pi_data))
 {
-    int i;
+    unsigned int i;
     skplugin_field_t *field;
     skplugin_err_t rv = SKPLUGIN_OK;
     skplugin_callbacks_t regdata;
@@ -386,7 +386,7 @@ skCountryAddFields(
         }
     }
 
-    return rv;
+    return SKPLUGIN_OK;
 }
 
 

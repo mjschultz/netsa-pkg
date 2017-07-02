@@ -19,7 +19,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: silk_config.c.in 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: silk_config.c.in efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sksite.h>
@@ -40,7 +40,6 @@ typedef enum {
     OPT_INCLUDE,
     OPT_LIBS,
     OPT_LIBSILK_LIBS,
-    OPT_LIBSILK_THRD_LIBS,
     OPT_LIBFLOWSOURCE_LIBS,
     OPT_DATA_ROOTDIR,
     OPT_PYTHON_SITE_DIR
@@ -53,7 +52,6 @@ static struct option appOptions[] = {
     {"include",             NO_ARG,       0, OPT_INCLUDE},
     {"libs",                NO_ARG,       0, OPT_LIBS},
     {"libsilk-libs",        NO_ARG,       0, OPT_LIBSILK_LIBS},
-    {"libsilk-thrd-libs",   NO_ARG,       0, OPT_LIBSILK_THRD_LIBS},
     {"libflowsource-libs",  NO_ARG,       0, OPT_LIBFLOWSOURCE_LIBS},
     {"data-rootdir",        NO_ARG,       0, OPT_DATA_ROOTDIR},
     {"python-site-dir",     NO_ARG,       0, OPT_PYTHON_SITE_DIR},
@@ -71,8 +69,6 @@ static const char *appHelp[] = {
     ("An alias for --libsilk-libs"),
     ("Print the linker flags to use when linking a program\n"
      "\tagainst libsilk"),
-    ("Print the linker flags to use when linking a\n"
-     "\tprogram against libsilk-thrd"),
     ("Print the linker flags to use when linking a\n"
      "\tprogram against libflowsource"),
     ("Print the compiled-in location of data repository,\n"
@@ -240,13 +236,12 @@ appOptionsHandler(
 
       case OPT_CFLAGS:
         printf("%s\n",
-               ("-I" INCLUDEDIR " @SK_CPPFLAGS@ @FIXBUF_CFLAGS@"
-                " @SK_CFLAGS@ @CFLAGS@"));
+               ("-I" INCLUDEDIR " @SK_CPPFLAGS@ @SK_CFLAGS@ @CFLAGS@"));
         break;
 
       case OPT_INCLUDE:
         printf("%s\n",
-               ("-I" INCLUDEDIR " @SK_CPPFLAGS@ @FIXBUF_CFLAGS@"));
+               ("-I" INCLUDEDIR " @SK_CPPFLAGS@"));
         break;
 
       case OPT_LIBS:
@@ -256,20 +251,9 @@ appOptionsHandler(
                 " @LIBS@"));
         break;
 
-      case OPT_LIBSILK_THRD_LIBS:
-        printf("%s\n",
-               ("@SK_LDFLAGS@ -L" LIBDIR " -lsilk-thrd -lsilk"
-                " @PTHREAD_LDFLAGS@ @LIBS@"));
-        break;
-
       case OPT_LIBFLOWSOURCE_LIBS:
         printf("%s\n",
-               ("@SK_LDFLAGS@ -L" LIBDIR " -lflowsource"
-                " -lsilk-thrd -lsilk"
-#if SK_ENABLE_IPFIX
-                " @FIXBUF_LDFLAGS@"
-#endif
-                " @PTHREAD_LDFLAGS@ @LIBS@"));
+               ("@SK_LDFLAGS@ -L" LIBDIR " -lflowsource -lsilk @LIBS@"));
         break;
     }
 

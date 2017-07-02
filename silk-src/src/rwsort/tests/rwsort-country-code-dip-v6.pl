@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 # MD5: a68e8d7fc7ae52c6b19655bb743dda81
-# TEST: ./rwsort --fields=dcc ../../tests/data-v6.rwf | ../rwstats/rwuniq --fields=dcc --values=distinct:dip --presorted-input
+# TEST: ./rwsort --fields=dcc ../../tests/data-v6.rwf | ../rwuniq/rwuniq --fields=dcc --values=distinct:dip --presorted-input
 
 use strict;
 use SiLKTests;

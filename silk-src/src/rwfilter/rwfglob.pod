@@ -379,7 +379,7 @@ tape-farm systems.
 
 =cut
 
-$SiLK: rwfglob.pod 7c452d1f409f 2016-09-23 21:00:08Z mthomas $
+$SiLK: rwfglob.pod 908111cbb1d2 2016-10-03 19:54:24Z mthomas $
 
 Local Variables:
 mode:text

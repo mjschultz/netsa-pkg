@@ -15,8 +15,7 @@ B<rwrecgenerator> - Generate random SiLK Flow records
         [--time-step=MILLISECONDS] [--events-per-step=COUNT]
         [--num-subprocesses=COUNT] [--flush-timeout=MILLISEC]
         [--file-cache-size=SIZE] [--compression-method=COMP_METHOD]
-        [--timestamp-format=FORMAT] [--epoch-time]
-        [--ip-format=FORMAT] [--integer-ips] [--zero-pad-ips]
+        [--timestamp-format=FORMAT] [--ip-format=FORMAT]
         [--integer-sensors] [--integer-tcp-flags] [--no-titles]
         [--no-columns] [--column-separator=CHAR]
         [--no-final-delimiter] [--delimited=[CHAR]]]
@@ -499,13 +498,6 @@ time and duration may not equal the printed end time.
 
 =back
 
-=item B<--epoch-time>
-
-When producing textual output, print timestamps as epoch time (number
-of seconds since midnight GMT on 1970-01-01).  This switch is
-equivalent to B<--timestamp-format=epoch>, it is deprecated as of SiLK
-3.8.1, and it will be removed in the SiLK 4.0 release.
-
 =item B<--ip-format>=I<FORMAT>
 
 When producing textual output, specify how IP addresses are printed.
@@ -552,19 +544,6 @@ netblock.  The addresses C<127.0.0.1> and C<2001:db8::1> are printed
 as C<::ffff:7f00:1> and C<2001:db8::1>, respectively.
 
 =back
-
-=item B<--integer-ips>
-
-When producing textual output, print IP addresses as integers.  This
-switch is equivalent to B<--ip-format=decimal>, it is deprecated as of
-SiLK 3.8.1, and it will be removed in the SiLK 4.0 release.
-
-=item B<--zero-pad-ips>
-
-When producing textual output, print IP addresses as fully-expanded,
-zero-padded values in their canonical form.  This switch is equivalent
-to B<--ip-format=zero-padded>, it is deprecated as of SiLK 3.8.1, and
-it will be removed in the SiLK 4.0 release.
 
 =item B<--integer-sensors>
 
@@ -764,7 +743,7 @@ B<syslog(3)>, B<zlib(3)>, B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwrecgenerator.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwrecgenerator.pod d1637517606d 2017-06-23 16:51:31Z mthomas $
 
 Local Variables:
 mode:text

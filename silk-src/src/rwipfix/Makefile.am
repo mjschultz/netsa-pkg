@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am f09105e13b0f 2014-05-23 20:14:04Z mthomas $")
+# RCSIDENT("$SiLK: Makefile.am 9ebd52e51160 2014-05-27 13:15:06Z mthomas $")
 
 # Installed Targets
 
@@ -18,12 +18,10 @@ endif
 # Build Rules
 
 AM_CPPFLAGS = $(SK_SRC_INCLUDES) $(SK_CPPFLAGS)
-AM_CFLAGS = $(FIXBUF_CFLAGS) $(WARN_CFLAGS) $(SK_CFLAGS)
+AM_CFLAGS = $(WARN_CFLAGS) $(SK_CFLAGS)
 AM_LDFLAGS = $(SK_LDFLAGS) $(STATIC_APPLICATIONS)
 LDADD = ../libflowsource/libflowsource.la \
-	 ../libsilk/libsilk-thrd.la \
-	 ../libsilk/libsilk.la \
-	 $(FIXBUF_LDFLAGS) $(PTHREAD_LDFLAGS)
+	 ../libsilk/libsilk.la
 
 rwipfix2silk_SOURCES = rwipfix2silk.c
 

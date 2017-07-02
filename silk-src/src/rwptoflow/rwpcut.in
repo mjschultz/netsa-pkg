@@ -14,7 +14,7 @@
 # easier parsing.
 #
 
-# RCSIDENT("$SiLK: rwpcut.in 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+# RCSIDENT("$SiLK: rwpcut.in efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 from __future__ import print_function
 
@@ -23,7 +23,6 @@ import os
 import re
 import struct
 import sys
-import subprocess
 import time
 from optparse import OptionParser;
 
@@ -239,18 +238,18 @@ def parse_options( options ):
 
     # callback to turn comma delimited list of fields into an actual
     # list of string field names.
-    default_fields = "time,sip,dip,sport,dport,proto,payhex"
     parse_fields = lambda option, opt_str, value, parser: \
                    setattr( parser.values, option.dest,
                             [ i.strip() for i in value.split( "," ) ] )
-    parser.set_defaults( fields = default_fields.split( "," ) )
+    parser.set_defaults( fields = "time,sip,dip,sport,dport,proto,payhex")
     parser.add_option(
         "-f", "--fields",
         action = "callback", callback = parse_fields,
         dest = "fields", type = "string",
         help = "Comma separated list of fields to print.  Available " +\
         "fields:  time, sip, dip, sport, dport, proto, flags, payhex, " +\
-        "payascii.  Default: " + default_fields)
+        "payascii.  Default: time, sip, dip, sport, dport, proto, " +\
+        "payhex." )
 
     parser.add_option(
         "", "--integer-ips",
@@ -365,37 +364,27 @@ def main():
 
     header_printed = False
 
-    command_line = ["tcpdump", "-tttt", "-nn"]
+    command_line = "tcpdump %s-tttt -nn -r %s"
 
     if "payhex" in opt["fields"] \
        or "payascii" in opt["fields"] \
        or "proto" in opt["fields"] \
        or "flags" in opt["fields"]:
-        command_line.append("-X")
+        payload_flag = "-X "
+    else:
+        payload_flag = ""
 
 
     for f in opt["files"]:
-        cmd = command_line + ["-r", f]
-        proc = subprocess.Popen(cmd, close_fds=True, bufsize=1,
-                                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
-        proc.stdin.close()
+        proc_stdin, proc_stdout, proc_stderr = os.popen3( command_line % \
+                                                          ( payload_flag, f ) )
 
         # read and print tcpdump stderr message.  if it is a tcpdump
         # error, stop processing
-        errbuf = proc.stderr.readline()
-        if isinstance(errbuf, bytes):
-            errbuf = errbuf.decode()
+        errbuf = proc_stderr.read()
+        print(errbuf)
         if errbuf[:8] == "tcpdump:":
-            errbuf2 = proc.stderr.read()
-            if isinstance(errbuf2, bytes):
-                errbuf = errbuf + errbuf2.decode()
-            else:
-                errbuf = errbuf + errbuf2
-            print(errbuf)
             fatal( None )
-        else:
-            print(errbuf)
 
         # Print the header (delimited column names) if they haven't
         # been printed yet.
@@ -413,9 +402,7 @@ def main():
         flags = None
         proto = None
 
-        for line in proc.stdout:
-            if isinstance(line, bytes):
-                line = line.decode()
+        for line in proc_stdout:
             match_obj = re_tcpdump.match( line )
 
             # if we don't match, it is a payload line.  if we do
@@ -428,12 +415,16 @@ def main():
 
                 proto_obj = re_proto.match( line )
                 if proto_obj != None:
-                    proto = int(proto_obj.groups()[0], 16)
+                    proto_hex = "\\x" + proto_obj.groups()[0]
+                    proto = struct.unpack( "!b", proto_hex.decode(
+                        "string_escape" ) )[0]
                     pkt_dict["proto"] = str( proto )
 
                 flags_obj = re_flags.match( line )
                 if flags_obj != None:
-                    flags = int(flags_obj.groups()[0], 16)
+                    flags_hex = "\\x" + flags_obj.groups()[0]
+                    flags = struct.unpack( "!b", flags_hex.decode(
+                        "string_escape" ) )[0]
                     if pkt_dict["proto"] == "6":
                         pkt_dict["flags"] = parse_flags( flags )
             else:
@@ -473,22 +464,22 @@ def main():
             # end if loop
         # end for loop
 
-        if not first_packet:
-            #
-            # print the last packet
-            #
+        #
+        # print the last packet
+        #
 
-            # collate payload
-            pkt_dict["payhex"] = "".join( hex_list )
-            pkt_dict["payascii"] = "".join( ascii_list )
-            hex_list = []
-            ascii_list = []
+        # collate payload
+        pkt_dict["payhex"] = "".join( hex_list )
+        pkt_dict["payascii"] = "".join( ascii_list )
+        hex_list = []
+        ascii_list = []
 
-            if "flags" not in pkt_dict:
-                pkt_dict["flags"] = ""
+        if "flags" not in pkt_dict:
+            pkt_dict["flags"] = ""
 
-            print_packet( pkt_dict, opt )
-            pkt_dict = {}
+        print_packet( pkt_dict, opt )
+        pkt_dict = {}
+
 
     return
 
@@ -498,9 +489,3 @@ def main():
 if __name__ == "__main__":
     main()
     sys.exit( 0 )
-
-
-# Local Variables:
-# mode:python
-# indent-tabs-mode:nil
-# End:

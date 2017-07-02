@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpackchecker.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwpackchecker.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skdllist.h>
@@ -676,7 +676,7 @@ setThreshold(
     skstream_t *stream = NULL;
     skipset_t *ipset = NULL;
     uint32_t bitmap_size = 65536;
-    int rv;
+    ssize_t rv;
 
     assert(t);
     switch (t->t_type) {
@@ -871,10 +871,12 @@ checkFile(
     int unusual = 0;
     uint64_t rec_count = 0;
     uint64_t is_bad = 0;
-    uint32_t pkts, bytes, ms_dur, bpp, bps;
+    uint64_t pkts, bytes, ms_dur, bpp, bps;
     sk_dll_iter_t iter;
     threshold_t *t;
-    int rv;
+    ssize_t rv;
+
+    rwRecInitialize(&rwrec, NULL);
 
     while ((rv = skStreamReadRecord(stream, &rwrec)) == SKSTREAM_OK) {
         ++rec_count;
@@ -884,7 +886,7 @@ checkFile(
         bytes = rwRecGetBytes(&rwrec);
         ms_dur = 1 + rwRecGetElapsed(&rwrec);;
         if (pkts == 0) {
-            bpp = UINT32_MAX;
+            bpp = UINT64_MAX;
         } else {
             bpp = bytes / pkts;
         }
@@ -1115,8 +1117,8 @@ checkFile(
 
               case SNMP_INPUT:
                 if (t->t_type == THR_MAP_IN) {
-                    if (skBitmapGetBit(t->t_value.bitmap,
-                                       rwRecGetInput(&rwrec)))
+                    if (1 == skBitmapGetBit(t->t_value.bitmap,
+                                            rwRecGetInput(&rwrec)))
                     {
                         ++t->t_count;
                         unusual = 1;
@@ -1134,8 +1136,8 @@ checkFile(
 
               case SNMP_OUTPUT:
                 if (t->t_type == THR_MAP_IN) {
-                    if (skBitmapGetBit(t->t_value.bitmap,
-                                       rwRecGetOutput(&rwrec)))
+                    if (1 == skBitmapGetBit(t->t_value.bitmap,
+                                            rwRecGetOutput(&rwrec)))
                     {
                         ++t->t_count;
                         unusual = 1;
@@ -1277,20 +1279,25 @@ checkFile(
 int main(int argc, char ** argv)
 {
     skstream_t *stream;
+    char filename[PATH_MAX];
     int exit_status = EXIT_SUCCESS;
-    int rv;
+    ssize_t rv;
 
     appSetup(argc, argv);
 
     /* process each input stream/file */
-    while ((rv = skOptionsCtxNextSilkFile(optctx, &stream, &skAppPrintErr))
-           != 1)
+    while ((rv = skOptionsCtxNextArgument(optctx, filename, sizeof(filename)))
+           == 0)
     {
-        if (0 != rv) {
+        rv = skStreamOpenSilkFlow(&stream, filename, SK_IO_READ);
+        if (rv != SKSTREAM_OK) {
             /* error opening file */
+            skStreamPrintLastErr(stream, rv, &skAppPrintErr);
+            skStreamDestroy(&stream);
             exit_status = EXIT_FAILURE;
             continue;
         }
+
         if (checkFile(stream)) {
             exit_status = EXIT_FAILURE;
         }

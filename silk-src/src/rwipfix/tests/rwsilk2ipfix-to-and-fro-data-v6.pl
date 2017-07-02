@@ -1,5 +1,5 @@
 #! /usr/bin/perl -w
-# MD5: fd4b4c2fe7eaf0eb498f524ec86bcd82
+# MD5: 5e3644eb255d8e76fbc217763d61fade
 # TEST: ./rwsilk2ipfix ../../tests/data-v6.rwf | ./rwipfix2silk --silk-output=stdout | ../rwcat/rwcat --compression-method=none --byte-order=little
 
 use strict;
@@ -10,8 +10,7 @@ my $rwipfix2silk = check_silk_app('rwipfix2silk');
 my $rwcat = check_silk_app('rwcat');
 my %file;
 $file{v6data} = get_data_or_exit77('v6data');
-check_features(qw(ipfix ipv6));
 my $cmd = "$rwsilk2ipfix $file{v6data} | $rwipfix2silk --silk-output=stdout | $rwcat --compression-method=none --byte-order=little";
-my $md5 = "fd4b4c2fe7eaf0eb498f524ec86bcd82";
+my $md5 = "5e3644eb255d8e76fbc217763d61fade";
 
 check_md5_output($md5, $cmd);

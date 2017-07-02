@@ -9,7 +9,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: rwflowpack-daemon.py 275df62a2e41 2017-01-05 17:30:40Z mthomas $
+# $SiLK: rwflowpack-daemon.py efd886457770 2017-06-21 18:43:23Z mthomas $
 #######################################################################
 from __future__ import print_function
 import optparse
@@ -49,7 +49,7 @@ def send_network_data(options):
     # options.pdu is empty or a list of strings of the form
     # "<num-recs>,<address>,<port>"
     split = [x.split(',') for x in options.pdu]
-    send_list = [PduSender(int(count), int(port), address=addr, log=log)
+    send_list = [PduSender(int(count), int(port), address=addr, log=log, usleep=500)
                  for [count, addr, port] in split]
     # options.tcp is empty or a list of strings of the form
     # "<filename>,<address>,<port>"
@@ -94,31 +94,19 @@ def main():
                       dest="copy_after", default=[])
     parser.add_option("--move-after", action="append", type="string",
                       dest="move_after", default=[])
-    parser.add_option("--input-mode", action="store", type="string",
-                      dest="input_mode")
-    parser.add_option("--output-mode", action="store", type="string",
-                      dest="output_mode")
     parser.add_option("--basedir", action="store", type="string",
                       dest="basedir")
     parser.add_option("--daemon-timeout", action="store", type="int",
                       dest="daemon_timeout", default=60)
     parser.add_option("--limit", action="store", type="int", dest="limit")
-    parser.add_option("--sensor-configuration", action="store", type="string",
-                      dest="sensor_conf")
-    parser.add_option("--flush-timeout", action="store", type="int",
-                      dest="flush_timeout", default=10)
-    parser.add_option("--verbose", action="store_true", dest="verbose",
-                      default=False)
     parser.add_option("--overwrite-dirs", action="store_true", dest="overwrite",
                       default=False)
-    parser.add_option("--log-level", action="store", type="string",
-                      dest="log_level", default="info")
     (options, args) = parser.parse_args()
-    VERBOSE = options.verbose
+    VERBOSE = True
 
     # Create the dirs
     dirobj = Dirobject(overwrite=options.overwrite, basedir=options.basedir)
-    dirobj.dirs = ['incoming', 'archive', 'error', 'sender',
+    dirobj.dirs = ['incoming', 'archive', 'error', 'processing',
                    'incremental', 'root', 'log', 'incoming2',
                    'incoming3', 'incoming4']
     dirobj.create_dirs()
@@ -126,49 +114,18 @@ def main():
     # Make the log file
     logfile = open(dirobj.get_path('log', 'rwflowpack-daemon.log'), 'wb', 0)
 
-    # Create the configuration file from the template
-    if options.sensor_conf:
-        conf_file = open(options.sensor_conf, "r").read()
-        new_conf = string.Template(conf_file)
-        (fd, conf) = tempfile.mkstemp(dir=dirobj.basedir)
-        out_file = os.fdopen(fd, "w")
-        out_file.write(new_conf.substitute(dirobj.dirname))
-        out_file.close()
-
-    # Generate the subprocess arguments
-    args += ['--flush-timeout', str(options.flush_timeout),
-             '--log-dest', 'stderr',
-             '--log-level', options.log_level,
-             '--no-daemon']
-    if options.input_mode == "fcfiles" or options.input_mode == "respool":
-        args += ['--incoming-directory', dirobj.dirname['incoming']]
-    args += ['--archive-directory', dirobj.dirname['archive'],
-             '--error-directory', dirobj.dirname['error']]
-    if options.output_mode == "sending":
-        args += ['--sender-directory', dirobj.dirname['sender'],
-                 '--incremental-directory', dirobj.dirname['incremental']]
-    elif options.output_mode == "incremental-files":
-        args += ['--incremental-directory', dirobj.dirname['incremental']]
-    else:
-        args += ['--root-directory', dirobj.dirname['root']]
-    if options.input_mode:
-        args += ['--input-mode', options.input_mode]
-    if options.output_mode:
-        args += ['--output-mode', options.output_mode]
-    if options.sensor_conf:
-        args += ['--sensor-configuration', conf]
-
     progname = os.environ.get("RWFLOWPACK", os.path.join('.', 'rwflowpack'))
     args = progname.split() + args
 
     # Set up state variables
     count = 0
     clean = False
-    term = False
     send_list = None
     regexp = re.compile(": /[^:].*: (?P<recs>[0-9]+) recs")
     closing = re.compile("Stopped logging")
     started = re.compile("Starting flush timer")
+    packing_logic_fail = "Unable to open packing-logic"
+    packing_logic = re.compile("(Using packing logic|%s)" % packing_logic_fail)
 
     # Copy or move data
     copy_files(dirobj, options.copy)
@@ -176,6 +133,9 @@ def main():
 
     # Note the time
     starttime = time.time()
+    # The (possibly future) time when a sigterm should be sent
+    future_sigtermtime = None
+    # Time when SIGTERM is sent
     shutdowntime = None
 
     # Start the process
@@ -191,15 +151,9 @@ def main():
                 base_log(line)
 
             # Check for timeout
-            if time.time() - starttime > options.daemon_timeout and not term:
-                shutdowntime = time.time()
+            if time.time() - starttime > options.daemon_timeout and not future_sigtermtime:
                 log("Timed out")
-                log("Sending SIGTERM")
-                term = True
-                try:
-                    os.kill(proc.pid, signal.SIGTERM)
-                except OSError:
-                    pass
+                future_sigtermtime = time.time()
 
             # Match record counts
             match = regexp.search(line)
@@ -209,30 +163,40 @@ def main():
                     count += num
                     # Reset the timer if we are still receiving data
                     starttime = time.time()
-                    if options.limit and count >= options.limit and not term:
-                        shutdowntime = time.time()
+                    if options.limit and count >= options.limit and not future_sigtermtime:
                         log("Reached limit")
-                        log("Sending SIGTERM")
-                        term = True
-                        try:
-                            os.kill(proc.pid, signal.SIGTERM)
-                        except OSError:
-                            pass
+                        future_sigtermtime = time.time() + 2
 
-            # check for starting up network data or after-data
-            if started:
-                match = started.search(line)
+            # Check whether packing-logic was loaded
+            if packing_logic:
+                match = packing_logic.search(line)
                 if match:
-                    if send_list is None:
-                        send_list = send_network_data(options)
-                    copy_files(dirobj, options.copy_after)
-                    move_files(dirobj, options.move_after)
-                    started = None
+                    if match.group(0) == packing_logic_fail:
+                        log("Skipping test: Unable to load packing logic")
+                        sys.exit(77)
+                    packing_logic = None
+
+            # Check for starting up network data or after-data
+            if started and started.search(line):
+                if send_list is None:
+                    send_list = send_network_data(options)
+                copy_files(dirobj, options.copy_after)
+                move_files(dirobj, options.move_after)
+                started = None
 
             # Check for clean shutdown
-            match = closing.search(line)
-            if match:
+            if closing.search(line):
                 clean = True
+
+            # Check for whether future-dated shutdowntime has arrived
+            if future_sigtermtime and not shutdowntime and future_sigtermtime <= time.time():
+                shutdowntime = time.time()
+                log("Sending SIGTERM")
+                term = True
+                try:
+                    os.kill(proc.pid, signal.SIGTERM)
+                except OSError:
+                    pass
 
             # Check for timeout on SIGTERM shutdown
             if shutdowntime and time.time() - shutdowntime > 15:
@@ -261,7 +225,7 @@ def main():
             except OSError:
                 pass
 
-    # Print record count
+    # Print record count to both stdout and to the log
     print("Record count:", count)
     base_log("Record count:", count)
     if options.limit and options.limit != count:

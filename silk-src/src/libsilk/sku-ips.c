@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-ips.c d84fde825740 2017-02-14 14:49:23Z mthomas $");
+RCSIDENT("$SiLK: sku-ips.c 410f3ed2cfca 2017-06-23 14:05:00Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/utils.h>
@@ -32,15 +32,17 @@ const uint8_t sk_ipv6_zero[SK_IPV6_ZERO_LEN] =
 const uint8_t sk_ipv6_v4inv6[SK_IPV6_V4INV6_LEN] =
     {0,0,0,0, 0,0,0,0, 0,0,0xFF,0xFF};
 
+/* Constant returned by skSockaddrArrayGetHostname() when no
+ * host-name/-address was specified to skStringParseHostPortPair(). */
+const char *sk_sockaddr_array_anyhostname = "*";
+
 
 /* LOCAL VARIABLES */
 
-#if SK_ENABLE_IPV6
 static const uint8_t max_ip6[16] = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 };
-#endif
 
 /* masks of various sizes used when computing CIDR blocks */
 static const uint32_t bitmask[] = {
@@ -161,7 +163,6 @@ skCIDRComputePrefix(
 {
     int prefix = -1;
 
-#if SK_ENABLE_IPV6
     if (skipaddrIsV6(start_addr) || skipaddrIsV6(end_addr)) {
         uint8_t start_ip6[16];
         uint8_t end_ip6[16];
@@ -256,9 +257,7 @@ skCIDRComputePrefix(
 
         return prefix;
 
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         uint32_t start_ip4 = skipaddrGetV4(start_addr);
         uint32_t end_ip4 = skipaddrGetV4(end_addr);
         uint32_t range_start;
@@ -325,7 +324,6 @@ skCIDR2IPRange(
 {
     uint32_t ip4;
 
-#if SK_ENABLE_IPV6
     if (skipaddrIsV6(ipaddr)) {
         uint8_t ip6[16];
         uint32_t i;
@@ -359,7 +357,6 @@ skCIDR2IPRange(
 
         return 0;
     }
-#endif /* SK_ENABLE_IPV6 */
 
     if (cidr >= 32) {
         if (cidr > 32) {
@@ -391,7 +388,6 @@ skCIDRComputeStart(
 {
     uint32_t ip4;
 
-#if SK_ENABLE_IPV6
     if (skipaddrIsV6(ipaddr)) {
         uint8_t ip6[16];
         uint32_t i;
@@ -418,7 +414,6 @@ skCIDRComputeStart(
 
         return 0;
     }
-#endif /* SK_ENABLE_IPV6 */
 
     if (cidr >= 32) {
         if (cidr > 32) {
@@ -445,7 +440,6 @@ skCIDRComputeEnd(
 {
     uint32_t ip4;
 
-#if SK_ENABLE_IPV6
     if (skipaddrIsV6(ipaddr)) {
         uint8_t ip6[16];
         uint32_t i;
@@ -472,7 +466,6 @@ skCIDRComputeEnd(
 
         return 0;
     }
-#endif /* SK_ENABLE_IPV6 */
 
     if (cidr >= 32) {
         if (cidr > 32) {
@@ -491,7 +484,6 @@ skCIDRComputeEnd(
 }
 
 
-#if SK_ENABLE_IPV6
 int
 skipaddrV6toV4(
     const skipaddr_t   *srcaddr,
@@ -525,7 +517,6 @@ skipaddrGetAsV4(
     }
     return 0;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 char *
@@ -534,7 +525,6 @@ skipaddrString(
     const skipaddr_t   *ip,
     uint32_t            ip_flags)
 {
-#if SK_ENABLE_IPV6
     if (skipaddrIsV6(ip)) {
         /* to represent a 128 bit number, divide the number into 4
          * 64-bit values where each value represents 10 decimal digits
@@ -574,12 +564,23 @@ skipaddrString(
         unsigned int longest_zero_pos;
         unsigned int longest_zero_len;
         uint64_t tmp;
+        uint32_t ipv4;
         char tmpbuf[SK_NUM2DOT_STRLEN];
         char *pos;
         unsigned int len;
         unsigned int i, j, k;
 
         switch ((skipaddr_flags_t)ip_flags) {
+          case SKIPADDR_AS_IPV4:
+            if (0 == skipaddrGetAsV4(ip, &ipv4)) {
+                snprintf(outbuf, SK_NUM2DOT_STRLEN,
+                         ("%" PRIu32 ".%" PRIu32 ".%" PRIu32 ".%" PRIu32),
+                         ((ipv4 >> 24) & 0xFF), ((ipv4 >> 16) & 0xFF),
+                         ((ipv4 >> 8) & 0xFF), (ipv4 & 0xFF));
+                break;
+            }
+            /* FALLTHROUGH */
+
           case SKIPADDR_CANONICAL:
 #ifdef SK_HAVE_INET_NTOP
 #  if    SK_NUM2DOT_STRLEN < INET6_ADDRSTRLEN
@@ -771,12 +772,11 @@ skipaddrString(
             }
             break;
         }
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         /* address is IPv4 */
         switch ((skipaddr_flags_t)ip_flags) {
           case SKIPADDR_CANONICAL:
+          case SKIPADDR_AS_IPV4:
             /* Convert integer 0 to string "0.0.0.0" */
             snprintf(outbuf, SK_NUM2DOT_STRLEN, "%lu.%lu.%lu.%lu",
                      (unsigned long)((ip->ip_ip.ipu_ipv4 >> 24) & 0xFF),
@@ -920,21 +920,9 @@ skIPv6PolicyOptionsRegister(
         }
     }
 
-#if !SK_ENABLE_IPV6
-    /* Force an IPv4-only SiLK to ignore any IPv6 flows */
-    ipv6_default = SK_IPV6POLICY_IGNORE;
-    *ipv6_policy = ipv6_default;
-
-    /* Register the option for compatibility with an IPv6-enabled
-     * silk, but pass 'ipv6_default' as the clientData, so the user's
-     * value does not modify the value the application uses. */
-    return skOptionsRegister(ipv6_policy_options, &ipv6PolicyHandler,
-                             (clientData)&ipv6_default);
-#else
     /* add the option */
     return skOptionsRegister(ipv6_policy_options, &ipv6PolicyHandler,
                              (clientData)ipv6_policy);
-#endif  /* SK_ENABLE_IPV6 */
 }
 
 
@@ -947,11 +935,6 @@ skIPv6PolicyUsage(
     fprintf(fh, "--%s %s. ",
             ipv6_policy_options[OPT_IPV6_POLICY].name,
             SK_OPTION_HAS_ARG(ipv6_policy_options[OPT_IPV6_POLICY]));
-#if !SK_ENABLE_IPV6
-    fprintf(fh, ("No IPv6 support available; IPv6 flows are always ignored\n"
-                 "\tregardless of the value passed to this switch."
-                 " Legal values:\n"));
-#else
     fprintf(fh, "Set policy for handling IPv4 and IPv6 flows.");
     for (i = 0; i < sizeof(policies)/sizeof(struct policies_st); ++i) {
         if (ipv6_default != policies[i].policy) {
@@ -962,7 +945,6 @@ skIPv6PolicyUsage(
         break;
     }
     fprintf(fh, "Choices:\n");
-#endif
     for (i = 0; i < sizeof(policies)/sizeof(struct policies_st); ++i) {
         fprintf(fh, "\t%-6s  - %s\n",
                 policies[i].name, policies[i].description);
@@ -970,7 +952,6 @@ skIPv6PolicyUsage(
 }
 
 
-#if SK_ENABLE_IPV6
 int
 skipaddrCompare(
     const skipaddr_t   *addr1,
@@ -1038,8 +1019,6 @@ skipaddrMask(
     return;
 }
 
-#endif /* SK_ENABLE_IPV6 */
-
 
 /* *************    IP WILDCARDS   ******************* */
 
@@ -1054,8 +1033,6 @@ skIPWildcardClear(
 }
 
 
-
-#if SK_ENABLE_IPV6
 int
 skIPWildcardCheckIp(
     const skIPWildcard_t   *ipwild,
@@ -1124,7 +1101,6 @@ skIPWildcardIteratorBindV4(
 
     return 0;
 }
-#endif /* SK_ENABLE_IPV6 */
 
 
 /* Bind iterator to an ipwildcard */
@@ -1175,7 +1151,6 @@ ipwildcardIterNext(
     /* the iterator is already set to the single IP to return or to
      * the first IP of the CIDR block to return; get that first IP,
      * and set prefix assuming a single IP */
-#if SK_ENABLE_IPV6
     if (skIPWildcardIsV6(iter->ipwild)) {
         if (iter->force_ipv4) {
             uint32_t ip4 = (iter->i_block[6] << 16) | iter->i_block[7];
@@ -1210,9 +1185,7 @@ ipwildcardIterNext(
                         (iter->i_block[3]));
         skipaddrSetV6FromUint32(ipaddr, &ip4);
         *prefix = 128;
-    } else
-#endif
-    {
+    } else {
         uint32_t ip4 = ((iter->i_block[0] << 24) |
                         (iter->i_block[1] << 16) |
                         (iter->i_block[2] <<  8) |
@@ -1451,7 +1424,6 @@ skIPWildcardIteratorReset(
 
     assert(iter);
 
-#if SK_ENABLE_IPV6
     if (iter->force_ipv4) {
         /* must ensure that wildcard contains 0:0:0:0:0:FFFF:x:x */
         assert(skIPWildcardIsV6(iter->ipwild));
@@ -1476,7 +1448,6 @@ skIPWildcardIteratorReset(
         iter->no_more_entries = 0;
         return;
     }
-#endif  /* SK_ENABLE_IPV6 */
 
     iter->no_more_entries = 0;
     for (i = 0; i < iter->ipwild->num_blocks; ++i) {
@@ -1490,7 +1461,6 @@ skIPWildcardIteratorReset(
 /* ******************************************************************** */
 
 
-#if SK_ENABLE_IPV6
 /* check whether 'ipaddr' is in 'cidr' */
 int
 skcidrCheckIP(
@@ -1513,7 +1483,6 @@ skcidrCheckIP(
     }
     return 0;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 /* Fill 'ipaddr' with the IP address in 'cidr' */
 void
@@ -1521,12 +1490,10 @@ skcidrGetIPAddr(
     const skcidr_t     *cidr,
     skipaddr_t         *ipaddr)
 {
-#if SK_ENABLE_IPV6
     if (skcidrIsV6(cidr)) {
         skipaddrSetV6(ipaddr, cidr->v6.ip);
         return;
     }
-#endif
     skipaddrSetV4(ipaddr, &(cidr->v4.ip));
 }
 
@@ -1538,13 +1505,11 @@ skcidrSetFromIPAddr(
     const skipaddr_t   *ipaddr,
     uint32_t            cidr_len)
 {
-#if SK_ENABLE_IPV6
     if (skipaddrIsV6(ipaddr)) {
         uint8_t tmp_ip[16];
         skipaddrGetV6(ipaddr, tmp_ip);
         return skcidrSetV6(cidr, tmp_ip, cidr_len);
     }
-#endif
     return skcidrSetV4(cidr, skipaddrGetV4(ipaddr), cidr_len);
 }
 
@@ -1570,7 +1535,6 @@ skcidrSetV4(
 }
 
 
-#if SK_ENABLE_IPV6
 /* Fill 'cidr' using the 'ipv6' and 'cidr_len' */
 int
 skcidrSetV6(
@@ -1594,7 +1558,6 @@ skcidrSetV6(
     }
     return 0;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /* ******************************************************************** */
@@ -1612,7 +1575,6 @@ skipaddrToSockaddr(
     assert(src);
     assert(dest);
 
-#if SK_ENABLE_IPV6
     if (skipaddrIsV6(src)) {
         struct sockaddr_in6 *v6 = (struct sockaddr_in6 *)dest;
         if (len < sizeof(*v6)) {
@@ -1621,9 +1583,7 @@ skipaddrToSockaddr(
         memset(v6, 0, sizeof(*v6));
         v6->sin6_family = AF_INET6;
         skipaddrGetV6(src, v6->sin6_addr.s6_addr);
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         struct sockaddr_in *v4 = (struct sockaddr_in *)dest;
         if (len < sizeof(*v4)) {
             return -1;
@@ -1654,14 +1614,12 @@ skipaddrFromSockaddr(
             skipaddrSetV4(dest, &addr);
         }
         break;
-#if SK_ENABLE_IPV6
       case AF_INET6:
         {
             const struct sockaddr_in6 *v6 = (const struct sockaddr_in6 *)src;
             skipaddrSetV6(dest, v6->sin6_addr.s6_addr);
         }
         break;
-#endif
       default:
         return -1;
     }
@@ -1764,17 +1722,17 @@ skSockaddrCompare(
     }
 }
 
-int
+ssize_t
 skSockaddrString(
     char                   *buffer,
-    int                     size,
+    size_t                  size,
     const sk_sockaddr_t    *addr)
 {
     /* Must be large enough to hold UNIX domain socket path. */
     char sabuf[PATH_MAX];
     skipaddr_t ipaddr;
     uint16_t port;
-    int rv;
+    ssize_t rv;
 
     switch (addr->sa.sa_family) {
       case AF_INET6:
@@ -1784,18 +1742,8 @@ skSockaddrString(
             sabuf[0] = '*';
             sabuf[1] = '\0';
         } else {
-#if SK_ENABLE_IPV6
             skipaddrFromSockaddr(&ipaddr, &addr->sa);
             skipaddrString(sabuf, &ipaddr, SKIPADDR_CANONICAL);
-#elif defined(SK_HAVE_INET_NTOP)
-            if (NULL == inet_ntop(AF_INET6, &addr->v6.sin6_addr,
-                                  sabuf, sizeof(sabuf)))
-            {
-                strcpy(sabuf, "<unknown-ipv6>");
-            }
-#else  /* !SK_ENABLE_IPV6 && !defined(SK_HAVE_INET_NTOP) */
-            strcpy(sabuf, "<unknown-ipv6>");
-#endif  /* SK_ENABLE_IPV6 */
         }
         port = ntohs(addr->v6.sin6_port);
         if (port) {
@@ -1840,7 +1788,7 @@ skSockaddrArrayContains(
     if (array == NULL || addr == NULL) {
         return 0;
     }
-    for (i = 0; i < skSockaddrArraySize(array); i++) {
+    for (i = 0; i < skSockaddrArrayGetSize(array); i++) {
         if (skSockaddrCompare(skSockaddrArrayGet(array, i),
                               addr, flags) == 0)
         {
@@ -1865,10 +1813,10 @@ skSockaddrArrayEqual(
     if (b == NULL) {
         return 0;
     }
-    if (skSockaddrArraySize(a) != skSockaddrArraySize(b)) {
+    if (skSockaddrArrayGetSize(a) != skSockaddrArrayGetSize(b)) {
         return 0;
     }
-    for (i = 0; i < skSockaddrArraySize(a); i++) {
+    for (i = 0; i < skSockaddrArrayGetSize(a); i++) {
         if (!skSockaddrArrayContains(b, skSockaddrArrayGet(a, i), flags)) {
             return 0;
         }
@@ -1890,8 +1838,8 @@ skSockaddrArrayMatches(
     if (b == NULL) {
         return 0;
     }
-    for (i = 0; i < skSockaddrArraySize(a); ++i) {
-        for (j = 0; j < skSockaddrArraySize(b); ++j) {
+    for (i = 0; i < skSockaddrArrayGetSize(a); ++i) {
+        for (j = 0; j < skSockaddrArrayGetSize(b); ++j) {
             if (skSockaddrCompare(skSockaddrArrayGet(a, i),
                                   skSockaddrArrayGet(b, j),
                                   flags) == 0)

@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skplugin-simple.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skplugin-simple.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skdllist.h>
@@ -400,14 +400,7 @@ ip_to_bin(
     assert(extra == NULL);
 
     info->fn(&val, rec);
-#if SK_ENABLE_IPV6
     skipaddrGetAsV6(&val, dest);
-#else
-    {
-        uint32_t val32 = htonl(skipaddrGetV4(&val));
-        memcpy(dest, &val32, sizeof(val32));
-    }
-#endif
 
     return SKPLUGIN_OK;
 }
@@ -425,17 +418,8 @@ ip_bin_to_text(
     char addr[SK_NUM2DOT_STRLEN];
 
     assert(cbdata != NULL);
-#if SK_ENABLE_IPV6
     skipaddrSetV6(&val, bin);
     skipaddrV6toV4(&val, &val);
-#else
-    {
-        uint32_t val32;
-        memcpy(&val32, bin, sizeof(val32));
-        val32 = ntohl(val32);
-        skipaddrSetV4(&val, &val32);
-    }
-#endif
     skipaddrString(addr, &val, SKIPADDR_CANONICAL);
     strncpy(dest, addr, width);
     dest[width - 1] = '\0';
@@ -464,13 +448,8 @@ skpinRegIPAddressField(
 
     memset(&callbacks, 0, sizeof(callbacks));
 
-#if SK_ENABLE_IPV6
     callbacks.column_width = width ? width : 39;
     callbacks.bin_bytes    = 16;
-#else
-    callbacks.column_width = width ? width : 15;
-    callbacks.bin_bytes    = 4;
-#endif
     callbacks.rec_to_text  = ip_to_text;
     callbacks.rec_to_bin   = ip_to_bin;
     callbacks.bin_to_text  = ip_bin_to_text;

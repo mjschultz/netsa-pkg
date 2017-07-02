@@ -78,9 +78,8 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwmatch.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwmatch.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
-#include <silk/rwascii.h>
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
 #include <silk/sksite.h>
@@ -114,8 +113,8 @@ typedef enum {
 /* val_t is used when comparing values */
 struct val_st {
     skipaddr_t  ip;
-    uint32_t    u32;
-    int32_t     is_ipv6;
+    uint64_t    u64;
+    uint8_t     is_ipv6;
 };
 typedef struct val_st val_t;
 
@@ -130,12 +129,12 @@ static skstream_t *matched_stream = NULL;
 /* ipv6-policy */
 static sk_ipv6policy_t ipv6_policy = SK_IPV6POLICY_MIX;
 
-/* available fields; rwAsciiFieldMapAddDefaultFields() fills this */
+/* available fields; skRwrecAppendFieldsToStringMap() fills this */
 static sk_stringmap_t *field_map = NULL;
 
 /* the pairs of fields to match on as set by --relate */
 static unsigned int relate_count;
-static rwrec_printable_fields_t relate[RELATE_COUNT_MAX][2];
+static rwrec_field_id_t relate[RELATE_COUNT_MAX][2];
 
 /* time difference between query and response in milliseconds */
 static sktime_t delta_msec = 0;
@@ -363,7 +362,9 @@ appSetup(
 
     /* initialize string-map of field identifiers, then remove the
      * time fields */
-    if (rwAsciiFieldMapAddDefaultFields(&field_map)) {
+    if (skStringMapCreate(&field_map)
+        || skRwrecAppendFieldsToStringMap(field_map))
+    {
         skAppPrintErr("Unable to create fields stringmap");
         exit(EXIT_FAILURE);
     }
@@ -371,9 +372,6 @@ appSetup(
     (void)skStringMapRemoveByID(field_map, RWREC_FIELD_STIME);
     (void)skStringMapRemoveByID(field_map, RWREC_FIELD_ETIME);
     (void)skStringMapRemoveByID(field_map, RWREC_FIELD_ELAPSED);
-    (void)skStringMapRemoveByID(field_map, RWREC_FIELD_STIME_MSEC);
-    (void)skStringMapRemoveByID(field_map, RWREC_FIELD_ETIME_MSEC);
-    (void)skStringMapRemoveByID(field_map, RWREC_FIELD_ELAPSED_MSEC);
 
     /* parse options */
     arg_index = skOptionsParse(argc, argv);
@@ -457,7 +455,6 @@ appSetup(
         exit(EXIT_FAILURE);
     }
 
-#if SK_ENABLE_IPV6
     /* Determine the file format; use the IPv6 format if the user
      * wants to process IPs as IPv6 or if either input file is in an
      * IPv6 format */
@@ -479,7 +476,6 @@ appSetup(
             }
         }
     }
-#endif  /* SK_ENABLE_IPV6 */
 
     matched_hdr = skStreamGetSilkHeader(matched_stream);
 
@@ -648,10 +644,10 @@ parseRelateFields(
             i = 3;
             break;
         }
-        if (entry->id >= RWREC_PRINTABLE_FIELD_COUNT) {
+        if (entry->id >= RWREC_FIELD_ID_COUNT) {
             skAbort();
         }
-        relate[relate_count][i] = (rwrec_printable_fields_t)entry->id;
+        relate[relate_count][i] = (rwrec_field_id_t)entry->id;
         ++i;
     }
     if (i != 2) {
@@ -748,85 +744,79 @@ write_record(
  */
 static void
 getField(
-    const rwRec                *current_rec,
-    rwrec_printable_fields_t    field_id,
-    val_t                      *value)
+    const rwRec        *current_rec,
+    rwrec_field_id_t    field_id,
+    val_t              *value)
 {
     value->is_ipv6 = 0;
 
     switch (field_id) {
       case RWREC_FIELD_SIP:
-#if SK_ENABLE_IPV6
         if (rwRecIsIPv6(current_rec)) {
             value->is_ipv6 = 1;
             rwRecMemGetSIP(current_rec, &value->ip);
-        } else
-#endif  /*  SK_ENABLE_IPV6 */
-        {
-            value->u32 = rwRecGetSIPv4(current_rec);
+        } else {
+            value->u64 = rwRecGetSIPv4(current_rec);
         }
         break;
       case RWREC_FIELD_DIP:
-#if SK_ENABLE_IPV6
         if (rwRecIsIPv6(current_rec)) {
             value->is_ipv6 = 1;
             rwRecMemGetDIP(current_rec, &value->ip);
-        } else
-#endif  /*  SK_ENABLE_IPV6 */
-        {
-            value->u32 = rwRecGetDIPv4(current_rec);
+        } else {
+            value->u64 = rwRecGetDIPv4(current_rec);
         }
         break;
       case RWREC_FIELD_SPORT:
-        value->u32 = rwRecGetSPort(current_rec);
+        value->u64 = rwRecGetSPort(current_rec);
         break;
       case RWREC_FIELD_DPORT:
-        value->u32 = rwRecGetDPort(current_rec);
+        value->u64 = rwRecGetDPort(current_rec);
         break;
       case RWREC_FIELD_PROTO:
-        value->u32 = rwRecGetProto(current_rec);
+        value->u64 = rwRecGetProto(current_rec);
         break;
       case RWREC_FIELD_PKTS:
-        value->u32 = rwRecGetPkts(current_rec);
+        value->u64 = rwRecGetPkts(current_rec);
         break;
       case RWREC_FIELD_BYTES:
-        value->u32 = rwRecGetBytes(current_rec);
+        value->u64 = rwRecGetBytes(current_rec);
         break;
       case RWREC_FIELD_FLAGS:
-        value->u32 = rwRecGetFlags(current_rec);
+        value->u64 = rwRecGetFlags(current_rec);
         break;
       case RWREC_FIELD_SID:
-        value->u32 = rwRecGetSensor(current_rec);
+        value->u64 = rwRecGetSensor(current_rec);
         break;
       case RWREC_FIELD_INPUT:
-        value->u32 = rwRecGetInput(current_rec);
+        value->u64 = rwRecGetInput(current_rec);
         break;
       case RWREC_FIELD_OUTPUT:
-        value->u32 = rwRecGetOutput(current_rec);
+        value->u64 = rwRecGetOutput(current_rec);
         break;
       case RWREC_FIELD_INIT_FLAGS:
-        value->u32 = rwRecGetInitFlags(current_rec);
+        value->u64 = rwRecGetInitFlags(current_rec);
         break;
       case RWREC_FIELD_REST_FLAGS:
-        value->u32 = rwRecGetRestFlags(current_rec);
+        value->u64 = rwRecGetRestFlags(current_rec);
         break;
       case RWREC_FIELD_TCP_STATE:
-        value->u32 = rwRecGetTcpState(current_rec);
+        value->u64 = rwRecGetTcpState(current_rec);
         break;
       case RWREC_FIELD_APPLICATION:
-        value->u32 = rwRecGetApplication(current_rec);
+        value->u64 = rwRecGetApplication(current_rec);
         break;
       case RWREC_FIELD_FTYPE_CLASS:
-        value->u32 = sksiteFlowtypeGetClassID(rwRecGetFlowType(current_rec));
+        value->u64 = sksiteFlowtypeGetClassID(rwRecGetFlowType(current_rec));
         break;
       case RWREC_FIELD_FTYPE_TYPE:
-        value->u32 = rwRecGetFlowType(current_rec);
+        value->u64 = rwRecGetFlowType(current_rec);
         break;
       case RWREC_FIELD_ICMP_TYPE:
-        value->u32 = rwRecGetIcmpType(current_rec);
+        value->u64 = rwRecGetIcmpType(current_rec);
         break;
       case RWREC_FIELD_ICMP_CODE:
-        value->u32 = rwRecGetIcmpCode(current_rec);
+        value->u64 = rwRecGetIcmpCode(current_rec);
         break;
       default:
         skAbortBadCase(field_id);
@@ -853,10 +843,15 @@ compareFields(
     const rwRec        *rec_2,
     match_rec_t         type_2)
 {
-#if SK_ENABLE_IPV6
+    union ipv6_convert_un {
+        uint8_t u8_array[16];
+        struct u64_pair_st {
+            uint64_t  n1;
+            uint64_t  n2;
+        } u64_pair;
+    } ipv6_convert;
     skipaddr_t tmp_ip;
     int rv;
-#endif
     unsigned int i;
     val_t val_1;
     val_t val_2;
@@ -867,7 +862,6 @@ compareFields(
     for (i = 0; i < relate_count; ++i) {
         getField(rec_1, relate[i][type_1], &val_1);
         getField(rec_2, relate[i][type_2], &val_2);
-#if SK_ENABLE_IPV6
         if (val_1.is_ipv6) {
             if (val_2.is_ipv6) {
                 /* val_1 and val_2 are IPv6; compare IPs */
@@ -875,22 +869,24 @@ compareFields(
                 if (rv) { return rv; }
             } else {
                 /* val_2 is a number. make it an IP and compare*/
-                skipaddrSetV4(&tmp_ip, &val_2.u32);
+                ipv6_convert.u64_pair.n1 = 0;
+                ipv6_convert.u64_pair.n2 = hton64(val_2.u64);
+                skipaddrSetV6(&tmp_ip, ipv6_convert.u8_array);
                 rv = skipaddrCompare(&val_1.ip, &tmp_ip);
                 if (rv) { return rv; }
             }
         } else if (val_2.is_ipv6) {
             /* val_1 is a number. make it an IP and compare*/
-            skipaddrSetV4(&tmp_ip, &val_1.u32);
+            ipv6_convert.u64_pair.n1 = 0;
+            ipv6_convert.u64_pair.n2 = hton64(val_1.u64);
+            skipaddrSetV6(&tmp_ip, ipv6_convert.u8_array);
             rv = skipaddrCompare(&tmp_ip, &val_2.ip);
             if (rv) { return rv; }
-        } else
-#endif  /* SK_ENABLE_IPV6 */
-        {
+        } else {
             /* compare two numbers */
-            if (val_1.u32 < val_2.u32) {
+            if (val_1.u64 < val_2.u64) {
                 return -1;
-            } else if (val_1.u32 > val_2.u32) {
+            } else if (val_1.u64 > val_2.u64) {
                 return 1;
             }
         }
@@ -1043,6 +1039,9 @@ int main(int argc, char **argv)
     match_id = 0;
     max_time = INT64_MAX;
     base_type = MATCH_QUERY;
+    rwRecInitialize(&query_rec, NULL);
+    rwRecInitialize(&response_rec, NULL);
+    rwRecInitialize(&base_rec, NULL);
 
     /*
      * The revised version of this application requires
@@ -1111,9 +1110,9 @@ int main(int argc, char **argv)
             /* The first 'match_lead' is the base record. */
             match_lead = base_type;
             if (base_type == MATCH_QUERY) {
-                RWREC_COPY(&base_rec, &query_rec);
+                rwRecCopy(&base_rec, &query_rec, 0);
             } else {
-                RWREC_COPY(&base_rec, &response_rec);
+                rwRecCopy(&base_rec, &response_rec, 0);
             }
             /* The maximum time-window to use for this match; if the
              * delta_policy is RELATIVE_DELTA, this window will move
@@ -1243,6 +1242,10 @@ int main(int argc, char **argv)
     if (matched_stream) {
         skStreamDestroy(&matched_stream);
     }
+
+    rwRecReset(&query_rec);
+    rwRecReset(&response_rec);
+    rwRecReset(&base_rec);
 
     /* done */
     appTeardown();

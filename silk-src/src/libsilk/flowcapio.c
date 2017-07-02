@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: flowcapio.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: flowcapio.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include "skstream_priv.h"
 
@@ -21,24 +21,82 @@ RCSIDENT("$SiLK: flowcapio.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 /* Version to use when SK_RECORD_VERSION_ANY is specified */
 #define DEFAULT_RECORD_VERSION 5
 
+/*
+ *    Store 'ps_value' in the single byte referenced by 'ps_pos'.  If
+ *    'ps_value' cannot be represented in a single byte, set the value
+ *    referenced by 'ps_pos' to UINT8_MAX.
+ */
+#define flowcapPackSnmp8(ps_value, ps_pos)                              \
+    {                                                                   \
+        *(ps_pos) = (uint8_t)(((ps_value) <= 0xFF) ? (ps_value) : 0xFF); \
+    }
+
+
+/* Helper macros for the Packets & Protocol macros below */
+#if SK_LITTLE_ENDIAN
+#define flowcapPackPacketsProtoHelper(pph_value, pph_pos)       \
+    memcpy(pph_pos, pph_value, 3)
+#define flowcapUnpackPacketsProtoHelper(pph_value, pph_pos)     \
+    memcpy(pph_value, pph_pos, 3)
+#else
+#define flowcapPackPacketsProtoHelper(pph_value, pph_pos)       \
+    memcpy(pph_pos, (((uint8_t*)pph_value) + 1), 3)
+#define flowcapUnpackPacketsProtoHelper(pph_value, pph_pos)     \
+    memcpy((((uint8_t*)pph_value) + 1), pph_pos, 3)
+#endif
+
+/*
+ *  flowcapPackPacketsProto(pp_rec, pp_pos);
+ *
+ *    Store the packets value and protocol from the SiLK flow record
+ *    'pp_rec' in the 4-byte (32-bit) value referenced by 'pp_pos',
+ *    using 3 bytes for the packets.  If the packets will not fit in 3
+ *    bytes, store a value of 0xFFFFFF for the packets.
+ */
+#define flowcapPackPacketsProto(pp_rec, pp_pos)                 \
+    do {                                                        \
+        if (rwRecGetPkts(pp_rec) > 0xFFFFFF) {                  \
+            memset((pp_pos), 0xFF, 3);                          \
+        } else {                                                \
+            uint32_t pp_tmp32 = (uint32_t)rwRecGetPkts(pp_rec); \
+            flowcapPackPacketsProtoHelper(&pp_tmp32, (pp_pos)); \
+        }                                                       \
+        *((pp_pos) + 3) = rwRecGetProto(pp_rec);                \
+    }while(0)
+
+/*
+ *  flowcapUnpackPacketsProto(pp_rec, pp_pos);
+ *
+ *    Retrieive the packets and protocol values from the 4-byte
+ *    (32-bit) value referenced by 'pp_pos' and set the fields on the
+ *    SiLK flow record 'pp_rec'.
+ */
+#define flowcapUnpackPacketsProto(pp_rec, pp_pos)               \
+    do {                                                        \
+        uint32_t pp_tmp32 = 0;                                  \
+        flowcapUnpackPacketsProtoHelper(&pp_tmp32, (pp_pos));   \
+        rwRecSetPkts((pp_rec), pp_tmp32);                       \
+        rwRecSetProto((pp_rec), *((pp_pos) + 3));               \
+    }while(0)
+
 
 /* LOCAL FUNCTION PROTOTYPES */
 
 static int
 flowcapioRecordUnpack_V5(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar);
 static int
 flowcapioRecordUnpack_V3(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar);
 static int
 flowcapioRecordPack_V3(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar);
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar);
 
 
 
@@ -55,7 +113,7 @@ flowcapioRecordPack_V3(
 static int
 flowcapioRecordUnpack_V6(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     int rv;
@@ -139,21 +197,23 @@ flowcapioRecordUnpack_V6(
 static int
 flowcapioRecordUnpack_V5(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     uint32_t tmp32 = 0;
     uint16_t elapsed = 0;
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         flowcapioRecordSwap_V5(ar);
     }
 
-    /* sIP, dIP, bytes */
+    /* sIP, dIP */
     rwRecMemSetSIPv4(rwrec, &ar[0]);
     rwRecMemSetDIPv4(rwrec, &ar[4]);
-    rwRecMemSetBytes(rwrec, &ar[8]);
+
+    /* bytes */
+    rwpackUnpackBytes32(rwrec, &ar[8]);
 
     /* sTime seconds, plus fractional seconds in bytes 35,36 */
     memcpy(&tmp32, &ar[12], sizeof(tmp32));
@@ -167,22 +227,17 @@ flowcapioRecordUnpack_V5(
                             + ((GET_MASKED_BITS(ar[36], 0, 6) << 4)
                                | GET_MASKED_BITS(ar[37], 4, 4))));
 
-    /* sPort, dPort, application, input, output */
+    /* sPort, dPort, application */
     rwRecMemSetSPort(rwrec, &ar[18]);
     rwRecMemSetDPort(rwrec, &ar[20]);
     rwRecMemSetApplication(rwrec, &ar[22]);
-    rwRecMemSetInput(rwrec, &ar[24]);
-    rwRecMemSetOutput(rwrec, &ar[26]);
+
+    /* input, output */
+    rwpackUnpackInput16(rwrec, &ar[24]);
+    rwpackUnpackOutput16(rwrec, &ar[26]);
 
     /* packets, protocol */
-    tmp32 = 0;
-#if SK_LITTLE_ENDIAN
-    memcpy(&tmp32, &ar[28], 3);
-#else
-    memcpy((((uint8_t*)&tmp32) + 1), &ar[28], 3);
-#endif
-    rwRecSetPkts(rwrec, tmp32);
-    rwRecSetProto(rwrec, ar[31]);
+    flowcapUnpackPacketsProto(rwrec, &ar[28]);
 
     /* Flags, Initial flags, TCP State */
     rwRecSetTcpState(rwrec, ar[34]);
@@ -199,7 +254,7 @@ flowcapioRecordUnpack_V5(
     /* Fractional times in bytes 35-37 handled above */
 
     /* Get sensor from header */
-    rwRecSetSensor(rwrec, stream->hdr_sensor);
+    rwRecSetSensor(rwrec, stream->silkflow.hdr_sensor);
 
     return SKSTREAM_OK;
 }
@@ -210,17 +265,24 @@ flowcapioRecordUnpack_V5(
  */
 static int
 flowcapioRecordPack_V5(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
-    uint32_t tmp32;
     uint16_t elapsed;
+    int rv = 0;
 
-    /* sIP, dIP, bytes, sTime */
+    /* sIP, dIP */
     rwRecMemGetSIPv4(rwrec, &ar[0]);
     rwRecMemGetDIPv4(rwrec, &ar[4]);
-    rwRecMemGetBytes(rwrec, &ar[8]);
+
+    /* bytes */
+    rwpackPackBytes32(rwrec, &ar[8], &rv);
+    if (rv) {
+        memset(&ar[8], 0xFF, 4);
+    }
+
+    /* sTime */
     rwRecMemGetStartSeconds(rwrec, &ar[12]);
 
     /* elapsed */
@@ -231,25 +293,23 @@ flowcapioRecordPack_V5(
         memcpy(&ar[16], &elapsed, sizeof(elapsed));
     }
 
-    /* sPort, dPort, application, input, output */
+    /* sPort, dPort, application */
     rwRecMemGetSPort(rwrec, &ar[18]);
     rwRecMemGetDPort(rwrec, &ar[20]);
     rwRecMemGetApplication(rwrec, &ar[22]);
-    rwRecMemGetInput(rwrec, &ar[24]);
-    rwRecMemGetOutput(rwrec, &ar[26]);
+
+    /* input, output */
+    rwpackPackInput16(rwrec, &ar[24], &rv);
+    if (rv) {
+        memset(&ar[24], 0xFF, 2);
+    }
+    rwpackPackOutput16(rwrec, &ar[26], &rv);
+    if (rv) {
+        memset(&ar[26], 0xFF, 2);
+    }
 
     /* packets, protocol */
-    tmp32 = rwRecGetPkts(rwrec);
-    if (tmp32 > 0xFFFFFF) {
-        memset(&ar[28], 0xFF, 3);
-    } else {
-#if SK_LITTLE_ENDIAN
-        memcpy(&ar[28], &tmp32, 3);
-#else
-        memcpy(&ar[28], (((uint8_t*)&tmp32) + 1), 3);
-#endif
-    }
-    ar[31] = rwRecGetProto(rwrec);
+    flowcapPackPacketsProto(rwrec, &ar[28]);
 
     /* Flags, Initial flags, TCP State */
     ar[34] = rwRecGetTcpState(rwrec);
@@ -270,7 +330,7 @@ flowcapioRecordPack_V5(
     ar[37] = 0xFF & (rwRecGetElapsedMSec(rwrec) << 4);
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         flowcapioRecordSwap_V5(ar);
     }
 
@@ -326,7 +386,7 @@ flowcapioRecordPack_V5(
 static int
 flowcapioRecordUnpack_V4(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     int rv;
@@ -335,7 +395,7 @@ flowcapioRecordUnpack_V4(
     rv = flowcapioRecordUnpack_V3(stream, rwrec, ar);
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         /* only need to swap the payload hash */
         SWAP_DATA32((ar) + 36);
     }
@@ -354,9 +414,9 @@ flowcapioRecordUnpack_V4(
  */
 static int
 flowcapioRecordPack_V4(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
     int rv;
 
@@ -368,7 +428,7 @@ flowcapioRecordPack_V4(
     }
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         /* only need to swap the payload hash */
         SWAP_DATA32((ar) + 36);
     }
@@ -449,21 +509,23 @@ flowcapioRecordPack_V4(
 static int
 flowcapioRecordUnpack_V3(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     uint32_t tmp32 = 0;
     uint16_t elapsed = 0;
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         flowcapioRecordSwap_V3(ar);
     }
 
-    /* sIP, dIP, bytes */
+    /* sIP, dIP */
     rwRecMemSetSIPv4(rwrec, &ar[0]);
     rwRecMemSetDIPv4(rwrec, &ar[4]);
-    rwRecMemSetBytes(rwrec, &ar[8]);
+
+    /* bytes */
+    rwpackUnpackBytes32(rwrec, &ar[8]);
 
     /* sTime seconds, plus fractional seconds in bytes 33,34 */
     memcpy(&tmp32, &ar[12], sizeof(tmp32));
@@ -487,14 +549,7 @@ flowcapioRecordUnpack_V3(
     rwRecSetOutput(rwrec, ar[25]);
 
     /* packets, protocol */
-    tmp32 = 0;
-#if SK_LITTLE_ENDIAN
-    memcpy(&tmp32, &ar[26], 3);
-#else
-    memcpy((((uint8_t*)&tmp32) + 1), &ar[26], 3);
-#endif
-    rwRecSetPkts(rwrec, tmp32);
-    rwRecSetProto(rwrec, ar[29]);
+    flowcapUnpackPacketsProto(rwrec, &ar[26]);
 
     /* Flags, Initial flags, TCP State */
     rwRecSetTcpState(rwrec, ar[32]);
@@ -511,7 +566,7 @@ flowcapioRecordUnpack_V3(
     /* Fractional times in bytes 33-35 handled above */
 
     /* Get sensor from header */
-    rwRecSetSensor(rwrec, stream->hdr_sensor);
+    rwRecSetSensor(rwrec, stream->silkflow.hdr_sensor);
 
     return SKSTREAM_OK;
 }
@@ -522,17 +577,24 @@ flowcapioRecordUnpack_V3(
  */
 static int
 flowcapioRecordPack_V3(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
-    uint32_t tmp32;
     uint16_t elapsed;
+    int rv = 0;
 
-    /* sIP, dIP, bytes, sTime */
+    /* sIP, dIP */
     rwRecMemGetSIPv4(rwrec, &ar[0]);
     rwRecMemGetDIPv4(rwrec, &ar[4]);
-    rwRecMemGetBytes(rwrec, &ar[8]);
+
+    /* bytes */
+    rwpackPackBytes32(rwrec, &ar[8], &rv);
+    if (rv) {
+        memset(&ar[8], 0xFF, 4);
+    }
+
+    /* sTime */
     rwRecMemGetStartSeconds(rwrec, &ar[12]);
 
     /* elapsed */
@@ -549,21 +611,11 @@ flowcapioRecordPack_V3(
     rwRecMemGetApplication(rwrec, &ar[22]);
 
     /* input, output are single byte values */
-    ar[24] = 0xFF & rwRecGetInput(rwrec);
-    ar[25] = 0xFF & rwRecGetOutput(rwrec);
+    flowcapPackSnmp8(rwRecGetInput(rwrec),  &ar[24]);
+    flowcapPackSnmp8(rwRecGetOutput(rwrec), &ar[25]);
 
     /* packets, protocol */
-    tmp32 = rwRecGetPkts(rwrec);
-    if (tmp32 > 0xFFFFFF) {
-        memset(&ar[26], 0xFF, 3);
-    } else {
-#if SK_LITTLE_ENDIAN
-        memcpy(&ar[26], &tmp32, 3);
-#else
-        memcpy(&ar[26], (((uint8_t*)&tmp32) + 1), 3);
-#endif
-    }
-    ar[29] = rwRecGetProto(rwrec);
+    flowcapPackPacketsProto(rwrec, &ar[26]);
 
     /* Flags, Initial flags, TCP State */
     ar[32] = rwRecGetTcpState(rwrec);
@@ -584,7 +636,7 @@ flowcapioRecordPack_V3(
     ar[35] = 0xFF & (rwRecGetElapsedMSec(rwrec) << 4);
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         flowcapioRecordSwap_V3(ar);
     }
 
@@ -655,21 +707,23 @@ flowcapioRecordPack_V3(
 static int
 flowcapioRecordUnpack_V2(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     uint32_t tmp32 = 0;
     uint16_t elapsed = 0;
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         flowcapioRecordSwap_V2(ar);
     }
 
-    /* sIP, dIP, bytes */
+    /* sIP, dIP */
     rwRecMemSetSIPv4(rwrec, &ar[0]);
     rwRecMemSetDIPv4(rwrec, &ar[4]);
-    rwRecMemSetBytes(rwrec, &ar[8]);
+
+    /* bytes */
+    rwpackUnpackBytes32(rwrec, &ar[8]);
 
     /* sTime */
     memcpy(&tmp32, &ar[12], sizeof(tmp32));
@@ -688,20 +742,13 @@ flowcapioRecordUnpack_V2(
     rwRecSetOutput(rwrec, ar[23]);
 
     /* packets, protocol */
-    tmp32 = 0;
-#if SK_LITTLE_ENDIAN
-    memcpy(&tmp32, &ar[24], 3);
-#else
-    memcpy((((uint8_t*)&tmp32) + 1), &ar[24], 3);
-#endif
-    rwRecSetPkts(rwrec, tmp32);
-    rwRecSetProto(rwrec, ar[27]);
+    flowcapUnpackPacketsProto(rwrec, &ar[24]);
 
     /* Flags */
     rwRecSetFlags(rwrec, ar[28]);
 
     /* Get sensor from header */
-    rwRecSetSensor(rwrec, stream->hdr_sensor);
+    rwRecSetSensor(rwrec, stream->silkflow.hdr_sensor);
 
     return SKSTREAM_OK;
 }
@@ -712,17 +759,24 @@ flowcapioRecordUnpack_V2(
  */
 static int
 flowcapioRecordPack_V2(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
-    uint32_t tmp32;
     uint16_t elapsed;
+    int rv = 0;
 
-    /* sIP, dIP, bytes, sTime */
+    /* sIP, dIP */
     rwRecMemGetSIPv4(rwrec, &ar[0]);
     rwRecMemGetDIPv4(rwrec, &ar[4]);
-    rwRecMemGetBytes(rwrec, &ar[8]);
+
+    /* bytes */
+    rwpackPackBytes32(rwrec, &ar[8], &rv);
+    if (rv) {
+        memset(&ar[8], 0xFF, 4);
+    }
+
+    /* sTime */
     rwRecMemGetStartSeconds(rwrec, &ar[12]);
 
     /* elapsed */
@@ -738,28 +792,18 @@ flowcapioRecordPack_V2(
     rwRecMemGetDPort(rwrec, &ar[20]);
 
     /* input, output are single byte values */
-    ar[22] = 0xFF & rwRecGetInput(rwrec);
-    ar[23] = 0xFF & rwRecGetOutput(rwrec);
+    flowcapPackSnmp8(rwRecGetInput(rwrec),  &ar[22]);
+    flowcapPackSnmp8(rwRecGetOutput(rwrec), &ar[23]);
 
     /* packets, protocol */
-    tmp32 = rwRecGetPkts(rwrec);
-    if (tmp32 > 0xFFFFFF) {
-        memset(&ar[24], 0xFF, 3);
-    } else {
-#if SK_LITTLE_ENDIAN
-        memcpy(&ar[24], &tmp32, 3);
-#else
-        memcpy(&ar[24], (((uint8_t*)&tmp32) + 1), 3);
-#endif
-    }
-    ar[27] = rwRecGetProto(rwrec);
+    flowcapPackPacketsProto(rwrec, &ar[24]);
 
     /* Flags, TOS */
     ar[28] = rwRecGetFlags(rwrec);
     ar[29] = 0;
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         flowcapioRecordSwap_V2(ar);
     }
 
@@ -821,24 +865,24 @@ flowcapioPrepare(
     /* version check; set values based on version */
     switch (skHeaderGetRecordVersion(hdr)) {
       case 6:
-        stream->rwUnpackFn = &flowcapioRecordUnpack_V6;
-        stream->rwPackFn   = &flowcapioRecordPack_V5;
+        stream->silkflow.unpack = &flowcapioRecordUnpack_V6;
+        stream->silkflow.pack   = &flowcapioRecordPack_V5;
         break;
       case 5:
-        stream->rwUnpackFn = &flowcapioRecordUnpack_V5;
-        stream->rwPackFn   = &flowcapioRecordPack_V5;
+        stream->silkflow.unpack = &flowcapioRecordUnpack_V5;
+        stream->silkflow.pack   = &flowcapioRecordPack_V5;
         break;
       case 4:
-        stream->rwUnpackFn = &flowcapioRecordUnpack_V4;
-        stream->rwPackFn   = &flowcapioRecordPack_V4;
+        stream->silkflow.unpack = &flowcapioRecordUnpack_V4;
+        stream->silkflow.pack   = &flowcapioRecordPack_V4;
         break;
       case 3:
-        stream->rwUnpackFn = &flowcapioRecordUnpack_V3;
-        stream->rwPackFn   = &flowcapioRecordPack_V3;
+        stream->silkflow.unpack = &flowcapioRecordUnpack_V3;
+        stream->silkflow.pack   = &flowcapioRecordPack_V3;
         break;
       case 2:
-        stream->rwUnpackFn = &flowcapioRecordUnpack_V2;
-        stream->rwPackFn   = &flowcapioRecordPack_V2;
+        stream->silkflow.unpack = &flowcapioRecordUnpack_V2;
+        stream->silkflow.pack   = &flowcapioRecordPack_V2;
         break;
       case 1:
         /* no longer supported */
@@ -848,22 +892,22 @@ flowcapioPrepare(
         goto END;
     }
 
-    stream->recLen = flowcapioGetRecLen(skHeaderGetRecordVersion(hdr));
+    stream->rec_len = flowcapioGetRecLen(skHeaderGetRecordVersion(hdr));
 
     /* verify lengths */
-    if (stream->recLen == 0) {
+    if (stream->rec_len == 0) {
         skAppPrintErr("Record length not set for %s version %u",
                       FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr));
         skAbort();
     }
-    if (stream->recLen != skHeaderGetRecordLength(hdr)) {
+    if (stream->rec_len != skHeaderGetRecordLength(hdr)) {
         if (0 == skHeaderGetRecordLength(hdr)) {
-            skHeaderSetRecordLength(hdr, stream->recLen);
+            skHeaderSetRecordLength(hdr, stream->rec_len);
         } else {
             skAppPrintErr(("Record length mismatch for %s version %u\n"
                            "\tcode = %" PRIu16 " bytes;  header = %lu bytes"),
                           FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr),
-                          stream->recLen,
+                          stream->rec_len,
                           (unsigned long)skHeaderGetRecordLength(hdr));
             skAbort();
         }

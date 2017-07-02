@@ -13,8 +13,7 @@ $file{pysilk_plugin} = get_data_or_exit77('pysilk_plugin');
 $ENV{PYTHONPATH} = $SiLKTests::testsdir.((defined $ENV{PYTHONPATH}) ? ":$ENV{PYTHONPATH}" : "");
 add_plugin_dirs('/src/pysilk');
 
-skip_test('Cannot use --python-file') 
-    unless check_exit_status(qq|$rwfilter --python-file=$file{pysilk_plugin} --help|);
+check_python_plugin($rwfilter);
 my $cmd = "$rwfilter --python-file=$file{pysilk_plugin} --print-volume $file{data} 2>&1";
 my $md5 = "97951e047345b07e92c9ccb93fe55021";
 

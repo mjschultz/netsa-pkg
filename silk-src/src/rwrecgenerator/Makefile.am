@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 696fd479073b 2014-01-28 19:15:22Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 7e6fa3b4c996 2016-06-08 21:00:24Z mthomas $");
 
 # Installed Targets
 
@@ -19,17 +19,18 @@ AM_CFLAGS = $(WARN_CFLAGS) $(SK_CFLAGS)
 AM_LDFLAGS = $(SK_LDFLAGS) $(STATIC_APPLICATIONS)
 LDADD = ../libsilk/libsilk.la
 
-rwrecgenerator_SOURCES = rwrecgenerator.c \
+COMMON_RECGEN = \
+	 rwascii.c rwascii.h \
 	 skheap-rwrec.c skheap-rwrec.h \
 	 stream-cache.c stream-cache.h
+
+rwrecgenerator_SOURCES = rwrecgenerator.c \
+	 $(COMMON_RECGEN)
 
 # The code in the threaded version is outdated.  It is also slower
 # than the non-threaded version.
 rwrecgenerator_threaded_SOURCES =  rwrecgenerator-threaded.c \
-	 skheap-rwrec.c skheap-rwrec.h \
-	 stream-cache.c stream-cache.h
-rwrecgenerator_threaded_LDADD = ../libsilk/libsilk-thrd.la \
-	 $(LDADD) $(PTHREAD_LDFLAGS)
+	 $(COMMON_RECGEN)
 
 skheap_rwrec_test_SOURCES = skheap-rwrec-test.c \
 	 skheap-rwrec.c skheap-rwrec.h

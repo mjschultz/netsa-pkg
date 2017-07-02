@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am f162742a8f51 2014-05-09 18:47:33Z mthomas $")
+# RCSIDENT("$SiLK: Makefile.am 52b8a985f34b 2014-05-04 20:03:45Z mthomas $")
 
 # Installed Targets
 
@@ -21,8 +21,7 @@ EXTRA_DIST += rwpollexec.init.d.in
 AM_CPPFLAGS = $(SK_SRC_INCLUDES) $(SK_CPPFLAGS)
 AM_CFLAGS = $(WARN_CFLAGS) $(SK_CFLAGS)
 AM_LDFLAGS = $(SK_LDFLAGS) $(STATIC_APPLICATIONS)
-LDADD = ../libsilk/libsilk-thrd.la ../libsilk/libsilk.la \
-	$(PTHREAD_LDFLAGS)
+LDADD = ../libsilk/libsilk.la
 
 rwpollexec_SOURCES = rwpollexec.c
 

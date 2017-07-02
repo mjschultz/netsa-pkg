@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_HASHLIB_H, "$SiLK: hashlib.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_HASHLIB_H, "$SiLK: hashlib.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 /**
  *  @file
@@ -90,7 +90,7 @@ RCSIDENTVAR(rcsID_HASHLIB_H, "$SiLK: hashlib.h 275df62a2e41 2017-01-05 17:30:40Z
  *
  *    UNSUPPORTED.
  */
-#define HTT_ALLOWDELETION 0
+#define HTT_ALLOWDELETION 1
 
 /**
  *    Default load is 185 (72.27%). Generally, this is the value that
@@ -148,6 +148,29 @@ typedef int
     const void         *key_b,
     void               *cmp_userdata);
 
+/**
+ *    Signature of a callback function used by
+ *    hashlib_set_get_key_data() for the case when the keys in a
+ *    HashTable are pointers to data stored outside of the table.
+ *
+ *    The function is expected to take the key in 'storage_key' and
+ *    store its contents in the 'key_data' array, which is an array of
+ *    HASHLIB_MAX_KEY_WIDTH bytes, and return the length of the key it
+ *    stored in 'key_data'.
+ *
+ *    The 'key_len_storage' parameter gives the length (in bytes) of
+ *    the key in 'storage_key'.
+ *
+ *    The 'get_key_data_userdata' parameter is a context pointer for
+ *    the function to use.
+ */
+typedef uint8_t
+(*hashlib_get_key_data_fn)(
+    const uint8_t      *storage_key,
+    uint8_t             key_data[],
+    uint8_t             key_len_storage,
+    const void         *get_key_data_userdata);
+
 
 /**
  *    Creates a new hash table. The initial table includes a single
@@ -188,6 +211,58 @@ hashlib_create_table(
     uint32_t            app_data_size,
     uint64_t            estimated_size,
     uint8_t             load_factor);
+
+
+/**
+ *    Modifies the HashTable 'table_ptr' to allow the HashTable to
+ *    store pointers in (part of) the keys with data residing outside
+ *    (or partially outside) the HashTable.
+ *
+ *    Normally a HashTable assumes the key passed into
+ *    hashlib_insert() is the key to be hashed.  When a hash-collision
+ *    occurs, memcmp() is used to determine whether two keys are
+ *    identical.
+ *
+ *    Calling this function causes the HashTable to invoke the
+ *    callback 'get_key_data_fn' whenever the table has a key and
+ *    needs to get the contents of the key.  When a hash-collision
+ *    occurs, the 'get_key_data_fn' callback is invoked on each key
+ *    and the contents of the keys are compared with memcmp().  The
+ *    callback is also used to get keys' content when
+ *    hashlib_sort_entries() is called.
+ *
+ *    Calling this function with a NULL value for 'get_key_data_fn'
+ *    restores the default behavior.
+ *
+ *    The 'get_key_data_userdata' parameter is provided as a context
+ *    pointer for the callback.
+ *
+ *    All hashlib functions continue use 'get_key_data_fn' and
+ *    'get_key_data_userdata' until the table is detroyed or this
+ *    function is called with a NULL callback function.
+ *
+ *    This function may only be called with a HashTable that contains
+ *    no entries.
+ *
+ *    Parameters:
+ *
+ *    table_ptr:      A pointer to the table to configure.
+ *
+ *    get_key_data_fn:         Function to use to get a key's contents.
+ *
+ *    get_key_data_userdata:   Value passed unchanged to 'get_key_data_fn'.
+ *
+ *    Returns:
+ *
+ *    OK when the table is empty.
+ *
+ *    ERR_BADARGUMENT when the 'table_ptr' is not empty.
+ */
+int
+hashlib_set_get_key_data(
+    HashTable              *table_ptr,
+    hashlib_get_key_data_fn get_key_data_fn,
+    const void             *get_key_data_userdata);
 
 
 /**
@@ -236,6 +311,10 @@ hashlib_sort_entries_usercmp(
 /**
  *    A wrapper around hashlib_sort_entries_usercmp() that uses
  *    memcmp() to compare the keys.
+ *
+ *    If hashlib_set_get_key_data() has been called on 'table_ptr',
+ *    the callback function is used to get a key's content and then
+ *    memcmp() is used to compare the contents.
  */
 int
 hashlib_sort_entries(

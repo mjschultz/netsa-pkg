@@ -17,23 +17,164 @@ B<rwpmapbuild> - Create a binary prefix map from a text file
 
 =head1 DESCRIPTION
 
-Prefix maps provide a way to map field values (specifically either IP
-addresses or protocol-port pairs) to string labels based on a
-user-defined map file.  B<rwpmapbuild> reads textual input to create a
-binary prefix map file.  The syntax of this input is described in the
-L</INPUT FILE FORMAT> section below.
+A prefix map file is a binary file that maps a value (specifically
+either an IP addresses or a protocol-port pair) to a string label.
+B<rwpmapbuild> reads textual input to create a binary prefix map file.
+The syntax of this input is described in the L</INPUT FILE FORMAT>
+section below.
 
-As described in B<pmapfilter(3)>, you can partition, count, sort and
-display SiLK flow records based on the string labels defined in the
-prefix map.  To view the contents of a prefix map file, use
-B<rwpmapcat(1)>.  To query the contents of a prefix map, use
-B<rwpmaplookup(1)>.
+Once you have created a prefix map file, you may use the file in
+B<rwfilter(1)>, B<rwstats(1)>, B<rwuniq(1)>, B<rwgroup(1)>,
+B<rwsort(1)>, or B<rwcut(1)> to partition, count, sort and display
+SiLK flow records based on the string labels defined in the prefix
+map.  See the B<pmapfilter(3)> manual page for details.  To view the
+contents of a prefix map file, use B<rwpmapcat(1)>.  To query the
+contents of a prefix map, use B<rwpmaplookup(1)>.
 
-The textual input is read from the specified input file, or from the
-standard input when the B<--input-file> switch is not provided.  The
-binary output is written to the named output file, or to the standard
-output when the B<--output-file> switch is not provided and the
+The textual input is read from the file specified by B<--input-file>
+or from the standard input when the switch is not provided.  The
+binary output is written to the location named by B<--output-file> or
+to the standard output when the switch is not provided and the
 standard output is not connected to a terminal.
+
+The remainder of this section provides three example files that could
+be used as input to B<rwpmapbuild>.  For details on the syntax of the
+input, see the L</INPUT FILE FORMAT> section that follows the
+description of the command line L</OPTIONS>.
+
+=head2 Sample IPv4 input file
+
+The following is a sample input file for B<rwpmapbuild> that describes
+the registry of special-purpose IPv4 addresses.  Any IP address that
+is not a special-purpose address get the label C<Normal>.
+
+ # Prefix map sample input file for special purpose IPv4 addresses
+ map-name   ipv4-special
+ mode       ipv4
+ default    Normal
+
+ #    Each line has an either a CIDR block or a pair of IP
+ #    addresses and then a label for that range
+ 0.0.0.0/8          This host on this network [RFC1122 section 3.2.1.3]
+ 10.0.0.0/8         Private-Use [RFC1918]
+ 100.64.0.0/10      Shared Address Space [RFC6598]
+ 127.0.0.0/8        Loopback [RFC1122 section 3.2.1.3]
+ 169.254.0.0/16     Link Local [RFC3927]
+ 172.16.0.0/12      Private-Use [RFC1918]
+ 192.0.0.0/24       IETF Protocol Assignments [RFC6890 section 2.1]
+ 192.0.0.0/29       IPv4 Service Continuity Prefix [RFC7335]
+ #    A range of a single IP address requires a "/32" suffix or
+ #    that the IP address be repeated
+ 192.0.0.8/32       IPv4 dummy address [RFC7600]
+ 192.0.0.9/32       Port Control Protocol Anycast [RFC7723]
+ 192.0.0.10/32      Traversal Using Relays around NAT Anycast [draft]
+ #    A range may be specified as two IP addresses
+ 192.0.0.170  192.0.0.171   NAT64/DNS64 Discovery [RFC7050 section 2.2]
+ 192.0.2.0/24       Documentation (TEST-NET-1) [RFC5737]
+ 192.31.196.0/24    AS112-v4 [RFC7535]
+ 192.52.193.0/24    AMT [RFC7450]
+ 192.88.99.0/24     Deprecated (6to4 Relay Anycast) [RFC7526]
+ 192.168.0.0/16     Private-Use [RFC1918]
+ 192.175.48.0/24    Direct Delegation AS112 Service [RFC7534]
+ 198.18.0.0/15      Benchmarking [RFC2544]
+ 198.51.100.0/24    Documentation (TEST-NET-2) [RFC5737]
+ 203.0.113.0/24     Documentation (TEST-NET-3) [RFC5737]
+ 240.0.0.0/4        Reserved [RFC1112 section 4]
+ 255.255.255.255/32 Limited Broadcast [RFC919 section 7]
+
+=head2 Sample IPv6 input file
+
+The following input file for B<rwpmapbuild> describes IPv6 address
+space.  The file demonstrates the use of the B<label> statement.  It
+uses a hyphen ("-") as the label for any undefined ranges.
+
+ # Prefix map sample input file for IPv6 address space
+ map-name   iana-ipv6
+ mode       ipv6
+
+ label      0   RFC3849
+ label      1   RFC3879
+ label      2   RFC4048
+ label      3   RFC4193
+ label      4   RFC4291
+ label      5   RFC4291 Loopback Address
+ label      6   RFC4291 Unspecified Address
+ label      7   RFC4291 IPv4-mapped Address
+ label      8   RFC5180
+ label      9   RFC6666
+ label     10   RFC7723
+ label     11   -
+
+ default        -
+
+ 0000::/8       4
+ ::1/128        5
+ ::/128         6
+ ::ffff:0:0/96  7
+ 0100::/8       4
+ 0100::/64 	9           # RFC6666
+ 0200::/7       2           # RFC4048
+ 0400::/6       4
+ 0800::/5       4
+ 1000::/4       4
+ 2000::/3       4
+ 2001:1::1/128 10           # RFC7723
+ 2001:2::/48 	8           # Benchmarking
+ 2001:db8::/32  0           # Documentation
+ 4000::/3       4
+ 6000::/3       4
+ 8000::/3       4
+ a000::/3       4
+ c000::/3       4
+ e000::/4       4           # You may use the label number or the
+ f000::/5       RFC4291     # exact label name, but any other text
+ f800::/6       4           # causes rwpmapbuild to issue an error
+ fc00::/7       RFC4193
+ fe00::/9       4
+ fe80::/10      4
+ fec0::/10      RFC3879
+ ff00::/8       4
+
+=head2 Sample protocol-port input file
+
+This is a small sample of a file that could be used to label IP
+protocols, specific ports within the TCP and UDP protocols, and ICMP
+type and code values.  When ranges overlap or one range is a
+specialization of another, the wider or more general range should be
+listed first, followed by the narrower or more specific ranges.
+
+ map-name   protocol-port-example
+ mode       proto-port
+
+ #    The range is either a single protocol or a protocol and
+ #    a port separated by a slash.
+ 1      1           ICMP
+ #    Specify the wider categories first, then specialize
+ 6      6           TCP
+ 6/0    6/1024      TCP/Generic reserved
+ #    A range of a single port requires both the starting
+ #    value and the ending value
+ 6/21   6/21        TCP/FTP
+ 6/22   6/22        TCP/SSH
+ 6/25   6/25        TCP/SMTP
+ 6/80   6/80        TCP/HTTP
+ 6/443  6/443       TCP/HTTPS
+ 6/6000 6/6063      TCP/X11
+ 17     17          UDP
+ 17/0   17/1024     UDP/Generic reserved
+ 17/53  17/53       UDP/DNS
+ 17/67  17/68       UDP/DHCP
+ 50     50          ESP
+ 58     58          ICMPv6
+ #    For ICMP Type/Code, convert the type and code to a port
+ #    value using this expression:  type * 256 + code
+ 1/0    1/255       ICMP/Echo Reply
+ 1/768  1/1023      ICMP/Destination Unreachable
+ 1/1024 1/1279      ICMP/Source Quench
+ 1/768  1/768       ICMP/Net Unreachable
+ 1/769  1/769       ICMP/Host Unreachable
+ 1/770  1/770       ICMP/Protocol Unreachable
+ 1/771  1/771       ICMP/Port Unreachable
 
 =head1 OPTIONS
 
@@ -110,31 +251,72 @@ configured, then exit the application.
 
 =head1 INPUT FILE FORMAT
 
-The input file format consists of any number of input lines of the
-forms described below.  Note that there is B<not> a form that accepts
-a single IP address and a label; therefore, to provide a label for a
-single IP address you must append C</32> to a single IPv4 address (or
-C</128> to a single IPv6 address).
+This section describes the format of the textual input file for
+B<rwpmapbuild>.  Three example files are shown above in the
+L</DESCRIPTION> section.
 
-Blank lines in the input file are ignored, as are comments.  Comments
-begin with the first C<#> character on a line and extend to the end of
-the line.
+Blank lines or lines containing only whitespace in the input file are
+ignored.
 
-B<rwpmapbuild> maps ranges to string labels.  These string labels may
-be created either explicitly via the B<label> statement or implicitly
-by specifying text after a range, but a single input file must use
-only one method to create labels.  When the B<label> statement is
-used, all labels must be pre-declared in the B<label> statement prior
-to their use in the B<default> statement or an range statements.
+The file may contain comments, and these are ignored.  A comment
+begins with the first C<#> character on a line and extends to the end
+of the line.  Note that C<#> appearing in a textual label is treated
+as the beginning of a comment.
 
-In the following, the I<label-value> represents either a numerical
-label identifier that was created with the B<label> statement or
-I<label-text>.
+Each non-blank line in the input file that is not a comment is
+considered a statement.  A statement must be completed on a single
+line, and only one statement may appear on a line.
 
-B<NOTE:> Unlike many SiLK input files, there is no explicit delimiter
-between the range and the string label.  The range and string label
-are separated by whitespace.  The first non-whitespace character after
-the range begins the label.
+The delimiter in the input file is whitespace---specifically one or
+more space and/or tab characters.
+
+B<rwpmapbuild> supports five types of statements.  Four of those
+statements begin with a specific keyword: one of B<mode>, B<map-name>,
+B<label>, and B<default>.  Any line that does not begin with with a
+keyword is expected to contain a range definition, which maps a range
+to a label.  The format of the range definition depends on the
+B<mode>.
+
+The four statement types that begin with a keyword are all optional.
+They are:
+
+=over 4
+
+=item B<mode> { B<ipv4> | B<ipv6> | B<proto-port> | B<ip> }
+
+Specify what types of ranges are defined in the file.  The B<mode>
+statement must appear before any ranges are specified.  The mode may
+also be set using the B<--mode> command line switch.  When both the
+B<mode> statement and the B<--mode> switch are given, their values
+must match.  When neither the B<mode> statement nor the B<--mode>
+switch is provided, B<rwpmapbuild> processes the input in IPv4 address
+mode.  The B<ip> mode is deprecated; it is an alias for B<ipv4>.  The
+B<mode> statement may only appear one time.
+
+=item B<map-name> I<simple-string>
+
+Create a name for the data in this prefix map file that other SiLK
+tools may use to refer to this prefix map file.  When the prefix map
+file is used by B<rwfilter(1)>, the I<simple-string> is used to
+generate the filtering switch names.  When the prefix map file is used
+by B<rwcut(1)>, B<rwgroup(1)>, B<rwsort(1)>, B<rwstats(1)>, or
+B<rwuniq(1)>, the I<simple-string> is used to generate the field
+names.  See B<pmapfilter(3)> for details.  The I<simple-string> may
+not contain whitespace, a comma, or a colon.  The B<map-name>
+statement may only appear one time.
+
+=item B<label> I<num> I<label-text>
+
+Associate the numeric identifier I<num> with the given label text
+I<label-text>.  By specifying a B<label> statement, the identifier
+I<num> is expanded to I<label-text> when the range definitions are
+being defined.
+
+Either all labels used in the file must appear in B<label> statements,
+or no B<label> statements may appear in which case B<rwpmapbuild>
+creates labels as it parses the range definitions.  All B<label>
+statements must appear before the B<default> statement and before the
+range definitions.
 
 I<label-text> is a textual string that begins at the first
 non-whitespace character and extends to the final non-whitespace
@@ -144,57 +326,76 @@ characters.  While a comma (C<,>) is legal in the I<label-text>, using
 a comma prevents the label from being used by the B<--pmap-src> and
 B<--pmap-dest> switches in B<rwfilter(1)>.
 
-The following statements are supported:
+If no B<label> statements appear in the input, any text containing at
+least one non-whitespace character may be used as the label in the
+B<default> statement and the range definitions.
 
-=over 4
-
-=item B<map-name> I<simple-string>
-
-Creates a name for the data in this prefix map file.  The
-I<simple-string> cannot contain whitespace, a comma, or a colon.  When
-the prefix map file is used by B<rwfilter(1)>, the I<simple-string> is
-used to generate the filtering switch names.  When the prefix map file
-is used by B<rwcut(1)>, B<rwgroup(1)>, B<rwsort(1)>, B<rwstats(1)>, or
-B<rwuniq(1)>, the I<simple-string> is used to generate the field
-names.  See B<pmapfilter(3)> for details.
-
-=item B<label> I<num> I<label-text>
-
-Associate the numeric identifier I<num> with the given label text
-I<label-text>.  It is an error if I<num> or I<label-text> appear in
-any other B<label> statement.  The maximum allowed value for I<num> is
-2147483647, but note that B<rwpmapbuild> creates an empty label for
-all the unassigned numeric identifiers that are less than the maximum
-identifier used in the input file.  The B<label> statement must appear
-before the B<default> statement and before range definitions.  When a
-B<label> statement appears in the input, B<rwpmapbuild> will complain
-if you attempt to use a I<label-value> that was not previously defined
-in a B<label> statement.
+It is an error if I<num> or I<label-text> appear in any other B<label>
+statement.  The minimum value for I<num> is 0 and the maximum value is
+2147483647.  Note that B<rwpmapbuild> creates labels for B<all>
+numeric identifiers between 0 and the maximum identifier used in the
+input file, and using an unnecessarily large value creates many empty
+entries.
 
 =item B<default> I<label-value>
 
-Make the given label identifier or label text the default value for
-any ranges not explicitly mentioned in this input file.  The
-B<default> statement must appear before any ranges are specified.  If
-the B<default> statement does not appear in the input, the label
-C<UNKNOWN> is automatically defined and used as the default.
+Use the label I<label-value> for any ranges not explicitly mentioned
+in this input file.  The I<label-value> text is one of
 
-=item B<mode> { B<ipv4> | B<ipv6> | B<proto-port> | B<ip> }
+=over 4
 
-Specify how to process the file.  The B<mode> statement must appear
-before any ranges are specified.  The mode can also be set using the
-B<--mode> command line switch.  When both the B<mode> statement and
-the B<--mode> switch are given, their values must match.  When neither
-the B<mode> statement nor the B<--mode> switch is provided,
-B<rwpmapbuild> processes the input in IPv4 address mode.  The B<ip>
-mode is deprecated; it is an alias for B<ipv4>.
+=item 1
+
+when B<label> statements are used, a numerical label identifier that
+was specified in one of the statements
+
+=item 2
+
+when B<label> statements are used, a string that is an I<exact> match
+of the I<label-text> that was specified in one of those statements
+
+=item 3
+
+when B<label> statements are I<not> used, a string that begins at the
+first non-whitespace character and extends to the final non-whitespace
+character on that line that does not appear in a comment
 
 =back
 
+The B<default> statement must appear before the range definitions are
+specified.  If the B<default> statement does not appear in the input,
+the label C<UNKNOWN> is automatically defined and used as the default.
+
+=back
+
+As mentioned above, any line that does not begin with one of the above
+keywords must contain a range definition, and the format of the line
+depends on the type of data in the input file--that is, the B<mode> of
+the input.
+
+Regardless of the input mode, the final item in each range definition
+is the label to assign to that range.  The label has the same form as
+that described for the B<default> statement above, and the label is
+denoted by I<label-value> in the following.
+
 =head2 Address Mode
 
-When B<rwpmapbuild> is in IPv4 address mode, any IPv6 address in the
-input file will raise an error.
+When the B<mode> is either B<ipv4> or B<ipv6>, B<rwpmapbuild> parses
+the file in address mode.  In address mode, each range definition
+contains an IP range and a I<label-value>.
+
+A range is either a CIDR block or a pair of IP addresses that specify
+the starting IP and ending IP of the range.  To provide a label for a
+single IP address, you must either use the same IP address as the
+starting and ending values of the range, append C</32> to a single
+IPv4 address, or append C</128> to a single IPv6 address.  When the
+B<mode> is B<ipv4>, an IPv6 address in the input file raises an error.
+B<rwpmapbuild> also accepts integer representations of IP addresses
+when in B<ipv4> mode,
+
+When ranges overlap or one range is a specialization of another, the
+wider or more general range should be listed first, followed by the
+narrower or more specific ranges.
 
 =over 4
 
@@ -220,6 +421,24 @@ text with the IPv4 range.
 
 =head2 Protocol/Port Mode
 
+When the B<mode> is B<proto-port>, B<rwpmapbuild> parses the file in
+protocol/port mode.  In protocol/port mode, each range definition
+contains a starting value, an ending value, and the I<label-value>.
+
+The starting and ending values may both be integers between 0 and 255,
+inclusive.  The numbers are treated as protocol values, where 6 is
+TCP, 17 is UDP, and 1 is ICMP.
+
+The starting and ending values may also both be a number, a slash
+(C</>), and a number.  The first number is treated as the protocol and
+the second number as a port number (or service) in that protocol.  For
+example, 6/80 is considered the http service of TCP.
+
+When ranges overlap or one range is a specialization of another, the
+wider or more general range should be listed first, followed by the
+narrower or more specific ranges.  That is, specify the generic
+protocol first, then port numbers within that protocol.
+
 =over 4
 
 =item I<proto>/I<port> I<proto>/I<port> I<label-value>
@@ -228,32 +447,14 @@ Associate the given label identifier or label text with all protocols
 and port numbers between these two values inclusive.  Note that while
 port is not meaningful for all protocols (specifically, it is
 meaningful for TCP and UDP and may contain type/code information for
-ICMP), this file allows port numbers to be given for any protocol.
+ICMP), B<rwpmapbuild> accepts port numbers for any protocol.
 
 =item I<proto> I<proto> I<label-value>
 
-Associate the given label identifier or label text with all protocols
-between these two values.
+Associate the given label identifier or label text for all protocols
+between these two values inclusive.
 
 =back
-
-=head1 NOTES
-
-The IP Address input file can contain nested CIDR blocks.  They
-should be ordered with the more general blocks first, and the more
-specific blocks last.  That is, use:
-
-  10.0.0.0/8     My-network
-  10.1.0.0/16    Special-Subnet-1
-  10.1.2.0/24    Special-Subnet-2
-
-Likewise, the protocol/port data can be nested:
-
-  6 6            TCP
-  6/0  6/1024    TCP/Generic reserved
-  6/22 6/22      TCP/SSH
-  6/25 6/25      TCP/SMTP
-  6/80 6/80      TCP/HTTP
 
 =head1 EXAMPLE
 
@@ -262,147 +463,16 @@ prompt.  The text after the dollar sign represents the command line.
 Lines have been wrapped for improved readability, and the back slash
 (C<\>) is used to indicate a wrapped line.
 
-Reading and writing to a file:
+Reading from and writing to a file:
 
- $ echo "10.1.2.3/32 my favorite host" > fav.txt
- $ rwpmapbuild -i fav.txt -o fav.pmap
+ $ rwpmapbuild --input iana-ipv6.txt --output iana-ipv6.pmap
 
-Reading and writing to stdin and stdout:
+Reading from the standard input and writing to the standard output:
 
- $ echo "10.9.8.128/27 suspicious subnet" \
-   | rwpmapbuild --input-file=stdin --output-file=stdout > suspicious.pmap
+ $ cat ipv4-special.txt              \
+   | rwpmapbuild > ipv4-special.pmap
 
-=head2 Complex IP File
-
-  #    Numerical mappings of labels
-
-  label 0             non-routable
-  label 1             internal
-  label 2             external
-
-  #    Default to "external" for all un-defined ranges.
-
-  default             external
-
-  #    Force IP-mode
-
-  mode                ip
-
-  #    Create a name
-  #
-  #        This will add --pmap-src-network and --pmap-dst-network
-  #        switches to rwfilter, and src-network and dst-network
-  #        fields to rwcut, rwgroup, rwsort, rwstats, and rwuniq
-
-  map-name            network
-
-  ## Reserved and non-routable blocks ###########################
-
-  #    Addresses in this block refer to source hosts on "this"
-  #    network.  Address 0.0.0.0/32 may be used as a source
-  #    address for this host on this network; other addresses
-  #    within 0.0.0.0/8 may be used to refer to specified hosts
-  #    on this network [RFC1700, page 4].
-
-  0.0.0.0/8           non-routable
-
-  #    This block is set aside for use in private networks.  Its
-  #    intended use is documented in [RFC1918].  Addresses within
-  #    this block should not appear on the public Internet.
-
-  10.0.0.0/8          non-routable
-
-  #    This block is assigned for use as the Internet host
-  #    loopback address.  A datagram sent by a higher level
-  #    protocol to an address anywhere within this block should
-  #    loop back inside the host.  This is ordinarily
-  #    implemented using only 127.0.0.1/32 for loopback, but no
-  #    addresses within this block should ever appear on any
-  #    network anywhere [RFC1700, page 5].
-
-  127.0.0.0/8         non-routable
-
-  #    This is the "link local" block.  It is allocated for
-  #    communication between hosts on a single link.  Hosts
-  #    obtain these addresses by auto-configuration, such as when
-  #    a DHCP server may not be found.
-
-  169.254.0.0/16      non-routable
-
-  #    This block is set aside for use in private networks.  Its
-  #    intended use is documented in [RFC1918].  Addresses within
-  #    this block should not appear on the public Internet.
-
-  172.16.0.0/12       non-routable
-
-  #    This block is assigned as "TEST-NET" for use in
-  #    documentation and example code.  It is often used in
-  #    conjunction with domain names example.com or example.net
-  #    in vendor and protocol documentation.  Addresses within
-  #    this block should not appear on the public Internet.
-
-  192.0.2.0/24        non-routable
-
-  #    This block is set aside for use in private networks.
-  #    Its intended use is documented in [RFC1918].  Addresses
-  #    within this block should not appear on the public Internet.
-
-  192.168.0.0/16      non-routable
-
-  #    240.0.0.0/4 - This block, formerly known as the Class E
-  #    address space, is reserved.  The "limited broadcast"
-  #    destination address 255.255.255.255 should never be
-  #    forwarded outside the (sub-)net of the source.  The
-  #    remainder of this space is reserved for future use.
-  #    [RFC1700, page 4]
-
-  255.255.255.255/32  non-routable
-
-  # -- Below this line, would add any mappings appropriate to
-  # -- the local network.
-
-=head2 Complex Protocol/Port File
-
-  #    Default to a hyphen ("-") for all un-defined ranges.
-
-  default             -
-
-  #    Force Protocol/Port-mode
-  #
-  #        This MUST be present, since IP mode is the default.
-
-  mode                proto-port
-
-  #    Protocol Overview
-
-   1  1               ICMP
-   6  6               TCP
-  17 17               UDP
-  50 50               ESP
-  58 58               ICMPv6
-
-  #    TCP -- Specific Ports
-
-  6/0 6/1024          TCP/Generic Reserved
-  6/21 6/21           TCP/ftp
-  6/22 6/22           TCP/ssh
-  6/25 6/25           TCP/smtp
-  6/53 6/53           TCP/dns
-  6/80 6/80           TCP/http
-  6/6000 6/6063       TCP/X11
-
-  #    UDP -- Specific Ports
-
-  17/53 17/53         UDP/dns
-
-  #    ICMP -- Specific Type/Code
-  #
-  #    To convert a type/code to a "port" value as stored in SiLK:
-  #        (type << 8) | code     OR    (type * 256) + code
-  #    so 3/3 (Destination Unreachable/Port Unreachable) becomes:
-
-  1/771 1/771         ICMP/Destination Unreachable/Port Unreachable
-
+For example input files, see the L</DESCRIPTION> section above.
 
 =head1 ENVIRONMENT
 
@@ -423,7 +493,7 @@ B<rwstats(1)>, B<rwuniq(1)>, B<silk(7)>
 
 =cut
 
-$SiLK: rwpmapbuild.pod 555a887b31de 2016-03-24 15:18:09Z mthomas $
+$SiLK: rwpmapbuild.pod a8d636e20bfd 2017-04-21 22:04:53Z mthomas $
 
 Local Variables:
 mode:text

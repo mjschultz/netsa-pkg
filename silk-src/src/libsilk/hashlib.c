@@ -10,7 +10,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: hashlib.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: hashlib.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/utils.h>
@@ -147,10 +147,14 @@ struct HashTable_st {
     uint8_t            *no_value_ptr;
     /**  Pointer to representation of a deleted value */
     uint8_t            *del_value_ptr;
+    /**  Function to take a storage key and return the key data */
+    hashlib_get_key_data_fn     get_key_data_fn;
     /**  Comparison function to use for a sorted table */
     hashlib_sort_key_cmp_fn     cmp_fn;
     /**  Caller's argument to the cmp_fn comparison function */
     void               *cmp_userdata;
+    /**  Caller's argument to the get_key_data_fn key data function */
+    const void         *get_key_data_userdata;
     /**  A pointer to this table, so that macros may accept either a
      *   HashTable or a HashBlock */
     const HashTable    *table;
@@ -493,6 +497,25 @@ hashlib_create_table(
                 TRC_ARG, table_ptr->num_blocks - 1));
 
     return table_ptr;
+}
+
+
+int
+hashlib_set_get_key_data(
+    HashTable              *table_ptr,
+    hashlib_get_key_data_fn get_key_data_fn,
+    const void             *get_key_data_userdata)
+{
+    assert(table_ptr);
+
+    if (hashlib_count_entries(table_ptr) > 0) {
+        return ERR_BADARGUMENT;
+    }
+
+    table_ptr->get_key_data_fn = get_key_data_fn;
+    table_ptr->get_key_data_userdata = get_key_data_userdata;
+
+    return OK;
 }
 
 
@@ -1061,6 +1084,8 @@ hashlib_block_find_entry(
 #ifndef NDEBUG
     uint32_t num_tries = 0;
 #endif
+    hashlib_get_key_data_fn get_key_data;
+    uint8_t *current_entry_ptr = NULL;
     uint32_t hash_index;
     uint32_t hash_value;
     uint32_t hash_probe_increment;
@@ -1071,6 +1096,10 @@ hashlib_block_find_entry(
     HASH_STAT_INCR(block_ptr, find_entries);
 
     /*
+     *  Both braches of the if/else below do the same thing.  The code
+     *  only varies by whether a separate callback function is used to
+     *  get a key's content.
+     *
      *  First this code computes the hash for the key, the
      *  'hash_value'.
      *
@@ -1084,7 +1113,8 @@ hashlib_block_find_entry(
      *
      *  If the bucket is not empty, the function checks to see if
      *  bucket's key matches the key passed into the function.  The
-     *  comparison is done by memcmp()ing the keys.  If the keys
+     *  comparison is done either by memcmp()ing the keys or getting
+     *  the contents of the keys and memcmp()ing those.  If the keys
      *  match, the entry is found; the function passes back a handle
      *  the bucket and returns OK.
      *
@@ -1106,34 +1136,89 @@ hashlib_block_find_entry(
      *  update a bucket's value to the no_value_ptr value---though
      *  there is no way for the hashlib code to enforce this.
      */
-    hash_value = hash(key_ptr, HASH_GET_KEY_LEN(block_ptr), 0);
-    hash_probe_increment = hash_value | 0x01; /* must be odd */
-    for (;;) {
-        hash_index = hash_value & ((uint32_t)block_ptr->max_entries - 1);
 
-        *entry_pptr = HASH_ENTRY_AT(block_ptr, hash_index);
-        if (HASHENTRY_ISEMPTY(block_ptr, *entry_pptr)) {
-            /* Hit an empty entry, we're done. */
-            return ERR_NOTFOUND;
-        }
-        /* compare the keys */
-        if (0 == memcmp(HASHENTRY_GET_KEY(block_ptr, *entry_pptr),
-                        key_ptr, HASH_GET_KEY_LEN(block_ptr)))
-        {
-            /* Found a match, we're done */
-            return OK;
-        }
+    get_key_data = block_ptr->table->get_key_data_fn;
 
-        /* increment the hash value */
-        hash_value += hash_probe_increment;
-        assert(++num_tries < block_ptr->max_entries);
+    if (NULL == get_key_data) {
+        hash_value = hash(key_ptr, HASH_GET_KEY_LEN(block_ptr), 0);
+        hash_probe_increment = hash_value | 0x01; /* must be odd */
+        for (;;) {
+            hash_index = hash_value & ((uint32_t)block_ptr->max_entries - 1);
+
+            current_entry_ptr = HASH_ENTRY_AT(block_ptr, hash_index);
+            if (HASHENTRY_ISEMPTY(block_ptr, current_entry_ptr)) {
+                /* Hit an empty entry, we're done. */
+                *entry_pptr = current_entry_ptr;
+                return ERR_NOTFOUND;
+            }
+            /* compare the keys */
+            if (0 == memcmp(HASHENTRY_GET_KEY(block_ptr, current_entry_ptr),
+                            key_ptr, HASH_GET_KEY_LEN(block_ptr)))
+            {
+                /* Found a match, we're done */
+                *entry_pptr = current_entry_ptr;
+                return OK;
+            }
+
+            /* increment the hash value */
+            hash_value += hash_probe_increment;
+            assert(++num_tries < block_ptr->max_entries);
 #ifdef HASHLIB_RECORD_STATS
-        if (first_check) {
-            first_check = 0;
-            HASH_STAT_INCR(block_ptr, find_collisions);
-        }
-        HASH_STAT_INCR(block_ptr, collision_hops);
+            if (first_check) {
+                first_check = 0;
+                HASH_STAT_INCR(block_ptr, find_collisions);
+            }
+            HASH_STAT_INCR(block_ptr, collision_hops);
 #endif  /* HASHLIB_RECORD_STATS */
+        }
+    } else {
+        uint8_t current_key_data[HASHLIB_MAX_KEY_WIDTH];
+        uint8_t new_key_data[HASHLIB_MAX_KEY_WIDTH];
+        uint8_t current_key_data_len;
+        uint8_t new_key_data_len;
+
+        /* call function to get key data for new key */
+        new_key_data_len
+            = get_key_data(key_ptr, new_key_data, HASH_GET_KEY_LEN(block_ptr),
+                           block_ptr->table->get_key_data_userdata);
+        hash_value = hash(new_key_data, new_key_data_len, 0);
+
+        hash_probe_increment = hash_value | 0x01; /* must be odd */
+        for (;;) {
+            hash_index = hash_value & ((uint32_t)block_ptr->max_entries - 1);
+
+            current_entry_ptr = HASH_ENTRY_AT(block_ptr, hash_index);
+            if (HASHENTRY_ISEMPTY(block_ptr, current_entry_ptr)) {
+                /* Hit an empty entry, we're done. */
+                *entry_pptr = current_entry_ptr;
+                return ERR_NOTFOUND;
+            }
+            /* call function to get key data for current key */
+            current_key_data_len
+                = get_key_data(HASHENTRY_GET_KEY(block_ptr, current_entry_ptr),
+                               current_key_data, HASH_GET_KEY_LEN(block_ptr),
+                               block_ptr->table->get_key_data_userdata);
+
+            /* compare the keys; we care only to find exact match */
+            if (new_key_data_len == current_key_data_len
+                && (memcmp(current_key_data, new_key_data, new_key_data_len)
+                    == 0))
+            {
+                *entry_pptr = current_entry_ptr;
+                return OK;
+            }
+
+            /* increment the hash value */
+            hash_value += hash_probe_increment;
+            assert(++num_tries < block_ptr->max_entries);
+#ifdef HASHLIB_RECORD_STATS
+            if (first_check) {
+                first_check = 0;
+                HASH_STAT_INCR(block_ptr, find_collisions);
+            }
+            HASH_STAT_INCR(block_ptr, collision_hops);
+#endif  /* HASHLIB_RECORD_STATS */
+        }
     }
 }
 
@@ -1421,6 +1506,42 @@ hashlib_memcmp_keys(
 
 
 /*
+ *    Callback function used by hashlib_sort_entries() when caller has
+ *    set the get_key_get_fn---see hashlib_set_get_key_data().
+ *
+ *    Invoke the 'get_key_get_fn' for each of the keys in 'a' and 'b'
+ *    and then memcmp() the results.  The table is in 'v_table'.
+ */
+static int
+hashlib_cmp_get_key_data(
+    const void         *a,
+    const void         *b,
+    void               *v_table)
+{
+    const HashTable *table_ptr;
+    hashlib_get_key_data_fn get_key_data;
+    uint8_t key_a[HASHLIB_MAX_KEY_WIDTH];
+    uint8_t key_b[HASHLIB_MAX_KEY_WIDTH];
+    uint8_t len_a;
+    uint8_t len_b;
+    uint8_t len;
+    int rv;
+
+    table_ptr = (const HashTable*)v_table;
+    get_key_data = table_ptr->get_key_data_fn;
+
+    len_a = get_key_data((const uint8_t*)a, key_a, HASH_GET_KEY_LEN(table_ptr),
+                         table_ptr->get_key_data_userdata);
+    len_b = get_key_data((const uint8_t*)b, key_b, HASH_GET_KEY_LEN(table_ptr),
+                         table_ptr->get_key_data_userdata);
+
+    len = (len_a < len_b) ? len_a : len_b;
+    rv = memcmp(key_a, key_b, len);
+    return ((rv) ? rv : ((int)len_a - (int)len_b));
+}
+
+
+/*
  *    move the entries in each block to the front of the block, in
  *    preparation for sorting the entries
  */
@@ -1528,6 +1649,10 @@ int
 hashlib_sort_entries(
     HashTable          *table_ptr)
 {
+    if (table_ptr->get_key_data_fn) {
+        return (hashlib_sort_entries_usercmp(
+                    table_ptr, &hashlib_cmp_get_key_data, table_ptr));
+    }
     /* pass the key length in the context pointer */
     table_ptr->keylen_cmp_userdata = HASH_GET_KEY_LEN(table_ptr);
     return hashlib_sort_entries_usercmp(table_ptr, &hashlib_memcmp_keys,

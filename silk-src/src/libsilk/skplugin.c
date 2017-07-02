@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skplugin.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skplugin.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skdllist.h>
@@ -127,7 +127,6 @@ typedef struct skp_field_st {
     size_t                      field_width_bin;
 } skp_field_t;
 
-
 typedef struct skp_option_st {
     /* opt[1] is the sentinel */
     struct option         opt[2];
@@ -137,6 +136,7 @@ typedef struct skp_option_st {
     const char           *plugin_name;
     void                 *cbdata;
 } skp_option_t;
+
 
 
 /* LOCAL VARIABLE DEFINITIONS */
@@ -659,30 +659,6 @@ skp_arg_list_subset_of_list(
     return 1;
 }
 
-#if 0
-/* Check to see if there is a duplicate name in a list of fields */
-static int
-skp_find_name(
-    const char         *name,
-    sk_dllist_t        *list)
-{
-    sk_dll_iter_t  iter;
-    skp_field_t   *field;
-    char         **fieldname;
-
-    skDLLAssignIter(&iter, list);
-    while (skDLLIterForward(&iter, (void **)&field) == 0) {
-        for (fieldname = field->names; *fieldname; fieldname++) {
-            if (strcasecmp(name, *fieldname) == 0) {
-                return  1;
-            }
-        }
-    }
-
-    return 0;
-}
-#endif  /* 0 */
-
 
 /* Gets the applications list of extra arguments as a NULL-terminated
  * list of strings. */
@@ -866,32 +842,6 @@ skpinRegOption2(
     va_end(ap);
 
     return rv;
-}
-
-skplugin_err_t
-skpinRegOption(
-    skplugin_fn_mask_t      fn_mask,
-    const char             *option_name,
-    skplugin_arg_mode_t     mode,
-    const char             *option_help,
-    skplugin_option_fn_t    opt,
-    void                   *data)
-{
-    return skpinRegOption2(option_name, mode, option_help, NULL, opt, data,
-                           1, fn_mask);
-}
-
-skplugin_err_t
-skpinRegOptionWithHelpFn(
-    skplugin_fn_mask_t      fn_mask,
-    const char             *option_name,
-    skplugin_arg_mode_t     mode,
-    skplugin_help_fn_t      option_help,
-    skplugin_option_fn_t    opt,
-    void                   *data)
-{
-    return skpinRegOption2(option_name, mode, NULL, option_help, opt, data,
-                           1, fn_mask);
 }
 
 
@@ -1104,12 +1054,6 @@ skpinRegField(
         }
         return SKPLUGIN_ERR;
     }
-#if 0
-    if (skp_find_name(name, skp_field_list)) {
-        skAppPrintErr("A field already has the name, \"%s\"", name);
-        return SKPLUGIN_ERR;
-    }
-#endif  /* 0 */
 
     extra = skp_arg_list_from_array(regdata->extra);
     CHECK_MEM(extra);
@@ -1381,8 +1325,9 @@ skPluginRunCleanupHelper(
  */
 static skplugin_err_t
 skPluginRunHelper(
-    skplugin_fn_mask_t  fn_mask,
-    skplugin_err_t    (*helper)(const skp_function_common_t *, const char *))
+    skplugin_fn_mask_t      fn_mask,
+    skplugin_err_t        (*helper)(const skp_function_common_t *,
+                                    const char *))
 {
     sk_dll_iter_t          iter;
     skplugin_err_t         err;

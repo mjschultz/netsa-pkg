@@ -41,15 +41,6 @@
    the libipa library and the <ipa/ipa.h> header file. */
 #undef ENABLE_IPA
 
-/* Define to 1 to build with support for IPFIX. Define to 0 otherwise.
-   Requires libfixbuf-1.7.0 or later support and the <fixbuf/public.h> header
-   file. */
-#undef ENABLE_IPFIX
-
-/* Define to 1 to build with support for capturing, storing, and querying flow
-   records containing IPV6 addresses. */
-#undef ENABLE_IPV6
-
 /* Define to 1 to use the local timezone for command input and printing
    records. Define to 0 to use UTC. */
 #undef ENABLE_LOCALTIME
@@ -102,11 +93,18 @@
    be applied to printf-style function-pointer typedefs. */
 #undef HAVE_COMP_ATTRIBUTE_PRINTF_TYPEDEF
 
+/* Define to 1 if your compiler understands __attribute__((sentinel)). */
+#undef HAVE_COMP_ATTRIBUTE_SENTINEL
+
 /* Define to 1 if your compiler understands __attribute__((__used__)). */
 #undef HAVE_COMP_ATTRIBUTE_USED
 
 /* Define to 1 if you have the <ctype.h> header file. */
 #undef HAVE_CTYPE_H
+
+/* Define to 1 if you have the declaration of `environ', and to 0 if you
+   don't. */
+#undef HAVE_DECL_ENVIRON
 
 /* Define to 1 if you have the declaration of `FB_ENABLE_SCTP', and to 0 if
    you don't. */
@@ -123,6 +121,10 @@
 /* Define to 1 if you have the declaration of `HAVE_SPREAD', and to 0 if you
    don't. */
 #undef HAVE_DECL_HAVE_SPREAD
+
+/* Define to 1 if you have the declaration of `_NSGetEnviron', and to 0 if you
+   don't. */
+#undef HAVE_DECL__NSGETENVIRON
 
 /* Define to 1 if you have the <dirent.h> header file, and it defines `DIR'.
    */
@@ -169,6 +171,9 @@
 
 /* Define to 1 if you have the `inet_pton' function. */
 #undef HAVE_INET_PTON
+
+/* Define to 1 if your compiler understands inline; define to 0 otherwise. */
+#undef HAVE_INLINE
 
 /* Define to 1 if the system has the type `intmax_t'. */
 #undef HAVE_INTMAX_T
@@ -331,6 +336,9 @@
 /* Define to 1 if the system has the type `unsigned long long int'. */
 #undef HAVE_UNSIGNED_LONG_LONG_INT
 
+/* Define to keyword use for inline support, or empty if none. */
+#undef INLINE
+
 /* Set to the default IPset record version to use when writing to disk. */
 #undef IPSET_DEFAULT_VERSION
 
@@ -338,6 +346,9 @@
    first (like Intel, unlike Motorola and SPARC). Define to 0 otherwise. See
    also SK_BIG_ENDIAN. */
 #undef LITTLE_ENDIAN
+
+/* The full path to the program to use to compress log files */
+#undef LOG_COMPRESSOR
 
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
@@ -370,11 +381,6 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
-/* Define to the path of the C source file that rwflowpack will use for
-   categorizing flow records. When this is undefined, rwflowpack will use a
-   plug-in loaded at run-time to determine the categories. */
-#undef PACKING_LOGIC_PATH
-
 /* Filename extension to use for SiLK plug-ins */
 #undef PLUGIN_SUFFIX
 
@@ -386,9 +392,6 @@
 
 /* The size of `ssize_t', as computed by sizeof. */
 #undef SIZEOF_SSIZE_T
-
-/* The size of `uintptr_t', as computed by sizeof. */
-#undef SIZEOF_UINTPTR_T
 
 /* The size of `unsigned long long', as computed by sizeof. */
 #undef SIZEOF_UNSIGNED_LONG_LONG
@@ -485,15 +488,6 @@
    #define below would cause a syntax error. */
 #undef _UINT8_T
 
-/* Define to empty if `const' does not conform to ANSI C. */
-#undef const
-
-/* Define to `__inline__' or `__inline' if that's what the C compiler
-   calls it, or to nothing if 'inline' is not supported under any name.  */
-#ifndef __cplusplus
-#undef inline
-#endif
-
 /* Define to the type of a signed integer type of width exactly 16 bits if
    such a type exists and the standard includes do not define it. */
 #undef int16_t
@@ -556,7 +550,3 @@
 /* Define to the type of an unsigned integer type wide enough to hold a
    pointer, if such a type exists, and if the system does not define it. */
 #undef uintptr_t
-
-/* Define to empty if the keyword `volatile' does not work. Warning: valid
-   code using `volatile' can become incorrect without. Disable with care. */
-#undef volatile

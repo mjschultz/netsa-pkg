@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 # MD5: dd4ad291c05df4f4cc2ca9dfe918c876
-# TEST: ls -1 ../../tests/data.rwf ../../tests/data.rwf ../../tests/data.rwf | ./rwfilter --xargs=stdin --proto=17 --pass=stdout | ../rwstats/rwuniq --fields=1-5 --ipv6-policy=ignore --timestamp-format=epoch --values=bytes,packets,records,stime,etime --sort-output --delimited --no-titles
+# TEST: ls -1 ../../tests/data.rwf ../../tests/data.rwf ../../tests/data.rwf | ./rwfilter --xargs=stdin --proto=17 --pass=stdout | ../rwuniq/rwuniq --fields=1-5 --ipv6-policy=ignore --timestamp-format=epoch --values=bytes,packets,records,stime,etime --sort-output --delimited --no-titles
 
 use strict;
 use SiLKTests;

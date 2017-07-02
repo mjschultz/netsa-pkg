@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcompare.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwcompare.c 693f5476a2e8 2017-06-23 21:43:30Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -83,7 +83,8 @@ appUsageLong(
      "\tCompare the SiLK Flow records in FILE1 and FILE2.  Print nothing\n"   \
      "\tand exit with status 0 if the SiLK Flow records in the two files\n"   \
      "\tare identical.  Else, print the record where files differ and exit\n" \
-     "\twith status 1.\n")
+     "\twith status 1.  Use 'stdin' or '-' for either FILE1 or FILE2 to\n"    \
+     "\tread from the standard input.\n")
 
     FILE *fh = USAGE_FH;
 
@@ -211,144 +212,6 @@ appOptionsHandler(
 }
 
 
-#ifdef RWCOMPARE_VERBOSE
-
-#define RWCOMPARE_BUFSIZ    64
-#if RWCOMPARE_BUFSIZ < SK_NUM2DOT_STRLEN
-#error "Buffer size is smaller than SK_NUM2DOT_STRLEN"
-#endif
-#if RWCOMPARE_BUFSIZ < SKTIMESTAMP_STRLEN
-#error "Buffer size is smaller than SKTIMESTAMP_STRLEN"
-#endif
-
-/* Width of the name column */
-#define WIDTH_NAME  11
-
-/* Width of value columns */
-#define WIDTH_VALUE 33
-
-#define DIFF_STRING "***"
-
-static void
-compareStrings(
-    const char         *title,
-    const char          str[][RWCOMPARE_BUFSIZ])
-{
-    char buf[16];
-    int width = WIDTH_NAME - strlen(DIFF_STRING);
-
-    if (0 == strcmp(str[0], str[1])) {
-        printf("%*.*s|%*s|%*s|\n",
-               WIDTH_NAME, WIDTH_NAME, title,
-               WIDTH_VALUE, str[0], WIDTH_VALUE, str[1]);
-        return;
-    }
-
-    snprintf(buf, sizeof(buf), "%*.*s%s",
-             width, width, title, DIFF_STRING);
-    printf("%*s|%*s|%*s|\n",
-           WIDTH_NAME, buf, WIDTH_VALUE, str[0], WIDTH_VALUE, str[1]);
-}
-
-static void
-compareNumbers(
-    const char         *title,
-    const uint32_t      num[])
-{
-    char buf[16];
-    int width = WIDTH_NAME - strlen(DIFF_STRING);
-
-    if (num[0] == num[1]) {
-        printf("%*.*s|%*" PRIu32 "|%*" PRIu32 "|\n",
-               WIDTH_NAME, WIDTH_NAME, title,
-               WIDTH_VALUE, num[0], WIDTH_VALUE, num[1]);
-        return;
-    }
-
-    snprintf(buf, sizeof(buf), "%*.*s%s",
-             width, width, title, DIFF_STRING);
-    printf("%*s|%*" PRIu32 "|%*" PRIu32 "|\n",
-           WIDTH_NAME, buf, WIDTH_VALUE, num[0], WIDTH_VALUE, num[1]);
-}
-
-static void
-printRecords(
-    const rwRec         rec[])
-{
-    char starttime[2][RWCOMPARE_BUFSIZ];
-    uint32_t elapsed[2];
-    uint32_t sport[2];
-    uint32_t dport[2];
-    uint32_t proto[2];
-    uint32_t flowtype[2];
-    uint32_t sensor[2];
-    uint32_t flags[2];
-    uint32_t initflags[2];
-    uint32_t restflags[2];
-    uint32_t tcpstate[2];
-    uint32_t application[2];
-    uint32_t memo[2];
-    uint32_t input[2];
-    uint32_t output[2];
-    uint32_t pkts[2];
-    uint32_t bytes[2];
-    char sip[2][RWCOMPARE_BUFSIZ];
-    char dip[2][RWCOMPARE_BUFSIZ];
-    char nhip[2][RWCOMPARE_BUFSIZ];
-    skipaddr_t ip;
-    unsigned i;
-
-    for (i = 0; i < 2; ++i) {
-        sktimestamp_r(
-            starttime[i], rwRecGetStartTime(&rec[i]), SKTIMESTAMP_EPOCH);
-        elapsed[i] = rwRecGetElapsed(&rec[i]);
-        sport[i] = rwRecGetSPort(&rec[i]);
-        dport[i] = rwRecGetDPort(&rec[i]);
-        proto[i] = rwRecGetProto(&rec[i]);
-        flowtype[i] = rwRecGetFlowType(&rec[i]);
-        sensor[i] = rwRecGetSensor(&rec[i]);
-        flags[i] = rwRecGetFlags(&rec[i]);
-        initflags[i] = rwRecGetInitFlags(&rec[i]);
-        restflags[i] = rwRecGetRestFlags(&rec[i]);
-        tcpstate[i] = rwRecGetTcpState(&rec[i]);
-        application[i] = rwRecGetApplication(&rec[i]);
-        memo[i] = rwRecGetMemo(&rec[i]);
-        input[i] = rwRecGetInput(&rec[i]);
-        output[i] = rwRecGetOutput(&rec[i]);
-        pkts[i] = rwRecGetPkts(&rec[i]);
-        bytes[i] = rwRecGetBytes(&rec[i]);
-        rwRecMemGetSIP(&rec[i], &ip);
-        skipaddrString(sip[i], &ip, SKIPADDR_HEXADECIMAL);
-        rwRecMemGetDIP(&rec[i], &ip);
-        skipaddrString(dip[i], &ip, SKIPADDR_HEXADECIMAL);
-        rwRecMemGetNhIP(&rec[i], &ip);
-        skipaddrString(nhip[i], &ip, SKIPADDR_HEXADECIMAL);
-    }
-
-    compareStrings("StartTime", starttime);
-    compareNumbers("Elapsed", elapsed);
-    compareNumbers("SPort", sport);
-    compareNumbers("DPort", dport);
-    compareNumbers("Proto", proto);
-    compareNumbers("FlowType", flowtype);
-    compareNumbers("Sensor", sensor);
-    compareNumbers("Flags", flags);
-    compareNumbers("InitFlags", initflags);
-    compareNumbers("RestFlags", restflags);
-    compareNumbers("TcpState", tcpstate);
-    compareNumbers("Application", application);
-    compareNumbers("Memo", memo);
-    compareNumbers("Input", input);
-    compareNumbers("Output", output);
-    compareNumbers("Pkts", pkts);
-    compareNumbers("Bytes", bytes);
-    compareStrings("SIP", sip);
-    compareStrings("DIP", dip);
-    compareStrings("NhIP", nhip);
-}
-#endif  /* RWCOMPARE_VERBOSE */
-
-
 static int
 compareFiles(
     char              **file)
@@ -362,7 +225,7 @@ compareFiles(
     int eof = -1;
 
     memset(stream, 0, sizeof(stream));
-    memset(rec, 0, sizeof(rec));
+    rwRecInitializeArray(rec, NULL, 2);
 
     for (i = 0; i < 2; ++i) {
         if ((rv = skStreamCreate(&stream[i], SK_IO_READ, SK_CONTENT_SILK_FLOW))
@@ -440,9 +303,6 @@ compareFiles(
         } else {
             printf(("%s %s differ: record %" PRIu64 "\n"),
                    file[0], file[1], rec_count);
-#ifdef RWCOMPARE_VERBOSE
-            printRecords(rec);
-#endif
         }
     }
 

@@ -15,7 +15,7 @@
 #include <Python.h>
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pysilk_common.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: pysilk_common.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include "pysilk_common.h"
 
@@ -50,42 +50,6 @@ bytes_from_wchar(
     return bytes;
 }
 
-#if PY_VERSION_HEX < 0x02060000
-
-PyObject *
-string_to_unicode(
-    const char         *s)
-{
-    return PyUnicode_DecodeUTF8(s, strlen(s), "strict");
-}
-
-SK_DIAGNOSTIC_FORMAT_NONLITERAL_PUSH
-
-PyObject *
-format_to_unicode(
-    const char         *s,
-    ...)
-{
-    va_list ap;
-    PyObject *str;
-    PyObject *uni;
-
-    va_start(ap, s);
-    str = PyString_FromFormatV(s, ap);
-    va_end(ap);
-
-    if (str == NULL) {
-        return NULL;
-    }
-    uni = PyUnicode_FromObject(str);
-    Py_DECREF(str);
-
-    return uni;
-}
-
-SK_DIAGNOSTIC_FORMAT_NONLITERAL_POP
-
-#endif
 
 /*
 ** Local Variables:

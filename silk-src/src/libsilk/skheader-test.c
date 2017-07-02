@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skheader-test.c 4d3dd8f76605 2017-01-12 16:13:52Z mthomas $");
+RCSIDENT("$SiLK: skheader-test.c 02bab5000497 2017-06-22 16:08:47Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstream.h>
@@ -275,6 +275,7 @@ dowrite(
     skstream_t *stream;
     sk_file_header_t *hdr;
     sk_header_entry_t *hentry;
+    sksite_repo_key_t repo_key;
     int rv;
 
     if ((rv = skStreamCreate(&stream, SK_IO_WRITE, SK_CONTENT_SILK))
@@ -287,7 +288,10 @@ dowrite(
 
     hdr = skStreamGetSilkHeader(stream);
 
-    hentry = skHentryPackedfileCreate(1164215667, 1, 5);
+    repo_key.timestamp = 1164215667;
+    repo_key.flowtype_id = 1;
+    repo_key.sensor_id = 5;
+    hentry = skHentryPackedfileCreate(&repo_key);
     if (NULL == hentry) {
         skAppPrintErr("Unable to create packedfile header");
         return -1;

@@ -17,9 +17,10 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwnetmask.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
+RCSIDENT("$SiLK: rwnetmask.c d1637517606d 2017-06-23 16:51:31Z mthomas $");
 
 #include <silk/rwrec.h>
+#include <silk/skflowiter.h>
 #include <silk/sksite.h>
 #include <silk/skstream.h>
 #include <silk/utils.h>
@@ -53,26 +54,28 @@ static struct net_mask_st {
 
 /* support for looping over input files */
 static sk_options_ctx_t *optctx = NULL;
+static sk_flow_iter_t *flowiter = NULL;
 
 /* Where to write the output */
-static const char *output_path = NULL;
+static skstream_t *out_stream = NULL;
+
+/* object holding sidecar descriptions across all input file(s) */
+static sk_sidecar_t *sidecar = NULL;
+
+/* Lua state */
+static lua_State *L;
 
 /* the compression method to use when writing the file.
  * skCompMethodOptionsRegister() will set this to the default or
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
-/* how to handle IPv6 flows */
-static sk_ipv6policy_t ipv6_policy = SK_IPV6POLICY_MIX;
-
 
 /* OPTIONS */
 
 typedef enum {
     OPT_4SIP_PREFIX_LENGTH, OPT_4DIP_PREFIX_LENGTH, OPT_4NHIP_PREFIX_LENGTH,
-#if SK_ENABLE_IPV6
     OPT_6SIP_PREFIX_LENGTH, OPT_6DIP_PREFIX_LENGTH, OPT_6NHIP_PREFIX_LENGTH,
-#endif
     OPT_OUTPUT_PATH
 }  appOptionsEnum;
 
@@ -80,11 +83,9 @@ static struct option appOptions[] = {
     {"4sip-prefix-length",  REQUIRED_ARG, 0, OPT_4SIP_PREFIX_LENGTH},
     {"4dip-prefix-length",  REQUIRED_ARG, 0, OPT_4DIP_PREFIX_LENGTH},
     {"4nhip-prefix-length", REQUIRED_ARG, 0, OPT_4NHIP_PREFIX_LENGTH},
-#if SK_ENABLE_IPV6
     {"6sip-prefix-length",  REQUIRED_ARG, 0, OPT_6SIP_PREFIX_LENGTH},
     {"6dip-prefix-length",  REQUIRED_ARG, 0, OPT_6DIP_PREFIX_LENGTH},
     {"6nhip-prefix-length", REQUIRED_ARG, 0, OPT_6NHIP_PREFIX_LENGTH},
-#endif
     {"output-path",         REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
     {0,0,0,0}               /* sentinel entry */
 };
@@ -94,11 +95,9 @@ static const char *appHelp[] = {
     "High bits of source IPv4 to keep. Def 32",
     "High bits of destination IPv4 to keep. Def 32",
     "High bits of next-hop IPv4 to keep. Def 32",
-#if SK_ENABLE_IPV6
     "High bits of source IPv6 to keep. Def 128",
     "High bits of destination IPv6 to keep. Def 128",
     "High bits of next-hop IPv6 to keep. Def 128",
-#endif
     "Write the output to this stream or file. Def. stdout",
     (char *)NULL
 };
@@ -173,7 +172,6 @@ appUsageLong(
     }
 
     skOptionsCtxOptionsUsage(optctx, fh);
-    skIPv6PolicyUsage(fh);
     skCompMethodOptionsUsage(fh);
     skOptionsNotesUsage(fh);
     sksiteOptionsUsage(fh);
@@ -193,13 +191,23 @@ appTeardown(
     void)
 {
     static int teardownFlag = 0;
+    ssize_t rv;
 
     if (teardownFlag) {
         return;
     }
     teardownFlag = 1;
 
+    rv = skStreamDestroy(&out_stream);
+    if (rv) {
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+    }
+
+    sk_sidecar_destroy(&sidecar);
+    sk_lua_closestate(L);
+
     skOptionsNotesTeardown();
+    sk_flow_iter_destroy(&flowiter);
     skOptionsCtxDestroy(&optctx);
     skAppUnregister();
 }
@@ -223,7 +231,7 @@ appSetup(
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
     unsigned int optctx_flags;
-    int rv;
+    ssize_t rv;
     int i;
 
     /* verify same number of options and help strings */
@@ -248,7 +256,6 @@ appSetup(
         || skOptionsCtxOptionsRegister(optctx)
         || skOptionsRegister(appOptions, &appOptionsHandler, NULL)
         || skOptionsRegister(legacyOptions, &appOptionsHandler, NULL)
-        || skIPv6PolicyOptionsRegister(&ipv6_policy)
         || skOptionsNotesRegister(NULL)
         || skCompMethodOptionsRegister(&comp_method)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE))
@@ -264,11 +271,18 @@ appSetup(
         exit(EXIT_FAILURE);
     }
 
+    /* create an empty sidecar description and a Lua state */
+    sk_sidecar_create(&sidecar);
+    L = sk_lua_newstate();
+
     /* parse options */
     rv = skOptionsCtxOptionsParse(optctx, argc, argv);
     if (rv < 0) {
         skAppUsage();           /* never returns */
     }
+
+    /* create flow iterator to read the records from the stream */
+    flowiter = skOptionsCtxCreateFlowIterator(optctx);
 
     /* make certain at least one mask was specified */
     for (i = 0; i < PREFIX_COUNT; ++i) {
@@ -281,10 +295,48 @@ appSetup(
         skAppUsage();
     }
 
-    /* check the output */
-    if (output_path == NULL) {
-        output_path = "-";
+    /* use stdout if --output-path not specified */
+    if (NULL == out_stream) {
+        if ((rv = skStreamCreate(&out_stream,SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+            || (rv = skStreamBind(out_stream, "-")))
+        {
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+            skStreamDestroy(&out_stream);
+            exit(EXIT_FAILURE);
+        }
     }
+
+    /* read the headers from all input streams and look for sidecar
+     * data */
+    if (sk_flow_iter_fill_sidecar(flowiter, sidecar)) {
+        skAppPrintErr("Error reading file header");
+        exit(EXIT_FAILURE);
+    }
+    if (0 == sk_sidecar_count_elements(sidecar)) {
+        sk_sidecar_destroy(&sidecar);
+    } else {
+        /* add sidecar description to stream */
+        rv = skStreamSetSidecar(out_stream, sidecar);
+        if (rv) {
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+            skStreamDestroy(&out_stream);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    /* Open the output file */
+    if ((rv = skStreamSetCompressionMethod(out_stream, comp_method))
+        || (rv = skOptionsNotesAddToStream(out_stream))
+        || (rv = skStreamOpen(out_stream))
+        || (rv = skStreamWriteSilkHeader(out_stream)))
+    {
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+        skStreamDestroy(&out_stream);
+        exit(EXIT_FAILURE);
+    }
+
+    /* No longer need the notes */
+    skOptionsNotesTeardown();
 }
 
 
@@ -311,9 +363,7 @@ appOptionsHandler(
     int                 opt_index,
     char               *opt_arg)
 {
-#if SK_ENABLE_IPV6
     uint32_t j;
-#endif
     uint32_t n;
     uint32_t i;
     int rv;
@@ -340,7 +390,6 @@ appOptionsHandler(
         net_mask[i].mask4 = ~((n == 32) ? 0 : (UINT32_MAX >> n));
         break;
 
-#if SK_ENABLE_IPV6
       case OPT_6SIP_PREFIX_LENGTH:
       case OPT_6DIP_PREFIX_LENGTH:
       case OPT_6NHIP_PREFIX_LENGTH:
@@ -365,15 +414,20 @@ appOptionsHandler(
             memset(&net_mask[i].mask6[j+1], 0, (15 - j));
         }
         break;
-#endif  /* SK_ENABLE_IPV6 */
 
       case OPT_OUTPUT_PATH:
-        if (output_path) {
+        if (out_stream) {
             skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
             return 1;
         }
-        output_path = opt_arg;
+        if ((rv = skStreamCreate(&out_stream,SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+            || (rv = skStreamBind(out_stream, opt_arg)))
+        {
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+            skStreamDestroy(&out_stream);
+            return 1;
+        }
         break;
     }
 
@@ -388,23 +442,24 @@ appOptionsHandler(
 
 
 /*
- *  maskInput(in_stream, out_stream);
+ *  status = maskInputs();
  *
- *    Read SiLK Flow records from the 'in_stream' stream, mask off the
- *    source, destination, and/or next-hop IP addresses, and print the
- *    records to the 'out_stream' stream.
+ *    Read SiLK Flow records from all input streams, mask off the
+ *    source, destination, and/or next-hop IP addresses, and write the
+ *    records to the global out_stream.
  */
-static int
-maskInput(
-    skstream_t         *in_stream,
-    skstream_t         *out_stream)
+static ssize_t
+maskInputs(
+    void)
 {
     rwRec rwrec;
-    int rv;
+    ssize_t in_rv;
+    ssize_t out_rv;
+
+    rwRecInitialize(&rwrec, L);
 
     /* read the records and mask the IP addresses */
-    while ((rv = skStreamReadRecord(in_stream, &rwrec)) == SKSTREAM_OK) {
-#if SK_ENABLE_IPV6
+    while ((in_rv = sk_flow_iter_get_next_rec(flowiter, &rwrec)) == 0) {
         if (rwRecIsIPv6(&rwrec)) {
             if (net_mask[SIP_MASK].bits6) {
                 rwRecApplyMaskSIPv6(&rwrec, net_mask[SIP_MASK].mask6);
@@ -415,9 +470,7 @@ maskInput(
             if (net_mask[NHIP_MASK].bits6) {
                 rwRecApplyMaskNhIPv6(&rwrec, net_mask[NHIP_MASK].mask6);
             }
-        } else
-#endif  /* SK_ENABLE_IPV6 */
-        {
+        } else {
             if (net_mask[SIP_MASK].bits4) {
                 rwRecApplyMaskSIPv4(&rwrec, net_mask[SIP_MASK].mask4);
             }
@@ -429,59 +482,41 @@ maskInput(
             }
         }
 
-        rv = skStreamWriteRecord(out_stream, &rwrec);
-        if (SKSTREAM_ERROR_IS_FATAL(rv)) {
-            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
-            return rv;
+        out_rv = skStreamWriteRecord(out_stream, &rwrec);
+        if (SKSTREAM_ERROR_IS_FATAL(out_rv)) {
+            skStreamPrintLastErr(out_stream, out_rv, &skAppPrintErr);
+            in_rv = out_rv;
+            goto END;
         }
     }
 
-    if (SKSTREAM_ERR_EOF != rv) {
-        skStreamPrintLastErr(in_stream, rv, &skAppPrintErr);
+    if (SKSTREAM_ERR_EOF == in_rv) {
+        in_rv = SKSTREAM_OK;
     }
-    return SKSTREAM_OK;
+  END:
+    rwRecReset(&rwrec);
+    return in_rv;
 }
 
 
 int main(int argc, char **argv)
 {
-    skstream_t *stream_in;
-    skstream_t *stream_out;
-    int rv;
+    ssize_t rv;
 
     appSetup(argc, argv);       /* never returns on error */
 
-    /* Open the output file */
-    if ((rv = skStreamCreate(&stream_out, SK_IO_WRITE, SK_CONTENT_SILK_FLOW))
-        || (rv = skStreamBind(stream_out, output_path))
-        || (rv = skStreamSetCompressionMethod(stream_out, comp_method))
-        || (rv = skOptionsNotesAddToStream(stream_out))
-        || (rv = skStreamOpen(stream_out))
-        || (rv = skStreamWriteSilkHeader(stream_out)))
-    {
-        skStreamPrintLastErr(stream_out, rv, &skAppPrintErr);
-        skStreamDestroy(&stream_out);
-        exit(EXIT_FAILURE);
-    }
-
     /* Process each input file */
-    while ((rv = skOptionsCtxNextSilkFile(optctx, &stream_in, skAppPrintErr))
-           == 0)
-    {
-        skStreamSetIPv6Policy(stream_in, ipv6_policy);
-        maskInput(stream_in, stream_out);
-        skStreamDestroy(&stream_in);
-    }
-    if (rv < 0) {
+    rv = maskInputs();
+    if (rv != 0) {
         exit(EXIT_FAILURE);
     }
 
     /* Close output */
-    rv = skStreamClose(stream_out);
+    rv = skStreamClose(out_stream);
     if (rv) {
-        skStreamPrintLastErr(stream_out, rv, &skAppPrintErr);
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
     }
-    skStreamDestroy(&stream_out);
+    skStreamDestroy(&out_stream);
 
     /* done */
     return 0;

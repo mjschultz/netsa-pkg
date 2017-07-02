@@ -18,8 +18,10 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skheader.c 7e6884832fbd 2017-01-20 22:59:46Z mthomas $");
+RCSIDENT("$SiLK: skheader.c 373f990778e9 2017-06-22 21:57:36Z mthomas $");
 
+#include <silk/skbag.h>
+#include <silk/sksidecar.h>
 #include "skheader_priv.h"
 #include "skstream_priv.h"
 
@@ -165,6 +167,33 @@ skHeaderAddEntry(
 
 
 int
+skHeaderAppendStartBytes(
+    sk_file_header_t   *hdr,
+    const void         *buf,
+    size_t              count)
+{
+    if (NULL == hdr) {
+        return SKHEADER_ERR_NULL_ARGUMENT;
+    }
+    if (hdr->header_lock) {
+        return SKHEADER_ERR_IS_LOCKED;
+    }
+    if (0 == count) {
+        return SKHEADER_OK;
+    }
+    if (NULL == buf) {
+        return SKHEADER_ERR_NULL_ARGUMENT;
+    }
+    if (hdr->header_length + count >= sizeof(sk_header_start_t)) {
+        return SKHEADER_ERR_TOOLONG;
+    }
+    memcpy(((uint8_t*)&hdr->fh_start) + hdr->header_length, buf, count);
+    hdr->header_length += count;
+    return SKHEADER_OK;
+}
+
+
+int
 skHeaderCopy(
     sk_file_header_t       *dst_hdr,
     const sk_file_header_t *src_hdr,
@@ -257,11 +286,6 @@ skHeaderCopy(
 
             rv = skHeaderAddEntry(dst_hdr, dst_hentry);
             if (rv) {
-                sk_hentry_callback_fn_t free_fn;
-                free_fn = ((htype && htype->het_free)
-                           ? htype->het_free
-                           : &skHentryDefaultFree);
-                free_fn(dst_hentry);
                 break;
             }
 
@@ -321,11 +345,6 @@ skHeaderCopyEntries(
 
         rv = skHeaderAddEntry(dst_hdr, dst_hentry);
         if (rv) {
-            sk_hentry_callback_fn_t free_fn;
-            free_fn = ((htype && htype->het_free)
-                       ? htype->het_free
-                       : &skHentryDefaultFree);
-            free_fn(dst_hentry);
             break;
         }
     } while (!HENTRY_SPEC_EOH(src_hentry));
@@ -758,14 +777,15 @@ skHeaderInitialize(
                                &skHentryProbenameCopy,
                                &skHentryProbenameFree,
                                &skHentryProbenamePrint);
+
     /* defined in skprefixmap.c */
     rv |= skPrefixMapRegisterHeaderEntry(SK_HENTRY_PREFIXMAP_ID);
     /* defined in skbag.c */
     rv |= skBagRegisterHeaderEntry(SK_HENTRY_BAG_ID);
     /* defined in skipset.c */
     rv |= skIPSetRegisterHeaderEntry(SK_HENTRY_IPSET_ID);
-    /* defined in skaggbag.c */
-    rv |= skAggBagRegisterHeaderEntry(SK_HENTRY_AGGBAG_ID);
+    /* defined in sksidecar.c */
+    rv |= sk_sidecar_register_header_entry(SK_HENTRY_SIDECAR_ID);
 
     rv |= skHeaderLegacyInitialize();
 
@@ -905,6 +925,8 @@ skHeaderReadStart(
 
     /* read the traditional "genericHeader" */
     if (hdr->header_length < SKHDR_INITIAL_READLEN) {
+        /* may have part of the header from a previous call to
+         * skHeaderAppendStartBytes() */
         len = SKHDR_INITIAL_READLEN - hdr->header_length;
         saw = skStreamRead(
             stream, ((uint8_t*)&hdr->fh_start) + hdr->header_length, len);
@@ -1831,15 +1853,13 @@ skHentryDefaultUnpacker(
 
 int
 skHeaderAddPackedfile(
-    sk_file_header_t   *hdr,
-    sktime_t            start_time,
-    sk_flowtype_id_t    flowtype_id,
-    sk_sensor_id_t      sensor_id)
+    sk_file_header_t           *hdr,
+    const sksite_repo_key_t    *repo_key)
 {
     int rv;
     sk_header_entry_t *pfh;
 
-    pfh = skHentryPackedfileCreate(start_time, flowtype_id, sensor_id);
+    pfh = skHentryPackedfileCreate(repo_key);
     if (pfh == NULL) {
         return SKHEADER_ERR_ALLOC;
     }
@@ -1856,20 +1876,19 @@ sk_header_entry_t *
 skHentryPackedfileCopy(
     const sk_header_entry_t    *hentry)
 {
-    sk_hentry_packedfile_t *pf_hdr = (sk_hentry_packedfile_t*)hentry;
+    const sk_hentry_packedfile_t *pf_hdr
+        = (const sk_hentry_packedfile_t*)hentry;
+    sksite_repo_key_t repo_key;
 
     assert(hentry);
-    return skHentryPackedfileCreate(skHentryPackedfileGetStartTime(pf_hdr),
-                                    skHentryPackedfileGetFlowtypeID(pf_hdr),
-                                    skHentryPackedfileGetSensorID(pf_hdr));
+    return skHentryPackedfileCreate(
+        skHentryPackedfileGetRepositoryKey(pf_hdr, &repo_key));
 }
 
 
 sk_header_entry_t *
 skHentryPackedfileCreate(
-    sktime_t            start_time,
-    sk_flowtype_id_t    flowtype_id,
-    sk_sensor_id_t      sensor_id)
+    const sksite_repo_key_t    *repo_key)
 {
     sk_hentry_packedfile_t *pf_hdr;
 
@@ -1880,9 +1899,10 @@ skHentryPackedfileCreate(
 
     pf_hdr->he_spec.hes_id   = SK_HENTRY_PACKEDFILE_ID;
     pf_hdr->he_spec.hes_len  = sizeof(sk_hentry_packedfile_t);
-    pf_hdr->start_time       = start_time - (start_time % 3600000);
-    pf_hdr->flowtype_id      = flowtype_id;
-    pf_hdr->sensor_id        = sensor_id;
+    pf_hdr->start_time       = (repo_key->timestamp
+                                - (repo_key->timestamp % 3600000));
+    pf_hdr->flowtype_id      = repo_key->flowtype_id;
+    pf_hdr->sensor_id        = repo_key->sensor_id;
 
     return (sk_header_entry_t*)pf_hdr;
 }
@@ -1898,6 +1918,21 @@ skHentryPackedfileFree(
         hentry->he_spec.hes_id = UINT32_MAX;
         free(hentry);
     }
+}
+
+
+sksite_repo_key_t *
+skHentryPackedfileGetRepositoryKey(
+    const sk_hentry_packedfile_t   *hentry,
+    sksite_repo_key_t              *repo_key)
+{
+    assert(hentry);
+    assert(repo_key);
+
+    repo_key->timestamp = skHentryPackedfileGetStartTime(hentry);
+    repo_key->sensor_id = skHentryPackedfileGetSensorID(hentry);
+    repo_key->flowtype_id = skHentryPackedfileGetFlowtypeID(hentry);
+    return repo_key;
 }
 
 
@@ -2635,7 +2670,6 @@ skHentryProbenameUnpacker(
 
     return (sk_header_entry_t*)pn_hdr;
 }
-
 
 
 /*

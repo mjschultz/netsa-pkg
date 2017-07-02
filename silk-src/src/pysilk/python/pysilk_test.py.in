@@ -9,7 +9,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: pysilk_test.py.in 275df62a2e41 2017-01-05 17:30:40Z mthomas $
+# $SiLK: pysilk_test.py.in efd886457770 2017-06-21 18:43:23Z mthomas $
 #######################################################################
 
 import pickle
@@ -23,29 +23,6 @@ import os
 import os.path
 from silk import *
 from silk.site import have_site_config, sensors, classtypes
-
-if sys.hexversion >= 0x02050000:
-    operator_isub = operator.isub
-    operator_iadd = operator.iadd
-    operator_iand = operator.iand
-    operator_ior  = operator.ior
-    operator_ixor = operator.ixor
-else:
-    def operator_isub(a, b):
-        a -= b
-    def operator_iadd(a, b):
-        a += b
-    def operator_iand(a, b):
-        a &= b
-    def operator_ior(a, b):
-        a |= b
-    def operator_ixor(a, b):
-        a ^= b
-
-if sys.hexversion >= 0x02050000:
-    versionedAttributeError = AttributeError
-else:
-    versionedAttributeError = TypeError
 
 def tempname(tmpdir):
     if sys.hexversion >= 0x03000000:
@@ -1215,11 +1192,13 @@ class TestRWRec(unittest.TestCase):
         self.assertRaises(ValueError, setattr, rec, 'protocol', -1)
         self.assertRaises(ValueError, setattr, rec, 'sport', -1)
         self.assertRaises(ValueError, setattr, rec, 'application', 0x10000)
-        self.assertRaises(ValueError, setattr, rec, 'bytes', 0x100000000)
+        self.assertRaises(ValueError, setattr, rec,
+                          'bytes', 0x10000000000000000)
         self.assertRaises(ValueError, setattr, rec, 'dport', 0x10000)
-        self.assertRaises(ValueError, setattr, rec, 'input', 0x10000)
-        self.assertRaises(ValueError, setattr, rec, 'output', 0x10000)
-        self.assertRaises(ValueError, setattr, rec, 'packets', 0x100000000)
+        self.assertRaises(ValueError, setattr, rec, 'input', 0x100000000)
+        self.assertRaises(ValueError, setattr, rec, 'output', 0x100000000)
+        self.assertRaises(ValueError, setattr, rec,
+                          'packets', 0x10000000000000000)
         self.assertRaises(ValueError, setattr, rec, 'protocol', 0x100)
         self.assertRaises(ValueError, setattr, rec, 'sport', 0x10000)
         self.assertRaises(TypeError, setattr, rec, 'application', '0')
@@ -1339,9 +1318,9 @@ class TestRWRec(unittest.TestCase):
             self.assertEqual(rec.typename, classtype[1])
         self.assertRaises(TypeError, setattr, rec, 'sensor', 1)
         self.assertRaises(TypeError, setattr, rec, 'classtype', (1, 1))
-        self.assertRaises(versionedAttributeError, setattr, rec,
+        self.assertRaises(AttributeError, setattr, rec,
                           'classname', 'all')
-        self.assertRaises(versionedAttributeError, setattr, rec,
+        self.assertRaises(AttributeError, setattr, rec,
                           'typename', 'in')
 
     def testRWRecBitFields(self):
@@ -1934,7 +1913,7 @@ class TestIPSet(unittest.TestCase):
         self.assertRaises(TypeError, operator.or_, s1,
                           ["5.6.7.8", "9.10.11.12"])
         self.assertRaises(TypeError, operator.or_, s2, ["1.2.3.4", "5.6.7.8"])
-        self.assertRaises(TypeError, operator_ior, s5,
+        self.assertRaises(TypeError, operator.ior, s5,
                           ["5.6.7.8", "9.10.11.12"])
         s7 = s1.union(s2, IPWildcard("10.x.x.10"),
                       ["192.168.1.2", "192.168.3.4"])
@@ -2027,7 +2006,7 @@ class TestIPSet(unittest.TestCase):
                               ["2001:db8:5:6::7:8", "2001:db8:9:10::11:12"])
             self.assertRaises(TypeError, operator.or_, s2,
                               ["2001:db8:1:2::3:4", "2001:db8:5:6::7:8"])
-            self.assertRaises(TypeError, operator_ior, s5,
+            self.assertRaises(TypeError, operator.ior, s5,
                               ["2001:db8:5:6::7:8", "2001:db8:9:10::11:12"])
 
     def testIPSetIntersection(self):
@@ -2085,7 +2064,7 @@ class TestIPSet(unittest.TestCase):
         self.assertRaises(TypeError, operator.and_, s1,
                           ["5.6.7.8", "9.10.11.12"])
         self.assertRaises(TypeError, operator.and_, s2, ["1.2.3.4", "5.6.7.8"])
-        self.assertRaises(TypeError, operator_iand, s5,
+        self.assertRaises(TypeError, operator.iand, s5,
                           ["5.6.7.8", "9.10.11.12"])
         s6 = s1.intersection(s2, ["5.6.7.8", "9.10.11.12"])
         s7 = s1.copy()
@@ -2160,7 +2139,7 @@ class TestIPSet(unittest.TestCase):
                               ["2001:db8:5:6::7:8", "2001:db8:9:10::11:12"])
             self.assertRaises(TypeError, operator.and_, s2,
                               ["2001:db8:1:2::3:4", "2001:db8:5:6::7:8"])
-            self.assertRaises(TypeError, operator_iand, s5,
+            self.assertRaises(TypeError, operator.iand, s5,
                               ["2001:db8:5:6::7:8", "2001:db8:9:10::11:12"])
 
     def testIPSetDifference(self):
@@ -2220,7 +2199,7 @@ class TestIPSet(unittest.TestCase):
         self.assertRaises(TypeError, operator.sub, s1,
                           ["5.6.7.8", "9.10.11.12"])
         self.assertRaises(TypeError, operator.sub, s2, ["1.2.3.4", "5.6.7.8"])
-        self.assertRaises(TypeError, operator_isub,
+        self.assertRaises(TypeError, operator.isub,
                           s5, ["5.6.7.8", "9.10.11.12"])
         s6 = s1.copy()
         s6.add("7.7.7.7")
@@ -2301,7 +2280,7 @@ class TestIPSet(unittest.TestCase):
                               ["2001:db8:5:6::7:8", "2001:db8:9:10::11:12"])
             self.assertRaises(TypeError, operator.sub, s2,
                               ["2001:db8:1:2::3:4", "2001:db8:5:6::7:8"])
-            self.assertRaises(TypeError, operator_isub, s5,
+            self.assertRaises(TypeError, operator.isub, s5,
                               ["2001:db8:5:6::7:8", "2001:db8:9:10::11:12"])
 
     def testIPSetSymmetricDifference(self):
@@ -2376,7 +2355,7 @@ class TestIPSet(unittest.TestCase):
                           ["5.6.7.8", "9.10.11.12"])
         self.assertRaises(TypeError, operator.xor, s2,
                           ["1.2.3.4", "5.6.7.8"])
-        self.assertRaises(TypeError, operator_ixor, s5,
+        self.assertRaises(TypeError, operator.ixor, s5,
                           ["5.6.7.8", "9.10.11.12"])
         if IPSet.supports_ipv6():
             s1 = IPSet()
@@ -2460,7 +2439,7 @@ class TestIPSet(unittest.TestCase):
                               ["2001:db8:5:6::7:8", "2001:db8:9:10::11:12"])
             self.assertRaises(TypeError, operator.xor, s2,
                               ["2001:db8:1:2::3:4", "2001:db8:5:6::7:8"])
-            self.assertRaises(TypeError, operator_ixor, s5,
+            self.assertRaises(TypeError, operator.ixor, s5,
                               ["2001:db8:5:6::7:8", "2001:db8:9:10::11:12"])
 
     def testIPSetIsDisjoint(self):
@@ -3782,18 +3761,18 @@ class TestSilkFile(unittest.TestCase):
         recs = []
         for i in range(10):
             recs.append(RWRec(self.baserec, input=i))
-        f = SilkFile(self.tmpfile, WRITE)
+        f = silkfile_open(self.tmpfile, WRITE)
         for x in recs:
             f.write(x)
         f.close()
-        nf = SilkFile(self.tmpfile, READ)
-        nf = SilkFile(self.tmpfile, READ)
+        nf = silkfile_open(self.tmpfile, READ)
+        nf = silkfile_open(self.tmpfile, READ)
         nrecs = []
         for x in nf:
             nrecs.append(x)
         nf.close()
         self.assertEqual(recs, nrecs)
-        nf = SilkFile(self.tmpfile, READ)
+        nf = silkfile_open(self.tmpfile, READ)
         nrecs = []
         x = nf.read()
         while x:
@@ -3801,7 +3780,7 @@ class TestSilkFile(unittest.TestCase):
             x = nf.read()
         nf.close()
         self.assertEqual(recs, nrecs)
-        nf = SilkFile(self.tmpfile, READ)
+        nf = silkfile_open(self.tmpfile, READ)
         nrecs = list(nf)
         nf.close()
         self.assertEqual(recs, nrecs)
@@ -3811,24 +3790,24 @@ class TestSilkFile(unittest.TestCase):
         recs = []
         for i in range(10):
             recs.append(RWRec(self.baserec, input=i))
-        f = SilkFile(self.tmpfile, WRITE,
-                     notes=["Annot1", "Annot2"],
-                     invocations=["Invoc1", "Invoc2"])
+        f = silkfile_open(self.tmpfile, WRITE,
+                          notes=["Annot1", "Annot2"],
+                          invocations=["Invoc1", "Invoc2"])
         for x in recs:
             f.write(x)
         f.close()
-        nf = SilkFile(self.tmpfile, READ)
+        nf = silkfile_open(self.tmpfile, READ)
         self.assertEqual(nf.notes(), ["Annot1", "Annot2"])
         self.assertEqual(nf.invocations(), ["Invoc1", "Invoc2"])
         nrecs = list(nf)
         nf.close()
         self.assertEqual(recs, nrecs)
         self.rmfile()
-        f = SilkFile(self.tmpfile, WRITE)
+        f = silkfile_open(self.tmpfile, WRITE)
         for x in recs:
             f.write(x)
         f.close()
-        nf = SilkFile(self.tmpfile, READ)
+        nf = silkfile_open(self.tmpfile, READ)
         self.assertEqual(nf.notes(), [])
         self.assertEqual(nf.invocations(), [])
         self.rmfile()
@@ -3841,49 +3820,49 @@ class TestSilkFile(unittest.TestCase):
         recs = []
         for i in range(10):
             recs.append(RWRec(self.baserec, input=i))
-        f = SilkFile(self.tmpfile, WRITE, compression=DEFAULT)
+        f = silkfile_open(self.tmpfile, WRITE, compression=DEFAULT)
         for x in recs:
             f.write(x)
         f.close()
-        nf = SilkFile(self.tmpfile, READ)
+        nf = silkfile_open(self.tmpfile, READ)
         nrecs = list(nf)
         nf.close()
         self.assertEqual(recs, nrecs)
         self.rmfile()
 
-        f = SilkFile(self.tmpfile, WRITE, compression=NO_COMPRESSION)
+        f = silkfile_open(self.tmpfile, WRITE, compression=NO_COMPRESSION)
         for x in recs:
             f.write(x)
         f.close()
-        nf = SilkFile(self.tmpfile, READ)
+        nf = silkfile_open(self.tmpfile, READ)
         nrecs = list(nf)
         nf.close()
         self.assertEqual(recs, nrecs)
         self.rmfile()
 
         try:
-            f = SilkFile(self.tmpfile, WRITE, compression=ZLIB)
+            f = silkfile_open(self.tmpfile, WRITE, compression=ZLIB)
         except IOError:
             pass
         else:
             for x in recs:
                 f.write(x)
             f.close()
-            nf = SilkFile(self.tmpfile, READ)
+            nf = silkfile_open(self.tmpfile, READ)
             nrecs = list(nf)
             nf.close()
             self.assertEqual(recs, nrecs)
             self.rmfile()
 
         try:
-            f = SilkFile(self.tmpfile, WRITE, compression=LZO1X)
+            f = silkfile_open(self.tmpfile, WRITE, compression=LZO1X)
         except IOError:
             pass
         else:
             for x in recs:
                 f.write(x)
             f.close()
-            nf = SilkFile(self.tmpfile, READ)
+            nf = silkfile_open(self.tmpfile, READ)
             nrecs = list(nf)
             nf.close()
             self.assertEqual(recs, nrecs)
@@ -3893,11 +3872,11 @@ class TestSilkFile(unittest.TestCase):
         recs = []
         for i in range(10):
             recs.append(RWRec(self.baserec, input=i))
-        f = SilkFile(self.tmpfile, WRITE)
+        f = silkfile_open(self.tmpfile, WRITE)
         for x in recs:
             f.write(x)
         f.close()
-        nf = SilkFile(self.tmpfile, READ)
+        nf = silkfile_open(self.tmpfile, READ)
         self.assertRaises(TypeError, pickle.dumps,
                           nf)
         for i in range(-1, 1+pickle.HIGHEST_PROTOCOL):

@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: hashlib_tests.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: hashlib_tests.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/hashlib.h>
 
@@ -30,30 +30,22 @@ hashlib_test1(
     const int initial_table_size = 600000;
     HashTable *test_ptr = NULL;
     uint32_t no_value = 0xFFFFFFFF;
-    uint8_t *no_value_ptr;
     uint32_t num_found = 0;
     HASH_ITER iter;
 
     printf("\n--- Testing value-based hash table\n");
 
-    /* Allocate memory for and initialize special "empty" value */
-    no_value_ptr = (uint8_t*)malloc(sizeof(iValue));
-    memcpy(no_value_ptr, &no_value, sizeof(iValue));
-
     /* Create a table to test with */
     test_ptr = hashlib_create_table(sizeof(iKey),
                                     sizeof(iValue),
                                     HTT_INPLACE,   /* values, not pointers */
-                                    no_value_ptr,  /* all FF means empty */
+                                    (uint8_t*)&no_value,  /* all FF == empty */
                                     NULL, 0, /* No user data */
                                     initial_table_size, DEFAULT_LOAD_FACTOR);
     assert(test_ptr);
 
-    /* done with the no_value_ptr */
-    free(no_value_ptr);
-
     /* Populate the table with integers and their doubles */
-    for (iKey = 1; iKey <= max_key; iKey++) {
+    for (iKey = 1; iKey <= max_key; ++iKey) {
         iValue = iKey*2;
         hashlib_insert(test_ptr, (uint8_t*)&iKey, (uint8_t**)&val_ref);
         memcpy(val_ref, &iValue, sizeof(iValue));
@@ -63,11 +55,9 @@ hashlib_test1(
     if (hashlib_count_entries(test_ptr) != max_key) {
         printf(("Error in hashlib_test1."
                 " hashlib_count_entries returned incorrect value\n"));
+        passed = 0;
         exit(EXIT_FAILURE);
     }
-
-    printf("Table information:\n");
-    hashlib_dump_table_header(stderr, test_ptr);
 
     printf("Testing iteration\n");
     num_found = 0;
@@ -77,10 +67,11 @@ hashlib_test1(
            != ERR_NOMOREENTRIES)
     {
         uint32_t inv_val = (uint32_t) (*val_ref)/2;
-        num_found++;
+        ++num_found;
         if (inv_val != *key_ref) {
             printf("%u --> %u (%u)", *key_ref, *val_ref, inv_val);
             printf("****Incorrect value: %u != %u\n", inv_val, *key_ref);
+            passed = 0;
             exit(EXIT_FAILURE);
         }
     }
@@ -88,6 +79,7 @@ hashlib_test1(
     if (num_found != max_key) {
         printf("Iteration failed.  Expected %d entries, found %d\n", max_key,
                num_found);
+        passed=0;
         exit(EXIT_FAILURE);
     }
 
@@ -98,7 +90,7 @@ hashlib_test1(
     }
 
     printf("Testing lookup\n");
-    for (iKey = 1; iKey <= max_key; iKey++) {
+    for (iKey = 1; iKey <= max_key; ++iKey) {
         uint32_t inv_val;
         key_ref = &iKey;
         iValue = iKey*2;
@@ -107,6 +99,7 @@ hashlib_test1(
         if (inv_val != *key_ref) {
             printf("%u --> %u (%u)", *key_ref, *val_ref, inv_val);
             printf("****Incorrect value: %u != %u\n", inv_val, *key_ref);
+            passed = 0;
             exit(EXIT_FAILURE);
         }
     }
@@ -154,18 +147,18 @@ hashlib_test_remove(
 
     /* Add values except those in removed_keys to hash table and
      * to present_keys array */
-    for (i = 0; i < 300; i++) {
+    for (i = 0; i < 300; ++i) {
         uint8_t use_it_bool = 1;
 
         /* Add it to present vals only if we're not going to remove it */
-        for (j = 0; j < num_removed_keys; j++) {
+        for (j = 0; j < num_removed_keys; ++j) {
             if (i == removed_keys[j]) {
                 use_it_bool = 0;
                 break;
             }
         }
         if (use_it_bool) {
-            present_keys[num_present++] = i;
+            present_keys[++num_present] = i;
         }
 
         /* Add it to the table */
@@ -176,7 +169,7 @@ hashlib_test_remove(
     }
 
     /* Remove values in removed_keys */
-    for (i = 0; i < num_removed_keys; i++) {
+    for (i = 0; i < num_removed_keys; ++i) {
         key = removed_keys[i];
         fprintf(stderr, "Removing: %d\n", key);
         rv = hashlib_remove(table_ptr, (uint8_t*) &key);
@@ -184,7 +177,7 @@ hashlib_test_remove(
     }
 
     /* Make sure the values in present_keys are in the hash table */
-    for (i = 0; i < num_present; i++) {
+    for (i = 0; i < num_present; ++i) {
         key = present_keys[i];
         fprintf(stderr, "Looking up %d\n", key);
         rv = hashlib_lookup(table_ptr, (uint8_t*) &key, (uint8_t**) val_ptr);
@@ -196,7 +189,7 @@ hashlib_test_remove(
     }
 
     /* Make sure the removed_keys are not */
-    for (i = 0; i < num_removed_keys; i++) {
+    for (i = 0; i < num_removed_keys; ++i) {
         key = removed_keys[i];
         fprintf(stderr, "Checking: %d. ", key);
         rv = hashlib_lookup(table_ptr, (uint8_t*) &key, (uint8_t**) val_ptr);
@@ -214,7 +207,8 @@ hashlib_test_remove(
 #endif /* 0 */
 
 
-int main(
+int
+main(
     int          UNUSED(argc),
     char       UNUSED(**argv))
 {

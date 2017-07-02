@@ -10,7 +10,6 @@ my %file;
 $file{data} = get_data_or_exit77('data');
 $file{v6data} = get_data_or_exit77('v6data');
 $file{empty} = get_data_or_exit77('empty');
-check_features(qw(ipv6));
 my $cmd = "$rwcount --bin-size=3600 --load-scheme=1 $file{empty} $file{data} $file{v6data} $file{empty}";
 my $md5 = "11151f02e3e150ffd4b2915cd8d4f190";
 

@@ -10,7 +10,6 @@ my $rwsetcat = check_silk_app('rwsetcat');
 my %file;
 $file{v6set1} = get_data_or_exit77('v6set1');
 $file{v6set2} = get_data_or_exit77('v6set2');
-check_features(qw(ipset_v6));
 my $cmd = "$rwsettool --union $file{v6set2} $file{v6set1} | $rwsetcat --cidr";
 my $md5 = "6374ba3d54b244fe32b1d525a8e91b60";
 

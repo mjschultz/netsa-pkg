@@ -9,7 +9,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: rwflowappend-daemon.py 275df62a2e41 2017-01-05 17:30:40Z mthomas $
+# $SiLK: rwflowappend-daemon.py efd886457770 2017-06-21 18:43:23Z mthomas $
 #######################################################################
 from __future__ import print_function
 import optparse
@@ -64,42 +64,22 @@ def main():
                       default=[])
     parser.add_option("--move", action="append", type="string", dest="move",
                       default=[])
-    parser.add_option("--file-limit", action="store", type="int",
-                      dest="file_limit", default=0)
-    parser.add_option("--no-archive", action="store_true", dest="no_archvie",
-                      default=False)
     parser.add_option("--basedir", action="store", type="string",
                       dest="basedir")
     parser.add_option("--daemon-timeout", action="store", type="int",
                       dest="daemon_timeout", default=60)
-    parser.add_option("--verbose", action="store_true", dest="verbose",
-                      default=False)
     parser.add_option("--overwrite-dirs", action="store_true", dest="overwrite",
                       default=False)
-    parser.add_option("--log-level", action="store", type="string",
-                      dest="log_level", default="info")
     (options, args) = parser.parse_args()
-    VERBOSE = options.verbose
+    VERBOSE = True
 
     # Create the dirs
     dirobj = Dirobject(overwrite=options.overwrite, basedir=options.basedir)
-    dirobj.dirs = ['incoming', 'archive', 'error', 'root', 'log']
+    dirobj.dirs = ['archive', 'error', 'incoming', 'log', 'processing', 'root']
     dirobj.create_dirs()
 
     # Make the log file
     logfile = open(dirobj.get_path('log', 'rwflowappend-daemon.log'), 'wb', 0)
-
-    # Generate the subprocess arguments
-    args += ['--log-dest', 'stderr',
-             '--log-level', options.log_level,
-             '--no-daemon',
-             '--root-directory', dirobj.dirname['root'],
-             '--incoming-directory', dirobj.dirname['incoming'],
-             '--error-directory', dirobj.dirname['error']]
-
-    if not options.no_archvie:
-        args += ['--archive-directory', dirobj.dirname['archive']]
-
 
     progname = os.environ.get("RWFLOWAPPEND",
                               os.path.join('.', 'rwflowappend'))
@@ -110,14 +90,9 @@ def main():
     clean = False
     term = False
     send_list = None
-    limit = len(options.copy) + len(options.move) + options.file_limit
+    limit = len(options.copy) + len(options.move)
     regexp = re.compile("APPEND OK")
     closing = re.compile("Stopped logging")
-
-    if 0 == limit:
-        print("ERROR: File limit is zero")
-        base_log("ERROR: File limit is zero")
-        sys.exit(1)
 
     # Copy or move data
     copy_files(dirobj, options.copy)
@@ -198,7 +173,7 @@ def main():
             except OSError:
                 pass
 
-    # Print record count
+    # Print record count, both to the log and to stdout
     print("File count:", count)
     base_log("File count:", count)
     if limit != count:

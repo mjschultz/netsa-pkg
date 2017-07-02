@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmapcat.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
+RCSIDENT("$SiLK: rwpmapcat.c fc8761f1d6b8 2017-06-23 16:42:19Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
@@ -97,10 +97,6 @@ static char delimiter = '|';
 
 /* format for printing IP addresses */
 static uint32_t ip_format = SKIPADDR_CANONICAL;
-
-/* flags when registering --ip-format */
-static const unsigned int ip_format_register_flags =
-    (SK_OPTION_IP_FORMAT_INTEGER_IPS | SK_OPTION_IP_FORMAT_ZERO_PAD_IPS);
 
 
 /* OPTIONS SETUP */
@@ -305,7 +301,7 @@ appSetup(
 
     /* register the options */
     if (skOptionsRegister(appOptions, &appOptionsHandler,(clientData)&opt_val)
-        || skOptionsIPFormatRegister(&ip_format, ip_format_register_flags))
+        || skOptionsIPFormatRegister(&ip_format))
     {
         skAppPrintErr("Unable to register options");
         exit(EXIT_FAILURE);

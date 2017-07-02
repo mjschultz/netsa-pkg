@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwrtd2split.c 5129c94db905 2017-01-19 22:25:14Z mthomas $");
+RCSIDENT("$SiLK: rwrtd2split.c c29e851274ef 2017-06-22 14:26:23Z mthomas $");
 
 #include <silk/skstream.h>
 #include <silk/rwrec.h>
@@ -285,6 +285,8 @@ int main(int argc, char **argv)
 
     /* Setup app: open input and output files; will exit(1) on error */
     appSetup(argc, argv);
+
+    rwRecInitialize(&rwrec, NULL);
 
     /* Process body */
     while (SKSTREAM_OK == (in_rv = skStreamReadRecord(in_stream, &rwrec))) {

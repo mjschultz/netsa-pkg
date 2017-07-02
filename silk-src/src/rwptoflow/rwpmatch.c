@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmatch.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwpmatch.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skstream.h>
@@ -291,15 +291,6 @@ appOptionsHandler(
 
     switch ((appOptionsEnum)opt_index) {
       case OPT_FLOW_FILE:
-        /* the input-pipe must be 'stdin' or it must be an existing
-         * FIFO.  If 'stdin', stdin must not be a TTY, since we expect
-         * binary. */
-        if (strcmp(opt_arg, "stdin") == 0) {
-            if (FILEIsATty(stdin)) {
-                skAppPrintErr("stdin is connected to a terminal.");
-                return -1;
-            }
-        }
         rv = skStreamOpenSilkFlow(&flow_input, opt_arg, SK_IO_READ);
         if (rv) {
             skStreamPrintLastErr(flow_input, rv, &skAppPrintErr);
@@ -490,8 +481,9 @@ int main(int argc, char **argv)
      */
     int ts_compare;
 
-
     appSetup(argc, argv);
+
+    rwRecInitialize(&flow, NULL);
 
     while (!done) {
         /* If the current packet data is stale, load the next packet */

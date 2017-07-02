@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-times.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: sku-times.c 64d7ed05a614 2017-06-26 16:36:15Z mthomas $");
 
 #include <silk/utils.h>
 

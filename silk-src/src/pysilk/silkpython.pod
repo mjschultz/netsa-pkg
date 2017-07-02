@@ -1956,7 +1956,7 @@ B<silk(7)>, B<python(1)>, L<http://docs.python.org/>
 
 =cut
 
-$SiLK: silkpython.pod 3cddb6030400 2016-04-20 19:08:48Z mthomas $
+$SiLK: silkpython.pod ce150ce9bf2a 2016-09-02 21:07:24Z mthomas $
 
 Local Variables:
 mode:text

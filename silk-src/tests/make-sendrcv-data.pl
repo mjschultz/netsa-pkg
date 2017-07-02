@@ -1,12 +1,9 @@
 #! /usr/bin/perl -w
 #
-
 #######################################################################
-## Copyright (C) 2010-2017 by Carnegie Mellon University.
-##
-## @OPENSOURCE_LICENSE_START@
-## See license information in ../LICENSE.txt
-## @OPENSOURCE_LICENSE_END@
+#  Copyright (C) 2010-2017 by Carnegie Mellon University.
+#
+#  See end of file
 #######################################################################
 #  make-sendrcv-data.pl
 #
@@ -18,7 +15,7 @@
 #  Mark Thomas
 #  March 2010
 #######################################################################
-#  RCSIDENT("$SiLK: make-sendrcv-data.pl 275df62a2e41 2017-01-05 17:30:40Z mthomas $")
+#  RCSIDENT("$SiLK: make-sendrcv-data.pl efd886457770 2017-06-21 18:43:23Z mthomas $")
 #######################################################################
 
 use strict;
@@ -262,3 +259,11 @@ EOF
 }
 
 __END__
+
+#######################################################################
+# Copyright (C) 2010-2017 by Carnegie Mellon University.
+#
+# @OPENSOURCE_LICENSE_START@
+# See license information in ../LICENSE.txt
+# @OPENSOURCE_LICENSE_END@
+#######################################################################

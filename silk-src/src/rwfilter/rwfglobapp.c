@@ -21,9 +21,11 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfglobapp.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
+RCSIDENT("$SiLK: rwfglobapp.c d1637517606d 2017-06-23 16:51:31Z mthomas $");
 
-#include "rwfilter.h"
+#include <silk/skfglob.h>
+#include <silk/sksite.h>
+#include <silk/utils.h>
 
 
 /* LOCAL DEFINES AND TYPEDEFS */
@@ -43,16 +45,13 @@ RCSIDENT("$SiLK: rwfglobapp.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
 #define OUTPUT_FH stdout
 
 
-/* EXPORTED VARIABLES */
-
-
-/* index into argv of first option that does not start with a '--'.
- * This assumes getopt rearranges the options, which gnu getopt will
- * do.  (Must be non-static since available in rwfilter.h) */
-int arg_index;
-
-
 /* LOCAL VARIABLES */
+
+/* index into argv of first non-switch option */
+static int arg_index;
+
+/* The fglob state. */
+static sk_fglob_t *fglob = NULL;
 
 /* when this variable is nonzero, stat() to get the file's size and
  * block count and print BLOCK_CHECK_ZERO_MSG if size is non-zero but
@@ -139,7 +138,7 @@ appUsageLong(
         fprintf(fh, "--%s %s. %s\n", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]), appHelp[i]);
     }
-    fglobUsage(fh);
+    skFGlobUsage(fglob, fh);
 }
 
 
@@ -153,7 +152,7 @@ appUsageLong(
  *
  *    NOTE: Make this extern due to declaration in rwfilter.h.
  */
-void
+static void
 appTeardown(
     void)
 {
@@ -165,7 +164,7 @@ appTeardown(
     teardownFlag = 1;
 
     /* cleanup */
-    fglobTeardown();
+    skFGlobDestroy(&fglob);
 
     skAppUnregister();
 }
@@ -184,7 +183,7 @@ appTeardown(
  *
  *    NOTE: Make this extern due to declaration in rwfilter.h.
  */
-void
+static void
 appSetup(
     int                 argc,
     char              **argv)
@@ -209,7 +208,7 @@ appSetup(
     }
 
     /* Set up the fglob module */
-    if (fglobSetup()){
+    if (skFGlobCreate(&fglob)){
         skAppPrintErr("Unable to setup fglob module");
         exit(EXIT_FAILURE);
     }
@@ -240,7 +239,7 @@ appSetup(
 
     /* verify that an fglob option was provided and that everything is
      * ok with the setup. */
-    rv = fglobValid();
+    rv = skFGlobValid(fglob);
     if (rv == -1) {
         exit(EXIT_FAILURE);
     }
@@ -302,20 +301,19 @@ int main(int argc, char **argv)
     unsigned int numFiles = 0;
     unsigned int numOnTape = 0;
 
-
     appSetup(argc, argv);
 
     switch ((no_block_check << 1) | (no_file_names)) {
       case 3:
         /* do not stat() the files; do not print file names */
-        while (fglobNext(pathname, sizeof(pathname)) != NULL) {
+        while (skFGlobNext(fglob, pathname, sizeof(pathname)) != NULL) {
             ++numFiles;
         }
         break;
 
       case 2:
         /* do not stat() the files; print file names */
-        while (fglobNext(pathname, sizeof(pathname)) != NULL) {
+        while (skFGlobNext(fglob, pathname, sizeof(pathname)) != NULL) {
             fprintf(OUTPUT_FH, "%s\n", pathname);
             ++numFiles;
         }
@@ -323,7 +321,7 @@ int main(int argc, char **argv)
 
       case 1:
         /* stat the files; do not print the file names */
-        while (fglobNext(pathname, sizeof(pathname)) != NULL) {
+        while (skFGlobNext(fglob, pathname, sizeof(pathname)) != NULL) {
             if (-1 == stat(pathname, &statbuf)) {
                 /* should never happen; fglob wouldn't have returned it */
                 skAppPrintSyserror("Cannot stat '%s'", pathname);
@@ -338,7 +336,7 @@ int main(int argc, char **argv)
 
       case 0:
         /* stat the files; print the file names */
-        while (fglobNext(pathname, sizeof(pathname)) != NULL) {
+        while (skFGlobNext(fglob, pathname, sizeof(pathname)) != NULL) {
             if (-1 == stat(pathname, &statbuf)) {
                 /* should never happen; fglob wouldn't have returned it */
                 skAppPrintSyserror("Cannot stat '%s'", pathname);

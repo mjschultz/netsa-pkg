@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: ipafilter.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: ipafilter.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
@@ -372,6 +372,7 @@ ipafilter_preload_set(
             skIPSetInsertRange(set, &begin, &end);
         }
     }
+    skIPSetClean(set);
 } /* ipafilter_preload_set */
 
 
@@ -433,19 +434,22 @@ ipafilter_filter_lazy(
     skIPWildcard_t ipwild;
     skipaddr_t ipaddr;
 
-    addr = rwRecGetSIPv4(rwrec);
+    rwRecMemGetSIP(rwrec, &ipaddr);
 
-    if (skIPSetCheckAddress(pass_set, addr)) {
+    if (skIPSetCheckAddress(pass_set, &ipaddr)) {
         /* this address was already passed */
         /* fprintf(stderr, "already passed\n"); */
         return SKPLUGIN_FILTER_PASS;
-    } else if (skIPSetCheckAddress(fail_set, addr)) {
+    }
+    if (skIPSetCheckAddress(fail_set, &ipaddr)) {
         /* this address was already failed */
         /* fprintf(stderr, "already failed\n"); */
         return SKPLUGIN_FILTER_FAIL;
-    } else {
+    }
+
+    {
         /* haven't seen this address, let's check IPA */
-        ipa_rv = ipa_find_assoc(ipa, &assoc, addr, NULL);
+        ipa_rv = ipa_find_assoc(ipa, &assoc, skipaddrGetV4(&ipaddr), NULL);
         switch (ipa_rv) {
           case IPA_OK:
             /* Add the matching range from IPA to the pass tree */
@@ -455,13 +459,13 @@ ipafilter_filter_lazy(
                               assoc.range, skStringParseStrerror(rv));
                 return SKPLUGIN_ERR;
             }
-            skIPTreeAddIPWildcard(pass_set, &ipwild);
+            skIPSetInsertIPWildcard(pass_set, &ipwild);
             /* fprintf(stderr, "pass: %s\n", num2dot(addr)); */
             return SKPLUGIN_FILTER_PASS;
           case IPA_ERR_NOTFOUND:
             /* Add the failed address to the fail tree */
             /* fprintf(stderr, "fail: %s\n", num2dot(addr)); */
-            skIPTreeAddAddress(fail_set, addr);
+            skIPSetInsertAddress(fail_set, &ipaddr, 32);
             return SKPLUGIN_FILTER_FAIL;
           default:
             skAppPrintErr("IPA error finding range in dataset");

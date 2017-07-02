@@ -1,9 +1,7 @@
-# RCSIDENT($SiLK: Makefile.am 7e6884832fbd 2017-01-20 22:59:46Z mthomas $)
+# RCSIDENT($SiLK: Makefile.am b6bece4ab21f 2016-12-02 17:01:44Z mthomas $)
 
 SILK_SRC_MAKE_BASE_LIBS = \
-	 libsilk
-
-SILK_SRC_MAKE_PACKING_LIBS = \
+	 libsilk \
 	 libflowsource
 
 SILK_SRC_MAKE_RWFILTER = \
@@ -14,7 +12,6 @@ SILK_SRC_MAKE_PYTHON_PLUGIN = \
          pysilk
 
 SILK_SRC_MAKE_PACKING_TOOLS = \
-         flowcap \
          rwflowpack \
          rwpollexec \
          sendrcv
@@ -22,7 +19,6 @@ SILK_SRC_MAKE_PACKING_TOOLS = \
 SILK_SRC_MAKE_ANALYSIS_TOOLS = \
          num2dot \
          rwaddrcount \
-         rwaggbag \
          rwappend \
          rwbag \
          rwcat \
@@ -32,6 +28,7 @@ SILK_SRC_MAKE_ANALYSIS_TOOLS = \
          rwcut \
          rwfileinfo \
          rwgroup \
+         rwipfix \
          rwmatch \
          rwnetmask \
          rwpmap \
@@ -49,7 +46,6 @@ SILK_SRC_MAKE_ANALYSIS_TOOLS = \
          rwtuc
 
 # Conditional analysis tools
-SILK_SRC_MAKE_ANALYSIS_FIXBUF = rwipfix
 SILK_SRC_MAKE_ANALYSIS_IPA = rwipa
 SILK_SRC_MAKE_ANALYSIS_PCAP = rwptoflow
 SILK_SRC_MAKE_ANALYSIS_PYTHONBIN = rwids
@@ -81,20 +77,6 @@ if HAVE_IPA
 SUBDIRS += $(SILK_SRC_MAKE_ANALYSIS_IPA)
 endif
 
-# Add the packing libraries here if either fixbuf is available or if
-# the packing tools are being built.
-if HAVE_FIXBUF
-SUBDIRS += $(SILK_SRC_MAKE_PACKING_LIBS)
-else
-if BUILD_PACKING_TOOLS
-SUBDIRS += $(SILK_SRC_MAKE_PACKING_LIBS)
-endif
-endif
-
-if HAVE_FIXBUF
-SUBDIRS += $(SILK_SRC_MAKE_ANALYSIS_FIXBUF)
-endif
-
 if BUILD_PACKING_TOOLS
 SUBDIRS += $(SILK_SRC_MAKE_PACKING_TOOLS)
 endif
@@ -104,7 +86,6 @@ else !BUILD_ANALYSIS_TOOLS
 
 if BUILD_PACKING_TOOLS
 SUBDIRS += \
-	$(SILK_SRC_MAKE_PACKING_LIBS) \
 	$(SILK_SRC_MAKE_PACKING_TOOLS)
 endif
 
@@ -114,13 +95,11 @@ SUBDIRS += include/silk
 
 DIST_SUBDIRS = \
 	 $(SILK_SRC_MAKE_BASE_LIBS) \
-	 $(SILK_SRC_MAKE_PACKING_LIBS) \
 	 include/silk \
 	 $(SILK_SRC_MAKE_RWFILTER) \
 	 $(SILK_SRC_MAKE_PYTHON_PLUGIN) \
-         $(SILK_SRC_MAKE_PACKING_TOOLS) \
+	 $(SILK_SRC_MAKE_PACKING_TOOLS) \
 	 $(SILK_SRC_MAKE_ANALYSIS_TOOLS) \
-         $(SILK_SRC_MAKE_ANALYSIS_PCAP) \
-         $(SILK_SRC_MAKE_ANALYSIS_IPA) \
-	 $(SILK_SRC_MAKE_ANALYSIS_PYTHONBIN) \
-	 $(SILK_SRC_MAKE_ANALYSIS_FIXBUF)
+	 $(SILK_SRC_MAKE_ANALYSIS_PCAP) \
+	 $(SILK_SRC_MAKE_ANALYSIS_IPA) \
+	 $(SILK_SRC_MAKE_ANALYSIS_PYTHONBIN)

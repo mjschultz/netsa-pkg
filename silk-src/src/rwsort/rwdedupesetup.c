@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwdedupesetup.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwdedupesetup.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstringmap.h>
@@ -31,7 +31,7 @@ RCSIDENT("$SiLK: rwdedupesetup.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 /* LOCAL VARIABLES */
 
-/* available fields; rwAsciiFieldMapAddDefaultFields() fills this */
+/* available key fields; skRwrecAppendFieldsToStringMap() fills this */
 static sk_stringmap_t *field_map = NULL;
 
 /* input checker */
@@ -51,11 +51,6 @@ static const char *ignore_fields = NULL;
 
 /* temporary directory */
 static const char *temp_directory = NULL;
-
-/* read-only cache of argc and argv used for writing header to output
- * file */
-static int pargc;
-static char **pargv;
 
 
 /* OPTIONS */
@@ -112,6 +107,11 @@ static int
 setSortFields(
     uint32_t            ignore_count,
     uint32_t           *ignore_field_ids);
+static void
+copy_file_header_callback(
+    sk_flow_iter_t     *f_iter,
+    skstream_t         *stream,
+    void               *data);
 
 
 
@@ -217,6 +217,7 @@ appTeardown(
     }
 
     skOptionsNotesTeardown();
+    sk_flow_iter_destroy(&flowiter);
     skOptionsCtxDestroy(&optctx);
     skAppUnregister();
 }
@@ -253,8 +254,8 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
-    uint64_t tmp64;
     unsigned int optctx_flags;
+    uint64_t tmp64;
     int rv;
 
     /* verify same number of options and help strings */
@@ -274,10 +275,6 @@ appSetup(
 
     optctx_flags = (SK_OPTIONS_CTX_INPUT_SILK_FLOW | SK_OPTIONS_CTX_ALLOW_STDIN
                     | SK_OPTIONS_CTX_XARGS | SK_OPTIONS_CTX_PRINT_FILENAMES);
-
-    /* store a copy of the arguments */
-    pargc = argc;
-    pargv = argv;
 
     /* register the options */
     if (skOptionsCtxCreate(&optctx, optctx_flags)
@@ -300,13 +297,12 @@ appSetup(
 
     /* initialize string-map of field identifiers.  Remove any fields
      * that do not correspond to a field on the actual rwRec */
-    if (rwAsciiFieldMapAddDefaultFields(&field_map)) {
+    if (skStringMapCreate(&field_map)
+        || skRwrecAppendFieldsToStringMap(field_map))
+    {
         skAppPrintErr("Unable to setup fields stringmap");
         appExit(EXIT_FAILURE);
     }
-    (void)skStringMapRemoveByID(field_map, RWREC_FIELD_STIME_MSEC);
-    (void)skStringMapRemoveByID(field_map, RWREC_FIELD_ETIME_MSEC);
-    (void)skStringMapRemoveByID(field_map, RWREC_FIELD_ELAPSED_MSEC);
     (void)skStringMapRemoveByID(field_map, RWREC_FIELD_ETIME);
     (void)skStringMapRemoveByID(field_map, RWREC_FIELD_ICMP_TYPE);
     (void)skStringMapRemoveByID(field_map, RWREC_FIELD_ICMP_CODE);
@@ -316,6 +312,12 @@ appSetup(
     if (rv < 0) {
         skAppUsage();           /* never returns */
     }
+
+    /* create flow iterator to read the records from the stream */
+    flowiter = skOptionsCtxCreateFlowIterator(optctx);
+    /* copy header information from inputs to output */
+    sk_flow_iter_set_stream_event_cb(flowiter, SK_FLOW_ITER_CB_EVENT_PRE_READ,
+                                     &copy_file_header_callback, NULL);
 
     /* try to load site config file; if it fails, we will not be able
      * to resolve flowtype and sensor from input file names */
@@ -341,7 +343,7 @@ appSetup(
 
     /* Check for an output stream; or default to stdout  */
     if (out_stream == NULL) {
-        if ((rv = skStreamCreate(&out_stream, SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+        if ((rv = skStreamCreate(&out_stream,SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
             || (rv = skStreamBind(out_stream, "-")))
         {
             skStreamPrintLastErr(out_stream, rv, NULL);
@@ -457,7 +459,7 @@ appOptionsHandler(
             skStreamDestroy(&out_stream);
             return 1;
         }
-        if ((rv = skStreamCreate(&out_stream, SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+        if ((rv = skStreamCreate(&out_stream,SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
             || (rv = skStreamBind(out_stream, opt_arg)))
         {
             skStreamPrintLastErr(out_stream, rv, NULL);
@@ -595,7 +597,7 @@ setSortFields(
     uint32_t num_deltas = 0;
     uint32_t i, j;
 
-    for (i = 0; i < RWREC_PRINTABLE_FIELD_COUNT; ++i) {
+    for (i = 0; i < RWREC_FIELD_ID_COUNT; ++i) {
 
         /* are we concerned with this id? */
         if (NULL == skStringMapGetFirstName(field_map, i)) {
@@ -624,7 +626,6 @@ setSortFields(
          * temporary list */
         switch (i) {
           case RWREC_FIELD_STIME:
-          case RWREC_FIELD_STIME_MSEC:
             if (delta.d_stime) {
                 delta_fields[num_deltas] = i;
                 ++num_deltas;
@@ -633,7 +634,6 @@ setSortFields(
             break;
 
           case RWREC_FIELD_ELAPSED:
-          case RWREC_FIELD_ELAPSED_MSEC:
             if (delta.d_elapsed) {
                 delta_fields[num_deltas] = i;
                 ++num_deltas;
@@ -696,45 +696,31 @@ helpFields(
 
 
 /*
- *  int = appNextInput(&stream);
+ *    Copy the annotation and command line entries from the header of
+ *    the input stream 'stream' to the global output stream
+ *    'out_stream'.
  *
- *    Fill 'stream' with the next input file to read.  Return 0 if
- *    'stream' was successfully opened or 1 if there are no more input
- *    files.  Return -1 if a file cannot be opened.
+ *    This is a callback function registered with the global
+ *    sk_flow_iter_t 'flowiter' and it may be invoked by
+ *    sk_flow_iter_get_next_rec().
  */
-int
-appNextInput(
-    skstream_t        **stream)
+static void
+copy_file_header_callback(
+    sk_flow_iter_t  UNUSED(*f_iter),
+    skstream_t             *stream,
+    void            UNUSED(*data))
 {
-    int retval;
-    int rv;
+    ssize_t rv;
 
-    retval = skOptionsCtxNextSilkFile(optctx, stream, &skAppPrintErr);
-    if (0 == retval) {
-        /* copy annotations and command line entries from the input to
-         * the output */
-        if ((rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_stream),
-                                      skStreamGetSilkHeader(*stream),
-                                      SK_HENTRY_INVOCATION_ID))
-            || (rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_stream),
-                                         skStreamGetSilkHeader(*stream),
-                                         SK_HENTRY_ANNOTATION_ID)))
-        {
-            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
-            retval = -1;
-        }
-    } else if (1 == retval) {
-        /* no more input.  add final information to header */
-        if ((rv = skHeaderAddInvocation(skStreamGetSilkHeader(out_stream),
-                                        1, pargc, pargv))
-            || (rv = skOptionsNotesAddToStream(out_stream)))
-        {
-            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
-            retval = -1;
-        }
+    if ((rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_stream),
+                                  skStreamGetSilkHeader(stream),
+                                  SK_HENTRY_INVOCATION_ID))
+        || (rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_stream),
+                                     skStreamGetSilkHeader(stream),
+                                     SK_HENTRY_ANNOTATION_ID)))
+    {
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
     }
-
-    return retval;
 }
 
 

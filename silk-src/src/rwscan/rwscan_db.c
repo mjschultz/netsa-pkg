@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwscan_db.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwscan_db.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include "rwscan_db.h"
 
@@ -108,13 +108,13 @@ write_scan_record(
             fprintf(out, "%*s", width, etimestr);
             break;
           case RWSCAN_FIELD_FLOWS:
-            fprintf(out, "%*u", width, rec->flows);
+            fprintf(out, "%*" PRIu32, width, rec->flows);
             break;
           case RWSCAN_FIELD_PKTS:
-            fprintf(out, "%*u", width, rec->pkts);
+            fprintf(out, "%*" PRIu64, width, rec->pkts);
             break;
           case RWSCAN_FIELD_BYTES:
-            fprintf(out, "%*u", width, rec->bytes);
+            fprintf(out, "%*" PRIu64, width, rec->bytes);
             break;
           case RWSCAN_FIELD_MODEL:
             if (options.model_fields) {

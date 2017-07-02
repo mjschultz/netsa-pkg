@@ -1,11 +1,9 @@
 #! /usr/bin/perl -w
 #
 #######################################################################
-## Copyright (C) 2009-2017 by Carnegie Mellon University.
-##
-## @OPENSOURCE_LICENSE_START@
-## See license information in ../LICENSE.txt
-## @OPENSOURCE_LICENSE_END@
+#  Copyright (C) 2009-2017 by Carnegie Mellon University.
+#
+#  See end of file
 #######################################################################
 #  make-data.pl
 #
@@ -41,12 +39,13 @@
 #  Mark Thomas
 #  March 2009
 #######################################################################
-#  RCSIDENT("$SiLK: make-data.pl 275df62a2e41 2017-01-05 17:30:40Z mthomas $")
+#  RCSIDENT("$SiLK: make-data.pl efd886457770 2017-06-21 18:43:23Z mthomas $")
 #######################################################################
 
 use strict;
 use Getopt::Long qw(GetOptions);
 use Socket;
+use Time::HiRes qw(usleep);
 
 our $STATUS_DOTS = 0;
 our $COLUMNAR = 0;
@@ -64,6 +63,10 @@ our $PDU_IPV4;
 
 # true if --pdu-6network was specified (use IPv6-only)
 our $PDU_IPV6;
+
+# value specified to --usleep switch; this is the amound of
+# microseconds to delay after sending a packet over the network
+our $USLEEP;
 
 
 # the hash keys for each field
@@ -780,6 +783,9 @@ sub send_pdu
     if ($pdu{sock}) {
         defined(send($pdu{sock}, ($header . $pdu{data}), 0))
             or die "$MYNAME: Cannot send: $!\n";
+        if ($USLEEP) {
+            usleep($USLEEP);
+        }
     }
     if ($pdu{file}) {
         my $pdu_fh = $pdu{file};
@@ -816,8 +822,9 @@ sub process_options
                'ipv6-output=s'  => \$IPV6_OUTPUT,
                'pdu-output=s'   => \$PDU_OUTPUT,
                'pdu-network=s'  => \$pdu_anynet,
-               'pdu-4network=s'  => \$pdu_4net,
-               'pdu-6network=s'  => \$pdu_6net,
+               'pdu-4network=s' => \$pdu_4net,
+               'pdu-6network=s' => \$pdu_6net,
+               'usleep=i'       => \$USLEEP,
         )
         or usage(1);
 
@@ -1299,6 +1306,7 @@ make-data.pl [--status] [--columnar] [--fields=FIELDS] [--show-fields]
       | --pdu-network=HOST:PORT
       | --pdu-4network=HOST:PORT
       | --pdu-6network=HOST:PORT}
+     [--usleep=MICROSEC]
 
 
 Create output to use for testing the SiLK tool suite.  make-data.pl
@@ -1364,6 +1372,9 @@ Options:
         Like --pdu-network, but only uses the IPv6 address of "host".
         The script will exit with status 77 if the Socket6 module is
         not available.
+    --usleep=MICROSEC
+        When sending on the network, delay at this long between
+        packets.
 EOF
 
     if ($exit_val) {
@@ -1377,3 +1388,11 @@ EOF
 }
 
 __END__
+
+#######################################################################
+# Copyright (C) 2009-2017 by Carnegie Mellon University.
+#
+# @OPENSOURCE_LICENSE_START@
+# See license information in ../LICENSE.txt
+# @OPENSOURCE_LICENSE_END@
+#######################################################################

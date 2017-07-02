@@ -1,10 +1,11 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: rwscanquery-sqlite.pl 57438dede53e 2015-03-20 16:14:32Z mthomas $")
+# RCSIDENT("$SiLK: rwscanquery-sqlite.pl 23e62811e29c 2016-11-16 15:30:29Z mthomas $")
 
 use strict;
 use SiLKTests;
+use File::Find;
 
 my $NAME = $0;
 $NAME =~ s,.*/,,;
@@ -70,7 +71,8 @@ my $scanner_ips2 = join ",", ('10.144.0.0',
                               '10.144.0.1-10.159.255.255',
     );
 $cmd = "echo $scanner_ips1 | $rwsetbuild - $scanner_set";
-check_md5_output($empty_md5, $cmd);
+check_exit_status($cmd)
+    or die "$NAME Error while running '$cmd'\n";
 
 
 # IPs of destinations we want to see whether the scanners hit
@@ -80,7 +82,8 @@ my $got_scanned_ips1 = '192.168.196.0/22';
 my $got_scanned_ips2 = '192.168.196-199.x';
 
 $cmd = "echo $got_scanned_ips1 | $rwsetbuild - $got_scanned_set";
-check_md5_output($empty_md5, $cmd);
+check_exit_status($cmd)
+    or die "$NAME Error while running '$cmd'\n";
 
 
 #### CREATE AND POPULATE THE SCAN DATABASE
@@ -102,7 +105,8 @@ $cmd = join " ", ($rwfilter,
                   $rwset,
                   "--dip=$valid_destination_ips",
     );
-check_md5_output($empty_md5, $cmd);
+check_exit_status($cmd)
+    or die "$NAME Error while running '$cmd'\n";
 
 $cmd = join " ", ($rwsort,
                   '--fields=sip,proto,dip',
@@ -462,15 +466,71 @@ sub scanquery_md5
 
 sub create_data_repo
 {
+    my $root_ipfix = "$tmpdir/root-ipfix";
+    my $root_dir   = "$tmpdir/root";
+
+    my $rwfileinfo = check_silk_app('rwfileinfo');
+    my $rwipfix2silk = check_silk_app('rwipfix2silk');
+
+    create_ipfix_repo($root_ipfix);
+
+    mkdir $root_dir
+        or die "$NAME: Cannot create directory '$root_dir': $!\n";
+
+    my @files;
+    my @dirs;
+
+    # convert every IPFIX file in ${root_ipfix} to a SiLK Flow File
+    File::Find::find(sub {if (-f $_) { push @files, $File::Find::name; }
+                          elsif (-d _) { push @dirs, $File::Find::name; }},
+                     $root_ipfix);
+    for my $src (@dirs) {
+        my $dest = $src;
+        $dest =~ s|^\Q$root_ipfix\E|$root_dir|;
+        unless (-d $dest) {
+            mkdir $dest
+                or die "$NAME: Cannot mkdir '$dest': $!\n";
+        }
+    }
+    for my $src (@files) {
+        my $dest = $src;
+        $dest =~ s|^\Q$root_ipfix\E|$root_dir|;
+        my $format = `$rwfileinfo --no-titles --fields=format $src 2>&1`;
+        if ($format !~ /IPFIX/) {
+            rename $src, $dest
+                or die "$NAME: Failed to rename '$src' to '$dest': $!\n";
+        }
+        else {
+            my $convert = "$rwipfix2silk --silk-output=$dest $src";
+            check_exit_status($convert)
+                or die "$NAME: Failed to convert '$src': $!\n";
+            unless ($ENV{SK_TESTS_SAVEOUTPUT}) {
+                unlink $src;
+            }
+        }
+    }
+
+    $ENV{SILK_DATA_ROOTDIR} = $root_dir;
+}
+
+
+sub create_ipfix_repo
+{
+    my ($root_dir) = @_;
+
     #### CREATE REPOSITORY USED BY REMAINING TESTS
+
+    local $!;
 
     my $rwflowpack = check_silk_app('rwflowpack');
 
-    my $root_dir  = "$tmpdir/root";
-    my $in_dir    = "$tmpdir/incoming";
-    my $pack_log  = "$tmpdir/rwflowpack.log";
+    my $config     = "$tmpdir/config";
+    my $in_dir     = "$tmpdir/incoming";
+    my $pack_log   = "$tmpdir/rwflowpack.log";
+    my $proc_dir   = "$tmpdir/processing";
+    my $error_dir  = "$tmpdir/error";
 
-    for ($root_dir, $in_dir) {
+    for ($root_dir, $in_dir, $proc_dir, $error_dir) {
         mkdir $_
             or die "$NAME: Cannot create directory '$_': $!\n";
     }
@@ -483,19 +543,51 @@ sub create_data_repo
         die "$NAME: Cannot copy files for rwflowpack\n";
     }
 
+    my $debug = ($ENV{SK_TESTS_LOG_DEBUG} ? "\n    level = \"debug\"," : "");
+
+    my $config_body = <<EOF;
+local rec_format = silk.file_format_id("FT_RWGENERIC")
+input = {
+  mode = "stream",
+  probes = {
+    {
+      name = "respool",
+      type = "silk",
+      source = {
+        directory = "${in_dir}",
+        error_directory = "${error_dir}",
+        interval = 1,
+      },
+      packing_function = function (probe, rec)
+        write_rwrec(rec, {record_format = rec_format})
+      end,
+    },
+  },
+}
+output = {
+  mode = "local-storage",
+  flush_interval = 10,
+  processing = {
+    directory = "${proc_dir}",
+    error_directory = "${error_dir}",
+  },
+  root_directory = "${root_dir}",
+}
+log = {
+  destination = "stdout",${debug}
+}
+daemon = {
+  fork = false,
+}
+EOF
+
+    make_config_file($config, \$config_body);
+
     # ignore children
     local $SIG{CHLD} = 'IGNORE';
 
-    $cmd = join " ", ($rwflowpack,
-                      ($ENV{SK_TESTS_LOG_DEBUG} ? "--log-level=debug" : ()),
-                      '--input-mode=respool',
-                      '--log-destination=stdout',
-                      '--polling-interval=1',
-                      '--pack-interfaces',
-                      "--root-dir=$root_dir",
-                      "--incoming-dir=$in_dir",
-                      '--no-daemon',
-    );
+    my @prog = ($rwflowpack, $config);
+    $cmd = join " ", @prog;
 
     # fork and have parent read from the child
     my $pid = open PACKER, "-|";
@@ -504,7 +596,6 @@ sub create_data_repo
             die "$NAME: Cannot fork: $!\n";
         }
         # child
-        my @prog = split " ", $cmd;
         exec @prog
             or die "Cannot exec $cmd: $!\n";
     }
@@ -513,26 +604,56 @@ sub create_data_repo
     print STDERR "RUNNING: $cmd\n"
         if $ENV{SK_TESTS_VERBOSE};
     eval {
-        my $file_count = scalar @data_files;
+        my $data_file_count = scalar @data_files;
+        my $incr_file_count = 0;
+        my $rec_count = 0;
         my $timeout = 30;
         local $SIG{ALRM} = sub {die "alarm fired after $timeout seconds\n"};
         alarm $timeout;
         while (<PACKER>) {
             #print STDERR "$NAME: $_" if $ENV{SK_TESTS_VERBOSE};
             print PACK_LOG $_;
-            if (m,$in_dir/(.+\.rwf: Recs\s+\d+)$,) {
-                --$file_count;
-                print PACK_LOG ("$NAME ".localtime().
-                                ": Matched file '$1'; count = $file_count\n");
-                print STDERR "$NAME: Matched file '$1'; count = $file_count\n"
+
+            # Look for a line noting incremental file has been read
+            if (m,$proc_dir/(.+): (\d+) recs$,) {
+                $rec_count -= $2;
+                #my $str = (": Matched out file '$1';"
+                #           ." data_file_count = $data_file_count;"
+                #           ." rec_count = $rec_count\n");
+                #print PACK_LOG ("$NAME ".localtime().$str);
+                #print STDERR "$NAME$str"
+                #    if $ENV{SK_TESTS_VERBOSE};
+            }
+            # Look for a line noting that an input file has been processed
+            elsif (m/Processed file '(.+\.rwf)': Recs (\d+)$/) {
+                --$data_file_count;
+                $rec_count += $2;
+                my $str = (": Matched src file '$1';"
+                           ." data_file_count = $data_file_count;"
+                           ." rec_count = $rec_count\n");
+                print PACK_LOG ("$NAME ".localtime().$str);
+                print STDERR "$NAME$str"
                     if $ENV{SK_TESTS_VERBOSE};
-                if (0 == $file_count) {
-                    print PACK_LOG ("$NAME ".localtime().": kill -15 $pid\n");
-                    if ($ENV{SK_TESTS_VERBOSE}) {
-                        print STDERR "$NAME: kill -15 $pid\n";
-                    }
-                    kill 15, $pid;
-                }
+            }
+            elsif (m/closed and queued (\d+) files\./) {
+                $incr_file_count += $1;
+                next;
+            }
+            elsif (m/: APPEND OK \S+ to \S+ \@ \d+/) {
+                --$incr_file_count;
+            }
+            else {
+                next;
+            }
+            # Matched one of the lines above; see if we should exit
+            if (0 == $data_file_count && 0 == $rec_count
+                && 0 == $incr_file_count)
+            {
+                print STDERR "$NAME: Met stopping condition\n";
+                print PACK_LOG ("$NAME ".localtime().": kill -15 $pid\n");
+                print STDERR "$NAME: kill -15 $pid\n"
+                    if $ENV{SK_TESTS_VERBOSE};
+                kill 15, $pid;
             }
         }
         alarm 0;
@@ -554,6 +675,15 @@ sub create_data_repo
         }
         die "$NAME: Error running rwflowpack: $@\n";
     }
-
-    $ENV{SILK_DATA_ROOTDIR} = $root_dir;
+    close PACKER;
+    if (0 == $?) {
+        print STDERR "$NAME: Packer exited successfully\n";
+    } elsif (-1 == $?) {
+        print STDERR "$NAME: Packer exited with error: $!\n";
+    } elsif ($? & 127) {
+        print STDERR "$NAME: Packer died by signal ", ($? & 127), "\n";
+    }
+    else {
+        print STDERR "$NAME: Packer exited with status ", ($? >> 8), "\n";
+    }
 }

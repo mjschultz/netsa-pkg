@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwgroupsetup.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
+RCSIDENT("$SiLK: rwgroupsetup.c d1637517606d 2017-06-23 16:51:31Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/sksite.h>
@@ -50,7 +50,7 @@ static skstream_t *copy_input = NULL;
 /* whether stdout has been used as an output stream */
 static int stdout_used = 0;
 
-/* available key fields; rwAsciiFieldMapAddDefaultFields() fills this */
+/* available key fields; skRwrecAppendFieldsToStringMap() fills this */
 static sk_stringmap_t *key_field_map = NULL;
 
 /* fields that get defined just like plugins */
@@ -158,7 +158,7 @@ appUsageLong(
      "\tby the same keys as specified in --id-fields and --delta-field.\n")
 
     FILE *fh = USAGE_FH;
-    unsigned int i;
+    int i;
 
     /* Create the string map for --fields */
     createStringmaps();
@@ -166,10 +166,10 @@ appUsageLong(
     fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
     fprintf(fh, "\nSWITCHES:\n");
     skOptionsDefaultUsage(fh);
-    for (i = 0; appOptions[i].name; ++i) {
+    for (i = 0; appOptions[i].name; i++ ) {
         fprintf(fh, "--%s %s. ", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]));
-        switch ((appOptionsEnum)appOptions[i].val) {
+        switch (i) {
           case OPT_ID_FIELDS:
             /* Dynamically build the help */
             fprintf(fh, "%s\n", appHelp[i]);
@@ -630,7 +630,6 @@ parseIdFields(
     sk_stringmap_entry_t *sm_entry;
     char *errmsg;
     uint32_t i;
-    int have_icmp_type_code;
     int rv = -1;
 
     /* parse the input */
@@ -642,40 +641,7 @@ parseIdFields(
         goto END;
     }
 
-    num_fields = 0;
-
-    /* check and handle legacy icmpTypeCode field */
-    have_icmp_type_code = 0;
-    while (skStringMapIterNext(sm_iter, &sm_entry, NULL) == SK_ITERATOR_OK) {
-        switch (sm_entry->id) {
-          case RWREC_FIELD_ICMP_TYPE:
-          case RWREC_FIELD_ICMP_CODE:
-            have_icmp_type_code |= 1;
-            break;
-          case RWREC_PRINTABLE_FIELD_COUNT:
-            have_icmp_type_code |= 2;
-            break;
-        }
-    }
-    if (3 == have_icmp_type_code) {
-        skAppPrintErr("Invalid %s: May not mix field %s with %s or %s",
-                      appOptions[OPT_ID_FIELDS].name,
-                      skStringMapGetFirstName(
-                          key_field_map, RWREC_PRINTABLE_FIELD_COUNT),
-                      skStringMapGetFirstName(
-                          key_field_map, RWREC_FIELD_ICMP_TYPE),
-                      skStringMapGetFirstName(
-                          key_field_map, RWREC_FIELD_ICMP_CODE));
-        goto END;
-    }
-    if (2 == have_icmp_type_code) {
-        /* add 1 since icmpTypeCode will become 2 fields */
-        num_fields = 1;
-    }
-
-    skStringMapIterReset(sm_iter);
-
-    num_fields += skStringMapIterCountMatches(sm_iter);
+    num_fields = skStringMapIterCountMatches(sm_iter);
     id_fields = (uint32_t*)malloc(num_fields * sizeof(uint32_t));
     if (NULL == id_fields) {
         skAppPrintOutOfMemory(NULL);
@@ -688,15 +654,6 @@ parseIdFields(
          ++i)
     {
         assert(i < num_fields);
-        if (sm_entry->id == RWREC_PRINTABLE_FIELD_COUNT) {
-            /* handle the icmpTypeCode field */
-            id_fields[i] = RWREC_FIELD_ICMP_TYPE;
-            ++i;
-            assert(i < num_fields);
-            id_fields[i] = RWREC_FIELD_ICMP_CODE;
-            continue;
-        }
-
         id_fields[i] = sm_entry->id;
         if (NULL != sm_entry->userdata) {
             /* field comes from a plug-in */
@@ -705,7 +662,7 @@ parseIdFields(
             size_t                  bin_width;
             skplugin_err_t          pi_err;
 
-            assert(id_fields[i] >  RWREC_PRINTABLE_FIELD_COUNT);
+            assert(id_fields[i] >=  RWREC_FIELD_ID_COUNT);
 
             if (key_num_fields == MAX_PLUGIN_KEY_FIELDS) {
                 skAppPrintErr("Too many fields specified %lu > %u max",
@@ -811,7 +768,6 @@ parseDeltaField(
       case RWREC_FIELD_NHIP:
         /* for IPs, the delta_value is the number of LEAST significant
          * bits to REMOVE */
-#if SK_ENABLE_IPV6
         limit = 127;
         if (delta_value <= limit) {
             uint8_t mask[16];
@@ -821,19 +777,10 @@ parseDeltaField(
             memset(&mask[i+1], 0, (15 - i));
             skipaddrSetV6(&delta_value_ip, mask);
         }
-#else
-        limit = 31;
-        if (delta_value <= limit) {
-            limit = 0;
-            delta_value = UINT32_MAX << delta_value;
-        }
-#endif /* SK_ENABLE_IPV6 */
         break;
 
       case RWREC_FIELD_STIME:
-      case RWREC_FIELD_STIME_MSEC:
       case RWREC_FIELD_ETIME:
-      case RWREC_FIELD_ETIME_MSEC:
         /* this is a sktime_t. multiply user's value by 1000 to
          * convert from seconds to milliseconds */
         limit = INT64_MAX / 1000;
@@ -844,7 +791,6 @@ parseDeltaField(
         break;
 
       case RWREC_FIELD_ELAPSED:
-      case RWREC_FIELD_ELAPSED_MSEC:
         /* max elapsed is UINT32_MAX milliseconds.  multiply user's
          * value by 1000 to convert from seconds to milliseconds. */
         limit = UINT32_MAX / 1000;
@@ -967,18 +913,13 @@ createStringmaps(
      * keep the millisecond fields so that SiLK applications take the
      * same switches; the seconds and milliseconds value map to the
      * same code. */
-    if (rwAsciiFieldMapAddDefaultFields(&key_field_map)) {
+    if (skStringMapCreate(&key_field_map)
+        || skRwrecAppendFieldsToStringMap(key_field_map))
+    {
         skAppPrintErr("Unable to setup fields stringmap");
         exit(EXIT_FAILURE);
     }
-    max_id = RWREC_PRINTABLE_FIELD_COUNT - 1;
-
-    /* add icmpTypeCode */
-    ++max_id;
-    if (rwAsciiFieldMapAddIcmpTypeCode(key_field_map, max_id)) {
-        skAppPrintErr("Unable to add icmpTypeCode");
-        return -1;
-    }
+    max_id = RWREC_FIELD_ID_COUNT - 1;
 
     /* add --fields from plug-ins */
     pi_err = skPluginFieldIteratorBind(&pi_iter, SKPLUGIN_APP_GROUP, 1);

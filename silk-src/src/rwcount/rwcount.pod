@@ -8,13 +8,12 @@ B<rwcount> - Print traffic summary across time
 
   rwcount [--bin-size=SIZE] [--load-scheme=LOADSCHEME]
         [--start-time=START_TIME] [--end-time=END_TIME]
-        [--skip-zeroes] [--bin-slots] [--epoch-slots]
+        [--skip-zeroes] [--bin-slots]
         [--timestamp-format=FORMAT] [--no-titles]
         [--no-columns] [--column-separator=CHAR]
         [--no-final-delimiter] [{--delimited | --delimited=CHAR}]
         [--print-filenames] [--copy-input=PATH] [--output-path=PATH]
         [--pager=PAGER_PROG] [--site-config-file=FILENAME]
-        [{--legacy-timestamps | --legacy-timestamps={1,0}}]
         {[--xargs] | [--xargs=FILENAME] | [FILE [FILE ...]]}
 
   rwcount --help
@@ -277,15 +276,6 @@ Use the internal bin index as the label for each bin in the output;
 the default is to label each bin with the time in a human-readable
 format.
 
-=item B<--epoch-slots>
-
-Use the UNIX epoch time (number of seconds since midnight UTC on
-1970-01-01) as the label for each bin in the output; the default is to
-label each bin with the time in a human-readable format.  This switch
-is equivalent to B<--timestamp-format=epoch>.  This switch is
-deprecated as of SiLK 3.11.0, and it will be removed in the SiLK 4.0
-release.
-
 =item B<--timestamp-format>=I<FORMAT>
 
 Specify the format and/or timezone to use when printing timestamps.
@@ -398,15 +388,6 @@ When this switch is not provided, B<rwcount> searches for the site
 configuration file in the locations specified in the L</FILES>
 section.
 
-=item B<--legacy-timestamps>
-
-=item B<--legacy-timestamps>=I<NUM>
-
-When I<NUM> is not specified or is 1, this switch is equivalent to
-B<--timestamp-format=m/d/y>.  Otherwise, the switch has no effect.
-This switch is deprecated as of SiLK 3.0.0, and it will be removed
-in the SiLK 4.0 release.
-
 =item B<--xargs>
 
 =item B<--xargs>=I<FILENAME>
@@ -425,16 +406,6 @@ Print the available options and exit.
 
 Print the version number and information about how SiLK was
 configured, then exit the application.
-
-=item B<--start-epoch>=I<START_TIME>
-
-Alias the B<--start-time> switch.  This switch is deprecated as of
-SiLK 3.8.0.
-
-=item B<--end-epoch>=I<START_TIME>
-
-Alias the B<--end-time> switch.  This switch is deprecated as of
-SiLK 3.8.0.
 
 =back
 
@@ -597,7 +568,7 @@ bins.
 
 =cut
 
-$SiLK: rwcount.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwcount.pod d1637517606d 2017-06-23 16:51:31Z mthomas $
 
 Local Variables:
 mode:text

@@ -21,12 +21,12 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWSORT_H, "$SiLK: rwsort.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_RWSORT_H, "$SiLK: rwsort.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
-#include <silk/rwascii.h>
 #include <silk/rwrec.h>
-#include <silk/skplugin.h>
+#include <silk/skflowiter.h>
 #include <silk/skipaddr.h>
+#include <silk/skplugin.h>
 #include <silk/skstream.h>
 #include <silk/sktempfile.h>
 #include <silk/utils.h>
@@ -39,22 +39,23 @@ RCSIDENTVAR(rcsID_RWSORT_H, "$SiLK: rwsort.h 275df62a2e41 2017-01-05 17:30:40Z m
 /* LOCAL DEFINES AND TYPEDEFS */
 
 /*
- *    The default buffer size to use, unless the user selects a
- *    different value with the --sort-buffer-size switch.
+ *    The approximate maximum amount of memory we attempt to use for
+ *    storing records by default.  The user may select a different
+ *    value with the --sort-buffer-size switch.
  *
  *    Support of a buffer of almost 2GB.
  */
 #define DEFAULT_SORT_BUFFER_SIZE    "1920m"
 
 /*
- *    We do not allocate the buffer at once, but use realloc() to grow
- *    the buffer linearly to the maximum size.  The following is the
- *    number of steps to take to reach the maximum size.  The number
- *    of realloc() calls will be once less than this value.
+ *    We do not allocate the pointer buffer at once, but use realloc()
+ *    to grow the buffer linearly to the maximum size.  The following
+ *    is the number of steps to take to reach the maximum size.  The
+ *    number of realloc() calls will be once less than this value.
  *
  *    If the initial allocation fails, the number of chunks is
  *    incremented---making the size of the initial malloc()
- *    smaller---and allocation is attempted again.
+ *    smaller---and alloation is attempted again.
  */
 #define NUM_CHUNKS  6
 
@@ -70,7 +71,7 @@ RCSIDENTVAR(rcsID_RWSORT_H, "$SiLK: rwsort.h 275df62a2e41 2017-01-05 17:30:40Z m
 #define MAX_CHUNK_SIZE      ((size_t)(0x40000000))
 
 /*
- *    If we cannot allocate a buffer that will hold at least this many
+ *    If we can't allocate a buffer that will hold at least this many
  *    records, give up.
  */
 #define MIN_IN_CORE_RECORDS     1000
@@ -81,17 +82,9 @@ RCSIDENTVAR(rcsID_RWSORT_H, "$SiLK: rwsort.h 275df62a2e41 2017-01-05 17:30:40Z m
 #define MAX_MERGE_FILES         1024
 
 /*
- *    Maximum number of fields that can come from plugins.  Allow four
- *    per plug-in.
+ *    The size of a node, which is the complete rwRec.
  */
-#define MAX_PLUGIN_KEY_FIELDS   32
-
-/*
- *    Maximum bytes allotted to a "node", which is the complete rwRec
- *    and the bytes required by all keys that can come from plug-ins.
- *    Allow 8 bytes per field, plus enough space for an rwRec.
- */
-#define MAX_NODE_SIZE ((size_t)(8 * MAX_PLUGIN_KEY_FIELDS + SK_MAX_RECORD_SIZE))
+#define NODE_SIZE       sizeof(rwRec)
 
 /*
  *    The maximum buffer size is the maximum size we can allocate.
@@ -101,18 +94,34 @@ RCSIDENTVAR(rcsID_RWSORT_H, "$SiLK: rwsort.h 275df62a2e41 2017-01-05 17:30:40Z m
 /*
  *    The minium buffer size.
  */
-#define MINIMUM_SORT_BUFFER_SIZE ((size_t)(MAX_NODE_SIZE * MIN_IN_CORE_RECORDS))
+#define MINIMUM_SORT_BUFFER_SIZE    ((size_t)(NODE_SIZE * MIN_IN_CORE_RECORDS))
+
+/*
+ *    When this bit is set in a sk_stringmap_entry_t, the entry comes
+ *    from a plug-in.
+ */
+#define PLUGIN_FIELD_BIT    0x80000000
+
+/*
+ *    When this bit is set in a sk_stringmap_entry_t, the entry comes
+ *    from a sidecar.
+ */
+#define SIDECAR_FIELD_BIT   0x40000000
 
 
 /* for key fields that come from plug-ins, this struct will hold
  * information about a single field */
 typedef struct key_field_st {
     /* The plugin field handle */
-    skplugin_field_t *kf_field_handle;
-    /* the byte-offset for this field */
-    size_t            kf_offset;
+    skplugin_field_t   *kf_pi_handle;
+    /* the name of this field in the rwRec's sidecar */
+    char               *kf_name;
     /* the byte-width of this field */
-    size_t            kf_width;
+    size_t              kf_width;
+    /* The id of this field */
+    uint32_t            kf_id;
+    /* the type of this field */
+    sk_sidecar_type_t   kf_type;
 } key_field_t;
 
 
@@ -122,25 +131,17 @@ typedef struct key_field_st {
 /* number of fields to sort over; skStringMapParse() sets this */
 extern uint32_t num_fields;
 
-/* IDs of the fields to sort over; skStringMapParse() sets it; values
- * are from the rwrec_printable_fields_t enum and from values that
- * come from plug-ins. */
-extern uint32_t *sort_fields;
+/* the fields that make up the key */
+extern key_field_t *key_fields;
 
-/* the size of a "node".  Because the output from rwsort are SiLK
- * records, the node size includes the complete rwRec, plus any binary
- * fields that we get from plug-ins to use as the key.  This node_size
- * value may increase when we parse the --fields switch. */
-extern size_t node_size;
-
-/* the columns that make up the key that come from plug-ins */
-extern key_field_t key_fields[MAX_PLUGIN_KEY_FIELDS];
-
-/* the number of these key_fields */
-extern size_t key_num_fields;
+/* for looping over the input streams */
+extern sk_flow_iter_t *flowiter;
 
 /* output stream */
 extern skstream_t *out_stream;
+
+/* sidecar to write to the output file */
+extern sk_sidecar_t *out_sidecar;
 
 /* temp file context */
 extern sk_tempfilectx_t *tmpctx;
@@ -154,7 +155,8 @@ extern int presorted_input;
 /* maximum amount of RAM to attempt to allocate */
 extern size_t sort_buffer_size;
 
-/* FUNCTIONS */
+extern lua_State *L;
+
 
 void
 appExit(
@@ -164,9 +166,17 @@ void
 appSetup(
     int                 argc,
     char              **argv);
+void
+sort_stream_record_init(
+    rwRec              *rwrec,
+    void               *v_lua_state);
+void
+addPluginFields(
+    rwRec              *out_rwrec);
 int
-appNextInput(
-    skstream_t        **stream);
+fillRecordAndKey(
+    skstream_t         *stream,
+    rwRec              *rwrec);
 
 #ifdef __cplusplus
 }

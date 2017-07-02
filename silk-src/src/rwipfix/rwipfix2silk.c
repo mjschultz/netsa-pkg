@@ -18,10 +18,11 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwipfix2silk.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwipfix2silk.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/rwrec.h>
+#include <silk/skipfix.h>
 #include <silk/sklog.h>
 #include <silk/sksite.h>
 #include <silk/skstream.h>
@@ -66,9 +67,6 @@ static int decode_vlan = 0;
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
-/* required to process the IPFIX records */
-static skpc_probe_t *probe;
-
 
 /* OPTIONS SETUP */
 
@@ -93,7 +91,7 @@ static const char *appHelp[] = {
     ("Write the SiLK Flow records to the specified path.\n\tDef. stdout"),
     ("Specify value to store in 'input' and 'output'\n"
      "\tfields.  Def. snmp.  Choices: snmp, vlan"),
-    "Print the number of records written. Def. No.",
+    "Print the number of records written. Def. No",
     ("Write messages about number of records read from each\n"
      "\tinput and messages about ignored IPFIX records to the specified\n"
      "\tlocation. Def. none. Choices: none, stdout, stderr, or a filename"),
@@ -107,7 +105,7 @@ static const char *appHelp[] = {
 
 static int appOptionsHandler(clientData cData, int opt_index, char *opt_arg);
 static int parseInterfaceValue(const char *if_value_choice);
-static int parseLogFlags(const char *log_flags_str);
+static int parseLogFlags(skpc_probe_t *probe, const char *log_flags_str);
 static size_t logprefix(char *buffer, size_t bufsize);
 
 
@@ -177,7 +175,6 @@ appTeardown(
 
     skOptionsNotesTeardown();
     skOptionsCtxDestroy(&optctx);
-    skIPFIXSourcesTeardown();
     skAppUnregister();
 }
 
@@ -229,6 +226,7 @@ appSetup(
 
     /* enable the logger */
     sklogSetup(0);
+    sklogSetDestination("stderr");
     sklogSetStampFunction(&logprefix);
 
     /* register the teardown handler */
@@ -247,13 +245,12 @@ appSetup(
     if ('\0' == log_destination[0]) {
         strncpy(log_destination, LOG_DESTINATION_DEFAULT,
                 sizeof(log_destination));
-    } else {
-        sklogSetLevel("debug");
     }
     sklogSetDestination(log_destination);
 
     /* set up libflowsource */
-    skIPFIXSourcesSetup();
+    skipfix_initialize(SKIPFIX_INITIALIZE_FLAG_LOG);
+    skiInitialize();
 
     /* default output is "stdout" */
     if (!silk_output) {
@@ -280,21 +277,6 @@ appSetup(
     }
 
     if (skpcSetup()) {
-        exit(EXIT_FAILURE);
-    }
-    if (skpcProbeCreate(&probe)) {
-        exit(EXIT_FAILURE);
-    }
-    skpcProbeSetName(probe, skAppName());
-    skpcProbeSetType(probe, PROBE_ENUM_IPFIX);
-    skpcProbeSetPollDirectory(probe, "/dev/null");
-    if (parseLogFlags(log_flags)) {
-        exit(EXIT_FAILURE);
-    }
-    if (decode_vlan) {
-        skpcProbeSetInterfaceValueType(probe, SKPC_IFVALUE_VLAN);
-    }
-    if (skpcProbeVerify(probe, 0)) {
         exit(EXIT_FAILURE);
     }
 
@@ -476,10 +458,12 @@ parseInterfaceValue(
 
 
 /*
- *    Parse the argument to the --log-flags switch.
+ *    Parse the argument to the --log-flags switch and the set flags
+ *    on 'probe'..
  */
 static int
 parseLogFlags(
+    skpc_probe_t       *probe,
     const char         *log_flags_str)
 {
     char *log_flags_copy = NULL;
@@ -559,24 +543,42 @@ ipfix2silk(
 {
     static unsigned int file_count = 0;
     char probe_name[128];
-    skIPFIXSource_t *ipfix_src;
-    skFlowSourceParams_t params;
     int64_t count;
     rwRec rwrec;
     int rv;
+    /* required to process the file */
+    skpc_probe_t *probe;
 
     ++file_count;
     snprintf(probe_name, sizeof(probe_name), "input%04u", file_count);
 
-    params.path_name = filename;
+    if (skpcProbeCreate(&probe)) {
+        skAppPrintErr("Unable to create probe");
+        return -1;
+    }
     skpcProbeSetName(probe, probe_name);
-    ipfix_src = skIPFIXSourceCreate(probe, &params);
-    if (ipfix_src == NULL) {
+    skpcProbeSetType(probe, PROBE_ENUM_IPFIX);
+    skpcProbeSetFileSource(probe, filename);
+    if (parseLogFlags(probe, log_flags)) {
+        skpcProbeDestroy(&probe);
+        return -1;
+    }
+    if (decode_vlan) {
+        skpcProbeSetInterfaceValueType(probe, SKPC_IFVALUE_VLAN);
+    }
+    if (skpcProbeVerify(probe, 0)) {
+        skAppPrintErr("Unable to verify probe");
         return -1;
     }
 
+    if (skpcProbeStartSource(probe)) {
+        return -1;
+    }
+
+    rwRecInitialize(&rwrec, NULL);
+
     count = 0;
-    while (-1 != skIPFIXSourceGetGeneric(ipfix_src, &rwrec)) {
+    while (-1 != skpcProbeGetRecordFromSource(probe, &rwrec)) {
         /* remove any firewallEvent, NF_F_FW_EVENT, NF_F_FW_EXT_EVENT
          * value stored by libflowsource */
         rwRecSetMemo(&rwrec, 0);
@@ -590,8 +592,14 @@ ipfix2silk(
         }
     }
 
-    skIPFIXSourceLogStatsAndClear(ipfix_src);
-    skIPFIXSourceDestroy(ipfix_src);
+    skpcProbeLogSourceStats(probe);
+    skpcProbeDestroySource(probe);
+
+    /* FIXME: Do not destroy the probe, since it exists in a global
+     * list of probes, and it will be destroyed by skpcTeardown(). */
+    /* FIXME: skpcProbeDestroy(&probe); */
+
+    rwRecReset(&rwrec);
 
     return count;
 }
@@ -599,7 +607,7 @@ ipfix2silk(
 
 int main(int argc, char **argv)
 {
-    char *path;
+    char path[PATH_MAX];
     int64_t total_count;
     int64_t count;
     int rv;
@@ -609,7 +617,7 @@ int main(int argc, char **argv)
     total_count = 0;
 
     /* process each file on the command line */
-    while ((rv = skOptionsCtxNextArgument(optctx, &path)) == 0) {
+    while ((rv = skOptionsCtxNextArgument(optctx, path, sizeof(path))) == 0) {
         count = ipfix2silk(path);
         if (count < 0) {
             exit(EXIT_FAILURE);

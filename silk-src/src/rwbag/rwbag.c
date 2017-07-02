@@ -17,11 +17,12 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbag.c 259bfd3bc809 2017-01-19 22:35:17Z mthomas $");
+RCSIDENT("$SiLK: rwbag.c 4d2fb07fe10f 2017-06-22 14:32:25Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skbag.h>
 #include <silk/skcountry.h>
+#include <silk/skflowiter.h>
 #include <silk/skipaddr.h>
 #include <silk/skprefixmap.h>
 #include <silk/sksite.h>
@@ -128,9 +129,7 @@ static sk_compmethod_t comp_method;
 
 /* support for handling inputs */
 static sk_options_ctx_t *optctx = NULL;
-
-/* how to handle IPv6 flows */
-static sk_ipv6policy_t ipv6_policy = SK_IPV6POLICY_MIX;
+static sk_flow_iter_t *flowiter = NULL;
 
 /*
  * stdout_used is set to 1 by parseBagFileOption() when a bag file is
@@ -271,6 +270,11 @@ static void appUsageLegacyCreationSwitches(FILE *);
 static int  legacyOptionsHandler(clientData cData, int opt_index, char *path);
 static int  parseBagFileOption(const char *opt_arg);
 static int  parsePmapFileOption(const char *opt_arg);
+static void
+copy_file_header_callback(
+    sk_flow_iter_t     *f_iter,
+    skstream_t         *stream,
+    void               *data);
 
 
 /* FUNCTION DEFINITIONS */
@@ -321,7 +325,6 @@ appUsageLong(
     }
 
     skOptionsCtxOptionsUsage(optctx, fh);
-    skIPv6PolicyUsage(fh);
     skCompMethodOptionsUsage(fh);
     sksiteOptionsUsage(fh);
 
@@ -383,6 +386,7 @@ appTeardown(
     /* close the copy stream */
     skOptionsCtxCopyStreamClose(optctx, &skAppPrintErr);
 
+    sk_flow_iter_destroy(&flowiter);
     skOptionsNotesTeardown();
     skOptionsCtxDestroy(&optctx);
     skAppUnregister();
@@ -406,7 +410,7 @@ appSetup(
     char              **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
-    unsigned int optctx_flags;
+    int optctx_flags;
     bagfile_t *bag;
     ssize_t rv;
     size_t i;
@@ -425,7 +429,7 @@ appSetup(
 
     optctx_flags = (SK_OPTIONS_CTX_INPUT_SILK_FLOW | SK_OPTIONS_CTX_ALLOW_STDIN
                     | SK_OPTIONS_CTX_XARGS | SK_OPTIONS_CTX_PRINT_FILENAMES
-                    | SK_OPTIONS_CTX_COPY_INPUT);
+                    | SK_OPTIONS_CTX_COPY_INPUT | SK_OPTIONS_CTX_IPV6_POLICY);
 
     /* register the options */
     if (skOptionsCtxCreate(&optctx, optctx_flags)
@@ -435,8 +439,7 @@ appSetup(
             legacy_bag_creation_option, &legacyOptionsHandler, NULL)
         || skOptionsNotesRegister(&notes_strip)
         || skCompMethodOptionsRegister(&comp_method)
-        || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE)
-        || skIPv6PolicyOptionsRegister(&ipv6_policy))
+        || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE))
     {
         skAppPrintErr("Unable to register options");
         exit(EXIT_FAILURE);
@@ -454,6 +457,13 @@ appSetup(
     if (rv < 0) {
         skAppUsage();           /* never returns */
     }
+
+    /* create flow iterator to read the records from the stream */
+    flowiter = skOptionsCtxCreateFlowIterator(optctx);
+    /* copy header information from inputs to output */
+    sk_flow_iter_set_stream_event_cb(
+        flowiter, SK_FLOW_ITER_CB_EVENT_PRE_READ,
+        &copy_file_header_callback, NULL);
 
     /* try to load site config file; if it fails, we will not be able
      * to resolve flowtype and sensor from input file names */
@@ -1108,29 +1118,27 @@ legacyOptionsHandler(
 
 
 /*
- *  ok = processFile(stream);
+ *    Copy the annotation and command line entries from the header of
+ *    the input stream 'stream' to the global output stream
+ *    'out_stream'.
  *
- *    Read the SiLK Flow records from the 'stream' stream---and
- *    potentially create bag files for {sIP,dIP,sPort,dPort,proto} x
- *    {flows,pkts,bytes}.
- *
- *    Return 0 if successful; non-zero otherwise.
+ *    This is a callback function registered with the global
+ *    sk_flow_iter_t 'flowiter' and it may be invoked by
+ *    sk_flow_iter_get_next_rec().
  */
-static int
-processFile(
-    skstream_t         *stream)
+static void
+copy_file_header_callback(
+    sk_flow_iter_t     *f_iter,
+    skstream_t         *stream,
+    void               *data)
 {
-    skBagTypedKey_t key;
-    skBagTypedCounter_t counter;
-    skBagErr_t err;
     bagfile_t *bag;
-    skPrefixMapProtoPort_t pp;
-    skipaddr_t ip;
-    rwRec rwrec;
     ssize_t rv;
     size_t i;
 
-    /* copy header entries from the source file */
+    (void)f_iter;
+    (void)data;
+
     for (i = 0; (bag = (bagfile_t*)skVectorGetValuePointer(bag_vec, i)); ++i) {
         if (!invocation_strip) {
             rv = skHeaderCopyEntries(skStreamGetSilkHeader(bag->stream),
@@ -1149,10 +1157,37 @@ processFile(
             }
         }
     }
+}
 
+
+/*
+ *  ok = processFiles();
+ *
+ *    Read the SiLK Flow records from all input streams and fill the
+ *    bag data structures.
+ *
+ *    Return 0 if successful; non-zero otherwise.
+ */
+static ssize_t
+processFiles(
+    void)
+{
+    skBagTypedKey_t key;
+    skBagTypedCounter_t counter;
+    skBagErr_t err;
+    bagfile_t *bag;
+    skPrefixMapProtoPort_t pp;
+    skipaddr_t ip;
+    rwRec rwrec;
+    ssize_t rv;
+    size_t i;
+
+    rwRecInitialize(&rwrec, NULL);
+
+    /* set the type for the counter once */
     counter.type = SKBAG_COUNTER_U64;
 
-    while ((rv = skStreamReadRecord(stream, &rwrec)) == SKSTREAM_OK) {
+    while ((rv = sk_flow_iter_get_next_rec(flowiter, &rwrec)) == 0) {
         for (i=0; (bag = (bagfile_t*)skVectorGetValuePointer(bag_vec, i)); ++i)
         {
             switch (bag->counter) {
@@ -1318,13 +1353,7 @@ processFile(
         }
     }
 
-    if (rv == SKSTREAM_ERR_EOF) {
-        /* Successful if we make it here */
-        rv = 0;
-    } else {
-        skStreamPrintLastErr(stream, rv, &skAppPrintErr);
-        rv = -1;
-    }
+    rv = ((SKSTREAM_ERR_EOF == rv) ? 0 : -1);
 
   END:
     return rv;
@@ -1333,7 +1362,6 @@ processFile(
 
 int main(int argc, char **argv)
 {
-    skstream_t *stream;
     char errbuf[2 * PATH_MAX];
     bagfile_t *bag;
     int had_err = 0;
@@ -1344,18 +1372,7 @@ int main(int argc, char **argv)
     appSetup(argc, argv);                       /* never returns on error */
 
     /* process input */
-    while ((rv = skOptionsCtxNextSilkFile(optctx, &stream, &skAppPrintErr))
-           == 0)
-    {
-        skStreamSetIPv6Policy(stream, ipv6_policy);
-        if (0 != processFile(stream)) {
-            skAppPrintErr("Error processing input from %s",
-                          skStreamGetPathname(stream));
-            skStreamDestroy(&stream);
-            return EXIT_FAILURE;
-        }
-        skStreamDestroy(&stream);
-    }
+    rv = processFiles();
     if (rv < 0) {
         exit(EXIT_FAILURE);
     }

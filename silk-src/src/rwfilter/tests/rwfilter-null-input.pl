@@ -1,11 +1,11 @@
 #! /usr/bin/perl -w
-# STATUS: ERR
-# TEST: ./rwfilter --input-pipe=/dev/null --all=/dev/null
+# STATUS: OK
+# TEST: ./rwfilter --all=/dev/null /dev/null
 
 use strict;
 use SiLKTests;
 
 my $rwfilter = check_silk_app('rwfilter');
-my $cmd = "$rwfilter --input-pipe=/dev/null --all=/dev/null";
+my $cmd = "$rwfilter --all=/dev/null /dev/null";
 
-exit (check_exit_status($cmd) ? 1 : 0);
+exit (check_exit_status($cmd) ? 0 : 1);

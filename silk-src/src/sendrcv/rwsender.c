@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsender.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwsender.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skdaemon.h>
@@ -1841,13 +1841,12 @@ transferFiles(
 int main(int argc, char **argv)
 {
     int rv;
+    skPollDirErr_t pderr;
 
     appSetup(argc, argv);       /* never returns on error */
 
     /* start the logger and become a daemon */
-    if (skdaemonize(&shuttingdown, NULL) == -1
-        || sklogEnableThreadedLogging() == -1)
-    {
+    if (skdaemonize(&shuttingdown, NULL) == -1) {
         exit(EXIT_FAILURE);
     }
     daemonized = 1;
@@ -1861,6 +1860,14 @@ int main(int argc, char **argv)
     polldir = skPollDirCreate(incoming_dir, polling_interval);
     if (NULL == polldir) {
         CRITMSG("Could not initiate polling for '%s'", incoming_dir);
+        exit(EXIT_FAILURE);
+    }
+    pderr = skPollDirStart(polldir);
+    if (PDERR_NONE != pderr) {
+        CRITMSG("Failed to start polling for directory '%s': %s",
+                skPollDirGetDir(polldir), ((PDERR_SYSTEM == pderr)
+                                           ? strerror(errno)
+                                           : skPollDirStrError(pderr)));
         exit(EXIT_FAILURE);
     }
 

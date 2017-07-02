@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skpolldir.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skpolldir.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/skdeque.h>
 #include <silk/redblack.h>
@@ -71,12 +71,14 @@ typedef struct sk_polldir_st {
     /** once a file in the dirctory is quiescent, it is added to this
      * queue until requested by the caller.  the queue holds
      * pd_qentry_t objects */
-    skDeque_t        queue;
+    sk_deque_t      *queue;
     /** when the timer fires, it is time to poll the directory again */
-    skTimer_t        timer;
+    sk_timer_t      *timer;
     /** this is max number of seconds the NextFile() function will
      * wait for a file.  if 0, wait forever. */
     uint32_t         wait_next_file;
+    /** number of seconds to wait between scans of the directory */
+    uint32_t         poll_interval;
     /** current error.  this can be set while polling the directory or
      * when skPollDirStop() is called.  */
     skPollDirErr_t   error;
@@ -108,9 +110,9 @@ typedef struct pd_dirent_st {
 /* The file entry for items stored in the deque. */
 typedef struct pd_qentry_st {
     /* complete path to the file */
-    char       *path;
+    char *path;
     /* basename of the file; points into 'path' */
-    char       *name;
+    char *name;
 } pd_qentry_t;
 
 
@@ -244,8 +246,9 @@ remove_unseen(
 #endif
 
     /* Remove items in the delete list */
-    for (i = 0; i < skVectorGetCount(dellist); ++i) {
-        skVectorGetValue(&x, dellist, i);
+    for (i = 0; i < skVectorGetCount(dellist); i++) {
+        rv = skVectorGetValue(&x, dellist, i);
+        assert(0 == rv);
         rbdelete(x, pd->tree);
         free(x->name);
         free(x);
@@ -299,8 +302,18 @@ free_tree_nodes(
     rbcloselist(list);
 }
 
-/* Actually poll the directory.  This is the function that the
- * skTimer_t will call. */
+
+/*
+ *  repeat = pollDir(pd);
+ *
+ *  THREAD ENTRY POINT
+ *
+ *    This function is the callback function that is invoked every
+ *    'poll_interval' seconds by the skTimer_t pd->timer.
+ *
+ *    Polls the directory for files and updates the file "list" that
+ *    the sk_polldir_t maintains.
+ */
 static skTimerRepeat_t
 pollDir(
     void               *vpd)
@@ -319,6 +332,12 @@ pollDir(
 #endif
 
     skp_fh_sem_aquire();
+    if (pd->stopped) {
+        skp_fh_sem_release();
+        pd->error = PDERR_STOPPED;
+        return SK_TIMER_END;
+    }
+
     TRACEMSG(1, ("polldir %p: Starting directory scan of '%s'",
                  pd, pd->directory));
 
@@ -494,6 +513,30 @@ pollDir(
 }
 
 
+skPollDirErr_t
+skPollDirStart(
+    sk_polldir_t       *pd)
+{
+    int rv;
+
+    assert(pd);
+
+    TRACEMSG(1, ("polldir %p: Being told to start", pd));
+
+    /* Initial population of tree */
+    if (pollDir(pd) == SK_TIMER_END) {
+        return pd->error;
+    }
+    /* Start timer */
+    rv = skTimerCreate(&pd->timer, pd->poll_interval, &pollDir, pd, 0);
+    if (0 != rv) {
+        errno = rv;
+        return PDERR_SYSTEM;
+    }
+    return PDERR_NONE;
+}
+
+
 void
 skPollDirStop(
     sk_polldir_t       *pd)
@@ -524,9 +567,9 @@ skPollDirDestroy(
     pd_qentry_t *item;
 
     if (NULL == pd) {
-        TRACEMSG(1, ("polldir %p: Attempting to destroy NULL polldir", pd));
         return;
     }
+
     skPollDirStop(pd);
 
     TRACEMSG(1, ("polldir %p: Being destroyed", pd));
@@ -567,18 +610,27 @@ skPollDirCreate(
     uint32_t            poll_interval)
 {
     sk_polldir_t *pd;
-    int           rv;
+    DIR *dir;
 
-    assert(directory);
+    if (NULL == directory || 0 == poll_interval) {
+        return NULL;
+    }
 
     if (!skDirExists(directory)) {
         return NULL;
     }
+    dir = opendir(directory);
+    if (NULL == dir) {
+        return NULL;
+    }
+    closedir(dir);
 
     pd = (sk_polldir_t*)calloc(1, sizeof(sk_polldir_t));
     if (NULL == pd) {
         return NULL;
     }
+
+    pd->poll_interval = poll_interval;
 
     pd->queue = skDequeCreate();
     if (NULL == pd->queue) {
@@ -600,15 +652,6 @@ skPollDirCreate(
 
     TRACEMSG(1, ("polldir %p: Created to scan '%s' every %" PRIu32 " seconds",
                  pd, directory, poll_interval));
-
-    /* Initial population of tree */
-    pollDir(pd);
-
-    /* Start timer */
-    rv = skTimerCreate(&pd->timer, poll_interval, pollDir, pd);
-    if (0 != rv) {
-        goto err;
-    }
 
     return pd;
 
@@ -758,9 +801,9 @@ skPollDirSetFileTimeout(
 /* Return a string describing an error */
 const char *
 skPollDirStrError(
-    skPollDirErr_t      err)
+    ssize_t             err)
 {
-    switch (err) {
+    switch ((skPollDirErr_t)err) {
       case PDERR_NONE:
         return "No error";
       case PDERR_STOPPED:

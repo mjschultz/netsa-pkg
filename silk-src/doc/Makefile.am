@@ -1,8 +1,7 @@
-# RCSIDENT($SiLK: Makefile.am fb0b4814fb3d 2016-05-05 21:15:30Z mthomas $)
+# RCSIDENT($SiLK: Makefile.am af677a0da759 2016-12-07 20:32:48Z mthomas $)
 
 EXTRA_DIST = \
 	GPL.txt \
+	INSTALL.txt \
 	RELEASE-NOTES.txt \
-	autotools-readme.txt \
-	silk-acceptance-tests.pdf \
-	silk-install-handbook.pdf
+	autotools-readme.txt

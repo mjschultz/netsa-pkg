@@ -19,7 +19,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmapbuild.l 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwpmapbuild.l efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skprefixmap.h>
@@ -728,7 +728,6 @@ checkRange(
                           linenum);
             return -1;
         }
-#if SK_ENABLE_IPV6
         {
             uint32_t ipv4;
             if (skipaddrGetAsV4(&stmt.range_start.addr, &ipv4)
@@ -740,11 +739,9 @@ checkRange(
                 return -1;
             }
         }
-#endif  /* SK_ENABLE_IPV6 */
         break;
 
       case SKPREFIXMAP_CONT_ADDR_V6:
-#if SK_ENABLE_IPV6
         if (skipaddrCompare(&stmt.range_start.addr,
                             &stmt.range_end.addr) > 0)
         {
@@ -752,7 +749,6 @@ checkRange(
                           linenum);
             return -1;
         }
-#endif  /* SK_ENABLE_IPV6 */
         break;
 
       default:
@@ -789,7 +785,6 @@ stmtCIDR(
                       linenum, string, skStringParseStrerror(rv));
         return -1;
     }
-#if SK_ENABLE_IPV6
     if (skipaddrIsV6(&ip)) {
         if (mode != SKPREFIXMAP_CONT_ADDR_V6) {
             skAppPrintErr(("Invalid IP on line %d:"
@@ -798,7 +793,6 @@ stmtCIDR(
             return -1;
         }
     }
-#endif /* SK_ENABLE_IPV6 */
 
     skCIDR2IPRange(&ip, cidr, &stmt.range_start.addr, &stmt.range_end.addr);
     return 0;
@@ -854,7 +848,6 @@ stmtIPs(
                       linenum, string, skStringParseStrerror(rv));
         return -1;
     }
-#if SK_ENABLE_IPV6
     if (skipaddrIsV6(&ip)) {
         if (mode != SKPREFIXMAP_CONT_ADDR_V6) {
             skAppPrintErr(("Invalid IP on line %d:"
@@ -863,7 +856,6 @@ stmtIPs(
             return -1;
         }
     }
-#endif /* SK_ENABLE_IPV6 */
 
     if (state == 0) {
         skipaddrCopy(&stmt.range_start.addr, &ip);

@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfilterio.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwfilterio.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #define RWPACK_BYTES_PACKETS          1
 /* #define RWPACK_FLAGS_TIMES_VOLUMES    1 */
@@ -64,7 +64,7 @@ RCSIDENT("$SiLK: rwfilterio.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 **    // uint32_t     padding   : 2; //        padding/reserved
 **    // uint32_t     elaps_msec:10; //        Fractional elapsed (millisec)
 **
-**    uint16_t      sID;             // 36-37  Sensor ID
+**    uint16_t      sensorID;        // 36-37  Sensor ID
 **
 **    uint8_t       flowtype;        // 38     flow type (class&type)
 **    uint8_t       prot_flags;      // 39     is_tcp==0: IP protocol
@@ -117,7 +117,7 @@ RCSIDENT("$SiLK: rwfilterio.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 static int
 filterioRecordUnpack_V4(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     uint32_t pkts_stimems, bb_elapsems;
@@ -126,18 +126,20 @@ filterioRecordUnpack_V4(
     uint8_t is_tcp;
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         filterioRecordSwap_V4(ar);
     }
 
-    /* sIP, dIP, sPort, dPort, nhIP, input, output */
+    /* sIP, dIP, sPort, dPort, nhIP */
     rwRecMemSetSIPv4(rwrec, &ar[0]);
     rwRecMemSetDIPv4(rwrec, &ar[4]);
     rwRecMemSetSPort(rwrec, &ar[8]);
     rwRecMemSetDPort(rwrec, &ar[10]);
     rwRecMemSetNhIPv4(rwrec, &ar[12]);
-    rwRecMemSetInput(rwrec, &ar[16]);
-    rwRecMemSetOutput(rwrec, &ar[18]);
+
+    /* input, output */
+    rwpackUnpackInput16(rwrec, &ar[16]);
+    rwpackUnpackOutput16(rwrec, &ar[18]);
 
     /* sTime, elapsed */
     memcpy(&sTime, &ar[20], 4);
@@ -182,9 +184,9 @@ filterioRecordUnpack_V4(
  */
 static int
 filterioRecordPack_V4(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
     int rv = SKSTREAM_OK; /* return value */
     uint32_t pkts_stimems, bb_elapsems;
@@ -212,14 +214,21 @@ filterioRecordPack_V4(
     bb_elapsems = ((bb_elapsems << 12)
                    | (rwRecGetElapsedMSec(rwrec) & MASKARRAY_10));
 
-    /* sIP, dIP, sPort, dPort, nhIP, input, output, sTime */
+    /* sIP, dIP, sPort, dPort, nhIP */
     rwRecMemGetSIPv4(rwrec, &ar[0]);
     rwRecMemGetDIPv4(rwrec, &ar[4]);
     rwRecMemGetSPort(rwrec, &ar[8]);
     rwRecMemGetDPort(rwrec, &ar[10]);
     rwRecMemGetNhIPv4(rwrec, &ar[12]);
-    rwRecMemGetInput(rwrec, &ar[16]);
-    rwRecMemGetOutput(rwrec, &ar[18]);
+
+    /* input, output */
+    rwpackPackInput16(rwrec, &ar[16], &rv);
+    rwpackPackOutput16(rwrec, &ar[18], &rv);
+    if (rv) {
+        return rv;
+    }
+
+    /* sTime */
     rwRecMemGetStartSeconds(rwrec, &ar[20]);
     rwRecMemGetElapsedSeconds(rwrec, &ar[24]);
 
@@ -233,7 +242,7 @@ filterioRecordPack_V4(
     rwRecMemGetApplication(rwrec, &ar[40]);
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         filterioRecordSwap_V4(ar);
     }
 
@@ -270,7 +279,7 @@ filterioRecordPack_V4(
 **    // uint32_t     bPPFrac   : 6; //        Fractional bytes-per-packet
 **    // uint32_t     pad       :12; //        padding/reserved
 **
-**    uint16_t      sID;             // 36-37  Sensor ID
+**    uint16_t      sensorID;        // 36-37  Sensor ID
 **
 **    uint8_t       proto;           // 38     IP protocol
 **    uint8_t       flags;           // 39     OR of all TCP flags on all pkts
@@ -309,25 +318,27 @@ filterioRecordPack_V4(
 static int
 filterioRecordUnpack_V3(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     uint32_t tmp32, bpp;
     uint32_t pkts, pflag;
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         filterioRecordSwap_V3(ar);
     }
 
-    /* sIP, dIP, sPort, dPort, nhIP, input, output */
+    /* sIP, dIP, sPort, dPort, nhIP */
     rwRecMemSetSIPv4(rwrec, &ar[0]);
     rwRecMemSetDIPv4(rwrec, &ar[4]);
     rwRecMemSetSPort(rwrec, &ar[8]);
     rwRecMemSetDPort(rwrec, &ar[10]);
     rwRecMemSetNhIPv4(rwrec, &ar[12]);
-    rwRecMemSetInput(rwrec, &ar[16]);
-    rwRecMemSetOutput(rwrec, &ar[18]);
+
+    /* input, output */
+    rwpackUnpackInput16(rwrec, &ar[16]);
+    rwpackUnpackOutput16(rwrec, &ar[18]);
 
     /* sTime, elapsed */
     memcpy(&tmp32, &ar[20], 4);
@@ -366,22 +377,27 @@ filterioRecordUnpack_V3(
  */
 static int
 filterioRecordPack_V3(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
     int rv = SKSTREAM_OK; /* return value */
     uint32_t tmp32, bpp;
     uint32_t pflag = 0;
 
-    /* sIP, dIP, sPort, dPort, nhIP, input, output */
+    /* sIP, dIP, sPort, dPort, nhIP */
     rwRecMemGetSIPv4(rwrec, &ar[0]);
     rwRecMemGetDIPv4(rwrec, &ar[4]);
     rwRecMemGetSPort(rwrec, &ar[8]);
     rwRecMemGetDPort(rwrec, &ar[10]);
     rwRecMemGetNhIPv4(rwrec, &ar[12]);
-    rwRecMemGetInput(rwrec, &ar[16]);
-    rwRecMemGetOutput(rwrec, &ar[18]);
+
+    /* input, output */
+    rwpackPackInput16(rwrec, &ar[16], &rv);
+    rwpackPackOutput16(rwrec, &ar[18], &rv);
+    if (rv) {
+        return rv;
+    }
 
     /* sTime, elapsed */
     tmp32 = (uint32_t)(rwRecGetStartTime(rwrec) / 1000);
@@ -413,7 +429,7 @@ filterioRecordPack_V3(
     ar[39] = rwRecGetFlags(rwrec);
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         filterioRecordSwap_V3(ar);
     }
 
@@ -522,7 +538,7 @@ filterioRecordPack_V3(
 static int
 filterioRecordUnpack_V1V2(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     uint32_t pef, sbb;
@@ -530,7 +546,7 @@ filterioRecordUnpack_V1V2(
     uint32_t sTime;
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         filterioRecordSwap_V1V2(ar);
     }
 
@@ -583,9 +599,9 @@ filterioRecordUnpack_V1V2(
  */
 static int
 filterioRecordPack_V1V2(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
     int rv = SKSTREAM_OK; /* return value */
     uint32_t bbs;
@@ -594,11 +610,11 @@ filterioRecordPack_V1V2(
     uint32_t sTime;
 
     /* Check sizes of fields we've expanded in later versions */
-    if (rwRecGetInput(rwrec) > 255 || rwRecGetOutput(rwrec) > 255) {
+    if (rwRecGetInput(rwrec) > 0xFF || rwRecGetOutput(rwrec) > 0xFF) {
         rv = SKSTREAM_ERR_SNMP_OVRFLO;
         goto END;
     }
-    if (rwRecGetSensor(rwrec) > 255) {
+    if (rwRecGetSensor(rwrec) > 0xFF) {
         rv = SKSTREAM_ERR_SENSORID_OVRFLO;
         goto END;
     }
@@ -661,7 +677,7 @@ filterioRecordPack_V1V2(
     memcpy(&ar[28], &bbs, 4);
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         filterioRecordSwap_V1V2(ar);
     }
 
@@ -728,17 +744,17 @@ filterioPrepare(
       case 4:
         /* V4 and V5 differ only in that V5 supports compression on
          * read and write; V4 supports compression only on read */
-        stream->rwUnpackFn = &filterioRecordUnpack_V4;
-        stream->rwPackFn   = &filterioRecordPack_V4;
+        stream->silkflow.unpack = &filterioRecordUnpack_V4;
+        stream->silkflow.pack   = &filterioRecordPack_V4;
         break;
       case 3:
-        stream->rwUnpackFn = &filterioRecordUnpack_V3;
-        stream->rwPackFn   = &filterioRecordPack_V3;
+        stream->silkflow.unpack = &filterioRecordUnpack_V3;
+        stream->silkflow.pack   = &filterioRecordPack_V3;
         break;
       case 2:
       case 1:
-        stream->rwUnpackFn = &filterioRecordUnpack_V1V2;
-        stream->rwPackFn   = &filterioRecordPack_V1V2;
+        stream->silkflow.unpack = &filterioRecordUnpack_V1V2;
+        stream->silkflow.pack   = &filterioRecordPack_V1V2;
         break;
       case 0:
         /* no longer supported */
@@ -747,22 +763,22 @@ filterioPrepare(
         goto END;
     }
 
-    stream->recLen = filterioGetRecLen(skHeaderGetRecordVersion(hdr));
+    stream->rec_len = filterioGetRecLen(skHeaderGetRecordVersion(hdr));
 
     /* verify lengths */
-    if (stream->recLen == 0) {
+    if (stream->rec_len == 0) {
         skAppPrintErr("Record length not set for %s version %u",
                       FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr));
         skAbort();
     }
-    if (stream->recLen != skHeaderGetRecordLength(hdr)) {
+    if (stream->rec_len != skHeaderGetRecordLength(hdr)) {
         if (0 == skHeaderGetRecordLength(hdr)) {
-            skHeaderSetRecordLength(hdr, stream->recLen);
+            skHeaderSetRecordLength(hdr, stream->rec_len);
         } else {
             skAppPrintErr(("Record length mismatch for %s version %u\n"
                            "\tcode = %" PRIu16 " bytes;  header = %lu bytes"),
                           FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr),
-                          stream->recLen,
+                          stream->rec_len,
                           (unsigned long)skHeaderGetRecordLength(hdr));
             skAbort();
         }

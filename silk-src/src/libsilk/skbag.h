@@ -19,10 +19,6 @@
 **
 **    The API defined in this file is current as of SiLK 3.0.
 **
-**    As of SiLK 3.0, some older functions and types have been
-**    deprecated.  Those functions and types are declared in the
-**    header file silk/bagtree.h.
-**
 **    Original implementation:
 **      Christopher Lee
 **      2004-11-04
@@ -37,7 +33,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKBAG_H, "$SiLK: skbag.h 470ce106b096 2017-03-21 19:56:22Z mthomas $");
+RCSIDENTVAR(rcsID_SKBAG_H, "$SiLK: skbag.h 662aa15979cc 2017-06-23 18:47:10Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -147,16 +143,6 @@ typedef struct skBagTypedCounter_st {
 
 
 /*
- *    The older SiLK 2.x Bag API (see bagtree.h) used a fixed size for
- *    the key and counter stored in the bag.  Those types are defined
- *    here.
- */
-
-typedef uint32_t skBagKey_t;
-typedef uint64_t skBagCounter_t;
-
-
-/*
  *    The following specify the numeric range of counters in a Bag.
  *
  *    Note that the maximum counter in SiLK 3.0 is less than that in
@@ -188,7 +174,7 @@ typedef uint64_t skBagCounter_t;
  *    The following enumeration lists those types.
  */
 typedef enum skBagFieldType_en {
-    /* the following correspond to values in rwascii.h */
+    /* the following correspond to values in rwrec.h */
     SKBAG_FIELD_SIPv4 = 0,
     SKBAG_FIELD_DIPv4,
     SKBAG_FIELD_SPORT,
@@ -216,7 +202,7 @@ typedef enum skBagFieldType_en {
      *  SKBAG_FIELD_ELAPSED_MSEC,
      */
     SKBAG_FIELD_ICMP_TYPE_CODE = 24,
-    /* the above correspond to values in rwascii.h */
+    /* the above correspond to values in rwrec.h */
 
     SKBAG_FIELD_SIPv6,
     SKBAG_FIELD_DIPv6,

@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skbitmap-test.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skbitmap-test.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/utils.h>
@@ -1055,8 +1055,6 @@ ipwild_test_v4(
 }
 
 
-#if SK_ENABLE_IPV6
-
 static const char *
 v6tostring(
     uint8_t            *ip)
@@ -1107,8 +1105,6 @@ ipwild_test_helper_v6(
     int64_t i;
     int j;
     int rv;
-
-    tmp_ipv6[0] = '\0';
 
     fprintf(stderr, "Testing IPWildcard '%s' ...", str);
 
@@ -1195,10 +1191,6 @@ ipwild_test_helper_v6(
         ++i;
     }
 
-    if (0 == i) {
-        fprintf(stderr, "iterator returned no addresses");
-        exit(EXIT_FAILURE);
-    }
     if (range_length) {
         if (i != range_length) {
             fprintf(stderr, ("out of iterator before values i=%" PRId64
@@ -1716,9 +1708,6 @@ ipwild_test_v6(
     v = 0;
 }
 
-#endif /*  SK_ENABLE_IPV6 */
-
-
 
 int main(int UNUSED(argc), char **argv)
 {
@@ -1729,9 +1718,7 @@ int main(int UNUSED(argc), char **argv)
 
     bitmap_test();
     ipwild_test_v4();
-#if SK_ENABLE_IPV6
     ipwild_test_v6();
-#endif /* SK_ENABLE_IPV6 */
 
     skAppUnregister();
 

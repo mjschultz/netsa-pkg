@@ -20,8 +20,9 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_LOG_H, "$SiLK: sklog.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_LOG_H, "$SiLK: sklog.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
+#include <silk/sklua.h>
 #include <syslog.h>
 
 /**
@@ -100,9 +101,11 @@ DEBUGMSG(
  *   Available features; pass to sklogSetup().
  */
 /** Enable options for use of syslog() */
-#define SKLOG_FEATURE_SYSLOG  1
+#define SKLOG_FEATURE_SYSLOG        1
 /** Enable options that mimic the legacy logging */
-#define SKLOG_FEATURE_LEGACY  2
+#define SKLOG_FEATURE_LEGACY        2
+/** Enable use of a configuration file instead of command-line switches */
+#define SKLOG_FEATURE_CONFIG_FILE   4
 
 
 /*
@@ -111,15 +114,6 @@ DEBUGMSG(
 #ifndef TRACEMSG_FUNCTION
 #  define TRACEMSG_FUNCTION DEBUGMSG
 #endif
-
-
-/**
- *    Signature of function callbacked that will be invoked to lock
- *    and unlock the log.  These functions are set by
- *    sklogSetLocking().
- */
-typedef int (*sklog_lock_fn_t)(
-    void       *caller_data);
 
 
 /**
@@ -174,6 +168,24 @@ sklogCommandLine(
 
 
 /**
+ *    Disable locking of the log file.
+ *
+ *    Normally a mutex is used to prevent multiple threads from
+ *    simultaneously manipulating the state of the log.  Calling this
+ *    function disables use of the mutex regardless of the current
+ *    state of the mutex.  This function is normally called after a
+ *    fork() to ensure the child process is not blocked due to some
+ *    other thread holding the log's mutex when fork() was called.
+ *
+ *    sklogReenableLocking() restores use of the mutex, but there is
+ *    never a reason to use that function.
+ */
+void
+sklogDisableLocking(
+    void);
+
+
+/**
  *    Disable log rotation once the log has been opened.  Once this
  *    function has been called, there is no way to re-enable log
  *    rotation.
@@ -184,28 +196,6 @@ sklogCommandLine(
  */
 void
 sklogDisableRotation(
-    void);
-
-
-/**
- *    This function is only available when using libsilk-thrd.
- *
- *    Configure the log for use in a multithreaded environemnt.  This
- *    function creates a mutex and calls the sklogSetLocking()
- *    function with the necessary function pointers.  This function
- *    returns the value returned by sklogSetLocking(); i.e., it
- *    returns 0 unless sklogSetup() has not yet been called.
- *
- *    If the multithreaded program calls fork(), the child process
- *    should first call sklogSetLocking() using NULL for all
- *    parameters.  This ensures that the (single-threaded) child
- *    process ignores the log-file lock that the parent may have held
- *    when fork() was called.  Next the child should call
- *    sklogDisableRotation() to ensure it does not attempt to rotate
- *    the log-file.
- */
-int
-sklogEnableThreadedLogging(
     void);
 
 
@@ -296,6 +286,19 @@ sklogOptionsUsage(
 
 
 /**
+ *    Configure the logging parameters by examining the value of the
+ *    global 'log' variable (which is a table) in the Lua file that
+ *    was read from 'config_file'.
+ *
+ *    Return 0 on success, or non-zero if errors are encountered.
+ */
+int
+sklogParseConfigFile(
+    lua_State          *L,
+    const char         *config_file);
+
+
+/**
  *    Redirect the standard output and standard error as follows:
  *
  *    If log messages are going to a local file, redirect stdout and
@@ -317,6 +320,15 @@ int
 sklogRedirectStandardStreams(
     char               *buf,
     size_t              bufsize);
+
+
+/**
+ *    Re-enable locking of the log file after a call to
+ *    sklogDisableLocking().
+ */
+void
+sklogReenableLocking(
+    void);
 
 
 /**
@@ -343,7 +355,7 @@ sklogSetDestination(
  *    This function is provided for backward compatibility.  We
  *    recommend the use of syslog(3) instead.
  *
- *    Set the destination for log messages to multiple files in the
+ *    Set the destination for log messages to mutliple files in the
  *    directory 'dir_name', using 'base_name' as part of the basename
  *    for the files, and the current date as the remainder of the
  *    name.  The format of the files will be
@@ -402,38 +414,6 @@ sklogSetFacilityByName(
 int
 sklogSetLevel(
     const char         *level);
-
-
-/**
- *    Set functions that lock and unlock the log when a logging
- *    mechanism other than syslog(3) is used.  These functions should
- *    be set in a multi-threaded application so that messages from
- *    different threads are kept distinct.  The 'locker' function will
- *    be called to lock the log; the 'unlocker' function to unlock it.
- *    The value in 'data' will be passed to these functions.
- *
- *    The function in 'try_locker' is used when sklogNonBlock() is
- *    called.  The function should lock the log and return 0 if it is
- *    currently unlocked, or immediately return a non-zero value.
- *
- *    This function must be called after sklogSetup().  The function
- *    returns 0 unless sklogSetup() has not yet been called, in which
- *    case -1 is returned.
- *
- *    This function can be called multiple times to modify the locking
- *    mechanism, and it can be called with all arguments set to NULL
- *    to disable log file locking.  Changing or disabling the locking
- *    in a multi-threaded environment or when the log file is locked
- *    is undefined.
- *
- *    See also the sklogEnableThreadedLogging() function.
- */
-int
-sklogSetLocking(
-    sklog_lock_fn_t     locker,
-    sklog_lock_fn_t     unlocker,
-    sklog_lock_fn_t     try_locker,
-    void               *data);
 
 
 /**

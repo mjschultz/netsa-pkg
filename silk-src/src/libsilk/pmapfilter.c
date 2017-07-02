@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pmapfilter.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: pmapfilter.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skplugin.h>
@@ -251,16 +251,13 @@ skPrefixMapAddFields(
     /* Add --pmap-file to apps that accept RWREC: rwcut, rwsort, etc */
     err = skpinRegOption2(pmap_file_option,
                           REQUIRED_ARG,
-                          PMAP_FILE_HELP(
-                              "\tfield names.  As such, this switch must"
-                              " precede the --fields switch."), NULL,
+                          PMAP_FILE_HELP("\tfield names.  As such, this "
+                                         "switch must precede the "
+                                         "--fields switch."), NULL,
                           pmapfile_handler, NULL,
                           2,
                           SKPLUGIN_FN_REC_TO_TEXT,
                           SKPLUGIN_FN_REC_TO_BIN);
-    if (err == SKPLUGIN_ERR_FATAL) {
-        return err;
-    }
 
     /* Add --pmap-column-width to apps that produce TEXT: rwcut, rwuniq  */
     err = skpinRegOption2(pmap_column_width_option,
@@ -270,21 +267,15 @@ skPrefixMapAddFields(
                           2,
                           SKPLUGIN_FN_REC_TO_TEXT,
                           SKPLUGIN_FN_BIN_TO_TEXT);
-    if (err == SKPLUGIN_ERR_FATAL) {
-        return err;
-    }
 
     /* Add --pmap-file to rwfilter */
-    err = skpinRegOption2(pmap_file_option,
-                          REQUIRED_ARG,
-                          PMAP_FILE_HELP(
-                              "\tfiltering switches.  This switch must"
-                              " precede other --pmap-* switches."), NULL,
-                          pmapfile_handler, NULL,
-                          1, SKPLUGIN_FN_FILTER);
-    if (err == SKPLUGIN_ERR_FATAL) {
-        return err;
-    }
+    skpinRegOption2(pmap_file_option,
+                    REQUIRED_ARG,
+                    PMAP_FILE_HELP("\tfiltering switches.  This switch must"
+                                   " precede other --pmap-* switches."),
+                    NULL,
+                    pmapfile_handler, NULL,
+                    1, SKPLUGIN_FN_FILTER);
 
     /* Register cleanup function */
     skpinRegCleanup(pmap_teardown);
@@ -516,7 +507,7 @@ pmapfile_handler(
     int                  ok;
     const char          *filename;
     const char          *sep;
-    const char          *mapname           = NULL;
+    const char          *mapname;
     char                *prefixed_name     = NULL;
     char                *short_prefixed_name;
     size_t               namelen           = 0;
@@ -540,12 +531,8 @@ pmapfile_handler(
     if (NULL == sep) {
         /* We do not have a mapname.  We'll check for one in the pmap
          * once we read it. */
+        mapname = NULL;
         filename = opt_arg;
-    } else if (sep == opt_arg) {
-        /* Treat a 0-length mapname on the command as having none.
-         * Allows use of default mapname for files that contain the
-         * separator. */
-        filename = sep + 1;
     } else {
         /* A mapname was supplied on the command line */
         if (sep == opt_arg) {
@@ -758,7 +745,7 @@ pmapfile_handler(
 
 
     /* Verify unique field names */
-    for (i = 0; i < skVectorGetCount(pmap_vector); ++i) {
+    for (i = 0; i < skVectorGetCount(pmap_vector); i++) {
         pmap_data_t *p;
 
         skVectorGetValue(&p, pmap_vector, i);
@@ -789,7 +776,8 @@ pmapfile_handler(
                                      ? &pmap_data->sdir
                                      : &pmap_data->ddir);
 
-        skpinRegField(&dir->field, dir->field_name, NULL, &regdata, dir);
+        ok = skpinRegField(&dir->field, dir->field_name, NULL, &regdata, dir);
+
         skpinRegOption2(dir->filter_option,
                         REQUIRED_ARG,
                         NULL, &pmap_filter_help,
@@ -805,10 +793,7 @@ pmapfile_handler(
                     1, SKPLUGIN_FN_FILTER);
 
 
-    if (skVectorAppendValue(pmap_vector, &pmap_data)) {
-        rv = SKPLUGIN_ERR_FATAL;
-        goto END;
-    }
+    ok = skVectorAppendValue(pmap_vector, &pmap_data);
 
     rv = SKPLUGIN_OK;
 

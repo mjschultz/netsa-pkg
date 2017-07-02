@@ -9,17 +9,23 @@ B<flowrate> - SiLK plug-in providing payload and rate filters and fields
   rwfilter --plugin=flowrate.so [--payload-bytes=INTEGER_RANGE]
         [--payload-rate=DECIMAL_RANGE]
         [--bytes-per-second=DECIMAL_RANGE]
-        [--packets-per-second=DECIMAL_RANGE] ...
+        [--packets-per-second=DECIMAL_RANGE]
+        [--flowrate-zero-duration=MICROSECONDS] ...
 
-  rwcut --plugin=flowrate.so --fields=FIELDS ...
+  rwcut --plugin=flowrate.so --fields=FIELDS
+        [--flowrate-zero-duration=MICROSECONDS] ...
 
-  rwgroup --plugin=flowrate.so --fields=FIELDS ...
+  rwgroup --plugin=flowrate.so --fields=FIELDS
+        [--flowrate-zero-duration=MICROSECONDS] ...
 
-  rwsort --plugin=flowrate.so --fields=FIELDS ...
+  rwsort --plugin=flowrate.so --fields=FIELDS
+        [--flowrate-zero-duration=MICROSECONDS] ...
 
-  rwstats --plugin=flowrate.so --fields=FIELDS --values=FIELDS ...
+  rwstats --plugin=flowrate.so --fields=FIELDS --values=FIELDS
+        [--flowrate-zero-duration=MICROSECONDS] ...
 
-  rwuniq --plugin=flowrate.so --fields=FIELDS --values=FIELDS ...
+  rwuniq --plugin=flowrate.so --fields=FIELDS --values=FIELDS
+        [--flowrate-zero-duration=MICROSECONDS] ...
 
 =head1 DESCRIPTION
 
@@ -45,9 +51,17 @@ value is zero.
 
 The various flow-rate quantities are determined by dividing the
 payload byte count, packet count, or byte count by the duration of the
-flow, giving the average rate across the flow.  When the flow's
-reported duration is zero, a duration of one second is assumed (that
-is, the count is used directly).
+flow, giving the average rate across the flow.  Flow records whose
+duration is zero create a problem when computing a flow-rate.
+
+If a flow record's reported duration is zero, the count is divided by
+a value which defaults to 400 microseconds and may be specified by the
+B<--flowrate-zero-duration> switch.  The switch accepts a minimum of 1
+microsecond.  The smallest (non-zero) duration SiLK flow records
+support is 1 millisecond (1000 microseconds).  Prior to SiLK 3.16.0,
+the B<flowrate> plug-in used a duration of 1 second (1000000
+microseconds) when the reported duration was zero except when the rate
+was used as an aggregate value field in B<rwstats> or B<rwuniq>.
 
 The B<flowrate> plug-in must be explicitly loaded into an application
 via the B<--plugin> switch.  The reason for this is due to name
@@ -59,6 +73,24 @@ of the current B<--packets> switch will fail.
 
 The B<flowrate> plug-in provides the following options to the
 indicated applications.
+
+=head2 Common Switches
+
+The following switch is available whenever the B<flowrate> plug-in has
+been loaded into a supported application:
+
+=over 4
+
+=item B<--flowrate-zero-duration>=I<MICROSECONDS>
+
+When computing a rate and a flow record has a duration of zero, assume
+the duration is actually I<MICROSECONDS> microseconds.  The
+I<MICROSECONDS> value must be one or greater.  If this switch is not
+specified, a duration of 400 microseconds is used.  The smallest
+non-zero duration SiLK flow records support is 1 millisecond (1000
+microseconds).  I<Since SiLK 3.16.0.>
+
+=back
 
 =head2 B<rwfilter> Switches
 
@@ -224,7 +256,7 @@ B<rwstats(1)>, B<rwuniq(1)>, B<silk(7)>
 
 =cut
 
-$SiLK: flowrate.pod 3a8f972758a1 2014-07-19 15:15:27Z mthomas $
+$SiLK: flowrate.pod c3d10f53bec8 2017-06-01 17:58:29Z mthomas $
 
 Local Variables:
 mode:text

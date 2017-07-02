@@ -12,7 +12,6 @@ $file{v6set1} = get_data_or_exit77('v6set1');
 $file{v6set2} = get_data_or_exit77('v6set2');
 my %temp;
 $temp{intersect} = make_tempname('intersect');
-check_features(qw(ipset_v6));
 my $cmd = "$rwsettool --intersect $file{v6set1} $file{v6set2} > $temp{intersect} && $rwsettool --union $file{v6set1} $file{v6set2} | $rwsettool --difference - $temp{intersect} | $rwsetcat --cidr";
 my $md5 = "b43dcea6089a4d405183a79500c4bcad";
 

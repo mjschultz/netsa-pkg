@@ -165,10 +165,8 @@ B<True>.  The
 B<IPAddr> object that the constructor returns will be either an
 B<IPv4Addr> object or an B<IPv6Addr> object.
 
-For compatibility with releases prior to SiLK 2.2.0, the B<IPAddr>
-constructor will also accept an integer I<address>, in which case it
-converts that integer to an B<IPv4Addr> object.  This behavior is
-deprecated.  Use the B<IPv4Addr> and B<IPv6Addr> constructors instead.
+As of SiLK 4.0.0, the B<IPAddr> constructor does not accept an integer
+I<address>.  Use the B<IPv4Addr> and B<IPv6Addr> constructors instead.
 
 Examples:
 
@@ -177,7 +175,6 @@ Examples:
  >>> addr3 = IPAddr('::ffff:12.34.56.78')
  >>> addr4 = IPAddr(addr1)
  >>> addr5 = IPAddr(addr2)
- >>> addr6 = IPAddr(0x10000000) # Deprecated as of SiLK 2.2.0
 
 =back
 
@@ -226,10 +223,6 @@ otherwise.
 =item I<addr>.is_ipv6(I<>)
 
 Return B<True> if I<addr> is an IPv6 address, B<False> otherwise.
-
-=item I<addr>.isipv6(I<>)
-
-(DEPRECATED in SiLK 2.2.0) An alias for B<is_ipv6()>.
 
 =item I<addr>.to_ipv6(I<>)
 
@@ -874,8 +867,8 @@ I<rec>.dport.
 =item I<rec>.input
 
 The SNMP interface where the flow I<rec> entered the router or the
-vlanId if the packing tools are configured to capture it (see
-B<sensor.conf(5)>), a 16-bit integer.  The default input value is 0.
+vlanId if the packing tools are configured to capture it, a 16-bit
+integer.  The default input value is 0.
 
 =item I<rec>.nhip
 
@@ -887,8 +880,8 @@ address.
 =item I<rec>.output
 
 The SNMP interface where the flow I<rec> exited the router or the
-postVlanId if the packing tools are configured to capture it (see
-B<sensor.conf(5)>), a 16-bit integer.  The default output value is 0.
+postVlanId if the packing tools are configured to capture it, a 16-bit
+integer.  The default output value is 0.
 
 =item I<rec>.packets
 
@@ -1518,18 +1511,6 @@ file.  When I<key_type> is not provided and the bag file does not
 contain type information, the key is set to 'custom' with a length of
 4.
 
-=item silk.B<Bag.load_ipaddr(>I<path>B<)>
-
-Creates an IP address bag from a SiLK bag file.  Equivalent to
-S<B<Bag.load(I<path>, I<key_type> = IPv4Addr)>>.  This constructor is
-deprecated as of SiLK 3.2.0.
-
-=item silk.B<Bag.load_integer(>I<path>B<)>
-
-Creates an integer bag from a SiLK bag file.  Equivalent to
-S<B<Bag.load(I<path>, I<key_type> = int)>>.  This constructor is
-deprecated as of SiLK 3.2.0.
-
 =back
 
 Constants:
@@ -1909,8 +1890,9 @@ integer.  If a B<TCPFlags> value, it returns a copy of that value.  If
 an integer, the integer should represent the 8-bit representation of
 the flags.  If a string, the string should consist of a concatenation
 of zero or more of the characters C<F>, C<S>, C<R>, C<P>, C<A>, C<U>,
-C<E>, and C<C>---upper or lower-case---representing the FIN, SYN, RST,
-PSH, ACK, URG, ECE, and CWR flags.  Spaces in the string are ignored.
+C<E>, and C<C>---upper or lower-case---representing the TCP_FIN,
+TCP_SYN, TCP_RST, TCP_PSH, TCP_ACK, TCP_URG, TCP_ECE, and TCP_CWR
+flags.  Spaces in the string are ignored.
 
 Examples:
 
@@ -2154,7 +2136,7 @@ file, and query information from that file.
 
 Initializes the SiLK system's site configuration.  The I<siteconf>
 parameter, if given, should be the path and name of a SiLK site
-configuration file (see B<silk.conf(3)>).  If I<siteconf> is omitted,
+configuration file (see B<silk.conf(5)>).  If I<siteconf> is omitted,
 the value specified in the environment variable SILK_CONFIG_FILE will
 be used as the name of the configuration file.  If SILK_CONFIG_FILE is
 not set, the module looks for a file named F<silk.conf> in the
@@ -2789,12 +2771,13 @@ configuration file, F<silk.conf>, in this directory.
 B<silkpython(3)>, B<rwfglob(1)>, B<rwfileinfo(1)>, B<rwfilter(1)>,
 B<rwcut(1)>, B<rwpmapbuild(1)>, B<rwset(1)>, B<rwsetbuild(1)>,
 B<rwgroup(1)>, B<rwsort(1)>, B<rwstats(1)>, B<rwuniq(1)>,
-B<rwgeoip2ccmap(1)>, B<silk.conf(5)>, B<sensor.conf(5)>, B<silk(7)>,
-B<python(1)>, B<gzip(1)>, B<yaf(1)>, L<http://docs.python.org/>
+B<rwgeoip2ccmap(1)>, B<silk.conf(5)>, B<silk(7)>,
+B<python(1)>, B<gzip(1)>, B<yaf(1)>, B<tzset(3)>,
+L<http://docs.python.org/>
 
 =cut
 
-$SiLK: pysilk.pod 22da9b03c74d 2016-09-19 18:28:03Z mthomas $
+$SiLK: pysilk.pod 5036d9fcc2e7 2017-06-26 20:31:01Z mthomas $
 
 Local Variables:
 mode:text

@@ -1,16 +1,18 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: rwflowpack-pack-silk-discard-when.pl 40a363507ed0 2014-04-01 14:09:52Z mthomas $")
+# RCSIDENT("$SiLK: rwflowpack-pack-silk-discard-when.pl 23e62811e29c 2016-11-16 15:30:29Z mthomas $")
 
 use strict;
 use SiLKTests;
 use File::Find;
 
-my $rwflowpack = check_silk_app('rwflowpack');
+my $NAME = $0;
+$NAME =~ s,.*/,,;
 
 # find the apps we need.  this will exit 77 if they're not available
-my $rwcat = check_silk_app('rwcat');
+my $rwflowpack = check_silk_app('rwflowpack');
+my $rwcut = check_silk_app('rwcut');
 
 # find the data files we use as sources, or exit 77
 my %file;
@@ -19,74 +21,49 @@ $file{data} = get_data_or_exit77('data');
 # prefix any existing PYTHONPATH with the proper directories
 check_python_bin();
 
-# set the environment variables required for rwflowpack to find its
-# packing logic plug-in
-add_plugin_dirs('/site/twoway');
-
-# Skip this test if we cannot load the packing logic
-check_exit_status("$rwflowpack --sensor-conf=$srcdir/tests/sensor77.conf"
-                  ." --verify-sensor-conf")
-    or skip_test("Cannot load packing logic");
-
 # create our tempdir
 my $tmpdir = make_tempdir();
 
-# Generate the sensor.conf file
-my $sensor_conf = "$tmpdir/sensor-templ.conf";
-make_packer_sensor_conf($sensor_conf, 'silk', 0, 'polldir', 'discard_when');
+# Generate the config.lua file, and name it based on the test's name
+my $config_lua = $0;
+$config_lua =~ s,^.*\b(rwflowpack-.+)\.pl,$tmpdir/$1.lua,;
+make_config_file($config_lua, get_config_lua_body());
 
 # the command that wraps rwflowpack
 my $cmd = join " ", ("$SiLKTests::PYTHON $srcdir/tests/rwflowpack-daemon.py",
-                     ($ENV{SK_TESTS_VERBOSE} ? "--verbose" : ()),
-                     ($ENV{SK_TESTS_LOG_DEBUG} ? "--log-level=debug" : ()),
-                     "--sensor-conf=$sensor_conf",
+                     "--basedir=$tmpdir",
                      "--copy $file{data}:incoming",
                      "--limit=486394",
-                     "--basedir=$tmpdir",
                      "--",
-                     "--polling-interval=5",
+                     $config_lua,
     );
 
 # run it and check the MD5 hash of its output
 check_md5_output('49fcb3ee5f7b60a8c6d02ef868f05ead', $cmd);
 
-
 # the following directories should be empty
-verify_empty_dirs($tmpdir, qw(error incoming incremental sender));
+verify_empty_dirs($tmpdir, qw(error incoming incremental processing));
+
+# input files should now be in the archive directory
+verify_archived_files("$tmpdir/archive", $file{data});
 
 # path to the data directory
 my $data_dir = "$tmpdir/root";
-die "ERROR: Missing data directory '$data_dir'\n"
+die "$NAME: ERROR: Missing data directory '$data_dir'\n"
     unless -d $data_dir;
 
 # number of files to find in the data directory
 my $expected_count = 0;
 my $file_count = 0;
 
-# read in the MD5s for every packed file we expect to find.  Although
-# we are packing IPv4 data, whether we write IPv4 or IPv6 files
-# depends on how SiLK was compiled.  In the packed IPv4 files, bytes
-# are stored as a byte/packet ratio, and due to rounding the "bytes"
-# value in the IPv4 and IPv6 files may differ.  Thus, we read in
-# separate MD5 sums for each.
-# fields.
+# read in the MD5s for every packed file we expect to find.
 my %md5_map;
-my $md5_file = $0;
+my $md5_file = "$0.txt";
 # both the discard-when and discard-unless tests give the same output
 $md5_file =~ s/(discard)-(unless|when)/$1/;
 
-if ($SiLKTests::SK_ENABLE_IPV6) {
-    $md5_file .= "-ipv6.txt";
-}
-else {
-    # The sensor.conf file contains the "zero-packets" quirk for the
-    # probe used in this test (simulating the Cisco ASA router),
-    # causing the IPv4 file format to be RWGENERIC.
-    $md5_file .= "-ipv4-asa.txt";
-}
-
 open F, $md5_file
-    or die "ERROR: Cannot open $md5_file: $!\n";
+    or die "$NAME: ERROR: Cannot open $md5_file: $!\n";
 while (my $lines = <F>) {
     my ($md5, $path) = split " ", $lines;
     $md5_map{$path} = $md5;
@@ -98,9 +75,8 @@ close F;
 File::Find::find({wanted => \&check_file, no_chdir => 1}, $data_dir);
 
 # did we find all our files?
-if ($file_count != $expected_count) {
-    die "ERROR: Found $file_count files in root; expected $expected_count\n";
-}
+die "$NAME: ERROR: Found $file_count files in root; expected $expected_count\n"
+    unless ($file_count == $expected_count);
 
 # successful!
 exit 0;
@@ -115,11 +91,153 @@ sub check_file
     my $path = $_;
     # set $_ to just be the file basename
     s,^.*/,,;
-    die "ERROR: Unexpected file $path\n"
+    die "$NAME: ERROR: Unexpected file $path\n"
         unless $md5_map{$_};
     ++$file_count;
 
+    my $check_cmd
+        = ("$rwcut --delim=,"
+           ." --ip-format=hexadecimal --timestamp-format=epoch"
+           ." --fields=".join(",", qw(sip dip sport dport proto
+                                      packets bytes flags stime etime sensor
+                                      initialFlags sessionFlags attributes
+                                      application type iType iCode))
+           ." $path");
+
     # do the MD5 sums match?
-    check_md5_output($md5_map{$_}, ("$rwcat --ipv4-output --byte-order=little"
-                                    ." --compression-method=none $path"));
+    check_md5_output($md5_map{$_}, $check_cmd);
+}
+
+
+sub get_config_lua_body
+{
+    my $debug = ($ENV{SK_TESTS_LOG_DEBUG} ? "\n    level = \"debug\"," : "");
+
+    # The Lua configuration file is the text after __END__.  Read it,
+    # perform variable substitution, and return a scalar reference.
+    local $/ = undef;
+    my $text = <DATA>;
+    $text =~ s/\$\{tmpdir\}/$tmpdir/;
+    $text =~ s/\$\{debug\}/$debug/;
+
+    # Check for unexpanded variable
+    if ($text =~ /(\$\{?\w+\}?)/) {
+        die "$NAME: Unknown variable '$1' in Lua configuration\n";
+    }
+    return \$text;
+}
+
+__END__
+if not silk.site.have_site_config() then
+  if not silk.site.init_site(nil, nil, true) then
+    error("The silk.conf file was not found")
+  end
+end
+
+local file_info = {
+  record_format = silk.file_format_id("FT_RWIPV6"),
+}
+
+-- Given a probe definition and an rwrec, write the rwRec to
+-- appropriate outputs.
+local function pack_function (probe, rec)
+  local saddr = rec.sip
+  local daddr = rec.dip
+
+  -- Discard (ignore) record when its source IP or destination IP
+  -- matches probe.null
+  if probe.null[saddr] or probe.null[daddr] then
+    return
+  end
+
+  -- Determine flowtype
+  local flowtype;
+  if probe.external[saddr] then
+    -- Came from an external address and...
+    if probe.internal[daddr] then
+      -- ...went to an internal address (incoming)
+      if silk.rwrec_is_web(rec) then
+        flowtype = "iw"
+      else
+        flowtype = "in"
+      end
+    elseif probe.external[daddr] then
+      -- ...went back to an external address (external to external)
+      flowtype = "ext2ext"
+    else
+      -- ...went to unrecognized address
+      flowtype = "other"
+    end
+  elseif probe.internal[saddr] then
+    -- Came from an internal address and...
+    if probe.external[daddr] then
+      -- ...went to an external address (outgoing)
+      if silk.rwrec_is_web(rec) then
+        flowtype = "ow"
+      else
+        flowtype = "out"
+      end
+    elseif probe.internal[daddr] then
+      -- ...went to another internal address (internal to internal)
+      flowtype = "int2int"
+    else
+      -- ...went to unrecognized address
+      flowtype = "other"
+    end
+  else
+    -- Came from an unrecognized IP.
+    flowtype = "other"
+  end
+
+  -- Set flowtype and sensor
+  rec.classtype_id = silk.site.flowtype_id(flowtype)
+  rec.sensor_id = probe.sensor
+
+  -- Write record
+  write_rwrec(rec, file_info)
+end
+
+
+--  ------------------------------------------------------------------
+--
+--  Configuration
+--
+local tmpdir = "${tmpdir}"
+
+input = {
+    mode = "stream",
+    probes = {
+        P0 = {
+            name = "P0",
+            type = "silk",
+            source = {
+                directory = tmpdir .. "/incoming",
+                interval = 5,
+                archive_directory = tmpdir .. "/archive",
+                error_directory = tmpdir .. "/error",
+            },
+            packing_function = pack_function,
+            vars = {
+                internal = silk.ipwildcard("192.168.x.x"),
+                external = silk.ipwildcard("10.0.0.0/8"),
+                null = silk.ipwildcard("172.16.0.0/13"),
+                sensor = silk.site.sensor_id("S0"),
+            },
+        },
+    },
+}
+output = {
+    mode = "local-storage",
+    flush_interval = 10,
+    processing = {
+        directory = tmpdir .. "/processing",
+        error_directory = tmpdir .. "/error",
+    },
+    root_directory = tmpdir .. "/root",
+}
+log = {
+    destination = "stderr",${debug}
+}
+daemon = {
+    fork = false,
 }

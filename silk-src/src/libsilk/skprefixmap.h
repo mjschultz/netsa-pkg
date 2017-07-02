@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKPREFIXMAP_H, "$SiLK: skprefixmap.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_SKPREFIXMAP_H, "$SiLK: skprefixmap.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/skplugin.h>
@@ -289,7 +289,7 @@ skPrefixMapFindRange(
  *    See also skPrefixMapFindValue(), skPrefixMapFindRange().
  *
  *    skPrefixMapFindString() was added in SiLK-3.8.0 and replaces
- *    skPrefixMapGetString(), which is deprecated.
+ *    skPrefixMapGetString(), which was removed in SiLK-4.0.0.
  */
 int
 skPrefixMapFindString(
@@ -312,20 +312,12 @@ skPrefixMapFindString(
  *    See also skPrefixMapFindString(), skPrefixMapFindRange().
  *
  *    skPrefixMapFindValue() was added in SiLK-3.8.0 and replaces
- *    skPrefixMapGet(), which is deprecated.
+ *    skPrefixMapGet(), which was removed in SiLK-4.0.0.
  */
 uint32_t
 skPrefixMapFindValue(
     const skPrefixMap_t    *map,
     const void             *key);
-
-
-/**
- *    Alias the skPrefixMapFindValue() function.
- *
- *    skPrefixMapGet() is deprecated as of SiLK 3.8.0.
- */
-#define skPrefixMapGet(pmg_a, pmg_b) skPrefixMapFindValue(pmg_a, pmg_b)
 
 
 /**
@@ -357,15 +349,6 @@ skPrefixMapGetContentType(
 const char *
 skPrefixMapGetMapName(
     const skPrefixMap_t    *map);
-
-
-/**
- *    Alias the skPrefixMapFindString() function.
- *
- *    skPrefixMapGetString() is deprecated as of SiLK 3.8.0.
- */
-#define skPrefixMapGetString(pmgs_a, pmgs_b, pmgs_c, pmgs_d)    \
-    skPrefixMapFindString(pmgs_a, pmgs_b, pmgs_c, pmgs_d)
 
 
 /**

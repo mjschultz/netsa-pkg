@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsetbuild.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwsetbuild.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skipset.h>
@@ -353,9 +353,7 @@ static int
 buildIPSetRanges(
     skstream_t         *stream)
 {
-#if SK_ENABLE_IPV6
     int saw_integer = 0;
-#endif
     int lc = 0;
     char line_buf[512];
     char *sep;
@@ -415,7 +413,6 @@ buildIPSetRanges(
                 goto END;
             }
 
-#if SK_ENABLE_IPV6
             /* do not allow integers mixed with IPv6 addresses */
             if (saw_integer) {
                 if (skipaddrIsV6(&ip)) {
@@ -433,7 +430,6 @@ buildIPSetRanges(
                     goto END;
                 }
             }
-#endif  /* SK_ENABLE_IPV6 */
 
             rv = skIPSetInsertAddress(ipset, &ip, prefix);
             if (rv) {
@@ -467,7 +463,6 @@ buildIPSetRanges(
             goto END;
         }
 
-#if SK_ENABLE_IPV6
         /* do not allow integers mixed with IPv6 addresses */
         if (saw_integer) {
             if (skipaddrIsV6(&ip_min) || skipaddrIsV6(&ip_max)) {
@@ -485,7 +480,6 @@ buildIPSetRanges(
                 goto END;
             }
         }
-#endif  /* SK_ENABLE_IPV6 */
 
         rv = skIPSetInsertRange(ipset, &ip_min, &ip_max);
         if (rv) {
@@ -517,9 +511,7 @@ static int
 buildIPSetWildcards(
     skstream_t         *stream)
 {
-#if SK_ENABLE_IPV6
     int saw_integer = 0;
-#endif
     int lc = 0;
     char line_buf[512];
     skIPWildcard_t ipwild;
@@ -550,7 +542,6 @@ buildIPSetWildcards(
         /* first, attempt to parse as a CIDR block */
         rv = skStringParseCIDR(&ip, &prefix, line_buf);
         if (rv == 0) {
-#if SK_ENABLE_IPV6
             /* do not allow integers mixed with IPv6 addresses */
             if (saw_integer) {
                 if (skipaddrIsV6(&ip)) {
@@ -568,7 +559,6 @@ buildIPSetWildcards(
                     goto END;
                 }
             }
-#endif  /* SK_ENABLE_IPV6 */
 
             rv = skIPSetInsertAddress(ipset, &ip, prefix);
             if (rv) {
@@ -590,7 +580,6 @@ buildIPSetWildcards(
             if (rv2 > 0) {
                 /* parsed an IP and there is extra text after the IP
                  * address; check to see if it is another IP addr */
-#if SK_ENABLE_IPV6
                 if (skipaddrIsV6(&ip)
                     && ((cp = strchr(line_buf + rv2, ':')) != NULL))
                 {
@@ -604,7 +593,6 @@ buildIPSetWildcards(
                         goto END;
                     }
                 }
-#endif
                 if (!skipaddrIsV6(&ip)
                     && ((cp = strchr(line_buf + rv2, '.')) != NULL))
                 {
@@ -625,7 +613,6 @@ buildIPSetWildcards(
             goto END;
         }
 
-#if SK_ENABLE_IPV6
         /* do not allow integers mixed with IPv6 addresses */
         if (saw_integer && skIPWildcardIsV6(&ipwild)) {
             skAppPrintErr("Error on line %d: %s",
@@ -633,7 +620,6 @@ buildIPSetWildcards(
             rv = -1;
             goto END;
         }
-#endif  /* SK_ENABLE_IPV6 */
 
         rv = skIPSetInsertIPWildcard(ipset, &ipwild);
         if (rv) {

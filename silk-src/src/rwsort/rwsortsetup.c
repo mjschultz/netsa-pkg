@@ -16,11 +16,12 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsortsetup.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
+RCSIDENT("$SiLK: rwsortsetup.c d1637517606d 2017-06-23 16:51:31Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skcountry.h>
 #include <silk/skprefixmap.h>
+#include <silk/sksidecar.h>
 #include <silk/sksite.h>
 #include <silk/skstringmap.h>
 #include "rwsort.h"
@@ -37,17 +38,30 @@ RCSIDENT("$SiLK: rwsortsetup.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
 
 /* LOCAL VARIABLES */
 
+/* whether to print the fields' help */
+static int help_fields = 0;
+
 /* the text the user entered for the --fields switch */
 static char *fields_arg = NULL;
 
-/* available key fields; rwAsciiFieldMapAddDefaultFields() fills this */
+/* available key fields; skRwrecAppendFieldsToStringMap() fills this */
 static sk_stringmap_t *key_field_map = NULL;
+
+/* fields used as part of the key that come from plug-ins; this is an
+ * array of pointers into the key_fields[] array */
+static key_field_t **active_plugins = NULL;
+
+/* the number of active plug-in fields */
+static uint32_t num_plugins = 0;
 
 /* handle input streams */
 static sk_options_ctx_t *optctx = NULL;
 
 /* whether to print names of files as they are opened; 0 == no */
 static int print_filenames = 0;
+
+/* sidecar holding all defined sidecar elements */
+static sk_sidecar_t *sidecar = NULL;
 
 /* non-zero if we are shutting down due to a signal; controls whether
  * errors are printed in appTeardown(). */
@@ -79,11 +93,6 @@ static const char *app_plugin_names[] = {
 
 /* temporary directory */
 static const char *temp_directory = NULL;
-
-/* read-only cache of argc and argv used for writing header to output
- * file */
-static int pargc;
-static char **pargv;
 
 
 /* OPTIONS */
@@ -135,6 +144,11 @@ static void appHandleSignal(int sig);
 static int  parseFields(const char *fields_string);
 static void helpFields(FILE *fh);
 static int  createStringmaps(void);
+static void
+copy_file_header_callback(
+    sk_flow_iter_t     *f_iter,
+    skstream_t         *stream,
+    void               *data);
 
 
 
@@ -160,7 +174,7 @@ appUsageLong(
      "\tfrom the standard input.\n")
 
     FILE *fh = USAGE_FH;
-    unsigned int i;
+    int i;
 
     /* Create the string map for --fields */
     createStringmaps();
@@ -169,10 +183,10 @@ appUsageLong(
     fprintf(fh, "\nSWITCHES:\n");
     skOptionsDefaultUsage(fh);
 
-    for (i = 0; appOptions[i].name; ++i) {
+    for (i = 0; appOptions[i].name; i++ ) {
         fprintf(fh, "--%s %s. ", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]));
-        switch ((appOptionsEnum)appOptions[i].val) {
+        switch (i) {
           case OPT_FIELDS:
             /* Dynamically build the help */
             fprintf(fh, "%s\n", appHelp[i]);
@@ -217,6 +231,8 @@ appTeardown(
     void)
 {
     static int teardownFlag = 0;
+    key_field_t *key;
+    uint32_t i;
     int rv;
 
     if (teardownFlag) {
@@ -242,14 +258,25 @@ appTeardown(
     skPluginTeardown();
 
     /* free variables */
-    if (sort_fields != NULL) {
-        free(sort_fields);
+    if (key_fields != NULL) {
+        for (i = 0, key = key_fields; i < num_fields; ++i, ++key) {
+            free(key->kf_name);
+        }
+        free(key_fields);
     }
-    if (key_field_map) {
-        skStringMapDestroy(key_field_map);
-    }
+    skStringMapDestroy(key_field_map);
+    key_field_map = NULL;
+
+    sk_sidecar_destroy(&sidecar);
+    sk_sidecar_destroy(&out_sidecar);
+
+    sk_lua_closestate(L);
+    L = NULL;
+
+    free(active_plugins);
 
     skOptionsNotesTeardown();
+    sk_flow_iter_destroy(&flowiter);
     skOptionsCtxDestroy(&optctx);
     skAppUnregister();
 }
@@ -301,18 +328,13 @@ appSetup(
     skOptionsSetUsageCallback(&appUsageLong);
 
     /* Initialize variables */
-    memset(key_fields, 0, sizeof(key_fields));
     rv = skStringParseHumanUint64(&tmp64, DEFAULT_SORT_BUFFER_SIZE,
                                   SK_HUMAN_NORMAL);
     assert(0 == rv);
     sort_buffer_size = tmp64;
 
     optctx_flags = (SK_OPTIONS_CTX_INPUT_SILK_FLOW | SK_OPTIONS_CTX_ALLOW_STDIN
-                    | SK_OPTIONS_CTX_XARGS | SK_OPTIONS_CTX_INPUT_PIPE);
-
-    /* store a copy of the arguments */
-    pargc = argc;
-    pargv = argv;
+                    | SK_OPTIONS_CTX_XARGS);
 
     /* Initialize plugin library */
     skPluginSetup(1, SKPLUGIN_APP_SORT);
@@ -336,6 +358,10 @@ appSetup(
         appExit(EXIT_FAILURE);
     }
 
+    sk_sidecar_create(&sidecar);
+    sk_sidecar_create(&out_sidecar);
+    L = sk_lua_newstate();
+
     /* try to load hard-coded plugins */
     for (j = 0; app_static_plugins[j].name; ++j) {
         skPluginAddAsPlugin(app_static_plugins[j].name,
@@ -349,6 +375,18 @@ appSetup(
     rv = skOptionsCtxOptionsParse(optctx, argc, argv);
     if (rv < 0) {
         skAppUsage();           /* never returns */
+    }
+
+    /* create flow iterator to read the records from the stream */
+    flowiter = skOptionsCtxCreateFlowIterator(optctx);
+    /* copy header information from inputs to output */
+    sk_flow_iter_set_stream_event_cb(
+        flowiter, SK_FLOW_ITER_CB_EVENT_PRE_READ,
+        &copy_file_header_callback, NULL);
+
+    if (help_fields) {
+        helpFields(USAGE_FH);
+        exit(EXIT_SUCCESS);
     }
 
     /* try to load site config file; if it fails, we will not be able
@@ -381,7 +419,7 @@ appSetup(
 
     /* Check for an output stream; or default to stdout  */
     if (out_stream == NULL) {
-        if ((rv = skStreamCreate(&out_stream, SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+        if ((rv = skStreamCreate(&out_stream,SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
             || (rv = skStreamBind(out_stream, "-")))
         {
             skStreamPrintLastErr(out_stream, rv, NULL);
@@ -444,8 +482,8 @@ appOptionsHandler(
 
     switch ((appOptionsEnum)opt_index) {
       case OPT_HELP_FIELDS:
-        helpFields(USAGE_FH);
-        exit(EXIT_SUCCESS);
+        help_fields = 1;
+        break;
 
       case OPT_FIELDS:
         assert(opt_arg);
@@ -473,7 +511,7 @@ appOptionsHandler(
             skStreamDestroy(&out_stream);
             return 1;
         }
-        if ((rv = skStreamCreate(&out_stream, SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
+        if ((rv = skStreamCreate(&out_stream,SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
             || (rv = skStreamBind(out_stream, opt_arg)))
         {
             skStreamPrintLastErr(out_stream, rv, NULL);
@@ -549,7 +587,7 @@ appHandleSignal(
  *  status = parseFields(fields_string);
  *
  *    Parse the user's option for the --fields switch and fill in the
- *    global sort_fields[].  Return 0 on success; -1 on failure.
+ *    global key_fields[].  Return 0 on success; -1 on failure.
  */
 static int
 parseFields(
@@ -557,9 +595,9 @@ parseFields(
 {
     sk_stringmap_iter_t *sm_iter = NULL;
     sk_stringmap_entry_t *sm_entry;
+    key_field_t *key;
     char *errmsg;
     uint32_t i;
-    int have_icmp_type_code;
     int rv = -1;
 
     /* have we been here before? */
@@ -577,130 +615,91 @@ parseFields(
         goto END;
     }
 
-    num_fields = 0;
+    num_fields = skStringMapIterCountMatches(sm_iter);
+    key_fields = sk_alloc_array(key_field_t, num_fields);
 
-    /* check and handle legacy icmpTypeCode field */
-    have_icmp_type_code = 0;
-    while (skStringMapIterNext(sm_iter, &sm_entry, NULL) == SK_ITERATOR_OK) {
-        switch (sm_entry->id) {
-          case RWREC_FIELD_ICMP_TYPE:
-          case RWREC_FIELD_ICMP_CODE:
-            have_icmp_type_code |= 1;
-            break;
-          case RWREC_PRINTABLE_FIELD_COUNT:
-            have_icmp_type_code |= 2;
-            break;
-        }
-    }
-    if (3 == have_icmp_type_code) {
-        skAppPrintErr("Invalid %s: May not mix field %s with %s or %s",
-                      appOptions[OPT_FIELDS].name,
-                      skStringMapGetFirstName(
-                          key_field_map, RWREC_PRINTABLE_FIELD_COUNT),
-                      skStringMapGetFirstName(
-                          key_field_map, RWREC_FIELD_ICMP_TYPE),
-                      skStringMapGetFirstName(
-                          key_field_map, RWREC_FIELD_ICMP_CODE));
-        goto END;
-    }
-    if (2 == have_icmp_type_code) {
-        /* add 1 since icmpTypeCode will become 2 fields */
-        num_fields = 1;
-    }
-
-    skStringMapIterReset(sm_iter);
-
-    num_fields += skStringMapIterCountMatches(sm_iter);
-    sort_fields = (uint32_t*)malloc(num_fields * sizeof(uint32_t));
-    if (NULL == sort_fields) {
-        skAppPrintOutOfMemory(NULL);
-        goto END;
-    }
-
-    /* convert the vector to an array, and initialize any plug-ins */
-    for (i = 0;
+    for (key = key_fields;
          skStringMapIterNext(sm_iter, &sm_entry, NULL) == SK_ITERATOR_OK;
-         ++i)
+         ++key)
     {
-        assert(i < num_fields);
-        if (sm_entry->id == RWREC_PRINTABLE_FIELD_COUNT) {
-            /* handle the icmpTypeCode field */
-            sort_fields[i] = RWREC_FIELD_ICMP_TYPE;
-            ++i;
-            assert(i < num_fields);
-            sort_fields[i] = RWREC_FIELD_ICMP_CODE;
-            continue;
-        }
+        assert(key < key_fields + num_fields);
+        key->kf_id = sm_entry->id;
+        if (key->kf_id & SIDECAR_FIELD_BIT) {
+            /* field comes from a sidecar */
+            const sk_sidecar_elem_t *sc_elem;
 
-        sort_fields[i] = sm_entry->id;
-        if (NULL != sm_entry->userdata) {
+            sc_elem = (sk_sidecar_elem_t *)sm_entry->userdata;
+            assert(sc_elem);
+
+            key->kf_name = sk_alloc_strdup(sm_entry->name);
+            key->kf_type = sk_sidecar_elem_get_data_type(sc_elem);
+
+        } else if (key->kf_id & PLUGIN_FIELD_BIT) {
             /* field comes from a plug-in */
-            key_field_t      *key;
+            const char **field_names;
             skplugin_field_t *pi_field;
-            size_t            bin_width;
-            skplugin_err_t    pi_err;
+            skplugin_err_t pi_err;
+            const char *title;
+            size_t bin_width;
 
-            if (key_num_fields == MAX_PLUGIN_KEY_FIELDS) {
-                skAppPrintErr("Too many fields specified %lu > %u max",
-                              (unsigned long)key_num_fields,
-                              MAX_PLUGIN_KEY_FIELDS);
-                goto END;
-            }
+            pi_field = (skplugin_field_t*)sm_entry->userdata;
+            assert(pi_field);
 
-            pi_field = (skplugin_field_t*)(sm_entry->userdata);
+            key->kf_pi_handle = pi_field;
 
             /* Activate the plugin (so cleanup knows about it) */
-            pi_err = skPluginFieldActivate(pi_field);
-            if (pi_err != SKPLUGIN_OK) {
-                goto END;
-            }
-
+            skPluginFieldActivate(pi_field);
             /* Initialize this field */
             pi_err = skPluginFieldRunInitialize(pi_field);
             if (pi_err != SKPLUGIN_OK) {
+                skAppPrintErr("Cannot add field %s from plugin",
+                              sm_entry->name);
                 goto END;
             }
+
+            /* get the names and the title */
+            skPluginFieldName(pi_field, &field_names);
+            skPluginFieldTitle(pi_field, &title);
+            key->kf_name = sk_alloc_strdup(field_names[0]);
 
             /* get the bin width for this field */
             pi_err = skPluginFieldGetLenBin(pi_field, &bin_width);
             if (pi_err != SKPLUGIN_OK) {
+                skAppPrintErr("Cannot add field %s from plugin:"
+                              " Unable to get bin length",
+                              sm_entry->name);
                 goto END;
             }
             if (0 == bin_width) {
-                const char *title;
-                skPluginFieldTitle(pi_field, &title);
-                skAppPrintErr("Plug-in field '%s' has a binary width of 0",
-                              title);
+                skAppPrintErr("Cannot add field %s from plugin:"
+                              " Field has a binary width of 0",
+                              sm_entry->name);
                 goto END;
             }
+            key->kf_width = bin_width;
+            ++num_plugins;
 
-            key = &(key_fields[key_num_fields]);
-            key->kf_field_handle = pi_field;
-            key->kf_offset       = node_size;
-            key->kf_width        = bin_width;
-
-            ++key_num_fields;
-
-            node_size += bin_width;
-            if (node_size > MAX_NODE_SIZE) {
-                skAppPrintErr(("Sort key is too large %" SK_PRIuZ
-                               " bytes > %" SK_PRIuZ " max"),
-                              node_size, MAX_NODE_SIZE);
-                goto END;
-            }
+        } else {
+            assert(NULL == sm_entry->userdata);
+            /* field is built-in */
         }
     }
+    num_fields = (key - key_fields);
 
-#ifdef SK_HAVE_ALIGNED_ACCESS_REQUIRED
-    /* records must be aligned */
-    node_size = (1 + ((node_size - 1) / sizeof(uint64_t))) * sizeof(uint64_t);
-    if (node_size > MAX_NODE_SIZE) {
-        skAppPrintErr(("Sort key is too large %" SK_PRIuZ
-                       " bytes > %" SK_PRIuZ " max"),
-                      node_size, MAX_NODE_SIZE);
-        goto END;
+    /* create an array for quick access to plug-in fields */
+    if (num_plugins) {
+        uint32_t j = 0;
+
+        active_plugins = sk_alloc_array(key_field_t *, num_plugins);
+        for (i = 0, key = key_fields; i < num_fields; ++i, ++key) {
+            if (key->kf_id & PLUGIN_FIELD_BIT) {
+                assert(j < num_plugins);
+                active_plugins[j] = key;
+                ++j;
+            }
+        }
+        assert(j == num_plugins);
     }
-#endif
 
     /* success */
     rv = 0;
@@ -737,83 +736,57 @@ helpFields(
 
 
 /*
- *  int = appNextInput(&stream);
+ *    Copy the annotation and command line entries from the header of
+ *    the input stream 'stream' to the global output stream
+ *    'out_stream'.
  *
- *    Fill 'stream' with the next input file to read.  Return 0 if
- *    'stream' was successfully opened or 1 if there are no more input
- *    files.
- *
- *    When an input file cannot be opened, the return value is
- *    dependent on the error.  If the error is due to being out of
- *    file handles or memory (EMFILE or ENOMEM), return -2; otherwise
- *    return -1.
+ *    This is a callback function registered with the global
+ *    sk_flow_iter_t 'flowiter' and it may be invoked by
+ *    sk_flow_iter_get_next_rec().
  */
-int
-appNextInput(
-    skstream_t        **stream)
+static void
+copy_file_header_callback(
+    sk_flow_iter_t     *f_iter,
+    skstream_t         *stream,
+    void               *data)
 {
-    static char *path = NULL;
-    int rv;
+    const sk_sidecar_t *in_sidecar;
+    const sk_sidecar_elem_t *elem;
+    sk_sidecar_iter_t iter;
+    ssize_t rv;
 
-    /* 'path' will be non-NULL if we failed to open the file last time
-     * due to being out of memory or file handles. */
+    (void)f_iter;
+    (void)data;
 
-    if (NULL == path) {
-        rv = skOptionsCtxNextArgument(optctx, &path);
-        if (rv < 0) {
-            appExit(EXIT_FAILURE);
-        }
-        if (1 == rv) {
-            /* no more input.  add final information to header */
-            if ((rv = skHeaderAddInvocation(skStreamGetSilkHeader(out_stream),
-                                            1, pargc, pargv))
-                || (rv = skOptionsNotesAddToStream(out_stream)))
-            {
-                skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
-            }
-            return 1;
-        }
-    }
-
-    /* create stream and open file */
-    errno = 0;
-    rv = skStreamOpenSilkFlow(stream, path, SK_IO_READ);
-    if (rv) {
-        if (errno == EMFILE || errno == ENOMEM) {
-            TRACEMSG(("Unable to open '%s': %s", path, strerror(errno)));
-            rv = -2;
-        } else {
-            if (print_filenames) {
-                fprintf(PRINT_FILENAMES_FH, "%s\n",
-                        skStreamGetPathname(*stream));
-            }
-            skStreamPrintLastErr(*stream, rv, &skAppPrintErr);
-            rv = -1;
-        }
-        skStreamDestroy(stream);
-        return rv;
-    }
-
-    /* successfully opened file */
-    path = NULL;
-
-    /* copy annotations and command line entries from the input to the
-     * output */
     if ((rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_stream),
-                                  skStreamGetSilkHeader(*stream),
+                                  skStreamGetSilkHeader(stream),
                                   SK_HENTRY_INVOCATION_ID))
         || (rv = skHeaderCopyEntries(skStreamGetSilkHeader(out_stream),
-                                     skStreamGetSilkHeader(*stream),
+                                     skStreamGetSilkHeader(stream),
                                      SK_HENTRY_ANNOTATION_ID)))
     {
         skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
     }
 
-    if (print_filenames) {
-        fprintf(PRINT_FILENAMES_FH, "%s\n", skStreamGetPathname(*stream));
+    in_sidecar = skStreamGetSidecar(stream);
+    if (NULL == in_sidecar) {
+        return;
+    }
+    sk_sidecar_iter_bind(in_sidecar, &iter);
+    while (sk_sidecar_iter_next(&iter, &elem) == SK_ITERATOR_OK) {
+        rv = sk_sidecar_add_elem(out_sidecar, elem, NULL);
+        if (rv) {
+            if (SK_SIDECAR_E_DUPLICATE == rv) {
+                /* FIXME: ignore for now */
+            } else {
+                skAppPrintErr("Cannot add field from sidecar: %" SK_PRIdZ, rv);
+            }
+        }
     }
 
-    return 0;
+    if (print_filenames) {
+        fprintf(PRINT_FILENAMES_FH, "%s\n", skStreamGetPathname(stream));
+    }
 }
 
 
@@ -835,21 +808,40 @@ createStringmaps(
     const char           **name;
     uint32_t               max_id;
 
-    /* initialize string-map of field identifiers: add default fields;
-     * keep the millisecond fields so that SiLK applications take the
-     * same switches; the seconds and milliseconds value map to the
-     * same code. */
-    if (rwAsciiFieldMapAddDefaultFields(&key_field_map)) {
+    /* initialize string-map of field identifiers */
+    if (skStringMapCreate(&key_field_map)
+        || skRwrecAppendFieldsToStringMap(key_field_map))
+    {
         skAppPrintErr("Unable to setup fields stringmap");
         appExit(EXIT_FAILURE);
     }
-    max_id = RWREC_PRINTABLE_FIELD_COUNT - 1;
+    max_id = RWREC_FIELD_ID_COUNT - 1;
 
-    /* add "icmpTypeCode" field */
-    ++max_id;
-    if (rwAsciiFieldMapAddIcmpTypeCode(key_field_map, max_id)) {
-        skAppPrintErr("Unable to add icmpTypeCode");
-        return -1;
+    if (flowiter) {
+        sk_sidecar_iter_t sc_iter;
+        const sk_sidecar_elem_t *sc_elem;
+        char buf[PATH_MAX];
+        size_t buflen;
+
+        if (sk_flow_iter_fill_sidecar(flowiter, sidecar)) {
+            skAppPrintErr("Error reading file header");
+            return -1;
+        }
+        sk_sidecar_iter_bind(sidecar, &sc_iter);
+        while (sk_sidecar_iter_next(&sc_iter, &sc_elem) == SK_ITERATOR_OK) {
+            buflen = sizeof(buf);
+            sk_sidecar_elem_get_name(sc_elem, buf, &buflen);
+            ++max_id;
+            sm_entry.name = buf;
+            sm_entry.id = SIDECAR_FIELD_BIT | max_id;
+            sm_entry.userdata = sc_elem;
+            sm_entry.description = NULL;
+            sm_err = skStringMapAddEntries(key_field_map, 1, &sm_entry);
+            if (sm_err) {
+                skAppPrintErr("Cannot add field '%s' from sidecar: %s",
+                              buf, skStringMapStrerror(sm_err));
+            }
+        }
     }
 
     /* add --fields from plug-ins */
@@ -865,10 +857,10 @@ createStringmaps(
         ++max_id;
 
         /* Add the field to the key_field_map */
-        for (name = field_names; *name; name++) {
+        for (name = field_names; *name; ++name) {
             memset(&sm_entry, 0, sizeof(sm_entry));
             sm_entry.name = *name;
-            sm_entry.id = max_id;
+            sm_entry.id = PLUGIN_FIELD_BIT | max_id;
             sm_entry.userdata = pi_field;
             skPluginFieldDescription(pi_field, &sm_entry.description);
             sm_err = skStringMapAddEntries(key_field_map, 1, &sm_entry);
@@ -884,6 +876,93 @@ createStringmaps(
     }
 
     return 0;
+}
+
+
+/*
+ *    Copy 'src_rec' into 'dst_rec' and add plug-in fields.
+ *
+ *    If 'src_rec' has sidecar data, add a sidecar table to 'dst_rec'
+ *    and copy the entries from 'src_rec' to 'dst_rec'.
+ *
+ *    If plug-in fields exist, add the plug-in's data into sidecar
+ *    fields on 'dst_rec'.
+ */
+void
+addPluginFields(
+    rwRec              *rwrec)
+{
+    skplugin_err_t pi_err;
+    key_field_t *key;
+    uint8_t data_buf[1 << 14];
+    size_t i;
+    int ref;
+
+    assert(rwrec->lua_state == L);
+    if (0 == num_plugins) {
+        return;
+    }
+
+    ref = rwRecGetSidecar(rwrec);
+    if (ref == LUA_NOREF) {
+        /* create a table to use as sidecar on the record */
+        lua_newtable(L);
+    } else if (lua_rawgeti(L, LUA_REGISTRYINDEX, ref) != LUA_TTABLE) {
+        skAppPrintErr("Sidecar is not a table");
+        skAbort();
+    }
+
+    /* call the plug-ins */
+    for (i = 0; i < num_plugins; ++i) {
+        key = active_plugins[i];
+        pi_err = (skPluginFieldRunRecToBinFn(
+                      key->kf_pi_handle, data_buf, rwrec, NULL));
+        if (pi_err != SKPLUGIN_OK) {
+            skAppPrintErr(("Plugin-based field %s failed converting to binary "
+                           "with error code %d"), key->kf_name, pi_err);
+            exit(EXIT_FAILURE);
+        }
+        lua_pushlstring(L, (char *)data_buf, key->kf_width);
+        lua_setfield(L, -2, key->kf_name);
+    }
+
+    assert(LUA_TTABLE == lua_type(L, -1));
+
+    /* The copied table is at the top of the stack; get a reference to
+     * it and remove it */
+    if (ref == LUA_NOREF) {
+        rwRecSetSidecar(rwrec, luaL_ref(L, LUA_REGISTRYINDEX));
+    } else {
+        lua_pop(L, 1);
+    }
+}
+
+
+/*
+ *  status = fillRecordAndKey(stream, node);
+ *
+ *    Reads a flow record from 'stream', computes the key based on the
+ *    global key_fields[] settings, and fills in the parameter 'buf'
+ *    with the record and then the key.  Return 1 if a record was
+ *    read, or 0 if it was not.
+ */
+int
+fillRecordAndKey(
+    skstream_t         *stream,
+    rwRec              *rwrec)
+{
+    int rv;
+
+    rv = skStreamReadRecord(stream, rwrec);
+    if (rv) {
+        /* end of file or error getting record */
+        if (SKSTREAM_ERR_EOF != rv) {
+            skStreamPrintLastErr(stream, rv, &skAppPrintErr);
+        }
+        return 0;
+    }
+    addPluginFields(rwrec);
+    return 1;
 }
 
 

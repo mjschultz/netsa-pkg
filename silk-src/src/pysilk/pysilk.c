@@ -16,7 +16,7 @@
                                    headers */
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pysilk.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: pysilk.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skbag.h>
@@ -42,22 +42,7 @@ SK_DIAGNOSTIC_IGNORE_PUSH("-Wwrite-strings")
 #define XSTR(s) #s
 #define STR(s) XSTR(s)
 
-
-/* In Python 2.4, length()-type functions are 'inquiry's that return
- * int.  In Python 2.5, they are 'lenfunc's that return Py_ssize_t. */
-#if PY_VERSION_HEX < 0x02050000
-#define Py_ssize_t     int
-#define PY_SSIZE_T_MAX INT_MAX
-#endif
-
 #define NOT_SET -9999
-
-#if SK_ENABLE_IPV6
-#define UNUSED_NOv6(x) x
-#else
-#define UNUSED_NOv6(x) UNUSED(x)
-#endif
-
 
 #define CHECK_SITE(err)                         \
     do {                                        \
@@ -112,9 +97,7 @@ typedef struct silkpy_globals_st {
     PyObject *flowtypes;
     PyObject *newrawrec;
     PyObject *maxintipv4;
-#if SK_ENABLE_IPV6
     PyObject *maxintipv6;
-#endif
     int site_configured;
 } silkpy_globals_t;
 
@@ -139,14 +122,6 @@ static silkpy_globals_t silkpy_globals_static;
 #define GLOBALS   (&silkpy_globals_static)
 
 #endif  /* #else of #if PY_MAJOR_VERSION >= 3 */
-
-/*    A pointer to pass as the closure to C functions that implement
- *    multiple Python functions where some of the Python function
- *    names are deprecated. */
-static const char deprecated_true_str[] = "1";
-
-/*    Cast away the const */
-#define deprecated_true ((void*)deprecated_true_str)
 
 
 /* LOCAL FUNCTION PROTOTYPES */
@@ -199,13 +174,6 @@ static int
 silkPyDatetimeToSktime(
     sktime_t           *silktime,
     PyObject           *datetime);
-#if !SK_ENABLE_IPV6
-static PyObject *
-silkPyNotImplemented(
-    PyObject    UNUSED(*self),
-    PyObject    UNUSED(*args),
-    PyObject    UNUSED(*kwds));
-#endif
 
 
 /* FUNCTION DEFINITIONS */
@@ -234,9 +202,6 @@ silkPyIPAddr_int(
     silkPyIPAddr       *obj);
 static PyObject *
 silkPyIPAddr_is_ipv6(
-    silkPyIPAddr        UNUSED_NOv6(*self));
-static PyObject *
-silkPyIPAddr_isipv6_deprecated(
     silkPyIPAddr       *self);
 static PyObject *
 silkPyIPAddr_mask(
@@ -274,11 +239,9 @@ silkPyIPAddr_str(
 static PyObject *
 silkPyIPAddr_to_ipv4(
     PyObject           *self);
-#if SK_ENABLE_IPV6
 static PyObject *
 silkPyIPAddr_to_ipv6(
     PyObject           *self);
-#endif
 static int
 silkPyIPv4Addr_init(
     silkPyIPAddr       *self,
@@ -294,13 +257,11 @@ silkPyIPv6Addr_init(
     silkPyIPAddr       *self,
     PyObject           *args,
     PyObject           *kwds);
-#if SK_ENABLE_IPV6
 static PyObject *
 silkPyIPv6Addr_new(
     PyTypeObject       *type,
     PyObject           *args,
     PyObject           *kwds);
-#endif
 static PyObject *
 silkPyIPvXAddr_new(
     PyTypeObject       *basetype,
@@ -329,17 +290,9 @@ static PyNumberMethods silkPyIPAddr_number_methods;
 
 static PyMethodDef silkPyIPAddr_methods[] = {
     {"__reduce__", (PyCFunction)reduce_error, METH_NOARGS, ""},
-    {"isipv6", (PyCFunction)silkPyIPAddr_isipv6_deprecated, METH_NOARGS,
-     ("addr.isipv6() -> bool -- return whether addr is an IPv6 address."
-      " DEPRECATED Use addr.is_ipv6() instead.")},
     {"is_ipv6", (PyCFunction)silkPyIPAddr_is_ipv6, METH_NOARGS,
      "addr.is_ipv6() -> bool -- return whether addr is an IPv6 address"},
-    {"to_ipv6", (PyCFunction)
-#if SK_ENABLE_IPV6
-     silkPyIPAddr_to_ipv6, METH_NOARGS,
-#else
-     silkPyNotImplemented, METH_VARARGS | METH_KEYWORDS,
-#endif
+    {"to_ipv6", (PyCFunction)silkPyIPAddr_to_ipv6, METH_NOARGS,
      "addr.to_ipv6() -- return addr converted to an IPv6 address"},
     {"to_ipv4", (PyCFunction)silkPyIPAddr_to_ipv4, METH_NOARGS,
      "addr.to_ipv4() -- return addr converted to an IPv4 address"},
@@ -408,10 +361,8 @@ static PyTypeObject silkPyIPAddrType = {
     0,                          /* tp_cache */
     0,                          /* tp_subclasses */
     0,                          /* tp_weaklist */
-    0                           /* tp_del */
-#if PY_VERSION_HEX >= 0x02060000
-    ,0                          /* tp_version_tag */
-#endif
+    0,                          /* tp_del */
+    0                           /* tp_version_tag */
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
@@ -463,10 +414,8 @@ static PyTypeObject silkPyIPv4AddrType = {
     0,                          /* tp_cache */
     0,                          /* tp_subclasses */
     0,                          /* tp_weaklist */
-    0                           /* tp_del */
-#if PY_VERSION_HEX >= 0x02060000
-    ,0                          /* tp_version_tag */
-#endif
+    0,                          /* tp_del */
+    0                           /* tp_version_tag */
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
@@ -510,11 +459,7 @@ static PyTypeObject silkPyIPv6AddrType = {
     0,                          /* tp_dictoffset */
     (initproc)silkPyIPv6Addr_init, /* tp_init */
     0,                          /* tp_alloc */
-#if SK_ENABLE_IPV6
     silkPyIPv6Addr_new,         /* tp_new */
-#else
-    (newfunc)silkPyNotImplemented, /* tp_new */
-#endif
     0,                          /* tp_free */
     0,                          /* tp_is_gc */
     0,                          /* tp_bases */
@@ -522,10 +467,8 @@ static PyTypeObject silkPyIPv6AddrType = {
     0,                          /* tp_cache */
     0,                          /* tp_subclasses */
     0,                          /* tp_weaklist */
-    0                           /* tp_del */
-#if PY_VERSION_HEX >= 0x02060000
-    ,0                          /* tp_version_tag */
-#endif
+    0,                          /* tp_del */
+    0                           /* tp_version_tag */
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
@@ -566,7 +509,6 @@ silkPyIPAddr_hash(
     silkPyIPAddr       *obj)
 {
     long retval;
-#if SK_ENABLE_IPV6
     if (skipaddrIsV6(&obj->addr)) {
         uint8_t v6[16];
         skipaddrGetAsV6(&obj->addr, v6);
@@ -578,7 +520,6 @@ silkPyIPAddr_hash(
 #endif  /* SK_SIZEOF_LONG */
         return retval;
     }
-#endif  /* SK_ENABLE_IPV6 */
     retval = skipaddrGetV4(&obj->addr);
     if (retval == -1) {
         retval = 0;
@@ -592,7 +533,6 @@ silkPyIPAddr_int(
 {
     PyObject *result;
 
-#if SK_ENABLE_IPV6
     if (skipaddrIsV6(&obj->addr)) {
         char      buf[33];
         char     *p;
@@ -607,9 +547,7 @@ silkPyIPAddr_int(
             ++v6;
         }
         result = PyLong_FromString(buf, NULL, 16);
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
+    } else {
         result = PyLong_FromUnsignedLong(skipaddrGetV4(&obj->addr));
     }
 
@@ -618,24 +556,9 @@ silkPyIPAddr_int(
 
 static PyObject *
 silkPyIPAddr_is_ipv6(
-    silkPyIPAddr        UNUSED_NOv6(*self))
-{
-#if SK_ENABLE_IPV6
-    return PyBool_FromLong(skipaddrIsV6(&self->addr));
-#else
-    Py_RETURN_FALSE;
-#endif
-}
-
-static PyObject *
-silkPyIPAddr_isipv6_deprecated(
     silkPyIPAddr       *self)
 {
-    /* deprecated in SiLK-2.2.0 */
-    PyErr_Warn(PyExc_DeprecationWarning,
-               ("IPAddr.isipv6() is deprecated.  "
-                "Use IPAddr.is_ipv6() instead."));
-    return silkPyIPAddr_is_ipv6(self);
+    return PyBool_FromLong(skipaddrIsV6(&self->addr));
 }
 
 static PyObject *
@@ -654,12 +577,9 @@ silkPyIPAddr_mask(
 
     skipaddrCopy(&addr, &self->addr);
     skipaddrMask(&addr, &((silkPyIPAddr*)mask)->addr);
-#if SK_ENABLE_IPV6
     if (skipaddrIsV6(&addr)) {
         type = &silkPyIPv6AddrType;
-    } else
-#endif
-    {
+    } else {
         type = &silkPyIPv4AddrType;
     }
     retval = PyObject_New(silkPyIPAddr, type);
@@ -686,13 +606,10 @@ silkPyIPAddr_mask_prefix(
         return NULL;
     }
 
-#if SK_ENABLE_IPV6
     if (skipaddrIsV6(&self->addr)) {
         type = &silkPyIPv6AddrType;
         max = 128;
-    } else
-#endif
-    {
+    } else {
         type = &silkPyIPv4AddrType;
         max = 32;
     }
@@ -707,12 +624,9 @@ silkPyIPAddr_mask_prefix(
                             "Prefix must be between 0 and %d", max);
     }
 
-#if SK_ENABLE_IPV6
     if (skipaddrIsV6(&self->addr)) {
         type = &silkPyIPv6AddrType;
-    } else
-#endif
-    {
+    } else {
         type = &silkPyIPv4AddrType;
     }
     retval = PyObject_New(silkPyIPAddr, type);
@@ -750,12 +664,9 @@ silkPyIPAddr_new(
     if (silkPyIPAddr_Check(o)) {
         /* Unknown subclass of IPAddr, do a real copy */
         if (type == &silkPyIPAddrType) {
-#if SK_ENABLE_IPV6
             if (skipaddrIsV6(&((silkPyIPAddr*)o)->addr)) {
                 type = &silkPyIPv6AddrType;
-            } else
-#endif
-            {
+            } else {
                 type = &silkPyIPv4AddrType;
             }
         }
@@ -776,16 +687,6 @@ silkPyIPAddr_new(
             type = &silkPyIPv4AddrType;
         }
         Py_DECREF(bytes);
-    } else if (IS_INT(o)) {
-        /* The IPAddr(int) constructor is deprecated as of SiLK 2.2.0 */
-        int rv = PyErr_Warn(PyExc_DeprecationWarning,
-                            ("IPAddr(int) is deprecated.  Use IPv4Addr(int) "
-                             "or IPv6Addr(int) instead."));
-        if (rv) {
-            return NULL;
-        }
-        type = &silkPyIPv4AddrType;
-
     } else {
         return PyErr_Format(PyExc_TypeError, "Must be a string or IPAddr");
     }
@@ -807,7 +708,6 @@ silkPyIPAddr_octets(
     PyObject *octet;
     int i;
 
-#if SK_ENABLE_IPV6
     if (skipaddrIsV6(&self->addr)) {
         uint8_t v6[16];
         retval = PyTuple_New(16);
@@ -824,9 +724,7 @@ silkPyIPAddr_octets(
             }
             PyTuple_SET_ITEM(retval, i, octet);
         }
-    } else
-#endif
-    {
+    } else {
         uint32_t v4 = skipaddrGetV4(&self->addr);
         retval = PyTuple_New(4);
         if (retval == NULL) {
@@ -930,7 +828,6 @@ static PyObject *
 silkPyIPAddr_to_ipv4(
     PyObject           *self)
 {
-#if SK_ENABLE_IPV6
     PyObject *obj;
 
     obj = PyObject_CallFunctionObjArgs((PyObject*)&silkPyIPv4AddrType,
@@ -943,13 +840,8 @@ silkPyIPAddr_to_ipv4(
     }
 
     return obj;
-#else  /* SK_ENABLE_IPV6 */
-    Py_INCREF(self);
-    return self;
-#endif  /* SK_ENABLE_IPV6 */
 }
 
-#if SK_ENABLE_IPV6
 static PyObject *
 silkPyIPAddr_to_ipv6(
     PyObject           *self)
@@ -957,7 +849,6 @@ silkPyIPAddr_to_ipv6(
     return PyObject_CallFunctionObjArgs((PyObject*)&silkPyIPv6AddrType,
                                         self, NULL);
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 static int
 silkPyIPv4Addr_init(
@@ -991,13 +882,11 @@ silkPyIPv4Addr_init(
                             "String is not a valid IP address");
             return -1;
         }
-#if SK_ENABLE_IPV6
         if (skipaddrIsV6(&self->addr)) {
             PyErr_SetString(PyExc_ValueError,
                             "String is not a valid IPv4 address");
             return -1;
         }
-#endif
     } else if (IS_INT(addr)) {
         uint32_t value;
         PyObject *num;
@@ -1021,7 +910,6 @@ silkPyIPv4Addr_init(
         value = PyLong_AsUnsignedLong(addr);
         skipaddrSetV4(&self->addr, &value);
 
-#if SK_ENABLE_IPV6
     } else if (silkPyIPv6Addr_Check(addr)) {
         /* Convert to v4 */
         silkPyIPAddr *v6addr = (silkPyIPAddr*)addr;
@@ -1031,7 +919,6 @@ silkPyIPv4Addr_init(
                             "IP address not convertable to IPv4.");
             return -1;
         }
-#endif  /* SK_ENABLE_IPV6 */
 
     } else if (silkPyIPv4Addr_Check(addr)) {
         /* Copy */
@@ -1059,10 +946,6 @@ silkPyIPv6Addr_init(
     PyObject           *args,
     PyObject           *kwds)
 {
-#if !SK_ENABLE_IPV6
-    silkPyNotImplemented((PyObject*)self, args, kwds);
-    return -1;
-#else  /* if SK_ENABLE_IPV6 */
     static char  *kwlist[] = {"address", NULL};
     PyObject     *addr;
     int           rv;
@@ -1156,10 +1039,8 @@ silkPyIPv6Addr_init(
     }
 
     return 0;
-#endif  /* else of !SK_ENABLE_IPV6 */
 }
 
-#if SK_ENABLE_IPV6
 static PyObject *
 silkPyIPv6Addr_new(
     PyTypeObject       *type,
@@ -1168,7 +1049,6 @@ silkPyIPv6Addr_new(
 {
     return silkPyIPvXAddr_new(&silkPyIPv6AddrType, type, args, kwds);
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 static PyObject *
 silkPyIPvXAddr_new(
@@ -1229,9 +1109,6 @@ silkPyIPWildcard_dealloc(
     silkPyIPWildcard   *obj);
 static PyObject *
 silkPyIPWildcard_is_ipv6(
-    silkPyIPWildcard    UNUSED_NOv6(*self));
-static PyObject *
-silkPyIPWildcard_isipv6_deprecated(
     silkPyIPWildcard   *self);
 static PyObject *
 silkPyIPWildcard_iter(
@@ -1254,9 +1131,6 @@ silkPyIPWildcard_str(
 
 static PyMethodDef silkPyIPWildcard_methods[] = {
     {"__reduce__", (PyCFunction)reduce_error, METH_NOARGS, ""},
-    {"isipv6", (PyCFunction)silkPyIPWildcard_isipv6_deprecated, METH_NOARGS,
-     ("wild.isipv6() -> bool -- return whether wild is an IPv6 wildcard."
-      " DEPRECATED Use wild.is_ipv6() instead.")},
     {"is_ipv6", (PyCFunction)silkPyIPWildcard_is_ipv6, METH_NOARGS,
      "wild.is_ipv6() -> bool -- return whether wild is an IPv6 wildcard"},
     {NULL, NULL, 0, NULL}       /* Sentinel */
@@ -1323,10 +1197,8 @@ static PyTypeObject silkPyIPWildcardType = {
     0,                          /* tp_cache */
     0,                          /* tp_subclasses */
     0,                          /* tp_weaklist */
-    0                           /* tp_del */
-#if PY_VERSION_HEX >= 0x02060000
-    ,0                          /* tp_version_tag */
-#endif
+    0,                          /* tp_del */
+    0                           /* tp_version_tag */
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
@@ -1378,10 +1250,8 @@ static PyTypeObject silkPyIPWildcardIterType = {
     0,                          /* tp_cache */
     0,                          /* tp_subclasses */
     0,                          /* tp_weaklist */
-    0                           /* tp_del */
-#if PY_VERSION_HEX >= 0x02060000
-    ,0                          /* tp_version_tag */
-#endif
+    0,                          /* tp_del */
+    0                           /* tp_version_tag */
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
@@ -1461,24 +1331,9 @@ silkPyIPWildcard_dealloc(
 
 static PyObject *
 silkPyIPWildcard_is_ipv6(
-    silkPyIPWildcard    UNUSED_NOv6(*self))
-{
-#if SK_ENABLE_IPV6
-    return PyBool_FromLong(skIPWildcardIsV6(&self->wildcard));
-#else
-    Py_RETURN_FALSE;
-#endif
-}
-
-static PyObject *
-silkPyIPWildcard_isipv6_deprecated(
     silkPyIPWildcard   *self)
 {
-    /* deprecated in SiLK 3.0.0.  Function is undocumented. */
-    PyErr_Warn(PyExc_DeprecationWarning,
-               ("IPWildcard.isipv6() is deprecated.  "
-                "Use IPWildcard.is_ipv6() instead."));
-    return silkPyIPWildcard_is_ipv6(self);
+    return PyBool_FromLong(skIPWildcardIsV6(&self->wildcard));
 }
 
 static PyObject *
@@ -1726,11 +1581,7 @@ static PyMethodDef silkPyIPSet_methods[] = {
 };
 
 static PySequenceMethods silkPyIPSet_sequence_methods = {
-#if PY_VERSION_HEX < 0x02050000
-    (inquiry)silkPyIPSet_len,   /* sq_length */
-#else
     (lenfunc)silkPyIPSet_len,   /* sq_length */
-#endif
     0,                          /* sq_concat */
     0,                          /* sq_repeat */
     0,                          /* sq_item */
@@ -1789,10 +1640,8 @@ static PyTypeObject silkPyIPSetType = {
     0,                          /* tp_cache */
     0,                          /* tp_subclasses */
     0,                          /* tp_weaklist */
-    0                           /* tp_del */
-#if PY_VERSION_HEX >= 0x02060000
-    ,0                          /* tp_version_tag */
-#endif
+    0,                          /* tp_del */
+    0                           /* tp_version_tag */
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
@@ -1844,10 +1693,8 @@ static PyTypeObject silkPyIPSetIterType = {
     0,                          /* tp_cache */
     0,                          /* tp_subclasses */
     0,                          /* tp_weaklist */
-    0                           /* tp_del */
-#if PY_VERSION_HEX >= 0x02060000
-    ,0                          /* tp_version_tag */
-#endif
+    0,                          /* tp_del */
+    0                           /* tp_version_tag */
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
@@ -2103,14 +1950,9 @@ silkPyIPSet_convert(
         return (PyObject*)self;
     }
     if (rv == SKIPSET_ERR_IPV6) {
-#if SK_ENABLE_IPV6
         PyErr_SetString(
             PyExc_ValueError,
             "IPSet cannot be converted to v4, as it contains v6 addresses");
-#else
-        PyErr_SetString(PyExc_ValueError,
-                        "This build of SiLK does not support IPv6");
-#endif
         return NULL;
     }
     return PyErr_Format(PyExc_RuntimeError,
@@ -2501,10 +2343,8 @@ static PyTypeObject silkPyPmapType = {
     0,                          /* tp_cache */
     0,                          /* tp_subclasses */
     0,                          /* tp_weaklist */
-    0                           /* tp_del */
-#if PY_VERSION_HEX >= 0x02060000
-    ,0                          /* tp_version_tag */
-#endif
+    0,                          /* tp_del */
+    0                           /* tp_version_tag */
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
@@ -2556,10 +2396,8 @@ static PyTypeObject silkPyPmapIterType = {
     0,                          /* tp_cache */
     0,                          /* tp_subclasses */
     0,                          /* tp_weaklist */
-    0                           /* tp_del */
-#if PY_VERSION_HEX >= 0x02060000
-    ,0                          /* tp_version_tag */
-#endif
+    0,                          /* tp_del */
+    0                           /* tp_version_tag */
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
@@ -2976,11 +2814,7 @@ silkPyBag_type_merge(
 static PyNumberMethods silkPyBag_number_methods;
 
 static PyMappingMethods silkPyBag_mapping_methods = {
-#if PY_VERSION_HEX < 0x02050000
-    (inquiry)silkPyBag_count,   /* mp_length */
-#else
-    (lenfunc)silkPyBag_count,   /* mp_length */
-#endif
+    (lenfunc)silkPyBag_count,              /* mp_length */
     (binaryfunc)silkPyBag_subscript,       /* mp_subscript */
     (objobjargproc)silkPyBag_ass_subscript /* mp_ass_subscript */
 };
@@ -3070,10 +2904,8 @@ static PyTypeObject silkPyBagType = {
     0,                          /* tp_cache */
     0,                          /* tp_subclasses */
     0,                          /* tp_weaklist */
-    0                           /* tp_del */
-#if PY_VERSION_HEX >= 0x02060000
-    ,0                          /* tp_version_tag */
-#endif
+    0,                          /* tp_del */
+    0                           /* tp_version_tag */
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
@@ -3125,10 +2957,8 @@ static PyTypeObject silkPyBagIterType = {
     0,                          /* tp_cache */
     0,                          /* tp_subclasses */
     0,                          /* tp_weaklist */
-    0                           /* tp_del */
-#if PY_VERSION_HEX >= 0x02060000
-    ,0                          /* tp_version_tag */
-#endif
+    0,                          /* tp_del */
+    0                           /* tp_version_tag */
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
@@ -3916,10 +3746,6 @@ static PyObject *
 silkPyTCPFlags_getflag(
     silkPyTCPFlags     *obj,
     void               *bit);
-static PyObject *
-silkPyTCPFlags_getflag_deprecated(
-    silkPyTCPFlags     *obj,
-    void               *bit);
 static long
 silkPyTCPFlags_hash(
     silkPyTCPFlags     *obj);
@@ -4011,30 +3837,6 @@ static PyGetSetDef silkPyTCPFlags_getsetters[] = {
     {"cwr", (getter)silkPyTCPFlags_getflag, NULL,
      "True if the CWR flag is set; False otherwise", (void*)&flags_array[7]},
 
-    {"FIN", (getter)silkPyTCPFlags_getflag_deprecated, NULL,
-     ("True if the FIN flag is set; False otherwise."
-      " DEPRECATED Use flag.fin instead"), (void*)&flags_array[0]},
-    {"SYN", (getter)silkPyTCPFlags_getflag_deprecated, NULL,
-     ("True if the SYN flag is set; False otherwise."
-      " DEPRECATED Use flag.syn instead"), (void*)&flags_array[1]},
-    {"RST", (getter)silkPyTCPFlags_getflag_deprecated, NULL,
-     ("True if the RST flag is set; False otherwise."
-      " DEPRECATED Use flag.rst instead"), (void*)&flags_array[2]},
-    {"PSH", (getter)silkPyTCPFlags_getflag_deprecated, NULL,
-     ("True if the PSH flag is set; False otherwise."
-      " DEPRECATED Use flag.psh instead"), (void*)&flags_array[3]},
-    {"ACK", (getter)silkPyTCPFlags_getflag_deprecated, NULL,
-     ("True if the ACK flag is set; False otherwise."
-      " DEPRECATED Use flag.ack instead"), (void*)&flags_array[4]},
-    {"URG", (getter)silkPyTCPFlags_getflag_deprecated, NULL,
-     ("True if the URG flag is set; False otherwise."
-      " DEPRECATED Use flag.urg instead"), (void*)&flags_array[5]},
-    {"ECE", (getter)silkPyTCPFlags_getflag_deprecated, NULL,
-     ("True if the ECE flag is set; False otherwise."
-      " DEPRECATED Use flag.ece instead"), (void*)&flags_array[6]},
-    {"CWR", (getter)silkPyTCPFlags_getflag_deprecated, NULL,
-     ("True if the CWR flag is set; False otherwise."
-      " DEPRECATED Use flag.cwr instead"), (void*)&flags_array[7]},
     {NULL, NULL, NULL, NULL, NULL}
 };
 
@@ -4088,10 +3890,8 @@ static PyTypeObject silkPyTCPFlagsType = {
     0,                          /* tp_cache */
     0,                          /* tp_subclasses */
     0,                          /* tp_weaklist */
-    0                           /* tp_del */
-#if PY_VERSION_HEX >= 0x02060000
-    ,0                          /* tp_version_tag */
-#endif
+    0,                          /* tp_del */
+    0                           /* tp_version_tag */
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
@@ -4125,18 +3925,6 @@ silkPyTCPFlags_getflag(
     silkPyTCPFlags     *obj,
     void               *bit)
 {
-    return PyBool_FromLong(obj->val & *(uint8_t*)bit);
-}
-
-static PyObject *
-silkPyTCPFlags_getflag_deprecated(
-    silkPyTCPFlags     *obj,
-    void               *bit)
-{
-    /* Deprecated as of SiLK 3.0.0. */
-    PyErr_Warn(PyExc_DeprecationWarning,
-               ("Use of upper-case flag check attributes for "
-                "TCPFlags is deprecated"));
     return PyBool_FromLong(obj->val & *(uint8_t*)bit);
 }
 
@@ -4551,13 +4339,11 @@ silkPyRWRec_init(
     PyObject           *kwds);
 static PyObject *
 silkPyRWRec_initial_tcpflags_get(
-    silkPyRWRec        *obj,
-    void               *deprecated);
+    silkPyRWRec        *obj);
 static int
 silkPyRWRec_initial_tcpflags_set(
     silkPyRWRec        *obj,
-    PyObject           *value,
-    void               *deprecated);
+    PyObject           *value);
 static PyObject *
 silkPyRWRec_input_get(
     silkPyRWRec        *obj,
@@ -4572,7 +4358,7 @@ silkPyRWRec_is_icmp(
     silkPyRWRec        *obj);
 static PyObject *
 silkPyRWRec_is_ipv6(
-    silkPyRWRec         UNUSED_NOv6(*obj));
+    silkPyRWRec        *obj);
 static PyObject *
 silkPyRWRec_is_web(
     silkPyRWRec        *obj);
@@ -4628,11 +4414,9 @@ silkPyRWRec_sensor_id_get(
 static PyObject *
 silkPyRWRec_to_ipv4(
     silkPyRWRec        *obj);
-#if SK_ENABLE_IPV6
 static PyObject *
 silkPyRWRec_to_ipv6(
     silkPyRWRec        *obj);
-#endif
 static int
 silkPyRWRec_sensor_id_set(
     silkPyRWRec        *obj,
@@ -4645,13 +4429,11 @@ silkPyRWRec_sensor_set(
     void        UNUSED(*closure));
 static PyObject *
 silkPyRWRec_session_tcpflags_get(
-    silkPyRWRec        *obj,
-    void               *deprecated);
+    silkPyRWRec        *obj);
 static int
 silkPyRWRec_session_tcpflags_set(
     silkPyRWRec        *obj,
-    PyObject           *value,
-    void               *deprecated);
+    PyObject           *value);
 static PyObject *
 silkPyRWRec_sip_get(
     silkPyRWRec        *obj,
@@ -4750,12 +4532,7 @@ static PyMethodDef silkPyRWRec_methods[] = {
      "Returns whether record can be stored in a SiLK WWW file format"},
     {"to_ipv4", (PyCFunction)silkPyRWRec_to_ipv4, METH_NOARGS,
      "Returns a new raw copy of the record converted to IPv4"},
-    {"to_ipv6", (PyCFunction)
-#if SK_ENABLE_IPV6
-     silkPyRWRec_to_ipv6, METH_NOARGS,
-#else
-     silkPyNotImplemented, METH_VARARGS | METH_KEYWORDS,
-#endif
+    {"to_ipv6", (PyCFunction)silkPyRWRec_to_ipv6, METH_NOARGS,
      "Returns a new raw copy of the record converted to IPv6"},
     {NULL, NULL, 0, NULL}       /* Sentinel */
 };
@@ -4805,11 +4582,6 @@ static PyGetSetDef silkPyRWRec_getseters[] = {
     {"icmptype",
      (getter)silkPyRWRec_icmptype_get,    (setter)silkPyRWRec_icmptype_set,
      "ICMP type", NULL},
-    {"initflags", /* Deprecated in SiLK 3.0.0 */
-     (getter)silkPyRWRec_initial_tcpflags_get,
-     (setter)silkPyRWRec_initial_tcpflags_set,
-     "TCP flags of first packet. DEPRECATED Use initial_tcpflags instead",
-      deprecated_true},
     {"initial_tcpflags",
      (getter)silkPyRWRec_initial_tcpflags_get,
      (setter)silkPyRWRec_initial_tcpflags_set,
@@ -4829,11 +4601,6 @@ static PyGetSetDef silkPyRWRec_getseters[] = {
     {"protocol",
      (getter)silkPyRWRec_protocol_get,    (setter)silkPyRWRec_protocol_set,
      "IP protocol", NULL},
-    {"restflags", /* Deprecated,SiLK 3.0.0 */
-     (getter)silkPyRWRec_session_tcpflags_get,
-     (setter)silkPyRWRec_session_tcpflags_set,
-     ("TCP flags on non-initial packets."
-      " DEPRECATED Use session_tcpflags instead"), deprecated_true},
     {"sensor",
      (getter)silkPyRWRec_sensor_get,      (setter)silkPyRWRec_sensor_set,
      "sensor name", NULL},
@@ -4925,10 +4692,8 @@ static PyTypeObject silkPyRawRWRecType = {
     0,                          /* tp_cache */
     0,                          /* tp_subclasses */
     0,                          /* tp_weaklist */
-    0                           /* tp_del */
-#if PY_VERSION_HEX >= 0x02060000
-    ,0                          /* tp_version_tag */
-#endif
+    0,                          /* tp_del */
+    0                           /* tp_version_tag */
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
@@ -4983,10 +4748,8 @@ static PyTypeObject silkPyRWRecType = {
     0,                          /* tp_cache */
     0,                          /* tp_subclasses */
     0,                          /* tp_weaklist */
-    0                           /* tp_del */
-#if PY_VERSION_HEX >= 0x02060000
-    ,0                          /* tp_version_tag */
-#endif
+    0,                          /* tp_del */
+    0                           /* tp_version_tag */
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
@@ -5022,7 +4785,8 @@ silkPyRWRec_application_set(
     val = PyLong_AsLong(value);
     if (PyErr_Occurred() || val < 0 || val > (long)UINT16_MAX) {
         PyErr_SetString(PyExc_ValueError,
-                        "The application value must be a 16-bit integer");
+                        "The application value must be an"
+                        " unsigned 16-bit integer");
         return -1;
     }
 
@@ -5039,16 +4803,13 @@ silkPyRWRec_to_ipv4(
     if (copy == NULL) {
         return NULL;
     }
-#if SK_ENABLE_IPV6
     if (rwRecIsIPv6(&copy->rec) && rwRecConvertToIPv4(&copy->rec)) {
         Py_DECREF(copy);
         Py_RETURN_NONE;
     }
-#endif  /* SK_ENABLE_IPV6 */
     return (PyObject *)copy;
 }
 
-#if SK_ENABLE_IPV6
 static PyObject *
 silkPyRWRec_to_ipv6(
     silkPyRWRec        *obj)
@@ -5061,14 +4822,13 @@ silkPyRWRec_to_ipv6(
     rwRecConvertToIPv6(&copy->rec);
     return (PyObject *)copy;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 static PyObject *
 silkPyRWRec_bytes_get(
     silkPyRWRec        *obj,
     void        UNUSED(*closure))
 {
-    return PyLong_FromUnsignedLong(rwRecGetBytes(&obj->raw->rec));
+    return PyLong_FromUnsignedLongLong(rwRecGetBytes(&obj->raw->rec));
 }
 
 static int
@@ -5077,17 +4837,17 @@ silkPyRWRec_bytes_set(
     PyObject           *value,
     void        UNUSED(*closure))
 {
-    unsigned long val;
+    unsigned PY_LONG_LONG val;
 
     if (!IS_INT(value)) {
         PyErr_SetString(PyExc_TypeError, "Expected an integer");
         return -1;
     }
 
-    val = PyLong_AsUnsignedLong(value);
-    if (PyErr_Occurred() || val > UINT32_MAX) {
+    val = LONG_AS_UNSIGNED_LONGLONG(value);
+    if (PyErr_Occurred()) {
         PyErr_SetString(PyExc_ValueError,
-                        "The bytes value must be a 32-bit integer");
+                        "The bytes value must be an unsigned 64-bit integer");
         return -1;
     }
 
@@ -5100,8 +4860,8 @@ silkPyRWRec_classname_get(
     silkPyRWRec        *obj,
     void        UNUSED(*closure))
 {
-    char              class_name[SK_MAX_STRLEN_FLOWTYPE+1];
-    sk_flowtype_id_t  flowtype = rwRecGetFlowType(&obj->raw->rec);
+    char class_name[SK_MAX_STRLEN_FLOWTYPE+1];
+    sk_flowtype_id_t flowtype = rwRecGetFlowType(&obj->raw->rec);
 
     CHECK_SITE(NULL);
 
@@ -5210,12 +4970,9 @@ silkPyRWRec_dip_get(
     silkPyIPAddr *addr;
     PyTypeObject *type;
 
-#if SK_ENABLE_IPV6
     if (rwRecIsIPv6(&obj->raw->rec)) {
         type = &silkPyIPv6AddrType;
-    } else
-#endif
-    {
+    } else {
         type = &silkPyIPv4AddrType;
     }
 
@@ -5289,7 +5046,7 @@ silkPyRWRec_dport_set(
     val = PyLong_AsLong(value);
     if (PyErr_Occurred() || val < 0 || val > (long)UINT16_MAX) {
         PyErr_SetString(PyExc_ValueError,
-                        "The dport value must be a 16-bit integer");
+                        "The dport value must be an unsigned 16-bit integer");
         return -1;
     }
 
@@ -5558,7 +5315,7 @@ silkPyRWRec_icmpcode_set(
     val = PyLong_AsLong(value);
     if (PyErr_Occurred() || val < 0 || val > (long)UINT8_MAX) {
         PyErr_SetString(PyExc_ValueError,
-                        "The icmpcode value must be a 8-bit integer");
+                        "The icmpcode value must be an unsigned 8-bit integer");
         return -1;
     }
 
@@ -5590,7 +5347,7 @@ silkPyRWRec_icmptype_set(
     val = PyLong_AsLong(value);
     if (PyErr_Occurred() || val < 0 || val > (long)UINT8_MAX) {
         PyErr_SetString(PyExc_ValueError,
-                        "The icmptype value must be a 8-bit integer");
+                        "The icmptype value must be an unsigned 8-bit integer");
         return -1;
     }
 
@@ -5658,20 +5415,9 @@ silkPyRWRec_init(
 
 static PyObject *
 silkPyRWRec_initial_tcpflags_get(
-    silkPyRWRec        *obj,
-    void               *deprecated)
+    silkPyRWRec        *obj)
 {
     silkPyTCPFlags *flags;
-
-    if (deprecated == deprecated_true) {
-        /* Deprecated in SiLK 3.0.0 */
-        int rv = PyErr_Warn(PyExc_DeprecationWarning,
-                            ("'initflags' is deprecated in favor of"
-                             " 'initial_tcpflags'."));
-        if (rv) {
-            return NULL;
-        }
-    }
 
     if (!(rwRecGetTcpState(&obj->raw->rec) & SK_TCPSTATE_EXPANDED)) {
         Py_RETURN_NONE;
@@ -5688,22 +5434,11 @@ silkPyRWRec_initial_tcpflags_get(
 static int
 silkPyRWRec_initial_tcpflags_set(
     silkPyRWRec        *obj,
-    PyObject           *value,
-    void               *deprecated)
+    PyObject           *value)
 {
     uint8_t state;
     uint8_t flagval;
     silkPyTCPFlags *flags;
-
-    if (deprecated == deprecated_true) {
-        /* Deprecated in SiLK 3.0.0 */
-        int rv = PyErr_Warn(PyExc_DeprecationWarning,
-                            ("'initflags' is deprecated in favor of"
-                             " 'initial_tcpflags'."));
-        if (rv) {
-            return -1;
-        }
-    }
 
     if (rwRecGetProto(&obj->raw->rec) != IPPROTO_TCP) {
         PyErr_SetString(
@@ -5735,7 +5470,7 @@ silkPyRWRec_input_get(
     silkPyRWRec        *obj,
     void        UNUSED(*closure))
 {
-    return  PyInt_FromLong(rwRecGetInput(&obj->raw->rec));
+    return  PyLong_FromUnsignedLong(rwRecGetInput(&obj->raw->rec));
 }
 
 static int
@@ -5744,21 +5479,21 @@ silkPyRWRec_input_set(
     PyObject           *value,
     void        UNUSED(*closure))
 {
-    long val;
+    unsigned long val;
 
     if (!IS_INT(value)) {
         PyErr_SetString(PyExc_TypeError, "Expected an integer");
         return -1;
     }
 
-    val = PyLong_AsLong(value);
-    if (PyErr_Occurred() || val < 0 || val > (long)UINT16_MAX) {
+    val = PyLong_AsUnsignedLong(value);
+    if (PyErr_Occurred() || val > UINT32_MAX) {
         PyErr_SetString(PyExc_ValueError,
-                        "The input value must be a 16-bit integer");
+                        "The input value must be an unsigned 32-bit integer");
         return -1;
     }
 
-    rwRecSetInput(&obj->raw->rec, val);
+    rwRecSetInput(&obj->raw->rec, (uint32_t)val);
     return 0;
 }
 
@@ -5771,7 +5506,7 @@ silkPyRWRec_is_icmp(
 
 static PyObject *
 silkPyRWRec_is_ipv6(
-    silkPyRWRec         UNUSED_NOv6(*obj))
+    silkPyRWRec        *obj)
 {
     return PyBool_FromLong(rwRecIsIPv6(&obj->raw->rec));
 }
@@ -5791,12 +5526,9 @@ silkPyRWRec_nhip_get(
     silkPyIPAddr *addr;
     PyTypeObject *type;
 
-#if SK_ENABLE_IPV6
     if (rwRecIsIPv6(&obj->raw->rec)) {
         type = &silkPyIPv6AddrType;
-    } else
-#endif
-    {
+    } else {
         type = &silkPyIPv4AddrType;
     }
 
@@ -5850,43 +5582,11 @@ silkPyRWRec_output_get(
     silkPyRWRec        *obj,
     void        UNUSED(*closure))
 {
-    return PyInt_FromLong(rwRecGetOutput(&obj->raw->rec));
+    return PyLong_FromUnsignedLong(rwRecGetOutput(&obj->raw->rec));
 }
 
 static int
 silkPyRWRec_output_set(
-    silkPyRWRec        *obj,
-    PyObject           *value,
-    void        UNUSED(*closure))
-{
-    long val;
-
-    if (!IS_INT(value)) {
-        PyErr_SetString(PyExc_TypeError, "Expected an integer");
-        return -1;
-    }
-
-    val = PyLong_AsLong(value);
-    if (PyErr_Occurred() || val < 0 || val > (long)UINT16_MAX) {
-        PyErr_SetString(PyExc_ValueError,
-                        "The output value must be a 16-bit integer");
-        return -1;
-    }
-
-    rwRecSetOutput(&obj->raw->rec, val);
-    return 0;
-}
-
-static PyObject *
-silkPyRWRec_packets_get(
-    silkPyRWRec        *obj,
-    void        UNUSED(*closure))
-{
-    return PyLong_FromUnsignedLong(rwRecGetPkts(&obj->raw->rec));
-}
-
-static int
-silkPyRWRec_packets_set(
     silkPyRWRec        *obj,
     PyObject           *value,
     void        UNUSED(*closure))
@@ -5901,7 +5601,39 @@ silkPyRWRec_packets_set(
     val = PyLong_AsUnsignedLong(value);
     if (PyErr_Occurred() || val > UINT32_MAX) {
         PyErr_SetString(PyExc_ValueError,
-                        "The packets value must be a 32-bit integer");
+                        "The output value must be an unsigned 32-bit integer");
+        return -1;
+    }
+
+    rwRecSetOutput(&obj->raw->rec, (uint32_t)val);
+    return 0;
+}
+
+static PyObject *
+silkPyRWRec_packets_get(
+    silkPyRWRec        *obj,
+    void        UNUSED(*closure))
+{
+    return PyLong_FromUnsignedLongLong(rwRecGetPkts(&obj->raw->rec));
+}
+
+static int
+silkPyRWRec_packets_set(
+    silkPyRWRec        *obj,
+    PyObject           *value,
+    void        UNUSED(*closure))
+{
+    unsigned PY_LONG_LONG val;
+
+    if (!IS_INT(value)) {
+        PyErr_SetString(PyExc_TypeError, "Expected an integer");
+        return -1;
+    }
+
+    val = LONG_AS_UNSIGNED_LONGLONG(value);
+    if (PyErr_Occurred()) {
+        PyErr_SetString(PyExc_ValueError,
+                        "The packets value must be an unsigned 64-bit integer");
         return -1;
     }
 
@@ -5933,7 +5665,7 @@ silkPyRWRec_protocol_set(
     val = PyLong_AsLong(value);
     if (PyErr_Occurred() || val < 0 || val > (long)UINT8_MAX) {
         PyErr_SetString(PyExc_ValueError,
-                        "The protocol value must be an 8-bit integer");
+                        "The protocol value must be an unsigned 8-bit integer");
         return -1;
     }
 
@@ -6010,7 +5742,8 @@ silkPyRWRec_sensor_id_set(
     val = PyLong_AsLong(value);
     if (PyErr_Occurred() || val < 0 || val > (long)UINT16_MAX) {
         PyErr_SetString(PyExc_ValueError,
-                        "The sensor_id value must be a 16-bit integer");
+                        "The sensor_id value must be an"
+                        " unsigned 16-bit integer");
         return -1;
     }
 
@@ -6053,20 +5786,9 @@ silkPyRWRec_sensor_set(
 
 static PyObject *
 silkPyRWRec_session_tcpflags_get(
-    silkPyRWRec        *obj,
-    void               *deprecated)
+    silkPyRWRec        *obj)
 {
     silkPyTCPFlags *flags;
-
-    if (deprecated == deprecated_true) {
-        /* Deprecated in SiLK 3.0.0 */
-        int rv = PyErr_Warn(PyExc_DeprecationWarning,
-                            ("'restflags' is deprecated in favor of"
-                             " 'session_tcpflags'."));
-        if (rv) {
-            return NULL;
-        }
-    }
 
     if (!(rwRecGetTcpState(&obj->raw->rec) & SK_TCPSTATE_EXPANDED)) {
         Py_RETURN_NONE;
@@ -6083,22 +5805,11 @@ silkPyRWRec_session_tcpflags_get(
 static int
 silkPyRWRec_session_tcpflags_set(
     silkPyRWRec        *obj,
-    PyObject           *value,
-    void               *deprecated)
+    PyObject           *value)
 {
     uint8_t state;
     uint8_t flagval;
     silkPyTCPFlags *flags;
-
-    if (deprecated == deprecated_true) {
-        /* Deprecated in SiLK 3.0.0 */
-        int rv = PyErr_Warn(PyExc_DeprecationWarning,
-                            ("'restflags' is deprecated in favor of"
-                             " 'session_tcpflags'."));
-        if (rv) {
-            return -1;
-        }
-    }
 
     if (rwRecGetProto(&obj->raw->rec) != IPPROTO_TCP) {
         PyErr_SetString(
@@ -6133,12 +5844,9 @@ silkPyRWRec_sip_get(
     silkPyIPAddr *addr;
     PyTypeObject *type;
 
-#if SK_ENABLE_IPV6
     if (rwRecIsIPv6(&obj->raw->rec)) {
         type = &silkPyIPv6AddrType;
-    } else
-#endif
-    {
+    } else {
         type = &silkPyIPv4AddrType;
     }
 
@@ -6211,7 +5919,7 @@ silkPyRWRec_sport_set(
     val = PyLong_AsLong(value);
     if (PyErr_Occurred() || val < 0 || val > (long)UINT16_MAX) {
         PyErr_SetString(PyExc_ValueError,
-                        "The sport value must be a 16-bit integer");
+                        "The sport value must be an unsigned 16-bit integer");
         return -1;
     }
 
@@ -6427,8 +6135,8 @@ silkPyRWRec_typename_get(
     silkPyRWRec        *obj,
     void        UNUSED(*closure))
 {
-    char              type_name[SK_MAX_STRLEN_FLOWTYPE+1];
-    sk_flowtype_id_t  flowtype = rwRecGetFlowType(&obj->raw->rec);
+    char                type_name[SK_MAX_STRLEN_FLOWTYPE+1];
+    sk_flowtype_id_t    flowtype = rwRecGetFlowType(&obj->raw->rec);
 
     CHECK_SITE(NULL);
 
@@ -6485,7 +6193,6 @@ silkPyRawRWRec_init(
     {
         return -1;
     }
-
     if (copy) {
         RWREC_COPY(&self->rec, &((silkPyRawRWRec*)copy)->rec);
     }
@@ -6501,9 +6208,8 @@ silkPyRawRWRec_new(
     silkPyRawRWRec *self;
 
     self = (silkPyRawRWRec*)type->tp_alloc(type, 0);
-
     if (self != NULL) {
-        RWREC_CLEAR(&self->rec);
+        rwRecInitialize(&self->rec, NULL);
     }
 
     return (PyObject*)self;
@@ -6626,10 +6332,8 @@ static PyTypeObject silkPySilkFileType = {
     0,                          /* tp_cache */
     0,                          /* tp_subclasses */
     0,                          /* tp_weaklist */
-    0                           /* tp_del */
-#if PY_VERSION_HEX >= 0x02060000
-    ,0                          /* tp_version_tag */
-#endif
+    0,                          /* tp_del */
+    0                           /* tp_version_tag */
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
@@ -6961,6 +6665,7 @@ silkPySilkFile_read(
         return NULL;
     }
 
+    rwRecInitialize(&((silkPyRawRWRec*)pyrec)->rec, NULL);
     rv = skStreamReadRecord(obj->io, &((silkPyRawRWRec*)pyrec)->rec);
     if (rv != 0) {
         Py_DECREF(pyrec);
@@ -7065,10 +6770,8 @@ static PyTypeObject silkPyRepoIterType ={
     0,                          /* tp_cache */
     0,                          /* tp_subclasses */
     0,                          /* tp_weaklist */
-    0                           /* tp_del */
-#if PY_VERSION_HEX >= 0x02060000
-    ,0                          /* tp_version_tag */
-#endif
+    0,                          /* tp_del */
+    0                           /* tp_version_tag */
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
@@ -7458,14 +7161,18 @@ static PyMethodDef silk_methods[] = {
     {"init_site", (PyCFunction)silk_init_site,
      METH_VARARGS | METH_KEYWORDS,
      ("init_site([siteconf][, rootdir])\n"
-      "Initialize the silk site.\n"
-      "When siteconf is None, PySiLK uses the file named by the environment\n"
-      "variable " SILK_CONFIG_FILE_ENVAR ", if available, or the file\n"
-      "'silk.conf' in the rootdir, the directories '$SILK_PATH/share/silk/'\n"
-      "and '$SILK_PATH/share/', and the 'share/silk/' and 'share/'\n"
-      "directories parallel to the application's directory.\n"
-      "When rootdir is not supplied, SiLK's default value is used.\n"
-      "Throw an exception if the site is already initialized.")},
+      "Initialize the silk site using the given siteconf file name\n"
+      "and rootdir.\n"
+      "If the siteconf is not supplied, the value of the environment\n"
+      "variable " SILK_CONFIG_FILE_ENVAR " will be used if available.\n"
+      "Otherwise, PySiLK will look for a file named 'silk.conf' in the\n"
+      "following directories: the rootdir, the directories\n"
+      "'$SILK_PATH/share/silk/' and '$SILK_PATH/share/'; and the\n"
+      "'share/silk/' and 'share/' directories parallel to the\n"
+      "application's directory.\n"
+      "If the rootdir is not supplied, SiLK's default value will be\n"
+      "used.\n"
+      "Will throw an exception if the site is already initialized.")},
     {"have_site_config", (PyCFunction)silk_have_site_config,
      METH_NOARGS,
      ("Return whether the site configuration file has been loaded")},
@@ -7691,22 +7398,14 @@ static PyObject *
 silk_ipset_supports_ipv6(
     void)
 {
-#if SK_ENABLE_IPV6
     Py_RETURN_TRUE;
-#else
-    Py_RETURN_FALSE;
-#endif
 }
 
 static PyObject *
 silk_ipv6_enabled(
     void)
 {
-#if SK_ENABLE_IPV6
     Py_RETURN_TRUE;
-#else
-    Py_RETURN_FALSE;
-#endif
 }
 
 static PyObject *
@@ -7784,6 +7483,7 @@ silk_raw_rwrec_copy(
     if (pyrec != NULL) {
         rec = (rwRec*)COBJ_PTR(c_rec);
         if (rec != NULL) {
+            rwRecInitialize(&pyrec->rec, NULL);
             RWREC_COPY(&pyrec->rec, rec);
         }
     }
@@ -8042,12 +7742,12 @@ static int
 init_flowtypes(
     void)
 {
-    sk_flowtype_iter_t   flowtype_iter;
-    sk_flowtype_id_t     flowtype;
-    char                 name[SK_MAX_STRLEN_SENSOR+1];
-    PyObject            *dict;
-    PyObject            *flowtypes;
-    int                  rv;
+    sk_flowtype_iter_t  flowtype_iter;
+    sk_flowtype_id_t    flowtype;
+    char                name[SK_MAX_STRLEN_SENSOR+1];
+    PyObject           *dict;
+    PyObject           *flowtypes;
+    int                 rv;
 
     flowtypes = PyDict_New();
     if (flowtypes == NULL) {
@@ -8056,8 +7756,8 @@ init_flowtypes(
 
     sksiteFlowtypeIterator(&flowtype_iter);
     while (sksiteFlowtypeIteratorNext(&flowtype_iter, &flowtype)) {
-        sk_class_id_t class_id;
-        PyObject     *val;
+        sk_class_id_t   class_id;
+        PyObject       *val;
 
         dict = PyDict_New();
         if (dict == NULL) {
@@ -8127,13 +7827,13 @@ static int
 init_sensors(
     void)
 {
-    sk_sensor_iter_t   sensor_iter;
-    sk_sensor_id_t     sensor;
-    char               name[SK_MAX_STRLEN_SENSOR+1];
-    PyObject          *list;
-    PyObject          *dict;
-    PyObject          *sensors;
-    int                rv;
+    sk_sensor_iter_t    sensor_iter;
+    sk_sensor_id_t      sensor;
+    char                name[SK_MAX_STRLEN_SENSOR+1];
+    PyObject           *list;
+    PyObject           *dict;
+    PyObject           *sensors;
+    int                 rv;
 
     sensors = PyDict_New();
     if (sensors == NULL) {
@@ -8142,10 +7842,10 @@ init_sensors(
 
     sksiteSensorIterator(&sensor_iter);
     while (sksiteSensorIteratorNext(&sensor_iter, &sensor)) {
-        sk_class_iter_t   class_iter;
-        sk_class_id_t     class_id;
-        PyObject         *val;
-        const char       *desc;
+        sk_class_iter_t class_iter;
+        sk_class_id_t   class_id;
+        PyObject       *val;
+        const char     *desc;
 
         dict = PyDict_New();
         if (dict == NULL) {
@@ -8500,18 +8200,6 @@ silkPyDatetimeToSktime(
     return retval;
 }
 
-#if !SK_ENABLE_IPV6
-static PyObject *
-silkPyNotImplemented(
-    PyObject    UNUSED(*self),
-    PyObject    UNUSED(*args),
-    PyObject    UNUSED(*kwds))
-{
-    return PyErr_Format(PyExc_NotImplementedError,
-                        "SiLK was not built with IPv6 support.");
-}
-#endif  /* !SK_ENABLE_IPV6 */
-
 
 static PyObject *
 initpysilkbase(
@@ -8726,14 +8414,12 @@ initpysilkbase(
                                      globals->maxintipv4),
                   int, 0);
 
-#if SK_ENABLE_IPV6
     globals->maxintipv6 =
         PyLong_FromString("0xffffffffffffffffffffffffffffffff", NULL, 0);
     assert(globals->maxintipv6 != NULL);
     ASSERT_RESULT(PyModule_AddObject(silkmod, "_maxintipv6",
                                      globals->maxintipv6),
                   int, 0);
-#endif  /* SK_ENABLE_IPV6 */
 
     globals->newrawrec = PyObject_CallFunctionObjArgs(
         (PyObject *)&silkPyRawRWRecType, NULL);

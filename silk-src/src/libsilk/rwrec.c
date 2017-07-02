@@ -20,55 +20,19 @@
 **
 */
 
+#define SOURCE_FILE_RWREC_C 1
 #define RWREC_DEFINE_BODY 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwrec.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwrec.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
+#include <silk/skstringmap.h>
 #include <silk/utils.h>
 
 
 /* FUNCTION DEFINITIONS */
-
-
-#if SK_ENABLE_IPV6
-/*
- *    Helper function to compare an IP on an rwRec with an skipaddr_t.
- */
-static int
-recCompareIPAddr(
-    const rwRec        *r,
-    const skIPUnion_t  *ip,
-    const skipaddr_t   *cmp_addr)
-{
-    skIPUnion_t tmp;
-
-    if (_recIsIPv6(r)) {
-        if (cmp_addr->ip_is_v6) {
-            /* both are IPv6 */
-            return memcmp(ip->ipu_ipv6, cmp_addr->ip_ip.ipu_ipv6, 16);
-        }
-        /* must convert cmp_addr to V6 */
-        skIPUnion4to6(&(cmp_addr->ip_ip), &tmp);
-        return memcmp(ip->ipu_ipv6, tmp.ipu_ipv6, 16);
-    }
-    if (cmp_addr->ip_is_v6) {
-        /* must convert record IP to V6 */
-        skIPUnion4to6(ip, &tmp);
-        return memcmp(tmp.ipu_ipv6, cmp_addr->ip_ip.ipu_ipv6, 16);
-    }
-    /* both addresses are IPv4 */
-    if (ip->ipu_ipv4 < cmp_addr->ip_ip.ipu_ipv4) {
-        return -1;
-    }
-    if (ip->ipu_ipv4 > cmp_addr->ip_ip.ipu_ipv4) {
-        return 1;
-    }
-    return 0;
-}
-
 
 /*
  *    Helper function to mask an IP on an rwRec with an skipaddr_t.
@@ -81,7 +45,7 @@ recApplyMaskIPAddr(
 {
     skIPUnion_t tmp;
 
-    if (_recIsIPv6(r)) {
+    if (rwRecIsIPv6(r)) {
         if (mask_addr->ip_is_v6) {
             /* both are IPv6 */
             skIPUnionApplyMaskV6(ip, mask_addr->ip_ip.ipu_ipv6);
@@ -105,1269 +69,45 @@ recApplyMaskIPAddr(
             skIPUnionApplyMaskV4(ip, ntohl(mask_v4));
             return;
         }
-        _recConvertToIPv6(r);
+        rwRecConvertToIPv6(r);
         skIPUnionApplyMaskV6(ip, mask_addr->ip_ip.ipu_ipv6);
         return;
     }
     /* both addresses are IPv4 */
     skIPUnionApplyMaskV4(ip, mask_addr->ip_ip.ipu_ipv4);
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
-uint8_t
-rwrec_GetIcmpType(
-    const rwRec        *r)
-{
-    return _recGetIcmpType(r);
-}
-
-
-void
-rwrec_SetIcmpType(
-    rwRec              *r,
-    uint8_t             in_v)
-{
-    _recSetIcmpType(r, in_v);
-}
-
-
-void
-rwrec_MemGetIcmpType(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetIcmpType(r, (uint8_t*)out_vp);
-}
-
-
-uint8_t
-rwrec_GetIcmpCode(
-    const rwRec        *r)
-{
-    return _recGetIcmpCode(r);
-}
-
-
-void
-rwrec_SetIcmpCode(
-    rwRec              *r,
-    uint8_t             in_v)
-{
-    _recSetIcmpCode(r, in_v);
-}
-
-
-void
-rwrec_MemGetIcmpCode(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetIcmpCode(r, (uint8_t*)out_vp);
-}
-
-
-uint16_t
-rwrec_GetIcmpTypeAndCode(
-    const rwRec        *r)
-{
-    return _recGetIcmpTypeAndCode(r);
-}
-
-
-void
-rwrec_SetIcmpTypeAndCode(
-    rwRec              *r,
-    uint16_t            in_v)
-{
-    _recSetIcmpTypeAndCode(r, in_v);
-}
-
-
-void
-rwrec_MemGetIcmpTypeAndCode(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetIcmpTypeAndCode(r, out_vp);
-}
-
-
-void
-rwrec_MemSetIcmpTypeAndCode(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetIcmpTypeAndCode(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpIcmpTypeAndCode(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpIcmpTypeAndCode(r, vp);
-}
-
-
-uint32_t
-rwrec_GetSIPv4(
-    const rwRec        *r)
-{
-    return _recGetSIPv4(r);
-}
-
-
-void
-rwrec_SetSIPv4(
-    rwRec              *r,
-    uint32_t            in_v)
-{
-    _recSetSIPv4(r, in_v);
-}
-
-
-void
-rwrec_MemGetSIPv4(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetSIPv4(r, out_vp);
-}
-
-
-void
-rwrec_MemSetSIPv4(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetSIPv4(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpSIPv4(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpSIPv4(r, vp);
-}
-
-
-uint32_t
-rwrec_GetMaskSIPv4(
-    const rwRec        *r,
-    uint32_t            mask)
-{
-    return _recGetMaskSIPv4(r, mask);
-}
-
-
-void
-rwrec_ApplyMaskSIPv4(
-    rwRec              *r,
-    uint32_t            mask)
-{
-    _recApplyMaskSIPv4(r, mask);
-}
-
-
-uint32_t
-rwrec_GetDIPv4(
-    const rwRec        *r)
-{
-    return _recGetDIPv4(r);
-}
-
-
-void
-rwrec_SetDIPv4(
-    rwRec              *r,
-    uint32_t            in_v)
-{
-    _recSetDIPv4(r, in_v);
-}
-
-
-void
-rwrec_MemGetDIPv4(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetDIPv4(r, out_vp);
-}
-
-
-void
-rwrec_MemSetDIPv4(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetDIPv4(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpDIPv4(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpDIPv4(r, vp);
-}
-
-
-uint32_t
-rwrec_GetMaskDIPv4(
-    const rwRec        *r,
-    uint32_t            mask)
-{
-    return _recGetMaskDIPv4(r, mask);
-}
-
-
-void
-rwrec_ApplyMaskDIPv4(
-    rwRec              *r,
-    uint32_t            mask)
-{
-    _recApplyMaskDIPv4(r, mask);
-}
-
-
-uint16_t
-rwrec_GetSPort(
-    const rwRec        *r)
-{
-    return _recGetSPort(r);
-}
-
-
-void
-rwrec_SetSPort(
-    rwRec              *r,
-    uint16_t            in_v)
-{
-    _recSetSPort(r, in_v);
-}
-
-
-void
-rwrec_MemGetSPort(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetSPort(r, out_vp);
-}
-
-
-void
-rwrec_MemSetSPort(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetSPort(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpSPort(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpSPort(r, vp);
-}
-
-
-uint16_t
-rwrec_GetDPort(
-    const rwRec        *r)
-{
-    return _recGetDPort(r);
-}
-
-
-void
-rwrec_SetDPort(
-    rwRec              *r,
-    uint16_t            in_v)
-{
-    _recSetDPort(r, in_v);
-}
-
-
-void
-rwrec_MemGetDPort(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetDPort(r, out_vp);
-}
-
-
-void
-rwrec_MemSetDPort(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetDPort(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpDPort(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpDPort(r, vp);
-}
-
-
-uint8_t
-rwrec_GetProto(
-    const rwRec        *r)
-{
-    return _recGetProto(r);
-}
-
-
-void
-rwrec_SetProto(
-    rwRec              *r,
-    uint8_t             in_v)
-{
-    _recSetProto(r, in_v);
-}
-
-
-void
-rwrec_MemGetProto(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetProto(r, out_vp);
-}
-
-
-void
-rwrec_MemSetProto(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetProto(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpProto(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpProto(r, vp);
-}
-
-
-uint32_t
-rwrec_GetPkts(
-    const rwRec        *r)
-{
-    return _recGetPkts(r);
-}
-
-
-void
-rwrec_SetPkts(
-    rwRec              *r,
-    uint32_t            in_v)
-{
-    _recSetPkts(r, in_v);
-}
-
-
-void
-rwrec_MemGetPkts(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetPkts(r, out_vp);
-}
-
-
-void
-rwrec_MemSetPkts(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetPkts(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpPkts(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpPkts(r, vp);
-}
-
-
-uint32_t
-rwrec_GetBytes(
-    const rwRec        *r)
-{
-    return _recGetBytes(r);
-}
-
-
-void
-rwrec_SetBytes(
-    rwRec              *r,
-    uint32_t            in_v)
-{
-    _recSetBytes(r, in_v);
-}
-
-
-void
-rwrec_MemGetBytes(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetBytes(r, out_vp);
-}
-
-
-void
-rwrec_MemSetBytes(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetBytes(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpBytes(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpBytes(r, vp);
-}
-
-
-uint8_t
-rwrec_GetFlags(
-    const rwRec        *r)
-{
-    return _recGetFlags(r);
-}
-
-
-void
-rwrec_SetFlags(
-    rwRec              *r,
-    uint8_t             in_v)
-{
-    _recSetFlags(r, in_v);
-}
-
-
-void
-rwrec_MemGetFlags(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetFlags(r, out_vp);
-}
-
-
-void
-rwrec_MemSetFlags(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetFlags(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpFlags(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpFlags(r, vp);
-}
-
-
-sktime_t
-rwrec_GetStartTime(
-    const rwRec        *r)
-{
-    return _recGetStartTime(r);
-}
-
-
-void
-rwrec_SetStartTime(
-    rwRec              *r,
-    sktime_t            in_v)
-{
-    _recSetStartTime(r, in_v);
-}
-
-
-void
-rwrec_MemGetStartTime(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetStartTime(r, out_vp);
-}
-
-
-void
-rwrec_MemSetStartTime(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetStartTime(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpStartTime(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpStartTime(r, vp);
-}
-
-
-uint32_t
-rwrec_GetStartSeconds(
-    const rwRec        *r)
-{
-    return _recGetStartSeconds(r);
-}
-
-
-void
-rwrec_MemGetStartSeconds(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetStartSeconds(r, out_vp);
-}
-
-
-uint32_t
-rwrec_GetElapsed(
-    const rwRec        *r)
-{
-    return _recGetElapsed(r);
-}
-
-
-void
-rwrec_SetElapsed(
-    rwRec              *r,
-    sktime_t            in_v)
-{
-    _recSetElapsed(r, in_v);
-}
-
-
-void
-rwrec_MemGetElapsed(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetElapsed(r, out_vp);
-}
-
-
-void
-rwrec_MemSetElapsed(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetElapsed(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpElapsed(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpElapsed(r, vp);
-}
-
-
-uint32_t
-rwrec_GetElapsedSeconds(
-    const rwRec        *r)
-{
-    return _recGetElapsedSeconds(r);
-}
-
-
-void
-rwrec_MemGetElapsedSeconds(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetElapsedSeconds(r, out_vp);
-}
-
-
-sktime_t
-rwrec_GetEndTime(
-    const rwRec        *r)
-{
-    return _recGetEndTime(r);
-}
-
-
-void
-rwrec_MemGetEndTime(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetEndTime(r, out_vp);
-}
-
-
-uint32_t
-rwrec_GetEndSeconds(
-    const rwRec        *r)
-{
-    return _recGetEndSeconds(r);
-}
-
-
-void
-rwrec_MemGetEndSeconds(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetEndSeconds(r, out_vp);
-}
-
-
-sk_sensor_id_t
-rwrec_GetSensor(
-    const rwRec        *r)
-{
-    return _recGetSensor(r);
-}
-
-
-void
-rwrec_SetSensor(
-    rwRec              *r,
-    sk_sensor_id_t      in_v)
-{
-    _recSetSensor(r, in_v);
-}
-
-
-void
-rwrec_MemGetSensor(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetSensor(r, out_vp);
-}
-
-
-void
-rwrec_MemSetSensor(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetSensor(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpSensor(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpSensor(r, vp);
-}
-
-
-uint32_t
-rwrec_GetNhIPv4(
-    const rwRec        *r)
-{
-    return _recGetNhIPv4(r);
-}
-
-
-void
-rwrec_SetNhIPv4(
-    rwRec              *r,
-    uint32_t            in_v)
-{
-    _recSetNhIPv4(r, in_v);
-}
-
-
-void
-rwrec_MemGetNhIPv4(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetNhIPv4(r, out_vp);
-}
-
-
-void
-rwrec_MemSetNhIPv4(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetNhIPv4(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpNhIPv4(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpNhIPv4(r, vp);
-}
-
-
-uint32_t
-rwrec_GetMaskNhIPv4(
-    const rwRec        *r,
-    uint32_t            mask)
-{
-    return _recGetMaskNhIPv4(r, mask);
-}
-
-
-void
-rwrec_ApplyMaskNhIPv4(
-    rwRec              *r,
-    uint32_t            mask)
-{
-    _recApplyMaskNhIPv4(r, mask);
-}
-
-
-uint16_t
-rwrec_GetInput(
-    const rwRec        *r)
-{
-    return _recGetInput(r);
-}
-
-
-void
-rwrec_SetInput(
-    rwRec              *r,
-    uint16_t            in_v)
-{
-    _recSetInput(r, in_v);
-}
-
-
-void
-rwrec_MemGetInput(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetInput(r, out_vp);
-}
-
-
-void
-rwrec_MemSetInput(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetInput(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpInput(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpInput(r, vp);
-}
-
-
-uint16_t
-rwrec_GetOutput(
-    const rwRec        *r)
-{
-    return _recGetOutput(r);
-}
-
-
-void
-rwrec_SetOutput(
-    rwRec              *r,
-    uint16_t            in_v)
-{
-    _recSetOutput(r, in_v);
-}
-
-
-void
-rwrec_MemGetOutput(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetOutput(r, out_vp);
-}
-
-
-void
-rwrec_MemSetOutput(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetOutput(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpOutput(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpOutput(r, vp);
-}
-
-
-uint8_t
-rwrec_GetInitFlags(
-    const rwRec        *r)
-{
-    return _recGetInitFlags(r);
-}
-
-
-void
-rwrec_SetInitFlags(
-    rwRec              *r,
-    uint8_t             in_v)
-{
-    _recSetInitFlags(r, in_v);
-}
-
-
-void
-rwrec_MemGetInitFlags(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetInitFlags(r, out_vp);
-}
-
-
-void
-rwrec_MemSetInitFlags(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetInitFlags(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpInitFlags(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpInitFlags(r, vp);
-}
-
-
-uint8_t
-rwrec_GetRestFlags(
-    const rwRec        *r)
-{
-    return _recGetRestFlags(r);
-}
-
-
-void
-rwrec_SetRestFlags(
-    rwRec              *r,
-    uint8_t             in_v)
-{
-    _recSetRestFlags(r, in_v);
-}
-
-
-void
-rwrec_MemGetRestFlags(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetRestFlags(r, out_vp);
-}
-
-
-void
-rwrec_MemSetRestFlags(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetRestFlags(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpRestFlags(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpRestFlags(r, vp);
-}
-
-
-uint8_t
-rwrec_GetTcpState(
-    const rwRec        *r)
-{
-    return _recGetTcpState(r);
-}
-
-
-void
-rwrec_SetTcpState(
-    rwRec              *r,
-    uint8_t             in_v)
-{
-    _recSetTcpState(r, in_v);
-}
-
-
-void
-rwrec_MemGetTcpState(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetTcpState(r, out_vp);
-}
-
-
-void
-rwrec_MemSetTcpState(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetTcpState(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpTcpState(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpTcpState(r, vp);
-}
-
-
-sk_flowtype_id_t
-rwrec_GetFlowType(
-    const rwRec        *r)
-{
-    return _recGetFlowType(r);
-}
-
-
-void
-rwrec_SetFlowType(
-    rwRec              *r,
-    sk_flowtype_id_t    in_v)
-{
-    _recSetFlowType(r, in_v);
-}
-
-
-void
-rwrec_MemGetFlowType(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetFlowType(r, out_vp);
-}
-
-
-void
-rwrec_MemSetFlowType(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetFlowType(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpFlowType(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpFlowType(r, vp);
-}
-
-
-uint16_t
-rwrec_GetApplication(
-    const rwRec        *r)
-{
-    return _recGetApplication(r);
-}
-
-
-void
-rwrec_SetApplication(
-    rwRec              *r,
-    uint16_t            in_v)
-{
-    _recSetApplication(r, in_v);
-}
-
-
-void
-rwrec_MemGetApplication(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetApplication(r, out_vp);
-}
-
-
-void
-rwrec_MemSetApplication(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetApplication(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpApplication(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpApplication(r, vp);
-}
-
-
-uint16_t
-rwrec_GetMemo(
-    const rwRec        *r)
-{
-    return _recGetMemo(r);
-}
-
-
-void
-rwrec_SetMemo(
-    rwRec              *r,
-    uint16_t            in_v)
-{
-    _recSetMemo(r, in_v);
-}
-
-
-void
-rwrec_MemGetMemo(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetMemo(r, out_vp);
-}
-
-
-void
-rwrec_MemSetMemo(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetMemo(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpMemo(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpMemo(r, vp);
-}
-
-
-void
-rwrec_MemGetSIP(
-    const rwRec        *r,
-    skipaddr_t         *out_vp)
-{
-    _recMemGetSIP(r, out_vp);
-}
-
-
-void
-rwrec_MemSetSIP(
-    rwRec              *r,
-    const skipaddr_t   *in_vp)
-{
-    _recMemSetSIP(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpSIP(
-    const rwRec        *r,
-    const skipaddr_t   *cmp_addr)
-{
-#if !SK_ENABLE_IPV6
-    return _recMemCmpSIP(r, cmp_addr);
-#else
-    return recCompareIPAddr(r, &(r->sIP), cmp_addr);
-#endif
-}
-
-
 void
-rwrec_ApplyMaskSIP(
+rwRecApplyMaskNhIP(
     rwRec              *r,
     const skipaddr_t   *mask_addr)
 {
-#if !SK_ENABLE_IPV6
-    _recApplyMaskSIP(r, mask_addr);
-#else
-    recApplyMaskIPAddr(r, &(r->sIP), mask_addr);
-#endif
+    recApplyMaskIPAddr(r, &r->nhIP, mask_addr);
 }
-
 
 void
-rwrec_MemGetDIP(
-    const rwRec        *r,
-    skipaddr_t         *out_vp)
-{
-    _recMemGetDIP(r, out_vp);
-}
-
-
-void
-rwrec_MemSetDIP(
-    rwRec              *r,
-    const skipaddr_t   *in_vp)
-{
-    _recMemSetDIP(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpDIP(
-    const rwRec        *r,
-    const skipaddr_t   *cmp_addr)
-{
-#if !SK_ENABLE_IPV6
-    return _recMemCmpDIP(r, cmp_addr);
-#else
-    return recCompareIPAddr(r, &(r->dIP), cmp_addr);
-#endif
-}
-
-
-void
-rwrec_ApplyMaskDIP(
+rwRecApplyMaskSIP(
     rwRec              *r,
     const skipaddr_t   *mask_addr)
 {
-#if !SK_ENABLE_IPV6
-    _recApplyMaskDIP(r, mask_addr);
-#else
-    recApplyMaskIPAddr(r, &(r->dIP), mask_addr);
-#endif
+    recApplyMaskIPAddr(r, &r->sIP, mask_addr);
 }
-
 
 void
-rwrec_MemGetNhIP(
-    const rwRec        *r,
-    skipaddr_t         *out_vp)
-{
-    _recMemGetNhIP(r, out_vp);
-}
-
-
-void
-rwrec_MemSetNhIP(
-    rwRec              *r,
-    const skipaddr_t   *in_vp)
-{
-    _recMemSetNhIP(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpNhIP(
-    const rwRec        *r,
-    const skipaddr_t   *cmp_addr)
-{
-#if !SK_ENABLE_IPV6
-    return _recMemCmpNhIP(r, cmp_addr);
-#else
-    return recCompareIPAddr(r, &(r->nhIP), cmp_addr);
-#endif
-}
-
-
-void
-rwrec_ApplyMaskNhIP(
+rwRecApplyMaskDIP(
     rwRec              *r,
     const skipaddr_t   *mask_addr)
 {
-#if !SK_ENABLE_IPV6
-    _recApplyMaskNhIP(r, mask_addr);
-#else
-    recApplyMaskIPAddr(r, &(r->nhIP), mask_addr);
-#endif
+    recApplyMaskIPAddr(r, &r->dIP, mask_addr);
 }
 
-
-#if SK_ENABLE_IPV6
 
 int
-rwrec_IsIPv6(
-    const rwRec        *r)
-{
-    return _recIsIPv6(r);
-}
-
-
-void
-rwrec_ConvertToIPv6(
+rwRecConvertToIPv4(
     rwRec              *r)
 {
-    _recConvertToIPv6(r);
-}
-
-
-int
-rwrec_ConvertToIPv4(
-    rwRec              *r)
-{
-    uint32_t ipv4;
+    uint32_t            ipv4;
 
     if (!SK_IPV6_IS_V4INV6(r->sIP.ipu_ipv6)
         || !SK_IPV6_IS_V4INV6(r->dIP.ipu_ipv6)
@@ -1377,147 +117,126 @@ rwrec_ConvertToIPv4(
         return -1;
     }
 
-    memcpy(&ipv4, &(r->sIP.ipu_ipv6[12]), 4);
+    MEMCPY32(&ipv4, &(r->sIP.ipu_ipv6[12]));
     r->sIP.ipu_ipv4 = ntohl(ipv4);
 
-    memcpy(&ipv4, &(r->dIP.ipu_ipv6[12]), 4);
+    MEMCPY32(&ipv4, &(r->dIP.ipu_ipv6[12]));
     r->dIP.ipu_ipv4 = ntohl(ipv4);
 
-    memcpy(&ipv4, &(r->nhIP.ipu_ipv6[12]), 4);
+    MEMCPY32(&ipv4, &(r->nhIP.ipu_ipv6[12]));
     r->nhIP.ipu_ipv4 = ntohl(ipv4);
 
-    _recSetIPv4(r);
+    r->tcp_state &= 0x7F;
 
     return 0;
 }
 
 
-void
-rwrec_SetIPv4(
-    rwRec              *r)
-{
-    _recSetIPv4(r);
-}
-
-
-void
-rwrec_SetIPv6(
-    rwRec              *r)
-{
-    _recSetIPv6(r);
-}
-
-
-void
-rwrec_MemGetSIPv6(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetSIPv6(r, out_vp);
-}
-
-
-void
-rwrec_MemSetSIPv6(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetSIPv6(r, in_vp);
-}
-
-
 int
-rwrec_MemCmpSIPv6(
-    const rwRec        *r,
-    const void         *vp)
+skRwrecAppendFieldsToStringMap(
+    sk_stringmap_t     *str_map)
 {
-    return _recMemCmpSIPv6(r, vp);
+    /*
+     * This struct holds the field names and their IDs.
+     *
+     * Names that map to the same ID must be put together, with the
+     * name that you want to use for the title first, then any aliases
+     * afterward.
+     *
+     * NOTE!! We are assuming that the stringmap code leaves things in
+     * the order we insert them and doesn't re-arrange them.  Since
+     * that code uses a linked-list, we are safe for now.
+     */
+    static const sk_stringmap_entry_t rwrec_fields[] = {
+        {"sIP",          RWREC_FIELD_SIP,
+         "Source IP address", NULL},
+        {"1",            RWREC_FIELD_SIP,               NULL, NULL},
+        {"dIP",          RWREC_FIELD_DIP,
+         "Destination IP address", NULL},
+        {"2",            RWREC_FIELD_DIP,               NULL, NULL},
+        {"sPort",        RWREC_FIELD_SPORT,
+         "Source port for TCP, UDP, or equivalent", NULL},
+        {"3",            RWREC_FIELD_SPORT,             NULL, NULL},
+        {"dPort",        RWREC_FIELD_DPORT,
+         "Destination port for TCP, UDP, or equivalent", NULL},
+        {"4",            RWREC_FIELD_DPORT,             NULL, NULL},
+        {"protocol",     RWREC_FIELD_PROTO,
+         "IP protocol", NULL},
+        {"5",            RWREC_FIELD_PROTO,             NULL, NULL},
+        {"packets",      RWREC_FIELD_PKTS,
+         "Number of packets in the flow", NULL},
+        {"pkts",         RWREC_FIELD_PKTS,              NULL, NULL},
+        {"6",            RWREC_FIELD_PKTS,              NULL, NULL},
+        {"bytes",        RWREC_FIELD_BYTES,
+         "Number of octets (bytes) in the flow", NULL},
+        {"7",            RWREC_FIELD_BYTES,             NULL, NULL},
+        {"flags",        RWREC_FIELD_FLAGS,
+         "Bit-wise OR of TCP flags over all packets [FSRPAUEC]", NULL},
+        {"8",            RWREC_FIELD_FLAGS,             NULL, NULL},
+        {"sTime",        RWREC_FIELD_STIME,
+         "Starting time of the flow", NULL},
+        {"9",            RWREC_FIELD_STIME,             NULL, NULL},
+        {"duration",     RWREC_FIELD_ELAPSED,
+         "Duration of the flow", NULL},
+        {"10",           RWREC_FIELD_ELAPSED,           NULL, NULL},
+        {"eTime",        RWREC_FIELD_ETIME,
+         "Ending time of the flow", NULL},
+        {"11",           RWREC_FIELD_ETIME,             NULL, NULL},
+        {"sensor",       RWREC_FIELD_SID,
+         "Name or ID of the sensor as assigned by rwflowpack", NULL},
+        {"12",           RWREC_FIELD_SID,               NULL, NULL},
+        {"in",           RWREC_FIELD_INPUT,
+         "Router SNMP input interface or vlanId", NULL},
+        {"13",           RWREC_FIELD_INPUT,             NULL, NULL},
+        {"out",          RWREC_FIELD_OUTPUT,
+         "Router SNMP output interface or postVlanId", NULL},
+        {"14",           RWREC_FIELD_OUTPUT,            NULL, NULL},
+        {"nhIP",         RWREC_FIELD_NHIP,
+         "Router next-hop IP address", NULL},
+        {"15",           RWREC_FIELD_NHIP,              NULL, NULL},
+        {"initialFlags", RWREC_FIELD_INIT_FLAGS,
+         "TCP flags on first packet in the flow", NULL},
+        {"26",           RWREC_FIELD_INIT_FLAGS,        NULL, NULL},
+        {"sessionFlags", RWREC_FIELD_REST_FLAGS,
+         "Bit-wise OR of TCP flags over second through final packet", NULL},
+        {"27",           RWREC_FIELD_REST_FLAGS,        NULL, NULL},
+        {"attributes",   RWREC_FIELD_TCP_STATE,
+         "Flow attributes set by flow generator [SFTC]", NULL},
+        {"28",           RWREC_FIELD_TCP_STATE,         NULL, NULL},
+        {"application",  RWREC_FIELD_APPLICATION,
+         "Guess as to content of flow (appLabel)", NULL},
+        {"29",           RWREC_FIELD_APPLICATION,       NULL, NULL},
+        {"class",        RWREC_FIELD_FTYPE_CLASS,
+         "Class of the sensor as assigned by rwflowpack", NULL},
+        {"20",           RWREC_FIELD_FTYPE_CLASS,       NULL, NULL},
+        {"type",         RWREC_FIELD_FTYPE_TYPE,
+         "Type within the class as assigned by rwflowpack", NULL},
+        {"21",           RWREC_FIELD_FTYPE_TYPE,        NULL, NULL},
+        {"iType",        RWREC_FIELD_ICMP_TYPE,
+         "ICMP type value for ICMP or ICMPv6 flows; empty otherwise", NULL},
+        {"iCode",        RWREC_FIELD_ICMP_CODE,
+         "ICMP code value for ICMP or ICMPv6 flows; empty otherwise", NULL},
+
+        /* Do not add the following since the "icmp" prefix cause
+         * conflicts with "icmpTypeCode" */
+        /* {"icmpType",     RWREC_FIELD_ICMP_TYPE,         NULL, NULL}, */
+        /* {"icmpCode",     RWREC_FIELD_ICMP_CODE,         NULL, NULL}, */
+
+        SK_STRINGMAP_SENTINEL
+    };
+    sk_stringmap_status_t sm_err;
+
+    assert(str_map);
+
+    /* add entries */
+    sm_err = (skStringMapAddEntries(
+                  str_map, (sizeof(rwrec_fields)/sizeof(rwrec_fields[0]) - 1),
+                  rwrec_fields));
+    if (SKSTRINGMAP_OK != sm_err) {
+        return -1;
+    }
+    return 0;
 }
-
-
-void
-rwrec_ApplyMaskSIPv6(
-    rwRec              *r,
-    const void         *mask_vp)
-{
-    _recApplyMaskSIPv6(r, mask_vp);
-}
-
-
-void
-rwrec_MemGetDIPv6(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetDIPv6(r, out_vp);
-}
-
-
-void
-rwrec_MemSetDIPv6(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetDIPv6(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpDIPv6(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpDIPv6(r, vp);
-}
-
-
-void
-rwrec_ApplyMaskDIPv6(
-    rwRec              *r,
-    const void         *mask_vp)
-{
-    _recApplyMaskDIPv6(r, mask_vp);
-}
-
-
-void
-rwrec_MemGetNhIPv6(
-    const rwRec        *r,
-    void               *out_vp)
-{
-    _recMemGetNhIPv6(r, out_vp);
-}
-
-
-void
-rwrec_MemSetNhIPv6(
-    rwRec              *r,
-    const void         *in_vp)
-{
-    _recMemSetNhIPv6(r, in_vp);
-}
-
-
-int
-rwrec_MemCmpNhIPv6(
-    const rwRec        *r,
-    const void         *vp)
-{
-    return _recMemCmpNhIPv6(r, vp);
-}
-
-
-void
-rwrec_ApplyMaskNhIPv6(
-    rwRec              *r,
-    const void         *mask_vp)
-{
-    _recApplyMaskNhIPv6(r, mask_vp);
-}
-
-
-#endif /* SK_ENABLE_IPV6 */
-
 
 
 /*

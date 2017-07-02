@@ -7,138 +7,138 @@
 */
 
 /*
-**  rwstats.c
-**
-**  Implementation of the rwstats suite application.
-**
-**  Reads packed files or reads the output from rwfilter and can
-**  compute a battery of characterizations and statistics:
-**
-**  -- Top N or Bottom N SIPs with counts; count of unique SIPs
-**  -- Top N or Bottom N DIPs with counts; count of unique DIPs
-**  -- Top N or Bottom N SIP/DIP pairs with counts; count of unique
-**     SIP/DIP pairs (for a limited number of records)
-**  -- Top N or Bottom N Src Ports with counts; count of unique Src Ports
-**  -- Top N or Bottom N Dest Ports with counts; count of unique Dest Ports
-**  -- Top N or Bottom N Protocols with counts; count of unique protocols
-**  -- For more continuous variables (bytes, packets, bytes/packet)
-**     provide statistics such as min, max, quartiles, and intervals
-**
-**  Instead of specifying a Top N or Bottom N as an absolute number N,
-**  the user may specify a cutoff threshold.  In this case, the Top N
-**  or Bottom N required to print all counts meeting the threshold is
-**  computed by the application.
-**
-**  Instead of specifying the threshold as an absolute count, the user
-**  may specify the threshold as percentage of all input records.  For
-**  this case, the absolute threshold is calculated and then that is
-**  used to calculate the Top N or Bottom N.
-**
-**  The application will only do calculations and produce output when
-**  asked to do so.  At least one argument is required to tell the
-**  application what to do.
-**
-**  Ideas for expansion
-**  -- Similarly for other variables, e.g., country code.
-**  -- Output each type of data to its own file
-**  -- Save intermediate data in files for faster reprocessing by this
-**     application
-**  -- Save intermediate data in files for processing by other
-**     applications
-**
-*/
+ *  rwstats.c
+ *
+ *  Implementation of the rwstats suite application.
+ *
+ *  Reads packed files or reads the output from rwfilter and can
+ *  compute a battery of characterizations and statistics:
+ *
+ *  -- Top N or Bottom N SIPs with counts; count of unique SIPs
+ *  -- Top N or Bottom N DIPs with counts; count of unique DIPs
+ *  -- Top N or Bottom N SIP/DIP pairs with counts; count of unique
+ *     SIP/DIP pairs (for a limited number of records)
+ *  -- Top N or Bottom N Src Ports with counts; count of unique Src Ports
+ *  -- Top N or Bottom N Dest Ports with counts; count of unique Dest Ports
+ *  -- Top N or Bottom N Protocols with counts; count of unique protocols
+ *  -- For more continuous variables (bytes, packets, bytes/packet)
+ *     provide statistics such as min, max, quartiles, and intervals
+ *
+ *  Instead of specifying a Top N or Bottom N as an absolute number N,
+ *  the user may specify a cutoff threshold.  In this case, the Top N
+ *  or Bottom N required to print all counts meeting the threshold is
+ *  computed by the application.
+ *
+ *  Instead of specifying the threshold as an absolute count, the user
+ *  may specify the threshold as percentage of all input records.  For
+ *  this case, the absolute threshold is calculated and then that is
+ *  used to calculate the Top N or Bottom N.
+ *
+ *  The application will only do calculations and produce output when
+ *  asked to do so.  At least one argument is required to tell the
+ *  application what to do.
+ *
+ *  Ideas for expansion
+ *  -- Similarly for other variables, e.g., country code.
+ *  -- Output each type of data to its own file
+ *  -- Save intermediate data in files for faster reprocessing by this
+ *     application
+ *  -- Save intermediate data in files for processing by other
+ *     applications
+ *
+ */
 
 /*
-**  IMPLEMENTATION NOTES
-**
-**  For each input type (source ip, dest ip, source port, proto, etc),
-**  there are two globals: limit_<type> contains the value the user
-**  entered for the input type, and wanted_stat_<type> is a member
-**  of the wanted_stat_type and says what the limit_<type> value
-**  represents---e.g., the Top N, the bottom threshold percentage, etc.
-**
-**  The application takes input (either from stdin or as files on
-**  command line) and calls processFile() on each.  A count of each
-**  unique source IP addresses is stored in the IpCounter hash table
-**  counter_src_ip; Destinations IPs in counter_dest_ip; data for
-**  flow between a Source IP and Destination IP pair are stored in
-**  counter_pair_ip.
-**
-**  Since there are relatively few ports and protocols, two
-**  65536-elements arrays, src_port_array and dest_port_array are
-**  used to store a count of the records for each source and
-**  destination port, respectively, and a 256-element array,
-**  proto_array, is used to store a count of each protocol.
-**
-**  Minima, maxima, quartile, and interval data are stored for each of
-**  bytes, packets, and bytes-per-packet for all flows--regardless of
-**  protocol--and detailed for a limited number (RWSTATS_NUM_PROTO-1)
-**  of protocols..  The minima and maxima are each stored in arrays
-**  for each of bytes, packets, bpp.  For example bytes_min[0]
-**  stores the smallest byte count regardless of protocol (ie, over
-**  all protocols), and pkts_max[1] stores the largest packet count
-**  for the first protocol the user specified.  The mapping from
-**  protocol to array index is given by proto_to_stats_idx[], where
-**  the index into proto_to_stats_idx[] returns an integer that is
-**  the index into bytes_min[].  Data for the intervals is stored in
-**  two dimensional arrays, where the first dimension is the same as
-**  for the minima and maxima, and the second dimension is the number
-**  of intervals, NUM_INTERVALS.
-**
-**  Once data is collected, it is processed.
-**
-**  For the IPs, the user is interested the number of unique IPs and
-**  the IPs with the topN counts (things are similar for the bottomN,
-**  but we use topN in this dicussion to keep things more clear).  In
-**  the printTopIps() function, an array with 2*topN elements is
-**  created and passed to calcTopIps(); that array will be the result
-**  array and it will hold the topN IpAddr and IpCount pairs in sorted
-**  order.  In calcTopIps(), a working array of 2*topN elements and a
-**  Heap data structure with topN nodes are created.  The topN
-**  IpCounts seen are stored as IpCount/IpAddr pairs in the
-**  2*topN-element array (but not in sorted order), and the heap
-**  stores pointers into that array with the lowest IpCount at the
-**  root of the heap.  As the function iterates over the hash table,
-**  it compares the IpCount of the current hash-table element with the
-**  IpCount at the root of the heap.  When the IpCount of the
-**  hash-table element is larger, the root of the heap is removed, the
-**  IpCount/IpAddr pair pointed to by the former heap-root is removed
-**  from the 2*topN-element array and replaced with the new
-**  IpCount/IpAddr pair, and finally a new node is added to the heap
-**  that points to the new IpCount/IpAddr pair.  This continues until
-**  all hash-table entries are processed.  To get the list of topN IPs
-**  from highest to lowest, calcTopIps() removes elements from the
-**  heap and stores them in the result array from position N-1 to
-**  position 0.
-**
-**  Finding the topN source ports, topN destination ports, and topN
-**  protocols are similar to finding the topN IPs, except the ports
-**  and protocols are already stored in an array, so pointers directly
-**  into the src_port_array, dest_port_array, and proto_array
-**  are stored in the heap.  When generating output, the number of the
-**  port or protocol is determined by the diffence between the pointer
-**  into the *_port_array or proto_array and its start.
-**
-**  Instead of specifying a topN, the user may specify a cutoff
-**  threshold.  In this case, the topN required to print all counts
-**  meeting the threshold is computed by looping over the IP
-**  hash-table or port/protocol arrays and finding all entries with at
-**  least threshold hits.
-**
-**  The user may specify a percentage threshold instead of an absolute
-**  threshold.  Once all records are read, the total record count is
-**  multiplied by the percentage threshold to get the absolute
-**  threshold cutoff, and that is used to calculate the topN as
-**  described in the preceeding paragraph.
-**
-**  For the continuous variables bytes, packets, bpp, most of the work
-**  was done while reading the data, so processing is minimal.  Only
-**  the quartiles must be calculated.
-*/
+ *  IMPLEMENTATION NOTES
+ *
+ *  For each input type (source ip, dest ip, source port, proto, etc),
+ *  there are two globals: limit_<type> contains the value the user
+ *  entered for the input type, and wanted_stat_<type> is a member
+ *  of the wanted_stat_type and says what the limit_<type> value
+ *  represents---e.g., the Top N, the bottom threshold percentage, etc.
+ *
+ *  The application takes input (either from stdin or as files on
+ *  command line) and calls processFile() on each.  A count of each
+ *  unique source IP addresses is stored in the IpCounter hash table
+ *  counter_src_ip; Destinations IPs in counter_dest_ip; data for
+ *  flow between a Source IP and Destination IP pair are stored in
+ *  counter_pair_ip.
+ *
+ *  Since there are relatively few ports and protocols, two
+ *  65536-elements arrays, src_port_array and dest_port_array are
+ *  used to store a count of the records for each source and
+ *  destination port, respectively, and a 256-element array,
+ *  proto_array, is used to store a count of each protocol.
+ *
+ *  Minima, maxima, quartile, and interval data are stored for each of
+ *  bytes, packets, and bytes-per-packet for all flows--regardless of
+ *  protocol--and detailed for a limited number (RWSTATS_NUM_PROTO-1)
+ *  of protocols..  The minima and maxima are each stored in arrays
+ *  for each of bytes, packets, bpp.  For example bytes_min[0]
+ *  stores the smallest byte count regardless of protocol (ie, over
+ *  all protocols), and pkts_max[1] stores the largest packet count
+ *  for the first protocol the user specified.  The mapping from
+ *  protocol to array index is given by proto_to_stats_idx[], where
+ *  the index into proto_to_stats_idx[] returns an integer that is
+ *  the index into bytes_min[].  Data for the intervals is stored in
+ *  two dimensional arrays, where the first dimension is the same as
+ *  for the minima and maxima, and the second dimension is the number
+ *  of intervals, NUM_INTERVALS.
+ *
+ *  Once data is collected, it is processed.
+ *
+ *  For the IPs, the user is interested the number of unique IPs and
+ *  the IPs with the topN counts (things are similar for the bottomN,
+ *  but we use topN in this dicussion to keep things more clear).  In
+ *  the printTopIps() function, an array with 2*topN elements is
+ *  created and passed to calcTopIps(); that array will be the result
+ *  array and it will hold the topN IpAddr and IpCount pairs in sorted
+ *  order.  In calcTopIps(), a working array of 2*topN elements and a
+ *  Heap data structure with topN nodes are created.  The topN
+ *  IpCounts seen are stored as IpCount/IpAddr pairs in the
+ *  2*topN-element array (but not in sorted order), and the heap
+ *  stores pointers into that array with the lowest IpCount at the
+ *  root of the heap.  As the function iterates over the hash table,
+ *  it compares the IpCount of the current hash-table element with the
+ *  IpCount at the root of the heap.  When the IpCount of the
+ *  hash-table element is larger, the root of the heap is removed, the
+ *  IpCount/IpAddr pair pointed to by the former heap-root is removed
+ *  from the 2*topN-element array and replaced with the new
+ *  IpCount/IpAddr pair, and finally a new node is added to the heap
+ *  that points to the new IpCount/IpAddr pair.  This continues until
+ *  all hash-table entries are processed.  To get the list of topN IPs
+ *  from highest to lowest, calcTopIps() removes elements from the
+ *  heap and stores them in the result array from position N-1 to
+ *  position 0.
+ *
+ *  Finding the topN source ports, topN destination ports, and topN
+ *  protocols are similar to finding the topN IPs, except the ports
+ *  and protocols are already stored in an array, so pointers directly
+ *  into the src_port_array, dest_port_array, and proto_array
+ *  are stored in the heap.  When generating output, the number of the
+ *  port or protocol is determined by the diffence between the pointer
+ *  into the *_port_array or proto_array and its start.
+ *
+ *  Instead of specifying a topN, the user may specify a cutoff
+ *  threshold.  In this case, the topN required to print all counts
+ *  meeting the threshold is computed by looping over the IP
+ *  hash-table or port/protocol arrays and finding all entries with at
+ *  least threshold hits.
+ *
+ *  The user may specify a percentage threshold instead of an absolute
+ *  threshold.  Once all records are read, the total record count is
+ *  multiplied by the percentage threshold to get the absolute
+ *  threshold cutoff, and that is used to calculate the topN as
+ *  described in the preceeding paragraph.
+ *
+ *  For the continuous variables bytes, packets, bpp, most of the work
+ *  was done while reading the data, so processing is minimal.  Only
+ *  the quartiles must be calculated.
+ */
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwstats.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwstats.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/skheap.h>
 #include "rwstats.h"
@@ -162,28 +162,14 @@ RCSIDENT("$SiLK: rwstats.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 #define DIR_AND_TYPE(dat_t_or_b, dat_val_type)  \
     ((dat_t_or_b) | ((dat_val_type) << 1))
 
+#define HEAP_PTR_KEY(hp)                        \
+    ((uint8_t*)(hp) + heap_offset_key)
 
-/*
- *  These macros extract part of a field-list buffer to get a value,
- *  and then set that value on 'rec' by calling 'func'
- */
-#define KEY_TO_REC(type, func, rec, field_buffer, field_list, field)    \
-    {                                                                   \
-        type k2r_val;                                                   \
-        skFieldListExtractFromBuffer(field_list, field_buffer,          \
-                                     field, (uint8_t*)&k2r_val);        \
-        func((rec), k2r_val);                                           \
-    }
+#define HEAP_PTR_VALUE(hp)                      \
+    ((uint8_t*)(hp) + heap_offset_value)
 
-#define KEY_TO_REC_08(func, rec, field_buffer, field_list, field)       \
-    KEY_TO_REC(uint8_t, func, rec, field_buffer, field_list, field)
-
-#define KEY_TO_REC_16(func, rec, field_buffer, field_list, field)       \
-    KEY_TO_REC(uint16_t, func, rec, field_buffer, field_list, field)
-
-#define KEY_TO_REC_32(func, rec, field_buffer, field_list, field)       \
-    KEY_TO_REC(uint32_t, func, rec, field_buffer, field_list, field)
-
+#define HEAP_PTR_DISTINCT(hp)                                   \
+    ((uint8_t*)(hp) + heap_offset_distinct)
 
 #define MEMSET_HEAP_NODE(mhn_buf, key_buf, value_buf, distinct_buf)     \
     do {                                                                \
@@ -200,121 +186,19 @@ RCSIDENT("$SiLK: rwstats.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
  *  meets = VALUE_MEETS_THRESHOLD(value);
  *
  *    Return true if 'value' meets the threshold value set by the
- *    user.  Uses the global 'limit' and 'direction' variables.
+ *    user.  Uses the global 'limit' variable.
  */
-#define VALUE_MEETS_THRESHOLD(vmt_value)                        \
-    (((vmt_value) > limit.value[RWSTATS_THRESHOLD].u64)             \
-     ? (RWSTATS_DIR_TOP == direction)                           \
-     : ((RWSTATS_DIR_BOTTOM == direction)                       \
+#define VALUE_MEETS_THRESHOLD(vmt_value)                                \
+    (((vmt_value) > limit.value[RWSTATS_THRESHOLD].u64)                 \
+     ? (RWSTATS_DIR_TOP == limit.direction)                             \
+     : ((RWSTATS_DIR_BOTTOM == limit.direction)                         \
         || ((vmt_value) == limit.value[RWSTATS_THRESHOLD].u64)))
-
-
-/* structure to get the distinct count when using IPv6 */
-typedef union ipv6_distinct_un {
-    uint64_t count;
-    uint8_t  ip[16];
-} ipv6_distinct_t;
 
 
 /* EXPORTED VARIABLES */
 
-/* user limit for this stat: N if top N or bottom N, threshold, or
- * percentage */
-rwstats_limit_t limit;
-
-rwstats_direction_t direction = RWSTATS_DIR_TOP;
-
-/* the final delimiter on each line; assume none */
-char final_delim[] = {'\0', '\0'};
-
-int width[RWSTATS_COLUMN_WIDTH_COUNT] = {
-    15, /* WIDTH_KEY:   key */
-    20, /* WIDTH_VAL:   count */
-    10, /* WIDTH_INTVL: interval maximum */
-    10, /* WIDTH_PCT:   percentage value */
-};
-
-/* non-zero when --overall-stats or --detail-proto-stats is given */
-int proto_stats = 0;
-
-sk_unique_t *uniq;
-sk_sort_unique_t *ps_uniq;
-
-sk_fieldlist_t *key_fields;
-sk_fieldlist_t *value_fields;
-sk_fieldlist_t *distinct_fields;
-
-/* for the key, value, and distinct fields used by the heap, the byte
- * lengths of each and the offsets of each when creating a heap
- * node */
-size_t heap_octets_key = 0;
-size_t heap_octets_value = 0;
-size_t heap_octets_distinct = 0;
-
-size_t heap_offset_key = 0;
-size_t heap_offset_value = 0;
-size_t heap_offset_distinct = 0;
-
-/* the total byte length of a node in the heap */
-size_t heap_octets_node = 0;
-
-/* delimiter between output columns */
-char delimiter = '|';
-
-/* to convert the key fields (as an rwRec) to ascii */
-rwAsciiStream_t *ascii_str;
-
-/* the real output */
-sk_fileptr_t output;
-
-/* flags set by the user options */
-app_flags_t app_flags;
-
-/* number of records read */
-uint64_t record_count = 0;
-
-/* Summation of whatever value (bytes, packets, flows) we are using.
- * When counting flows, this will be equal to record_count. */
-uint64_t value_total = 0;
-
-/* how to handle IPv6 flows */
-sk_ipv6policy_t ipv6_policy = SK_IPV6POLICY_MIX;
-
-/* CIDR block mask for src and dest ips.  If 0, use all bits;
- * otherwise, the IP address should be bitwised ANDed with this
- * value. */
-uint32_t cidr_sip = 0;
-uint32_t cidr_dip = 0;
-
-/* Information about each potential "value" field the user can choose
- * to compute and display.  Ensure these appear in same order as in
- * the OPT_BYTES...OPT_DIP_DISTINCT values in appOptionsEnum. */
-builtin_field_t builtin_values[] = {
-    /* title, min, max, text_len, id, is_distinct, description */
-    {"Bytes",          1, UINT64_MAX, 20, SK_FIELD_SUM_BYTES,     0,
-     "Sum of bytes for all flows in the group"},
-    {"Packets",        1, UINT64_MAX, 15, SK_FIELD_SUM_PACKETS,   0,
-     "Sum of packets for all flows in the group"},
-    {"Records",        1, UINT64_MAX, 10, SK_FIELD_RECORDS,       0,
-     "Number of flow records in the group"},
-    {"sIP-Distinct",   1, UINT64_MAX, 10, SK_FIELD_SIPv4,         1,
-     "Number of distinct source IPs in the group"},
-    {"dIP-Distinct",   1, UINT64_MAX, 10, SK_FIELD_DIPv4,         1,
-     "Number of distinct source IPs in the group"},
-    {"Distinct",       1, UINT64_MAX, 10, SK_FIELD_CALLER,        1,
-     "You must append a colon and a key field to count the number of"
-     " distinct values seen for that field in the group"}
-};
-
-const size_t num_builtin_values = (sizeof(builtin_values)/
-                                   sizeof(builtin_field_t));
-
-/* which of elapsed, sTime, and eTime are part of the key. uses the
- * PARSE_KEY_* values from rwstats.h */
-unsigned int time_fields_key = 0;
-
-/* whether dPort is part of the key */
-unsigned int dport_key = 0;
+/* which program is this */
+const statsuniq_program_t this_program = STATSUNIQ_PROGRAM_STATS;
 
 
 /* LOCAL VARIABLES */
@@ -325,13 +209,26 @@ static skheap_t *heap = NULL;
 /* the comparison function to use for the heap */
 static skheapcmpfn_t cmp_fn = NULL;
 
+/* for the key, value, and distinct fields used by the heap, the byte
+ * lengths of each and the offsets of each when creating a heap
+ * node */
+static size_t heap_octets_key = 0;
+static size_t heap_octets_value = 0;
+static size_t heap_octets_distinct = 0;
+
+static size_t heap_offset_key = 0;
+static size_t heap_offset_value = 0;
+static size_t heap_offset_distinct = 0;
+
+/* the total byte length of a node in the heap */
+static size_t heap_octets_node = 0;
+
 
 /* LOCAL FUNCTION PROTOTYPES */
 
 
 
 /* FUNCTION DEFINITIONS */
-
 
 /*
  *  topnPrintHeader();
@@ -344,9 +241,10 @@ static void
 topnPrintHeader(
     void)
 {
-    char buf[128];
     const char *direction_name = "";
     const char *above_below = "";
+    char *fmtr_buf = NULL;
+    size_t len;
 
     /* enable the pager */
     setOutputHandle();
@@ -356,7 +254,7 @@ topnPrintHeader(
         return;
     }
 
-    switch (direction) {
+    switch (limit.direction) {
       case RWSTATS_DIR_TOP:
         direction_name = "Top";
         above_below = "above";
@@ -422,318 +320,8 @@ topnPrintHeader(
     }
 
     /* print key titles */
-    rwAsciiPrintTitles(ascii_str);
-
-    if (!app_flags.no_percents) {
-        snprintf(buf, sizeof(buf), "%%%s", limit.title);
-        buf[sizeof(buf)-1] = '\0';
-
-        if (app_flags.no_columns) {
-            fprintf(output.of_fp, "%c%s%c%s",
-                    delimiter, buf, delimiter, "cumul_%");
-        } else {
-            fprintf(output.of_fp, ("%c%*.*s%c%*.*s"),
-                    delimiter, width[WIDTH_PCT], width[WIDTH_PCT], buf,
-                    delimiter, width[WIDTH_PCT], width[WIDTH_PCT], "cumul_%");
-        }
-        fprintf(output.of_fp, "%s\n", final_delim);
-    }
-}
-
-
-/*
- *  writeAsciiRecord(heap_ptr);
- *
- *    Unpacks the fields from 'key' and the value fields from 'value'.
- *    Prints the key fields and the value fields to the global output
- *    stream 'output.of_fp'.
- */
-static void
-writeAsciiRecord(
-    skheapnode_t        heap_ptr)
-{
-    rwRec rwrec;
-    uint32_t val32;
-    uint32_t eTime = 0;
-    uint16_t dport = 0;
-    sk_fieldlist_iterator_t fl_iter;
-    sk_fieldentry_t *field;
-    int id;
-
-#if  SK_ENABLE_IPV6
-    /* whether IPv4 addresses have been added to a record */
-    int added_ipv4 = 0;
-    uint8_t ipv6[16];
-#endif
-
-    /* in mixed IPv4/IPv6 setting, keep record as IPv4 unless an IPv6
-     * address forces us to use IPv6. */
-#define KEY_TO_REC_IPV6(func_v6, func_v4, rec, field_buf, field_list, field) \
-    skFieldListExtractFromBuffer(key_fields, field_buf, field, ipv6);   \
-    if (rwRecIsIPv6(rec)) {                                             \
-        /* record is already IPv6 */                                    \
-        func_v6((rec), ipv6);                                           \
-    } else if (SK_IPV6_IS_V4INV6(ipv6)) {                               \
-        /* record is IPv4, and so is the IP */                          \
-        func_v4((rec), ntohl(*(uint32_t*)(ipv6 + SK_IPV6_V4INV6_LEN))); \
-        added_ipv4 = 1;                                                 \
-    } else {                                                            \
-        /* address is IPv6, but record is IPv4 */                       \
-        if (added_ipv4) {                                               \
-            /* record has IPv4 addrs; must convert */                   \
-            rwRecConvertToIPv6(rec);                                    \
-        } else {                                                        \
-            /* no addresses on record yet */                            \
-            rwRecSetIPv6(rec);                                          \
-        }                                                               \
-        func_v6((rec), ipv6);                                           \
-    }
-
-    /* Zero out rwrec to avoid display errors---specifically with msec
-     * fields and eTime. */
-    RWREC_CLEAR(&rwrec);
-
-    /* Initialize the protocol to 1 (ICMP), so that if the user has
-     * requested ICMP type/code but the protocol is not part of the
-     * key, we still get ICMP values. */
-    rwRecSetProto(&rwrec, IPPROTO_ICMP);
-
-#if SK_ENABLE_IPV6
-    if (ipv6_policy > SK_IPV6POLICY_MIX) {
-        /* Force records to be in IPv6 format */
-        rwRecSetIPv6(&rwrec);
-    }
-#endif /* SK_ENABLE_IPV6 */
-
-    /* unpack the key into 'rwrec' */
-    skFieldListIteratorBind(key_fields, &fl_iter);
-    while (NULL != (field = skFieldListIteratorNext(&fl_iter))) {
-        id = skFieldListEntryGetId(field);
-        switch (id) {
-#if SK_ENABLE_IPV6
-          case SK_FIELD_SIPv6:
-            KEY_TO_REC_IPV6(rwRecMemSetSIPv6, rwRecSetSIPv4, &rwrec,
-                            HEAP_PTR_KEY(heap_ptr), key_fields, field);
-            break;
-          case SK_FIELD_DIPv6:
-            KEY_TO_REC_IPV6(rwRecMemSetDIPv6, rwRecSetDIPv4, &rwrec,
-                            HEAP_PTR_KEY(heap_ptr), key_fields, field);
-            break;
-          case SK_FIELD_NHIPv6:
-            KEY_TO_REC_IPV6(rwRecMemSetNhIPv6, rwRecSetNhIPv4, &rwrec,
-                            HEAP_PTR_KEY(heap_ptr), key_fields, field);
-            break;
-#endif  /* SK_ENABLE_IPV6 */
-
-          case SK_FIELD_SIPv4:
-            KEY_TO_REC_32(rwRecSetSIPv4, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_DIPv4:
-            KEY_TO_REC_32(rwRecSetDIPv4, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_NHIPv4:
-            KEY_TO_REC_32(rwRecSetNhIPv4, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_SPORT:
-            KEY_TO_REC_16(rwRecSetSPort, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_DPORT:
-            /* just extract dPort; we will set it later to ensure
-             * dPort takes precedence over ICMP type/code */
-            skFieldListExtractFromBuffer(key_fields, HEAP_PTR_KEY(heap_ptr),
-                                         field, (uint8_t*)&dport);
-            break;
-          case SK_FIELD_ICMP_TYPE:
-            KEY_TO_REC_08(rwRecSetIcmpType, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_ICMP_CODE:
-            KEY_TO_REC_08(rwRecSetIcmpCode, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_PROTO:
-            KEY_TO_REC_08(rwRecSetProto, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_PACKETS:
-            KEY_TO_REC_32(rwRecSetPkts, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_BYTES:
-            KEY_TO_REC_32(rwRecSetBytes, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_FLAGS:
-            KEY_TO_REC_08(rwRecSetFlags, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_SID:
-            KEY_TO_REC_16(rwRecSetSensor, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_INPUT:
-            KEY_TO_REC_16(rwRecSetInput, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_OUTPUT:
-            KEY_TO_REC_16(rwRecSetOutput, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_INIT_FLAGS:
-            KEY_TO_REC_08(rwRecSetInitFlags, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_REST_FLAGS:
-            KEY_TO_REC_08(rwRecSetRestFlags, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_TCP_STATE:
-            KEY_TO_REC_08(rwRecSetTcpState, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_APPLICATION:
-            KEY_TO_REC_16(rwRecSetApplication, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_FTYPE_CLASS:
-          case SK_FIELD_FTYPE_TYPE:
-            KEY_TO_REC_08(rwRecSetFlowType, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_STARTTIME:
-          case SK_FIELD_STARTTIME_MSEC:
-            skFieldListExtractFromBuffer(key_fields, HEAP_PTR_KEY(heap_ptr),
-                                         field, (uint8_t*)&val32);
-            rwRecSetStartTime(&rwrec, sktimeCreate(val32, 0));
-            break;
-          case SK_FIELD_ELAPSED:
-          case SK_FIELD_ELAPSED_MSEC:
-            skFieldListExtractFromBuffer(key_fields, HEAP_PTR_KEY(heap_ptr),
-                                         field, (uint8_t*)&val32);
-            rwRecSetElapsed(&rwrec, val32 * 1000);
-            break;
-          case SK_FIELD_ENDTIME:
-          case SK_FIELD_ENDTIME_MSEC:
-            /* just extract eTime; we will set it later */
-            skFieldListExtractFromBuffer(key_fields, HEAP_PTR_KEY(heap_ptr),
-                                         field, (uint8_t*)&eTime);
-            break;
-          default:
-            assert(skFieldListEntryGetId(field) == SK_FIELD_CALLER);
-            break;
-        }
-    }
-
-    if (dport_key) {
-        rwRecSetDPort(&rwrec, dport);
-    }
-
-    switch (time_fields_key) {
-      case PARSE_KEY_ETIME:
-        /* etime only; just set sTime to eTime--elapsed is already 0 */
-        rwRecSetStartTime(&rwrec, sktimeCreate(eTime, 0));
-        break;
-      case (PARSE_KEY_ELAPSED | PARSE_KEY_ETIME):
-        /* etime and elapsed; set start time based on end time and elapsed */
-        val32 = rwRecGetElapsedSeconds(&rwrec);
-        rwRecSetStartTime(&rwrec, sktimeCreate((eTime - val32), 0));
-        break;
-      case (PARSE_KEY_STIME | PARSE_KEY_ETIME):
-        /* etime and stime; set elapsed as their difference */
-        val32 = rwRecGetStartSeconds(&rwrec);
-        assert(val32 <= eTime);
-        rwRecSetElapsed(&rwrec, (1000 * (eTime - val32)));
-        break;
-      case PARSE_KEY_ALL_TIMES:
-        /* 'time_fields_key' should contain 0, 1, or 2 time values */
-        skAbortBadCase(time_fields_key);
-      default:
-        assert(0 == time_fields_key
-               || PARSE_KEY_STIME == time_fields_key
-               || PARSE_KEY_ELAPSED == time_fields_key
-               || (PARSE_KEY_STIME | PARSE_KEY_ELAPSED) == time_fields_key);
-        break;
-    }
-
-    /* print everything */
-    rwAsciiPrintRecExtra(ascii_str, &rwrec, heap_ptr);
-}
-
-
-/*
- *  rwstatsPrintHeap();
- *
- *    Loop over nodes of the heap and print each, as well as the
- *    percentage columns.
- */
-static void
-rwstatsPrintHeap(
-    void)
-{
-    skheapiterator_t *itheap;
-    skheapnode_t heap_ptr;
-    double cumul_pct = 0.0;
-    double percent;
-    uint64_t val64;
-    uint32_t val32;
-
-    /* print the headings and column titles */
-    topnPrintHeader();
-
-    skHeapSortEntries(heap);
-
-    itheap = skHeapIteratorCreate(heap, -1);
-
-    if (app_flags.no_percents) {
-        while (skHeapIteratorNext(itheap, &heap_ptr) == SKHEAP_OK) {
-            writeAsciiRecord(heap_ptr);
-        }
-    } else {
-        switch (limit.fl_id) {
-          case SK_FIELD_RECORDS:
-            while (skHeapIteratorNext(itheap, &heap_ptr) == SKHEAP_OK) {
-                writeAsciiRecord(heap_ptr);
-                skFieldListExtractFromBuffer(value_fields,
-                                             HEAP_PTR_VALUE(heap_ptr),
-                                             limit.fl_entry, (uint8_t*)&val32);
-                percent = 100.0 * (double)val32 / value_total;
-                cumul_pct += percent;
-                fprintf(output.of_fp, ("%c%*.6f%c%*.6f%s\n"),
-                        delimiter, width[WIDTH_PCT], percent, delimiter,
-                        width[WIDTH_PCT], cumul_pct, final_delim);
-            }
-            break;
-
-          case SK_FIELD_SUM_BYTES:
-          case SK_FIELD_SUM_PACKETS:
-            while (skHeapIteratorNext(itheap, &heap_ptr) == SKHEAP_OK) {
-                writeAsciiRecord(heap_ptr);
-                skFieldListExtractFromBuffer(value_fields,
-                                             HEAP_PTR_VALUE(heap_ptr),
-                                             limit.fl_entry, (uint8_t*)&val64);
-                percent = 100.0 * (double)val64 / value_total;
-                cumul_pct += percent;
-                fprintf(output.of_fp, ("%c%*.6f%c%*.6f%s\n"),
-                        delimiter, width[WIDTH_PCT], percent, delimiter,
-                        width[WIDTH_PCT], cumul_pct, final_delim);
-            }
-            break;
-
-          default:
-            while (skHeapIteratorNext(itheap, &heap_ptr) == SKHEAP_OK) {
-                writeAsciiRecord(heap_ptr);
-                fprintf(output.of_fp, ("%c%*c%c%*c%s\n"),
-                        delimiter, width[WIDTH_PCT], '?', delimiter,
-                        width[WIDTH_PCT], '?', final_delim);
-            }
-        }
-    }
-
-    skHeapIteratorFree(itheap);
+    len = sk_formatter_fill_title_buffer(fmtr, &fmtr_buf);
+    fwrite(fmtr_buf, len, 1, output.of_fp);
 }
 
 
@@ -750,7 +338,6 @@ rwstatsPrintHeap(
  *    For the *Btm* functions, return -1, 0, 1 depending on whether
  *    the value in 'node1' is <, ==, > the value in 'node2'.
  */
-
 #define COMPARE(cmp_a, cmp_b)                                   \
     (((cmp_a) < (cmp_b)) ? -1 : (((cmp_a) > (cmp_b)) ? 1 : 0))
 
@@ -843,7 +430,7 @@ rwstatsComparePluginAny(
                        "binary comparison with error code %d"), name[0], err);
         appExit(EXIT_FAILURE);
     }
-    return ((RWSTATS_DIR_TOP == direction) ? -cmp : cmp);
+    return ((RWSTATS_DIR_TOP == limit.direction) ? -cmp : cmp);
 }
 
 static int
@@ -899,7 +486,7 @@ rwstatsCompareDistinctsAny(
         break;
     }
 
-    return ((RWSTATS_DIR_TOP == direction) ? -cmp : cmp);
+    return ((RWSTATS_DIR_TOP == limit.direction) ? -cmp : cmp);
 }
 
 
@@ -970,9 +557,7 @@ statsRandom(
     uint8_t newnode[HASHLIB_MAX_KEY_WIDTH + HASHLIB_MAX_VALUE_WIDTH];
     sk_unique_iterator_t *iter;
     uint8_t *outbuf[3] = {NULL, NULL, NULL};
-    skstream_t *stream;
-    rwRec rwrec;
-    int rv = 0;
+    int rv;
     size_t len;
     union count_un {
         uint8_t   ar[HASHLIB_MAX_VALUE_WIDTH];
@@ -982,23 +567,8 @@ statsRandom(
         uint8_t   u8;
     } count;
 
-    /* read SiLK Flow records and insert into the skunique data structure */
-    while (0 == (rv = appNextInput(&stream))) {
-        while (SKSTREAM_OK == (rv = readRecord(stream, &rwrec))) {
-            if (0 != skUniqueAddRecord(uniq, &rwrec)) {
-                return -1;
-            }
-        }
-        if (rv != SKSTREAM_ERR_EOF) {
-            /* corrupt record in file */
-            skStreamPrintLastErr(stream, rv, &skAppPrintErr);
-            skStreamDestroy(&stream);
-            return -1;
-        }
-        skStreamDestroy(&stream);
-    }
-    if (rv == -1) {
-        /* error opening file */
+    rv = readAllRecords();
+    if (rv != SKSTREAM_ERR_EOF) {
         return -1;
     }
 
@@ -1507,6 +1077,9 @@ static void
 topnMain(
     void)
 {
+    uint8_t *outbuf[3] = {NULL, NULL, NULL};
+    skheapiterator_t *itheap;
+    skheapnode_t heap_ptr;
     uint32_t initial_entries;
     int rv;
 
@@ -1514,7 +1087,7 @@ topnMain(
     if (limit.distinct) {
         cmp_fn = &rwstatsCompareDistinctsAny;
     } else {
-        switch (DIR_AND_TYPE(direction, limit.fl_id)) {
+        switch (DIR_AND_TYPE(limit.direction, limit.fl_id)) {
           case DIR_AND_TYPE(RWSTATS_DIR_TOP, SK_FIELD_RECORDS):
             cmp_fn = &rwstatsCompareValuesTop32;
             break;
@@ -1539,7 +1112,7 @@ topnMain(
             break;
 
           default:
-            skAbortBadCase(DIR_AND_TYPE(direction, limit.fl_id));
+            skAbortBadCase(DIR_AND_TYPE(limit.direction, limit.fl_id));
         }
     }
 
@@ -1585,9 +1158,21 @@ topnMain(
         appExit(EXIT_FAILURE);
     }
 
-    /* print the results */
-    rwstatsPrintHeap();
+    skHeapSortEntries(heap);
 
+    /* print the headings and column titles */
+    topnPrintHeader();
+
+    /* print each entry */
+    itheap = skHeapIteratorCreate(heap, -1);
+    while (skHeapIteratorNext(itheap, &heap_ptr) == SKHEAP_OK) {
+        outbuf[0] = HEAP_PTR_KEY(heap_ptr);
+        outbuf[1] = HEAP_PTR_VALUE(heap_ptr);
+        outbuf[2] = HEAP_PTR_DISTINCT(heap_ptr);
+        writeAsciiRecord(outbuf);
+    }
+
+    skHeapIteratorFree(itheap);
     skHeapFree(heap);
 }
 

@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: intervalstats.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: intervalstats.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/utils.h>
 #include "interval.h"
@@ -28,22 +28,22 @@ RCSIDENT("$SiLK: intervalstats.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
  * we want to change it, treat icmp like udp
  */
 uint32_t tcpByteIntervals[NUM_INTERVALS] = {
-    40,60,100,150,256,1000,10000,100000,1000000,0xFFFFFFFF
+    40,60,100,150,256,1000,10000,100000,1000000,UINT32_MAX
 };
 uint32_t udpByteIntervals[NUM_INTERVALS] = {
-    20,40,80,130,256,1000,10000,100000,1000000,0xFFFFFFFF
+    20,40,80,130,256,1000,10000,100000,1000000,UINT32_MAX
 };
 uint32_t tcpPktIntervals[NUM_INTERVALS] = {
-    3,4,10,20,50,100,500,1000,10000,0xFFFFFFFF
+    3,4,10,20,50,100,500,1000,10000,UINT32_MAX
 };
 uint32_t udpPktIntervals[NUM_INTERVALS] = {
-    3,4,10,20,50,100,500,1000,10000,0xFFFFFFFF
+    3,4,10,20,50,100,500,1000,10000,UINT32_MAX
 };
 uint32_t tcpBppIntervals[NUM_INTERVALS] = {
-    40,44,60,100,200,400,600,800,1500,0xFFFFFFFF
+    40,44,60,100,200,400,600,800,1500,UINT32_MAX
 };
 uint32_t udpBppIntervals[NUM_INTERVALS] = {
-    20,24,40,100,200,400,600,800,1500,0xFFFFFFFF
+    20,24,40,100,200,400,600,800,1500,UINT32_MAX
 };
 
 
@@ -57,24 +57,20 @@ static uint32_t quartileValues[3];
 
 /* FUNCTION DECLARATIONS */
 
-static double
-getQuantile(
-    const uint32_t     *data,
-    const uint32_t     *boundaries,
-    uint32_t            numIntervals,
-    uint32_t            quantile);
-static void
-intervalSetup(
-    const uint32_t     *data,
-    uint32_t            numIntervals);
+static double getQuantile(
+    const uint32_t *data,
+    const uint32_t *boundaries,
+    uint32_t        numIntervals,
+    uint32_t        quantile);
+static void intervalSetup(
+    const uint32_t *data,
+    uint32_t        numIntervals);
 static void intervalTeardown(void);
 
 
 /* FUNCTION DEFINITIONS */
 
-static void
-intervalTeardown(
-    void)
+static void intervalTeardown(void)
 {
     if (cumFrequencies != NULL) {
         free(cumFrequencies);
@@ -83,16 +79,12 @@ intervalTeardown(
 }
 
 /* pure noops */
-int
-intervalInit(
-    void)
+int intervalInit(void)
 {
     return 0;
 }
 
-void
-intervalShutdown(
-    void)
+void intervalShutdown(void)
 {
     return;
 }
@@ -108,10 +100,9 @@ intervalShutdown(
  * Output: None
  * Side Effects: globals cumFrequencies, quartileIndices, total set.
  */
-static void
-intervalSetup(
-    const uint32_t     *data,
-    uint32_t            numIntervals)
+static void intervalSetup(
+    const uint32_t *data,
+    uint32_t        numIntervals)
 {
     register uint32_t i;
 
@@ -160,12 +151,11 @@ intervalSetup(
 ** Output: the quantile
 ** Side Effects: None
 */
-static double
-getQuantile(
-    const uint32_t     *data,
-    const uint32_t     *boundaries,
-    uint32_t            numIntervals,
-    uint32_t            quantile)
+static double getQuantile(
+    const uint32_t *data,
+    const uint32_t *boundaries,
+    uint32_t        numIntervals,
+    uint32_t        quantile)
 {
     int32_t intervalIndex;
     int32_t intervalOffset;
@@ -203,7 +193,7 @@ getQuantile(
     }
 
     if (intervalIndex == (numIntervals - 1) ) {
-        /* in last interval which has a high value of 0xFFFFFFFF */
+        /* in last interval which has a high value of UINT32_MAX */
         return 0.00;
     }
     intervalOffset = cumFrequencies[intervalIndex]
@@ -216,12 +206,11 @@ getQuantile(
     return result;
 }
 #else
-static double
-getQuantile(
-    const uint32_t  UNUSED(*data),
-    const uint32_t         *boundaries,
-    uint32_t                numIntervals,
-    uint32_t                quantile)
+static double getQuantile(
+    const uint32_t *UNUSED(data),
+    const uint32_t *boundaries,
+    uint32_t        numIntervals,
+    uint32_t        quantile)
 {
     /*
     ** Blo = boundary value at the lower index of the cumFreq containing
@@ -276,11 +265,10 @@ getQuantile(
 #endif
 
 
-double *
-intervalQuartiles(
-    const uint32_t     *data,
-    const uint32_t     *boundaries,
-    uint32_t            numIntervals)
+double *intervalQuartiles(
+    const uint32_t *data,
+    const uint32_t *boundaries,
+    uint32_t        numIntervals)
 {
     intervalSetup(data, numIntervals);
     retArray[0] = getQuantile(data, boundaries, numIntervals, 25);
@@ -299,11 +287,10 @@ intervalQuartiles(
 ** Outputs: double *array of mean and var.
 ** Side Effects: None.
 */
-double *
-intervalMoments(
-    const uint32_t         *data,
-    const uint32_t  UNUSED(*boundaries),
-    uint32_t                numIntervals)
+double *intervalMoments(
+    const uint32_t *data,
+    const uint32_t *UNUSED(boundaries),
+    uint32_t        numIntervals)
 {
     intervalSetup(data, numIntervals);
 

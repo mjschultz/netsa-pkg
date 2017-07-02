@@ -1,13 +1,13 @@
-# RCSIDENT("$SiLK: Makefile.am e460180628b1 2016-06-13 20:58:23Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 3c900b990f34 2016-09-07 15:33:27Z mthomas $");
 
 # Installed Targets
 
-bin_PROGRAMS = rwgeoip2ccmap rwip2cc rwpmapbuild rwpmapcat rwpmaplookup
+bin_PROGRAMS = rwgeoip2ccmap rwpmapbuild rwpmapcat rwpmaplookup
 
 EXTRA_DIST = addrtype.pod ccfilter.pod pmapfilter.pod rwgeoip2ccmap.pod \
-	rwip2cc.pod rwpmapbuild.pod rwpmapcat.pod rwpmaplookup.pod
+	rwpmapbuild.pod rwpmapcat.pod rwpmaplookup.pod
 if HAVE_POD2MAN
-man1_MANS = rwgeoip2ccmap.1 rwip2cc.1 rwpmapbuild.1 rwpmapcat.1 rwpmaplookup.1
+man1_MANS = rwgeoip2ccmap.1 rwpmapbuild.1 rwpmapcat.1 rwpmaplookup.1
 man3_MANS = addrtype.3 ccfilter.3 pmapfilter.3
 endif
 
@@ -23,8 +23,6 @@ LDADD = ../libsilk/libsilk.la
 
 rwgeoip2ccmap_SOURCES = rwgeoip2ccmap.l
 
-rwip2cc_SOURCES = rwip2cc.c
-
 rwpmapbuild_SOURCES = rwpmapbuild.l
 
 rwpmapcat_SOURCES = rwpmapcat.c
@@ -34,6 +32,8 @@ rwpmaplookup_SOURCES = rwpmaplookup.c
 
 # add switches to flex that remove unused functions
 AM_LFLAGS = $(FLEX_NOFUNS)
+
+CLEANFILES = rwip2cc rwip2cc.1
 
 # Global Rules
 include $(top_srcdir)/build.mk
@@ -48,10 +48,6 @@ check_DATA = $(SILK_TESTSDIR) $(SILK_TESTDATA)
 EXTRA_DIST += $(TESTS)
 
 TESTS = \
-	tests/rwip2cc-help.pl \
-	tests/rwip2cc-version.pl \
-	tests/rwip2cc-lone-command.pl \
-	tests/rwip2cc-null-input.pl \
 	tests/rwgeoip2ccmap-help.pl \
 	tests/rwgeoip2ccmap-version.pl \
 	tests/rwgeoip2ccmap-lone-command.pl \
@@ -68,18 +64,6 @@ TESTS = \
 	tests/rwpmaplookup-version.pl \
 	tests/rwpmaplookup-lone-command.pl \
 	tests/rwpmaplookup-null-input.pl \
-	tests/rwip2cc-address.pl \
-	tests/rwip2cc-address-print-0.pl \
-	tests/rwip2cc-address-print-1.pl \
-	tests/rwip2cc-stdin.pl \
-	tests/rwip2cc-stdin-print-1.pl \
-	tests/rwip2cc-stdin-print-0.pl \
-	tests/rwip2cc-stdin-no-columns.pl \
-	tests/rwip2cc-stdin-delimited.pl \
-	tests/rwip2cc-stdin-integer-ips.pl \
-	tests/rwip2cc-stdin-zero-pad.pl \
-	tests/rwip2cc-stdin-environ.pl \
-	tests/rwip2cc-many-ips.pl \
 	tests/rwpmapcat-ip.pl \
 	tests/rwpmapcat-ip-no-cidr.pl \
 	tests/rwpmapcat-ip-integer-ips.pl \

@@ -7,32 +7,66 @@
 */
 
 /*
- *  ipfixsource.c
- *
- *    This file and skipfix.c are tightly coupled, and together they
- *    read IPFIX records and convert them to SiLK flow records.
- *
- *    This file is primary about setting up and tearing down the data
- *    structures used when processing IPFIX.
- *
- *    The skipfix.c file primarly handles the conversion, and it is
- *    where the reading functions exist.
- */
+**  ipfixsource.c
+**
+**    Interface to pull flows from IPFIX/NetFlowV9/sFlow streams.
+**
+*/
 
+#define LIBFLOWSOURCE_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: ipfixsource.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: ipfixsource.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
-#include "ipfixsource.h"
+#include <silk/libflowsource.h>
 #include <silk/redblack.h>
+#include <silk/rwrec.h>
+#include <silk/skcircbuf.h>
+#include <silk/skipfix.h>
+#include <silk/sklog.h>
 #include <silk/skthread.h>
-#include <silk/skvector.h>
+#include <silk/utils.h>
 
 #ifdef  SKIPFIXSOURCE_TRACE_LEVEL
 #define TRACEMSG_LEVEL SKIPFIXSOURCE_TRACE_LEVEL
 #endif
-#define TRACEMSG(lvl, msg)    TRACEMSG_TO_TRACEMSGLVL(lvl, msg)
+#define TRACEMSG(lvl, msg)                      \
+    TRACEMSG_TO_TRACEMSGLVL(lvl, msg)
 #include <silk/sktracemsg.h>
+
+/*
+ *  Logging messages for function entry/return.
+ *
+ *    Define the macro SKIPFIXSOURCE_ENTRY_RETURN to trace entry to
+ *    and return from the functions in this file.
+ *
+ *    Developers must use "TRACE_ENTRY" at the beginning of every
+ *    function.  Use "TRACE_RETURN(x);" for functions that return the
+ *    value "x", and use "TRACE_RETURN;" for functions that have no
+ *    return value.
+ */
+/* #define SKIPFIXSOURCE_ENTRY_RETURN 1 */
+
+#ifndef SKIPFIXSOURCE_ENTRY_RETURN
+#  define TRACE_ENTRY
+#  define TRACE_RETURN       return
+#else
+/*
+ *  this macro is used when the extra-level debugging statements write
+ *  to the log, since we do not want the result of the log's printf()
+ *  to trash the value of 'errno'
+ */
+#define WRAP_ERRNO(x)                                           \
+    do { int _saveerrno = errno; x; errno = _saveerrno; }       \
+    while (0)
+
+#  define TRACE_ENTRY                                   \
+    WRAP_ERRNO(DEBUGMSG("Entering %s", __func__))
+
+#  define TRACE_RETURN                                          \
+    WRAP_ERRNO(DEBUGMSG("Exiting %s", __func__)); return
+
+#endif  /* SKIPFIXSOURCE_ENTRY_RETURN */
 
 
 /*
@@ -149,11 +183,61 @@ RCSIDENT("$SiLK: ipfixsource.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
  */
 #define SK_IPFIX_UDP_IGNORE_SOURCE_PORT "SK_IPFIX_UDP_IGNORE_SOURCE_PORT"
 
-/*
- *    Name of environment variable that, when set, cause SiLK to
- *    ignore any G_LOG_LEVEL_WARNING messages.
- */
-#define SK_ENV_FIXBUF_SUPPRESS_WARNING "SILK_LIBFIXBUF_SUPPRESS_WARNINGS"
+/* error codes used in callback that fixbuf calls */
+#define SK_IPFIXSOURCE_DOMAIN  g_quark_from_string("silkError")
+#define SK_IPFIX_ERROR_CONN    1
+
+
+/* Various macros for handling yaf stats */
+
+/* compute difference of fields at current time 'stats' and previous
+ * time 'last'; last and stats are ski_yaf_stats_t structures */
+#define STAT_REC_FIELD_DIFF(last, stats, field) \
+    (stats.field - last.field)
+
+/* update current counts on skIPFIXSource_t 'source' with the values
+ * at current time 'stats' compared with those at previous time
+ * 'last'; last and stats are ski_yaf_stats_t structures */
+#define INCORPORATE_STAT_RECORD(source, last, stats)                    \
+    pthread_mutex_lock(&source->stats_mutex);                           \
+    source->saw_yaf_stats_pkt = 1;                                      \
+    if (stats.systemInitTimeMilliseconds != last.systemInitTimeMilliseconds) \
+    {                                                                   \
+        memset(&(last), 0, sizeof(last));                               \
+    }                                                                   \
+    source->yaf_dropped_packets +=                                      \
+        STAT_REC_FIELD_DIFF(last, stats, droppedPacketTotalCount);      \
+    source->yaf_ignored_packets +=                                      \
+        STAT_REC_FIELD_DIFF(last, stats, ignoredPacketTotalCount);      \
+    source->yaf_notsent_packets +=                                      \
+        STAT_REC_FIELD_DIFF(last, stats, notSentPacketTotalCount);      \
+    source->yaf_expired_fragments +=                                    \
+        STAT_REC_FIELD_DIFF(last, stats, expiredFragmentCount);         \
+    source->yaf_processed_packets +=                                    \
+        STAT_REC_FIELD_DIFF(last, stats, packetTotalCount);             \
+    source->yaf_exported_flows +=                                       \
+        STAT_REC_FIELD_DIFF(last, stats, exportedFlowRecordTotalCount); \
+    last = stats;                                                       \
+    pthread_mutex_unlock(&source->stats_mutex);
+
+#define TRACEMSG_YAF_STATS(source, stats)               \
+    TRACEMSG(1, (("'%s': "                              \
+                 "inittime %" PRIu64                    \
+                 ", dropped %" PRIu64                   \
+                 ", ignored %" PRIu64                   \
+                 ", notsent %" PRIu64                   \
+                 ", expired %" PRIu32                   \
+                 ", pkttotal %" PRIu64                  \
+                 ", exported %" PRIu64),                \
+                 (source)->name,                        \
+                 (stats).systemInitTimeMilliseconds,    \
+                 (stats).droppedPacketTotalCount,       \
+                 (stats).ignoredPacketTotalCount,       \
+                 (stats).notSentPacketTotalCount,       \
+                 (stats).expiredFragmentCount,          \
+                 (stats).packetTotalCount,              \
+                 (stats).exportedFlowRecordTotalCount))
+
 
 /*
  *  SILK_PROTO_TO_FIXBUF_TRANSPORT(silk_proto, &fb_trans);
@@ -176,6 +260,152 @@ RCSIDENT("$SiLK: ipfixsource.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
         skAbortBadCase(silk_proto);                             \
     }
 
+
+/* forward declarations */
+struct skIPFIXSourceBase_st;
+typedef struct skIPFIXSourceBase_st skIPFIXSourceBase_t;
+
+/* The skIPFIXSource_t object represents a single source, as mapped to
+ * be a single probe. */
+struct skIPFIXSource_st {
+    /* when reading from a file-based source, if we get both a forward
+     * and reverse record (a biflow) from libfixbuf, we temporarily
+     * cache the reverse record here.  For network biflows, both
+     * records are stored in the circular buffer.  The 'reverse'
+     * member says whether 'rvbuf' contains an unread record.  */
+    skIPFIXSourceRecord_t   rvbuf;
+
+    /* when reading from a file-based source, this contains the counts
+     * of statistics for this file.  when reading from the network,
+     * the statistics are maintained per connection on the
+     * skIPFIXConnection_t object. */
+    ski_yaf_stats_t         last_yaf_stats;
+
+    /* for yaf sources, packets dropped by libpcap, libdag,
+     * libpcapexpress.  For NetFlowV9/sFlow sources, number of packets
+     * that were missed. */
+    uint64_t                yaf_dropped_packets;
+
+    /* packets ignored by yaf (unsupported packet types; bad headers) */
+    uint64_t                yaf_ignored_packets;
+
+    /* packets rejected by yaf due to being out-of-sequence */
+    uint64_t                yaf_notsent_packets;
+
+    /* packet fragments expired by yaf (e.g., never saw first frag) */
+    uint64_t                yaf_expired_fragments;
+
+    /* packets processed by yaf */
+    uint64_t                yaf_processed_packets;
+
+    /* exported flow record count */
+    uint64_t                yaf_exported_flows;
+
+    /* these next values are based on records the ipfixsource gets
+     * from skipfix */
+    uint64_t                forward_flows;
+    uint64_t                reverse_flows;
+    uint64_t                ignored_flows;
+
+    /* mutex to protect access to the above statistics */
+    pthread_mutex_t         stats_mutex;
+
+    /* source's base */
+    skIPFIXSourceBase_t    *base;
+
+    /* probe associated with this source and its name */
+    const skpc_probe_t     *probe;
+    const char             *name;
+
+    /* when reading from the network, 'data_buffer' holds packets
+     * collected for this probe but not yet requested.
+     * 'current_record' is the current location in the
+     * 'data_buffer'. */
+    sk_circbuf_t           *data_buffer;
+    skIPFIXSourceRecord_t  *current_record;
+
+    /* buffer for file based reads */
+    fBuf_t                 *readbuf;
+
+    /* file for file-based reads */
+    sk_fileptr_t            fileptr;
+
+    /* for NetFlowV9/sFlow sources, a red-black tree of
+     * skIPFIXConnection_t objects that currently point to this
+     * skIPFIXSource_t, keyed by the skIPFIXConnection_t pointer. */
+    struct rbtree          *connections;
+
+    /* count of skIPFIXConnection_t's associated with this source */
+    uint32_t                connection_count;
+
+    /* Whether this source has been stopped */
+    unsigned                stopped             :1;
+
+    /* Whether this source has been marked for destructions */
+    unsigned                destroy             :1;
+
+    /* whether the 'rvbuf' field holds a valid record (1==yes) */
+    unsigned                reverse             :1;
+
+    /* Whether this source has received a STATS packet from yaf.  The
+     * yaf stats are only written to the log once a stats packet has
+     * been received.  */
+    unsigned                saw_yaf_stats_pkt   :1;
+};
+/* typedef struct skIPFIXSource_st skIPFIXSource_t;  // libflowsource.h */
+
+
+/* This object represents a single listening port or file */
+struct skIPFIXSourceBase_st {
+    /* when a probe does not have an accept-from-host clause, any peer
+     * may connect, and there is a one-to-one mapping between a source
+     * object and a base object.  The 'any' member points to the
+     * source, and the 'addr_to_source' member must be NULL. */
+    skIPFIXSource_t    *any;
+
+    /* if there is an accept-from clause, the 'addr_to_source'
+     * red-black tree maps the address of the peer to a particular
+     * source object (via 'peeraddr_source_t' objects), and the 'any'
+     * member must be NULL. */
+    struct rbtree      *addr_to_source;
+
+    /* address we are listening to. This is an array to support a
+     * hostname that maps to multiple IPs (e.g. IPv4 and IPv6). */
+    const sk_sockaddr_array_t *listen_address;
+
+    pthread_t           thread;
+    pthread_mutex_t     mutex;
+    pthread_cond_t      cond;
+
+    /* the listener and connection objects from libfixbuf */
+    fbListener_t       *listener;
+    fbConnSpec_t       *connspec;
+
+    /* A count of sources associated with this base object */
+    uint32_t            source_count;
+
+    /* whether the source is in the process of being destroyed */
+    unsigned            destroyed : 1;
+
+    /* Whether the reading thread was started */
+    unsigned            started   : 1;
+
+    /* Whether the reading thread is currently running */
+    unsigned            running   : 1;
+};
+
+/* Data for "active" connections */
+typedef struct skIPFIXConnection_st {
+    skIPFIXSource_t    *source;
+    ski_yaf_stats_t     last_yaf_stats;
+    /* Address of the host that contacted us */
+    sk_sockaddr_t       peer_addr;
+    size_t              peer_len;
+    /* The observation domain id. */
+    uint32_t            ob_domain;
+} skIPFIXConnection_t;
+
+
 /*
  *    The 'addr_to_source' member of 'skIPFIXSourceBase_t' is a
  *    red-black tree whose data members are 'peeraddr_source_t'
@@ -192,89 +422,6 @@ typedef struct peeraddr_source_st {
 } peeraddr_source_t;
 
 
-/*  **********  Augment the Information Model  **********  */
-
-/*
- *    Define the IPFIX information elements in IPFIX_CERT_PEN space
- *    for SiLK.  These are added to the information model by the
- *    skiInfoModel() function.
- */
-static fbInfoElement_t ski_info_elements[] = {
-    /* Extra fields produced by yaf for SiLK records */
-    FB_IE_INIT("initialTCPFlags",              IPFIX_CERT_PEN, 14,  1,
-               FB_IE_F_ENDIAN | FB_IE_F_REVERSIBLE),
-    FB_IE_INIT("unionTCPFlags",                IPFIX_CERT_PEN, 15,  1,
-               FB_IE_F_ENDIAN | FB_IE_F_REVERSIBLE),
-    FB_IE_INIT("reverseFlowDeltaMilliseconds", IPFIX_CERT_PEN, 21,  4,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("silkFlowType",                 IPFIX_CERT_PEN, 30,  1,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("silkFlowSensor",               IPFIX_CERT_PEN, 31,  2,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("silkTCPState",                 IPFIX_CERT_PEN, 32,  1,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("silkAppLabel",                 IPFIX_CERT_PEN, 33,  2,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("flowAttributes",               IPFIX_CERT_PEN, 40,  2,
-               FB_IE_F_ENDIAN | FB_IE_F_REVERSIBLE),
-
-    /* Extra fields produced by yaf for yaf statistics */
-    FB_IE_INIT("expiredFragmentCount",         IPFIX_CERT_PEN, 100, 4,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("assembledFragmentCount",       IPFIX_CERT_PEN, 101, 4,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("meanFlowRate",                 IPFIX_CERT_PEN, 102, 4,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("meanPacketRate",               IPFIX_CERT_PEN, 103, 4,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("flowTableFlushEventCount",     IPFIX_CERT_PEN, 104, 4,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("flowTablePeakCount",           IPFIX_CERT_PEN, 105, 4,
-               FB_IE_F_ENDIAN),
-    FB_IE_NULL
-};
-
-/*
- *    Define IPFIX information elements that are either in the
- *    standard IANA model or are specific to NetFlowV9 but are not
- *    defined by all versions of libfixbuf.  These are added to the
- *    information model by the skiInfoModel() function.
- */
-static fbInfoElement_t ski_std_info_elements[] = {
-    FB_IE_NULL
-};
-
-
-/* EXPORTED VARIABLE DEFINITIONS */
-
-/* descriptions are in ipfixsource.h */
-
-/*
- *    If non-zero, print the templates when they arrive.  This can be
- *    set by defining the environment variable specified in
- *    SKI_ENV_PRINT_TEMPLATES.
- */
-int print_templates = 0;
-
-/*
- *    The names of IE 48, 49, 50 used by fixbuf (flowSamplerFOO) do
- *    not match the names specified by IANA (samplerFOO).  At some
- *    point the names used by fixbuf will change, and this variable is
- *    for forward compatibility to determine which names fixbuf uses.
- *    It is set by skiInitialize().
- *
- *    Variables and structure members in this file use the IANA name.
- */
-uint32_t sampler_flags = 0;
-
-
-/* Whether to consider the source port when determining whether a
- * source is unique.  See fbCollectorManageUDPStreamByPort().  This is
- * TRUE unless the environment variable named by
- * SK_IPFIX_UDP_IGNORE_SOURCE_PORT is set to a non-zero value. */
-int consider_udp_sport = 1;
-
-
 /* LOCAL VARIABLE DEFINITIONS */
 
 /* Mutex around calls to skiCreateListener. */
@@ -289,23 +436,6 @@ static struct rbtree *listener_to_source_base = NULL;
 
 /* Number of ipfix sources (both networked and file-based) */
 static uint32_t source_base_count = 0;
-
-
-/*
- *    There is a single infomation model.
- */
-static fbInfoModel_t *ski_model = NULL;
-
-/*
- *    When processing files with fixbuf, the session object
- *    (fbSession_t) is owned the reader/write buffer (fBuf_t).
- *
- *    When doing network processing, the fBuf_t does not own the
- *    session.  We use this global vector to maintain those session
- *    pointers so they can be freed at shutdown.
- */
-static sk_vector_t *session_list = NULL;
-
 
 
 /* FUNCTION DEFINITIONS */
@@ -383,8 +513,8 @@ free_source(
     assert(source->connection_count == 0);
 
     pthread_mutex_destroy(&source->stats_mutex);
-    if (source->circbuf) {
-        skCircBufDestroy(source->circbuf);
+    if (source->data_buffer) {
+        sk_circbuf_destroy(source->data_buffer);
     }
     if (source->connections) {
         rbdestroy(source->connections);
@@ -556,11 +686,8 @@ fixbufConnect(
 
     /* Get the domain (also needed for NetFlowV9/sFlow missed pkts).
      * In the TCP case, the collector does not exist yet, and the
-     * GetCollector call returns false.  In the UDP-IPFIX case, the
-     * domain of the collector always returns 0. */
-    if (source->connections
-        && fbListenerGetCollector(listener, &collector, NULL))
-    {
+     * following call returns false. */
+    if (fbListenerGetCollector(listener, &collector, NULL)) {
         conn->ob_domain = fbCollectorGetObservationDomain(collector);
         INFOMSG("'%s': accepted connection from %s, domain 0x%04x",
                 source->name, addr_buf, conn->ob_domain);
@@ -635,133 +762,472 @@ fixbufDisconnect(
 
 
 /*
- *    Return a pointer to the single information model.  If necessary
- *    create and initialize it.
+ *    THREAD ENTRY POINT
+ *
+ *    The ipfix_reader() function is the main thread for listening to
+ *    data from a single fbListener_t object.  It is passed the
+ *    skIPFIXSourceBase_t object containing that fbListener_t object.
+ *    This thread is started from the ipfixSourceCreateFromSockaddr()
+ *    function.
  */
-fbInfoModel_t *
-skiInfoModel(
-    void)
+static void *
+ipfix_reader(
+    void               *vsource_base)
 {
-    if (!ski_model) {
-        ski_model = fbInfoModelAlloc();
-        fbInfoModelAddElementArray(ski_model, ski_info_elements);
-        fbInfoModelAddElementArray(ski_model, ski_std_info_elements);
-    }
-    return ski_model;
-}
+#define IS_UDP (base->connspec->transport == FB_UDP)
+    skIPFIXSourceBase_t *base = (skIPFIXSourceBase_t *)vsource_base;
+    skIPFIXConnection_t *conn = NULL;
+    skIPFIXSource_t *source = NULL;
+    GError *err = NULL;
+    fBuf_t *ipfix_buf = NULL;
+    skIPFIXSourceRecord_t reverse;
+    int rv;
 
-/*
- *    Free the single information model.
- */
-void
-skiInfoModelFree(
-    void)
-{
-    if (ski_model) {
-        fbInfoModelFree(ski_model);
-        ski_model = NULL;
-    }
-}
+    TRACE_ENTRY;
 
+    /* Ignore all signals */
+    skthread_ignore_signals();
 
-/**
- *    Free the memory associated with the Info Model---note that doing
- *    so is not tread safe.
- */
-void
-skiTeardown(
-    void)
-{
-    size_t i;
-    fbSession_t *session;
+    /* Communicate that the thread has started */
+    pthread_mutex_lock(&base->mutex);
+    pthread_cond_signal(&base->cond);
+    base->started = 1;
+    base->running = 1;
+    DEBUGMSG("fixbuf listener started for [%s]:%s",
+             base->connspec->host ? base->connspec->host : "*",
+             base->connspec->svc);
+    pthread_mutex_unlock(&base->mutex);
 
-    if (session_list) {
-        for (i = 0; i < skVectorGetCount(session_list); i++) {
-            skVectorGetValue(&session, session_list, i);
-            fbSessionFree(session);
+    TRACEMSG(3, ("base %p started for [%s]:%s",
+                 base, base->connspec->host ? base->connspec->host : "*",
+                 base->connspec->svc));
+
+    /* Loop until destruction of the base object */
+    while (!base->destroyed) {
+
+        /* wait for a new connection */
+        ipfix_buf = fbListenerWait(base->listener, &err);
+        if (NULL == ipfix_buf) {
+            if (NULL == err) {
+                /* got an unknown error---treat as fatal */
+                NOTICEMSG("fixbuf listener shutting down:"
+                          " unknown error from fbListenerWait");
+                break;
+            }
+
+            if (g_error_matches(err,SK_IPFIXSOURCE_DOMAIN,SK_IPFIX_ERROR_CONN))
+            {
+                /* the callback rejected the connection (TCP only) */
+                DEBUGMSG("fixbuf listener rejected connection: %s",
+                         err->message);
+                g_clear_error(&err);
+                continue;
+            }
+
+            /* FB_ERROR_NLREAD indicates interrupted read, either
+             * because the socket received EINTR or because
+             * fbListenerInterrupt() was called.
+             *
+             * FB_ERROR_EOM indicates an end-of-message, and needs to
+             * be ignored when running in manual mode. */
+            if (g_error_matches(err, FB_ERROR_DOMAIN, FB_ERROR_NLREAD)
+                || g_error_matches(err, FB_ERROR_DOMAIN, FB_ERROR_EOM))
+            {
+                TRACEMSG(1, (("fixbuf listener received %s"
+                              " while waiting for a connection: %s"),
+                             ((FB_ERROR_EOM == err->code)
+                              ? "end-of-message" : "interrupted read"),
+                             err->message));
+                g_clear_error(&err);
+                continue;
+            }
+
+            /* treat any other error as fatal */
+            NOTICEMSG(("fixbuf listener shutting down: %s"
+                       " (d=%" PRIu32 ",c=%" PRId32 ")"),
+                      err->message, (uint32_t)err->domain, (int32_t)err->code);
+            g_clear_error(&err);
+            break;
         }
-        skVectorDestroy(session_list);
-        session_list = NULL;
-    }
 
-    skiInfoModelFree();
-}
+        /* Make sure the fbuf is in manual mode.  Manual mode is
+         * required to multiplex among multiple collectors using
+         * fbListenerWait().  Without this, fBufNext() blocks once the
+         * buffer is empty until it has messages again.  Instead, we
+         * want to switch to a different fbuf once we read all records
+         * in the current buffer. */
+        fBufSetAutomaticMode(ipfix_buf, 0);
 
+        /* Invoke a callback when a new template arrives that tells
+         * fixbuf how to map from the subTemplateMultiList used by YAF
+         * for TCP information to our internal strucure. */
+        skiAddSessionCallback(fBufGetSession(ipfix_buf));
 
-/**
- *    Create an IPFIX Collecting Process listener.
- */
-static fbListener_t *
-skiCreateListener(
-    fbConnSpec_t           *spec,
-    fbListenerAppInit_fn    appinit,
-    fbListenerAppFree_fn    appfree,
-    GError                **err)
-{
-    fbSession_t *session;
+        /* Loop over fBufNext() until the buffer empties, we begin to
+         * shutdown, or there is an error.  skiYafNextStats() and
+         * skiRwNextRecord() call fBufNext() internally.
+         *
+         * There is a 'break' statement after the switch(), so any
+         * "normal" record (no error condition and buffer is not
+         * empty) should call 'continue' after processing to continue
+         * the loop. */
+        while (!base->destroyed) {
+            ski_rectype_t rectype;
+            ski_yaf_stats_t stats;
 
-    /* The session is not owned by the buffer or the listener, so
-     * maintain a vector of them for later destruction. */
-    if (!session_list) {
-        session_list = skVectorNew(sizeof(fbSession_t *));
-        if (session_list == NULL) {
-            return NULL;
+            /* Determine what type of record is next */
+            rectype = skiGetNextRecordType(ipfix_buf, &err);
+
+            /* Get the connection data associated with this fBuf_t object */
+            conn = ((skIPFIXConnection_t *)
+                    fbCollectorGetContext(fBufGetCollector(ipfix_buf)));
+            if (conn == NULL) {
+                /* If conn is NULL, we must have rejected a UDP
+                 * connection from the appInit function. */
+                assert(rectype == SKI_RECTYPE_ERROR);
+                TRACEMSG(2, ("<UNKNOWN>: SKI_RECTYPE_ERROR"));
+                break;
+            }
+            source = conn->source;
+            assert(source != NULL);
+
+            TRACEMSG(5, ("'%s': conn = %p, source = %p, ipfix_buf = %p",
+                         source->name, conn, source, ipfix_buf));
+
+            /* If this source has been stopped, end the connection */
+            if (source->stopped) {
+                TRACEMSG(1,("'%s': Closing connection since source is stopping",
+                            source->name));
+                if (!IS_UDP) {
+                    fBufFree(ipfix_buf);
+                    ipfix_buf = NULL;
+                }
+                if (rectype == SKI_RECTYPE_ERROR) {
+                    g_clear_error(&err);
+                }
+                break;
+            }
+
+            /* All successful code in this switch() must use
+             * 'continue'.  Any 'break' indicates an error. */
+            switch (rectype) {
+              case SKI_RECTYPE_ERROR:
+                TRACEMSG(2, ("'%s': SKI_RECTYPE_ERROR", source->name));
+                break;          /* error */
+
+              case SKI_RECTYPE_UNKNOWN:
+                /* This occurs when there is an unknown options
+                 * template.  In this case, the safe thing to do is to
+                 * transcode it with a stats template (a valid options
+                 * template) and ignore the result.  */
+                if (!skiYafNextStats(ipfix_buf, source->probe, &stats, &err)) {
+                    /* should have been able to read something */
+                    TRACEMSG(2, (("'%s': SKI_RECTYPE_UNKNOWN and"
+                                  " NextStats() is FALSE"), source->name));
+                    break;      /* error */
+                }
+                continue;
+
+              case SKI_RECTYPE_STATS:
+                if (!skiYafNextStats(ipfix_buf, source->probe, &stats, &err)) {
+                    /* should have been able to read the stats */
+                    TRACEMSG(2, (("'%s': SKI_RECTYPE_STATS and"
+                                  " NextStats is FALSE"), source->name));
+                    break;      /* error */
+                }
+                DEBUGMSG("'%s': Got a yaf stats record", source->name);
+                TRACEMSG_YAF_STATS(source, stats);
+
+                /* There is a guarantee that new connections to
+                 * yaf always start with zeroed statistics */
+                INCORPORATE_STAT_RECORD(source, conn->last_yaf_stats, stats);
+                continue;
+
+              case SKI_RECTYPE_NF9_SAMPLING:
+                if (!skiNextSamplingOptionsTemplate(
+                        ipfix_buf, source->probe, &err))
+                {
+                    /* should have been able to read something */
+                    TRACEMSG(2, (("'%s': SKI_RECTYPE_UNKNOWN and"
+                                  " NextStats() is FALSE"), source->name));
+                    break;      /* error */
+                }
+                continue;
+
+              case SKI_RECTYPE_FLOW:
+                /* Get the next SiLK record. */
+                assert(source->current_record);
+                rv = skiRwNextRecord(ipfix_buf, source->probe,
+                                     source->current_record, &reverse, &err);
+                switch (rv) {
+                  case -1:
+                    TRACEMSG(2, ("'%s': SKI_RECTYPE_FLOW and NextRecord is -1",
+                                 source->name));
+                    break;      /* error */
+
+                  case 0:
+                    /* Ignore record */
+                    pthread_mutex_lock(&source->stats_mutex);
+                    ++source->ignored_flows;
+                    pthread_mutex_unlock(&source->stats_mutex);
+                    continue;
+
+                  case 1:
+                    /* We have filled the empty source->current_record slot.
+                     * Advance to the next record location.  */
+                    source->current_record
+                        = ((skIPFIXSourceRecord_t*)
+                           sk_circbuf_get_write_pos(source->data_buffer));
+                    if (source->current_record == NULL) {
+                        assert(source->stopped);
+                        continue;
+                    }
+                    pthread_mutex_lock(&source->stats_mutex);
+                    ++source->forward_flows;
+                    pthread_mutex_unlock(&source->stats_mutex);
+                    continue;
+
+                  case 2:
+                    source->current_record
+                        = ((skIPFIXSourceRecord_t*)
+                           sk_circbuf_get_write_pos(source->data_buffer));
+                    if (source->current_record) {
+                        memcpy(source->current_record, &reverse,
+                               sizeof(skIPFIXSourceRecord_t));
+                        source->current_record
+                            = ((skIPFIXSourceRecord_t*)
+                               sk_circbuf_get_write_pos(source->data_buffer));
+                    }
+                    if (source->current_record == NULL) {
+                        assert(source->stopped);
+                        continue;
+                    }
+                    pthread_mutex_lock(&source->stats_mutex);
+                    ++source->forward_flows;
+                    ++source->reverse_flows;
+                    pthread_mutex_unlock(&source->stats_mutex);
+                    continue;
+
+                  default:
+                    skAbortBadCase(rv);
+                }
+                break;
+            } /* switch (rectype) */
+
+            /* If we get here, stop reading from the current fbuf.
+             * This may be because the fbuf is empty, because we are
+             * shutting down, or due to an error. */
+            break;
+
+        } /* while (!base->destroyed) */
+
+        /* Handle shutdown events */
+        if (base->destroyed) {
+            break;
         }
-    }
-    session = fbSessionAlloc(skiInfoModel());
 
-    /* Initialize session for reading */
-    if (!skiSessionInitReader(session, err)) {
-        fbSessionFree(session);
-        return NULL;
-    }
-    if (skVectorAppendValue(session_list, &session) != 0) {
-        fbSessionFree(session);
-        return NULL;
+        /* Source has stopped, loop for the next source. */
+        if (conn && source->stopped) {
+            continue;
+        }
+
+        /* If we reach here, there is an error condition.  Any
+         * non-error condition in the switch() should have called
+         * continue.  The error could be something as simple an
+         * end-of-message. */
+
+        /* Handle FB_ERROR_NLREAD and FB_ERROR_EOM returned by
+         * fBufNext() in the same way as when they are returned by
+         * fbListenerWait().
+         *
+         * FB_ERROR_NLREAD is also returned when a previously rejected
+         * UDP client attempts to send more data. */
+        if (g_error_matches(err, FB_ERROR_DOMAIN, FB_ERROR_NLREAD)
+            || g_error_matches(err, FB_ERROR_DOMAIN, FB_ERROR_EOM))
+        {
+            TRACEMSG(1, ("'%s': Ignoring %s: %s",
+                         (conn ? source->name : "<UNKNOWN>"),
+                         ((FB_ERROR_EOM == err->code)
+                          ? "end-of-message" : "interrupted read"),
+                         err->message));
+            /* Do not free the fbuf here.  The fbuf is owned by the
+             * listener, and will be freed when the listener is freed.
+             * Calling fBufFree() here would cause fixbuf to forget
+             * the current template, which would cause it to ignore
+             * records until a new template is transmitted. */
+            g_clear_error(&err);
+            continue;
+        }
+
+        /* SK_IPFIX_ERROR_CONN indicates that a new UDP "connection"
+         * was rejected by the appInit function in a multi-UDP
+         * libfixbuf session.  Do not free the fbuf since we do not
+         * have a connection yet; wait for another connection. */
+        if (g_error_matches(err, SK_IPFIXSOURCE_DOMAIN, SK_IPFIX_ERROR_CONN)) {
+            assert(IS_UDP);
+            INFOMSG("Closing connection: %s", err->message);
+            g_clear_error(&err);
+            continue;
+        }
+
+        /* The remainder of the code in this while() block assumes
+         * that 'source' is valid, which is only true if 'conn' is
+         * non-NULL.  Trap that here, just in case. */
+        if (NULL == conn) {
+            if (NULL == err) {
+                /* give up when error code is unknown */
+                NOTICEMSG("'<UNKNOWN>': fixbuf listener shutting down:"
+                          " unknown error from fBufNext");
+                break;
+            }
+            DEBUGMSG("Ignoring packet: %s (d=%" PRIu32 ",c=%" PRId32 ")",
+                     err->message, (uint32_t)err->domain, (int32_t)err->code);
+            g_clear_error(&err);
+            continue;
+        }
+
+        /* FB_ERROR_NETFLOWV9 indicates an anomalous netflow v9
+         * record; these do not disturb fixbuf state, and so should be
+         * ignored. */
+        if (g_error_matches(err, FB_ERROR_DOMAIN, FB_ERROR_NETFLOWV9)) {
+            DEBUGMSG("'%s': Ignoring NetFlowV9 record: %s",
+                     source->name, err->message);
+            g_clear_error(&err);
+            continue;
+        }
+
+        /* FB_ERROR_SFLOW indicates an anomalous sFlow
+         * record; these do not disturb fixbuf state, and so should be
+         * ignored. */
+        if (g_error_matches(err, FB_ERROR_DOMAIN, FB_ERROR_SFLOW)) {
+            DEBUGMSG("'%s': Ignoring sFlow record: %s",
+                     source->name, err->message);
+            g_clear_error(&err);
+            continue;
+        }
+
+        /* FB_ERROR_TMPL indicates a set references a template ID for
+         * which there is no template.  Log and continue. */
+        if (g_error_matches(err, FB_ERROR_DOMAIN, FB_ERROR_TMPL)) {
+            DEBUGMSG("'%s': Ignoring data set: %s",
+                     source->name, err->message);
+            g_clear_error(&err);
+            continue;
+        }
+
+        /* FB_ERROR_IPFIX indicates invalid IPFIX.  We could simply
+         * choose to log and continue; instead we choose to log, close
+         * the connection, and continue. */
+        if (g_error_matches(err, FB_ERROR_DOMAIN, FB_ERROR_IPFIX)) {
+            if (IS_UDP) {
+                DEBUGMSG("'%s': Ignoring invalid IPFIX: %s",
+                         source->name, err->message);
+            } else {
+                INFOMSG("'%s': Closing connection; received invalid IPFIX: %s",
+                        source->name, err->message);
+                fBufFree(ipfix_buf);
+                ipfix_buf = NULL;
+            }
+            g_clear_error(&err);
+            continue;
+        }
+
+        /* FB_ERROR_EOF indicates that the connection associated with
+         * this fBuf_t object has finished.  In this case, free the
+         * fBuf_t object to close the connection.  Do not free the
+         * fBuf_t for UDP connections, since these UDP-based fBuf_t
+         * objects are freed with the listener. */
+        if (g_error_matches(err, FB_ERROR_DOMAIN, FB_ERROR_EOF)) {
+            if (!IS_UDP) {
+                INFOMSG("'%s': Closing connection: %s",
+                        source->name, err->message);
+                fBufFree(ipfix_buf);
+                ipfix_buf = NULL;
+            }
+            g_clear_error(&err);
+            continue;
+        }
+
+        /* Handle an unexpected error generated by fixbuf */
+        if (err && err->domain == FB_ERROR_DOMAIN) {
+            if (IS_UDP) {
+                DEBUGMSG(("'%s': Ignoring UDP packet: %s"
+                          " (d=%" PRIu32 ",c=%" PRId32 ")"),
+                         source->name, err->message,
+                         (uint32_t)err->domain, (int32_t)err->code);
+            } else {
+                INFOMSG(("'%s': Closing connection: %s"
+                         " (d=%" PRIu32 ",c=%" PRId32 ")"),
+                        source->name, err->message,
+                        (uint32_t)err->domain, (int32_t)err->code);
+                fBufFree(ipfix_buf);
+                ipfix_buf = NULL;
+            }
+            g_clear_error(&err);
+            continue;
+        }
+
+        /* In the event of an unhandled error, end the thread. */
+        if (NULL == err) {
+            NOTICEMSG(("'%s': fixbuf listener shutting down:"
+                       " unknown error from fBufNext"),
+                      source->name);
+        } else {
+            NOTICEMSG(("'%s': fixbuf listener shutting down: %s"
+                       " (d=%" PRIu32 ",c=%" PRId32 ")"),
+                      source->name, err->message,
+                      (uint32_t)err->domain, (int32_t)err->code);
+            g_clear_error(&err);
+        }
+        break;
     }
 
-    /* Allocate a listener.  'appinit' is called on each collection
-     * attempt; vetoes connection attempts and creates application
-     * context. */
-    return fbListenerAlloc(spec, session, appinit, appfree, err);
+    TRACEMSG(3, ("base %p exited while() loop", base));
+
+    /* Free the fbuf if it exists.  (If it's UDP, it will be freed by
+     * the destruction of the listener below.) */
+    if (ipfix_buf && !IS_UDP) {
+        TRACEMSG(3, ("base %p calling fBufFree", base));
+        fBufFree(ipfix_buf);
+    }
+
+    /* Note that the thread is ending, and wait for
+     * skIPFIXSourceDestroy() to mark this as destroyed */
+    DEBUGMSG("fixbuf listener ending for [%s]:%s...",
+             base->connspec->host ? base->connspec->host : "*",
+             base->connspec->svc);
+    pthread_mutex_lock(&base->mutex);
+    while (!base->destroyed) {
+        pthread_cond_wait(&base->cond, &base->mutex);
+    }
+
+    TRACEMSG(3, ("base %p is set to destroyed", base));
+
+    /* Remove this base object from the listener_to_source_base
+     * red-black tree */
+    pthread_mutex_lock(&global_tree_mutex);
+    rbdelete(base, listener_to_source_base);
+    pthread_mutex_unlock(&global_tree_mutex);
+
+    TRACEMSG(3, ("base %p calling fbListenerFree", base));
+
+    /* Destroy the fbListener_t object.  This destroys the fbuf if the
+     * stream is UDP. */
+    fbListenerFree(base->listener);
+    base->listener = NULL;
+
+    /* Notify skIPFIXSourceDestroy() that the thread is ending */
+    base->running = 0;
+    pthread_cond_signal(&base->cond);
+    DEBUGMSG("fixbuf listener ended for [%s]:%s.",
+             base->connspec->host ? base->connspec->host : "*",
+             base->connspec->svc);
+
+    pthread_mutex_unlock(&base->mutex);
+
+    TRACE_RETURN(NULL);
+#undef IS_UDP
 }
-
-
-/**
- *    Create a buffer pointer suitable for use for
- *    ski_fixrec_next(). The file pointer must be opened for reading.
- */
-static fBuf_t *
-skiCreateReadBufferForFP(
-    FILE               *fp,
-    GError            **err)
-{
-    fbSession_t    *session;
-    fBuf_t         *fbuf;
-
-    /* Allocate a session.  The session will be owned by the fbuf, so
-     * don't save it for later freeing. */
-    session = fbSessionAlloc(skiInfoModel());
-
-    /* Initialize session for reading */
-    if (!skiSessionInitReader(session, err)) {
-        fbSessionFree(session);
-        return NULL;
-    }
-
-    /* Create a buffer with the session and a collector */
-    fbuf = fBufAllocForCollection(session, fbCollectorAllocFP(NULL, fp));
-
-    /* Make certain the fbuf has an internal template */
-    if (!fBufSetInternalTemplate(fbuf, SKI_YAFSTATS_TID, err)) {
-        fBufFree(fbuf);
-        return NULL;
-    }
-
-    return fbuf;
-}
-
-
 
 
 /*
@@ -880,10 +1346,10 @@ ipfixSourceCreateFromFile(
 
   ERROR:
     g_clear_error(&err);
+    if (NULL != source->fileptr.of_fp) {
+        skFileptrClose(&source->fileptr, &WARNINGMSG);
+    }
     if (source) {
-        if (NULL != source->fileptr.of_fp) {
-            skFileptrClose(&source->fileptr, &WARNINGMSG);
-        }
         if (source->readbuf) {
             fBufFree(source->readbuf);
         }
@@ -963,7 +1429,7 @@ ipfixSourceBaseAddIPFIXSource(
         /* Add a mapping on the base for each accept-from-host address
          * on this source. */
         for (j = 0; j < accept_from_count; ++j) {
-            for (i = 0; i < skSockaddrArraySize(accept_from[j]); ++i) {
+            for (i = 0; i < skSockaddrArrayGetSize(accept_from[j]); ++i) {
                 peeraddr = ((peeraddr_source_t*)
                             calloc(1, sizeof(peeraddr_source_t)));
                 if (peeraddr == NULL) {
@@ -997,27 +1463,6 @@ ipfixSourceBaseAddIPFIXSource(
 }
 
 
-void
-ipfixSourceBaseFreeListener(
-    skIPFIXSourceBase_t *base)
-{
-    ASSERT_MUTEX_LOCKED(&base->mutex);
-
-    /* Remove this base object from the listener_to_source_base
-     * red-black tree */
-    pthread_mutex_lock(&global_tree_mutex);
-    rbdelete(base, listener_to_source_base);
-    pthread_mutex_unlock(&global_tree_mutex);
-
-    TRACEMSG(3, ("base %p calling fbListenerFree", base));
-
-    /* Destroy the fbListener_t object.  This destroys the fbuf if the
-     * stream is UDP. */
-    fbListenerFree(base->listener);
-    base->listener = NULL;
-}
-
-
 /*
  *    Creates a IPFIX source listening on the network.
  *
@@ -1029,14 +1474,14 @@ ipfixSourceBaseFreeListener(
  */
 static skIPFIXSource_t *
 ipfixSourceCreateFromSockaddr(
-    const skpc_probe_t *probe,
-    uint32_t            max_flows)
+    const skpc_probe_t *probe)
 {
     skIPFIXSource_t *source = NULL;
     skIPFIXSourceBase_t *localbase = NULL;
     skIPFIXSourceBase_t *base;
     const sk_sockaddr_array_t *listen_address;
     const sk_sockaddr_array_t **accept_from;
+    uint32_t max_flows;
     peeraddr_source_t target;
     const peeraddr_source_t *found;
     skpc_proto_t protocol;
@@ -1055,6 +1500,9 @@ ipfixSourceCreateFromSockaddr(
     /* Get the list of accept-from-host addresses. */
     accept_from_count = skpcProbeGetAcceptFromHost(probe, &accept_from);
 
+    /* Get max flow count */
+    max_flows = (uint32_t)skpcProbeGetMaximumBuffer(probe);
+
     /* Get the listen address. */
     rv = skpcProbeGetListenOnSockaddr(probe, &listen_address);
     if (rv == -1) {
@@ -1068,16 +1516,11 @@ ipfixSourceCreateFromSockaddr(
         base = NULL;
     } else {
         /* Loop through all current bases, and compare based on
-         * listen_address and protocol */
-        fbTransport_t transport;
-        RBLIST *iter;
-
-        SILK_PROTO_TO_FIXBUF_TRANSPORT(protocol, &transport);
-        iter = rbopenlist(listener_to_source_base);
+         * listen_address */
+        RBLIST *iter = rbopenlist(listener_to_source_base);
         while ((base = (skIPFIXSourceBase_t *)rbreadlist(iter)) != NULL) {
-            if (transport == base->connspec->transport
-                && skSockaddrArrayMatches(base->listen_address,
-                                          listen_address, 0))
+            if (skSockaddrArrayMatches(base->listen_address,
+                                       listen_address, 0))
             {
                 /* Found a match.  'base' is now set to the matching
                  * base */
@@ -1087,83 +1530,6 @@ ipfixSourceCreateFromSockaddr(
         rbcloselist(iter);
     }
     pthread_mutex_unlock(&global_tree_mutex);
-
-#if 0
-    /*
-     *    The following is #if 0'ed out because it fails to do what it
-     *    is intended to do.
-     *
-     *    The issue appears to be that fixbuf and SiLK use different
-     *    flags to getaddrinfo(), which changes the set of addresses
-     *    that are returned.
-     */
-
-    /*
-     *    fixbuf does not return an error when it cannot bind to any
-     *    listening address, which means the application can start
-     *    correctly but not be actively listening.  The following code
-     *    attempts to detect this situation before creating the fixbuf
-     *    listener by binding to the port.
-     */
-    if (NULL == base) {
-        const sk_sockaddr_t *addr;
-        char addr_name[PATH_MAX];
-        int *sock_array;
-        int *s;
-        uint16_t port = 0;
-
-        s = sock_array = (int *)calloc(skSockaddrArraySize(listen_address),
-                                       sizeof(int));
-        if (sock_array == NULL) {
-            goto ERROR;
-        }
-
-        DEBUGMSG(("Attempting to bind %" PRIu32 " addresses for %s"),
-                 skSockaddrArraySize(listen_address),
-                 skSockaddrArrayNameSafe(listen_address));
-        for (i = 0; i < skSockaddrArraySize(listen_address); ++i) {
-            addr = skSockaddrArrayGet(listen_address, i);
-            skSockaddrString(addr_name, sizeof(addr_name), addr);
-
-            /* Get a socket */
-            *s = socket(addr->sa.sa_family, SOCK_DGRAM, 0);
-            if (-1 == *s) {
-                DEBUGMSG("Skipping %s: Unable to create dgram socket: %s",
-                         addr_name, strerror(errno));
-                continue;
-            }
-            /* Bind socket to port */
-            if (bind(*s, &addr->sa, skSockaddrLen(addr)) == -1) {
-                DEBUGMSG("Skipping %s: Unable to bind: %s",
-                         addr_name, strerror(errno));
-                close(*s);
-                *s = -1;
-                continue;
-            }
-            DEBUGMSG("Bound %s for listening", addr_name);
-            ++s;
-
-            if (0 == port) {
-                port = skSockaddrPort(addr);
-            }
-            assert(port == skSockaddrPort(addr));
-        }
-        if (s == sock_array) {
-            ERRMSG("Failed to bind any addresses for %s",
-                   skSockaddrArrayNameSafe(listen_address));
-            free(sock_array);
-            goto ERROR;
-        }
-        DEBUGMSG(("Bound %" PRIu32 "/%" PRIu32 " addresses for %s"),
-                 (uint32_t)(s-sock_array), skSockaddrArraySize(listen_address),
-                 skSockaddrArrayNameSafe(listen_address));
-        while (s != sock_array) {
-            --s;
-            close(*s);
-        }
-        free(sock_array);
-    }
-#endif  /* 0 */
 
     if (base) {
         if (accept_from == NULL) {
@@ -1181,7 +1547,7 @@ ipfixSourceCreateFromSockaddr(
 
         /* Ensure the accept-from addresses are unique. */
         for (j = 0; j < accept_from_count; ++j) {
-            for (i = 0; i < skSockaddrArraySize(accept_from[j]); ++i) {
+            for (i = 0; i < skSockaddrArrayGetSize(accept_from[j]); ++i) {
                 target.addr = skSockaddrArrayGet(accept_from[j], i);
                 found = ((const peeraddr_source_t*)
                          rbfind(&target, base->addr_to_source));
@@ -1215,15 +1581,15 @@ ipfixSourceCreateFromSockaddr(
     }
 
     /* Create the circular buffer */
-    if (skCircBufCreate(&source->circbuf, sizeof(rwRec), max_flows)) {
+    if (sk_circbuf_create_const_itemsize(
+            &source->data_buffer, sizeof(skIPFIXSourceRecord_t), max_flows))
+    {
         goto ERROR;
     }
     /* Ready the first location in the circular buffer for writing */
-    if (skCircBufGetWriterBlock(
-            source->circbuf, &source->current_record, NULL))
-    {
-        skAbort();
-    }
+    source->current_record = ((skIPFIXSourceRecord_t*)
+                              sk_circbuf_get_write_pos(source->data_buffer));
+    assert(source->current_record);
 
     pthread_mutex_init(&source->stats_mutex, NULL);
 
@@ -1249,14 +1615,17 @@ ipfixSourceCreateFromSockaddr(
         if (base->connspec == NULL) {
             goto ERROR;
         }
-        if (skSockaddrArrayName(listen_address)) {
-            base->connspec->host = strdup(skSockaddrArrayName(listen_address));
+        if (skSockaddrArrayGetHostname(listen_address)
+            != sk_sockaddr_array_anyhostname)
+        {
+            base->connspec->host
+                = strdup(skSockaddrArrayGetHostname(listen_address));
             if (base->connspec->host == NULL) {
                 goto ERROR;
             }
         }
         rv = snprintf(port_string, sizeof(port_string), "%i",
-                      skSockaddrPort(skSockaddrArrayGet(listen_address, 0)));
+                      skSockaddrGetPort(skSockaddrArrayGet(listen_address,0)));
         assert((size_t)rv < sizeof(port_string));
         base->connspec->svc = strdup(port_string);
         if (base->connspec->svc == NULL) {
@@ -1266,15 +1635,34 @@ ipfixSourceCreateFromSockaddr(
 
         /* Create the listener */
         pthread_mutex_lock(&create_listener_mutex);
-        base->listener = skiCreateListener(base->connspec, fixbufConnect,
-                                           fixbufDisconnect, &err);
-        if (NULL == base->listener) {
-            pthread_mutex_unlock(&create_listener_mutex);
-            goto ERROR;
-        }
-        if (SKPC_PROTO_UDP == protocol) {
+        if (protocol != SKPC_PROTO_UDP) {
+            /* In the TCP case, the listener does not create a
+             * collector immediately, and as such does not need to
+             * stash the source object before allocating the listener.
+             * Instead, the fixbufConnect() call will find the base
+             * object and source in the listener_to_source_base tree
+             * when a new connection necessitates the creation of a
+             * new collector. */
+            assert(protocol == SKPC_PROTO_TCP);
+            base->listener = skiCreateListener(base->connspec,
+                                               fixbufConnect,
+                                               fixbufDisconnect, &err);
+            if (base->listener == NULL) {
+                pthread_mutex_unlock(&create_listener_mutex);
+                goto ERROR;
+            }
+        } else {
             fbCollector_t *collector;
+            const char *env;
+            int consider_sport = 1;
 
+            /* Create the listener */
+            base->listener = skiCreateListener(
+                base->connspec, fixbufConnect, fixbufDisconnect, &err);
+            if (base->listener == NULL) {
+                pthread_mutex_unlock(&create_listener_mutex);
+                goto ERROR;
+            }
             if (!fbListenerGetCollector(base->listener, &collector, &err)) {
                 pthread_mutex_unlock(&create_listener_mutex);
                 goto ERROR;
@@ -1284,9 +1672,12 @@ ipfixSourceCreateFromSockaddr(
 
             /* Treat UDP streams from the same address but different
              * ports as different streams unless
-             * SK_IPFIX_UDP_IGNORE_SOURCE_PORT is set to non-zero,
-             * which is checked in skIPFIXSourcesSetup(). */
-            fbCollectorManageUDPStreamByPort(collector, consider_udp_sport);
+             * SK_IPFIX_UDP_IGNORE_SOURCE_PORT is set to non-zero. */
+            env = getenv(SK_IPFIX_UDP_IGNORE_SOURCE_PORT);
+            if (NULL != env && *env && *env != '0') {
+                consider_sport = 0;
+            }
+            fbCollectorManageUDPStreamByPort(collector, consider_sport);
 
             /* If this is a Netflow v9 source or an sFlow source, tell
              * the collector. */
@@ -1309,6 +1700,7 @@ ipfixSourceCreateFromSockaddr(
                 skAbortBadCase(skpcProbeGetType(source->probe));
             }
         }
+
         pthread_mutex_unlock(&create_listener_mutex);
 
         pthread_mutex_init(&base->mutex, NULL);
@@ -1340,12 +1732,13 @@ ipfixSourceCreateFromSockaddr(
 
         /* Start the listener thread */
         pthread_mutex_lock(&base->mutex);
-        rv = skthread_create(skSockaddrArrayNameSafe(listen_address),
+        rv = skthread_create(skSockaddrArrayGetHostPortPair(listen_address),
                              &base->thread, ipfix_reader, (void*)base);
         if (rv != 0) {
             pthread_mutex_unlock(&base->mutex);
             WARNINGMSG("Unable to spawn new thread for '%s': %s",
-                       skSockaddrArrayNameSafe(listen_address), strerror(rv));
+                       skSockaddrArrayGetHostPortPair(listen_address),
+                       strerror(rv));
             goto ERROR;
         }
 
@@ -1376,8 +1769,8 @@ ipfixSourceCreateFromSockaddr(
         free(localbase);
     }
     if (source) {
-        if (source->circbuf) {
-            skCircBufDestroy(source->circbuf);
+        if (source->data_buffer) {
+            sk_circbuf_destroy(source->data_buffer);
         }
         if (source->connections) {
             rbdestroy(source->connections);
@@ -1385,157 +1778,6 @@ ipfixSourceCreateFromSockaddr(
         free(source);
     }
     TRACE_RETURN(NULL);
-}
-
-
-/*
- *    Handler to print log messages.  This will be invoked by g_log()
- *    and the other logging functions from GLib2.
- */
-static void
-ipfixGLogHandler(
-    const gchar     UNUSED(*log_domain),
-    GLogLevelFlags          log_level,
-    const gchar            *message,
-    gpointer         UNUSED(user_data))
-{
-    /* In syslog, CRIT is worse than ERR; in Glib2 ERROR is worse than
-     * CRITICAL. */
-
-    switch (log_level & G_LOG_LEVEL_MASK) {
-      case G_LOG_LEVEL_CRITICAL:
-        ERRMSG("%s", message);
-        break;
-      case G_LOG_LEVEL_WARNING:
-        WARNINGMSG("%s", message);
-        break;
-      case G_LOG_LEVEL_MESSAGE:
-        NOTICEMSG("%s", message);
-        break;
-      case G_LOG_LEVEL_INFO:
-        INFOMSG("%s", message);
-        break;
-      case G_LOG_LEVEL_DEBUG:
-        DEBUGMSG("%s", message);
-        break;
-      default:
-        CRITMSG("%s", message);
-        break;
-    }
-}
-
-/*
- *    GLib Log handler to discard messages.
- */
-static void
-ipfixGLogHandlerVoid(
-    const gchar     UNUSED(*log_domain),
-    GLogLevelFlags   UNUSED(log_level),
-    const gchar     UNUSED(*message),
-    gpointer         UNUSED(user_data))
-{
-    return;
-}
-
-
-/*
- *  ipfixSourceGlibInitialize();
- *
- *    Initialize the GLib slice allocator.  Since there is no way to
- *    de-initialize the slice allocator, valgrind will report this
- *    memory as "still-reachable".  We would rather have this
- *    "still-reachable" memory reported in a well-known location,
- *    instead of hidden somewhere within fixbuf.
- */
-static void
-ipfixSourceGlibInitialize(
-    void)
-{
-#if (GLIB_MAJOR_VERSION == 2 && GLIB_MINOR_VERSION >= 10)
-#define MEMORY_SIZE 128
-    gpointer memory;
-
-    memory = g_slice_alloc(MEMORY_SIZE);
-    g_slice_free1(MEMORY_SIZE, memory);
-#endif
-}
-
-
-/*
- *    Performs any initialization required prior to creating the IPFIX
- *    sources.  Returns 0 on success, or -1 on failure.
- */
-int
-skIPFIXSourcesSetup(
-    void)
-{
-    const char *env;
-    GLogLevelFlags log_levels = (GLogLevelFlags)(G_LOG_LEVEL_CRITICAL
-                                                 | G_LOG_LEVEL_WARNING
-                                                 | G_LOG_LEVEL_MESSAGE
-                                                 | G_LOG_LEVEL_INFO
-                                                 | G_LOG_LEVEL_DEBUG);
-
-    /* initialize the slice allocator */
-    ipfixSourceGlibInitialize();
-
-    /* As of glib 2.32, g_thread_init() is deprecated. */
-#if (GLIB_MAJOR_VERSION == 2 && GLIB_MINOR_VERSION < 32)
-    /* tell fixbuf (glib) we are a threaded program.  this will abort
-     * if glib does not have thread support. */
-    if (!g_thread_supported()) {
-        g_thread_init(NULL);
-    }
-#endif
-
-    /* Determine whether to consider the source port when determining
-     * whether a source is unique.  We do unless this environemnt
-     * variable is set.  See fbCollectorManageUDPStreamByPort(). */
-    env = getenv(SK_IPFIX_UDP_IGNORE_SOURCE_PORT);
-    if (NULL != env && *env && *env != '0') {
-        consider_udp_sport = 0;
-    }
-
-    /* Determine whether to print templates to the log file as they
-     * arrive. */
-    env = getenv(SK_ENV_PRINT_TEMPLATES);
-    if (NULL != env && *env && strcmp("0", env)) {
-        print_templates = 1;
-    }
-
-    /* set a log handler for messages from glib, which we always want
-     * to include in our log file.
-     * http://developer.gnome.org/glib/stable/glib-Message-Logging.html */
-    g_log_set_handler("GLib", log_levels, &ipfixGLogHandler, NULL);
-
-    /* set a log handler for messages from fixbuf, maybe using a void
-     * handler for warnings. */
-    env = getenv(SK_ENV_FIXBUF_SUPPRESS_WARNING);
-    if (env && *env && 0 == strcmp("1", env)) {
-        /* suppress warnings by setting a void handler */
-        log_levels = (GLogLevelFlags)((unsigned int)log_levels
-                                      & ~(unsigned int)G_LOG_LEVEL_WARNING);
-        g_log_set_handler(
-            NULL, G_LOG_LEVEL_WARNING, &ipfixGLogHandlerVoid, NULL);
-    }
-    g_log_set_handler(NULL, log_levels, &ipfixGLogHandler, NULL);
-
-    /* Determine which information elements should be used when
-     * defining the NetFlow v9 Sampling template. */
-    ski_nf9sampling_check_spec();
-
-    return 0;
-}
-
-
-/*
- *    Free any state allocated by skIPFIXSourcesSetup().
- */
-void
-skIPFIXSourcesTeardown(
-    void)
-{
-    skiTeardown();
 }
 
 
@@ -1577,7 +1819,7 @@ skIPFIXSourceCreate(
 
     } else {
         /* must be a network-based source */
-        source = ipfixSourceCreateFromSockaddr(probe, params->max_pkts);
+        source = ipfixSourceCreateFromSockaddr(probe);
     }
 
     TRACE_RETURN(source);
@@ -1599,8 +1841,8 @@ skIPFIXSourceStop(
 
     /* Mark the source as stopped, and unblock the circular buffer */
     source->stopped = 1;
-    if (source->circbuf) {
-        skCircBufStop(source->circbuf);
+    if (source->data_buffer) {
+        sk_circbuf_stop(source->data_buffer);
     }
     TRACE_RETURN;
 }
@@ -1640,7 +1882,7 @@ skIPFIXSourceDestroy(
         /* Remove the source's accept-from-host addresses from
          * base->addr_to_source */
         for (j = 0; j < accept_from_count; ++j) {
-            for (i = 0; i < skSockaddrArraySize(accept_from[j]); ++i) {
+            for (i = 0; i < skSockaddrArrayGetSize(accept_from[j]); ++i) {
                 target.addr = skSockaddrArrayGet(accept_from[j], i);
                 found = ((const peeraddr_source_t*)
                          rbdelete(&target, base->addr_to_source));
@@ -1736,6 +1978,98 @@ skIPFIXSourceDestroy(
 }
 
 
+/*
+ *    Requests a record from the file-based IPFIX source 'source'.
+ *
+ *    Returns 0 on success, -1 on failure.
+ */
+static int
+ipfixSourceGetRecordFromFile(
+    skIPFIXSource_t        *source,
+    skIPFIXSourceRecord_t  *ipfix_rec)
+{
+    ski_yaf_stats_t stats;
+    GError *err = NULL;
+    int rv;
+
+    TRACE_ENTRY;
+
+    /* Reading from a file */
+    pthread_mutex_lock(&source->base->mutex);
+    assert(source->readbuf);
+
+    if (source->reverse) {
+        /* A reverse record exists from the previous flow */
+        memcpy(ipfix_rec, &source->rvbuf, sizeof(skIPFIXSourceRecord_t));
+        ++source->reverse_flows;
+        source->reverse = 0;
+    } else {
+        /* Initialize the control variable for the do{}while() loop.
+         * 0: ignore; 1: uniflow; 2: biflow; -1: error */
+        rv = 0;
+        do {
+            /* Similar to the switch() block in ipfix_reader() above */
+            switch (skiGetNextRecordType(source->readbuf, &err)) {
+              case SKI_RECTYPE_ERROR:
+                rv = -1;
+                break;          /* error */
+
+              case SKI_RECTYPE_NF9_SAMPLING:
+              case SKI_RECTYPE_UNKNOWN:
+                if (!skiYafNextStats(
+                        source->readbuf, source->probe, &stats, &err))
+                {
+                    /* should have been able to read something */
+                    TRACEMSG(2, (("'%s': SKI_RECTYPE_UNKNOWN and"
+                                  " NextStats() is FALSE"), source->name));
+                    rv = -1;
+                    break;      /* error */
+                }
+                continue;
+
+              case SKI_RECTYPE_STATS:
+                if (!skiYafNextStats(
+                        source->readbuf, source->probe, &stats, &err))
+                {
+                    /* should have been able to read the stats */
+                    TRACEMSG(2, (("'%s': SKI_RECTYPE_STATS and"
+                                  " NextStats is FALSE"), source->name));
+                    rv = -1;
+                    break;      /* error */
+                }
+                TRACEMSG_YAF_STATS(source, stats);
+                INCORPORATE_STAT_RECORD(source, source->last_yaf_stats, stats);
+                continue;
+
+              case SKI_RECTYPE_FLOW:
+                rv = skiRwNextRecord(source->readbuf, source->probe,
+                                     ipfix_rec, &source->rvbuf, &err);
+                if (rv == 0) {
+                    ++source->ignored_flows;
+                }
+                break;
+            }
+        } while (rv == 0);  /* Continue while current record is ignored */
+
+        if (rv == -1) {
+            /* End of file or other problem */
+            g_clear_error(&err);
+            pthread_mutex_unlock(&source->base->mutex);
+            TRACE_RETURN(-1);
+        }
+
+        assert(rv == 1 || rv == 2);
+        ++source->forward_flows;
+
+        /* We have the next flow.  Set reverse if there is a
+         * reverse record.  */
+        source->reverse = (rv == 2);
+    }
+
+    pthread_mutex_unlock(&source->base->mutex);
+
+    TRACE_RETURN(0);
+}
 
 
 /*
@@ -1751,7 +2085,8 @@ skIPFIXSourceGetGeneric(
     skIPFIXSource_t    *source,
     rwRec              *rwrec)
 {
-    rwRec *rec;
+    skIPFIXSourceRecord_t *rec;
+    skIPFIXSourceRecord_t ipfix_rec;
     int rv;
 
     TRACE_ENTRY;
@@ -1759,26 +2094,78 @@ skIPFIXSourceGetGeneric(
     assert(source);
     assert(rwrec);
 
-    if (source->circbuf) {
+    if (source->data_buffer) {
         /* Reading from the circular buffer */
-        if (skCircBufGetReaderBlock(source->circbuf, &rec, NULL)) {
+        rec = ((skIPFIXSourceRecord_t*)
+               sk_circbuf_get_read_pos(source->data_buffer));
+        if (rec == NULL) {
             TRACE_RETURN(-1);
         }
-        RWREC_COPY(rwrec, rec);
+        RWREC_COPY(rwrec, skIPFIXSourceRecordGetRwrec(rec));
         TRACE_RETURN(0);
     }
 
-    rv = ipfixSourceGetRecordFromFile(source, rwrec);
+    rv = ipfixSourceGetRecordFromFile(source, &ipfix_rec);
+    if (0 == rv) {
+        RWREC_COPY(rwrec, skIPFIXSourceRecordGetRwrec(&ipfix_rec));
+    }
     TRACE_RETURN(rv);
 }
 
 
+/*
+ *    Requests a record from the IPFIX source 'source'.
+ *
+ *    This function will block if there are no IPFIX flows available
+ *    from which to create a record.
+ *
+ *    Returns 0 if SiLK Flow record only, -1 on failure.
+ */
+int
+skIPFIXSourceGetRecord(
+    skIPFIXSource_t        *source,
+    skIPFIXSourceRecord_t  *ipfix_rec)
+{
+    skIPFIXSourceRecord_t *rec;
+    int rv;
 
-/* Log statistics associated with a IPFIX source, and then clear the
- * statistics. */
-void
-skIPFIXSourceLogStatsAndClear(
-    skIPFIXSource_t    *source)
+    TRACE_ENTRY;
+
+    assert(source);
+    assert(ipfix_rec);
+
+    if (source->data_buffer) {
+        /* Reading from the circular buffer */
+        rec = ((skIPFIXSourceRecord_t*)
+               sk_circbuf_get_read_pos(source->data_buffer));
+        if (rec == NULL) {
+            TRACE_RETURN(-1);
+        }
+        memcpy(ipfix_rec, rec, sizeof(skIPFIXSourceRecord_t));
+    } else {
+        rv = ipfixSourceGetRecordFromFile(source, ipfix_rec);
+        if (-1 == rv) {
+            TRACE_RETURN(rv);
+        }
+    }
+    TRACE_RETURN(0);
+}
+
+
+/* Constants used to create source_do_stats()'s flags argument */
+#define SOURCE_DO_STATS_LOG     0x01
+#define SOURCE_DO_STATS_CLEAR   0x02
+
+/*
+ *  source_do_stats(source, flags);
+ *
+ *    Log and/or clear the statistics for the 'source'.  'flags' is a
+ *    combination of SOURCE_DO_STATS_LOG and SOURCE_DO_STATS_CLEAR.
+ */
+static void
+source_do_stats(
+    skIPFIXSource_t    *source,
+    unsigned int        flags)
 {
     TRACE_ENTRY;
 
@@ -1786,11 +2173,11 @@ skIPFIXSourceLogStatsAndClear(
 
     /* print log message giving the current statistics on the
      * skIPFIXSource_t pointer 'source' */
-    {
+    if (flags & SOURCE_DO_STATS_LOG) {
         fbCollector_t *collector = NULL;
         GError *err = NULL;
 
-        if (source->saw_yafstats_pkt) {
+        if (source->saw_yaf_stats_pkt) {
             /* IPFIX from yaf: print the stats */
 
             INFOMSG(("'%s': forward %" PRIu64
@@ -1855,28 +2242,28 @@ skIPFIXSourceLogStatsAndClear(
             while ((conn = (skIPFIXConnection_t *)rbreadlist(iter)) != NULL) {
                 /* store the previous number of dropped NF9/sFlow packets
                  * and get the new number of dropped packets. */
-                prev = conn->prev_yafstats.droppedPacketTotalCount;
+                prev = conn->last_yaf_stats.droppedPacketTotalCount;
                 if (skpcProbeGetType(source->probe) == PROBE_ENUM_SFLOW) {
-                    conn->prev_yafstats.droppedPacketTotalCount
+                    conn->last_yaf_stats.droppedPacketTotalCount
                         = fbCollectorGetSFlowMissed(
                             collector, &conn->peer_addr.sa, conn->peer_len,
                             conn->ob_domain);
                 } else {
-                    conn->prev_yafstats.droppedPacketTotalCount
+                    conn->last_yaf_stats.droppedPacketTotalCount
                         = fbCollectorGetNetflowMissed(
                             collector, &conn->peer_addr.sa, conn->peer_len,
                             conn->ob_domain);
                 }
-                if (prev > conn->prev_yafstats.droppedPacketTotalCount) {
+                if (prev > conn->last_yaf_stats.droppedPacketTotalCount) {
                     /* assume a new collector */
                     TRACEMSG(4, (("Assuming new collector: NF9 loss dropped"
                                   " old = %" PRIu64 ", new = %" PRIu64),
                                  prev,
-                                 conn->prev_yafstats.droppedPacketTotalCount));
+                                 conn->last_yaf_stats.droppedPacketTotalCount));
                     prev = 0;
                 }
                 source->yaf_dropped_packets
-                    += conn->prev_yafstats.droppedPacketTotalCount - prev;
+                    += conn->last_yaf_stats.droppedPacketTotalCount - prev;
             }
             rbcloselist(iter);
 
@@ -1894,16 +2281,9 @@ skIPFIXSourceLogStatsAndClear(
         }
     }
 
-#if SOURCE_LOG_MAX_PENDING_WRITE
-    if (skpcProbeGetLogFlags(source->probe) & SOURCE_LOG_MAX_PENDING_WRITE) {
-        INFOMSG(("'%s': Maximum number of read records waiting to be written:"
-                 " %" PRIu32), source->name, source->max_pending);
-    }
-#endif
-
     /* reset (set to zero) statistics on the skIPFIXSource_t
      * 'source' */
-    {
+    if (flags & SOURCE_DO_STATS_CLEAR) {
         source->yaf_dropped_packets = 0;
         source->yaf_ignored_packets = 0;
         source->yaf_notsent_packets = 0;
@@ -1913,13 +2293,37 @@ skIPFIXSourceLogStatsAndClear(
         source->forward_flows = 0;
         source->reverse_flows = 0;
         source->ignored_flows = 0;
-        source->max_pending = 0;
     }
 
     pthread_mutex_unlock(&source->stats_mutex);
     TRACE_RETURN;
 }
 
+
+/* Log statistics associated with a IPFIX source. */
+void
+skIPFIXSourceLogStats(
+    skIPFIXSource_t    *source)
+{
+    source_do_stats(source, SOURCE_DO_STATS_LOG);
+}
+
+/* Log statistics associated with a IPFIX source, and then clear the
+ * statistics. */
+void
+skIPFIXSourceLogStatsAndClear(
+    skIPFIXSource_t    *source)
+{
+    source_do_stats(source, SOURCE_DO_STATS_LOG | SOURCE_DO_STATS_CLEAR);
+}
+
+/* Clear out current statistics */
+void
+skIPFIXSourceClearStats(
+    skIPFIXSource_t    *source)
+{
+    source_do_stats(source, SOURCE_DO_STATS_CLEAR);
+}
 
 /*
 ** Local Variables:

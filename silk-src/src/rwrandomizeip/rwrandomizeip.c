@@ -29,7 +29,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwrandomizeip.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwrandomizeip.c 230792b311f0 2017-06-23 21:43:06Z mthomas $");
 
 #include "rwrandomizeip.h"
 #include <silk/rwrec.h>
@@ -146,12 +146,14 @@ static void
 appUsageLong(
     void)
 {
-#define USAGE_MSG                                                         \
-    ("[SWITCHES] <INPUT_FILE> <OUTPUT_FILE>\n"                            \
-     "\tSubstitute a pseudo-random IP address for the source and\n"       \
-     "\tdestination IP addresses of <INPUT_FILE> and write the result\n"  \
-     "\tto <OUTPUT_FILE>.  You may use \"stdin\" for <INPUT_FILE> and\n"  \
-     "\t\"stdout\" for <OUTPUT_FILE>.  Gzipped files are o.k.\n")
+#define USAGE_MSG                                                            \
+    ("[SWITCHES] [INPUT_FILE [OUTPUT_FILE]]\n"                               \
+     "\tRead each SiLK flow record from INPUT_FILE, substitute a pseudo-\n"  \
+     "\trandom IP address for its source and destination IPs, and write\n"   \
+     "\tthe record to OUTPUT_FILE.  Use 'stdin' or '-' for INPUT_FILE to\n"  \
+     "\tread from the standard input; use 'stdout' or '-' for OUTPUT_FILE\n" \
+     "\tto write to the standard output.  INPUT_FILE and OUTPUT_FILE\n"      \
+     "\tdefault to 'stdin' and 'stdout'.\n")
 
     FILE *fh = USAGE_FH;
     size_t count;
@@ -159,7 +161,6 @@ appUsageLong(
     backend_option_t *opt;
 
     skAppStandardUsage(fh, USAGE_MSG, appOptions, appHelp);
-    sksiteOptionsUsage(fh);
     if (options_vec) {
         count = skVectorGetCount(options_vec);
         for (i = 0; i < count; ++i) {
@@ -170,6 +171,7 @@ appUsageLong(
             }
         }
     }
+    sksiteOptionsUsage(fh);
 }
 
 
@@ -296,27 +298,25 @@ appSetup(
      * to resolve flowtype and sensor from input file names */
     sksiteConfigure(0);
 
-    /* Check that we have an input file */
-    if (arg_index >= argc) {
-        skAppPrintErr("Expecting input and output file names");
-        skAppUsage();           /* never returns */
-    }
-    in_path = argv[arg_index];
-    ++arg_index;
+    /* default is to read from stdin and write to stdout */
+    in_path = "-";
+    out_path = "-";
 
-    /* check that we have an output location */
-    if (arg_index >= argc) {
-        skAppPrintErr("Expecting output file name");
-        skAppUsage();           /* never returns */
-    }
-    out_path = argv[arg_index];
-    ++arg_index;
-
-    /* check for extra arguments on command line */
-    if (argc != arg_index) {
-        skAppPrintErr("Too many arguments or unrecognized switch '%s'",
-                      argv[arg_index]);
-        skAppUsage();           /* never returns */
+    /* process files named on the command line */
+    switch (argc - arg_index) {
+      case 2:
+        in_path = argv[arg_index++];
+        out_path = argv[arg_index++];
+        break;
+      case 1:
+        in_path = argv[arg_index++];
+        break;
+      case 0:
+        break;
+      default:
+        skAppPrintErr("Too many arguments;"
+                      " a maximum of two files may be specified");
+        skAppUsage();
     }
 
     /* determine which back-end to use */
@@ -726,12 +726,14 @@ randomizeFile(
     const char         *input_path,
     const char         *output_path)
 {
-    skstream_t *in_stream = NULL;
-    skstream_t *out_stream = NULL;
+    skstream_t *in_stream;
+    skstream_t *out_stream;
     rwRec rwrec;
     randomizer_modifyip_fn_t rand_ip_fn;
     int in_rv = SKSTREAM_OK;
     int rv = 0; /* return value */
+
+    rwRecInitialize(&rwrec, NULL);
 
     /* If the global back-end is set, use it; otherwise use
      * randomizeIP() to randomize the IP addresses. */
@@ -747,33 +749,33 @@ randomizeFile(
         rand_ip_fn = g_randomizer->modifyip_fn;
     }
 
-    /* Open input file */
+    /* Create and bind the output stream */
+    if ((rv = skStreamCreate(&out_stream, SK_IO_WRITE, SK_CONTENT_SILK_FLOW))
+        || (rv = skStreamBind(out_stream, output_path)))
+    {
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+        skStreamDestroy(&out_stream);
+        return 1;
+    }
+
+    /* Open the input file */
     rv = skStreamOpenSilkFlow(&in_stream, input_path, SK_IO_READ);
     if (rv) {
         skStreamPrintLastErr(in_stream, rv, &skAppPrintErr);
         skStreamDestroy(&in_stream);
+        skStreamDestroy(&out_stream);
         return 1;
     }
     skStreamSetIPv6Policy(in_stream, SK_IPV6POLICY_ASV4);
 
-    /* Create the output file, copy the headers from the source file,
-     * open it, and write the header */
-    rv = skStreamCreate(&out_stream, SK_IO_WRITE, SK_CONTENT_SILK_FLOW);
-    if (rv == SKSTREAM_OK) {
-        rv = skStreamBind(out_stream, output_path);
-    }
-    if (rv == SKSTREAM_OK) {
-        rv = skHeaderCopy(skStreamGetSilkHeader(out_stream),
-                          skStreamGetSilkHeader(in_stream),
-                          SKHDR_CP_ALL);
-    }
-    if (rv == SKSTREAM_OK) {
-        rv = skStreamOpen(out_stream);
-    }
-    if (rv == SKSTREAM_OK) {
-        rv = skStreamWriteSilkHeader(out_stream);
-    }
-    if (rv != SKSTREAM_OK) {
+    /* Copy the headers from the source file to the output file,
+     * open the output file, and write its header */
+    if ((rv = skHeaderCopy(skStreamGetSilkHeader(out_stream),
+                           skStreamGetSilkHeader(in_stream),
+                           SKHDR_CP_ALL))
+        || (rv = skStreamOpen(out_stream))
+        || (rv = skStreamWriteSilkHeader(out_stream)))
+    {
         goto END;
     }
 
@@ -828,9 +830,7 @@ randomizeFile(
         }
         skStreamDestroy(&out_stream);
     }
-    if (in_stream) {
-        skStreamDestroy(&in_stream);
-    }
+    skStreamDestroy(&in_stream);
 
     return rv;
 }
@@ -838,6 +838,8 @@ randomizeFile(
 
 int main(int argc, char **argv)
 {
+    int rv;
+
     appSetup(argc, argv);
 
     /* Initialize the random number generator unless the user
@@ -846,10 +848,10 @@ int main(int argc, char **argv)
         srandom((unsigned int) (time(NULL) / getpid()));
     }
 
-    randomizeFile(in_path, out_path);
+    rv = randomizeFile(in_path, out_path);
 
     /* done */
-    return 0;
+    return ((0 == rv) ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 

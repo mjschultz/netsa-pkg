@@ -14,7 +14,7 @@ B<rwsort> - Sort SiLK Flow records on one or more fields
         [--plugin=PLUGIN [--plugin=PLUGIN ...]]
         [--python-file=PATH [--python-file=PATH ...]]
         [--pmap-file=MAPNAME:PATH [--pmap-file=MAPNAME:PATH ...]]
-        {[--input-pipe=PATH] | [--xargs]|[--xargs=FILE] | [FILES...]}
+        {[--xargs] | [--xargs=FILE] | [FILES...]}
 
   rwsort [--pmap-file=MAPNAME:PATH [--pmap-file=MAPNAME:PATH ...]]
         [--plugin=PLUGIN ...] [--python-file=PATH ...] --help
@@ -38,17 +38,13 @@ B<rwuniq(1)>, B<rwstats(1)>, etc) do not require sorted data.
 
 B<rwsort> reads SiLK Flow records from the files named on the command
 line or from the standard input when no file names are specified and
-neither B<--xargs> nor B<--input-pipe> is present.  To read the
-standard input in addition to the named files, use C<-> or C<stdin> as
-a file name.  If an input file name ends in C<.gz>, the file is
-uncompressed as it is read.  When the B<--xargs> switch is provided,
-B<rwsort> reads the names of the files to process from the named text
-file or from the standard input if no file name argument is provided
-to the switch.  The input to B<--xargs> must contain one file name per
-line.  The B<--input-pipe> switch is deprecated and it is provided for
-legacy reasons; its use is not required since B<rwsort> will
-automatically read form the standard input.  The B<--input-pipe>
-switch will be removed in the SiLK 4.0 release.
+B<--xargs> is not present.  To read the standard input in addition to
+the named files, use C<-> or C<stdin> as a file name.  If an input
+file name ends in C<.gz>, the file is uncompressed as it is read.
+When the B<--xargs> switch is provided, B<rwsort> reads the names of
+the files to process from the named text file or from the standard
+input if no file name argument is provided to the switch.  The input
+to B<--xargs> must contain one file name per line.
 
 The amount of fast memory used by B<rwsort> will increase until it
 reaches a maximum near 2GB.  (Use the B<--sort-buffer-size> switch to
@@ -140,15 +136,15 @@ byte count
 
 bit-wise OR of TCP flags over all packets
 
-=item sTime,9,sTime+msec,22
+=item sTime,9
 
 starting time of flow (milliseconds resolution)
 
-=item duration,10,dur+msec,24
+=item duration,10
 
 duration of flow (milliseconds resolution)
 
-=item eTime,11,eTime+msec,23
+=item eTime,11
 
 end time of flow (milliseconds resolution)
 
@@ -173,13 +169,6 @@ in the sort key.  This field was introduced in SiLK 3.8.1.
 the ICMP code value for ICMP or ICMPv6 flows and zero for non-ICMP
 flows.  See note at C<iType>.
 
-=item icmpTypeCode,25
-
-equivalent to C<iType>,C<iCode>.  This field may not be mixed with
-C<iType> or C<iCode>, and this field is deprecated as of SiLK 3.8.1.
-Prior to SiLK 3.8.1, specifying the C<icmpTypeCode> field was
-equivalent to specifying the C<dPort> field.
-
 =back
 
 Many SiLK file formats do not store the following fields and their
@@ -190,7 +179,7 @@ values will always be 0; they are listed here for completeness:
 =item in,13
 
 router SNMP input interface or vlanId if packing tools were
-configured to capture it (see B<sensor.conf(5)>)
+configured to capture it
 
 =item out,14
 
@@ -301,26 +290,29 @@ F<country_codes.pmap> mapping file, as described in B<ccfilter(3)>.
 
 as B<scc> for the destination IP
 
-=item src-I<MAPNAME>
+=item src-I<map-name>
 
-value determined by passing the source IP or the protocol/source-port
-to the user-defined mapping defined in the prefix map associated with
-I<MAPNAME>.  See the description of the B<--pmap-file> switch below
-and the B<pmapfilter(3)> manual page.
+label contained in the prefix map file associated with I<map-name>.
+If the prefix map is for IP addresses, the label is that associated
+with the source IP address.  If the prefix map is for protocol/port
+pairs, the label is that associated with the protocol and source port.
+See also the description of the B<--pmap-file> switch below and the
+B<pmapfilter(3)> manual page.
 
-=item dst-I<MAPNAME>
+=item dst-I<map-name>
 
-as B<src-I<MAPNAME>> for the destination IP or
-protocol/destination-port.
+as B<src-I<map-name>> for the destination IP address or the protocol
+and destination port.
 
 =item sval
 
+as B<src-I<map-name>> when no map-name is associated with the prefix
+map file
+
 =item dval
 
-These are deprecated field names created by B<pmapfilter> that
-correspond to B<src-I<MAPNAME>> and B<dst-I<MAPNAME>>, respectively.
-These fields are available when a prefix map is used that is
-not associated with a I<MAPNAME>.
+as B<dst-I<map-name>> when no map-name is associated with the prefix
+map file
 
 =back
 
@@ -474,15 +466,6 @@ When this switch is not provided, B<rwsort> searches for the site
 configuration file in the locations specified in the L</FILES>
 section.
 
-=item B<--input-pipe>=I<PATH>
-
-Read the SiLK Flow records to be sorted from the named pipe at
-I<PATH>.  If I<PATH> is C<stdin> or C<->, records are read from the
-standard input.  Use of this switch is not required, since B<rwsort>
-will automatically read data from the standard input when no file
-names are specified on the command line.  This switch is deprecated
-and will be removed in the SiLK 4.0 release.
-
 =item B<--xargs>
 
 =item B<--xargs>=I<FILENAME>
@@ -510,20 +493,19 @@ allow the output to include descriptions of those fields.
 Print the version number and information about how SiLK was
 configured, then exit the application.
 
-=item B<--pmap-file>=I<MAPNAME>:I<PATH>
-
 =item B<--pmap-file>=I<PATH>
 
-Instruct B<rwsort> to load the mapping file located at I<PATH> and
-create the src-I<MAPNAME> and dst-I<MAPNAME> fields.  When I<MAPNAME>
-is provided explicitly, it will be used to refer to the fields
-specific to that prefix map.  If I<MAPNAME> is not provided, B<rwsort>
-will check the prefix map file to see if a map-name was specified when
-the file was created.  If no map-name is available, B<rwsort> creates
-the fields sval and dval.  Multiple B<--pmap-file> switches are
-supported as long as each uses a unique value for map-name.  The
-B<--pmap-file> switch(es) must precede the B<--fields> switch.  For
-more information, see B<pmapfilter(3)>.
+=item B<--pmap-file>=I<MAPNAME>:I<PATH>
+
+Load the prefix map file located at I<PATH> and create fields named
+src-I<map-name> and dst-I<map-name> where I<map-name> is either the
+I<MAPNAME> part of the argument or the map-name specified when the
+file was created (see B<rwpmapbuild(1)>).  If no map-name is
+available, B<rwsort> names the fields C<sval> and C<dval>.  Specify
+I<PATH> as C<-> or C<stdin> to read from the standard input.  The
+switch may be repeated to load multiple prefix map files, but each
+prefix map must use a unique map-name.  The B<--pmap-file> switch(es)
+must precede the B<--fields> switch.  See also B<pmapfilter(3)>.
 
 =item B<--python-file>=I<PATH>
 
@@ -732,12 +714,21 @@ Directory in which to create temporary files.
 
 =head1 SEE ALSO
 
-B<rwcut(1)>, B<rwfileinfo(1)>, B<rwstats(1)>, B<rwuniq(1)>,
-B<addrtype(3)>, B<ccfilter(3)>, B<pmapfilter(3)>, B<pysilk(3)>,
-B<silkpython(3)>, B<silk-plugin(3)>, B<sensor.conf(5)>,
+B<rwcount(1)>, B<rwcut(1)>, B<rwfileinfo(1)>, B<rwstats(1)>,
+B<rwuniq(1)>, B<rwpmapbuild(1)>, B<addrtype(3)>, B<ccfilter(3)>,
+B<pmapfilter(3)>, B<pysilk(3)>, B<silkpython(3)>, B<silk-plugin(3)>,
 B<rwflowpack(8)>, B<silk(7)>, B<yaf(1)>, B<dlopen(3)>, B<zlib(3)>
 
 =head1 NOTES
+
+Prior to SiLK 4.0, B<rwsort> supported an B<--input-pipe> switch whose
+argument was either the path to a named pipe from which B<rwsort> read
+records or the strings C<stdin> or C<-> to tell B<rwsort> to read from
+the standard input.  The switch was removed since it was unnecessary.
+Instead simply specify the path to the named pipe or the string
+C<stdin> or C<-> as a command-line argument.  When no input arguments
+are specified, B<rwsort> automatically attempts to read data from its
+standard input.
 
 If an output path is not specified, B<rwsort> will write to the
 standard output unless it is connected to a terminal, in which case an
@@ -761,7 +752,7 @@ sorted by providing the B<--presorted-input> switch.
 
 =cut
 
-$SiLK: rwsort.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwsort.pod 6ced2b9cf93b 2017-06-26 21:15:05Z mthomas $
 
 Local Variables:
 mode:text

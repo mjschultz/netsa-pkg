@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 1936829ad370 2016-08-24 18:29:37Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 01a94dbf4f09 2016-09-09 14:42:38Z mthomas $");
 
 # Installed Targets
 
@@ -20,8 +20,7 @@ MYCC = @CC@
 rwfilter_extra =
 cppflags_extra =
 ldadd_common = ../libsilk/libsilk.la
-ldadd_rwfilter = $(silkpython) $(ldadd_common) \
-	 $(PYTHON_LDFLAGS_EMBEDDED) $(PTHREAD_LDFLAGS)
+ldadd_rwfilter = $(silkpython) $(ldadd_common) $(PYTHON_LDFLAGS_EMBEDDED)
 
 CC = $(MYCC)
 AM_CPPFLAGS = $(SK_SRC_INCLUDES) $(PYTHON_CPPFLAGS) \
@@ -29,13 +28,19 @@ AM_CPPFLAGS = $(SK_SRC_INCLUDES) $(PYTHON_CPPFLAGS) \
 AM_CFLAGS = $(WARN_CFLAGS) $(SK_CFLAGS)
 AM_LDFLAGS = $(SK_LDFLAGS) $(STATIC_APPLICATIONS)
 
-rwfglob_SOURCES = fglob.c rwfglobapp.c
+rwfglob_SOURCES = rwfglobapp.c
 rwfglob_LDADD = $(ldadd_common)
 
-rwfilter_SOURCES = fglob.c rwfilter.c rwfilter.h \
+rwfilter_SOURCES = rwfilter.c rwfilter.h rwfilter.lua \
 	 rwfiltercheck.c rwfiltersetup.c rwfilterthread.c rwfiltertuple.c \
 	 $(rwfilter_extra)
 rwfilter_LDADD = $(ldadd_rwfilter)
+
+LUA_OUTPUT_FILES = rwfilter.i
+rwfiltersetup.$(OBJEXT): rwfilter.i
+
+BUILT_SOURCES = $(LUA_OUTPUT_FILES)
+CLEANFILES = $(LUA_OUTPUT_FILES)
 
 
 # Global Rules

@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWCOUNT_H, "$SiLK: rwcount.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_RWCOUNT_H, "$SiLK: rwcount.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -125,6 +125,7 @@ extern count_data_t bins;
 
 /* flags */
 extern count_flags_t flags;
+
 
 #ifdef __cplusplus
 }

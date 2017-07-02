@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwipv6io.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwipv6io.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 /* #define RWPACK_BYTES_PACKETS          1 */
 /* #define RWPACK_FLAGS_TIMES_VOLUMES    1 */
@@ -96,18 +96,18 @@ static const uint8_t IP4in6_prefix[12] =
 static int
 ipv6ioRecordUnpack_V2(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     uint32_t ip;
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         ipv6ioRecordSwap_V2(ar);
     }
 
     /* Start time, TCP flags, Protocol, TCP State */
-    rwpackUnpackTimesFlagsProto(rwrec, ar, stream->hdr_starttime);
+    rwpackUnpackTimesFlagsProto(rwrec, ar, stream->silkflow.hdr_starttime);
 
     /* application */
     rwRecMemSetApplication(rwrec, &ar[ 6]);
@@ -120,19 +120,15 @@ ipv6ioRecordUnpack_V2(
     rwRecMemSetElapsed(rwrec, &ar[12]);
 
     /* packets, bytes */
-    rwRecMemSetPkts(rwrec,  &ar[16]);
-    rwRecMemSetBytes(rwrec, &ar[20]);
+    rwpackUnpackPackets32(rwrec,  &ar[16]);
+    rwpackUnpackBytes32(rwrec, &ar[20]);
 
     /* sIP, dIP */
     if (ar[5] & 0x80) {
         /* Record is IPv6 */
-#if !SK_ENABLE_IPV6
-        return SKSTREAM_ERR_UNSUPPORT_IPV6;
-#else
         rwRecSetIPv6(rwrec);
         rwRecMemSetSIPv6(rwrec, &ar[24]);
         rwRecMemSetDIPv6(rwrec, &ar[40]);
-#endif /* SK_ENABLE_IPV6 */
     } else {
         /* Record is IPv4 */
         memcpy(&ip, &ar[24+12], sizeof(ip));
@@ -143,8 +139,8 @@ ipv6ioRecordUnpack_V2(
     }
 
     /* sensor, flow_type from file name/header */
-    rwRecSetSensor(rwrec, stream->hdr_sensor);
-    rwRecSetFlowType(rwrec, stream->hdr_flowtype);
+    rwRecSetSensor(rwrec, stream->silkflow.hdr_sensor);
+    rwRecSetFlowType(rwrec, stream->silkflow.hdr_flowtype);
 
     return SKSTREAM_OK;
 }
@@ -155,15 +151,15 @@ ipv6ioRecordUnpack_V2(
  */
 static int
 ipv6ioRecordPack_V2(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
     uint32_t ip;
     int rv;
 
     /* Start time, TCP Flags, Protocol, TCP State */
-    rv = rwpackPackTimesFlagsProto(rwrec, ar, stream->hdr_starttime);
+    rv = rwpackPackTimesFlagsProto(rwrec, ar, stream->silkflow.hdr_starttime);
     if (rv) {
         return rv;
     }
@@ -179,19 +175,21 @@ ipv6ioRecordPack_V2(
     rwRecMemGetElapsed(rwrec, &ar[12]);
 
     /* packets, bytes */
-    rwRecMemGetPkts(rwrec,  &ar[16]);
-    rwRecMemGetBytes(rwrec, &ar[20]);
+    rwpackPackPackets32(rwrec,  &ar[16], &rv);
+    if (rv) {
+        return rv;
+    }
+    rwpackPackBytes32(rwrec, &ar[20], &rv);
+    if (rv) {
+        return rv;
+    }
 
     /* sIP, dIP */
     if (rwRecIsIPv6(rwrec)) {
         /* Record is IPv6 */
-#if !SK_ENABLE_IPV6
-        return SKSTREAM_ERR_UNSUPPORT_IPV6;
-#else
         ar[ 5] |= 0x80;
         rwRecMemGetSIPv6(rwrec, &ar[24]);
         rwRecMemGetDIPv6(rwrec, &ar[40]);
-#endif /* SK_ENABLE_IPV6 */
     } else {
         /* Record is IPv4, but encode as IPv6 */
         ip = htonl(rwRecGetSIPv4(rwrec));
@@ -204,7 +202,7 @@ ipv6ioRecordPack_V2(
     }
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         ipv6ioRecordSwap_V2(ar);
     }
 
@@ -280,13 +278,13 @@ ipv6ioRecordPack_V2(
 static int
 ipv6ioRecordUnpack_V1(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     uint32_t ip;
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         ipv6ioRecordSwap_V1(ar);
     }
 
@@ -303,18 +301,14 @@ ipv6ioRecordUnpack_V1(
     rwRecMemSetTcpState(rwrec, &ar[23]);
     rwRecMemSetApplication(rwrec, &ar[24]);
     rwRecMemSetMemo(rwrec, &ar[26]);
-    rwRecMemSetPkts(rwrec, &ar[28]);
-    rwRecMemSetBytes(rwrec, &ar[32]);
+    rwpackUnpackPackets32(rwrec, &ar[28]);
+    rwpackUnpackBytes32(rwrec, &ar[32]);
 
     if (ar[23] & 0x80) {
         /* Record is IPv6 */
-#if !SK_ENABLE_IPV6
-        return SKSTREAM_ERR_UNSUPPORT_IPV6;
-#else
         rwRecSetIPv6(rwrec);
         rwRecMemSetSIPv6(rwrec, &ar[36]);
         rwRecMemSetDIPv6(rwrec, &ar[52]);
-#endif /* SK_ENABLE_IPV6 */
     } else {
         /* Record is IPv4 */
 
@@ -338,11 +332,12 @@ ipv6ioRecordUnpack_V1(
  */
 static int
 ipv6ioRecordPack_V1(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
     uint32_t ip;
+    int rv = SKSTREAM_OK;
 
     rwRecMemGetStartTime(rwrec, &ar[0]);
     rwRecMemGetElapsed(rwrec, &ar[8]);
@@ -357,18 +352,22 @@ ipv6ioRecordPack_V1(
     rwRecMemGetTcpState(rwrec, &ar[23]);
     rwRecMemGetApplication(rwrec, &ar[24]);
     rwRecMemGetMemo(rwrec, &ar[26]);
-    rwRecMemGetPkts(rwrec, &ar[28]);
-    rwRecMemGetBytes(rwrec, &ar[32]);
+
+    /* pkts, bytes */
+    rwpackPackPackets32(rwrec, &ar[28], &rv);
+    if (rv) {
+        return rv;
+    }
+    rwpackPackBytes32(rwrec, &ar[32], &rv);
+    if (rv) {
+        return rv;
+    }
 
     if (rwRecIsIPv6(rwrec)) {
         /* Record is IPv6 */
-#if !SK_ENABLE_IPV6
-        return SKSTREAM_ERR_UNSUPPORT_IPV6;
-#else
         ar[23] |= 0x80;
         rwRecMemGetSIPv6(rwrec, &ar[36]);
         rwRecMemGetDIPv6(rwrec, &ar[52]);
-#endif /* SK_ENABLE_IPV6 */
     } else {
         /* Record is IPv4, but encode as IPv6 */
 
@@ -384,7 +383,7 @@ ipv6ioRecordPack_V1(
     }
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         ipv6ioRecordSwap_V1(ar);
     }
 
@@ -441,12 +440,12 @@ ipv6ioPrepare(
     /* version check; set values based on version */
     switch (skHeaderGetRecordVersion(hdr)) {
       case 2:
-        stream->rwUnpackFn = &ipv6ioRecordUnpack_V2;
-        stream->rwPackFn   = &ipv6ioRecordPack_V2;
+        stream->silkflow.unpack = &ipv6ioRecordUnpack_V2;
+        stream->silkflow.pack   = &ipv6ioRecordPack_V2;
         break;
       case 1:
-        stream->rwUnpackFn = &ipv6ioRecordUnpack_V1;
-        stream->rwPackFn   = &ipv6ioRecordPack_V1;
+        stream->silkflow.unpack = &ipv6ioRecordUnpack_V1;
+        stream->silkflow.pack   = &ipv6ioRecordPack_V1;
         break;
       case 0:
       default:
@@ -454,22 +453,22 @@ ipv6ioPrepare(
         goto END;
     }
 
-    stream->recLen = ipv6ioGetRecLen(skHeaderGetRecordVersion(hdr));
+    stream->rec_len = ipv6ioGetRecLen(skHeaderGetRecordVersion(hdr));
 
     /* verify lengths */
-    if (stream->recLen == 0) {
+    if (stream->rec_len == 0) {
         skAppPrintErr("Record length not set for %s version %u",
                       FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr));
         skAbort();
     }
-    if (stream->recLen != skHeaderGetRecordLength(hdr)) {
+    if (stream->rec_len != skHeaderGetRecordLength(hdr)) {
         if (0 == skHeaderGetRecordLength(hdr)) {
-            skHeaderSetRecordLength(hdr, stream->recLen);
+            skHeaderSetRecordLength(hdr, stream->rec_len);
         } else {
             skAppPrintErr(("Record length mismatch for %s version %u\n"
                            "\tcode = %" PRIu16 " bytes;  header = %lu bytes"),
                           FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr),
-                          stream->recLen,
+                          stream->rec_len,
                           (unsigned long)skHeaderGetRecordLength(hdr));
             skAbort();
         }

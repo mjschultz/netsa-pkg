@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SILK_FILES_H, "$SiLK: silk_files.h 7e6884832fbd 2017-01-20 22:59:46Z mthomas $");
+RCSIDENTVAR(rcsID_SILK_FILES_H, "$SiLK: silk_files.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -237,6 +237,32 @@ skCompMethodOptionsUsage(
     FILE               *fh);
 
 
+/**
+ *    Parse the compression method name in 'comp_method_name'.  If the
+ *    name is available or known (see skCompMethodCheck()), set the
+ *    referent of 'out_comp_method' to the compression method and
+ *    return 0.
+ *
+ *    If 'comp_method_name' is NULL, use the compression method
+ *    specified in the environment (unless the function
+ *    skCompMethodOptionsNoEnviron() was called prior to calling this
+ *    function) or the default compression method and return 0.
+ *
+ *    If 'comp_method_name' is not available, report an error in the
+ *    configuration file 'config_file' while parsing the value of the
+ *    key 'key_name' and return -1.  If either 'config_file' or
+ *    'key_name' is NULL, do not print any error and return -1.
+ *
+ *    On error, the referent of 'out_comp_method' is unchanged.
+ */
+int
+skCompMethodSetFromConfigFile(
+    const char         *config_file,
+    const char         *key_name,
+    const char         *comp_method_name,
+    sk_compmethod_t    *out_comp_method);
+
+
 
 /** File Formats ******************************************************/
 
@@ -292,7 +318,7 @@ skFileFormatFromName(
 #define FT_EXPERIMENT1      0x06        /* free for all ID */
 #define FT_EXPERIMENT2      0x07        /* free for all ID */
 #define FT_TEMPFILE         0x08
-#define FT_AGGREGATEBAG     0x09
+#define FT_RESERVED_09      0x09
 #define FT_IPFIX            0x0A
 #define FT_RWIPV6           0x0B
 #define FT_RWIPV6ROUTING    0x0C
@@ -323,11 +349,6 @@ skFileFormatFromName(
 #define FT_PREFIXMAP        0x25
 /* When you add new types here; add the name to the array below. */
 
-/* old identifier names */
-#define FT_IPTREE           FT_IPSET
-#define FT_MACROBAGTREE     FT_RWBAG
-
-
 /*
  *   This header is included by skfileformat.c after declaring
  *   SKFILEFORMAT_SOURCE.  Users should use the functions defined
@@ -345,7 +366,7 @@ static const char *sk_file_format_names[] = {
     /* 0x06 */  "FT_EXPERIMENT1",
     /* 0x07 */  "FT_EXPERIMENT2",
     /* 0x08 */  "FT_TEMPFILE",
-    /* 0x09 */  "FT_AGGREGATEBAG",
+    /* 0x09 */  "FT_RESERVED_09",
     /* 0x0A */  "FT_IPFIX",
     /* 0x0B */  "FT_RWIPV6",
     /* 0x0C */  "FT_RWIPV6ROUTING",

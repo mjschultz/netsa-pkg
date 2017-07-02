@@ -21,11 +21,12 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_LIBFLOWSOURCE_H, "$SiLK: libflowsource.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_LIBFLOWSOURCE_H, "$SiLK: libflowsource.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/silk_types.h>
+#include <silk/skipfixcert.h>
 #include <silk/rwrec.h>
-#include <silk/probeconf.h>
+/* #include <silk/probeconf.h>   <-- This now at end of file */
 
 /**
  *  @file
@@ -35,6 +36,12 @@ RCSIDENTVAR(rcsID_LIBFLOWSOURCE_H, "$SiLK: libflowsource.h 275df62a2e41 2017-01-
  *
  *    This file is part of libflowsource.
  */
+
+
+/*
+ *    Forward declaration of the probe type, from probeconf.h.
+ */
+typedef struct skpc_probe_st skpc_probe_t;
 
 
 /**
@@ -126,46 +133,19 @@ RCSIDENTVAR(rcsID_LIBFLOWSOURCE_H, "$SiLK: libflowsource.h 275df62a2e41 2017-01-
 #define SOCKETBUFFER_MINIMUM       0x20000 /* 128K */
 
 /**
- *    Environment variable to modify SOCKETBUFFER_MINIMUM
+source.ipfix *    Environment variable to modify SOCKETBUFFER_MINIMUM
  */
 #define SOCKETBUFFER_MINIMUM_ENV "SK_SOCKETBUFFER_MINIMUM"
 
 
 typedef union skFlowSourceParams_un {
-    uint32_t    max_pkts;
     const char *path_name;
 } skFlowSourceParams_t;
 
 
-/**
- *    Structure used to report the statistics of packets processed by
- *    a flow source.
- */
-typedef struct skFlowSourceStats_st {
-    /** Number of processed packets */
-    uint64_t    procPkts;
-    /** Number of completely bad packets */
-    uint64_t    badPkts;
-    /** Number of good records processed */
-    uint64_t    goodRecs;
-    /** Number of records with bad data */
-    uint64_t    badRecs;
-    /** Number of missing records; NOTE: signed int to allow for out of
-     * seq pkts */
-    int64_t     missingRecs;
-} skFlowSourceStats_t;
-
-/**
- *    Macro to print the statistics.
- */
-#define FLOWSOURCE_STATS_INFOMSG(source_name, source_stats)             \
-    INFOMSG(("'%s': Pkts %" PRIu64 "/%" PRIu64                          \
-             ", Recs %" PRIu64 ", MissRecs %" PRId64                    \
-             ", BadRecs %" PRIu64),                                     \
-            (source_name),                                              \
-            ((source_stats)->procPkts - (source_stats)->badPkts),       \
-            (source_stats)->procPkts, (source_stats)->goodRecs,         \
-            (source_stats)->missingRecs, (source_stats)->badRecs)
+int
+load_config(
+    const char         *config_file);
 
 
 
@@ -236,27 +216,11 @@ skPDUSourceGetGeneric(
 
 
 /**
- *    Logs statistics associated with a PDU source.
- */
-void
-skPDUSourceLogStats(
-    skPDUSource_t      *source);
-
-
-/**
  *    Logs statistics associated with a PDU source, and then clears
  *    the stats.
  */
 void
 skPDUSourceLogStatsAndClear(
-    skPDUSource_t      *source);
-
-
-/**
- *    Clears the current statistics for the PDU source.
- */
-void
-skPDUSourceClearStats(
     skPDUSource_t      *source);
 
 
@@ -308,21 +272,17 @@ typedef struct skIPFIXSource_st skIPFIXSource_t;
 
 
 /**
- *    Performs any initialization required prior to creating the IPFIX
- *    sources.  Returns 0 on success, or -1 on failure.
+ *    Record type returned by skIPFIXSource_t.
  */
-int
-skIPFIXSourcesSetup(
-    void);
+typedef rwRec skIPFIXSourceRecord_t;
 
 
 /**
- *    Free any state allocated by skIPFIXSourcesSetup().  This
- *    function is not thread safe.
+ *    Get a pointer to a SiLK Flow record given a pointer to an
+ *    skIPFIXSourceRecord_t.
  */
-void
-skIPFIXSourcesTeardown(
-    void);
+#define skIPFIXSourceRecordGetRwrec(ipfix_src_rec)      \
+    ((rwRec*)(ipfix_src_rec))
 
 
 /**
@@ -379,6 +339,26 @@ skIPFIXSourceGetGeneric(
     skIPFIXSource_t    *source,
     rwRec              *rwrec);
 
+/**
+ *    Requests a record from the IPFIX source 'source'.
+ *
+ *    This function will block if there are no IPFIX flows available
+ *    from which to create a record.
+ *
+ *    Returns 0 on success, -1 on failure.
+ */
+int
+skIPFIXSourceGetRecord(
+    skIPFIXSource_t        *source,
+    skIPFIXSourceRecord_t  *ipfix_rec);
+
+/**
+ *    Logs statistics associated with a IPFIX source.
+ */
+void
+skIPFIXSourceLogStats(
+    skIPFIXSource_t    *source);
+
 
 /**
  *    Logs statistics associated with a IPFIX source, and then clears
@@ -389,7 +369,15 @@ skIPFIXSourceLogStatsAndClear(
     skIPFIXSource_t    *source);
 
 
+/**
+ *    Clears the current statistics for the IPFIX source.
+ */
+void
+skIPFIXSourceClearStats(
+    skIPFIXSource_t    *source);
 
+
+#include <silk/probeconf.h>
 
 #ifdef __cplusplus
 }

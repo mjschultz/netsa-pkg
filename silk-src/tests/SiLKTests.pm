@@ -11,7 +11,7 @@
 #  March 2009
 #
 #######################################################################
-#  RCSIDENT("$SiLK: SiLKTests.pm 22c7d008aa07 2017-01-26 23:10:13Z mthomas $")
+#  RCSIDENT("$SiLK: SiLKTests.pm 497f0d50d230 2017-06-23 21:15:28Z mthomas $")
 #######################################################################
 #
 #    Perl module used by the scripts that "make check" runs.
@@ -239,10 +239,10 @@ BEGIN {
                       &check_daemon_init_program_name
                       &check_exit_status &check_features
                       &check_md5_file &check_md5_output
-                      &check_python_bin &check_silk_app &compute_md5
+                      &check_python_bin &check_python_plugin
+                      &check_silk_app &compute_md5
                       &get_data_or_exit77 &get_datafile
                       &get_ephemeral_port &make_config_file
-                      &make_packer_sensor_conf
                       &make_tempdir &make_tempname &make_test_scripts
                       &print_tests_hash &run_command
                       &rwpollexec_use_alternate_shell &skip_test
@@ -279,24 +279,16 @@ BEGIN {
                 unless 1 == $SiLKTests::SK_ENABLE_IPA;
         },
         ipfix       => sub {
-            skip_test("No IPFIX support")
-                unless 1 == $SiLKTests::SK_ENABLE_IPFIX;
         },
         inet6       => sub {
             skip_test("No IPv6 networking support")
                 unless $SiLKTests::SK_ENABLE_INET6_NETWORKING;
         },
         ipset_v6    => sub {
-            skip_test("No IPv6 IPset support")
-                unless ($SiLKTests::SK_ENABLE_IPV6);
         },
         ipv6        => sub {
-            skip_test("No IPv6 Flow record support")
-                unless $SiLKTests::SK_ENABLE_IPV6;
         },
         netflow9    => sub {
-            skip_test("No NetFlow V9 support")
-                unless ($SiLKTests::SK_ENABLE_IPFIX);
         },
         stdin_tty   => sub {
             skip_test("stdin is not a tty")
@@ -325,7 +317,7 @@ our @DUMP_ENVVARS = qw(top_srcdir top_builddir srcdir
                        SILK_COUNTRY_CODES SILK_ADDRESS_TYPES
                        SILK_COMPRESSION_METHOD
                        SILK_IPSET_RECORD_VERSION SKIPSET_INCORE_FORMAT
-                       PYTHONPATH
+                       PYTHONPATH LUA_PATH
                        LD_LIBRARY_PATH DYLD_LIBRARY_PATH LIBPATH SHLIB_PATH
                        G_SLICE G_DEBUG);
 
@@ -364,6 +356,10 @@ my %test_files = (
     data            => "$testsdir/data.rwf",
     v6data          => "$testsdir/data-v6.rwf",
     scandata        => "$testsdir/scandata.rwf",
+
+    empty_ipfix     => "$testsdir/empty.ipfix",
+    data_ipfix      => "$testsdir/data.ipfix",
+    v6data_ipfix    => "$testsdir/data-v6.ipfix",
 
     v4set1          => "$testsdir/set1-v4.set",
     v4set2          => "$testsdir/set2-v4.set",
@@ -740,11 +736,11 @@ sub check_silk_app
     if (-x $name) {
         $path = "./$name";
     }
-    elsif ($name =~ /^rwuniq$/) {
-        $path = "../rwstats/$name";
-    }
     elsif ($name =~ /^(rwset|rwbag|rwids|rwipa|rwpmap|rwscan)/) {
         $path = "../$1/$name";
+    }
+    elsif ($name =~ /^rwuniq$/) {
+        $path = "../rwstats/$name";
     }
     elsif ($name =~ /^rwfglob$/) {
         $path = "../rwfilter/$name";
@@ -812,11 +808,11 @@ sub check_silk_app
 #
 #    gnutls    -- verify that GnuTLS support is available
 #    ipa       -- verify that support for libipa is available
-#    ipfix     -- verify that IPFIX support is available
+#    ipfix     -- no-op.  for backward compatibility
 #    inet6     -- verify that IPv6 networking support is available
-#    ipset_v6  -- verify that IPv6 IPsets is available
-#    ipv6      -- verify that IPv6 Flow record support is available
-#    netflow9  -- verify that support for NetFlow V9 is available
+#    ipset_v6  -- no-op.  for backward compatibility
+#    ipv6      -- no-op.  for backward compatibility
+#    netflow9  -- no-op.  for backward compatibility
 #
 #    The acceptable names for '@list' w.r.t. the environment are:
 #
@@ -983,19 +979,38 @@ sub check_exit_status
 #    exit 77.  Otherwise, prefix any existing PYTHONPATH with the
 #    proper directories and return 1.
 #
+#    This check used by the code that tests daemons since the daemon
+#    testing code requires a python interpreter.
+#
 sub check_python_bin
 {
-    if ($SiLKTests::PYTHON eq "no"
-        || $SiLKTests::PYTHON_VERSION !~ /^[23]/
-        || $SiLKTests::PYTHON_VERSION =~ /^2.[45]/)
-    {
-        skip_test("Python unset or not >= 2.6 < 4.0");
+    if ($SiLKTests::PYTHON eq "no") {
+        skip_test("Python unset");
     }
     $ENV{PYTHONPATH} = join ":", ($SiLKTests::top_builddir.'/tests',
                                   $SiLKTests::srcdir.'/tests',
                                   $SiLKTests::top_srcdir.'/tests',
                                   ($ENV{PYTHONPATH} ? $ENV{PYTHONPATH} : ()));
     return 1;
+}
+
+
+#  check_python_plugin($app)
+#
+#    Check whether the --python-file switch works for the application
+#    $app.  The argument to --python-file is the pysilk_plugin defined
+#    in the %test_files hash.  If the switch does not work, exit 77.
+#
+sub check_python_plugin
+{
+    my ($app) = @_;
+
+    my $file = get_data_or_exit77('pysilk_plugin');
+    if (check_exit_status(qq|$app --python-file=$file --help|)) {
+        return;
+    }
+    check_exit_status(qq|$app --python-file=$file --help|, 'no_redirect');
+    skip_test('Cannot use --python-file');
 }
 
 
@@ -1587,11 +1602,6 @@ EOF
             for my $key (@$file_keys) {
                 my $file = get_datafile($key);
                 if (!$file) {
-                    # Skip V6 when built without V6
-                    if ($key eq 'v6data' && $SiLKTests::SK_ENABLE_IPV6 == 0) {
-                        warn $INDENT, "Skipping V6 test\n";
-                        next TUPLE;
-                    }
                     die "$NAME: No file '$key'";
                 }
                 $run_body .= "\$file{$key} = '$file';\n";
@@ -1617,7 +1627,8 @@ EOF
 
         # Set any environment variables
         if ($env_hash) {
-            while (my ($var, $val) = each %$env_hash) {
+            for my $var (sort keys %$env_hash) {
+                my $val = $env_hash->{$var};
                 $test_body .= "\$ENV{$var} = $val;\n";
                 $run_body .= "\$ENV{$var} = $val;\n";
             }
@@ -1982,36 +1993,6 @@ sub make_config_file
         print STDERR $$text_ref;
         print STDERR "<< END OF FILE '$out' <<<<<<<<<<<<\n";
     }
-}
-
-
-sub make_packer_sensor_conf
-{
-    my ($sensor_conf, $probe_type, $port, @rest) = @_;
-
-    my $sensor_template = "$srcdir/tests/sensors.conf";
-
-    my %features;
-
-    for my $f (@rest) {
-        my $re = "\\#\U$f\\#";
-        $features{$f} = qr/$re/;
-    }
-
-    my $text = "";
-
-    open SENSOR_IN, $sensor_template
-        or die "$NAME: Cannot open file '$sensor_template': $!\n";
-    while (defined (my $line = <SENSOR_IN>)) {
-        $line =~ s/PROBETYPE/$probe_type/g;
-        $line =~ s/RANDOMPORT/$port/g;
-        for my $re (values %features) {
-            $line =~ s/$re//g;
-        }
-        $text .= $line;
-    }
-    close SENSOR_IN;
-    make_config_file($sensor_conf, \$text);
 }
 
 

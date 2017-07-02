@@ -26,9 +26,10 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsplit.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwsplit.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/rwrec.h>
+#include <silk/skflowiter.h>
 #include <silk/skipset.h>
 #include <silk/sksite.h>
 #include <silk/skstream.h>
@@ -55,16 +56,14 @@ typedef enum aggmode {
 /* LOCAL VARIABLES */
 
 /* for looping over files on the command line */
-static sk_options_ctx_t *optctx;
+static sk_options_ctx_t *optctx = NULL;
+static sk_flow_iter_t *flowiter = NULL;
 
 /* basename of output files */
 static char *out_basename = NULL;
 
 /* current output file */
 static skstream_t *stream_out = NULL;
-
-/* current input file */
-static skstream_t *stream_in;
 
 /* IPset in which to store unique IPs */
 static skipset_t *ips = NULL;
@@ -96,6 +95,12 @@ static aggmode_t aggmode = AGGMODE_NONE;
 
 /* whether the user specified the seed */
 static int seed_specified = 0;
+
+/* the Lua state */
+static lua_State *L = NULL;
+
+/* sidecar holding all defined sidecar elements */
+static sk_sidecar_t *sidecar = NULL;
 
 /* the compression method to use when writing the file.
  * skCompMethodOptionsRegister() will set this to the default or
@@ -235,13 +240,17 @@ appTeardown(
     teardownFlag = 1;
 
     closeOutput();
-    skStreamDestroy(&stream_in);
 
     if (ips) {
         skIPSetDestroy(&ips);
     }
 
+    sk_sidecar_destroy(&sidecar);
+    sk_lua_closestate(L);
+    L = NULL;
+
     skOptionsNotesTeardown();
+    sk_flow_iter_destroy(&flowiter);
     skOptionsCtxDestroy(&optctx);
     skAppUnregister();
 }
@@ -302,11 +311,18 @@ appSetup(
         exit(EXIT_FAILURE);
     }
 
+    /* create an empty sidecar description and a Lua state */
+    sk_sidecar_create(&sidecar);
+    L = sk_lua_newstate();
+
     /* parse the options */
     rv = skOptionsCtxOptionsParse(optctx, argc, argv);
     if (rv < 0) {
         skAppUsage();           /* never returns */
     }
+
+    /* create flow iterator to read the records from the stream */
+    flowiter = skOptionsCtxCreateFlowIterator(optctx);
 
     /* try to load site config file; if it fails, we will not be able
      * to resolve flowtype and sensor from input file names */
@@ -332,6 +348,15 @@ appSetup(
     /* create IPset if required */
     if (aggmode == AGGMODE_IPS) {
         skIPSetCreate(&ips, 0);
+    }
+
+    /* get the sidecar data from all input streams */
+    if (sk_flow_iter_fill_sidecar(flowiter, sidecar)) {
+        skAppPrintErr("Error reading file header");
+        exit(EXIT_FAILURE);
+    }
+    if (0 == sk_sidecar_count_elements(sidecar)) {
+        sk_sidecar_destroy(&sidecar);
     }
 
     return;  /* OK */
@@ -447,7 +472,7 @@ static int
 closeOutput(
     void)
 {
-    int rv = 0;
+    ssize_t rv = 0;
 
     if (stream_out) {
         rv = skStreamClose(stream_out);
@@ -472,7 +497,7 @@ newOutput(
 {
     static uint32_t sample_die_roll = 0;
     char datafn[PATH_MAX];
-    int rv;
+    ssize_t rv;
 
     if (file_ratio != 1) {
         if (0 == (output_ctr % file_ratio)) {
@@ -490,7 +515,7 @@ newOutput(
     }
     --max_outputs;
 
-    /* create new file name, open it, write the headers */
+    /* create new file name and add headers */
     snprintf(datafn, sizeof(datafn),  ("%s.%08" PRIu32 ".rwf"),
              out_basename, output_ctr);
     if ((rv = skStreamCreate(&stream_out, SK_IO_WRITE, SK_CONTENT_SILK_FLOW))
@@ -498,8 +523,25 @@ newOutput(
         || (rv = skStreamSetCompressionMethod(stream_out, comp_method))
         || (rv = skOptionsNotesAddToStream(stream_out))
         || (rv = skHeaderAddInvocation(skStreamGetSilkHeader(stream_out),
-                                       1, pargc, pargv))
-        || (rv = skStreamOpen(stream_out))
+                                       1, pargc, pargv)))
+    {
+        skStreamPrintLastErr(stream_out, rv, &skAppPrintErr);
+        skStreamDestroy(&stream_out);
+        exit(EXIT_FAILURE);
+    }
+
+    /* add sidecar to stream */
+    if (sidecar) {
+        rv = skStreamSetSidecar(stream_out, sidecar);
+        if (rv) {
+            skStreamPrintLastErr(stream_out, rv, &skAppPrintErr);
+            skStreamDestroy(&stream_out);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    /* open the stream and write the headers */
+    if ((rv = skStreamOpen(stream_out))
         || (rv = skStreamWriteSilkHeader(stream_out)))
     {
         skStreamPrintLastErr(stream_out, rv, &skAppPrintErr);
@@ -525,7 +567,7 @@ processRec(
     static uint32_t grab_index = 0;
     skipaddr_t ipaddr;
     int reset_status;
-    int rv;
+    ssize_t rv;
 
     reset_status = 0;
 
@@ -629,9 +671,9 @@ processRec(
 int main(int argc, char **argv)
 {
     struct timeval tv;
-    rwRec in_rec;
+    rwRec rwrec;
     int ret_val = EXIT_SUCCESS;
-    int rv;
+    ssize_t rv;
 
     appSetup(argc, argv);                       /* never returns on error */
 
@@ -642,19 +684,11 @@ int main(int argc, char **argv)
 
     /* for all inputs, read all records */
     /* process input */
-    while ((rv = skOptionsCtxNextSilkFile(optctx, &stream_in, &skAppPrintErr))
-           == 0)
-    {
-        while ((rv = skStreamReadRecord(stream_in, &in_rec)) == SKSTREAM_OK) {
-            processRec(&in_rec);
-        }
-        if (SKSTREAM_ERR_EOF != rv) {
-            skStreamPrintLastErr(stream_in, rv, &skAppPrintErr);
-            ret_val = EXIT_FAILURE;
-        }
-        skStreamDestroy(&stream_in);
+    rwRecInitialize(&rwrec, L);
+    while ((rv = sk_flow_iter_get_next_rec(flowiter, &rwrec)) == 0) {
+        processRec(&rwrec);
     }
-    if (rv < 0) {
+    if (SKSTREAM_ERR_EOF != rv) {
         ret_val = EXIT_FAILURE;
     }
 

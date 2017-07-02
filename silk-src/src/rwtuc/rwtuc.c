@@ -18,9 +18,8 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwtuc.c 6c153f4d1288 2017-03-22 13:43:57Z mthomas $");
+RCSIDENT("$SiLK: rwtuc.c 6dd88a00c518 2017-06-23 20:50:29Z mthomas $");
 
-#include <silk/rwascii.h>
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
 #include <silk/skstream.h>
@@ -50,10 +49,10 @@ RCSIDENT("$SiLK: rwtuc.c 6c153f4d1288 2017-03-22 13:43:57Z mthomas $");
 #define RWTUC_WHITESPACE    "\t\v\f\r "
 
 /* additional field types to define, it addition to the RWREC_FIELD_*
- * values defined by rwascii.h; values must be contiguous with the
+ * values defined by rwrec.h; values must be contiguous with the
  * RWREC_FIELD_* values. */
 typedef enum {
-    TUC_FIELD_IGNORED = RWREC_PRINTABLE_FIELD_COUNT
+    TUC_FIELD_IGNORED = RWREC_FIELD_ID_COUNT
 } field_ident_t;
 
 /* depending on what we are parsing, there may be various parts of the
@@ -99,7 +98,7 @@ typedef struct current_line_st {
  * defaults. */
 static const uint32_t max_avail_field = TUC_FIELD_IGNORED;
 
-/* fields in addition to those provided by rwascii */
+/* fields in addition to those provided by rwrec */
 static sk_stringmap_entry_t tuc_fields[] = {
     {"ignore", TUC_FIELD_IGNORED,   NULL, NULL},
     SK_STRINGMAP_SENTINEL
@@ -223,10 +222,6 @@ static struct option defaultValueOptions[] = {
 
     {"class",             REQUIRED_ARG, 0, RWREC_FIELD_FTYPE_CLASS},
     {"type",              REQUIRED_ARG, 0, RWREC_FIELD_FTYPE_TYPE},
-
-    {"stime+msec",        REQUIRED_ARG, 0, RWREC_FIELD_STIME_MSEC},
-    {"etime+msec",        REQUIRED_ARG, 0, RWREC_FIELD_ETIME_MSEC},
-    {"duration+msec",     REQUIRED_ARG, 0, RWREC_FIELD_ELAPSED_MSEC},
 
     {"icmp-type",         REQUIRED_ARG, 0, RWREC_FIELD_ICMP_TYPE},
     {"icmp-code",         REQUIRED_ARG, 0, RWREC_FIELD_ICMP_CODE},
@@ -464,7 +459,7 @@ appSetup(
     /* use "stdout" as default output path */
     if (NULL == out_stream) {
         if ((rv = skStreamCreate(&out_stream,SK_IO_WRITE,SK_CONTENT_SILK_FLOW))
-            || (rv = skStreamBind(out_stream, "stdout")))
+            || (rv = skStreamBind(out_stream, "-")))
         {
             skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
             skAppPrintErr("Could not create output stream");
@@ -643,7 +638,8 @@ static int
 createStringmaps(
     void)
 {
-    if (rwAsciiFieldMapAddDefaultFields(&field_map)
+    if (skStringMapCreate(&field_map)
+        || skRwrecAppendFieldsToStringMap(field_map)
         || skStringMapAddEntries(field_map, -1, tuc_fields))
     {
         return -1;
@@ -868,7 +864,6 @@ determineFields(
     uint32_t i;
     int is_title = 0;
     int per_file_field_list = 0;
-    int have_stime, have_etime, have_elapsed;
     char *errmsg;
 
     memset(defaults, 0, sizeof(parsed_values_t));
@@ -993,33 +988,24 @@ determineFields(
     }
 
     /* need a time */
-    have_stime = (have_field[RWREC_FIELD_STIME]
-                  || have_field[RWREC_FIELD_STIME_MSEC]);
-    have_etime = (have_field[RWREC_FIELD_ETIME]
-                  || have_field[RWREC_FIELD_ETIME_MSEC]);
-    have_elapsed = (have_field[RWREC_FIELD_ELAPSED]
-                    || have_field[RWREC_FIELD_ELAPSED_MSEC]);
-    if (have_stime) {
-        if (have_elapsed) {
+    if (have_field[RWREC_FIELD_STIME]) {
+        if (have_field[RWREC_FIELD_ELAPSED]) {
             defaults->handle_time = CALC_NONE;
-            if (have_etime) {
+            if (have_field[RWREC_FIELD_ETIME]) {
                 /* we will set etime from stime+elapsed */
                 default_val[RWREC_FIELD_ETIME] = NULL;
-                default_val[RWREC_FIELD_ETIME_MSEC] = NULL;
                 for (i = 0; i < num_fields; ++i) {
-                    if (((*field_type)[i] == RWREC_FIELD_ETIME)
-                        || ((*field_type)[i] == RWREC_FIELD_ETIME_MSEC))
-                    {
+                    if ((*field_type)[i] == RWREC_FIELD_ETIME) {
                         (*field_type)[i] = TUC_FIELD_IGNORED;
                     }
                 }
             }
-        } else if (have_etime) {
+        } else if (have_field[RWREC_FIELD_ETIME]) {
             /* must compute elapsed from eTime - sTime */
             defaults->handle_time = CALC_ELAPSED;
         }
         /* else elapsed is fixed at 0 */
-    } else if (have_etime) {
+    } else if (have_field[RWREC_FIELD_ETIME]) {
         /* must calculate stime from etime and duration */
         defaults->handle_time = CALC_STIME;
 
@@ -1121,9 +1107,10 @@ processFields(
     char                  **field_val,
     int                     checking_defaults)
 {
-    char field_name[128];
+    const char *field_name;
     sktime_t t;
     skipaddr_t ipaddr;
+    uint64_t tmp64;
     uint32_t tmp32;
     uint8_t proto;
     uint8_t flags;
@@ -1201,21 +1188,19 @@ processFields(
             break;
 
           case RWREC_FIELD_PKTS:
-            rv = skStringParseUint32(&tmp32, cp, 1, 0);
+            rv = skStringParseUint64(&tmp64, cp, 1, 0);
             if (rv) {
-                /* FIXME: Clamp value to max instead of rejecting */
                 goto PARSE_ERROR;
             }
-            rwRecSetPkts(&val->rec, tmp32);
+            rwRecSetPkts(&val->rec, tmp64);
             break;
 
           case RWREC_FIELD_BYTES:
-            rv = skStringParseUint32(&tmp32, cp, 1, 0);
+            rv = skStringParseUint64(&tmp64, cp, 1, 0);
             if (rv) {
-                /* FIXME: Clamp value to max instead of rejecting */
                 goto PARSE_ERROR;
             }
-            rwRecSetBytes(&val->rec, tmp32);
+            rwRecSetBytes(&val->rec, tmp64);
             break;
 
           case RWREC_FIELD_FLAGS:
@@ -1227,7 +1212,6 @@ processFields(
             break;
 
           case RWREC_FIELD_STIME:
-          case RWREC_FIELD_STIME_MSEC:
             if (0 == regexec(&time_regex, cp, 0, NULL, 0)) {
                 convertOldTime(cp);
             }
@@ -1240,7 +1224,6 @@ processFields(
             break;
 
           case RWREC_FIELD_ELAPSED:
-          case RWREC_FIELD_ELAPSED_MSEC:
             {
                 double dur;
                 rv = skStringParseDouble(&dur, cp, 0.0,
@@ -1255,7 +1238,6 @@ processFields(
             break;
 
           case RWREC_FIELD_ETIME:
-          case RWREC_FIELD_ETIME_MSEC:
             if (0 == regexec(&time_regex, cp, 0, NULL, 0)) {
                 convertOldTime(cp);
             }
@@ -1279,21 +1261,19 @@ processFields(
             break;
 
           case RWREC_FIELD_INPUT:
-            rv = skStringParseUint32(&tmp32, cp, 0, UINT16_MAX);
+            rv = skStringParseUint32(&tmp32, cp, 0, 0);
             if (rv) {
-                /* FIXME: Clamp value to max instead of rejecting */
                 goto PARSE_ERROR;
             }
-            rwRecSetInput(&val->rec, (uint16_t)tmp32);
+            rwRecSetInput(&val->rec, tmp32);
             break;
 
           case RWREC_FIELD_OUTPUT:
-            rv = skStringParseUint32(&tmp32, cp, 0, UINT16_MAX);
+            rv = skStringParseUint32(&tmp32, cp, 0, 0);
             if (rv) {
-                /* FIXME: Clamp value to max instead of rejecting */
                 goto PARSE_ERROR;
             }
-            rwRecSetOutput(&val->rec, (uint16_t)tmp32);
+            rwRecSetOutput(&val->rec, tmp32);
             break;
 
           case RWREC_FIELD_NHIP:
@@ -1390,8 +1370,7 @@ processFields(
     return 0;
 
   PARSE_ERROR:
-    rwAsciiGetFieldName(field_name, sizeof(field_name),
-                        (rwrec_printable_fields_t)field_type[i]);
+    field_name = skStringMapGetFirstName(field_map, field_type[i]);
     if (checking_defaults) {
         skAppPrintErr("Error parsing default %s value '%s': %s",
                       field_name, cp, skStringParseStrerror(rv));
@@ -1566,13 +1545,13 @@ processFile(
 
 int main(int argc, char **argv)
 {
-    char *fname;
+    char fname[PATH_MAX];
     ssize_t rv = 0;
 
     appSetup(argc, argv);
 
     /* process the input file(s) */
-    while ((rv = skOptionsCtxNextArgument(optctx, &fname)) == 0) {
+    while ((rv = skOptionsCtxNextArgument(optctx, fname, sizeof(fname))) == 0){
         /* create an input stream and open text file */
         if ((rv = skStreamCreate(&curline->stream, SK_IO_READ,SK_CONTENT_TEXT))
             || (rv = skStreamBind(curline->stream, fname))

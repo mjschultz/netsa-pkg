@@ -4,7 +4,7 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in ../LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: ax_check_libsnappy.m4 275df62a2e41 2017-01-05 17:30:40Z mthomas $")
+dnl RCSIDENT("$SiLK: ax_check_libsnappy.m4 efd886457770 2017-06-21 18:43:23Z mthomas $")
 
 # ---------------------------------------------------------------------------
 # AX_CHECK_LIBSNAPPY

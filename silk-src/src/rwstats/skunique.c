@@ -15,10 +15,9 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skunique.c 9d04be8e27ff 2017-01-05 19:09:17Z mthomas $");
+RCSIDENT("$SiLK: skunique.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/hashlib.h>
-#include <silk/rwascii.h>
 #include <silk/rwrec.h>
 #include <silk/skheap.h>
 #include <silk/skstream.h>
@@ -104,7 +103,7 @@ RCSIDENT("$SiLK: skunique.c 9d04be8e27ff 2017-01-05 19:09:17Z mthomas $");
 #define FIELDLIST_MAX_NUM_FIELDS    (HASHLIB_MAX_KEY_WIDTH >> 1)
 
 #define COMPARE(cmp_a, cmp_b)                                   \
-    (((cmp_a) < (cmp_b)) ? -1 : (((cmp_a) > (cmp_b)) ? 1 : 0))
+    (((cmp_a) < (cmp_b)) ? -1 : ((cmp_a) > (cmp_b)))
 
 #define WARN_OVERFLOW(wo_max, wo_a, wo_b)                       \
     if (wo_max - wo_b >= wo_a) { /* ok */ } else {              \
@@ -113,12 +112,31 @@ RCSIDENT("$SiLK: skunique.c 9d04be8e27ff 2017-01-05 19:09:17Z mthomas $");
 
 #if !SKUNIQ_USE_MEMCPY
 
-#define CMP_INT_PTRS(cmp_out, cmp_type, cmp_a, cmp_b)                   \
+/*
+ *  CMP_NUM_PTRS(result, data_type, ptr_a, ptr_b)
+ *
+ *    Assume 'ptr_a' and 'ptr_b' are pointers to variables whose type
+ *    is some numeric type 'data_type'.  Set 'result' to -1,0,1 when
+ *    the value in 'ptr_a' is less than, equal to, or greater than the
+ *    value in 'ptr_b'.
+ */
+#define CMP_NUM_PTRS(cmp_out, cmp_type, cmp_a, cmp_b)                   \
     {                                                                   \
         cmp_out = COMPARE(*(cmp_type *)(cmp_a), *(cmp_type *)(cmp_b));  \
     }
 
-#define MERGE_INT_PTRS(mrg_max, mrg_type, mrg_a, mrg_b)                 \
+/*
+ *  MERGE_NUM_PTRS(max_value, data_type, ptr_a, ptr_b)
+ *
+ *    Assume 'ptr_a' and 'ptr_b' are pointers to variables whose type
+ *    is some numeric type 'data_type'.  Add the value in 'ptr_b' to
+ *    the value in 'ptr_a'.
+ *
+ *    If the result of the addition would be larger than 'max_value',
+ *    print an error message that the value has encountered an
+ *    overflow, but perform the addition anyway.
+ */
+#define MERGE_NUM_PTRS(mrg_max, mrg_type, mrg_a, mrg_b)                 \
     {                                                                   \
         WARN_OVERFLOW(mrg_max, *(mrg_type*)(mrg_a), *(mrg_type*)(mrg_b)); \
         *(mrg_type*)(mrg_a) += *(mrg_type*)(mrg_b);                     \
@@ -131,7 +149,7 @@ RCSIDENT("$SiLK: skunique.c 9d04be8e27ff 2017-01-05 19:09:17Z mthomas $");
 
 #else
 
-#define CMP_INT_PTRS(cmp_out, cmp_type, cmp_a, cmp_b)   \
+#define CMP_NUM_PTRS(cmp_out, cmp_type, cmp_a, cmp_b)   \
     {                                                   \
         cmp_type cip_val_a;                             \
         cmp_type cip_val_b;                             \
@@ -142,7 +160,7 @@ RCSIDENT("$SiLK: skunique.c 9d04be8e27ff 2017-01-05 19:09:17Z mthomas $");
         cmp_out = COMPARE(cip_val_a, cip_val_b);        \
     }
 
-#define MERGE_INT_PTRS(mrg_max, mrg_type, mrg_a, mrg_b) \
+#define MERGE_NUM_PTRS(mrg_max, mrg_type, mrg_a, mrg_b) \
     {                                                   \
         mrg_type mip_val_a;                             \
         mrg_type mip_val_b;                             \
@@ -166,12 +184,14 @@ RCSIDENT("$SiLK: skunique.c 9d04be8e27ff 2017-01-05 19:09:17Z mthomas $");
 
 #endif  /* SKUNIQ_USE_MEMCPY */
 
+
 /* typedef struct sk_fieldentry_st sk_fieldentry_t; */
 struct sk_fieldentry_st {
     sk_fieldlist_rec_to_bin_fn_t    rec_to_bin;
     sk_fieldlist_bin_cmp_fn_t       bin_compare;
     sk_fieldlist_rec_to_bin_fn_t    add_rec_to_bin;
     sk_fieldlist_bin_merge_fn_t     bin_merge;
+    sk_fieldlist_bin_get_data_fn_t  bin_get_data;
     sk_fieldlist_output_fn_t        bin_output;
 
     int                             id;
@@ -194,109 +214,6 @@ struct sk_fieldlist_st {
     size_t             num_fields;
     size_t             total_octets;
 };
-
-
-/*  compare arbitrary buffers of size len */
-int
-skFieldCompareMemcmp(
-    const void         *a,
-    const void         *b,
-    void               *len)
-{
-    /* FIXME.  size_t or unit32_t? */
-    return memcmp(a, b, *(size_t*)len);
-}
-
-
-/*  compare buffers containing uint8_t */
-int
-skFieldCompareUint8(
-    const void         *a,
-    const void         *b,
-    void        UNUSED(*ctx))
-{
-    return COMPARE(*(uint8_t*)a, *(uint8_t*)b);
-}
-
-/*  merge buffers containing uint8_t */
-void
-skFieldMergeUint8(
-    void               *a,
-    const void         *b,
-    void        UNUSED(*ctx))
-{
-    WARN_OVERFLOW(UINT8_MAX, *(uint8_t*)a, *(uint8_t*)b);
-    *(uint8_t*)a += *(uint8_t*)b;
-}
-
-
-/*  compare buffers containing uint16_t */
-int
-skFieldCompareUint16(
-    const void         *a,
-    const void         *b,
-    void        UNUSED(*ctx))
-{
-    int rv;
-    CMP_INT_PTRS(rv, uint16_t, a, b);
-    return rv;
-}
-
-/*  merge buffers containing uint16_t */
-void
-skFieldMergeUint16(
-    void               *a,
-    const void         *b,
-    void        UNUSED(*ctx))
-{
-    MERGE_INT_PTRS(UINT16_MAX, uint16_t, a, b);
-}
-
-
-/*  compare buffers containing uint32_t */
-int
-skFieldCompareUint32(
-    const void         *a,
-    const void         *b,
-    void        UNUSED(*ctx))
-{
-    int rv;
-    CMP_INT_PTRS(rv, uint32_t, a, b);
-    return rv;
-}
-
-/*  merge buffers containing uint32_t */
-void
-skFieldMergeUint32(
-    void               *a,
-    const void         *b,
-    void        UNUSED(*ctx))
-{
-    MERGE_INT_PTRS(UINT32_MAX, uint32_t, a, b);
-}
-
-
-/*  compare buffers containing uint64_t */
-int
-skFieldCompareUint64(
-    const void         *a,
-    const void         *b,
-    void        UNUSED(*ctx))
-{
-    int rv;
-    CMP_INT_PTRS(rv, uint64_t, a, b);
-    return rv;
-}
-
-/*  merge buffers containing uint64_t */
-void
-skFieldMergeUint64(
-    void               *a,
-    const void         *b,
-    void        UNUSED(*ctx))
-{
-    MERGE_INT_PTRS(UINT64_MAX, uint64_t, a, b);
-}
 
 
 
@@ -374,6 +291,7 @@ skFieldListAddField(
     field->bin_compare = regdata->bin_compare;
     field->add_rec_to_bin = regdata->add_rec_to_bin;
     field->bin_merge = regdata->bin_merge;
+    field->bin_get_data = regdata->bin_get_data;
     field->bin_output = regdata->bin_output;
     if (regdata->initial_value) {
         /* only create space for value if it contains non-NUL */
@@ -418,14 +336,11 @@ skFieldListAddKnownField(
       case SK_FIELD_SIPv4:
       case SK_FIELD_DIPv4:
       case SK_FIELD_NHIPv4:
-      case SK_FIELD_PACKETS:
-      case SK_FIELD_BYTES:
       case SK_FIELD_STARTTIME:
-      case SK_FIELD_STARTTIME_MSEC:
       case SK_FIELD_ELAPSED:
-      case SK_FIELD_ELAPSED_MSEC:
       case SK_FIELD_ENDTIME:
-      case SK_FIELD_ENDTIME_MSEC:
+      case SK_FIELD_INPUT:
+      case SK_FIELD_OUTPUT:
       case SK_FIELD_RECORDS:
       case SK_FIELD_SUM_ELAPSED:
       case SK_FIELD_MIN_STARTTIME:
@@ -436,8 +351,6 @@ skFieldListAddKnownField(
       case SK_FIELD_SPORT:
       case SK_FIELD_DPORT:
       case SK_FIELD_SID:
-      case SK_FIELD_INPUT:
-      case SK_FIELD_OUTPUT:
       case SK_FIELD_APPLICATION:
         bin_octets = 2;
         break;
@@ -454,6 +367,8 @@ skFieldListAddKnownField(
         bin_octets = 1;
         break;
 
+      case SK_FIELD_PACKETS:
+      case SK_FIELD_BYTES:
       case SK_FIELD_SUM_PACKETS:
       case SK_FIELD_SUM_BYTES:
         bin_octets = 8;
@@ -531,8 +446,8 @@ skFieldListGetBufferSize(
 
 
 /*  return number of fields in the field_list */
-size_t
-skFieldListGetFieldCount(
+static size_t
+fieldListGetFieldCount(
     const sk_fieldlist_t   *field_list)
 {
     assert(field_list);
@@ -575,85 +490,58 @@ skFieldListGetFieldCount(
 
 
 
-/*  get the binary value for each field in 'field_list' and sets that
+/*  get the binary value for each field in 'field_list' and set that
  *  value in 'all_fields_buffer' */
-void
-skFieldListRecToBinary(
+static void
+fieldListRecToBinary(
     const sk_fieldlist_t   *field_list,
     const rwRec            *rwrec,
     uint8_t                *bin_buffer)
 {
-    const rwRec *rec_ipv4 = NULL;
     const sk_fieldentry_t *f;
+    skipaddr_t ipaddr;
     size_t i;
-
-#if !SK_ENABLE_IPV6
-#define  FIELDLIST_RWREC_TO_IPV4                \
-    rec_ipv4 = rwrec
-#else
-
-    const rwRec *rec_ipv6 = NULL;
-    rwRec rec_tmp;
-
-    /* ensure we have an IPv4 record when extracting IPv4
-     * addresses. If record is IPv6 and cannot be converted to IPv4,
-     * use 0 as the IP address. */
-#define  FIELDLIST_RWREC_TO_IPV4                \
-    if (rec_ipv4) { /* no-op */ }               \
-    else if (!rwRecIsIPv6(rwrec)) {             \
-        rec_ipv4 = rwrec;                       \
-    } else {                                    \
-        rec_ipv4 = &rec_tmp;                    \
-        RWREC_COPY(&rec_tmp, rwrec);            \
-        if (rwRecConvertToIPv4(&rec_tmp)) {     \
-            RWREC_CLEAR(&rec_tmp);              \
-        }                                       \
-    }
-
-    /* ensure we have an IPv6 record when extracting IPv6 addresses */
-#define  FIELDLIST_RWREC_TO_IPV6                \
-    if (rec_ipv6) { /* no-op */ }               \
-    else if (rwRecIsIPv6(rwrec)) {              \
-        rec_ipv6 = rwrec;                       \
-    } else {                                    \
-        rec_ipv6 = &rec_tmp;                    \
-        RWREC_COPY(&rec_tmp, rwrec);            \
-        rwRecConvertToIPv6(&rec_tmp);           \
-    }
-#endif  /* #else of #if !SK_ENABLE_IPV6 */
-
 
     for (i = 0, f = field_list->fields; i < field_list->num_fields; ++i, ++f) {
         if (f->rec_to_bin) {
             f->rec_to_bin(rwrec, FIELD_PTR(bin_buffer, f), f->context);
         } else {
             switch (f->id) {
-#if SK_ENABLE_IPV6
               case SK_FIELD_SIPv6:
-                FIELDLIST_RWREC_TO_IPV6;
-                rwRecMemGetSIPv6(rec_ipv6, FIELD_PTR(bin_buffer, f));
+                rwRecMemGetSIP(rwrec, &ipaddr);
+                skipaddrGetAsV6(&ipaddr, FIELD_PTR(bin_buffer, f));
                 break;
               case SK_FIELD_DIPv6:
-                FIELDLIST_RWREC_TO_IPV6;
-                rwRecMemGetDIPv6(rec_ipv6, FIELD_PTR(bin_buffer, f));
+                rwRecMemGetDIP(rwrec, &ipaddr);
+                skipaddrGetAsV6(&ipaddr, FIELD_PTR(bin_buffer, f));
                 break;
               case SK_FIELD_NHIPv6:
-                FIELDLIST_RWREC_TO_IPV6;
-                rwRecMemGetNhIPv6(rec_ipv6, FIELD_PTR(bin_buffer, f));
+                rwRecMemGetNhIP(rwrec, &ipaddr);
+                skipaddrGetAsV6(&ipaddr, FIELD_PTR(bin_buffer, f));
                 break;
-#endif  /* SK_ENABLE_IPV6 */
-
               case SK_FIELD_SIPv4:
-                FIELDLIST_RWREC_TO_IPV4;
-                REC_TO_KEY_32(rwRecGetSIPv4(rec_ipv4), bin_buffer, f);
+                rwRecMemGetSIP(rwrec, &ipaddr);
+                if (skipaddrGetAsV4(
+                        &ipaddr, (uint32_t*)FIELD_PTR(bin_buffer, f)))
+                {
+                    memset(FIELD_PTR(bin_buffer, f), 0, sizeof(uint32_t));
+                }
                 break;
               case SK_FIELD_DIPv4:
-                FIELDLIST_RWREC_TO_IPV4;
-                REC_TO_KEY_32(rwRecGetDIPv4(rec_ipv4), bin_buffer, f);
+                rwRecMemGetDIP(rwrec, &ipaddr);
+                if (skipaddrGetAsV4(
+                        &ipaddr, (uint32_t*)FIELD_PTR(bin_buffer, f)))
+                {
+                    memset(FIELD_PTR(bin_buffer, f), 0, sizeof(uint32_t));
+                }
                 break;
               case SK_FIELD_NHIPv4:
-                FIELDLIST_RWREC_TO_IPV4;
-                REC_TO_KEY_32(rwRecGetNhIPv4(rec_ipv4), bin_buffer, f);
+                rwRecMemGetNhIP(rwrec, &ipaddr);
+                if (skipaddrGetAsV4(
+                        &ipaddr, (uint32_t*)FIELD_PTR(bin_buffer, f)))
+                {
+                    memset(FIELD_PTR(bin_buffer, f), 0, sizeof(uint32_t));
+                }
                 break;
               case SK_FIELD_SPORT:
                 REC_TO_KEY_16(rwRecGetSPort(rwrec), bin_buffer, f);
@@ -679,10 +567,10 @@ skFieldListRecToBinary(
                 REC_TO_KEY_08(rwRecGetProto(rwrec), bin_buffer, f);
                 break;
               case SK_FIELD_PACKETS:
-                REC_TO_KEY_32(rwRecGetPkts(rwrec), bin_buffer, f);
+                REC_TO_KEY_64(rwRecGetPkts(rwrec), bin_buffer, f);
                 break;
               case SK_FIELD_BYTES:
-                REC_TO_KEY_32(rwRecGetBytes(rwrec), bin_buffer, f);
+                REC_TO_KEY_64(rwRecGetBytes(rwrec), bin_buffer, f);
                 break;
               case SK_FIELD_FLAGS:
                 REC_TO_KEY_08(rwRecGetFlags(rwrec), bin_buffer, f);
@@ -691,10 +579,10 @@ skFieldListRecToBinary(
                 REC_TO_KEY_16(rwRecGetSensor(rwrec), bin_buffer, f);
                 break;
               case SK_FIELD_INPUT:
-                REC_TO_KEY_16(rwRecGetInput(rwrec), bin_buffer, f);
+                REC_TO_KEY_32(rwRecGetInput(rwrec), bin_buffer, f);
                 break;
               case SK_FIELD_OUTPUT:
-                REC_TO_KEY_16(rwRecGetOutput(rwrec), bin_buffer, f);
+                REC_TO_KEY_32(rwRecGetOutput(rwrec), bin_buffer, f);
                 break;
               case SK_FIELD_INIT_FLAGS:
                 REC_TO_KEY_08(rwRecGetInitFlags(rwrec), bin_buffer, f);
@@ -703,9 +591,7 @@ skFieldListRecToBinary(
                 REC_TO_KEY_08(rwRecGetRestFlags(rwrec), bin_buffer, f);
                 break;
               case SK_FIELD_TCP_STATE:
-                REC_TO_KEY_08(
-                    (rwRecGetTcpState(rwrec) & SK_TCPSTATE_ATTRIBUTE_MASK),
-                    bin_buffer, f);
+                REC_TO_KEY_08(rwRecGetTcpState(rwrec), bin_buffer, f);
                 break;
               case SK_FIELD_APPLICATION:
                 REC_TO_KEY_16(rwRecGetApplication(rwrec), bin_buffer, f);
@@ -715,15 +601,12 @@ skFieldListRecToBinary(
                 REC_TO_KEY_08(rwRecGetFlowType(rwrec), bin_buffer, f);
                 break;
               case SK_FIELD_STARTTIME:
-              case SK_FIELD_STARTTIME_MSEC:
                 REC_TO_KEY_32(rwRecGetStartSeconds(rwrec), bin_buffer, f);
                 break;
               case SK_FIELD_ELAPSED:
-              case SK_FIELD_ELAPSED_MSEC:
                 REC_TO_KEY_32(rwRecGetElapsedSeconds(rwrec), bin_buffer, f);
                 break;
               case SK_FIELD_ENDTIME:
-              case SK_FIELD_ENDTIME_MSEC:
                 REC_TO_KEY_32(rwRecGetEndSeconds(rwrec), bin_buffer, f);
                 break;
               default:
@@ -736,8 +619,8 @@ skFieldListRecToBinary(
 
 /*  add the binary value for each field in 'field_list' to the values
  *  in 'all_fields_buffer' */
-void
-skFieldListAddRecToBuffer(
+static void
+fieldListAddRecToBuffer(
     const sk_fieldlist_t   *field_list,
     const rwRec            *rwrec,
     uint8_t                *summed)
@@ -820,8 +703,8 @@ skFieldListAddRecToBuffer(
 
 /*  set 'all_fields_buffer' to the initial value for each field in the
  *  field list. */
-void
-skFieldListInitializeBuffer(
+static void
+fieldListInitializeBuffer(
     const sk_fieldlist_t   *field_list,
     uint8_t                *all_fields_buffer)
 {
@@ -847,8 +730,8 @@ skFieldListInitializeBuffer(
 
 
 /*  merge (e.g., add) two buffers for a field list */
-void
-skFieldListMergeBuffers(
+static void
+fieldListMergeBuffers(
     const sk_fieldlist_t   *field_list,
     uint8_t                *all_fields_buffer1,
     const uint8_t          *all_fields_buffer2)
@@ -870,14 +753,14 @@ skFieldListMergeBuffers(
             switch (f->id) {
               case SK_FIELD_RECORDS:
               case SK_FIELD_SUM_ELAPSED:
-                MERGE_INT_PTRS(UINT32_MAX, uint32_t,
+                MERGE_NUM_PTRS(UINT32_MAX, uint32_t,
                                FIELD_PTR(all_fields_buffer1, f),
                                FIELD_PTR(all_fields_buffer2, f));
                 break;
 
               case SK_FIELD_SUM_PACKETS:
               case SK_FIELD_SUM_BYTES:
-                MERGE_INT_PTRS(UINT64_MAX, uint64_t,
+                MERGE_NUM_PTRS(UINT64_MAX, uint64_t,
                                FIELD_PTR(all_fields_buffer1, f),
                                FIELD_PTR(all_fields_buffer2, f));
                 break;
@@ -907,7 +790,7 @@ skFieldListMergeBuffers(
                 memcpy(&val_b, FIELD_PTR(all_fields_buffer2, f), f->octets);
                 if (val_b < val_a) {
                     val_a = val_b;
-                    memcpy(FIELD_PTR(all_fields_buffer1, f), &val_a, f->octets);
+                    memcpy(FIELD_PTR(all_fields_buffer1,f), &val_a, f->octets);
                 }
                 break;
 
@@ -916,7 +799,7 @@ skFieldListMergeBuffers(
                 memcpy(&val_b, FIELD_PTR(all_fields_buffer2, f), f->octets);
                 if (val_b > val_a) {
                     val_a = val_b;
-                    memcpy(FIELD_PTR(all_fields_buffer1, f), &val_a, f->octets);
+                    memcpy(FIELD_PTR(all_fields_buffer1,f), &val_a, f->octets);
                 }
                 break;
 #endif  /* SKUNIQ_USE_MEMCPY */
@@ -931,8 +814,8 @@ skFieldListMergeBuffers(
 
 /*  compare two field buffers, return -1, 0, 1, if
  *  'all_fields_buffer1' is <, ==, > 'all_fields_buffer2' */
-int
-skFieldListCompareBuffers(
+static int
+fieldListCompareBuffers(
     const uint8_t          *all_fields_buffer1,
     const uint8_t          *all_fields_buffer2,
     const sk_fieldlist_t   *field_list)
@@ -962,29 +845,24 @@ skFieldListCompareBuffers(
               case SK_FIELD_SIPv4:
               case SK_FIELD_DIPv4:
               case SK_FIELD_NHIPv4:
-              case SK_FIELD_PACKETS:
-              case SK_FIELD_BYTES:
               case SK_FIELD_STARTTIME:
-              case SK_FIELD_STARTTIME_MSEC:
               case SK_FIELD_ELAPSED:
-              case SK_FIELD_ELAPSED_MSEC:
               case SK_FIELD_ENDTIME:
-              case SK_FIELD_ENDTIME_MSEC:
+              case SK_FIELD_INPUT:
+              case SK_FIELD_OUTPUT:
               case SK_FIELD_RECORDS:
               case SK_FIELD_SUM_ELAPSED:
               case SK_FIELD_MIN_STARTTIME:
               case SK_FIELD_MAX_ENDTIME:
-                CMP_INT_PTRS(rv, uint32_t, FIELD_PTR(all_fields_buffer1, f),
+                CMP_NUM_PTRS(rv, uint32_t, FIELD_PTR(all_fields_buffer1, f),
                              FIELD_PTR(all_fields_buffer2, f));
                 break;
 
               case SK_FIELD_SPORT:
               case SK_FIELD_DPORT:
               case SK_FIELD_SID:
-              case SK_FIELD_INPUT:
-              case SK_FIELD_OUTPUT:
               case SK_FIELD_APPLICATION:
-                CMP_INT_PTRS(rv, uint16_t, FIELD_PTR(all_fields_buffer1, f),
+                CMP_NUM_PTRS(rv, uint16_t, FIELD_PTR(all_fields_buffer1, f),
                              FIELD_PTR(all_fields_buffer2, f));
                 break;
 
@@ -1001,9 +879,11 @@ skFieldListCompareBuffers(
                              *(FIELD_PTR(all_fields_buffer2, f)));
                 break;
 
+              case SK_FIELD_PACKETS:
+              case SK_FIELD_BYTES:
               case SK_FIELD_SUM_PACKETS:
               case SK_FIELD_SUM_BYTES:
-                CMP_INT_PTRS(rv, uint64_t, FIELD_PTR(all_fields_buffer1, f),
+                CMP_NUM_PTRS(rv, uint64_t, FIELD_PTR(all_fields_buffer1, f),
                              FIELD_PTR(all_fields_buffer2, f));
                 break;
 
@@ -1020,88 +900,6 @@ skFieldListCompareBuffers(
 }
 
 
-/*  Call the comparison function for a single field entry, where
- *  'field_buffer1' and 'field_buffer2' are pointing at the values
- *  specific to that field. */
-int
-skFieldListEntryCompareBuffers(
-    const uint8_t          *field_buffer1,
-    const uint8_t          *field_buffer2,
-    const sk_fieldentry_t  *field_entry)
-{
-    int rv;
-
-    if (field_entry->bin_compare) {
-        rv = field_entry->bin_compare(field_buffer1, field_buffer2,
-                                      field_entry->context);
-    } else {
-        switch (field_entry->id) {
-          case SK_FIELD_SIPv6:
-          case SK_FIELD_DIPv6:
-          case SK_FIELD_NHIPv6:
-            rv = memcmp(field_buffer1, field_buffer2, field_entry->octets);
-            break;
-
-          case SK_FIELD_SIPv4:
-          case SK_FIELD_DIPv4:
-          case SK_FIELD_NHIPv4:
-          case SK_FIELD_PACKETS:
-          case SK_FIELD_BYTES:
-          case SK_FIELD_STARTTIME:
-          case SK_FIELD_STARTTIME_MSEC:
-          case SK_FIELD_ELAPSED:
-          case SK_FIELD_ELAPSED_MSEC:
-          case SK_FIELD_ENDTIME:
-          case SK_FIELD_ENDTIME_MSEC:
-          case SK_FIELD_RECORDS:
-          case SK_FIELD_SUM_ELAPSED:
-          case SK_FIELD_MIN_STARTTIME:
-          case SK_FIELD_MAX_ENDTIME:
-            CMP_INT_PTRS(rv, uint32_t, field_buffer1, field_buffer2);
-            break;
-
-          case SK_FIELD_SPORT:
-          case SK_FIELD_DPORT:
-          case SK_FIELD_SID:
-          case SK_FIELD_INPUT:
-          case SK_FIELD_OUTPUT:
-          case SK_FIELD_APPLICATION:
-            CMP_INT_PTRS(rv, uint16_t, field_buffer1, field_buffer2);
-            break;
-
-          case SK_FIELD_PROTO:
-          case SK_FIELD_FLAGS:
-          case SK_FIELD_INIT_FLAGS:
-          case SK_FIELD_REST_FLAGS:
-          case SK_FIELD_TCP_STATE:
-          case SK_FIELD_FTYPE_CLASS:
-          case SK_FIELD_FTYPE_TYPE:
-          case SK_FIELD_ICMP_TYPE:
-          case SK_FIELD_ICMP_CODE:
-            rv = COMPARE(*field_buffer1, *field_buffer2);
-            break;
-
-          case SK_FIELD_SUM_PACKETS:
-          case SK_FIELD_SUM_BYTES:
-            CMP_INT_PTRS(rv, uint64_t, field_buffer1, field_buffer2);
-            break;
-
-          default:
-            rv = memcmp(field_buffer1, field_buffer2, field_entry->octets);
-            break;
-        }
-    }
-    return rv;
-}
-
-
-/*  call the output callback for each field */
-void
-skFieldListOutputBuffer(
-    const sk_fieldlist_t   *field_list,
-    const uint8_t          *all_fields_buffer);
-
-
 /* Do we still need the field iterators (as public)? */
 
 /*  bind an iterator to a field list */
@@ -1115,15 +913,6 @@ skFieldListIteratorBind(
 
     memset(iter, 0, sizeof(sk_fieldlist_iterator_t));
     iter->field_list = field_list;
-    iter->field_idx = 0;
-}
-
-/*  reset the fieldlist iterator */
-void
-skFieldListIteratorReset(
-    sk_fieldlist_iterator_t    *iter)
-{
-    assert(iter);
     iter->field_idx = 0;
 }
 
@@ -1299,39 +1088,6 @@ hashset_insert(
     }
     return rv;
 }
-
-
-#if 0                           /* currently unused; #if 0 to avoid warning */
-/*
- *  status = hashset_lookup(hashset, key);
- *
- *    Return OK if 'key' is set in 'hashset', or ERR_NOTFOUND if it is
- *    not.
- */
-static int
-hashset_lookup(
-    const HashSet      *set_ptr,
-    const uint8_t      *key_ptr)
-{
-    uint8_t tmp_key[HASHLIB_MAX_KEY_WIDTH];
-    uint8_t *value_ptr;
-    uint8_t bit;
-    int rv;
-
-    /* make a new key, masking off the lowest three bits */
-    memcpy(tmp_key, key_ptr, set_ptr->key_width);
-    tmp_key[set_ptr->mod_key] &= 0xF8;
-
-    /* determine which bit to check/set */
-    bit = 1 << (key_ptr[set_ptr->mod_key] & 0x7);
-
-    rv = hashlib_lookup(set_ptr->table, tmp_key, &value_ptr);
-    if (rv == OK && (*value_ptr & bit)) {
-        return OK;
-    }
-    return ERR_NOTFOUND;
-}
-#endif  /* 0 */
 
 
 /*
@@ -1767,9 +1523,6 @@ static struct allowed_fieldid_st {
     {SK_FIELD_APPLICATION,      KEY_DISTINCT},
     {SK_FIELD_FTYPE_CLASS,      KEY_DISTINCT},
     {SK_FIELD_FTYPE_TYPE,       KEY_DISTINCT},
-    {SK_FIELD_STARTTIME_MSEC,   KEY_DISTINCT},
-    {SK_FIELD_ENDTIME_MSEC,     KEY_DISTINCT},
-    {SK_FIELD_ELAPSED_MSEC,     KEY_DISTINCT},
     {SK_FIELD_ICMP_TYPE,        KEY_DISTINCT},
     {SK_FIELD_ICMP_CODE,        KEY_DISTINCT},
     {SK_FIELD_SIPv6,            KEY_DISTINCT},
@@ -1786,11 +1539,12 @@ static struct allowed_fieldid_st {
 
 
 /*
- *  status = uniqCheckFields(uniq_fields);
+ *  status = uniqCheckFields(uniq_fields, err_fn);
  *
  *    Verify that the fields for a unique object make sense.  The
  *    fields are given in 'uniq_fields'.  Return 0 if the fields are
- *    valid.  Return -1 if they are invalid and print an error.
+ *    valid.  Return -1 if they are invalid and print an error using
+ *    the 'err_fn' if it is non-NULL.
  *
  *    For the fields to make sense, there must be more or more key
  *    fields and at least one distinct field or one aggregate value
@@ -1857,7 +1611,7 @@ uniqCheckFields(
         }
     }
     SAFE_SET(field_info->key_num_fields,
-             skFieldListGetFieldCount(field_info->key_fields));
+             fieldListGetFieldCount(field_info->key_fields));
     SAFE_SET(field_info->key_octets,
              skFieldListGetBufferSize(field_info->key_fields));
     if (field_info->key_num_fields == 0 || field_info->key_octets == 0) {
@@ -1889,7 +1643,7 @@ uniqCheckFields(
         }
 
         SAFE_SET(field_info->value_num_fields,
-                 skFieldListGetFieldCount(field_info->value_fields));
+                 fieldListGetFieldCount(field_info->value_fields));
         SAFE_SET(field_info->value_octets,
                  skFieldListGetBufferSize(field_info->value_fields));
     }
@@ -1942,7 +1696,7 @@ uniqCheckFields(
         }
 
         SAFE_SET(field_info->distinct_num_fields,
-                 skFieldListGetFieldCount(field_info->distinct_fields));
+                 fieldListGetFieldCount(field_info->distinct_fields));
         SAFE_SET(field_info->distinct_octets,
                  skFieldListGetBufferSize(field_info->distinct_fields));
     }
@@ -1957,7 +1711,6 @@ uniqCheckFields(
 
     return 0;
 }
-
 
 
 /* **************************************************************** */
@@ -2071,11 +1824,7 @@ uniqDistinctAllocMerging(
     distinct_value_t *dist;
     uint8_t total_octets = 0;
 
-    assert(field_info);
-    assert(new_distincts);
-
     if (0 == field_info->distinct_num_fields) {
-        *new_distincts = NULL;
         return 0;
     }
 
@@ -2084,7 +1833,6 @@ uniqDistinctAllocMerging(
     if (NULL == distincts) {
         TRACEMSG(("%s:%d: Error allocating distinct field_info",
                   __FILE__, __LINE__));
-        *new_distincts = NULL;
         return -1;
     }
 
@@ -2132,15 +1880,10 @@ uniqDistinctAlloc(
     distinct_value_t *distincts;
     distinct_value_t *dist;
 
-    assert(field_info);
-    assert(new_distincts);
-
     if (0 == field_info->distinct_num_fields) {
-        *new_distincts = NULL;
         return 0;
     }
     if (uniqDistinctAllocMerging(field_info, &distincts)) {
-        *new_distincts = NULL;
         return -1;
     }
 
@@ -2180,7 +1923,6 @@ uniqDistinctAlloc(
 
   ERROR:
     uniqDistinctFree(field_info, distincts);
-    *new_distincts = NULL;
     return -1;
 }
 
@@ -2557,7 +2299,7 @@ uniqTempReadHelper(
     } else if (rv > 0) {
         TRACEMSG(("%s:%d: Failed to read %" SK_PRIuZ " bytes:"
                   " Short read of %" SK_PRIdZ " on '%s'",
-                  file_name, file_line, size, rv, skStreamGetPathname(stream)));
+                  file_name, file_line, size, rv,skStreamGetPathname(stream)));
     } else {
         char errbuf[2 * PATH_MAX];
 
@@ -2602,7 +2344,7 @@ uniqTempWriteHelper(
     if (rv >= 0) {
         TRACEMSG(("%s:%d: Failed to write %" SK_PRIuZ " bytes:"
                   " Short write of %" SK_PRIdZ " on '%s'",
-                  file_name, file_line, size, rv, skStreamGetPathname(stream)));
+                  file_name, file_line, size, rv,skStreamGetPathname(stream)));
     } else {
         TRACEMSG(("%s:%d: Failed to write %" SK_PRIuZ " bytes: %s",
                   file_name, file_line, size, errbuf));
@@ -2610,7 +2352,7 @@ uniqTempWriteHelper(
 #endif
 
     if (rv >= 0) {
-        snprintf(errbuf, sizeof(errbuf),
+        snprintf(errbuf,sizeof(errbuf),
                  "Short write of %" SK_PRIdZ " bytes to '%s'",
                  rv, skStreamGetPathname(stream));
     }
@@ -2799,6 +2541,32 @@ uniqueCreateHashTable(
         skAppPrintErr("Error allocating hash table");
         return -1;
     }
+
+#if 0
+    /* sk_fieldlist_iterator_t fl_iter; */
+    /* sk_fieldentry_t *field; */
+
+    /* /\* Determine whether any fields have a bin_get_data callback.  If */
+    /*  * any field does, set up the hashlib to use the data when */
+    /*  * computing the hash. *\/ */
+    /* skFieldListIteratorBind(uniq->fi.key_fields, &fl_iter); */
+    /* while (NULL != (field = skFieldListIteratorNext(&fl_iter))) { */
+    /*     // FIXME: Should not be reaching directory into the field. */
+
+    /*     // FIXME: This code is very limited.  If any fields actually */
+    /*     // have variable-sized data (unlike the country codes where */
+    /*     // there is vardata but all sizes are exactly the same), this */
+    /*     // code only works when there is a single vardata field and it */
+    /*     // is the final field. */
+    /*     if (field->bin_get_data) { */
+    /*         hashlib_set_get_key_data( */
+    /*             uniq->ht, &uniqueHashlibCallbackGetKeyData, */
+    /*             uniq->fi.key_fields); */
+    /*         break; */
+    /*     } */
+    /* } */
+#endif  /* 0 */
+
     return 0;
 }
 
@@ -2820,9 +2588,6 @@ uniqueDestroyHashTable(
     if (NULL == uniq->ht) {
         return;
     }
-#if 0 && defined(HASHLIB_RECORD_STATS)
-    hashlib_print_stats(stderr, uniq->ht);
-#endif
     if (0 == uniq->fi.distinct_num_fields) {
         hashlib_free_table(uniq->ht);
         uniq->ht = NULL;
@@ -2866,11 +2631,11 @@ uniqueDumpHashToTemp(
     assert(uniq->temp_fp);
     assert(0 == uniq->fi.distinct_num_fields || uniq->dist_fp);
 
-    /* sort the hash entries using skFieldListCompareBuffers.  To sort
+    /* sort the hash entries using fieldListCompareBuffers.  To sort
      * using memcmp(), we would need to ensure we use memcmp() when
      * reading/merging the values back out of the temp files. */
     hashlib_sort_entries_usercmp(uniq->ht,
-                                 COMP_FUNC_CAST(skFieldListCompareBuffers),
+                                 COMP_FUNC_CAST(fieldListCompareBuffers),
                                  (void*)uniq->fi.key_fields);
 
     /* create an iterator for the hash table */
@@ -2890,9 +2655,9 @@ uniqueDumpHashToTemp(
                                     hash_key, hash_val, NULL))
             {
                 /* error writing, errno may or may not be set */
-                skAppPrintSyserror(
-                    "Error writing key/value pair to temporary file '%s'",
-                    UNIQUE_TMPNAME_OUT(uniq));
+                skAppPrintErr(("Error writing key/value pair"
+                              " to temporary file '%s': %s"),
+                             UNIQUE_TMPNAME_OUT(uniq), strerror(errno));
                 return -1;
             }
         }
@@ -2906,14 +2671,14 @@ uniqueDumpHashToTemp(
         while (hashlib_iterate(uniq->ht, &ithash, &hash_key, &hash_val)
                != ERR_NOMOREENTRIES)
         {
-            memcpy(&distincts, hash_val + uniq->fi.value_octets, sizeof(void*));
+            memcpy(&distincts, hash_val + uniq->fi.value_octets,sizeof(void*));
             if (uniqTempWriteTriple(&uniq->fi, uniq->temp_fp, uniq->dist_fp,
                                     hash_key, hash_val, distincts))
             {
                 /* error writing, errno may or may not be set */
-                skAppPrintSyserror(("Error writing key/value/distinct triple"
-                                    " to temporary file '%s'"),
-                                   UNIQUE_TMPNAME_OUT(uniq));
+                skAppPrintErr(("Error writing key/value/distinct triple"
+                              " to temporary file '%s': %s"),
+                             UNIQUE_TMPNAME_OUT(uniq), strerror(errno));
                 return -1;
             }
         }
@@ -2939,14 +2704,16 @@ uniqueDumpHashToTemp(
     /* open a new temporary file */
     uniq->temp_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
     if (NULL == uniq->temp_fp) {
-        skAppPrintSyserror("Error creating temporary file");
+        skAppPrintErr("Error creating temporary file: %s",
+                     strerror(errno));
         return -1;
     }
     uniq->temp_idx = uniq->max_temp_idx;
     if (uniq->fi.distinct_num_fields) {
         uniq->dist_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
         if (NULL == uniq->dist_fp) {
-            skAppPrintSyserror("Error creating temporary file");
+            skAppPrintErr("Error creating temporary file: %s",
+                         strerror(errno));
             return -1;
         }
     }
@@ -3027,7 +2794,7 @@ skUniqueSetSortedOutput(
 
     if (uniq->ready_for_input) {
         skAppPrintErr("May not call skUniqueSetSortedOutput"
-                      " after calling skUniquePrepareForInput");
+                     " after calling skUniquePrepareForInput");
         return -1;
     }
     uniq->sort_output = 1;
@@ -3045,7 +2812,7 @@ skUniqueSetTempDirectory(
 
     if (uniq->ready_for_input) {
         skAppPrintErr("May not call skUniqueSetTempDirectory"
-                      " after calling skUniquePrepareForInput");
+                     " after calling skUniquePrepareForInput");
         return;
     }
 
@@ -3071,7 +2838,7 @@ skUniqueSetFields(
 
     if (uniq->ready_for_input) {
         skAppPrintErr("May not call skUniqueSetFields"
-                      " after calling skUniquePrepareForInput");
+                     " after calling skUniquePrepareForInput");
         return -1;
     }
 
@@ -3095,7 +2862,6 @@ skUniquePrepareForInput(
     if (uniq->ready_for_input) {
         return 0;
     }
-
     if (uniqCheckFields(&uniq->fi)) {
         return -1;
     }
@@ -3112,7 +2878,7 @@ skUniquePrepareForInput(
 
     /* initialize temp file context on the unique object */
     if (skTempFileInitialize(&uniq->tmpctx, uniq->temp_dir,
-                             NULL, &skAppPrintErr))
+                             NULL, skAppPrintErr))
     {
         return -1;
     }
@@ -3141,7 +2907,7 @@ skUniquePrepareForInput(
 int
 skUniqueAddRecord(
     sk_unique_t        *uniq,
-    const rwRec        *rwrec)
+    rwRec              *rwrec)
 {
     distinct_value_t *distincts = NULL;
     uint8_t field_buf[HASHLIB_MAX_KEY_WIDTH];
@@ -3160,7 +2926,7 @@ skUniqueAddRecord(
     }
 
     for (;;) {
-        skFieldListRecToBinary(uniq->fi.key_fields, rwrec, field_buf);
+        fieldListRecToBinary(uniq->fi.key_fields, rwrec, field_buf);
 
         /* the 'insert' will set 'hash_val' to the memory to use to
          * store the values. either fresh memory or the existing
@@ -3170,10 +2936,10 @@ skUniqueAddRecord(
           case OK:
             /* new key; don't increment value until we are sure we can
              * allocate the space for the distinct fields */
-            skFieldListInitializeBuffer(uniq->fi.value_fields, hash_val);
+            fieldListInitializeBuffer(uniq->fi.value_fields, hash_val);
             if (uniq->fi.distinct_num_fields) {
-                skFieldListRecToBinary(uniq->fi.distinct_fields, rwrec,
-                                       field_buf);
+                fieldListRecToBinary(uniq->fi.distinct_fields, rwrec,
+                                     field_buf);
                 if (uniqDistinctAlloc(&uniq->fi, &distincts)) {
                     memory_error |= 2;
                     break;
@@ -3185,7 +2951,7 @@ skUniqueAddRecord(
                 memcpy(hash_val + uniq->fi.value_octets, &distincts,
                        sizeof(void*));
             }
-            skFieldListAddRecToBuffer(uniq->fi.value_fields, rwrec, hash_val);
+            fieldListAddRecToBuffer(uniq->fi.value_fields, rwrec, hash_val);
             return 0;
 
           case OK_DUPLICATE:
@@ -3194,14 +2960,14 @@ skUniqueAddRecord(
             if (uniq->fi.distinct_num_fields) {
                 memcpy(&distincts, hash_val + uniq->fi.value_octets,
                        sizeof(void*));
-                skFieldListRecToBinary(uniq->fi.distinct_fields, rwrec,
-                                       field_buf);
+                fieldListRecToBinary(uniq->fi.distinct_fields, rwrec,
+                                     field_buf);
                 if (uniqDistinctIncrement(&uniq->fi, distincts, field_buf)) {
                     memory_error |= 8;
                     break;
                 }
             }
-            skFieldListAddRecToBuffer(uniq->fi.value_fields, rwrec, hash_val);
+            fieldListAddRecToBuffer(uniq->fi.value_fields, rwrec, hash_val);
             return 0;
 
           case ERR_OUTOFMEMORY:
@@ -3267,7 +3033,7 @@ skUniquePrepareForOutput(
     }
     if (!uniq->ready_for_input) {
         skAppPrintErr("May not call skUniquePrepareForOutput"
-                      " before calling skUniquePrepareForInput");
+                     " before calling skUniquePrepareForInput");
         return -1;
     }
 
@@ -3277,9 +3043,9 @@ skUniquePrepareForOutput(
             return -1;
         }
     } else if (uniq->sort_output) {
-        /* need to sort using the skFieldListCompareBuffers function */
+        /* need to sort using the fieldListCompareBuffers function */
         hashlib_sort_entries_usercmp(uniq->ht,
-                                     COMP_FUNC_CAST(skFieldListCompareBuffers),
+                                     COMP_FUNC_CAST(fieldListCompareBuffers),
                                      (void*)uniq->fi.key_fields);
     }
 
@@ -3691,7 +3457,8 @@ uniqIterTempfilesReset(
     /* Read the first key from each temp file into the 'key[]' array
      * on the iterator; add the file's index to the heap */
     for (j = 0; j < iter->open_count; j += step) {
-        if (uniqTempRead(iter->fps[j], iter->key[j], iter->uniq->fi.key_octets))
+        if (uniqTempRead(
+                iter->fps[j], iter->key[j], iter->uniq->fi.key_octets))
         {
             skHeapInsert(iter->heap, &j);
         } else if (skStreamGetLastErrno(iter->fps[j])) {
@@ -3789,7 +3556,7 @@ uniqIterTempfilesNext(
     skHeapExtractTop(iter->heap, NULL);
 
     while (skHeapPeekTop(iter->heap, (skheapnode_t*)&top_heap) == SKHEAP_OK
-           && 0 == (skFieldListCompareBuffers(
+           && 0 == (fieldListCompareBuffers(
                         cached_key, iter->key[*top_heap],
                         iter->uniq->fi.key_fields)))
     {
@@ -3820,8 +3587,8 @@ uniqIterTempfilesNext(
             /* keys within a file should always be sorted; duplicate
              * keys may appear if the distinct data structure ran out
              * of memory */
-            assert(skFieldListCompareBuffers(cached_key, iter->key[lowest],
-                                             iter->uniq->fi.key_fields) <= 0);
+            assert(fieldListCompareBuffers(cached_key, iter->key[lowest],
+                                           iter->uniq->fi.key_fields) <= 0);
         } else {
             /* read failed and no more data for this file */
             UNIQUE_DEBUG(iter->uniq,
@@ -4003,7 +3770,7 @@ uniqIterTempfilesNodistMergeValues(
 
     memcpy(cached_key, iter->key[lowest], iter->uniq->fi.key_octets);
 
-    skFieldListInitializeBuffer(iter->uniq->fi.value_fields, merged_values);
+    fieldListInitializeBuffer(iter->uniq->fi.value_fields, merged_values);
 
     /* repeat as long as the key of the item at top of the heap
      * matches the cached_key */
@@ -4018,10 +3785,10 @@ uniqIterTempfilesNodistMergeValues(
                           UNIQUE_TMPNUM_READ(iter, lowest)));
             skAppPrintErr(
                 "Cannot read value field from temporary file: %s",
-                (last_errno ? strerror(last_errno) : "EOF"));
+                (last_errno ? strerror(last_errno) :"EOF"));
             return -1;
         }
-        skFieldListMergeBuffers(
+        fieldListMergeBuffers(
             iter->uniq->fi.value_fields, merged_values, buf);
 
         /* replace the key for the value we just processed */
@@ -4033,8 +3800,8 @@ uniqIterTempfilesNodistMergeValues(
             skHeapReplaceTop(iter->heap, &lowest, NULL);
             /* keys within a file should always be unique and sorted
              * when no distinct fields are present */
-            assert(skFieldListCompareBuffers(cached_key, iter->key[lowest],
-                                             iter->uniq->fi.key_fields) < 0);
+            assert(fieldListCompareBuffers(cached_key, iter->key[lowest],
+                                           iter->uniq->fi.key_fields) < 0);
         } else {
             /* read failed or no more data for this file; remove it
              * from the heap */
@@ -4055,7 +3822,7 @@ uniqIterTempfilesNodistMergeValues(
         skHeapPeekTop(iter->heap, (skheapnode_t*)&top_heap);
         lowest = *top_heap;
 
-    } while (skFieldListCompareBuffers(
+    } while (fieldListCompareBuffers(
                  cached_key, iter->key[lowest], iter->uniq->fi.key_fields)==0);
 
     return 0;
@@ -4138,9 +3905,9 @@ uniqIterTempfilesHeapKeysCmp(
 {
     uniqiter_tempfiles_t *iter = (uniqiter_tempfiles_t*)v_iter;
 
-    return skFieldListCompareBuffers(iter->key[*(uint16_t*)a],
-                                     iter->key[*(uint16_t*)b],
-                                     iter->uniq->fi.key_fields);
+    return fieldListCompareBuffers(iter->key[*(uint16_t*)a],
+                                   iter->key[*(uint16_t*)b],
+                                   iter->uniq->fi.key_fields);
 }
 
 /*
@@ -4244,7 +4011,8 @@ uniqIterTempfilesNodistMergeFiles(
                 iter->fps[lowest], rv, errbuf, sizeof(errbuf));
             TRACEMSG(("%s:%d: Failed to read %" SK_PRIuZ " bytes: %s",
                       __FILE__, __LINE__, sizeof(buf), errbuf));
-            skAppPrintErr("Cannot read from temporary file: %s", errbuf);
+            skAppPrintErr("Cannot read from temporary file: %s",
+                          errbuf);
             return -1;
         }
         UNIQUE_DEBUG(iter->uniq,
@@ -4302,9 +4070,9 @@ uniqIterTempfilesMergeOne(
         }
         if (!write_to_temp) {
             /* store value in the 'merged_values[]' buffer */
-            skFieldListInitializeBuffer(
+            fieldListInitializeBuffer(
                 iter->uniq->fi.value_fields, merged_values);
-            skFieldListMergeBuffers(
+            fieldListMergeBuffers(
                 iter->uniq->fi.value_fields, merged_values, buf);
         } else {
             uniqTempWrite(iter->uniq->temp_fp, buf,
@@ -4321,7 +4089,7 @@ uniqIterTempfilesMergeOne(
             last_errno = skStreamGetLastErrno(iter->fps[fps_index]);
             skAppPrintErr(
                 "Cannot read distinct count from temporary file: %s",
-                (last_errno ? strerror(last_errno) : "EOF"));
+                (last_errno ? strerror(errno) : "EOF"));
             return -1;
         }
 
@@ -4348,7 +4116,7 @@ uniqIterTempfilesMergeOne(
             while (to_read) {
                 exp_len = ((to_read < sizeof(buf)) ? to_read : sizeof(buf));
                 if (!uniqTempRead(iter->fps[fps_index + 1], buf, exp_len)) {
-                    last_errno = skStreamGetLastErrno(iter->fps[fps_index + 1]);
+                    last_errno =skStreamGetLastErrno(iter->fps[fps_index + 1]);
                     skAppPrintErr(
                         "Cannot read distinct values from temporary file: %s",
                         (last_errno ? strerror(last_errno) : "EOF"));
@@ -4405,7 +4173,7 @@ uniqIterTempfilesMergeValuesDist(
          * the value and add it to the merged_values buffer. */
 
         /* initialize buffer */
-        skFieldListInitializeBuffer(iter->uniq->fi.value_fields,merged_values);
+        fieldListInitializeBuffer(iter->uniq->fi.value_fields,merged_values);
 
         /* read and merge all values */
         for (j = 0; j < file_ids_len; ++j) {
@@ -4423,7 +4191,7 @@ uniqIterTempfilesMergeValuesDist(
                     (last_errno ? strerror(last_errno) : "EOF"));
                 return -1;
             }
-            skFieldListMergeBuffers(
+            fieldListMergeBuffers(
                 iter->uniq->fi.value_fields, merged_values, buf);
         }
 
@@ -4467,7 +4235,7 @@ uniqIterTempfilesMergeValuesDist(
                                   iter->distinct_value[fps_index],
                                   dist->dv_octets))
                 {
-                    last_errno = skStreamGetLastErrno(iter->fps[fps_index + 1]);
+                    last_errno =skStreamGetLastErrno(iter->fps[fps_index + 1]);
                     UNIQUE_DEBUG(iter->uniq,
                                  ((SKUNIQUE_DEBUG_ENVAR
                                    ": Cannot read from temporary file #%u"),
@@ -4615,7 +4383,7 @@ uniqIterTempfilesMergeFiles(
         skHeapExtractTop(iter->heap, NULL);
 
         while (skHeapPeekTop(iter->heap, (skheapnode_t*)&top_heap) == SKHEAP_OK
-               && 0 == (skFieldListCompareBuffers(
+               && 0 == (fieldListCompareBuffers(
                             cached_key, iter->key[*top_heap],
                             iter->uniq->fi.key_fields)))
         {
@@ -4648,8 +4416,8 @@ uniqIterTempfilesMergeFiles(
                 /* keys within a file should always be sorted;
                  * duplicate keys may appear if the distinct data
                  * structure ran out of memory */
-                assert(skFieldListCompareBuffers(cached_key, iter->key[lowest],
-                                                 iter->uniq->fi.key_fields)<=0);
+                assert(fieldListCompareBuffers(cached_key, iter->key[lowest],
+                                               iter->uniq->fi.key_fields)<=0);
             } else {
                 UNIQUE_DEBUG(iter->uniq,
                              ((SKUNIQUE_DEBUG_ENVAR
@@ -4782,9 +4550,10 @@ uniqIterTempfilesOpenAll(
                                  strerror(errno)));
                     break;
                 } else {
-                    skAppPrintSyserror(
-                        "Error opening existing temporary file '%s'",
-                        skTempFileGetName(iter->uniq->tmpctx, j));
+                    skAppPrintErr(
+                        "Error opening existing temporary file '%s': %s",
+                        skTempFileGetName(iter->uniq->tmpctx, j),
+                        strerror(errno));
                     return -1;
                 }
             }
@@ -4930,43 +4699,6 @@ skUniqueIteratorCreate(
 }
 
 
-#if 0
-/*
- *    Destroy the interator.
- *
- *    Implemented as a macro in skunique.h that invokes the function
- *    pointer specified in the free_fn member of 'iter'.
- */
-void
-skUniqueIteratorDestroy(
-    sk_unique_iterator_t  **iter);
-
-/*
- *    Get the next set of values for the keys, values, and distinct
- *    counts.
- *
- *    Implemented as a macro in skunique.h that invokes the function
- *    pointer specified in the next_fn member of 'iter'.
- */
-int
-skUniqueIteratorNext(
-    sk_unique_iterator_t   *iter,
-    uint8_t               **key_fields_buffer,
-    uint8_t               **distinct_fields_buffer,
-    uint8_t               **agg_value_fields_buffer);
-
-/*
- *    Reset the iterator so it can be used again.
- *
- *    Implemented as a macro in skunique.h that invokes the function
- *    pointer specified in the rest_fn member of 'iter'.
- */
-int
-skUniqueIteratorReset(
-    sk_unique_iterator_t   *iter);
-#endif  /* 0 */
-
-
 
 /* **************************************************************** */
 
@@ -4980,11 +4712,10 @@ skUniqueIteratorReset(
 struct sk_sort_unique_st {
     sk_uniq_field_info_t    fi;
 
-    int                   (*post_open_fn)(skstream_t *);
     int                   (*read_rec_fn)(skstream_t *, rwRec *);
 
-    /* vector containing the names of files to process */
-    sk_vector_t            *files;
+    /* flow iterator providing access to the files to process */
+    sk_flow_iter_t         *flowiter;
 
     /* where to write temporary files */
     char                   *temp_dir;
@@ -5034,9 +4765,6 @@ struct sk_sort_unique_st {
      * file that is being merged */
     int                     temp_idx_base;
 
-    /* current position in the 'files' vector */
-    int                     files_position;
-
     /* current distinct field; used by comparison function for the
      * 'dist_heap' member */
     const distinct_value_t *cur_dist;
@@ -5072,60 +4800,56 @@ struct sk_sort_unique_st {
 static int
 sortuniqOpenNextInput(
     sk_sort_unique_t   *uniq,
-    skstream_t        **out_stream)
+    skstream_t        **stream)
 {
-    skstream_t *stream = NULL;
-    const char *filename;
-    int rv;
+    ssize_t rv;
 
-    do {
-        rv = skVectorGetValue(&filename, uniq->files,
-                              uniq->files_position);
-        if (rv != 0) {
-            /* no more files */
-            return 1;
-        }
-        ++uniq->files_position;
+    rv = sk_flow_iter_get_next_stream(uniq->flowiter, stream);
+    if (SKSTREAM_OK == rv) {
+        return 0;
+    }
+    if (SKSTREAM_ERR_EOF == rv) {
+        /* no more inputs */
+        return 1;
+    }
+    if (errno == EMFILE || errno == ENOMEM) {
+        rv = -2;
+        /* decrement counter to try this file next time */
+        UNIQUE_DEBUG(uniq,
+                     (SKUNIQUE_DEBUG_ENVAR ": Unable to open file: %s",
+                      strerror(errno)));
+    } else {
+        /* skStreamPrintLastErr(stream, rv, skAppPrintErr); */
+        rv = -1;
+    }
+    return rv;
+}
 
-        errno = 0;
-        rv = skStreamOpenSilkFlow(&stream, filename, SK_IO_READ);
-        if (rv) {
-            if (errno == EMFILE || errno == ENOMEM) {
-                rv = -2;
-                /* decrement counter to try this file next time */
-                --uniq->files_position;
-                UNIQUE_DEBUG(uniq,
-                             (SKUNIQUE_DEBUG_ENVAR ": Unable to open '%s': %s",
-                              filename, strerror(errno)));
-            } else {
-                skStreamPrintLastErr(stream, rv, skAppPrintErr);
-                rv = -1;
-            }
-            skStreamDestroy(&stream);
-            return rv;
-        }
 
-        /* call the user's PostOpenFn if they provided one. */
-        if (uniq->post_open_fn) {
-            rv = uniq->post_open_fn(stream);
-            if (rv == 1 || rv == -1) {
-                UNIQUE_DEBUG(uniq,
-                             ((SKUNIQUE_DEBUG_ENVAR
-                               ": Caller's post_open_fn returned %d"), rv));
-                skStreamDestroy(&stream);
-                return rv;
-            }
-            if (rv != 0) {
-                UNIQUE_DEBUG(uniq,
-                             ((SKUNIQUE_DEBUG_ENVAR
-                               ": Caller's post_open_fn returned %d"), rv));
-                skStreamDestroy(&stream);
-            }
-        }
-    } while (0 != rv);
+/*
+ *    If file cannot be opened due to no file handles, return an error
+ *    code that causes the flow iterator to retry the stream.  If
+ *    there is a different error, report the error and return that
+ *    same error code.
+ *
+ *    This is a callback function for the flow iterator when reading
+ *    presorted input.
+ */
+static ssize_t
+sortuniqOpenErrorCallback(
+    sk_flow_iter_t     *f_iter,
+    skstream_t         *stream,
+    ssize_t             err_code,
+    void               *cb_data)
+{
+    (void)f_iter;
+    (void)cb_data;
 
-    *out_stream = stream;
-    return 0;
+    if (EMFILE == errno || ENOMEM == errno) {
+        return SKSTREAM_ERR_NOT_OPEN;
+    }
+    skStreamPrintLastErr(stream, err_code, &skAppPrintErr);
+    return err_code;
 }
 
 
@@ -5153,8 +4877,7 @@ sortuniqFillRecordAndKey(
         return 0;
     }
 
-    skFieldListRecToBinary(uniq->fi.key_fields, &uniq->rec[idx],
-                           uniq->key[idx]);
+    fieldListRecToBinary(uniq->fi.key_fields, &uniq->rec[idx], uniq->key[idx]);
     return 1;
 }
 
@@ -5182,9 +4905,9 @@ sortuniqHeapKeysCmp(
 {
     sk_sort_unique_t *uniq = (sk_sort_unique_t*)v_uniq;
 
-    return skFieldListCompareBuffers(uniq->key[*(uint16_t*)a],
-                                     uniq->key[*(uint16_t*)b],
-                                     uniq->fi.key_fields);
+    return fieldListCompareBuffers(uniq->key[*(uint16_t*)a],
+                                   uniq->key[*(uint16_t*)b],
+                                   uniq->fi.key_fields);
 }
 
 /*
@@ -5263,14 +4986,14 @@ sortuniqReadSilkNodist(
     do {
         /* cache this low key and initialze values and distincts */
         memcpy(cached_key, uniq->key[lowest], uniq->fi.key_octets);
-        skFieldListInitializeBuffer(uniq->fi.value_fields, merged_values);
+        fieldListInitializeBuffer(uniq->fi.value_fields, merged_values);
 
         /* loop over all files until we get a key that does not
          * match the cached_key */
         do {
             /* add the values and distincts */
-            skFieldListAddRecToBuffer(
-                uniq->fi.value_fields, &uniq->rec[lowest], merged_values);
+            fieldListAddRecToBuffer(uniq->fi.value_fields,&uniq->rec[lowest],
+                                    merged_values);
 
             /* replace the record we just processed */
             if (!sortuniqFillRecordAndKey(uniq, lowest)) {
@@ -5287,7 +5010,7 @@ sortuniqReadSilkNodist(
                 if (0 == heap_count) {
                     break;
                 }
-            } else if (skFieldListCompareBuffers(
+            } else if (fieldListCompareBuffers(
                            cached_key, uniq->key[lowest], uniq->fi.key_fields)
                        == 0)
             {
@@ -5309,7 +5032,7 @@ sortuniqReadSilkNodist(
              * matches the cached_key */
             skHeapPeekTop(uniq->heap, (skheapnode_t*)&top_heap);
             lowest = *top_heap;
-        } while (skFieldListCompareBuffers(
+        } while (fieldListCompareBuffers(
                      cached_key, uniq->key[lowest], uniq->fi.key_fields)
                  == 0);
 
@@ -5327,9 +5050,9 @@ sortuniqReadSilkNodist(
                        &uniq->fi, uniq->temp_fp, NULL,
                        cached_key, merged_values, uniq->distincts))
         {
-            skAppPrintSyserror(
-                "Error writing merged keys/values to temporary file '%s'",
-                UNIQUE_TMPNAME_OUT(uniq));
+            skAppPrintErr(("Error writing merged keys/values"
+                           " to temporary file '%s': %s"),
+                          UNIQUE_TMPNAME_OUT(uniq), strerror(errno));
             return -1;
         }
     } while (heap_count > 0);
@@ -5387,7 +5110,7 @@ sortuniqReadSilkTotemp(
         memcpy(cached_key, uniq->key[lowest], uniq->fi.key_octets);
 
         /* reset the values and distincts */
-        skFieldListInitializeBuffer(uniq->fi.value_fields, merged_values);
+        fieldListInitializeBuffer(uniq->fi.value_fields, merged_values);
         if (uniqDistinctReset(&uniq->fi, uniq->distincts)) {
             skAppPrintErr("Error allocating table for distinct values");
             return -1;
@@ -5397,7 +5120,7 @@ sortuniqReadSilkTotemp(
          * not match the cached_key */
         do {
             /* add the distinct value to the data structure */
-            skFieldListRecToBinary(
+            fieldListRecToBinary(
                 uniq->fi.distinct_fields, &uniq->rec[lowest], distinct_buffer);
             if (uniqDistinctIncrement(
                     &uniq->fi, uniq->distincts, distinct_buffer))
@@ -5408,23 +5131,23 @@ sortuniqReadSilkTotemp(
                         &uniq->fi, uniq->temp_fp, uniq->dist_fp,
                         cached_key, merged_values, uniq->distincts))
                 {
-                    skAppPrintSyserror(
-                        ("Error writing merged keys/values/distincts"
-                         " to temporary file '%s'"),
-                        UNIQUE_TMPNAME_OUT(uniq));
+                    skAppPrintErr(("Error writing merged keys/values/distincts"
+                                   " to temporary file '%s': %s"),
+                                  UNIQUE_TMPNAME_OUT(uniq), strerror(errno));
                     return -1;
                 }
-                skFieldListInitializeBuffer(
+                fieldListInitializeBuffer(
                     uniq->fi.value_fields, merged_values);
                 if (uniqDistinctReset(&uniq->fi, uniq->distincts)) {
-                    skAppPrintErr("Error allocating table for distinct values");
+                    skAppPrintErr(
+                        "Error allocating table for distinct values");
                     return -1;
                 }
             }
 
             /* add the value */
-            skFieldListAddRecToBuffer(
-                uniq->fi.value_fields, &uniq->rec[lowest], merged_values);
+            fieldListAddRecToBuffer(uniq->fi.value_fields,&uniq->rec[lowest],
+                                    merged_values);
 
             /* replace the record we just processed */
             if (!sortuniqFillRecordAndKey(uniq, lowest)) {
@@ -5440,7 +5163,7 @@ sortuniqReadSilkTotemp(
                 if (0 == heap_count) {
                     break;
                 }
-            } else if (skFieldListCompareBuffers(
+            } else if (fieldListCompareBuffers(
                            cached_key, uniq->key[lowest], uniq->fi.key_fields)
                        == 0)
             {
@@ -5463,7 +5186,7 @@ sortuniqReadSilkTotemp(
              * key matches the cached_key */
             skHeapPeekTop(uniq->heap, (skheapnode_t*)&top_heap);
             lowest = *top_heap;
-        } while (skFieldListCompareBuffers(
+        } while (fieldListCompareBuffers(
                      cached_key, uniq->key[lowest], uniq->fi.key_fields)
                  == 0);
 
@@ -5472,9 +5195,9 @@ sortuniqReadSilkTotemp(
                 &uniq->fi, uniq->temp_fp, uniq->dist_fp,
                 cached_key, merged_values, uniq->distincts))
         {
-            skAppPrintSyserror(("Error writing merged  keys/values/distincts"
-                                " to temporary file '%s'"),
-                               UNIQUE_TMPNAME_OUT(uniq));
+            skAppPrintErr(("Error writing merged  keys/values/distincts"
+                           " to temporary file '%s': %s"),
+                          UNIQUE_TMPNAME_OUT(uniq), strerror(errno));
             return -1;
         }
     } while (heap_count > 0);
@@ -5533,8 +5256,8 @@ sortuniqMergeSingleFile(
             return -1;
         }
         if (output_fn) {
-            skFieldListInitializeBuffer(uniq->fi.value_fields, merged_values);
-            skFieldListMergeBuffers(uniq->fi.value_fields, merged_values, buf);
+            fieldListInitializeBuffer(uniq->fi.value_fields, merged_values);
+            fieldListMergeBuffers(uniq->fi.value_fields, merged_values, buf);
         } else {
             uniqTempWrite(uniq->temp_fp, buf, uniq->fi.value_octets);
         }
@@ -5576,7 +5299,7 @@ sortuniqMergeSingleFile(
             while (to_read) {
                 exp_len = ((to_read < sizeof(buf)) ? to_read : sizeof(buf));
                 if (!uniqTempRead(uniq->fps[fps_index + 1], buf, exp_len)) {
-                    last_errno = skStreamGetLastErrno(uniq->fps[fps_index + 1]);
+                    last_errno =skStreamGetLastErrno(uniq->fps[fps_index + 1]);
                     skAppPrintErr(
                         "Cannot read distinct values from temporary file: %s",
                         (last_errno ? strerror(last_errno) : "EOF"));
@@ -5658,12 +5381,13 @@ sortuniqMergeValuesDist(
          * the value and add it to the merged_values buffer. */
 
         /* initialize the merge_values buffer */
-        skFieldListInitializeBuffer(uniq->fi.value_fields, merged_values);
+        fieldListInitializeBuffer(uniq->fi.value_fields, merged_values);
 
         /* read and merge all values */
         for (j = 0; j < file_ids_len; ++j) {
             fps_index = file_ids[j];
-            if (!uniqTempRead(uniq->fps[fps_index], buf, uniq->fi.value_octets))
+            if (!uniqTempRead(
+                    uniq->fps[fps_index], buf, uniq->fi.value_octets))
             {
                 last_errno = skStreamGetLastErrno(uniq->fps[fps_index]);
                 UNIQUE_DEBUG(uniq,
@@ -5675,7 +5399,7 @@ sortuniqMergeValuesDist(
                     (last_errno ? strerror(last_errno) : "EOF"));
                 return -1;
             }
-            skFieldListMergeBuffers(
+            fieldListMergeBuffers(
                 uniq->fi.value_fields, merged_values, buf);
         }
 
@@ -5718,7 +5442,7 @@ sortuniqMergeValuesDist(
                                   uniq->distinct_value[fps_index],
                                   dist->dv_octets))
                 {
-                    last_errno = skStreamGetLastErrno(uniq->fps[fps_index + 1]);
+                    last_errno =skStreamGetLastErrno(uniq->fps[fps_index + 1]);
                     UNIQUE_DEBUG(uniq,
                                  ((SKUNIQUE_DEBUG_ENVAR
                                    ": Cannot read from temporary file #%u"),
@@ -5754,7 +5478,7 @@ sortuniqMergeValuesDist(
 
             if (!output_fn) {
                 /* write the distinct value */
-                uniqTempWrite(uniq->dist_fp, &lowest_distinct, dist->dv_octets);
+                uniqTempWrite(uniq->dist_fp, &lowest_distinct,dist->dv_octets);
             }
 
             /* ignore this lowest_distinct value in all other files */
@@ -5786,7 +5510,7 @@ sortuniqMergeValuesDist(
                     --num_distinct[lowest];
                     /* distinct values in each file must be sorted and
                      * unique */
-                    assert(memcmp(lowest_distinct, uniq->distinct_value[lowest],
+                    assert(memcmp(lowest_distinct,uniq->distinct_value[lowest],
                                   dist->dv_octets) < 0);
                 }
 
@@ -5875,7 +5599,7 @@ sortuniqMergeFilesDist(
 
         while (skHeapPeekTop(uniq->heap, (skheapnode_t*)&top_heap)
                == SKHEAP_OK
-               && 0 == (skFieldListCompareBuffers(
+               && 0 == (fieldListCompareBuffers(
                             cached_key, uniq->key[*top_heap],
                             uniq->fi.key_fields)))
         {
@@ -5980,7 +5704,7 @@ sortuniqMergeFilesNodist(
     do {
         /* cache this low key, initialize the values */
         memcpy(cached_key, uniq->key[lowest], uniq->fi.key_octets);
-        skFieldListInitializeBuffer(uniq->fi.value_fields, merged_values);
+        fieldListInitializeBuffer(uniq->fi.value_fields, merged_values);
 
         /* loop over all files until we get a key that does not
          * match the cached_key */
@@ -5991,12 +5715,11 @@ sortuniqMergeFilesNodist(
                 UNIQUE_DEBUG(uniq, ((SKUNIQUE_DEBUG_ENVAR
                                      ": Cannot read from temporary file #%u"),
                                     UNIQUE_TMPNUM_READ(uniq, lowest)));
-                skAppPrintErr(
-                    "Cannot read value field from temporary file: %s",
-                    (last_errno ? strerror(last_errno) : "EOF"));
+                skAppPrintErr("Cannot read value field from temporary file: %s",
+                              (last_errno ? strerror(last_errno) : "EOF"));
                 return -1;
             }
-            skFieldListMergeBuffers(
+            fieldListMergeBuffers(
                 uniq->fi.value_fields, merged_values, buf);
 
             /* replace the key for the value we just processed */
@@ -6024,7 +5747,7 @@ sortuniqMergeFilesNodist(
             skHeapPeekTop(uniq->heap, (skheapnode_t*)&top_heap);
             lowest = *top_heap;
 
-        } while (skFieldListCompareBuffers(
+        } while (fieldListCompareBuffers(
                      cached_key, uniq->key[lowest], uniq->fi.key_fields)
                  == 0);
 
@@ -6042,9 +5765,9 @@ sortuniqMergeFilesNodist(
                        &uniq->fi, uniq->temp_fp, NULL,
                        cached_key, merged_values, uniq->distincts))
         {
-            skAppPrintSyserror(
-                "Error writing merged key/values to temporary file '%s'",
-                UNIQUE_TMPNAME_OUT(uniq));
+            skAppPrintErr(
+                "Error writing merged key/values to temporary file '%s': %s",
+                UNIQUE_TMPNAME_OUT(uniq), strerror(errno));
             return -1;
         }
     } while (heap_count > 0);
@@ -6070,13 +5793,8 @@ skPresortedUniqueCreate(
     if (NULL == u) {
         return -1;
     }
-    u->files = skVectorNew(sizeof(char*));
-    if (NULL == u->files) {
-        free(u);
-        return -1;
-    }
 
-    u->read_rec_fn = &skStreamReadRecord;
+    u->read_rec_fn = NULL;
 
     env_value = getenv(SKUNIQUE_DEBUG_ENVAR);
     if (env_value && 0 == skStringParseUint32(&debug_lvl, env_value, 1, 0)) {
@@ -6097,8 +5815,6 @@ skPresortedUniqueDestroy(
     sk_sort_unique_t  **uniq)
 {
     sk_sort_unique_t *u;
-    char *filename;
-    size_t i;
 
     if (NULL == uniq || NULL == *uniq) {
         return;
@@ -6118,12 +5834,6 @@ skPresortedUniqueDestroy(
     skTempFileTeardown(&u->tmpctx);
     if (u->temp_dir) {
         free(u->temp_dir);
-    }
-    if (u->files) {
-        for (i = 0; 0 == skVectorGetValue(&filename, u->files, i); ++i) {
-            free(filename);
-        }
-        skVectorDestroy(u->files);
     }
 
     if (u->rec) {
@@ -6149,34 +5859,6 @@ skPresortedUniqueDestroy(
 }
 
 
-/*  tell the unique object to process the records in 'filename' */
-int
-skPresortedUniqueAddInputFile(
-    sk_sort_unique_t   *uniq,
-    const char         *filename)
-{
-    char *copy;
-
-    assert(uniq);
-    assert(filename);
-
-    if (uniq->processing) {
-        return -1;
-    }
-
-    copy = strdup(filename);
-    if (NULL == copy) {
-        return -1;
-    }
-    if (skVectorAppendValue(uniq->files, &copy)) {
-        free(copy);
-        return -1;
-    }
-
-    return 0;
-}
-
-
 /*  set the temporary directory used by 'uniq' to 'temp_dir' */
 void
 skPresortedUniqueSetTempDirectory(
@@ -6193,12 +5875,10 @@ skPresortedUniqueSetTempDirectory(
 }
 
 
-/*  set a function that gets called when the 'uniq' object opens a
- *  file that was specified in skPresortedUniqueAddInputFile(). */
 int
-skPresortedUniqueSetPostOpenFn(
+skPresortedUniqueSetFlowIterator(
     sk_sort_unique_t   *uniq,
-    int               (*stream_post_open)(skstream_t *))
+    sk_flow_iter_t     *flowiter)
 {
     assert(uniq);
 
@@ -6206,7 +5886,7 @@ skPresortedUniqueSetPostOpenFn(
         return -1;
     }
 
-    uniq->post_open_fn = stream_post_open;
+    uniq->flowiter = flowiter;
     return 0;
 }
 
@@ -6223,11 +5903,7 @@ skPresortedUniqueSetReadFn(
         return -1;
     }
 
-    if (NULL == stream_read) {
-        uniq->read_rec_fn = &skStreamReadRecord;
-    } else {
-        uniq->read_rec_fn = stream_read;
-    }
+    uniq->read_rec_fn = stream_read;
     return 0;
 }
 
@@ -6245,7 +5921,6 @@ skPresortedUniqueSetFields(
     if (uniq->processing) {
         return -1;
     }
-
     memset(&uniq->fi, 0, sizeof(sk_uniq_field_info_t));
     uniq->fi.key_fields = key_fields;
     uniq->fi.value_fields = agg_value_fields;
@@ -6286,11 +5961,20 @@ skPresortedUniqueProcess(
         return -1;
     }
 
-    if (skTempFileInitialize(&uniq->tmpctx, uniq->temp_dir,
-                             NULL, skAppPrintErr))
+    if (NULL == uniq->read_rec_fn) {
+        return -1;
+    }
+
+    if (skTempFileInitialize(
+            &uniq->tmpctx, uniq->temp_dir, NULL, skAppPrintErr))
     {
         return -1;
     }
+
+    /* set a callback that is used when an error occurs that checks
+     * whether we are out of file handles. */
+    sk_flow_iter_set_stream_error_cb(uniq->flowiter,SK_FLOW_ITER_CB_ERROR_OPEN,
+                                     sortuniqOpenErrorCallback, uniq);
 
     /* set up distinct fields */
     if (uniq->fi.distinct_num_fields) {
@@ -6318,7 +6002,7 @@ skPresortedUniqueProcess(
          * files. */
         uniq->temp_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
         if (uniq->temp_fp == NULL) {
-            skAppPrintSyserror("Error creating intermediate temporary file:");
+            skAppPrintSyserror("Error creating intermediate temporary file");
             return -1;
         }
         uniq->temp_idx = uniq->max_temp_idx;
@@ -6405,6 +6089,7 @@ skPresortedUniqueProcess(
                  i < MAX_MERGE_FILES;
                  ++i, n += uniq->fi.key_octets)
             {
+                rwRecInitialize(&uniq->rec[i], NULL);
                 uniq->key[i] = n;
             }
             uniq->heap = skHeapCreate2(sortuniqHeapKeysCmp, MAX_MERGE_FILES,
@@ -6450,7 +6135,8 @@ skPresortedUniqueProcess(
 
         /* Close the input files that we processed this time. */
         for (i = 0; i < open_count; ++i) {
-            skStreamDestroy(&uniq->fps[i]);
+            sk_flow_iter_close_stream(uniq->flowiter, uniq->fps[i]);
+            uniq->fps[i] = NULL;
         }
 
         /* Close the intermediate temp file. */
@@ -6521,8 +6207,7 @@ skPresortedUniqueProcess(
          * reading the data. */
         uniq->temp_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
         if (uniq->temp_fp == NULL) {
-            skAppPrintSyserror(
-                "Error creating intermediate temporary file");
+            skAppPrintSyserror("Error creating intermediate temporary file");
             return -1;
         }
         uniq->temp_idx = uniq->max_temp_idx;
@@ -6556,9 +6241,9 @@ skPresortedUniqueProcess(
                                   strerror(errno)));
                     break;
                 } else {
-                    skAppPrintSyserror(
-                        "Error opening existing temporary file '%s'",
-                        skTempFileGetName(uniq->tmpctx, i));
+                    skAppPrintErr(
+                        "Error opening existing temporary file '%s': %s",
+                        skTempFileGetName(uniq->tmpctx, i), strerror(errno));
                     return -1;
                 }
             }

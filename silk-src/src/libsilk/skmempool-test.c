@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcs_SKMEMPOOL_TEST, "$SiLK: skmempool-test.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcs_SKMEMPOOL_TEST, "$SiLK: skmempool-test.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 /* Note: including C file here */
 #include <skmempool.c>

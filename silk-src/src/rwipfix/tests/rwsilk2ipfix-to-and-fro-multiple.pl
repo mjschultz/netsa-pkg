@@ -11,7 +11,6 @@ my $rwcat = check_silk_app('rwcat');
 my %file;
 $file{empty} = get_data_or_exit77('empty');
 $file{data} = get_data_or_exit77('data');
-check_features(qw(ipfix));
 my $cmd = "$rwsilk2ipfix $file{empty} $file{data} $file{empty} | $rwipfix2silk | $rwcat --compression-method=none --byte-order=little --ipv4-output";
 my $md5 = "393789257810fde6263977f90d106343";
 

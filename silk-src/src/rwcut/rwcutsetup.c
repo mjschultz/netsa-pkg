@@ -15,14 +15,16 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcutsetup.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
+RCSIDENT("$SiLK: rwcutsetup.c d1637517606d 2017-06-23 16:51:31Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skcountry.h>
 #include <silk/skdllist.h>
 #include <silk/skplugin.h>
 #include <silk/skprefixmap.h>
+#include <silk/sksidecar.h>
 #include <silk/skstringmap.h>
+#include <silk/skvector.h>
 #include "rwcut.h"
 
 
@@ -34,12 +36,22 @@ RCSIDENT("$SiLK: rwcutsetup.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
 /* The last field printed by default. */
 #define RWCUT_LAST_DEFAULT_FIELD  RWREC_FIELD_SID
 
+/* A stringmap entry whose ID has this bit set is from a plugin */
+#define PLUGIN_FIELD_BIT    0x80000000
+
+/* A stringmap entry whose ID has this bit set is from a sidecar field
+ * that appears in the input files */
+#define SIDECAR_FIELD_BIT   0x40000000
+
+/* A stringmap entry whose ID has this bit set is from a sidecar field
+ * defined by a Lus function */
+#define SC_LUA_FIELD_BIT    0x20000000
+
 /* User options */
 typedef struct cut_opt_flags_st {
     unsigned no_titles          :1;
     unsigned no_final_delimiter :1;
     unsigned no_columns         :1;
-    unsigned icmp_type_and_code :1;
     unsigned integer_sensors    :1;
     unsigned integer_tcp_flags  :1;
     unsigned dry_run            :1;
@@ -48,13 +60,33 @@ typedef struct cut_opt_flags_st {
 
 /* LOCAL VARIABLES */
 
+/* Lua initialization code; this is binary code compiled from
+ * rwcut.lua */
+static const uint8_t rwcut_lua[] = {
+#include "rwcut.i"
+};
+
+
+/* Lua references into the Lua registry of various functions defined
+ * in rwcut.lua */
+static struct reg_ref_st {
+    int     load_lua_file;
+    int     activate_field;
+    int     get_sidecar;
+    int     count_functions;
+    int     apply_sidecar;
+    int     invoke_teardown;
+} reg_ref = {
+    LUA_NOREF, LUA_NOREF, LUA_NOREF, LUA_NOREF, LUA_NOREF, LUA_NOREF
+};
+
 /* start and end record number */
 static uint64_t start_rec_num = 0;
 static uint64_t end_rec_num = 0;
-/* num_recs and tail_recs are globals */
+/* the variables num_recs, skip_recs, and tail_recs are globals */
 
-/* The output stream: where to print the records */
-static sk_fileptr_t output;
+/* whether to print the fields help */
+static int help_fields = 0;
 
 /* name of program to run to page output */
 static char *pager = NULL;
@@ -68,16 +100,11 @@ static char delimiter;
 /* how to print IP addresses */
 static uint32_t ip_format = SKIPADDR_CANONICAL;
 
-/* flags when registering --ip-format */
-static const unsigned int ip_format_register_flags =
-    (SK_OPTION_IP_FORMAT_INTEGER_IPS | SK_OPTION_IP_FORMAT_ZERO_PAD_IPS);
-
 /* how to print timestamps */
 static uint32_t time_flags = 0;
 
 /* flags when registering --timestamp-format */
-static const uint32_t time_register_flags =
-    (SK_OPTION_TIMESTAMP_OPTION_EPOCH | SK_OPTION_TIMESTAMP_OPTION_LEGACY);
+static const uint32_t time_register_flags = 0;
 
 /* the text the user entered for the --fields switch */
 static char *fields_arg = NULL;
@@ -87,6 +114,12 @@ static int all_fields = 0;
 
 /* available fields */
 static sk_stringmap_t *key_field_map;
+
+/* sidecar holding all defined sidecar elements */
+static sk_sidecar_t *sidecar;
+
+/* number of sidecar functions defined in --lua-file */
+static long num_sidecar_adds = 0;
 
 /* fields that get defined just like plugins */
 static const struct app_static_plugins_st {
@@ -107,6 +140,12 @@ static const char *app_plugin_names[] = {
     NULL /* sentinel */
 };
 
+/* Plug-ins that are in use */
+static sk_vector_t *active_plugins = NULL;
+
+/* Number of active plugins */
+static size_t num_plugins = 0;
+
 
 /* OPTIONS SETUP */
 
@@ -115,13 +154,13 @@ typedef enum {
     OPT_HELP_FIELDS,
     OPT_FIELDS,
     OPT_ALL_FIELDS,
+    OPT_LUA_FILE,
     OPT_NUM_RECS,
     OPT_START_REC_NUM,
     OPT_END_REC_NUM,
     OPT_TAIL_RECS,
     OPT_DRY_RUN,
     OPT_PLUGIN,
-    OPT_ICMP_TYPE_AND_CODE,
     OPT_INTEGER_SENSORS,
     OPT_INTEGER_TCP_FLAGS,
     OPT_NO_TITLES,
@@ -137,13 +176,13 @@ static struct option appOptions[] = {
     {"help-fields",         NO_ARG,       0, OPT_HELP_FIELDS},
     {"fields",              REQUIRED_ARG, 0, OPT_FIELDS},
     {"all-fields",          NO_ARG,       0, OPT_ALL_FIELDS},
+    {"lua-file",            REQUIRED_ARG, 0, OPT_LUA_FILE},
     {"num-recs",            REQUIRED_ARG, 0, OPT_NUM_RECS},
     {"start-rec-num",       REQUIRED_ARG, 0, OPT_START_REC_NUM},
     {"end-rec-num",         REQUIRED_ARG, 0, OPT_END_REC_NUM},
     {"tail-recs",           REQUIRED_ARG, 0, OPT_TAIL_RECS},
     {"dry-run",             NO_ARG,       0, OPT_DRY_RUN},
     {"plugin",              REQUIRED_ARG, 0, OPT_PLUGIN},
-    {"icmp-type-and-code",  NO_ARG,       0, OPT_ICMP_TYPE_AND_CODE},
     {"integer-sensors",     NO_ARG,       0, OPT_INTEGER_SENSORS},
     {"integer-tcp-flags",   NO_ARG,       0, OPT_INTEGER_TCP_FLAGS},
     {"no-titles",           NO_ARG,       0, OPT_NO_TITLES},
@@ -159,7 +198,10 @@ static struct option appOptions[] = {
 static const char *appHelp[] = {
     "Describe each field and exit. Def. no",
     NULL, /* generated dynamically */
-    "Print all known fields to the output",
+    ("Print all known fields to the output. Conflicts with\n"
+     "\tthe --fields switch"),
+    ("Load the named Lua file during set-up.  Switch may be\n"
+     "\trepeated to load multiple files. Def. None"),
     "Print no more than this number of records. Def. Unlimited",
     ("Start printing with this record number, where 1 is the\n"
      "\tfirst record.  Def. 1.  Conflicts with --tail-recs"),
@@ -170,8 +212,6 @@ static const char *appHelp[] = {
     "Parse options and print column titles only. Def. No",
     ("Load given plug-in to add fields. Switch may be repeated to\n"
      "\tload multiple plug-ins. Def. None"),
-    ("Print the ICMP type/code in the sPort/dPort fields.\n"
-     "\tDef. No. DEPRECATED. Use the explicit iType and iCode fields instead"),
     "Print sensor as an integer. Def. Sensor name",
     "Print TCP Flags as an integer. Def. No",
     "Do not print column headers. Def. Print titles.",
@@ -190,6 +230,7 @@ static const char *appHelp[] = {
 static int  appOptionsHandler(clientData cData, int opt_index, char *opt_arg);
 static void usageFields(FILE *fh);
 static void helpFields(FILE *fh);
+static lua_State *appLuaCreateState(void);
 static int  createStringmaps(void);
 static int  selectFieldsDefault(void);
 static int  selectFieldsAll(void);
@@ -232,11 +273,9 @@ appUsageLong(
             /* Dynamically build the help */
             usageFields(fh);
             break;
-          case OPT_ICMP_TYPE_AND_CODE:
+          case OPT_PLUGIN:
             /* Simple static help text from the appHelp array */
             fprintf(fh, "%s\n", appHelp[i]);
-            /* Print the IPv6 usage next */
-            skIPv6PolicyUsage(fh);
             /* Print the timestamp format usage */
             skOptionsTimestampFormatUsage(fh);
             /* Print the IP address format usage */
@@ -268,6 +307,7 @@ appTeardown(
     void)
 {
     static uint8_t teardownFlag = 0;
+    int rv;
 
     if (teardownFlag) {
         return;
@@ -286,8 +326,10 @@ appTeardown(
         skFileptrClose(&output, &skAppPrintErr);
     }
 
+    sk_vector_destroy(active_plugins);
+
     /* destroy output */
-    rwAsciiStreamDestroy(&ascii_str);
+    sk_formatter_destroy(fmtr);
 
     /* destroy field map */
     if (key_field_map != NULL) {
@@ -295,11 +337,30 @@ appTeardown(
         key_field_map = NULL;
     }
 
-    if (tail_buf) {
-        free(tail_buf);
-        tail_buf = NULL;
+    if (L) {
+        /* invoke the teardown functions registered in Lua */
+        lua_rawgeti(L, LUA_REGISTRYINDEX, reg_ref.invoke_teardown);
+        rv = lua_pcall(L, 0, 1, 0);
+        if (rv != LUA_OK) {
+            skAppPrintErr("%s", lua_tostring(L, -1));
+            lua_pop(L, 1);
+        } else if (lua_type(L, -1) == LUA_TNIL) {
+            lua_pop(L, 1);
+        } else {
+            /* FIXME: go through entries in list and print any error
+             * messages */
+            lua_pop(L, 1);
+        }
     }
 
+    sk_sidecar_destroy(&sidecar);
+
+    free(tail_buf);
+    tail_buf = NULL;
+
+    sk_lua_closestate(L);
+
+    sk_flow_iter_destroy(&flowiter);
     skOptionsCtxDestroy(&optctx);
     skAppUnregister();
 }
@@ -344,7 +405,7 @@ appSetup(
 
     optctx_flags = (SK_OPTIONS_CTX_INPUT_SILK_FLOW | SK_OPTIONS_CTX_ALLOW_STDIN
                     | SK_OPTIONS_CTX_XARGS | SK_OPTIONS_CTX_PRINT_FILENAMES
-                    | SK_OPTIONS_CTX_COPY_INPUT);
+                    | SK_OPTIONS_CTX_COPY_INPUT | SK_OPTIONS_CTX_IPV6_POLICY);
 
     /* Initialize plugin library */
     skPluginSetup(1, SKPLUGIN_APP_CUT);
@@ -355,8 +416,7 @@ appSetup(
         || skOptionsRegister(appOptions, &appOptionsHandler, NULL)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE)
         || skOptionsTimestampFormatRegister(&time_flags, time_register_flags)
-        || skOptionsIPFormatRegister(&ip_format, ip_format_register_flags)
-        || skIPv6PolicyOptionsRegister(&ipv6_policy))
+        || skOptionsIPFormatRegister(&ip_format))
     {
         skAppPrintErr("Unable to register options");
         exit(EXIT_FAILURE);
@@ -378,10 +438,22 @@ appSetup(
         skPluginLoadPlugin(app_plugin_names[j], 0);
     }
 
+    L = appLuaCreateState();
+    sk_sidecar_create(&sidecar);
+
     /* parse options */
     rv = skOptionsCtxOptionsParse(optctx, argc, argv);
     if (rv < 0) {
         skAppUsage();         /* never returns */
+    }
+
+    /* create flow iterator to read the records from the stream */
+    flowiter = skOptionsCtxCreateFlowIterator(optctx);
+    sk_flow_iter_set_max_readers(flowiter, 1);
+
+    if (help_fields) {
+        helpFields(USAGE_FH);
+        exit(EXIT_SUCCESS);
     }
 
     /* Not having site config is allowed */
@@ -392,11 +464,11 @@ appSetup(
         exit(EXIT_FAILURE);
     }
 
-    /* Create the ascii stream */
-    if (rwAsciiStreamCreate(&ascii_str)) {
-        skAppPrintErr("Unable to create ascii stream");
-        exit(EXIT_FAILURE);
-    }
+    /* Create the formatter */
+    fmtr = sk_formatter_create();
+
+    /* Create vector to hold list of plugins */
+    active_plugins = sk_vector_create(sizeof(skplugin_field_t *));
 
     /* Parse the --fields or --all-fields argument, or use the default
      * fields */
@@ -411,6 +483,12 @@ appSetup(
     } else if (selectFieldsDefault()) {
         skAppPrintErr("Cannot set default output fields");
         exit(EXIT_FAILURE);
+    }
+
+    num_plugins = sk_vector_get_count(active_plugins);
+    if (0 == num_plugins) {
+        sk_vector_destroy(active_plugins);
+        active_plugins = NULL;
     }
 
     /* check limits; main loop uses 'num_recs' with either 'skip_recs'
@@ -461,30 +539,21 @@ appSetup(
         }
     }
 
-    /* set properties on the ascii-stream */
-    rwAsciiSetDelimiter(ascii_str, delimiter);
-    rwAsciiSetIPv6Policy(ascii_str, ipv6_policy);
-    rwAsciiSetIPFormatFlags(ascii_str, ip_format);
-    rwAsciiSetTimestampFlags(ascii_str, time_flags);
+    /* set properties on the formatter */
+    sk_formatter_set_delimeter(fmtr, delimiter);
+    if (skOptionsCtxGetIPv6Policy(optctx) < SK_IPV6POLICY_MIX) {
+        sk_formatter_set_assume_ipv4_ips(fmtr);
+    }
+    sk_formatter_set_default_ipaddr_format(fmtr, (skipaddr_flags_t)ip_format);
+    sk_formatter_set_default_timestamp_format(fmtr, time_flags);
 
-    if (cut_opts.no_titles) {
-        rwAsciiSetNoTitles(ascii_str);
-    }
     if (cut_opts.no_columns) {
-        rwAsciiSetNoColumns(ascii_str);
-    }
-    if (cut_opts.integer_sensors) {
-        rwAsciiSetIntegerSensors(ascii_str);
-    }
-    if (cut_opts.integer_tcp_flags) {
-        rwAsciiSetIntegerTcpFlags(ascii_str);
+        sk_formatter_set_no_columns(fmtr);
     }
     if (cut_opts.no_final_delimiter) {
-        rwAsciiSetNoFinalDelimiter(ascii_str);
+        sk_formatter_set_no_final_delimeter(fmtr);
     }
-    if (cut_opts.icmp_type_and_code) {
-        rwAsciiSetIcmpTypeCode(ascii_str);
-    }
+    sk_formatter_finalize(fmtr);
 
     /* allocate the buffer for 'tail_recs' */
     if (tail_recs) {
@@ -494,6 +563,7 @@ appSetup(
                           tail_recs);
             exit(EXIT_FAILURE);
         }
+        rwRecInitializeArray(tail_buf, L, tail_recs);
     }
 
     /* open the --output-path.  the 'of_name' member is NULL if user
@@ -514,11 +584,9 @@ appSetup(
         }
     }
 
-    rwAsciiSetOutputHandle(ascii_str, output.of_fp);
-
     /* if dry-run, print the column titles and exit */
     if (cut_opts.dry_run) {
-        rwAsciiPrintTitles(ascii_str);
+        printTitle();
         appTeardown();
         exit(EXIT_SUCCESS);
     }
@@ -559,10 +627,11 @@ appOptionsHandler(
 
     switch ((appOptionsEnum)opt_index) {
       case OPT_HELP_FIELDS:
-        helpFields(USAGE_FH);
-        exit(EXIT_SUCCESS);
+        help_fields = 1;
+        break;
 
       case OPT_FIELDS:
+        /* only one of --fields or --all-fields is allowed */
         if (fields_arg) {
             skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
@@ -585,6 +654,21 @@ appOptionsHandler(
             return 1;
         }
         all_fields = 1;
+        break;
+
+      case OPT_LUA_FILE:
+        /* get the 'load_lua_file' function from from the registry
+         * push the argument, and run the function */
+        lua_rawgeti(L, LUA_REGISTRYINDEX, reg_ref.load_lua_file);
+        lua_pushstring(L, opt_arg);
+        rv = lua_pcall(L, 1, 0, 0);
+        if (rv != LUA_OK) {
+            skAppPrintErr("%s", lua_tostring(L, -1));
+            lua_pop(L, 1);
+            assert(0 == lua_gettop(L));
+            return 1;
+        }
+        assert(0 == lua_gettop(L));
         break;
 
       case OPT_NUM_RECS:
@@ -639,10 +723,6 @@ appOptionsHandler(
         }
         break;
 
-      case OPT_ICMP_TYPE_AND_CODE:
-        cut_opts.icmp_type_and_code = 1;
-        break;
-
       case OPT_PLUGIN:
         if (skPluginLoadPlugin(opt_arg, 1) != 0) {
             skAppPrintErr("Unable to load %s as a plugin", opt_arg);
@@ -687,26 +767,153 @@ appOptionsHandler(
 
 
 /*
+ *    A helper function for appLuaCreateState().
+ *
+ *    This function expects the table of functions exported by
+ *    rwcut.lua to be at the top of the stack.  This function finds
+ *    the function named 'function_name', inserts it into the Lua
+ *    registry, and sets the reference of 'storage_location' to that
+ *    Lua reference.
+ *
+ *    In practice, the storage_location is the member of the reg_ref
+ *    structure that matches the string in 'function_name'.
+ */
+static void
+appLuaAddFunctionToRegistry(
+    lua_State          *S,
+    const char         *function_name,
+    int                *storage_location)
+{
+    assert(LUA_TTABLE == lua_type(S, -1));
+
+    lua_getfield(S, -1, function_name);
+    assert(LUA_TFUNCTION == lua_type(S, -1));
+    *storage_location = luaL_ref(S, LUA_REGISTRYINDEX);
+}
+
+/*
+ *    Create a Lua state and load the (compiled) contents of
+ *    "rwcut.lua" into that state.  Set some functions defined in
+ *    rwcut.lua as Lua globals, store others in the Lua registry and
+ *    store their locations in the reg_ref global structure.
+ */
+static lua_State *
+appLuaCreateState(
+    void)
+{
+#define ADD_REGISTRY_FUNC(l_state, l_name)                              \
+    appLuaAddFunctionToRegistry(l_state, #l_name, &( reg_ref. l_name ))
+
+    /* functions defined in the export table to make global so they
+     * may be called by code in --lua-file */
+    const char *global_fns[] = {
+        "register_field",
+        "register_teardown",
+        "add_sidecar_field",
+        NULL
+    };
+    lua_State *S;
+    size_t i;
+    int rv;
+
+    /* initialize Lua */
+    S = sk_lua_newstate();
+
+    /* load and run the the initialization code in rwcut.lua.  The
+     * return value is a table of functions. */
+    rv = luaL_loadbufferx(S, (const char*)rwcut_lua,
+                          sizeof(rwcut_lua), "rwcut.lua", "b");
+    if (LUA_OK == rv) {
+        rv = lua_pcall(S, 0, 1, 0);
+    }
+    if (rv != LUA_OK) {
+        skAppPrintErr("Lua initialization failed: %s", lua_tostring(S, -1));
+        exit(EXIT_FAILURE);
+    }
+    assert(LUA_TTABLE == lua_type(S, -1));
+
+    /* add functions from the export table to the global namespace */
+    for (i = 0; global_fns[i] != NULL; ++i) {
+        lua_getfield(S, -1, global_fns[i]);
+        assert(LUA_TFUNCTION == lua_type(S, -1));
+        lua_setglobal(S, global_fns[i]);
+    }
+
+    /* add functions from the export table to the Lua registry and
+     * store the inedexes in the reg_ref structure */
+    ADD_REGISTRY_FUNC(S, load_lua_file);
+    ADD_REGISTRY_FUNC(S, activate_field);
+    ADD_REGISTRY_FUNC(S, get_sidecar);
+    ADD_REGISTRY_FUNC(S, count_functions);
+    ADD_REGISTRY_FUNC(S, apply_sidecar);
+    ADD_REGISTRY_FUNC(S, invoke_teardown);
+
+    /* Done with the table of functions. */
+    lua_pop(S, 1);
+    assert(0 == lua_gettop(S));
+
+    return S;
+}
+
+
+/*
+ *    Update the formatter to print the standard SiLK field 'id'.
+ */
+static void
+addSilkField(
+    uint32_t            id)
+{
+    sk_formatter_field_t *field;
+
+    field = sk_formatter_add_silk_field(fmtr, (rwrec_field_id_t)id);
+    if (NULL == field) {
+        skAppPrintErr("Cannot add field %" PRIu32 " to output", id);
+        exit(EXIT_FAILURE);
+    }
+    switch ((rwrec_field_id_t)id) {
+      case RWREC_FIELD_FLAGS:
+      case RWREC_FIELD_INIT_FLAGS:
+      case RWREC_FIELD_REST_FLAGS:
+        if (cut_opts.integer_tcp_flags) {
+            sk_formatter_field_set_number_format(fmtr, field, 10);
+        } else if (!cut_opts.no_columns) {
+            sk_formatter_field_set_space_padded(fmtr, field);
+        }
+        break;
+
+      case RWREC_FIELD_TCP_STATE:
+        if (!cut_opts.no_columns) {
+            sk_formatter_field_set_space_padded(fmtr, field);
+        }
+        break;
+
+      case RWREC_FIELD_SID:
+        if (cut_opts.integer_sensors) {
+            sk_formatter_field_set_number_format(fmtr, field, 10);
+        }
+        break;
+
+      default:
+        break;
+    }
+}
+
+/*
  *  status = selectFieldsDefault();
  *
- *    Set the global ascii-stream to print rwcut's default columns.
+ *    Set the global formatter to print rwcut's default columns.
  *    Return 0 on success or -1 on memory error.
  */
 static int
 selectFieldsDefault(
     void)
 {
-    uint32_t default_fields[1+RWCUT_LAST_DEFAULT_FIELD];
-    const uint32_t count = 1+RWCUT_LAST_DEFAULT_FIELD;
     uint32_t i;
 
     /* set up the default fields for rwcut */
-    for (i = 0; i < count; ++i) {
-        default_fields[i] = i;
+    for (i = 0; i <= RWCUT_LAST_DEFAULT_FIELD; ++i) {
+        addSilkField(i);
     }
-
-    rwAsciiAppendFields(ascii_str, default_fields, count);
-
     return 0;
 }
 
@@ -714,7 +921,7 @@ selectFieldsDefault(
 /*
  *  status = selectFieldsAll();
  *
- *    Set the global ascii-stream to print all known fields---both
+ *    Set the global formatter to print all known fields---both
  *    built-in and from plug-ins.  Return 0 on success or -1 on memory
  *    error.
  */
@@ -734,12 +941,9 @@ selectFieldsAll(
         goto END;
     }
 
-    /* add all built-in fields to the ascii-stream */
-    for (i = 0; i < RWREC_PRINTABLE_FIELD_COUNT; ++i) {
-        if (rwAsciiAppendOneField(ascii_str, i)) {
-            skAppPrintErr(("Cannot add field %" PRIu32 " to stream"), i);
-            goto END;
-        }
+    /* add all built-in fields to the formatter */
+    for (i = 0; i < RWREC_FIELD_ID_COUNT; ++i) {
+        addSilkField(i);
     }
 
     /* disable error output to avoid seeing warnings from plug-ins */
@@ -775,13 +979,14 @@ selectFieldsAll(
 /*
  *  status = parseFields(fields_string);
  *
- *    Parse the user's option for the --fields switch and set up the
- *    rwAsciiStream.  Return 0 on success; 1 on failure.
+ *    Parse the user's option for the --fields switch and add the
+ *    fields to the formatter.  Return 0 on success; -1 on failure.
  */
 static int
 parseFields(
     const char         *field_string)
 {
+    const sk_sidecar_elem_t *sc_elem;
     sk_stringmap_iter_t *sm_iter = NULL;
     sk_stringmap_entry_t *sm_entry;
     char *errmsg;
@@ -802,49 +1007,67 @@ parseFields(
     }
 
     while (skStringMapIterNext(sm_iter, &sm_entry, NULL) == SK_ITERATOR_OK) {
-        if (sm_entry->id == RWREC_PRINTABLE_FIELD_COUNT) {
-            /* handle the icmpTypeCode field */
-            rwrec_printable_fields_t icmp_fields[] = {
-                RWREC_FIELD_ICMP_TYPE, RWREC_FIELD_ICMP_CODE
-            };
-            char name_buf[128];
-            size_t k;
-
-            for (k = 0; k < sizeof(icmp_fields)/sizeof(icmp_fields[0]); ++k) {
-                if (rwAsciiAppendOneField(ascii_str, icmp_fields[k])) {
-                    rwAsciiGetFieldName(name_buf, sizeof(name_buf),
-                                        icmp_fields[k]);
-                    skAppPrintErr("Cannot add key field '%s' to stream",
-                                  name_buf);
-                    goto END;
-                }
-            }
-        } else if (sm_entry->userdata == NULL) {
-            /* field is built-in */
-            if (rwAsciiAppendOneField(ascii_str, sm_entry->id)) {
-                skAppPrintErr("Cannot add field %s to stream",
-                              sm_entry->name);
-                goto END;
-            }
-        } else {
+        if (sm_entry->id & PLUGIN_FIELD_BIT) {
             /* field comes from a plug-in */
-            assert(sm_entry->id > RWREC_PRINTABLE_FIELD_COUNT);
-
             if (appAddPluginField(sm_entry)) {
                 skAppPrintErr("Cannot add field %s from plugin",
                               sm_entry->name);
                 goto END;
             }
+        } else if (sm_entry->id & (SIDECAR_FIELD_BIT | SC_LUA_FIELD_BIT)) {
+            /* field comes from a sidecar */
+            sc_elem = (sk_sidecar_elem_t *)sm_entry->userdata;
+            if (sm_entry->id & SC_LUA_FIELD_BIT) {
+                /* field comes from a sidecar added by --lua-file */
+                lua_rawgeti(L, LUA_REGISTRYINDEX, reg_ref.activate_field);
+                lua_pushstring(L, sm_entry->name);
+                rv = lua_pcall(L, 1, 0, 0);
+                if (rv != LUA_OK) {
+                    skAppPrintErr(
+                        "Unable to activate field %s defined in Lua: %s",
+                        sm_entry->name, lua_tostring(L, -1));
+                    lua_pop(L, 1);
+                    assert(0 == lua_gettop(L));
+                    goto END;
+                }
+            }
+            if (!sk_formatter_add_field(
+                    fmtr, sm_entry->name, 1+strlen(sm_entry->name),
+                    sk_sidecar_elem_get_data_type(sc_elem),
+                    sk_sidecar_elem_get_ipfix_ident(sc_elem)))
+            {
+                skAppPrintErr("Cannot add field %s to stream",
+                              sm_entry->name);
+                goto END;
+            }
+        } else {
+            assert(NULL == sm_entry->userdata);
+            /* field is built-in */
+            addSilkField(sm_entry->id);
         }
     }
+
+    /* determine the number of sidecar fields defined in --lua-file;
+     * the count is not really important---we only need to know
+     * whether to call the function that adds the sidecar fields. */
+    lua_rawgeti(L, LUA_REGISTRYINDEX, reg_ref.count_functions);
+    rv = lua_pcall(L, 0, 1, 0);
+    if (rv != LUA_OK) {
+        skAppPrintErr("Unable to get number of function: %s",
+                      lua_tostring(L, -1));
+        lua_pop(L, 1);
+        assert(0 == lua_gettop(L));
+        goto END;
+    }
+    num_sidecar_adds = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    assert(0 == lua_gettop(L));
 
     /* successful */
     rv = 0;
 
   END:
-    if (sm_iter) {
-        skStringMapIterDestroy(sm_iter);
-    }
+    skStringMapIterDestroy(sm_iter);
     return rv;
 }
 
@@ -891,7 +1114,10 @@ helpFields(
         exit(EXIT_FAILURE);
     }
 
-    fprintf(fh, "The following name(s) may be used in the --%s switch.\n",
+    fprintf(fh,
+            ("The following names may be used in the --%s switch. Names are\n"
+             "case-insensitive and may be abbreviated to the shortest"
+             " unique prefix.\n"),
             appOptions[OPT_FIELDS].name);
 
     skStringMapPrintDetailedUsage(key_field_map, fh);
@@ -907,27 +1133,51 @@ static int
 createStringmaps(
     void)
 {
-    skplugin_field_iter_t  pi_iter;
-    skplugin_err_t         pi_err;
-    skplugin_field_t      *pi_field;
-    sk_stringmap_status_t  sm_err;
-    sk_stringmap_entry_t   sm_entry;
-    const char           **field_names;
-    const char           **name;
-    uint32_t               max_id;
+    skplugin_field_iter_t       pi_iter;
+    skplugin_err_t              pi_err;
+    skplugin_field_t           *pi_field;
+    sk_stringmap_status_t       sm_err;
+    sk_stringmap_entry_t        sm_entry;
+    const char                **field_names;
+    const char                **name;
+    uint32_t                    max_id;
+    sk_sidecar_t              **sc;
+    sk_sidecar_iter_t           sc_iter;
+    const sk_sidecar_elem_t    *sc_elem;
+    char                        buf[PATH_MAX];
+    size_t                      buflen;
 
-    /* initialize string-map of field identifiers */
-    if (rwAsciiFieldMapAddDefaultFields(&key_field_map)) {
+    /* initialize string-map of field identifiers using the standard
+     * rwRec fields */
+    if (skStringMapCreate(&key_field_map)
+        || skRwrecAppendFieldsToStringMap(key_field_map))
+    {
         skAppPrintErr("Unable to setup fields stringmap");
         return -1;
     }
-    max_id = RWREC_PRINTABLE_FIELD_COUNT - 1;
+    max_id = RWREC_FIELD_ID_COUNT - 1;
 
-    /* add "icmpTypeCode" field */
-    ++max_id;
-    if (rwAsciiFieldMapAddIcmpTypeCode(key_field_map, max_id)) {
-        skAppPrintErr("Unable to add icmpTypeCode");
-        return -1;
+    /* add sidecar fields defined in the input files */
+    if (flowiter) {
+        if (sk_flow_iter_fill_sidecar(flowiter, sidecar)) {
+            skAppPrintErr("Error reading file header");
+            return -1;
+        }
+        sk_sidecar_iter_bind(sidecar, &sc_iter);
+        while (sk_sidecar_iter_next(&sc_iter, &sc_elem) == SK_ITERATOR_OK) {
+            buflen = sizeof(buf);
+            sk_sidecar_elem_get_name(sc_elem, buf, &buflen);
+            ++max_id;
+            sm_entry.name = buf;
+            sm_entry.id = SIDECAR_FIELD_BIT | max_id;
+            sm_entry.userdata = sc_elem;
+            sm_entry.description = NULL;
+            sm_err = skStringMapAddEntries(key_field_map, 1, &sm_entry);
+            if (sm_err) {
+                skAppPrintErr("Cannot add field '%s' from sidecar: %s",
+                              buf, skStringMapStrerror(sm_err));
+            }
+        }
     }
 
     /* add --fields from plug-ins */
@@ -937,7 +1187,6 @@ createStringmaps(
         skAppPrintErr("Unable to bind plugin field iterator");
         return -1;
     }
-
     while (skPluginFieldIteratorNext(&pi_iter, &pi_field)) {
         skPluginFieldName(pi_field, &field_names);
         ++max_id;
@@ -946,7 +1195,7 @@ createStringmaps(
         for (name = field_names; *name; name++) {
             memset(&sm_entry, 0, sizeof(sm_entry));
             sm_entry.name = *name;
-            sm_entry.id = max_id;
+            sm_entry.id = PLUGIN_FIELD_BIT | max_id;
             sm_entry.userdata = pi_field;
             skPluginFieldDescription(pi_field, &sm_entry.description);
             sm_err = skStringMapAddEntries(key_field_map, 1, &sm_entry);
@@ -961,10 +1210,48 @@ createStringmaps(
         }
     }
 
+    /* add sidecar fields defined by --lua-file */
+    lua_rawgeti(L, LUA_REGISTRYINDEX, reg_ref.get_sidecar);
+    lua_call(L, 0, 1);
+    switch (lua_type(L, -1)) {
+      case LUA_TNIL:
+        lua_pop(L, 1);
+        break;
+      case LUA_TSTRING:
+        skAppPrintErr("Error creating sidecar from registered fields: %s",
+                      lua_tostring(L, -1));
+        lua_pop(L, 1);
+        return -1;
+      case LUA_TUSERDATA:
+        sc = sk_lua_tosidecar(L, -1);
+        assert(sc && *sc);
+        sk_sidecar_iter_bind(*sc, &sc_iter);
+        while (sk_sidecar_iter_next(&sc_iter, &sc_elem) == SK_ITERATOR_OK) {
+            buflen = sizeof(buf);
+            sk_sidecar_elem_get_name(sc_elem, buf, &buflen);
+            ++max_id;
+            sm_entry.name = buf;
+            sm_entry.id = SC_LUA_FIELD_BIT | max_id;
+            sm_entry.userdata = sc_elem;
+            sm_entry.description = NULL;
+            sm_err = skStringMapAddEntries(key_field_map, 1, &sm_entry);
+            if (sm_err) {
+                skAppPrintErr("Cannot add field '%s' from sidecar: %s",
+                              buf, skStringMapStrerror(sm_err));
+            }
+        }
+        lua_pop(L, 1);
+        break;
+      default:
+        skAbortBadCase(lua_type(L, -1));
+    }
+    assert(0 == lua_gettop(L));
+
     return 0;
 }
 
 
+#if 0
 static void
 appPluginGetTitle(
     char               *text_buf,
@@ -1001,12 +1288,13 @@ appPluginGetValue(
     }
     return 0;
 }
+#endif  /* 0 */
 
 
 /*
  *  status = appAddPluginField(sm_entry);
  *
- *    Add callbacks to the global 'ascii_str' to print a field that
+ *    Add callbacks to the global 'fmtr' to print a field that
  *    comes from a plug-in.
  *
  *    Returns 0 on success, or -1 for a memory allocation error or if
@@ -1017,23 +1305,32 @@ static int
 appAddPluginField(
     const sk_stringmap_entry_t *sm_entry)
 {
+    sk_formatter_field_t *fmtr_field;
+    const char **field_names;
     skplugin_field_t *pi_field;
-    size_t            text_width;
-    skplugin_err_t    pi_err;
+    skplugin_err_t pi_err;
+    const char *title;
+    size_t text_width;
 
     pi_field = (skplugin_field_t*)sm_entry->userdata;
+    assert(pi_field);
 
-    /* Activate the plugin (so cleanup knows about it) */
+    /* activate the plugin (so cleanup knows about it) */
     pi_err = skPluginFieldActivate(pi_field);
     if (pi_err != SKPLUGIN_OK) {
         return -1;
     }
-
-    /* Initialize this field */
+    /* initialize this field */
     pi_err = skPluginFieldRunInitialize(pi_field);
     if (pi_err != SKPLUGIN_OK) {
         return -1;
     }
+
+    sk_vector_append_value(active_plugins, &pi_field);
+
+    /* get the names and the title */
+    skPluginFieldName(pi_field, &field_names);
+    skPluginFieldTitle(pi_field, &title);
 
     /* get the text width for this field */
     pi_err = skPluginFieldGetLenText(pi_field, &text_width);
@@ -1041,16 +1338,123 @@ appAddPluginField(
         return -1;
     }
     if (0 == text_width) {
-        const char *title;
-        skPluginFieldTitle(pi_field, &title);
-        skAppPrintErr("Plug-in field '%s' has a textual width of 0",
-                      title);
+        skAppPrintErr("Plug-in field '%s' has a textual width of 0", title);
         return -1;
     }
 
-    return rwAsciiAppendCallbackField(ascii_str, &appPluginGetTitle,
-                                      &appPluginGetValue, pi_field,
-                                      text_width);
+    fmtr_field = (sk_formatter_add_field(
+                      fmtr, field_names[0], 1+strlen(field_names[0]),
+                      SK_SIDECAR_STRING, 0));
+    sk_formatter_field_set_min_width(fmtr, fmtr_field, text_width);
+    sk_formatter_field_set_title(fmtr, fmtr_field, title);
+    return 0;
+}
+
+
+void
+printTitle(
+    void)
+{
+    char *fmtr_buf = NULL;
+    size_t len;
+
+    if (!cut_opts.no_titles) {
+        len = sk_formatter_fill_title_buffer(fmtr, &fmtr_buf);
+        if (!fwrite(fmtr_buf, len, 1, output.of_fp)) {
+            skAppPrintErr("Could not write titles");
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
+
+/*
+ *    If 'in_rwrec' and 'out_rwrec' point to the same location, this
+ *    function modifies 'out_rwrec' if it determines there is work to
+ *    do.  If the parameters point to different locations and there is
+ *    work to do, a copy of the record in 'in_rwrec' is made, stored
+ *    at 'out_rwrec' prior to modifying 'out_rwrec'.
+ *
+ *    If there are no plug-in fields or there are plug-in fields but
+ *    the record does not have a Lua state object, make out_rwrec
+ *    contain the contents of in_rwrec, and return 1.
+ *
+ *    Create a sidecar (Lua table) on 'out_rwrec' if none exists, add
+ *    the plug-in fields to the Lua table as sidecar data, and return
+ *    0.
+ */
+void
+addPluginFields(
+    rwRec              *rwrec)
+{
+    skplugin_field_t *pi_field;
+    skplugin_err_t pi_err;
+    const char **field_names;
+    char text_buf[4096];
+    size_t i;
+    int rv;
+    int ref;
+
+    assert(rwrec->lua_state == L);
+    if (0 == num_plugins && 0 == num_sidecar_adds) {
+        return;
+    }
+
+    ref = rwRecGetSidecar(rwrec);
+    if (ref == LUA_NOREF) {
+        /* create a table to use as sidecar on the record */
+        lua_newtable(L);
+    } else if (lua_rawgeti(L, LUA_REGISTRYINDEX, ref) != LUA_TTABLE) {
+        skAppPrintErr("Sidecar is not a table");
+        skAbort();
+    }
+
+    /* call the plug-ins */
+    for (i = 0; i < num_plugins; ++i) {
+        sk_vector_get_value(active_plugins, i, &pi_field);
+
+        skPluginFieldName(pi_field, &field_names);
+
+        pi_err = (skPluginFieldRunRecToTextFn(
+                      pi_field, text_buf, sizeof(text_buf), rwrec, NULL));
+        if (pi_err != SKPLUGIN_OK) {
+            skAppPrintErr(("Plugin-based field %s failed converting to text "
+                           "with error code %d"), field_names[0], pi_err);
+            exit(EXIT_FAILURE);
+        }
+
+        lua_pushstring(L, text_buf);
+        lua_setfield(L, -2, field_names[0]);
+    }
+
+    assert(LUA_TTABLE == lua_type(L, -1));
+
+    if (ref == LUA_NOREF) {
+        /* copied table is at the top of the stack; get a reference to
+         * it and remove it */
+        rwRecSetSidecar(rwrec, luaL_ref(L, LUA_REGISTRYINDEX));
+    } else {
+        lua_pop(L, 1);
+    }
+
+    if (num_sidecar_adds) {
+        rwRec *lua_rec;
+        lua_rawgeti(L, LUA_REGISTRYINDEX, reg_ref.apply_sidecar);
+        lua_rec = sk_lua_push_rwrec(L, NULL);
+        rwRecCopy(lua_rec, rwrec, SK_RWREC_COPY_FIXED);
+        lua_rec->sidecar = rwRecGetSidecar(rwrec);
+        rv = lua_pcall(L, 1, 1, 0);
+        if (LUA_OK != rv) {
+            skAppPrintErr("%s", lua_tostring(L, -1));
+            lua_pop(L, 1);
+            assert(0 == lua_gettop(L));
+            exit(EXIT_FAILURE);
+        }
+        lua_rec->sidecar = LUA_NOREF;
+        lua_pop(L, 1);
+    }
+
+    assert(0 == lua_gettop(L));
 }
 
 

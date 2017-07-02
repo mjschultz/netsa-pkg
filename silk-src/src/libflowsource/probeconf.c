@@ -8,16 +8,16 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconf.c d8ee22371cf3 2017-03-23 22:39:48Z mthomas $");
+RCSIDENT("$SiLK: probeconf.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/probeconf.h>
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
-#include <silk/skipset.h>
 #include <silk/sklog.h>
 #include <silk/sksite.h>
-#include "probeconfscan.h"
+#include <silk/skvector.h>
+#include <silk/utils.h>
 
 /*
  *  *****  Flow Type  **************************************************
@@ -34,13 +34,10 @@ RCSIDENT("$SiLK: probeconf.c d8ee22371cf3 2017-03-23 22:39:48Z mthomas $");
 /* LOCAL DEFINES AND TYPEDEFS */
 
 /* Minimum version of libfixbuf required for IPFIX */
-#define SKPC_LIBFIXBUF_VERSION_IPFIX        "1.7.0"
+#define SKPC_LIBFIXBUF_VERSION_IPFIX        "1.2.0"
 
 /* Minimum version of libfixbuf required for NetFlow V9 */
-#define SKPC_LIBFIXBUF_VERSION_NETFLOWV9    SKPC_LIBFIXBUF_VERSION_IPFIX
-
-/* Minimum version of libfixbuf required for sFlow */
-#define SKPC_LIBFIXBUF_VERSION_SFLOW        SKPC_LIBFIXBUF_VERSION_IPFIX
+#define SKPC_LIBFIXBUF_VERSION_NETFLOWV9    "1.2.0"
 
 /* Maximum valid value for a port 2^16 - 1 */
 #define PORT_VALID_MAX 0xFFFF
@@ -50,6 +47,19 @@ RCSIDENT("$SiLK: probeconf.c d8ee22371cf3 2017-03-23 22:39:48Z mthomas $");
 
 /* Value to use for remaining IPs to say that it hasn't been set */
 #define REMAINDER_NOT_SET  INT8_MAX
+
+/*
+ *  Specify the maximum size (in terms of RECORDS) of the buffer used
+ *  to hold records that have been read from the flow-source but not
+ *  yet processed.  This value is the number of records as read from
+ *  the wire (e.g., PDUs for a NetFlow v5 probe) per PROBE.  The
+ *  maximum memory per NetFlow v5 probe will be BUF_REC_COUNT * 1464.
+ *  The maximum memory per IPFIX or NetFlow v9 probe will be
+ *  BUF_REC_COUNT * 52 (or BUF_REC_COUNT * 88 for IPv6-enabled SiLK).
+ *  If records are processed as quickly as they are read, the normal
+ *  memory use per probe will be CIRCBUF_CHUNK_MAX_SIZE bytes.
+ */
+#define SKPC_DEFAULT_CIRCBUF_SIZE  (1 << 15)
 
 
 /* a map between probe types and printable names */
@@ -115,11 +125,7 @@ skpcGroupCheckInterface(
     const skpc_group_t *group,
     uint32_t            interface);
 static int
-skpcGroupCheckIPblock(
-    const skpc_group_t *group,
-    const skipaddr_t   *ip);
-static int
-skpcGroupCheckIPset(
+skpcGroupCheckIp(
     const skpc_group_t *group,
     const skipaddr_t   *ip);
 static int
@@ -170,9 +176,11 @@ skpcSetup(
         }
     }
 
+#if 0
     if (skpcParseSetup()) {
         goto ERROR;
     }
+#endif
 
     return 0;
 
@@ -205,8 +213,10 @@ skpcTeardown(
     skIPWildcard_t **ipwild;
     size_t i;
 
+#if 0
     /* clean up the parser */
     skpcParseTeardown();
+#endif  /* 0 */
 
     /* Free all the networks */
     if (skpc_networks) {
@@ -588,6 +598,7 @@ skpcProbeCreate(
     (*probe)->probe_type = PROBE_ENUM_INVALID;
     (*probe)->protocol = SKPC_PROTO_UNSET;
     (*probe)->log_flags = SOURCE_LOG_DEFAULT;
+    (*probe)->circbuf_size = SKPC_DEFAULT_CIRCBUF_SIZE;
 
     return 0;
 }
@@ -617,7 +628,7 @@ skpcProbeDestroy(
         free((*probe)->poll_directory);
     }
     if ((*probe)->probe_name) {
-        free((void *)((*probe)->probe_name));
+        free((*probe)->probe_name);
     }
     if ((*probe)->listen_addr) {
         skSockaddrArrayDestroy((*probe)->listen_addr);
@@ -635,8 +646,6 @@ skpcProbeDestroy(
 
 
 /* Get and set the name of probe */
-
-#ifndef skpcProbeGetName
 const char *
 skpcProbeGetName(
     const skpc_probe_t *probe)
@@ -644,7 +653,6 @@ skpcProbeGetName(
     assert(probe);
     return probe->probe_name;
 }
-#endif  /* skpcProbeGetName */
 
 int
 skpcProbeSetName(
@@ -674,7 +682,7 @@ skpcProbeSetName(
         return -1;
     }
     if (probe->probe_name) {
-        free((void *)probe->probe_name);
+        free(probe->probe_name);
     }
     probe->probe_name = copy;
     return 0;
@@ -682,7 +690,6 @@ skpcProbeSetName(
 
 
 /* Get and set the probe type */
-#ifndef skpcProbeGetType
 skpc_probetype_t
 skpcProbeGetType(
     const skpc_probe_t *probe)
@@ -690,7 +697,6 @@ skpcProbeGetType(
     assert(probe);
     return probe->probe_type;
 }
-#endif  /* skpcProbeGetType */
 
 int
 skpcProbeSetType(
@@ -732,7 +738,6 @@ skpcProbeSetProtocol(
 
 
 /* Get and set probe log-flags */
-#ifndef skpcProbeGetLogFlags
 uint8_t
 skpcProbeGetLogFlags(
     const skpc_probe_t *probe)
@@ -740,90 +745,134 @@ skpcProbeGetLogFlags(
     assert(probe);
     return probe->log_flags;
 }
-#endif  /* skpcProbeGetLogFlags */
+
+static int
+probe_log_flag_search(
+    const char         *log_flag_name,
+    uint8_t            *log_flag_value)
+{
+    assert(log_flag_name);
+    assert(log_flag_value);
+
+    switch (log_flag_name[0]) {
+      case 'a':
+        if (0 == strcmp(log_flag_name, "all")) {
+            *log_flag_value = SOURCE_LOG_ALL;
+            return 0;
+        }
+        break;
+      case 'b':
+        if (0 == strcmp(log_flag_name, "bad")) {
+            *log_flag_value = SOURCE_LOG_BAD;
+            return 0;
+        }
+        break;
+      case 'd':
+        if (0 == strcmp(log_flag_name, "default")) {
+            *log_flag_value = SOURCE_LOG_DEFAULT;
+            return 0;
+        }
+        break;
+      case 'f':
+        if (0 == strcmp(log_flag_name, "firewall-event")) {
+            *log_flag_value = SOURCE_LOG_FIREWALL;
+            return 0;
+        }
+        break;
+#ifdef SOURCE_LOG_LIBFIXBUF
+        case 'l':
+          if (0 == strcmp(log_flag_name, "libfixbuf")) {
+              *log_flag_value = SOURCE_LOG_LIBFIXBUF;
+              return 0;
+          }
+          break;
+#endif
+      case 'm':
+        if (0 == strcmp(log_flag_name, "missing")) {
+            *log_flag_value = SOURCE_LOG_MISSING;
+            return 0;
+        }
+        break;
+      case 'n':
+        if (0 == strcmp(log_flag_name, "none")) {
+            *log_flag_value = SOURCE_LOG_NONE;
+            return 0;
+        }
+        break;
+      case 'r':
+        if (0 == strcmp(log_flag_name, "record-timestamps")) {
+            *log_flag_value = SOURCE_LOG_TIMESTAMPS;
+            return 0;
+        }
+        break;
+      case 's':
+        if (0 == strcmp(log_flag_name, "sampling")) {
+            *log_flag_value = SOURCE_LOG_SAMPLING;
+            return 0;
+        }
+#ifdef SOURCE_LOG_TEMPLATES
+        if (0 == strcmp(log_flag_name, "show-templates")) {
+            *log_flag_value = SOURCE_LOG_TEMPLATES;
+            return 0;
+        }
+#endif
+        break;
+    }
+    return -1;
+}
 
 int
 skpcProbeAddLogFlag(
     skpc_probe_t       *probe,
     const char         *log_flag)
 {
+    uint8_t value;
+
     assert(probe);
 
-    if (!log_flag) {
+    if (probe_log_flag_search(log_flag, &value)) {
+        /* unrecognized log_flag */
         return -1;
     }
-    if (0 == strcmp(log_flag, "none")) {
-        if (probe->log_flags) {
-            /* invalid combination */
-            return -2;
-        }
-        return 0;
-    }
-    if (0 == strcmp(log_flag, "all")) {
-        probe->log_flags |= SOURCE_LOG_ALL;
-        return 0;
-    }
-    if (0 == strcmp(log_flag, "bad")) {
-        probe->log_flags |= SOURCE_LOG_BAD;
-        return 0;
-    }
-    if (0 == strcmp(log_flag, "default")) {
-        probe->log_flags |= SOURCE_LOG_DEFAULT;
-        return 0;
-    }
-    if (0 == strcmp(log_flag, "firewall-event")) {
-        probe->log_flags |= SOURCE_LOG_FIREWALL;
-        return 0;
-    }
-#ifdef SOURCE_LOG_LIBFIXBUF
-    if (0 == strcmp(log_flag, "libfixbuf")) {
-        probe->log_flags |= SOURCE_LOG_LIBFIXBUF;
-        return 0;
-    }
-#endif
-    if (0 == strcmp(log_flag, "missing")) {
-        probe->log_flags |= SOURCE_LOG_MISSING;
-        return 0;
-    }
-    if (0 == strcmp(log_flag, "record-timestamps")) {
-        probe->log_flags |= SOURCE_LOG_TIMESTAMPS;
-        return 0;
-    }
-    if (0 == strcmp(log_flag, "sampling")) {
-        probe->log_flags |= SOURCE_LOG_SAMPLING;
-        return 0;
-    }
-#ifdef SOURCE_LOG_TEMPLATES
-    if (0 == strcmp(log_flag, "show-templates")) {
-        probe->log_flags |= SOURCE_LOG_TEMPLATES;
-        return 0;
-    }
-#endif
-    /* unrecognized log-flag */
-    return -1;
+    probe->log_flags |= value;
+    return 0;
 }
 
 int
+skpcProbeRemoveLogFlag(
+    skpc_probe_t       *probe,
+    const char         *log_flag)
+{
+    uint8_t value;
+
+    assert(probe);
+
+    if (probe_log_flag_search(log_flag, &value)) {
+        /* unrecognized log_flag */
+        return -1;
+    }
+    probe->log_flags &= 0xFF & ~value;
+    return 0;
+}
+
+void
 skpcProbeClearLogFlags(
     skpc_probe_t       *probe)
 {
     assert(probe);
     probe->log_flags = SOURCE_LOG_NONE;
-    return 0;
 }
 
 
 /* Get and set type of data in the input/output fields */
 
-#ifndef skpcProbeGetInterfaceValueType
 skpc_ifvaluetype_t
 skpcProbeGetInterfaceValueType(
     const skpc_probe_t *probe)
 {
     assert(probe);
-    return probe->ifvaluetype;
+    return ((probe->ifvalue_vlan) ? SKPC_IFVALUE_VLAN : SKPC_IFVALUE_SNMP);
 }
-#endif  /* skpcProbeGetInterfaceValueType */
 
 int
 skpcProbeSetInterfaceValueType(
@@ -833,8 +882,10 @@ skpcProbeSetInterfaceValueType(
     assert(probe);
     switch (interface_value_type) {
       case SKPC_IFVALUE_SNMP:
+        probe->ifvalue_vlan = 0;
+        break;
       case SKPC_IFVALUE_VLAN:
-        probe->ifvaluetype = interface_value_type;
+        probe->ifvalue_vlan = 1;
         break;
       default:
         return -1;              /* NOTREACHED */
@@ -844,7 +895,7 @@ skpcProbeSetInterfaceValueType(
 
 
 /* Get and set any "peculiar" data handling for this probe. */
-#ifndef skpcProbeGetQuirks
+
 uint32_t
 skpcProbeGetQuirks(
     const skpc_probe_t *probe)
@@ -852,7 +903,6 @@ skpcProbeGetQuirks(
     assert(probe);
     return (uint32_t)probe->quirks;
 }
-#endif  /* skpcProbeGetQuirks */
 
 int
 skpcProbeAddQuirk(
@@ -881,10 +931,6 @@ skpcProbeAddQuirk(
     }
     if (0 == strcmp(quirk, "zero-packets")) {
         probe->quirks |= SKPC_QUIRK_ZERO_PACKETS;
-        return 0;
-    }
-    if (0 == strcmp(quirk, "nf9-sysuptime-seconds")) {
-        probe->quirks |= SKPC_QUIRK_NF9_SYSUPTIME_SECS;
         return 0;
     }
     /* unrecognized quirk */
@@ -1090,6 +1136,35 @@ skpcProbeSetAcceptFromHost(
 }
 
 
+/* Get and set the size of the circular buffers */
+size_t
+skpcProbeGetMaximumBuffer(
+    const skpc_probe_t *probe)
+{
+    assert(probe);
+    return probe->circbuf_size;
+}
+
+int
+skpcProbeSetMaximumBuffer(
+    skpc_probe_t       *probe,
+    size_t              max_records)
+{
+    assert(probe);
+    if (0 == max_records) {
+        return -1;
+    }
+#if SK_SIZEOF_SIZE_T > 4
+    if (max_records > UINT32_MAX) {
+        return -1;
+    }
+#endif
+    probe->circbuf_size = max_records;
+    return 0;
+}
+
+
+
 size_t
 skpcProbeGetSensorCount(
     const skpc_probe_t *probe)
@@ -1154,9 +1229,6 @@ skpcProbeAddSensor(
  *  *****  Verification  ***********************************************
  */
 
-
-
-#if SK_ENABLE_IPFIX
 /*
  *  is_valid = skpcProbeVerifyIPFIX(p);
  *
@@ -1221,7 +1293,6 @@ skpcProbeVerifyIPFIX(
 
     return 0;
 }
-#endif  /* SK_ENABLE_IPFIX */
 
 
 /*
@@ -1261,7 +1332,7 @@ skpcProbeVerifyNetflowV5(
     }
 
     /* NetFlow v5 does not support VLAN interfaces */
-    if (probe->ifvaluetype != SKPC_IFVALUE_SNMP) {
+    if (probe->ifvalue_vlan) {
         skAppPrintErr(("Error verifying probe '%s':\n"
                        "\tType '%s' probes do not have access"
                        " to vlan information"),
@@ -1274,7 +1345,6 @@ skpcProbeVerifyNetflowV5(
 }
 
 
-#if SK_ENABLE_IPFIX
 /*
  *  is_valid = skpcProbeVerifyNetflowV9(p);
  *
@@ -1333,7 +1403,6 @@ skpcProbeVerifyNetflowV9(
 
     return 0;
 }
-#endif  /* SK_ENABLE_IPFIX */
 
 
 /*
@@ -1523,8 +1592,8 @@ skpcProbeVerify(
     /* when listen-as-host is specified, listen-on-port must be as
      * well */
     if ((probe->listen_addr != NULL)
-        && (skSockaddrArraySize(probe->listen_addr) > 0)
-        && (skSockaddrPort(skSockaddrArrayGet(probe->listen_addr, 0)) == 0))
+        && (skSockaddrArrayGetSize(probe->listen_addr) > 0)
+        && (skSockaddrGetPort(skSockaddrArrayGet(probe->listen_addr, 0)) == 0))
     {
             skAppPrintErr(("Error verifying probe '%s':\n"
                            "\tThe listen-on-port clause is required when"
@@ -1628,49 +1697,24 @@ skpcProbeVerify(
         }
         break;
 
-
       case PROBE_ENUM_IPFIX:
-#if !SK_ENABLE_IPFIX
-        skAppPrintErr(("Error verifying probe '%s':\n"
-                       "\tIPFIX support requires libfixbuf-%s or later"
-                       " and the required\n"
-                       "\tlibfixbuf version was not included at compile time"),
-                      probe->probe_name, SKPC_LIBFIXBUF_VERSION_IPFIX);
-#else
-        if (0 == skpcProbeVerifyIPFIX(probe)) {
-            break;
+        if (0 != skpcProbeVerifyIPFIX(probe)) {
+            return -1;
         }
-#endif /* SK_ENABLE_IPFIX */
-        return -1;
+        break;
 
       case PROBE_ENUM_NETFLOW_V9:
-#if !SK_ENABLE_IPFIX
-        skAppPrintErr(("Error verifying probe '%s':\n"
-                       "\tNetFlow v9 support requires libfixbuf-%s or later"
-                       " and the required\n\t"
-                       "libfixbuf version was not included at compile time"),
-                      probe->probe_name, SKPC_LIBFIXBUF_VERSION_NETFLOWV9);
-#else
-        if (0 == skpcProbeVerifyNetflowV9(probe)) {
-            break;
+        if (0 != skpcProbeVerifyNetflowV9(probe)) {
+            return -1;
         }
-#endif /* SK_ENABLE_IPFIX */
-        return -1;
+        break;
 
       case PROBE_ENUM_SFLOW:
-#if !SK_ENABLE_IPFIX
-        skAppPrintErr(("Error verifying probe '%s':\n"
-                       "\tsFlow support requires libfixbuf-%s or later"
-                       " and the required\n\t"
-                       "libfixbuf version was not included at compile time"),
-                      probe->probe_name, SKPC_LIBFIXBUF_VERSION_SFLOW);
-#else
         /* sFlow probes have same requirements as NetFlow v9 */
-        if (0 == skpcProbeVerifyNetflowV9(probe)) {
-            break;
+        if (0 != skpcProbeVerifyNetflowV9(probe)) {
+            return -1;
         }
-#endif /* SK_ENABLE_IPFIX */
-        return -1;
+        break;
 
       case PROBE_ENUM_SILK:
         if (0 != skpcProbeVerifySilk(probe)) {
@@ -1691,6 +1735,207 @@ skpcProbeVerify(
     probe->verified = 1;
     return 0;
 }
+
+
+/*
+ *  *****  Probe as Data Source  ****************************************
+ */
+
+int
+skpcProbeStartSource(
+    skpc_probe_t       *probe)
+{
+    skFlowSourceParams_t params;
+
+    assert(probe);
+    assert(probe->verified);
+
+    if (probe->source_stopped) {
+        /* Cannot restart a source */
+        WARNINGMSG("'%s': Cannot restart a stopped source", probe->probe_name);
+        return -1;
+    }
+    if (probe->source.any) {
+        /* probe already started */
+        DEBUGMSG("'%s': Source already started", probe->probe_name);
+        return 0;
+    }
+    assert(0 == probe->source_started);
+
+    memset(&params, 0, sizeof(params));
+    if (probe->poll_directory) {
+        /* FIXME */
+        skAbort();
+    } else if (probe->file_source) {
+        params.path_name = probe->file_source;
+    }
+
+    DEBUGMSG("'%s': Starting %s source",
+             probe->probe_name, skpcProbetypeEnumtoName(probe->probe_type));
+
+    switch (probe->probe_type) {
+      case PROBE_ENUM_NETFLOW_V5:
+        probe->source.pdu = skPDUSourceCreate(probe, &params);
+        if (probe->source.pdu == NULL) {
+            return -1;
+        }
+        break;
+      case PROBE_ENUM_IPFIX:
+      case PROBE_ENUM_NETFLOW_V9:
+      case PROBE_ENUM_SFLOW:
+        probe->source.ipfix = skIPFIXSourceCreate(probe, &params);
+        if (probe->source.ipfix == NULL) {
+            return -1;
+        }
+        break;
+      default:
+        CRITMSG("'%s': Unsupported probe type id '%d'",
+                probe->probe_name, (int)probe->probe_type);
+        skAbortBadCase(probe->probe_type);
+    }
+
+    probe->source_started = 1;
+
+    return 0;
+}
+
+
+void
+skpcProbeStopSource(
+    skpc_probe_t       *probe)
+{
+    assert(probe);
+    assert(probe->verified);
+
+    if (!probe->source.any) {
+        DEBUGMSG("'%s': Source not running", probe->probe_name);
+        return;
+    }
+    if (probe->source_stopped) {
+        /* Cannot restart a source */
+        DEBUGMSG("'%s': Source already stopped", probe->probe_name);
+        return;
+    }
+    assert(1 == probe->source_started);
+
+    DEBUGMSG("'%s': Stopping %s source",
+             probe->probe_name, skpcProbetypeEnumtoName(probe->probe_type));
+
+    switch (probe->probe_type) {
+      case PROBE_ENUM_NETFLOW_V5:
+        skPDUSourceStop(probe->source.pdu);
+        break;
+      case PROBE_ENUM_IPFIX:
+      case PROBE_ENUM_NETFLOW_V9:
+      case PROBE_ENUM_SFLOW:
+        skIPFIXSourceStop(probe->source.ipfix);
+        break;
+      default:
+        CRITMSG("'%s': Invalid probe type id '%d'",
+                probe->probe_name, (int)probe->probe_type);
+        skAbortBadCase(probe->probe_type);
+    }
+
+
+}
+
+
+void
+skpcProbeDestroySource(
+    skpc_probe_t       *probe)
+{
+    assert(probe);
+    assert(probe->verified);
+
+    if (!probe->source.any) {
+        DEBUGMSG("'%s': Source not running", probe->probe_name);
+        return;
+    }
+    if (probe->source_started && !probe->source_stopped) {
+        skpcProbeStopSource(probe);
+    }
+
+    DEBUGMSG("'%s': Destroying %s source",
+             probe->probe_name, skpcProbetypeEnumtoName(probe->probe_type));
+
+    switch (probe->probe_type) {
+      case PROBE_ENUM_NETFLOW_V5:
+        skPDUSourceDestroy(probe->source.pdu);
+        break;
+      case PROBE_ENUM_IPFIX:
+      case PROBE_ENUM_NETFLOW_V9:
+      case PROBE_ENUM_SFLOW:
+        skIPFIXSourceDestroy(probe->source.ipfix);
+        break;
+      default:
+        CRITMSG("'%s': Invalid probe type id '%d'",
+                probe->probe_name, (int)probe->probe_type);
+        skAbortBadCase(probe->probe_type);
+    }
+    probe->source.any = NULL;
+}
+
+
+int
+skpcProbeGetRecordFromSource(
+    skpc_probe_t       *probe,
+    void               *rec)
+{
+    int rv;
+
+    assert(probe);
+    assert(probe->verified);
+    assert(probe->source.any);
+    assert(probe->source_started);
+    assert(!probe->source_stopped);
+
+    /* Get the next record */
+    switch (probe->probe_type) {
+      case PROBE_ENUM_NETFLOW_V5:
+        rv = skPDUSourceGetGeneric(probe->source.pdu, (rwRec*)rec);
+        break;
+      case PROBE_ENUM_IPFIX:
+      case PROBE_ENUM_SFLOW:
+        rv = skIPFIXSourceGetGeneric(probe->source.ipfix, (rwRec*)rec);
+        break;
+      case PROBE_ENUM_NETFLOW_V9:
+        rv = skIPFIXSourceGetGeneric(probe->source.ipfix, (rwRec*)rec);
+        break;
+      default:
+        CRITMSG("'%s': Invalid probe type id '%d'",
+                probe->probe_name, (int)probe->probe_type);
+        skAbortBadCase(probe->probe_type);
+    }
+
+    return rv;
+}
+
+
+void
+skpcProbeLogSourceStats(
+    skpc_probe_t       *probe)
+{
+    assert(probe);
+    assert(probe->verified);
+    assert(probe->source.any);
+    assert(probe->source_started);
+
+    switch (probe->probe_type) {
+      case PROBE_ENUM_NETFLOW_V5:
+        skPDUSourceLogStatsAndClear(probe->source.pdu);
+        break;
+      case PROBE_ENUM_IPFIX:
+      case PROBE_ENUM_NETFLOW_V9:
+      case PROBE_ENUM_SFLOW:
+        skIPFIXSourceLogStatsAndClear(probe->source.ipfix);
+        break;
+      default:
+        CRITMSG("'%s': Invalid probe type id '%d'",
+                probe->probe_name, (int)probe->probe_type);
+        skAbortBadCase(probe->probe_type);
+    }
+}
+
 
 
 /*
@@ -1926,27 +2171,7 @@ skpcSensorTestFlowInterfaces(
             rwRecMemGetDIP(rwrec, &ip);
         }
 
-        if (skpcGroupCheckIPblock(sensor->decider[network_id].nd_group, &ip)) {
-            found = !found;
-        }
-        return ((found == 0) ? -1 : 1);
-
-      case SKPC_NEG_IPSET:
-      case SKPC_REMAIN_IPSET:
-        found = 1;
-        /* FALLTHROUGH */
-
-      case SKPC_IPSET:
-        if (rec_dir == SKPC_DIR_SRC) {
-            /* look where the record is coming from: its source IP */
-            rwRecMemGetSIP(rwrec, &ip);
-        } else {
-            /* look where the record is going to: destination IP */
-            assert(rec_dir == SKPC_DIR_DST);
-            rwRecMemGetDIP(rwrec, &ip);
-        }
-
-        if (skpcGroupCheckIPset(sensor->decider[network_id].nd_group, &ip)) {
+        if (skpcGroupCheckIp(sensor->decider[network_id].nd_group, &ip)) {
             found = !found;
         }
         return ((found == 0) ? -1 : 1);
@@ -1978,22 +2203,18 @@ skpcSensorCheckFilters(
          ++j, ++filter)
     {
         discard = !filter->f_discwhen;
-        switch (filter->f_group_type) {
-          case SKPC_GROUP_UNSET:
-            skAbortBadCase(filter->f_group_type);
-
-          case SKPC_GROUP_IPBLOCK:
+        if (filter->f_wildcard) {
             switch (filter->f_type) {
               case SKPC_FILTER_SOURCE:
                 rwRecMemGetSIP(rwrec, &sip);
-                if (skpcGroupCheckIPblock(filter->f_group, &sip)) {
+                if (skpcGroupCheckIp(filter->f_group, &sip)) {
                     discard = !discard;
                 }
                 break;
 
               case SKPC_FILTER_DESTINATION:
                 rwRecMemGetDIP(rwrec, &dip);
-                if (skpcGroupCheckIPblock(filter->f_group, &dip)) {
+                if (skpcGroupCheckIp(filter->f_group, &dip)) {
                     discard = !discard;
                 }
                 break;
@@ -2001,44 +2222,14 @@ skpcSensorCheckFilters(
               case SKPC_FILTER_ANY:
                 rwRecMemGetSIP(rwrec, &sip);
                 rwRecMemGetDIP(rwrec, &dip);
-                if (skpcGroupCheckIPblock(filter->f_group, &sip)
-                    || skpcGroupCheckIPblock(filter->f_group, &dip))
+                if (skpcGroupCheckIp(filter->f_group, &sip)
+                    || skpcGroupCheckIp(filter->f_group, &dip))
                 {
                     discard = !discard;
                 }
                 break;
             }
-            break;
-
-          case SKPC_GROUP_IPSET:
-            switch (filter->f_type) {
-              case SKPC_FILTER_SOURCE:
-                rwRecMemGetSIP(rwrec, &sip);
-                if (skpcGroupCheckIPset(filter->f_group, &sip)) {
-                    discard = !discard;
-                }
-                break;
-
-              case SKPC_FILTER_DESTINATION:
-                rwRecMemGetDIP(rwrec, &dip);
-                if (skpcGroupCheckIPset(filter->f_group, &dip)) {
-                    discard = !discard;
-                }
-                break;
-
-              case SKPC_FILTER_ANY:
-                rwRecMemGetSIP(rwrec, &sip);
-                rwRecMemGetDIP(rwrec, &dip);
-                if (skpcGroupCheckIPset(filter->f_group, &sip)
-                    || skpcGroupCheckIPset(filter->f_group, &dip))
-                {
-                    discard = !discard;
-                }
-                break;
-            }
-            break;
-
-          case SKPC_GROUP_INTERFACE:
+        } else {
             switch (filter->f_type) {
               case SKPC_FILTER_SOURCE:
                 if (skpcGroupCheckInterface(filter->f_group,
@@ -2066,7 +2257,6 @@ skpcSensorCheckFilters(
                 }
                 break;
             }
-            break;
         }
         if (discard) {
             return 1;
@@ -2078,7 +2268,7 @@ skpcSensorCheckFilters(
 
 
 int
-skpcSensorSetNetworkDirection(
+skpcSensorSetNetwork(
     skpc_sensor_t      *sensor,
     skpc_network_id_t   network_id,
     skpc_direction_t    dir)
@@ -2122,12 +2312,6 @@ skpcSensorSetNetworkDirection(
       case SKPC_IPBLOCK:
         prev_decider = "ipblock";
         break;
-
-      case SKPC_NEG_IPSET:
-      case SKPC_REMAIN_IPSET:
-      case SKPC_IPSET:
-        prev_decider = "ipset";
-        break;
     }
 
     if (prev_decider) {
@@ -2143,12 +2327,13 @@ skpcSensorSetNetworkDirection(
 }
 
 
-/* Set the list of interfaces/IPs that represent a network */
+/* Set the list of IP blocks that represent a network */
 int
-skpcSensorSetNetworkGroup(
+skpcSensorSetIpBlocks(
     skpc_sensor_t      *sensor,
     skpc_network_id_t   network_id,
-    const skpc_group_t *group)
+    const skpc_group_t *ip_group,
+    int                 is_negatated)
 {
     const skpc_network_t *network;
     size_t i;
@@ -2156,15 +2341,14 @@ skpcSensorSetNetworkGroup(
     /* check input */
     assert(sensor);
     assert(network_id <= SKPC_NETWORK_ID_INVALID);
-    assert(group);
-    assert(skpcGroupGetType(group) != SKPC_GROUP_UNSET);
 
     /* check that group has data and that it is the correct type */
-    if (group == NULL) {
+    if (ip_group == NULL) {
         return -1;
     }
-    if (!skpcGroupIsFrozen(group)
-        || (skpcGroupGetItemCount(group) == 0))
+    if (!skpcGroupIsFrozen(ip_group)
+        || (skpcGroupGetItemCount(ip_group) == 0)
+        || (SKPC_GROUP_IPBLOCK != skpcGroupGetType(ip_group)))
     {
         return -1;
     }
@@ -2176,13 +2360,12 @@ skpcSensorSetNetworkGroup(
     }
     assert(network->id < sensor->decider_count);
 
-    /* cannot set group when the source/destination network has
+    /* cannot set ipblocks when the source/destination network has
      * been fixed to this network_id. */
     for (i = 0; i < 2; ++i) {
         if (sensor->fixed_network[i] == network_id) {
-            skAppPrintErr(("Error setting %ss on sensor '%s':\n"
+            skAppPrintErr(("Error setting IP blocks on sensor '%s':\n"
                            "\tAll flows are assumed to be %s the %s network"),
-                          skpcGrouptypeEnumtoName(skpcGroupGetType(group)),
                           sensor->sensor_name,
                           ((i == 0) ? "coming from" : "going to"),
                           network->name);
@@ -2192,45 +2375,31 @@ skpcSensorSetNetworkGroup(
 
     /* check that we're not attempting to change an existing value */
     if (sensor->decider[network->id].nd_type != SKPC_UNSET) {
-        skAppPrintErr(("Error setting %ss on sensor '%s':\n"
+        skAppPrintErr(("Error setting IP block on sensor '%s':\n"
                        "\tCannot overwrite existing %s network value"),
-                      skpcGrouptypeEnumtoName(skpcGroupGetType(group)),
                       sensor->sensor_name, network->name);
         return -1;
     }
 
-    sensor->decider[network->id].nd_group = group;
-    switch (skpcGroupGetType(group)) {
-      case SKPC_GROUP_INTERFACE:
-        sensor->decider[network->id].nd_type = SKPC_INTERFACE;
-        break;
-      case SKPC_GROUP_IPBLOCK:
-        sensor->decider[network->id].nd_type = SKPC_IPBLOCK;
-        break;
-      case SKPC_GROUP_IPSET:
-        sensor->decider[network->id].nd_type = SKPC_IPSET;
-        break;
-      case SKPC_GROUP_UNSET:
-        skAbortBadCase(skpcGroupGetType(group));
-    }
+    sensor->decider[network->id].nd_group = ip_group;
+    sensor->decider[network->id].nd_type =
+        (is_negatated ? SKPC_NEG_IPBLOCK : SKPC_IPBLOCK);
 
     return 0;
 }
 
 
-/* Set the specified network to all values not covered by other networks */
+/* Set the specified interface to all IPs not covered by other interfaces */
 int
-skpcSensorSetNetworkRemainder(
+skpcSensorSetToRemainderIpBlocks(
     skpc_sensor_t      *sensor,
-    skpc_network_id_t   network_id,
-    skpc_group_type_t   group_type)
+    skpc_network_id_t   network_id)
 {
     const skpc_network_t *network;
     int i;
 
     assert(sensor);
     assert(network_id <= SKPC_NETWORK_ID_INVALID);
-    assert(group_type != SKPC_GROUP_UNSET);
 
     /* get network */
     network = skpcNetworkLookupByID(network_id);
@@ -2240,41 +2409,28 @@ skpcSensorSetNetworkRemainder(
 
     assert(network->id < sensor->decider_count);
 
-    /* cannot set network when the source/destination network has
+    /* cannot set ipblocks when the source/destination network has
      * been fixed to this network_id. */
     for (i = 0; i < 2; ++i) {
         if (sensor->fixed_network[i] == network_id) {
-            skAppPrintErr(("Error setting %ss on sensor '%s':\n"
+            skAppPrintErr(("Error setting IP block on sensor '%s':\n"
                            "\tAll flows are assumed to be %s the %s network"),
-                          skpcGrouptypeEnumtoName(group_type),
                           sensor->sensor_name,
                           ((i == 0) ? "coming from" : "going to"),
                           network->name);
             return -1;
         }
     }
+
     /* check that we're not attempting to change an existing value */
     if (sensor->decider[network->id].nd_type != SKPC_UNSET) {
-        skAppPrintErr(("Error setting %ss on sensor '%s':\n"
+        skAppPrintErr(("Error setting IP block on sensor '%s':\n"
                        "\tCannot overwrite existing %s network value"),
-                      skpcGrouptypeEnumtoName(group_type),
                       sensor->sensor_name, network->name);
         return -1;
     }
 
-    switch (group_type) {
-      case SKPC_GROUP_INTERFACE:
-        sensor->decider[network->id].nd_type = SKPC_REMAIN_INTERFACE;
-        break;
-      case SKPC_GROUP_IPBLOCK:
-        sensor->decider[network->id].nd_type = SKPC_REMAIN_IPBLOCK;
-        break;
-      case SKPC_GROUP_IPSET:
-        sensor->decider[network->id].nd_type = SKPC_REMAIN_IPSET;
-        break;
-      case SKPC_GROUP_UNSET:
-        skAbortBadCase(group_type);
-    }
+    sensor->decider[network->id].nd_type = SKPC_REMAIN_IPBLOCK;
 
     return 0;
 }
@@ -2315,12 +2471,119 @@ skpcSensorSetDefaultNonrouted(
         skpcGroupFreeze(nonrouted_group);
     }
 
-    rv = skpcSensorSetNetworkGroup(sensor, network_id, nonrouted_group);
+    rv = skpcSensorSetInterfaces(sensor, network_id, nonrouted_group);
   END:
     if (ifvec) {
         skVectorDestroy(ifvec);
     }
     return rv;
+}
+
+
+/* Set the list of SNMP interfaces on the specified interface group */
+int
+skpcSensorSetInterfaces(
+    skpc_sensor_t      *sensor,
+    skpc_network_id_t   network_id,
+    const skpc_group_t *if_group)
+{
+    const skpc_network_t *network;
+    size_t i;
+
+    /* check input */
+    assert(sensor);
+    assert(network_id <= SKPC_NETWORK_ID_INVALID);
+
+    /* check that group has data and that it is the correct type */
+    if (if_group == NULL) {
+        return -1;
+    }
+    if (!skpcGroupIsFrozen(if_group)
+        || (skpcGroupGetItemCount(if_group) == 0)
+        || (SKPC_GROUP_INTERFACE != skpcGroupGetType(if_group)))
+    {
+        return -1;
+    }
+
+    /* get network */
+    network = skpcNetworkLookupByID(network_id);
+    if (network == NULL) {
+        return -1;
+    }
+    assert(network->id < sensor->decider_count);
+
+    /* cannot set interfaces when the source/destination network has
+     * been fixed to this network_id. */
+    for (i = 0; i < 2; ++i) {
+        if (sensor->fixed_network[i] == network_id) {
+            skAppPrintErr(("Error setting interfaces on sensor '%s':\n"
+                           "\tAll flows are assumed to be %s the %s network"),
+                          sensor->sensor_name,
+                          ((i == 0) ? "coming from" : "going to"),
+                          network->name);
+            return -1;
+        }
+    }
+
+    /* check that we're not attempting to change an existing value */
+    if (sensor->decider[network->id].nd_type != SKPC_UNSET) {
+        skAppPrintErr(("Error setting interfaces on sensor '%s':\n"
+                       "\tCannot overwrite existing %s network value"),
+                      sensor->sensor_name, network->name);
+        return -1;
+    }
+
+    sensor->decider[network->id].nd_group = if_group;
+    sensor->decider[network->id].nd_type = SKPC_INTERFACE;
+
+    return 0;
+}
+
+
+/* Set the SNMP interface list for the specified 'network' to all
+ * interfaces not mentioned in other lists. */
+int
+skpcSensorSetToRemainderInterfaces(
+    skpc_sensor_t      *sensor,
+    skpc_network_id_t   network_id)
+{
+    const skpc_network_t *network;
+    int i;
+
+    assert(sensor);
+    assert(network_id <= SKPC_NETWORK_ID_INVALID);
+
+    /* get network */
+    network = skpcNetworkLookupByID(network_id);
+    if (network == NULL) {
+        return -1;
+    }
+
+    assert(network->id < sensor->decider_count);
+
+    /* cannot set interfaces when the source/destination network has
+     * been fixed to this network_id. */
+    for (i = 0; i < 2; ++i) {
+        if (sensor->fixed_network[i] == network_id) {
+            skAppPrintErr(("Error setting interfaces on sensor '%s':\n"
+                           "\tAll flows are assumed to be %s the %s network"),
+                          sensor->sensor_name,
+                          ((i == 0) ? "coming from" : "going to"),
+                          network->name);
+            return -1;
+        }
+    }
+    /* check that we're not attempting to change an existing value */
+    if (sensor->decider[network->id].nd_type != SKPC_UNSET) {
+        skAppPrintErr(("Error setting IP block on sensor '%s':\n"
+                       "\tCannot overwrite existing %s network value"),
+                      sensor->sensor_name, network->name);
+        return -1;
+    }
+
+    sensor->decider[network->id].nd_type = SKPC_REMAIN_INTERFACE;
+
+    return 0;
 }
 
 
@@ -2445,73 +2708,6 @@ skpcSensorComputeRemainingIpBlocks(
 }
 
 
-static int
-skpcSensorComputeRemainingIpSets(
-    skpc_sensor_t      *sensor)
-{
-    size_t remain_network = SKPC_NETWORK_ID_INVALID;
-    int has_ipsets = 0;
-    skpc_group_t *group = NULL;
-    size_t i;
-
-    /* determine which network has claimed the 'remainder'. At the
-     * same time, verify that at least one network has 'ipsets' */
-    for (i = 0; i < sensor->decider_count; ++i) {
-        if (sensor->decider[i].nd_type == SKPC_REMAIN_IPSET) {
-            if (remain_network != SKPC_NETWORK_ID_INVALID) {
-                /* cannot have more than one "remainder" */
-                skAppPrintErr(("Cannot verify sensor '%s':\n"
-                               "\tMultiple network values claim 'remainder'"),
-                              sensor->sensor_name);
-                return -1;
-            }
-            remain_network = i;
-        } else if (sensor->decider[i].nd_type == SKPC_IPSET) {
-            has_ipsets = 1;
-        }
-    }
-
-    if (remain_network == SKPC_NETWORK_ID_INVALID) {
-        /* no one is set to remainder; return */
-        return 0;
-    }
-
-    /* need to have existing IPsets to set a remainder */
-    if (has_ipsets == 0) {
-        const skpc_network_t *network = skpcNetworkLookupByID(remain_network);
-        skAppPrintErr(("Cannot verify sensor '%s':\n"
-                       "\tCannot set %s-ipsets to remaining IP because\n"
-                       "\tno other interfaces hold IP sets"),
-                      sensor->sensor_name, network->name);
-        return -1;
-    }
-
-    /* create a new group */
-    if (skpcGroupCreate(&group)) {
-        skAppPrintOutOfMemory(NULL);
-        return -1;
-    }
-    skpcGroupSetType(group, SKPC_GROUP_IPSET);
-
-    sensor->decider[remain_network].nd_group = group;
-
-    /* add all existing groups to the new group */
-    for (i = 0; i < sensor->decider_count; ++i) {
-        if (sensor->decider[i].nd_type == SKPC_IPSET) {
-            if (skpcGroupAddGroup(group, sensor->decider[i].nd_group)) {
-                skAppPrintOutOfMemory(NULL);
-                return -1;
-            }
-        }
-    }
-
-    /* freze the group */
-    skpcGroupFreeze(group);
-
-    return 0;
-}
-
-
 /* add a new discard-{when,unless} list to 'sensor' */
 int
 skpcSensorAddFilter(
@@ -2519,7 +2715,7 @@ skpcSensorAddFilter(
     const skpc_group_t *group,
     skpc_filter_type_t  filter_type,
     int                 is_discardwhen_list,
-    skpc_group_type_t   group_type)
+    int                 is_wildcard_list)
 {
     const char *filter_name;
     skpc_filter_t *filter;
@@ -2534,7 +2730,9 @@ skpcSensorAddFilter(
     }
     if (!skpcGroupIsFrozen(group)
         || (skpcGroupGetItemCount(group) == 0)
-        || (skpcGroupGetType(group) != group_type))
+        || (skpcGroupGetType(group) != (is_wildcard_list
+                                        ? SKPC_GROUP_IPBLOCK
+                                        : SKPC_GROUP_INTERFACE)))
     {
         return -1;
     }
@@ -2544,30 +2742,35 @@ skpcSensorAddFilter(
          j < sensor->filter_count;
          ++j, ++filter)
     {
-        if (filter->f_type == filter_type
-            && filter->f_group_type == group_type)
-        {
-            /* error */
-            switch (filter_type) {
-              case SKPC_FILTER_ANY:
-                filter_name = "any";
-                break;
-              case SKPC_FILTER_DESTINATION:
-                filter_name = "destination";
-                break;
-              case SKPC_FILTER_SOURCE:
-                filter_name = "source";
-                break;
-              default:
-                skAbortBadCase(filter_type);
-            }
-            skAppPrintErr(("Error setting discard-%s list on sensor '%s':\n"
-                           "\tMay not overwrite existing %s-%ss list"),
-                          (is_discardwhen_list ? "when" : "unless"),
-                          sensor->sensor_name, filter_name,
-                          skpcGrouptypeEnumtoName(group_type));
-            return -1;
+        if (filter->f_type != filter_type) {
+            continue;
         }
+        if ((is_wildcard_list && !filter->f_wildcard)
+            || (!is_wildcard_list && filter->f_wildcard))
+        {
+            continue;
+        }
+
+        /* error */
+        switch (filter_type) {
+          case SKPC_FILTER_ANY:
+            filter_name = "any";
+            break;
+          case SKPC_FILTER_DESTINATION:
+            filter_name = "destination";
+            break;
+          case SKPC_FILTER_SOURCE:
+            filter_name = "source";
+            break;
+          default:
+            skAbortBadCase(filter_type);
+        }
+        skAppPrintErr(("Error setting discard-%s list on sensor '%s':\n"
+                       "\tCannot overwrite existing %s-%s list"),
+                      (is_discardwhen_list ? "when" : "unless"),
+                      sensor->sensor_name, filter_name,
+                      (is_wildcard_list ? "ipblocks" : "interfaces"));
+        return -1;
     }
 
     /* if this is the first filter, allocate space for all the filters
@@ -2575,9 +2778,8 @@ skpcSensorAddFilter(
     if (NULL == sensor->filter) {
         assert(0 == sensor->filter_count);
         /* allow room for both interface-filters and ipblock-filters */
-        sensor->filter = ((skpc_filter_t*)
-                          calloc(SKPC_NUM_GROUP_TYPES * SKPC_NUM_FILTER_TYPES,
-                                 sizeof(skpc_filter_t)));
+        sensor->filter = (skpc_filter_t*)calloc(2 * SKPC_NUM_FILTER_TYPES,
+                                                sizeof(skpc_filter_t));
         if (NULL == sensor->filter) {
             skAppPrintOutOfMemory(NULL);
             goto END;
@@ -2590,7 +2792,7 @@ skpcSensorAddFilter(
 
     filter->f_group = group;
     filter->f_type = filter_type;
-    filter->f_group_type = group_type;
+    filter->f_wildcard = (is_wildcard_list ? 1 : 0);
     filter->f_discwhen = (is_discardwhen_list ? 1 : 0);
 
     ++sensor->filter_count;
@@ -2768,9 +2970,6 @@ skpcSensorVerify(
     if (skpcSensorComputeRemainingIpBlocks(sensor)) {
         return -1;
     }
-    if (skpcSensorComputeRemainingIpSets(sensor)) {
-        return -1;
-    }
 
     /* add a link on each probe to this sensor */
     for (i = 0; i < sensor->probe_count; ++i) {
@@ -2848,12 +3047,6 @@ skpcGroupDestroy(
             (*group)->g_value.vec = NULL;
         }
         break;
-      case SKPC_GROUP_IPSET:
-        if ((*group)->g_value.ipset) {
-            skIPSetDestroy(&(*group)->g_value.ipset);
-            (*group)->g_value.ipset = NULL;
-        }
-        break;
     }
 
     if ((*group)->g_name) {
@@ -2875,7 +3068,6 @@ skpcGroupFreeze(
     size_t count;
     skIPWildcard_t **ipwild_list;
     sk_vector_t *ipblock_vec;
-    uint64_t ip_count;
 
     assert(group);
     if (group->g_is_frozen) {
@@ -2886,25 +3078,13 @@ skpcGroupFreeze(
         /* nothing else do */
         goto END;
     }
+
     if (SKPC_GROUP_INTERFACE == group->g_type) {
         group->g_itemcount = skBitmapGetHighCount(group->g_value.map);
         goto END;
     }
-    if (SKPC_GROUP_IPSET == group->g_type) {
-        if (skIPSetClean(group->g_value.ipset)) {
-            return -1;
-        }
-        ip_count = skIPSetCountIPs(group->g_value.ipset, NULL);
-        if (ip_count > UINT32_MAX) {
-            group->g_itemcount = UINT32_MAX;
-        } else {
-            group->g_itemcount = (uint32_t)ip_count;
-        }
-        goto END;
-    }
-    if (SKPC_GROUP_IPBLOCK != group->g_type) {
-        skAbortBadCase(group->g_type);
-    }
+
+    assert(SKPC_GROUP_IPBLOCK == group->g_type);
 
     /* convert the vector to an array */
     ipblock_vec = group->g_value.vec;
@@ -3022,12 +3202,6 @@ skpcGroupSetType(
             return -1;
         }
         break;
-
-      case SKPC_GROUP_IPSET:
-        if (skIPSetCreate(&group->g_value.ipset, 0)) {
-            return -1;
-        }
-        break;
     }
 
     group->g_type = group_type;
@@ -3044,8 +3218,6 @@ skpcGroupAddValues(
     size_t count;
     size_t i;
     uint32_t *num;
-    const skipset_t *ipset;
-    int rv;
 
     assert(group);
     if (group->g_is_frozen) {
@@ -3099,25 +3271,6 @@ skpcGroupAddValues(
             return -1;
         }
         break;
-
-      case SKPC_GROUP_IPSET:
-        /* check that vector has data of the correct type (size) */
-        if (skVectorGetElementSize(vec) != sizeof(skipset_t*)) {
-            return -1;
-        }
-        for (i = 0; i < count; ++i) {
-            ipset = *(skipset_t**)skVectorGetValuePointer(vec, i);
-            rv = skIPSetUnion(group->g_value.ipset, ipset);
-            if (rv) {
-                skAppPrintOutOfMemory(NULL);
-                return -1;
-            }
-        }
-        rv = skIPSetClean(group->g_value.ipset);
-        if (rv) {
-            return -1;
-        }
-        break;
     }
 
     return 0;
@@ -3163,15 +3316,6 @@ skpcGroupAddGroup(
         if (skVectorAppendFromArray(group->g_value.vec, g->g_value.ipblock,
                                     g->g_itemcount))
         {
-            return -1;
-        }
-        break;
-
-      case SKPC_GROUP_IPSET:
-        if (skIPSetUnion(group->g_value.ipset, g->g_value.ipset)) {
-            return -1;
-        }
-        if (skIPSetClean(group->g_value.ipset)) {
             return -1;
         }
         break;
@@ -3266,17 +3410,17 @@ skpcGroupCheckInterface(
     uint32_t            interface)
 {
     assert(group->g_type == SKPC_GROUP_INTERFACE);
-    return skBitmapGetBit(group->g_value.map, interface);
+    return (1 == skBitmapGetBit(group->g_value.map, interface));
 }
 
 
 /*
- *  found = skpcGroupCheckIPblock(group, ip);
+ *  found = skpcGroupCheckIp(group, ip);
  *
  *    Return 1 if 'group' contains the IP Address 'ip'; 0 otherwise.
  */
 static int
-skpcGroupCheckIPblock(
+skpcGroupCheckIp(
     const skpc_group_t *group,
     const skipaddr_t   *ip)
 {
@@ -3289,21 +3433,6 @@ skpcGroupCheckIPblock(
         }
     }
     return 0;
-}
-
-
-/*
- *  found = skpcGroupCheckIPset(group, ip);
- *
- *    Return 1 if 'group' contains the IP Address 'ip'; 0 otherwise.
- */
-static int
-skpcGroupCheckIPset(
-    const skpc_group_t *group,
-    const skipaddr_t   *ip)
-{
-    assert(group->g_type == SKPC_GROUP_IPSET);
-    return skIPSetCheckAddress(group->g_value.ipset, ip);
 }
 
 
@@ -3355,25 +3484,6 @@ skpcProbetypeEnumtoName(
         if (type == entry->value) {
             return entry->name;
         }
-    }
-    return NULL;
-}
-
-
-/* return a name given a group type */
-const char *
-skpcGrouptypeEnumtoName(
-    skpc_group_type_t   type)
-{
-    switch (type) {
-      case SKPC_GROUP_INTERFACE:
-        return "interface";
-      case SKPC_GROUP_IPBLOCK:
-        return "ipblock";
-      case SKPC_GROUP_IPSET:
-        return "ipset";
-      case SKPC_GROUP_UNSET:
-        break;
     }
     return NULL;
 }

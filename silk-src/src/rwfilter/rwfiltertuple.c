@@ -40,12 +40,11 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfiltertuple.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwfiltertuple.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
-#include <silk/skvector.h>
 #include <silk/redblack.h>
-#include <silk/rwascii.h>
 #include <silk/skstringmap.h>
+#include <silk/skvector.h>
 #include "rwfilter.h"
 
 
@@ -122,8 +121,6 @@ static struct field_st {
     uint32_t    type;
     /* byte offset of this field from start of the node */
     size_t      offset;
-    /* byte length of this field */
-    size_t      length;
 } field[TUPLE_MAX];
 
 /* the field map is used when parsing field names */
@@ -266,7 +263,7 @@ tupleUsage(
           case OPT_TUPLE_FIELDS:
             fprintf(fh, "%s\n", tupleOptionsHelp[i]);
             if (field_map) {
-                skStringMapPrintUsage(field_map, fh, 4);
+                skStringMapPrintUsage(field_map, fh, 8);
             }
             break;
 
@@ -395,19 +392,11 @@ tupleCheck(
         for (i = 0; i < num_fields; ++i) {
             switch (field[i].type) {
               case RWREC_FIELD_SIP:
-#if SK_ENABLE_IPV6
                 rwRecMemGetSIPv6(rwrec, key + field[i].offset);
-#else
-                rwRecMemGetSIPv4(rwrec, key + field[i].offset);
-#endif
                 break;
 
               case RWREC_FIELD_DIP:
-#if SK_ENABLE_IPV6
                 rwRecMemGetDIPv6(rwrec, key + field[i].offset);
-#else
-                rwRecMemGetDIPv4(rwrec, key + field[i].offset);
-#endif
                 break;
 
               case RWREC_FIELD_SPORT:
@@ -437,19 +426,11 @@ tupleCheck(
         for (i = 0; i < num_fields; ++i) {
             switch (field[i].type) {
               case RWREC_FIELD_SIP:
-#if SK_ENABLE_IPV6
                 rwRecMemGetDIPv6(rwrec, key + field[i].offset);
-#else
-                rwRecMemGetDIPv4(rwrec, key + field[i].offset);
-#endif
                 break;
 
               case RWREC_FIELD_DIP:
-#if SK_ENABLE_IPV6
                 rwRecMemGetSIPv6(rwrec, key + field[i].offset);
-#else
-                rwRecMemGetSIPv4(rwrec, key + field[i].offset);
-#endif
                 break;
 
               case RWREC_FIELD_SPORT:
@@ -568,7 +549,7 @@ static int
 tupleCreateFieldMap(
     void)
 {
-    /* the list of fields we support.  copied from rwascii.c. */
+    /* the list of fields we support.  copied from rwrec.c. */
     static const sk_stringmap_entry_t entries[] = {
         {"sIP",          RWREC_FIELD_SIP,   NULL, NULL},
         {"1",            RWREC_FIELD_SIP,   NULL, NULL},
@@ -677,10 +658,9 @@ tupleParseFieldNames(
 {
     sk_stringmap_iter_t *iter = NULL;
     sk_stringmap_entry_t *entry;
+    size_t length;
     char *errmsg;
     int rv = -1;
-
-    assert(0 == num_fields);
 
     if (NULL == field_map) {
         if (tupleCreateFieldMap()) {
@@ -706,20 +686,16 @@ tupleParseFieldNames(
         switch (entry->id) {
           case RWREC_FIELD_SIP:
           case RWREC_FIELD_DIP:
-#if SK_ENABLE_IPV6
-            field[num_fields].length = RWREC_SIZEOF_SIPv6;
-#else
-            field[num_fields].length = RWREC_SIZEOF_SIPv4;
-#endif
+            length = 16;
             break;
 
           case RWREC_FIELD_SPORT:
           case RWREC_FIELD_DPORT:
-            field[num_fields].length = RWREC_SIZEOF_SPORT;
+            length = sizeof(uint16_t);
             break;
 
           case RWREC_FIELD_PROTO:
-            field[num_fields].length = RWREC_SIZEOF_PROTO;
+            length = sizeof(uint8_t);
             break;
 
           default:
@@ -728,7 +704,7 @@ tupleParseFieldNames(
 
         field[num_fields].type = entry->id;
         field[num_fields].offset = node_length;
-        node_length += field[num_fields].length;
+        node_length += length;
         ++num_fields;
     }
 
@@ -758,8 +734,6 @@ tupleGetFieldsFromFirstLine(
 {
     char *cp = first_line;
     char *ep = first_line;
-
-    assert(0 == num_fields);
 
     /* need to get fields from the first line. convert the first line
      * in place to a list of fields by converting the delimiter to a
@@ -862,9 +836,6 @@ tupleProcessFields(
     uint8_t proto_cur;
     uint32_t incremented;
     int rv = -1;
-#if !SK_ENABLE_IPV6
-    uint32_t ipv4;
-#endif
 
     memset(&sport, 0, sizeof(number_list_t));
     memset(&dport, 0, sizeof(number_list_t));
@@ -895,12 +866,8 @@ tupleProcessFields(
             if (skStringParseIPWildcard(&sip.ipwild, field_val[i])) {
                 return 1;
             }
-#if SK_ENABLE_IPV6
             /* force addresses to be IPv6 */
             skIPWildcardIteratorBindV6(&sip.iter, &sip.ipwild);
-#else
-            skIPWildcardIteratorBind(&sip.iter, &sip.ipwild);
-#endif
             skIPWildcardIteratorNext(&sip.iter, &sip_cur);
             break;
 
@@ -911,12 +878,8 @@ tupleProcessFields(
             if (skStringParseIPWildcard(&dip.ipwild, field_val[i])) {
                 return 1;
             }
-#if SK_ENABLE_IPV6
             /* force addresses to be IPv6 */
             skIPWildcardIteratorBindV6(&dip.iter, &dip.ipwild);
-#else
-            skIPWildcardIteratorBind(&dip.iter, &dip.ipwild);
-#endif
             skIPWildcardIteratorNext(&dip.iter, &dip_cur);
             break;
 
@@ -968,12 +931,7 @@ tupleProcessFields(
         for (i = 0; i < num_fields; ++i) {
             switch (field[i].type) {
               case RWREC_FIELD_SIP:
-#if SK_ENABLE_IPV6
                 skipaddrGetV6(&sip_cur, cur_node + field[i].offset);
-#else
-                ipv4 = skipaddrGetV4(&sip_cur);
-                memcpy(cur_node + field[i].offset, &ipv4, field[i].length);
-#endif
                 if (incremented == 0) {
                     if (skIPWildcardIteratorNext(&sip.iter, &sip_cur)
                         == SK_ITERATOR_OK)
@@ -987,12 +945,7 @@ tupleProcessFields(
                 break;
 
               case RWREC_FIELD_DIP:
-#if SK_ENABLE_IPV6
                 skipaddrGetV6(&dip_cur, cur_node + field[i].offset);
-#else
-                ipv4 = skipaddrGetV4(&dip_cur);
-                memcpy(cur_node + field[i].offset, &ipv4, field[i].length);
-#endif
                 if (incremented == 0) {
                     if (skIPWildcardIteratorNext(&dip.iter, &dip_cur)
                         == SK_ITERATOR_OK)
@@ -1006,7 +959,8 @@ tupleProcessFields(
                 break;
 
               case RWREC_FIELD_SPORT:
-                memcpy(cur_node + field[i].offset, &sport_cur,field[i].length);
+                memcpy(cur_node + field[i].offset, &sport_cur,
+                       sizeof(sport_cur));
                 if (incremented == 0 && sport.count != 1) {
                     ++sport.idx;
                     if (sport.idx == sport.count) {
@@ -1020,7 +974,8 @@ tupleProcessFields(
                 break;
 
               case RWREC_FIELD_DPORT:
-                memcpy(cur_node + field[i].offset, &dport_cur,field[i].length);
+                memcpy(cur_node + field[i].offset, &dport_cur,
+                       sizeof(dport_cur));
                 if (incremented == 0 && dport.count != 1) {
                     ++dport.idx;
                     if (dport.idx == dport.count) {
@@ -1034,7 +989,8 @@ tupleProcessFields(
                 break;
 
               case RWREC_FIELD_PROTO:
-                memcpy(cur_node + field[i].offset, &proto_cur,field[i].length);
+                memcpy(cur_node + field[i].offset, &proto_cur,
+                       sizeof(proto_cur));
                 if (incremented == 0 && proto.count != 1) {
                     ++proto.idx;
                     if (proto.idx == proto.count) {
@@ -1199,13 +1155,16 @@ tupleParseFile(
 
             /* find end of current field */
             ep = strchr(cp, delimiter);
+            if (ep) {
+                *ep = '\0';
+            }
+
             if (NULL == ep) {
                 /* at end of line; break out of while() */
                 break;
             }
-            *ep = '\0';
 
-            /* goto next field */
+            /* we saw a delimiter earlier; goto next field */
             cp = ep + 1;
         } /* inner while over fields */
 

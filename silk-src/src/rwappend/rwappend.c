@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwappend.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwappend.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -373,6 +373,8 @@ int main(int argc, char **argv)
     int rv;
 
     appSetup(argc, argv);                 /* never returns on error */
+
+    rwRecInitialize(&rwrec, NULL);
 
     /* loop over the source files */
     for ( ; arg_index < argc; ++arg_index) {

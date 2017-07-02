@@ -92,7 +92,7 @@
 
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 typedef union YYSTYPE
-#line 115 "sksiteconfig_parse.y"
+#line 116 "sksiteconfig_parse.y"
 {
     int integer;
     char *str;

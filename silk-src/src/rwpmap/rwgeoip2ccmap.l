@@ -38,7 +38,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwgeoip2ccmap.l 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwgeoip2ccmap.l efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
@@ -743,7 +743,6 @@ stmtCreateEntry(
         }
     }
 
-#if SK_ENABLE_IPV6
     if (GEOIP2CCMAP_MODE_IPV4 == mode) {
         uint32_t ipv4;
         if (skipaddrGetAsV4(&stmt.range_start, &ipv4)
@@ -756,7 +755,6 @@ stmtCreateEntry(
             return;
         }
     }
-#endif  /* SK_ENABLE_IPV6 */
 
     rv = skPrefixMapAddRange(map, &stmt.range_start, &stmt.range_end,
                              stmt.value);

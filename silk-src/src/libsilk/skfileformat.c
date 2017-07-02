@@ -17,7 +17,7 @@
 #define SKFILEFORMAT_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skfileformat.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skfileformat.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/silk_files.h>
 #include <silk/utils.h>
@@ -144,34 +144,6 @@ skFileFormatIsValid(
     sk_file_format_t    id)
 {
     return (id < fileFormatGetCount());
-}
-
-
-/** DEPRECATED FUNCTIONS **********************************************/
-
-#include <silk/sksite.h>
-
-int
-sksiteFileformatGetName(
-    char               *buffer,
-    size_t              buffer_size,
-    sk_file_format_t    format_id)
-{
-    return skFileFormatGetName(buffer, buffer_size, format_id);
-}
-
-int
-sksiteFileformatIsValid(
-    sk_file_format_t    format_id)
-{
-    return skFileFormatIsValid(format_id);
-}
-
-sk_file_format_t
-sksiteFileformatFromName(
-    const char         *name)
-{
-    return skFileFormatFromName(name);
 }
 
 

@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SILK_TYPES_H, "$SiLK: silk_types.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_SILK_TYPES_H, "$SiLK: silk_types.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 /**
  *  @file
@@ -42,10 +42,9 @@ RCSIDENTVAR(rcsID_SILK_TYPES_H, "$SiLK: silk_types.h 275df62a2e41 2017-01-05 17:
  */
 typedef union skipunion_un {
     uint32_t    ipu_ipv4;
-#if SK_ENABLE_IPV6
     uint8_t     ipu_ipv6[16];
-#endif
 } skIPUnion_t;
+typedef skIPUnion_t ipUnion                 SK_GCC_DEPRECATED;
 
 /**
  *    An IP address structure that knows the version of IP address it
@@ -54,9 +53,7 @@ typedef union skipunion_un {
  */
 typedef struct skipaddr_st {
     skIPUnion_t ip_ip;
-#if SK_ENABLE_IPV6
     unsigned    ip_is_v6 :1;
-#endif
 } skipaddr_t;
 
 /**
@@ -107,7 +104,16 @@ typedef enum {
      *  addresses are present.  For that case, maximum string length
      *  is 16 for IPv4-as-IPv6, 20 for IPv4-as-IPv6/CIDR.
      */
-    SKIPADDR_FORCE_IPV6
+    SKIPADDR_FORCE_IPV6,
+    /**
+     *  Identical to the canonical form unless the address is an IPv6
+     *  address in the ::ffff:0:0/96 netblock, in which case the
+     *  address is converted to IPv4 and displayed in the canonical
+     *  form.
+     *
+     *  String lengths are the same as canonical.
+     */
+    SKIPADDR_AS_IPV4
 } skipaddr_flags_t;
 
 /**
@@ -189,19 +195,56 @@ typedef int64_t sktime_t;
  *    The generic SiLK Flow record returned from ANY file format
  *    containing packed SiLK Flow records.  It is defined in rwrec.h
  */
-typedef struct rwGenericRec_V5_st rwGenericRec_V5;
-typedef rwGenericRec_V5 rwRec;
+typedef struct rwGenericRec_V6 rwRec;
+
 
 /**
  *    The maximum size of a SiLK Flow record.
  */
-#define SK_MAX_RECORD_SIZE 104
+#define SK_MAX_RECORD_SIZE      144
 
 /**
  *    Number of possible SNMP interface index values
  */
 #define SK_SNMP_INDEX_LIMIT   65536
 
+/* *****  SCHEMAS, RECORDS, AND FIELDS **************************** */
+
+/**
+ *    A schema represents a set of sk_field_t's and maintains the
+ *    fields' offsets.  Schemas are reference counted, with
+ *    sk_schema_destroy() decrementing the count, and
+ *    sk_schema_clone() incrementing the count.  A schema can have
+ *    multiple copies of the same field.
+ */
+struct sk_schema_st;
+typedef struct sk_schema_st sk_schema_t;
+
+/**
+ *    A record consists of data, and an sk_schema_t describing the
+ *    data.
+ *
+ *    Schemas are referenced by records.  When a record is destroyed,
+ *    the schema's refcount is decremented.
+ */
+struct sk_fixrec_st;
+typedef struct sk_fixrec_st sk_fixrec_t;
+
+/**
+ *    A field consists of name and type information represented by an
+ *    fbInfoElement_t, and a set of basic operations represented by an
+ *    sk_field_ops_t.  A field also contains an offset which is
+ *    maintained by any owning schema.
+ */
+struct sk_field_st;
+typedef struct sk_field_st sk_field_t;
+
+/**
+ *    A sidecar data structure describes the type of fields that may
+ *    appear on the sidecar element of an rwRec.
+ */
+struct sk_sidecar_st;
+typedef struct sk_sidecar_st sk_sidecar_t;
 
 
 /* *****  STREAM / FILE FORMATS  ********************************** */
@@ -273,10 +316,16 @@ typedef enum {
     SK_CONTENT_SILK_FLOW = (1 << 1),
     /** stream contains a SiLK file header and data (non-Flow data) */
     SK_CONTENT_SILK = (1 << 2),
-    /** stream contains binary data other than SiLK */
+    /** stream contains binary data other than SiLK or IPFIX data */
     SK_CONTENT_OTHERBINARY = (1 << 3)
 } skcontent_t;
 
+
+/**
+ *    A wrapper over skstream_t that supports reading and writing
+ *    streams of IPFIX records.
+ */
+typedef struct sk_fixstream_st sk_fixstream_t;
 
 
 /* *****  CLASS / TYPE / SENSORS  ********************************* */
@@ -368,6 +417,19 @@ typedef sk_sensorgroup_id_t sensorgroupID_t SK_GCC_DEPRECATED;
  */
 #define SK_INVALID_SENSORGROUP      ((sk_sensorgroup_id_t)0xFF)
 
+/**
+ *    The sksite_repo_key_t is used to specify the location of a file
+ *    in a SiLK repository.
+ */
+struct sksite_repo_key_st {
+    /* the hour that this file is for */
+    sktime_t            timestamp;
+    /* the sensor that this file is for */
+    sk_sensor_id_t      sensor_id;
+    /* the flowtype (class/type) that this file is for */
+    sk_flowtype_id_t    flowtype_id;
+};
+typedef struct sksite_repo_key_st sksite_repo_key_t;
 
 
 /* *****  BITMPAP / LINKED-LIST / VECTOR  ************************* */

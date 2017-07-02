@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcs_SKSITECONFIG_H, "$SiLK: sksiteconfig.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcs_SKSITECONFIG_H, "$SiLK: sksiteconfig.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/skvector.h>
 

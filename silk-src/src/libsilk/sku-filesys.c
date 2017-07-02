@@ -17,9 +17,10 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-filesys.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: sku-filesys.c 21315f05de74 2017-06-26 20:03:25Z mthomas $");
 
 #include <silk/utils.h>
+#include <silk/sklog.h>
 
 
 /* DEFINES AND TYPEDEFS */
@@ -686,110 +687,6 @@ skFileptrStrerror(
 }
 
 
-/* open file 'FName' for read (mode==0) or write (mode==1).  See header. */
-int
-skOpenFile(
-    const char         *FName,
-    int                 mode,
-    FILE              **fp,
-    int                *isPipe)
-{
-    char cmd[1024];
-    const char *cp;
-    int fd;
-    unsigned char magic[2];
-    ssize_t num_read;
-
-    /* after this while() loop, 'cp' will be NULL if 'FName' is NOT
-     * compressed, or non-NULL if 'FName' is compressed. */
-    cp = FName;
-    while (NULL != (cp = strstr(cp, ".gz"))) {
-        if (*(cp + 3) == '\0') {
-            /* file ends with ".gz".  Treat it as compressed.  (In
-             * truth, this can be fooled by a bad mkstemp-based
-             * filename as below, but we'll worry about that
-             * later.) */
-            break;
-        } else if (*(cp + 3) == '.') {
-            /* Treat a file that contains ".gz." as a potential
-             * compressed file.  We do this to handle compressed files
-             * have had mkstemp() extensions added to them.  This is
-             * hackish, but it is simple and covers that common case
-             * with few false positives.  We then, if possible, check
-             * to see if it really is compressed by looking for the
-             * gzip magic number (31 139 (see RFC1952)) in the first
-             * two bytes.  We do not do this, however, if we are
-             * writing to the file or if we are working with a named
-             * pipe.  Despite the ability to search for the two-byte
-             * marker in a named pipe stream, we have no way to put
-             * the bytes back for normal processing.  Another solution
-             * would be to use gzopen() and gzread()---which again
-             * won't work for writing---and either accept their
-             * overhead when working with uncompressed files, or have
-             * librw do special things with compressed files.  There
-             * is really no good solution here.  Hopefully soon we
-             * will be using LZO compression in the body of the data
-             * files, but still have an uncompresed SiLK header. */
-            if ((1 == mode) || isFIFO(FName)) {
-                /* We will assume it is compressed if we are writing
-                 * to the file, or it is a FIFO, since we can't get
-                 * more information (such as a magic number) from the
-                 * file. */
-                break;
-            }
-            fd = open(FName, O_RDONLY);
-            if (-1 == fd) {
-                /* We couldn't open the file.  Pass it on for normal
-                 * processing and error handling. */
-                break;
-            }
-            /* Read the first two bytes of the file. */
-            num_read = read(fd, magic, 2);
-            if ((num_read != 2) || (magic[0] != 31) || (magic[1] != 139)) {
-                /* This cannot be a gzip compressed file, as it does
-                 * not contain the gzip magic number.  Setting cp to
-                 * NULL indicates that the file is not compressed. */
-                cp = NULL;
-            }
-            close(fd);
-            break;
-        } else {
-            cp += 3;
-        }
-    }
-
-    if (NULL == cp) {
-        /* Regular file or named pipe */
-        *isPipe = 0;
-        *fp = fopen(FName, mode ? "w" : "r");
-    } else if (mode == 0 && skFileExists(FName) == 0) {
-        /* Attempting to read from non-existent gzip */
-        *fp = NULL;
-    } else {
-        /* Either writing to gzip or reading from existing gzip */
-        if ((sizeof(cmd) - 16u) < strlen(FName)) {
-            return 1;
-        }
-        *isPipe = 1;
-        snprintf(cmd, sizeof(cmd), "gzip %s '%s'",
-                 (mode ? ">" : "-d -c"), FName);
-        *fp = popen(cmd, mode ? "w" : "r");
-    }
-
-    if (*fp == (FILE *)NULL) {
-        if (mode == 0 && skFileExists(FName) == 0) {
-            skAppPrintErr("Cannot open non-existant file '%s'", FName);
-        } else {
-            skAppPrintErr("Unable to open file '%s' for %s",
-                          FName, mode ? "writing" : "reading");
-        }
-        return 1;                   /* error */
-    }
-
-    return 0;
-}
-
-
 /*
  *  status = skMakeDir(path);
  *
@@ -1128,7 +1025,7 @@ skMoveFile(
 }
 
 
-/* return the tempory directory. */
+/* return the temporary directory. */
 const char *
 skTempDir(
     const char         *user_temp_dir,
@@ -1168,131 +1065,6 @@ skTempDir(
 }
 
 
-/* paginate the output.  see utils.h */
-int
-skOpenPagerWhenStdoutTty(
-    FILE              **output_stream,
-    char              **pager)
-{
-    FILE *out;
-    char *pg;
-    pid_t pid;
-    int wait_status;
-
-    /* verify input; deference the input variables */
-    assert(output_stream);
-    assert(pager);
-    out = *output_stream;
-    pg = *pager;
-
-    /* don't page if output is not "stdout" */
-    if (NULL == out) {
-        out = stdout;
-    } else if (out != stdout) {
-        /* no change */
-        return 0;
-    }
-
-    /* don't page a non-terminal */
-    if ( !FILEIsATty(out)) {
-        if (pg) {
-            /* pager explicitly given but ignored */
-            skAppPrintErr("Ignoring the --pager switch");
-        }
-        return 0;
-    }
-
-    /* get pager from environment if not passed in */
-    if (NULL == pg) {
-        pg = getenv("SILK_PAGER");
-        if (NULL == pg) {
-            pg = getenv("PAGER");
-        }
-    }
-
-    /* a NULL or an empty string pager means do nothing */
-    if ((NULL == pg) || ('\0' == pg[0])) {
-        return 0;
-    }
-
-#if 1
-    /* invoke the pager */
-    out = popen(pg, "w");
-    if (NULL == out) {
-        skAppPrintErr("Unable to invoke pager '%s'", pg);
-        return -1;
-    }
-
-    /* see if pager started.  There is a race condition here, and this
-     * assumes we have only one child, which should be true. */
-    pid = wait4(0, &wait_status, WNOHANG, NULL);
-    if (pid) {
-        skAppPrintErr("Unable to invoke pager '%s'", pg);
-        return -1;
-    }
-#else
-    {
-    int pipe_des[2];
-
-    /* create pipe and fork */
-    if (pipe(pipe_des) == -1) {
-        skAppPrintErr("Cannot create pipe: %s", strerror(errno));
-        return -1;
-    }
-    pid = fork();
-    if (pid < 0) {
-        skAppPrintErr("Cannot fork: %s", strerror(errno));
-        return -1;
-    }
-
-    if (pid == 0) {
-        /* CHILD */
-
-        /* close output side of pipe; set input to stdin */
-        close(pipe_des[1]);
-        if (pipe_des[0] != STDIN_FILENO) {
-            dup2(pipe_des[0], STDIN_FILENO);
-            close(pipe_des[0]);
-        }
-
-        /* invoke pager */
-        execlp(pg, NULL);
-        skAppPrintErr("Unable to invoke pager '%s': %s",
-                      pg, strerror(errno));
-        _exit(EXIT_FAILURE);
-    }
-
-    /* PARENT */
-
-    /* close input side of pipe */
-    close(pipe_des[0]);
-
-    /* try to open the write side of the pipe */
-    out = fdopen(pipe_des[1], "w");
-    if (NULL == out) {
-        skAppPrintErr("Cannot fdopen: %s", strerror(errno));
-        return -1;
-    }
-
-    /* it'd be nice to have a slight pause here to give child time to
-     * die if command cannot be exec'ed, but it's not worth the
-     * trouble to use select(), and sleep(1) is too long. */
-
-    /* see if child died unexpectedly */
-    if (waitpid(pid, &wait_status, WNOHANG)) {
-        skAppPrintErr("Unable to invoke pager '%s'", pg);
-        return -1;
-    }
-    }
-#endif /* 1: whether to use popen() */
-
-    /* looks good. set the output variables and return */
-    *pager = pg;
-    *output_stream = out;
-    return 1;
-}
-
-
 int
 skFileptrOpenPager(
     sk_fileptr_t       *file,
@@ -1308,7 +1080,7 @@ skFileptrOpenPager(
 
     /* don't page if output is not "stdout" */
     if (NULL == file->of_fp) {
-        /* assume output is stdout */
+        out = stdout;
     } else if (file->of_fp != stdout) {
         /* no change */
         return SK_FILEPTR_PAGER_IGNORED;
@@ -1354,20 +1126,6 @@ skFileptrOpenPager(
     file->of_type = SK_FILEPTR_IS_PROCESS;
 
     return SK_FILEPTR_OK;
-}
-
-
-/* Close the pager */
-void
-skClosePager(
-    FILE               *pager_stream,
-    const char         *pager)
-{
-    if (pager_stream && (pager_stream != stdout)) {
-        if (-1 == pclose(pager_stream)) {
-            skAppPrintErr("Error closing pager '%s'", pager);
-        }
-    }
 }
 
 
@@ -1437,6 +1195,293 @@ skGetLine(
 
     out_buffer[0] = '\0';
     return 0;
+}
+
+
+/* check contents of a printf-style converion string */
+size_t
+skSubcommandStringCheck(
+    const char         *command,
+    const char         *conversion_chars)
+{
+    const char *cp;
+
+    assert(command);
+    assert(conversion_chars);
+
+    cp = command;
+    while (NULL != (cp = strchr(cp, (int)'%'))) {
+        ++cp;
+        switch (*cp) {
+          case '%':
+            break;
+          case '\0':
+            return cp - command;
+          default:
+            if (NULL == strchr(conversion_chars, (int)*cp)) {
+                return cp - command;
+            }
+            break;
+        }
+        ++cp;
+    }
+    return 0;
+}
+
+
+/* return a new string that is command with conversions expanded */
+char *
+skSubcommandStringFill(
+    const char         *command,
+    const char         *conversion_chars,
+    ...)
+{
+    char *expanded_cmd;
+    char *expansion;
+    const char *cp;
+    const char *sp;
+    char *exp_cp;
+    va_list args;
+    size_t len;
+
+    /* Determine length of buffer needed for the expanded command
+     * string and allocate it.  */
+    cp = command;
+    len = 0;
+    while (NULL != (sp = strchr(cp, (int)'%'))) {
+        len += sp - cp;
+        cp = sp + 1;
+        if ('%' == *cp) {
+            ++len;
+        } else {
+            sp = strchr(conversion_chars, (int)*cp);
+            if (NULL == sp || '\0' == *sp) {
+                return NULL;
+            }
+            va_start(args, conversion_chars);
+            do {
+                expansion = va_arg(args, char *);
+                --sp;
+            } while (sp >= conversion_chars);
+            len += strlen(expansion);
+            va_end(args);
+        }
+        ++cp;
+    }
+    len += strlen(cp);
+    expanded_cmd = (char*)malloc(len + 1);
+    if (NULL == expanded_cmd) {
+        return NULL;
+    }
+
+    /* Copy command into buffer, handling %-expansions */
+    cp = command;
+    exp_cp = expanded_cmd;
+    while (NULL != (sp = strchr(cp, (int)'%'))) {
+        /* copy text we just jumped over */
+        strncpy(exp_cp, cp, sp - cp);
+        exp_cp += sp - cp;
+        cp = sp + 1;
+        /* handle conversion */
+        if ('%' == *cp) {
+            *exp_cp = '%';
+            ++exp_cp;
+        } else {
+            sp = strchr(conversion_chars, (int)*cp);
+            assert(sp && *sp);
+            va_start(args, conversion_chars);
+            do {
+                expansion = va_arg(args, char *);
+                --sp;
+            } while (sp >= conversion_chars);
+            strcpy(exp_cp, expansion);
+            exp_cp = strchr(exp_cp, (int)'\0');
+            va_end(args);
+        }
+        ++cp;
+        assert(len >= (size_t)(exp_cp - expanded_cmd));
+    }
+    strcpy(exp_cp, cp);
+    expanded_cmd[len] = '\0';
+
+    return expanded_cmd;
+}
+
+
+/*
+ *    Use the global 'environ' variable to get the environment table.
+ *    On macOS, we must use _NSGetEnviron() to get the environment.
+ */
+#if defined(SK_HAVE_DECL__NSGETENVIRON) && SK_HAVE_DECL__NSGETENVIRON
+#include <crt_externs.h>
+#define SK_ENVIRON_TABLE *_NSGetEnviron()
+#define SK_COPY_ENVIRONMENT 1
+#elif defined(SK_HAVE_DECL_ENVIRON) && SK_HAVE_DECL_ENVIRON
+#define SK_ENVIRON_TABLE environ
+#define SK_COPY_ENVIRONMENT 1
+#endif
+#ifndef SK_COPY_ENVIRONMENT
+#define SK_COPY_ENVIRONMENT 0
+#endif
+
+
+#if SK_COPY_ENVIRONMENT
+/**
+ *    Free the copy of the environment that was allocated by
+ *    skSubcommandCopyEnvironment().
+ */
+static void
+skSubcommandFreeEnvironment(
+    char              **env_copy)
+{
+    size_t i;
+
+    if (env_copy) {
+        for (i = 0; env_copy[i]; ++i) {
+            free(env_copy[i]);
+        }
+        free(env_copy);
+    }
+}
+
+/**
+ *    Make and return a copy of the current environment.
+ */
+static char **
+skSubcommandCopyEnvironment(
+    void)
+{
+    char **env = SK_ENVIRON_TABLE;
+    char **env_copy = NULL;
+    const size_t step = 100;
+    size_t sz = 0;
+    size_t i;
+
+    /* Add 1 for the terminating NULL */
+    for (i = 0; env[i]; ++i) {
+        if (i == sz) {
+            char **old = env_copy;
+            env_copy = (char **)realloc(old, (sz + step + 1) * sizeof(char *));
+            if (NULL == env_copy) {
+                old[i] = (char *)NULL;
+                skSubcommandFreeEnvironment(old);
+                return NULL;
+            }
+            sz += step;
+        }
+        env_copy[i] = strdup(env[i]);
+        if (NULL == env_copy[i]) {
+            skSubcommandFreeEnvironment(env_copy);
+            return NULL;
+        }
+    }
+    if (env_copy) {
+        env_copy[i] = (char *)NULL;
+    } else {
+        env_copy = (char **)calloc(1, sizeof(char *));
+    }
+    return env_copy;
+}
+#endif  /* SK_COPY_ENVIRONMENT */
+
+
+/* run the command */
+static long int
+skSubcommandExecuteHelper(
+    const char         *cmd_string,
+    char * const        cmd_array[])
+{
+    sigset_t sigs;
+    pid_t pid;
+
+#if SK_COPY_ENVIRONMENT
+    char **env_copy = skSubcommandCopyEnvironment();
+    if (NULL == env_copy) {
+        return -1;
+    }
+#endif  /* SK_COPY_ENVIRONMENT */
+
+    /* Parent (original process) forks to create Child 1 */
+    pid = fork();
+    if (-1 == pid) {
+        return -1;
+    }
+
+    /* Parent reaps Child 1 and returns */
+    if (0 != pid) {
+#if SK_COPY_ENVIRONMENT
+        skSubcommandFreeEnvironment(env_copy);
+#endif
+        /* Wait for Child 1 to exit. */
+        while (waitpid(pid, NULL, 0) == -1) {
+            if (EINTR != errno) {
+                return -2;
+            }
+        }
+        return (long)pid;
+    }
+
+    /* Change our process group, so a server program using this
+     * library that is waiting for any of its children (by process
+     * group) won't wait for this child. */
+    setpgid(0, 0);
+
+    /* Child 1 forks to create Child 2 */
+    pid = fork();
+    if (-1 == pid) {
+        skAppPrintSyserror("Child could not fork for to run command");
+        _exit(EXIT_FAILURE);
+    }
+
+    /* Child 1 immediately exits so Parent can stop waiting */
+    if (0 != pid) {
+        _exit(EXIT_SUCCESS);
+    }
+
+    /* Only Child 2 makes it here */
+
+    /* Unmask signals */
+    sigemptyset(&sigs);
+    sigprocmask(SIG_SETMASK, &sigs, NULL);
+
+    /* Execute the command */
+#if SK_COPY_ENVIRONMENT
+    if (cmd_string) {
+        execle("/bin/sh", "sh", "-c", cmd_string, (char*)NULL, env_copy);
+    } else {
+        execve(cmd_array[0], cmd_array, env_copy);
+    }
+#else  /* SK_COPY_ENVIRONMENT */
+    if (cmd_string) {
+        execl("/bin/sh", "sh", "-c", cmd_string, (char*)NULL);
+    } else {
+        execv(cmd_array[0], cmd_array);
+    }
+#endif  /* SK_COPY_ENVIRONMENT */
+
+    /* only get here when an error occurs */
+    if (cmd_string)  {
+        skAppPrintSyserror("Error invoking /bin/sh");
+    } else {
+        skAppPrintSyserror("Error invoking %s", cmd_array[0]);
+    }
+    _exit(EXIT_FAILURE);
+}
+
+
+long int
+skSubcommandExecute(
+    char * const        cmd_array[])
+{
+    return skSubcommandExecuteHelper(NULL, cmd_array);
+}
+
+
+long int
+skSubcommandExecuteShell(
+    const char         *cmd_string)
+{
+    return skSubcommandExecuteHelper(cmd_string, NULL);
 }
 
 

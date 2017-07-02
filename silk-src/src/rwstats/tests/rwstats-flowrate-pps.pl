@@ -1,5 +1,5 @@
 #! /usr/bin/perl -w
-# MD5: 8f3baa8ac2643c34b29d297fbf78cb65
+# MD5: e35889f1e3676d63ec3808825ec048f8
 # TEST: ./rwstats --plugin=flowrate.so --fields=pckts/sec --values=packets --count=10 ../../tests/data.rwf
 
 use strict;
@@ -13,6 +13,6 @@ add_plugin_dirs('/src/plugins');
 skip_test('Cannot load flowrate plugin')
     unless check_app_switch($rwstats.' --plugin=flowrate.so', 'fields', qr/payload-rate/);
 my $cmd = "$rwstats --plugin=flowrate.so --fields=pckts/sec --values=packets --count=10 $file{data}";
-my $md5 = "8f3baa8ac2643c34b29d297fbf78cb65";
+my $md5 = "e35889f1e3676d63ec3808825ec048f8";
 
 check_md5_output($md5, $cmd);

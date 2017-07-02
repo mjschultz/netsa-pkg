@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 74d271bfbc91 2016-08-16 21:00:41Z mthomas $");
 
 # Installed Targets
 
@@ -20,15 +20,19 @@ silkpython = ../pysilk/libsilkpython.la
 endif
 LDADD =  $(silkpython) ../libsilk/libsilk.la $(PYTHON_LDFLAGS_EMBEDDED)
 
-STATSUNIQ = skunique.c skunique.h
+STATSUNIQ = rwstats.h rwstats.lua rwstatssetup.c skunique.c skunique.h
 
-rwstats_SOURCES = rwstats.c rwstats.h rwstatssetup.c $(STATSUNIQ) \
-	interval.h intervalstats.c rwstatslegacy.c rwstatsproto.c
+rwstats_SOURCES = rwstats.c $(STATSUNIQ) \
+	interval.h intervalstats.c rwstatsproto.c
 
-rwuniq_SOURCES = rwuniq.c rwuniq.h rwuniqsetup.c $(STATSUNIQ)
+rwuniq_SOURCES = rwuniq.c $(STATSUNIQ)
 
-#include rwstats-old.mk
-#include rwuniq-old.mk
+LUA_OUTPUT_FILES = rwstats.i
+rwstatssetup.$(OBJEXT): rwstats.i
+
+BUILT_SOURCES = $(LUA_OUTPUT_FILES)
+CLEANFILES = $(LUA_OUTPUT_FILES)
+
 
 # Global Rules
 include $(top_srcdir)/build.mk
@@ -44,7 +48,6 @@ EXTRA_DIST += $(TESTS)
 
 TESTS = \
 	tests/rwstats-help.pl \
-	tests/rwstats-legacy-help.pl \
 	tests/rwstats-version.pl \
 	tests/rwstats-lone-command.pl \
 	tests/rwstats-no-switches.pl \

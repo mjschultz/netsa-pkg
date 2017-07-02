@@ -4,7 +4,7 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in ../LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: silkconfig.m4 275df62a2e41 2017-01-05 17:30:40Z mthomas $")
+dnl RCSIDENT("$SiLK: silkconfig.m4 6d5fc2555144 2017-06-23 19:38:28Z mthomas $")
 
 # ---------------------------------------------------------------------------
 # SILK_AC_COMPILER
@@ -216,9 +216,20 @@ AC_DEFUN([SILK_AC_COMPILER],[
     fi
 
     # Additional compiler characteristics
-    AC_C_CONST
-    AC_C_INLINE
-    AC_C_VOLATILE
+    AC_PROG_CC_C99
+    case "${ac_cv_prog_cc_c99}" in
+      no)
+        sk_have_inline=0
+        ;;
+      *)
+        sk_have_inline=1
+        sk_inline=inline
+        ;;
+    esac
+    AC_DEFINE_UNQUOTED([HAVE_INLINE], [${sk_have_inline}],
+        [Define to 1 if your compiler understands inline; define to 0 otherwise.])
+    AC_DEFINE_UNQUOTED([INLINE], [${sk_inline}],
+        [Define to keyword use for inline support, or empty if none.])
 
     # Check whether the compiler understands C99'ism __func__
     AC_MSG_CHECKING([whether the compiler understands __func__])
@@ -243,8 +254,8 @@ int foo(void)
 
     # Check whether the compiler understands __attribute__((__used__))
     AC_MSG_CHECKING([whether the compiler understands __attribute__((__used__))])
-    sk_save_CFLAGS="$CFLAGS"
-    CFLAGS="${sk_werror} $CFLAGS"
+    sk_save_CFLAGS="${CFLAGS}"
+    CFLAGS="${sk_werror} ${CFLAGS}"
     AC_COMPILE_IFELSE(
         [AC_LANG_PROGRAM([],[
              static char *x __attribute__((__used__)) = "used";
@@ -254,14 +265,14 @@ int foo(void)
                 [Define to 1 if your compiler understands __attribute__((__used__)).])
             AC_MSG_RESULT([yes])],
         [AC_MSG_RESULT([no])])
-    CFLAGS="$sk_save_CFLAGS"
+    CFLAGS="${sk_save_CFLAGS}"
 
     # Check whether the compiler allows
     # __attribute__((format(printf,...))) to apply to printf-style
     # function-pointer typedefs
     AC_MSG_CHECKING([whether __attribute__((format(printf,...))) may apply to typedefs])
-    sk_save_CFLAGS="$CFLAGS"
-    CFLAGS="${sk_werror} $CFLAGS"
+    sk_save_CFLAGS="${CFLAGS}"
+    CFLAGS="${sk_werror} ${CFLAGS}"
     AC_COMPILE_IFELSE(
         [AC_LANG_PROGRAM([
              typedef int (*printf_like_func)(const char *fmt, ...)
@@ -270,6 +281,23 @@ int foo(void)
         ],[
             AC_DEFINE([HAVE_COMP_ATTRIBUTE_PRINTF_TYPEDEF],[1],
                 [Define to 1 if your compiler allows __attribute__((format(printf, ...))) to be applied to printf-style function-pointer typedefs.])
+            AC_MSG_RESULT([yes])],
+        [AC_MSG_RESULT([no])])
+    CFLAGS="${sk_save_CFLAGS}"
+
+    # Check whether the compiler understands __attribute__((sentinel))
+    # to check for a mandatory NULL at the end of a varargs function
+    # prototype
+    AC_MSG_CHECKING([whether the compiler understands __attribute__((sentinel))])
+    sk_save_CFLAGS="$CFLAGS"
+    CFLAGS="${sk_werror} $CFLAGS"
+    AC_COMPILE_IFELSE(
+        [AC_LANG_PROGRAM([],[
+             void func(int arg0, ...) __attribute__((sentinel));
+             ],[])
+        ],[
+            AC_DEFINE([HAVE_COMP_ATTRIBUTE_SENTINEL],[1],
+                [Define to 1 if your compiler understands __attribute__((sentinel)).])
             AC_MSG_RESULT([yes])],
         [AC_MSG_RESULT([no])])
     CFLAGS="$sk_save_CFLAGS"
@@ -513,10 +541,10 @@ AC_DEFUN([SILK_AC_COMP_SHARED_OBJECT],[
 #
 AC_DEFUN([SILK_AC_FINALIZE],[
     # Add libraries to the default list
-    LIBS=`echo "${SNAPPY_LDFLAGS} ${LZO_LDFLAGS} ${ZLIB_LDFLAGS} ${LIBS}" | sed 's/   */ /g'`
+    LIBS=`echo "${FIXBUF_LDFLAGS} ${LUA_LDFLAGS} ${SNAPPY_LDFLAGS} ${LZO_LDFLAGS} ${ZLIB_LDFLAGS} ${PTHREAD_LDFLAGS} ${LIBS}" | sed 's/   */ /g'`
 
     # Add include flags
-    SK_CPPFLAGS=`echo "${SK_CPPFLAGS} ${ZLIB_CFLAGS} ${LZO_CFLAGS} ${SNAPPY_CFLAGS} ${PCAP_CFLAGS}" | sed 's/   */ /g'`
+    SK_CPPFLAGS=`echo "${SK_CPPFLAGS} ${ZLIB_CFLAGS} ${LZO_CFLAGS} ${SNAPPY_CFLAGS} ${PCAP_CFLAGS} ${LUA_CFLAGS} ${FIXBUF_CFLAGS}" | sed 's/   */ /g'`
 
     # Define these after all tests have run; some system headers also
     # define these macros
@@ -569,7 +597,6 @@ AC_DEFUN([SILK_AC_INIT],[
     AC_SUBST(SPLINT_FLAGS)
     AC_SUBST(SILK_VERSION_INTEGER)
 
-    PACKING_LOGIC_PATH_DEFAULT="${srcdir}/site/twoway/packlogic-twoway.c"
     SILK_DATA_ROOTDIR_DEFAULT=/data
 
     # Set a version number as an integer.  Note: embedded [] are to
@@ -693,8 +720,6 @@ AC_DEFUN([SILK_AC_ARG_DISABLE_SPLIT_WEB],[
 ]) # SILK_AC_ARG_DISABLE_SPLIT_WEB
 
 
-
-
 # ---------------------------------------------------------------------------
 # SILK_AC_ARG_ENABLE_EXTRA_CHECKS
 #
@@ -719,10 +744,6 @@ AC_DEFUN([SILK_AC_ARG_ENABLE_EXTRA_CHECKS],[
 ])# SILK_AC_ARG_ENABLE_EXTRA_CHECKS
 
 
-
-
-
-
 # ---------------------------------------------------------------------------
 # SILK_AC_ARG_ENABLE_IPSET_COMPATIBILITY
 #
@@ -742,12 +763,12 @@ AC_DEFUN([SILK_AC_ARG_ENABLE_EXTRA_CHECKS],[
 #    Output variable: IPSET_DEFAULT_VERSION
 #
 AC_DEFUN([SILK_AC_ARG_ENABLE_IPSET_COMPATIBILITY],[
-    SK_IPSET_COMPATIBILITY=1.0.0
-    SK_IPSET_DEFAULT_VERSION=2
+    SK_IPSET_COMPATIBILITY=3.14.0
+    SK_IPSET_DEFAULT_VERSION=5
 
     AC_ARG_ENABLE([ipset-compatibility],
         [AS_HELP_STRING([--enable-ipset-compatibilty],
-            [select release of SiLK that the default output from IPset tools is compatible with (changes at 3.7.0, 3.14.0) [1.0.0]])[]dnl
+            [select release of SiLK that the default output from IPset tools is compatible with (changes at 3.7.0, 3.14.0) [3.14.0]])[]dnl
         ],[],[
             enableval="yes"
         ])
@@ -776,38 +797,13 @@ AC_DEFUN([SILK_AC_ARG_ENABLE_IPSET_COMPATIBILITY],[
         SK_IPSET_DEFAULT_VERSION=4
     elif test "x${SK_IPSET_COMPATIBILITY}" != "x1.0.0"
     then
+        SK_IPSET_DEFAULT_VERSION=2
         SK_IPSET_COMPATIBILITY=1.0.0
     fi
 
     AC_DEFINE_UNQUOTED([IPSET_DEFAULT_VERSION], [${SK_IPSET_DEFAULT_VERSION}],
         [Set to the default IPset record version to use when writing to disk.])
 ])# SILK_AC_ARG_ENABLE_IPSET_COMPATIBILITY
-
-
-# ---------------------------------------------------------------------------
-# SILK_AC_ARG_ENABLE_IPV6
-#
-#    Enable support for IPv6 addresses in SiLK Flow records.
-#    Default: no
-#
-#    Output variable: ENABLE_IPV6
-#
-AC_DEFUN([SILK_AC_ARG_ENABLE_IPV6],[
-    ENABLE_IPV6=0
-
-    AC_ARG_ENABLE([ipv6],
-        [AS_HELP_STRING([--enable-ipv6],
-            [enable support for capturing, storing, and querying flow records containing IPv6 addresses [no]])[]dnl
-        ],[[
-        if test "x$enableval" = "xyes"
-        then
-            ENABLE_IPV6=1
-        fi]])
-
-    AC_DEFINE_UNQUOTED([ENABLE_IPV6], [$ENABLE_IPV6],
-        [Define to 1 to build with support for capturing, storing, and querying flow records containing IPV6 addresses.])
-    AM_CONDITIONAL(SK_ENABLE_IPV6, [test "x$ENABLE_IPV6" = x1])
-])# SILK_AC_ARG_ENABLE_IPV6
 
 
 # ---------------------------------------------------------------------------
@@ -936,98 +932,6 @@ AC_DEFUN([SILK_AC_ARG_ENABLE_OUTPUT_COMPRESSION],[
 
 
 # ---------------------------------------------------------------------------
-# SILK_AC_ARG_ENABLE_PACKING_LOGIC
-#
-#   Allow the use of a static C file to determine the packing logic
-#
-#   Output variables: PACKING_LOGIC_PATH
-#   Defines: SK_PACKING_LOGIC_PATH
-#
-AC_DEFUN([SILK_AC_ARG_ENABLE_PACKING_LOGIC],[
-    AC_SUBST(PACKING_LOGIC_PATH)
-
-    sk_pack_path=
-
-    AC_ARG_ENABLE([packing-logic],
-        AS_HELP_STRING([--enable-packing-logic=PATH],
-            [configure the packer (rwflowpack) to statically include PATH for the packing logic. PATH can be a complete path, relative to current directory, or relative to the configure script. When not provided, rwflowpack uses a run-time plug-in to determine the packing logic]),
-        [
-            if test "x$enableval" != "xno"
-            then
-                sk_pack_path="$enableval"
-            fi
-        ])
-
-    # Cannot do plug-ins if the user has disabled shared libraries
-    if test "x$sk_pack_path" = "x"
-    then
-        if test "x$enable_shared" = xno || test "x$STATIC_APPLICATIONS" != "x"
-        then
-            sk_pack_path="$PACKING_LOGIC_PATH_DEFAULT"
-            AC_MSG_NOTICE([(${PACKAGE}) Using static packing logic because of static linking])
-        fi
-    fi
-
-    if test "x$sk_pack_path" != "x"
-    then
-        # If the path is relative, try to find it by prepending either
-        # the current directory or the source directory to it
-        if expr "x$sk_pack_path" : "x/" >/dev/null
-        then
-            # complete path
-            PACKING_LOGIC_PATH="$sk_pack_path"
-            AC_CHECK_FILE([$PACKING_LOGIC_PATH], ,
-                AC_MSG_ERROR([Cannot find site packing logic file $PACKING_LOGIC_PATH]))
-        else
-            # relative path, first look relative to pwd
-            PACKING_LOGIC_PATH="`pwd`/$sk_pack_path"
-            AC_CHECK_FILE([$PACKING_LOGIC_PATH], , [
-                case "$srcdir" in
-                  .)
-                    # pwd and srcdir are the time
-                    AC_MSG_ERROR([Cannot find site packing logic file $sk_pack_path])
-                    ;;
-                  *)
-                    # look relative to srcdir
-                    sk_srcdir=`( cd "$srcdir" 2>/dev/null && pwd )`
-                    PACKING_LOGIC_PATH="$sk_srcdir/$sk_pack_path"
-                    AC_CHECK_FILE([$PACKING_LOGIC_PATH], ,
-                        AC_MSG_ERROR([Cannot find site packing logic file $sk_pack_path]))
-                    ;;
-                esac
-                ])
-        fi
-
-        AC_DEFINE_UNQUOTED([PACKING_LOGIC_PATH], "$PACKING_LOGIC_PATH",
-            [Define to the path of the C source file that rwflowpack
-             will use for categorizing flow records.  When this is
-             undefined, rwflowpack will use a plug-in loaded at
-             run-time to determine the categories.])
-
-    fi
-
-    AM_CONDITIONAL(HAVE_PACKING_LOGIC, [test "x$sk_pack_path" != "x"])
-])# SILK_AC_ARG_ENABLE_PACKING_LOGIC
-
-
-# ---------------------------------------------------------------------------
-# SILK_AC_ARG_ENABLE_SPLIT_ICMP
-#
-#    Do not pack the web flows separately
-#
-AC_DEFUN([SILK_AC_ARG_ENABLE_SPLIT_ICMP],[
-    AC_ARG_ENABLE([icmp-split],
-        [AS_HELP_STRING([--enable-icmp-split],
-            [in the packer, pack ICMP flow records separately from other flows])[]dnl
-        ],[[
-        if test "x$enableval" != "xno"
-        then
-            silk_enable_icmp_split=1
-        fi]])
-]) # SILK_AC_ARG_ENABLE_SPLIT_ICMP
-
-
-# ---------------------------------------------------------------------------
 # SILK_AC_ARG_ENABLE_STATIC_APPLICATIONS
 #
 #    Build all applications with static linking.
@@ -1047,8 +951,6 @@ AC_DEFUN([SILK_AC_ARG_ENABLE_STATIC_APPLICATIONS],[
 
     AM_CONDITIONAL(HAVE_STATIC_APPLICATIONS, [test "x$STATIC_APPLICATIONS" != "x"])
 ]) # SILK_AC_ARG_ENABLE_STATIC_APPLICATIONS
-
-
 
 
 
@@ -1085,9 +987,9 @@ AC_DEFUN([SILK_AC_ARG_WITH_PYTHON],[
     python_info="${srcdir}/$PYTHON_INFO_PROG"
 
     # Possible names for the python interpreter
-    python_names="python python2 python3 python2.7 python2.6 python3.2 python3.1 python3.0 python2.5 python2.4 no"
+    python_names="python python2 python3 python2.7 python2.6 python3.7 python3.6 python3.5 python3.4 python3.3 python3.2 python3.1 python3.0 no"
 
-    AC_ARG_VAR([PYTHON], [The Python interpreter to use for PySiLK support when no interpreter is specified to --with-python; must be Python 2.4 or later.])
+    AC_ARG_VAR([PYTHON], [The Python interpreter to use for PySiLK support when no interpreter is specified to --with-python; must be Python 2.6 or later.])
 
     python_declined=no
     AC_ARG_WITH([python],
@@ -1169,8 +1071,8 @@ AC_DEFUN([SILK_AC_ARG_WITH_PYTHON],[
             AC_MSG_ERROR([(${PACKAGE}) Specified Python program '$PYTHON' is not an executable file])
         fi
 
-        # We require at least Python 2.4.
-        AC_MSG_CHECKING([whether version of $PYTHON is 2.4 or later])
+        # We require at least Python 2.6.
+        AC_MSG_CHECKING([whether version of $PYTHON is 2.6 or later])
 
         echo "$as_me:$LINENO: python_info_result=\`\"$PYTHON\" \"$python_info\" --print-version\`" >&AS_MESSAGE_LOG_FD
         python_info_result=`"$PYTHON" "$python_info" --print-version 2>&AS_MESSAGE_LOG_FD`
@@ -1193,13 +1095,8 @@ AC_DEFUN([SILK_AC_ARG_WITH_PYTHON],[
     else
         # Find a python interpreter since none was specified.  We
         # always want to do this since we need to support stand-alone
-        # python scripts in addition to PySiLK.  If we find python2.4
-        # first go ahead and use it.  However, see if other versions
-        # of python are available, and if so, suggest that the user
-        # use them instead.
+        # python scripts in addition to PySiLK.
 
-        sk_python26=
-        sk_python26_version=
         AC_MSG_CHECKING([for a suitable Python program])
         for maybe_python in $python_names
         do
@@ -1216,36 +1113,11 @@ AC_DEFUN([SILK_AC_ARG_WITH_PYTHON],[
 
             if test $python_status -eq 0
             then
-                if test "x$PYTHON" = "x"
-                then
-                    # first python we found
-                    PYTHON="$maybe_python"
-                    PYTHON_VERSION="$python_info_result"
-                    if expr "x$python_info_result" : 'x2\.[[45]]' >/dev/null
-                    then
-                        :
-                    else
-                        break
-                    fi
-                elif expr "x$python_info_result" : 'x2\.[[45]]' >/dev/null
-                then
-                    # not first python, but still 2.4 or 2.5
-                    :
-                else
-                    # this is a better python
-                    sk_python26="$maybe_python"
-                    sk_python26_version="$python_info_result"
-                    break
-                fi
+                PYTHON="$maybe_python"
+                PYTHON_VERSION="$python_info_result"
+                break
             fi
         done
-
-        if test "x$ENABLE_PYTHON" != "x1" && test "x$sk_python26" != "x"
-        then
-            # when PySiLK not requested, use python2.6 or later
-            PYTHON="$sk_python26"
-            PYTHON_VERSION="$sk_python26_version"
-        fi
 
         if test x"$PYTHON" != "x"
         then
@@ -1409,9 +1281,7 @@ Py_InitializeEx(1);
 
     if test "x$PYTHON_VERSION" = "x"
     then
-        AC_MSG_NOTICE([(${PACKAGE}) Will not build some scripts which require Python 2.4 or later])
-    elif expr "x$PYTHON_VERSION" : 'x2\.[[45]]' >/dev/null
-    then
+        AC_MSG_NOTICE([(${PACKAGE}) Will not build some scripts which require Python 2.6 or later])
         AC_MSG_NOTICE([(${PACKAGE}) "make check" will skip daemon tests which require Python 2.6 or later])
     fi
 
@@ -1421,13 +1291,12 @@ Py_InitializeEx(1);
     # this is true if we are building with python plugin support
     AM_CONDITIONAL([HAVE_PYTHON], [test "x$ENABLE_PYTHON" = "x1"])
 
-    # determine version of python
-    AM_CONDITIONAL([HAVE_PYTHON24],
-                   [expr "x$PYTHON_VERSION" : 'x2\.[[45]]' >/dev/null])
-    AM_CONDITIONAL([HAVE_PYTHON30],
-                   [expr "x$PYTHON_VERSION" : 'x3\.' >/dev/null])
+    # not using this now
+    #| # determine version of python
+    #| AM_CONDITIONAL([HAVE_PYTHON30],
+    #|                [expr "x$PYTHON_VERSION" : 'x3\.' >/dev/null])
 
-    # this is true if python 2.4 or newer was found. this is used to
+    # this is true if python 2.6 or newer was found. this is used to
     # determine whether stand-alone python scripts are built
     AM_CONDITIONAL([HAVE_PYTHONBIN],
                    [expr "x$PYTHON_VERSION" : 'x[[23]]' >/dev/null ])
@@ -1464,7 +1333,7 @@ AC_DEFUN([SILK_AC_PREPROC_ADDITIONAL_FLAGS],[
 
 
 # ---------------------------------------------------------------------------
-# SILK_AC_WARN_TRANSFORM
+# SILK_AC_WRITE_SUMMARY
 #
 #    Warn about use of --program-prefix, --program-suffix,
 #    --program-transform-name
@@ -1500,15 +1369,6 @@ AC_DEFUN([SILK_AC_WRITE_SUMMARY],[
     * Install directory:            $sk_summary_prefix
     * Root of packed data tree:     $SILK_DATA_ROOTDIR"
 
-    if test "x$PACKING_LOGIC_PATH" = "x"
-    then
-        SILK_FINAL_MSG="$SILK_FINAL_MSG
-    * Packing logic:                via run-time plugin"
-    else
-        SILK_FINAL_MSG="$SILK_FINAL_MSG
-    * Packing logic:                $PACKING_LOGIC_PATH"
-    fi
-
     if test "x$ENABLE_LOCALTIME" = "x1"
     then
         SILK_FINAL_MSG="$SILK_FINAL_MSG
@@ -1530,37 +1390,21 @@ AC_DEFUN([SILK_AC_WRITE_SUMMARY],[
     * IPv6 network connections:     NO"
     fi
 
-    if test "x$ENABLE_IPV6" = "x1"
-    then
-        SILK_FINAL_MSG="$SILK_FINAL_MSG
+    SILK_FINAL_MSG="$SILK_FINAL_MSG
     * IPv6 flow record support:     YES"
-    else
-        SILK_FINAL_MSG="$SILK_FINAL_MSG
-    * IPv6 flow record support:     NO"
-    fi
 
     SILK_FINAL_MSG="$SILK_FINAL_MSG
     * IPset file compatibility:     SiLK ${SK_IPSET_COMPATIBILITY} (record-version=${SK_IPSET_DEFAULT_VERSION})"
 
-    if test "x$ENABLE_IPFIX" = "x1"
+    sk_msg_ldflags=`echo " $FIXBUF_LDFLAGS" | sed 's/^ *//' | sed 's/ *$//' | sed 's/  */ /g'`
+    if test -n "$sk_msg_ldflags"
     then
-        sk_msg_ldflags=`echo " $FIXBUF_LDFLAGS" | sed 's/^ *//' | sed 's/ *$//' | sed 's/  */ /g'`
-        if test -n "$sk_msg_ldflags"
-        then
-            sk_msg_ldflags=" ($sk_msg_ldflags)"
-        fi
-        SILK_FINAL_MSG="${SILK_FINAL_MSG}
+        sk_msg_ldflags=" ($sk_msg_ldflags)"
+    fi
+    SILK_FINAL_MSG="${SILK_FINAL_MSG}
     * IPFIX collection support:     YES${sk_msg_ldflags}
     * NetFlow9 collection support:  YES
-    * sFlow collection support:     YES
     * Fixbuf compatibility:         libfixbuf-${libfixbuf_have_version}"
-    else
-        SILK_FINAL_MSG="$SILK_FINAL_MSG
-    * IPFIX collection support:     NO
-    * NetFlow9 collection support:  NO (No IPFIX support)
-    * sFlow collection support:     NO (No IPFIX support)"
-    fi
-
 
 
     if test "x$ENABLE_GNUTLS" = "x0"
@@ -1675,6 +1519,20 @@ AC_DEFUN([SILK_AC_WRITE_SUMMARY],[
     * ADNS support:                 NO"
     fi
 
+    if test "x$ENABLE_READLINE" = "x1"
+    then
+        sk_msg_ldflags=`echo "$READLINE_LDFLAGS" | sed 's/^ *//' | sed 's/ *$//' | sed 's/  */ /g'`
+        if test -n "$sk_msg_ldflags"
+        then
+            sk_msg_ldflags=" ($sk_msg_ldflags)"
+        fi
+        SILK_FINAL_MSG="$SILK_FINAL_MSG
+    * READLINE support:             YES$sk_msg_ldflags"
+    else
+        SILK_FINAL_MSG="$SILK_FINAL_MSG
+    * READLINE support:             NO"
+    fi
+
         SILK_FINAL_MSG="$SILK_FINAL_MSG
     * Python interpreter:           $PYTHON"
 
@@ -1726,7 +1584,7 @@ AC_DEFUN([SILK_AC_WRITE_SUMMARY],[
     fi
 
     # Remove leading whitespace
-    sk_msg_cflags="$SK_SRC_INCLUDES $SK_CPPFLAGS $CPPFLAGS $WARN_CFLAGS $SK_CFLAGS $CFLAGS"
+    sk_msg_cflags="$CPPFLAGS $SK_SRC_INCLUDES $SK_CPPFLAGS $CFLAGS $SK_CFLAGS $WARN_CFLAGS"
     sk_msg_cflags=`echo "$sk_msg_cflags" | sed 's/^ *//' | sed 's/ *$//' | sed 's/  */ /g'`
 
     sk_msg_ldflags="$SK_LDFLAGS $LDFLAGS"
@@ -1750,6 +1608,11 @@ AC_DEFUN([SILK_AC_WRITE_SUMMARY],[
             cat $SILK_SUMMARY_FILE
         fi],[SILK_SUMMARY_FILE=$SILK_SUMMARY_FILE])
 
+    # Put SILK_SUMMARY_FILE into the environment so that the Lua
+    # subpackage can output it.
+    SILK_SUMMARY_FILE=`pwd`"/${SILK_SUMMARY_FILE}"
+    export SILK_SUMMARY_FILE
+
 ]) # SILK_AC_WRITE_SUMMARY
 
 
@@ -1764,8 +1627,6 @@ AC_DEFUN([SILK_TEST_SUBST],[
     AC_SUBST([SK_ENABLE_GNUTLS], [$ENABLE_GNUTLS])
     AC_SUBST([SK_ENABLE_INET6_NETWORKING], [$ENABLE_INET6_NETWORKING])
     AC_SUBST([SK_ENABLE_IPA], [$ENABLE_IPA])
-    AC_SUBST([SK_ENABLE_IPFIX], [$ENABLE_IPFIX])
-    AC_SUBST([SK_ENABLE_IPV6], [$ENABLE_IPV6])
     AC_SUBST([SK_ENABLE_OUTPUT_COMPRESSION], [$ENABLE_OUTPUT_COMPRESSION])
 ])# SILK_TEST_SUBST
 
@@ -1782,20 +1643,15 @@ AC_DEFUN([SILK_RPM_SPEC_SUBST],[
     RPM_SPEC_CONFIGURE=""
 
     # check for -DNDEBUG in CPPFLAGS
-    if echo " $SK_CPPFLAGS $CPPFLAGS " | grep '/ -DNDEBUG /' >/dev/null 2>&1
+    if echo " $CPPFLAGS $SK_CPPFLAGS " | grep '/ -DNDEBUG /' >/dev/null 2>&1
     then
         RPM_SPEC_CONFIGURE="$RPM_SPEC_CONFIGURE --enable-assert"
     else
         RPM_SPEC_CONFIGURE="$RPM_SPEC_CONFIGURE --disable-assert"
     fi
 
-
-    if test "x$ENABLE_IPV6" = "x1"
-    then
-        RPM_SPEC_CONFIGURE="$RPM_SPEC_CONFIGURE --enable-ipv6"
-    else
-        RPM_SPEC_CONFIGURE="$RPM_SPEC_CONFIGURE --disable-ipv6"
-    fi
+    RPM_SPEC_REQUIRES="$RPM_SPEC_REQUIRES libfixbuf >= $libfixbuf_required_version,"
+    RPM_SPEC_BUILDREQUIRES="$RPM_SPEC_BUILDREQUIRES libfixbuf-devel >= $libfixbuf_required_version,"
 
     if test "x$ENABLE_INET6_NETWORKING" = "x0"
     then
@@ -1828,14 +1684,6 @@ AC_DEFUN([SILK_RPM_SPEC_SUBST],[
         RPM_SPEC_BUILDREQUIRES="$RPM_SPEC_BUILDREQUIRES c-ares-devel,"
     else
         RPM_SPEC_CONFIGURE="$RPM_SPEC_CONFIGURE --without-c-ares"
-    fi
-
-    if test "x$ENABLE_IPFIX" = "x1"
-    then
-        RPM_SPEC_REQUIRES="$RPM_SPEC_REQUIRES libfixbuf >= $libfixbuf_required_version,"
-        RPM_SPEC_BUILDREQUIRES="$RPM_SPEC_BUILDREQUIRES libfixbuf-devel >= $libfixbuf_required_version,"
-    else
-        RPM_SPEC_CONFIGURE="$RPM_SPEC_CONFIGURE --without-libfixbuf"
     fi
 
     if test "x$ENABLE_GNUTLS" = "x1"
@@ -1889,8 +1737,8 @@ AC_DEFUN([SILK_RPM_SPEC_SUBST],[
     # Set variables used in the RPM spec file
     if test "x$ENABLE_PYTHON" = "x1"
     then
-        RPM_SPEC_REQUIRES="$RPM_SPEC_REQUIRES python >= 2.4,"
-        RPM_SPEC_BUILDREQUIRES="$RPM_SPEC_BUILDREQUIRES python-devel >= 2.4,"
+        RPM_SPEC_REQUIRES="$RPM_SPEC_REQUIRES python >= 2.6,"
+        RPM_SPEC_BUILDREQUIRES="$RPM_SPEC_BUILDREQUIRES python-devel >= 2.6,"
         RPM_SPEC_WITH_PYTHON=1
 
         RPM_SPEC_CONFIGURE="$RPM_SPEC_CONFIGURE --with-python='${PYTHON}'"

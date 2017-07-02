@@ -26,7 +26,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwptoflow.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
+RCSIDENT("$SiLK: rwptoflow.c d1637517606d 2017-06-23 16:51:31Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
@@ -632,19 +632,19 @@ appOptionsHandler(
         break;
 
       case OPT_SET_INPUTINDEX:
-        rv = skStringParseUint32(&temp, opt_arg, 0, UINT16_MAX);
+        rv = skStringParseUint32(&temp, opt_arg, 0, 0);
         if (rv) {
             goto PARSE_ERROR;
         }
-        rwRecSetInput(&default_flow_values, (uint16_t)temp);
+        rwRecSetInput(&default_flow_values, temp);
         break;
 
       case OPT_SET_OUTPUTINDEX:
-        rv = skStringParseUint32(&temp, opt_arg, 0, UINT16_MAX);
+        rv = skStringParseUint32(&temp, opt_arg, 0, 0);
         if (rv) {
             goto PARSE_ERROR;
         }
-        rwRecSetOutput(&default_flow_values, (uint16_t)temp);
+        rwRecSetOutput(&default_flow_values, temp);
         break;
 
       case OPT_SET_NEXTHOPIP:
@@ -652,13 +652,11 @@ appOptionsHandler(
         if (rv) {
             goto PARSE_ERROR;
         }
-#if SK_ENABLE_IPV6
         if (skipaddrIsV6(&ip)) {
             skAppPrintErr("Invalid %s '%s': IPv6 addresses not supported",
                           appOptions[opt_index].name, opt_arg);
             return 1;
         }
-#endif /* SK_ENABLE_IPV6 */
         rwRecSetNhIPv4(&default_flow_values, skipaddrGetV4(&ip));
         break;
 

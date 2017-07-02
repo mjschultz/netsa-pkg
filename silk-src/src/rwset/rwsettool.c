@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsettool.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
+RCSIDENT("$SiLK: rwsettool.c d1637517606d 2017-06-23 16:51:31Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skipset.h>
@@ -409,11 +409,7 @@ appOptionsHandler(
             return 1;
         }
         operation = opt_index;
-#if SK_ENABLE_IPV6
         rv = skStringParseUint32(&mask, opt_arg, 1, 128);
-#else
-        rv = skStringParseUint32(&mask, opt_arg, 1, 32);
-#endif
         if (rv) {
             goto PARSE_ERROR;
         }
@@ -955,7 +951,6 @@ symmetricDiffSets(
 }
 
 
-#if SK_ENABLE_IPV6
 /*
  *    Callback invoked after opening a stream to performing the union
  *    of IPsets.  Convert the output IPset to IPv6 when the input
@@ -982,7 +977,6 @@ unionConvert(
     }
     return SKIPSET_OK;
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 static int
 differenceCallback(
@@ -1056,9 +1050,7 @@ int main(int argc, char **argv)
           case OPT_MASK:
           case OPT_FILL_BLOCKS:
             param.cb_entry_func = unionCallback;
-#if SK_ENABLE_IPV6
             cb_init = unionConvert;
-#endif
             break;
 
           case OPT_DIFFERENCE:
@@ -1125,12 +1117,10 @@ int main(int argc, char **argv)
         }
     }
 
-#if SK_ENABLE_IPV6
     /* convert the set to IPv4 if possible */
     if (skIPSetIsV6(out_set) && !skIPSetContainsV6(out_set)) {
         skIPSetConvert(out_set, 4);
     }
-#endif  /* SK_ENABLE_IPV6 */
 
     skIPSetClean(out_set);
 

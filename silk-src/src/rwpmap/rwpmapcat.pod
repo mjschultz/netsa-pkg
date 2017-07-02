@@ -9,7 +9,7 @@ B<rwpmapcat> - Print each range and label present in a prefix map file
   rwpmapcat [--output-types={mapname | type | ranges | labels}]
         [--ignore-label=LABEL] [--ip-label-to-ignore=IP_ADDRESS]
         [--left-justify-labels] [--no-cidr-blocks]
-        [--ip-format=FORMAT] [--integer-ips] [--zero-pad-ips]
+        [--ip-format=FORMAT]
         [--no-titles] [--no-columns] [--column-separator=C]
         [--no-final-delimiter] [{--delimited | --delimited=C}]
         [--output-path=PATH] [--pager=PAGER_PROG]
@@ -221,19 +221,6 @@ netblock.  The addresses C<127.0.0.1> and C<2001:db8::1> are printed
 as C<::ffff:7f00:1> and C<2001:db8::1>, respectively.
 
 =back
-
-=item B<--integer-ips>
-
-Print IP addresses as integers.  This switch is equivalent to
-B<--ip-format=decimal>, it is deprecated as of SiLK 3.7.0, and it will
-be removed in the SiLK 4.0 release
-
-=item B<--zero-pad-ips>
-
-Print IP addresses as fully-expanded, zero-padded values in their
-canonical form.  This switch is equivalent to
-B<--ip-format=zero-padded>, it is deprecated as of SiLK 3.7.0, and it
-will be removed in the SiLK 4.0 release.
 
 =item B<--no-titles>
 
@@ -489,9 +476,9 @@ B<--address-types> switch is specified without an argument.
 
 =head1 SEE ALSO
 
-B<rwpmapbuild(1)>, B<rwgeoip2ccmap(1)>, B<pmapfilter(3)>,
-B<ccfilter(3)>, B<rwfilter(1)>, B<rwcut(1)>, B<rwgroup(1)>,
-B<rwsort(1)>, B<rwstats(1)>, B<rwuniq(1)>, B<silk(7)>
+B<rwpmapbuild(1)>, B<rwgeoip2ccmap(1)>, B<addrtype(3)>,
+B<pmapfilter(3)>, B<ccfilter(3)>, B<rwfilter(1)>, B<rwcut(1)>,
+B<rwgroup(1)>, B<rwsort(1)>, B<rwstats(1)>, B<rwuniq(1)>, B<silk(7)>
 
 =head1 NOTES
 
@@ -500,7 +487,7 @@ SiLK 3.8.0.
 
 =cut
 
-$SiLK: rwpmapcat.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwpmapcat.pod 5036d9fcc2e7 2017-06-26 20:31:01Z mthomas $
 
 Local Variables:
 mode:text

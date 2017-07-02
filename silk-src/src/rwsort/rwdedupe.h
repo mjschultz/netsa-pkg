@@ -20,11 +20,10 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWDEDUPE_H, "$SiLK: rwdedupe.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_RWDEDUPE_H, "$SiLK: rwdedupe.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
-#include <silk/rwascii.h>
 #include <silk/rwrec.h>
-#include <silk/skipaddr.h>
+#include <silk/skflowiter.h>
 #include <silk/skstream.h>
 #include <silk/sktempfile.h>
 #include <silk/utils.h>
@@ -114,8 +113,11 @@ typedef struct flow_delta_st {
 extern uint32_t num_fields;
 
 /* IDs of the fields to sort over; values are from the
- * rwrec_printable_fields_t enum. */
-extern uint32_t sort_fields[RWREC_PRINTABLE_FIELD_COUNT];
+ * rwrec_field_id_t enum. */
+extern uint32_t sort_fields[RWREC_FIELD_ID_COUNT];
+
+/* for looping over the input streams */
+extern sk_flow_iter_t *flowiter;
 
 /* output stream */
 extern skstream_t *out_stream;
@@ -140,9 +142,6 @@ void
 appSetup(
     int                 argc,
     char              **argv);
-int
-appNextInput(
-    skstream_t        **stream);
 
 
 #ifdef __cplusplus

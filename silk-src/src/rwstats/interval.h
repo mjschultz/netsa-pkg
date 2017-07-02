@@ -13,25 +13,19 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_INTERVAL_H, "$SiLK: interval.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_INTERVAL_H, "$SiLK: interval.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 
-int
-intervalInit(
-    void);
-void
-intervalShutdown(
-    void);
-double *
-intervalQuartiles(
-    const uint32_t     *data,
-    const uint32_t     *intervals,
-    uint32_t            numIntervals);
-double *
-intervalMoments(
-    const uint32_t     *data,
-    const uint32_t     *intervals,
-    uint32_t            numIntervals);
+int intervalInit(void);
+void intervalShutdown(void);
+double *intervalQuartiles(
+    const uint32_t *data,
+    const uint32_t *intervals,
+    uint32_t        numIntervals);
+double *intervalMoments(
+    const uint32_t *data,
+    const uint32_t *intervals,
+    uint32_t        numIntervals);
 
 
 #define NUM_INTERVALS   10

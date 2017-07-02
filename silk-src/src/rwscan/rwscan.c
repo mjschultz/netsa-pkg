@@ -8,8 +8,9 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwscan.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwscan.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
+#include <silk/skthread.h>
 #include "rwscan.h"
 #include "rwscan_db.h"
 #include "rwscan_workqueue.h"
@@ -43,28 +44,16 @@ static work_queue_t *cleanup_queue;
 static pthread_mutex_t output_mutex;
 
 
-/* LOCAL FUNCTION PROTOTYPES */
-
-static int
-process_file(
-    const char         *infile);
-static int
-invoke_trw_model(
-    worker_thread_data_t   *work);
-static int
-invoke_blr_model(
-    worker_thread_data_t   *work);
-
-
 /* FUNCTION DEFINITONS */
 
-int
+static int
 invoke_trw_model(
     worker_thread_data_t   *work)
 {
     rwRec           *flows    = NULL;
     event_metrics_t *metrics  = NULL;
     trw_counters_t  *counters = NULL;
+    skipaddr_t       ipaddr;
 
     rwRec   *rwcurr = NULL;
     uint32_t i;
@@ -143,9 +132,10 @@ invoke_trw_model(
         }
         if (counters->syns == counters->flows) {
             if (counters->likelihood > TRW_ETA1) {
-                /* add to scanners iptree */
+                /* add to scanners ipset */
+                rwRecMemGetSIP(rwcurr, &ipaddr);
                 pthread_mutex_lock(&trw_data.mutex);
-                skIPTreeAddAddress(trw_data.scanners, rwRecGetSIPv4(rwcurr));
+                skIPSetInsertAddress(trw_data.scanners, &ipaddr, 0);
                 pthread_mutex_unlock(&trw_data.mutex);
                 metrics->scan_probability = counters->likelihood;
                 calculate_shared_metrics(flows, metrics);
@@ -154,9 +144,10 @@ invoke_trw_model(
                                        counters->likelihood));
                 return (metrics->event_class = EVENT_SCAN);
             } else if (counters->likelihood < TRW_ETA0) {
-                /* add to benign iptree */
+                /* add to benign ipset */
+                rwRecMemGetSIP(rwcurr, &ipaddr);
                 pthread_mutex_lock(&trw_data.mutex);
-                skIPTreeAddAddress(trw_data.benign, rwRecGetSIPv4(rwcurr));
+                skIPSetInsertAddress(trw_data.benign, &ipaddr, 0);
                 pthread_mutex_unlock(&trw_data.mutex);
                 metrics->scan_probability = counters->likelihood;
                 print_verbose_results((RWSCAN_VERBOSE_FH,
@@ -186,7 +177,7 @@ invoke_trw_model(
     return (metrics->event_class = EVENT_UNKNOWN);
 }
 
-int
+static int
 invoke_blr_model(
     worker_thread_data_t   *work)
 {
@@ -254,39 +245,6 @@ invoke_blr_model(
     }
     return metrics->event_class;
 }
-
-
-#ifndef SKTHREAD_UNKNOWN_ID
-/* Create a local copy of the function from libsilk-thrd. */
-/*
- *    Tell the current thread to ignore all signals except those
- *    indicating a failure (e.g., SIGBUS and SIGSEGV).
- */
-static void
-skthread_ignore_signals(
-    void)
-{
-    sigset_t sigs;
-
-    sigfillset(&sigs);
-    sigdelset(&sigs, SIGABRT);
-    sigdelset(&sigs, SIGBUS);
-    sigdelset(&sigs, SIGILL);
-    sigdelset(&sigs, SIGSEGV);
-
-#ifdef SIGEMT
-    sigdelset(&sigs, SIGEMT);
-#endif
-#ifdef SIGIOT
-    sigdelset(&sigs, SIGIOT);
-#endif
-#ifdef SIGSYS
-    sigdelset(&sigs, SIGSYS);
-#endif
-
-    pthread_sigmask(SIG_SETMASK, &sigs, NULL);
-}
-#endif  /* #ifndef SKTHREAD_UNKNOWN_ID */
 
 
 /*  THREAD ENTRY POINT  */
@@ -449,19 +407,48 @@ worker_thread(
 }
 
 
-int
+static int
+spawn_worker(
+    event_metrics_t   **metrics,
+    rwRec             **event_flows,
+    uint32_t           *event_capacity)
+{
+    worker_thread_data_t *mywork;
+
+    if ((*metrics)->event_size == 0) {
+        return 0;
+    }
+    mywork = (worker_thread_data_t*)calloc(1, sizeof(worker_thread_data_t));
+    if (mywork == NULL) {
+        free(*metrics);
+        free(*event_flows);
+        skAppPrintOutOfMemory("worker thread data");
+    } else {
+        mywork->flows   = *event_flows;
+        mywork->metrics = *metrics;
+        workqueue_put(work_queue, &(mywork->node));
+    }
+
+    *metrics = NULL;
+    *event_flows = NULL;
+    *event_capacity = 0;
+
+    return ((NULL == mywork) ? -1 : 0);
+}
+
+
+static int
 process_file(
     const char         *infile)
 {
     skstream_t      *in;
+    uint32_t         event_capacity = 0; /* current size of event_flows */
     rwRec           *event_flows = NULL; /* all flows for a given sip/proto */
     rwRec            rwrec;              /* holds each record read */
     static char      ipstr[SK_NUM2DOT_STRLEN];
     uint32_t         last_sip   = 0;
     uint32_t         last_proto = 0;
-    int              done       = 0;
-    event_metrics_t *metrics    = NULL;
-    int              retval     = -1;
+    event_metrics_t *metrics;
     int              rv;
 
     metrics = (event_metrics_t*)calloc(1, sizeof(event_metrics_t));
@@ -470,25 +457,27 @@ process_file(
         return -1;
     }
 
-    RWREC_CLEAR(&rwrec);
+    rwRecInitialize(&rwrec, NULL);
     /* open the input file */
-
     rv = skStreamOpenSilkFlow(&in, infile, SK_IO_READ);
     if (rv) {
         skStreamPrintLastErr(in, rv, &skAppPrintErr);
-        goto END;
+        skStreamDestroy(&in);
+        free(metrics);
+        return -1;
     }
     skStreamSetIPv6Policy(in, SK_IPV6POLICY_ASV4);
 
     /* The main program runloop. */
-    while (!done) {
+    for (;;) {
         /* Read in a single RW record. */
-        if (!skStreamReadRecord(in, &rwrec)) {
-            pthread_mutex_lock(&summary_metrics.mutex);
-            summary_metrics.total_flows++;
-            pthread_mutex_unlock(&summary_metrics.mutex);
-        } else {
-            done = 1;
+        if (skStreamReadRecord(in, &rwrec) != SKSTREAM_OK) {
+            rv = spawn_worker(&metrics, &event_flows, &event_capacity);
+            if (rv) {
+                skStreamDestroy(&in);
+                return rv;
+            }
+            break;
         }
 
         /* If the proto is one we don't care about, read the next record. */
@@ -497,19 +486,23 @@ process_file(
             && (rwRecGetProto(&rwrec) != IPPROTO_UDP))
         {
             pthread_mutex_lock(&summary_metrics.mutex);
+            summary_metrics.total_flows++;
             summary_metrics.ignored_flows++;
             pthread_mutex_unlock(&summary_metrics.mutex);
             continue;
         }
+
+        pthread_mutex_lock(&summary_metrics.mutex);
+        summary_metrics.total_flows++;
+        pthread_mutex_unlock(&summary_metrics.mutex);
+
         /* These are the conditions under which we process the current event
          * (if applicable) and begin a new one. */
-        if (rwRecGetSIPv4(&rwrec)!= last_sip
-            || rwRecGetProto(&rwrec) != last_proto || done)
+        if (rwRecGetSIPv4(&rwrec) != last_sip
+            || rwRecGetProto(&rwrec) != last_proto)
         {
             /* If we have flows to examine, do so. */
             if (metrics->event_size > 0) {
-                worker_thread_data_t *mywork = NULL;
-
                 if ((last_sip & options.verbose_progress)
                     != (rwRecGetSIPv4(&rwrec) & options.verbose_progress))
                 {
@@ -517,51 +510,26 @@ process_file(
                               ipstr);
                     fprintf(RWSCAN_VERBOSE_FH, "progress: %s\n", ipstr);
                 }
-                mywork = ((worker_thread_data_t*)
-                          calloc(1, sizeof(worker_thread_data_t)));
-                if (mywork == NULL) {
-                    skAppPrintOutOfMemory("worker thread data");
-                    goto END;
+                rv = spawn_worker(&metrics, &event_flows, &event_capacity);
+                if (rv) {
+                    skStreamDestroy(&in);
+                    return rv;
                 }
-                mywork->flows   = event_flows;
-                mywork->metrics = metrics;
-                workqueue_put(work_queue, &(mywork->node));
 
-                metrics     = NULL;
-                event_flows = NULL;
-                mywork      = NULL;
-
-            }
-
-            /* begin new event */
-            if (event_flows == NULL) {
-                event_flows = (rwRec*)malloc(RWSCAN_ALLOC_SIZE *sizeof(rwRec));
-                if (event_flows == NULL) {
-                    skAppPrintOutOfMemory("event flow data");
-                    goto END;
-                }
-            } else {
-                rwRec *old_event_flows = event_flows;
-                event_flows = (rwRec*)realloc(event_flows,
-                                              (RWSCAN_ALLOC_SIZE
-                                               * sizeof(rwRec)));
-                if (event_flows == NULL) {
-                    skAppPrintOutOfMemory("event flow data");
-                    event_flows = old_event_flows;
-                    goto END;
-                }
-            }
-
-            if (metrics == NULL) {
-                metrics = (event_metrics_t*)malloc(sizeof(event_metrics_t));
+                /* begin new event */
                 if (metrics == NULL) {
-                    skAppPrintOutOfMemory("metrics data");
-                    goto END;
+                    metrics = (event_metrics_t*)malloc(sizeof(event_metrics_t));
+                    if (metrics == NULL) {
+                        skAppPrintOutOfMemory("metrics data");
+                        skStreamDestroy(&in);
+                        free(event_flows);
+                        return -1;
+                    }
                 }
             }
 
             memset(metrics, 0, sizeof(event_metrics_t));
-            metrics->protocol = rwRecGetProto(&rwrec) ;
+            metrics->protocol = rwRecGetProto(&rwrec);
             metrics->sip      = rwRecGetSIPv4(&rwrec);
             metrics->stime    = rwRecGetStartSeconds(&rwrec);
             metrics->etime    = rwRecGetEndSeconds(&rwrec);
@@ -571,44 +539,43 @@ process_file(
             if (rwRecGetStartSeconds(&rwrec) < metrics->stime) {
                 metrics->stime = rwRecGetStartSeconds(&rwrec);
             }
+            /* This comparison (Start-time > End-time) appears odd,
+             * but it dates back to the rwscan rewrite of 2006 */
             if (rwRecGetStartSeconds(&rwrec) > metrics->etime) {
                 metrics->etime = rwRecGetEndSeconds(&rwrec);
             }
         }
 
-        if (!(metrics->event_size % RWSCAN_ALLOC_SIZE)
-            && (metrics->event_size != 0))
-        {
+        if (metrics->event_size == event_capacity) {
             rwRec *old_event_flows = event_flows;
-            event_flows
-                = (rwRec*)realloc(event_flows,
-                                  ((metrics->event_size + RWSCAN_ALLOC_SIZE)
-                                   * sizeof(rwRec)));
+
+            event_capacity += RWSCAN_ALLOC_SIZE;
+            event_flows = (rwRec*)realloc(event_flows,
+                                          (event_capacity * sizeof(rwRec)));
             if (event_flows == NULL) {
                 skAppPrintOutOfMemory("event flow data");
-                event_flows = old_event_flows;
-                goto END;
+                skStreamDestroy(&in);
+                free(metrics);
+                free(old_event_flows);
+                return -1;
             }
         }
-        metrics->event_size++;
-        memcpy(&(event_flows[metrics->event_size - 1]), &rwrec,
-               sizeof(rwRec));
+        rwRecCopy(&(event_flows[metrics->event_size]), &rwrec,
+                  SK_RWREC_COPY_UNINIT);
+        ++metrics->event_size;
 
         last_sip   = rwRecGetSIPv4(&rwrec);
         last_proto = rwRecGetProto(&rwrec);
     }
-
-    retval = 0;
-
-  END:
     skStreamDestroy(&in);
+
     if (event_flows != NULL) {
         free(event_flows);
     }
     if (metrics != NULL) {
         free(metrics);
     }
-    return retval;
+    return 0;
 }
 
 int
@@ -676,7 +643,7 @@ int main(
     int    argc,
     char **argv)
 {
-    char *input_file;
+    char input_file[PATH_MAX];
     int count;
     int rv = 0;
 
@@ -699,7 +666,9 @@ int main(
         fprintf(RWSCAN_VERBOSE_FH, "Error starting worker threads!\n");
         skAbort();
     }
-    while (skOptionsCtxNextArgument(optctx, &input_file) == 0) {
+    while (skOptionsCtxNextArgument(optctx, input_file, sizeof(input_file))
+           == 0)
+    {
         if (options.verbose_progress) {
             fprintf(RWSCAN_VERBOSE_FH, "processing: %s\n", input_file);
         }

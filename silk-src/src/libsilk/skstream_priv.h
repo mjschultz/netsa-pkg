@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKSTREAM_PRIV_H, "$SiLK: skstream_priv.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_SKSTREAM_PRIV_H, "$SiLK: skstream_priv.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 /*
 **  skstream_priv.h
@@ -24,11 +24,14 @@ RCSIDENTVAR(rcsID_SKSTREAM_PRIV_H, "$SiLK: skstream_priv.h 275df62a2e41 2017-01-
 **
 */
 
-#include <silk/skstream.h>
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
+#include <silk/skstream.h>
+#include <silk/skredblack.h>
 #include <silk/utils.h>
-#include "skiobuf.h"
+#if SK_ENABLE_ZLIB
+#include <zlib.h>
+#endif
 
 
 /* macros to swap the bytes in place */
@@ -63,6 +66,39 @@ RCSIDENTVAR(rcsID_SKSTREAM_PRIV_H, "$SiLK: skstream_priv.h 275df62a2e41 2017-01-
         _SWAP_HELP(_byte, (ar), 3, 4);          \
     }
 #endif /* 0 */
+
+
+#ifndef SKSTREAM_USE_MEMCPY
+#ifdef SK_HAVE_ALIGNED_ACCESS_REQUIRED
+#define SKSTREAM_USE_MEMCPY 1
+#else
+#define SKSTREAM_USE_MEMCPY 0
+#endif
+#endif
+
+#if SKSTREAM_USE_MEMCPY
+
+#define COPY_DATA_SZ(copy_sz_dst, copy_sz_src, copy_sz_type)    \
+    memcpy((copy_sz_dst), (copy_sz_src), sizeof(copy_sz_type))
+
+#else
+
+#define COPY_DATA_SZ(copy_sz_dst, copy_sz_src, copy_sz_type)            \
+    { *((copy_sz_type*)(copy_sz_dst)) = *((copy_sz_type*)(copy_sz_src)); }
+
+#endif
+
+#define COPY_DATA64(copy_64_dst, copy_64_src)           \
+    COPY_DATA_SZ(copy_64_dst, copy_64_src, uint64_t)
+
+#define COPY_DATA32(copy_32_dst, copy_32_src)           \
+    COPY_DATA_SZ(copy_32_dst, copy_32_src, uint32_t)
+
+#define COPY_DATA16(copy_16_dst, copy_16_src)           \
+    COPY_DATA_SZ(copy_16_dst, copy_16_src, uint16_t)
+
+#define COPY_DATA8(copy_8_dst, copy_8_src)              \
+    { *(copy_sz_dst) = *((uint8_t*)(copy_sz_src)) }
 
 
 /*
@@ -196,7 +232,7 @@ RCSIDENTVAR(rcsID_SKSTREAM_PRIV_H, "$SiLK: skstream_priv.h 275df62a2e41 2017-01-
         rwRecSetInitFlags(r, 0);                                            \
         rwRecSetRestFlags(r, 0);                                            \
     }
-#endif  /* SK_NO_TCP_STATE_FIX */
+#endif  /* SK_NOTFIX_TCPSTATE_EXPANDED */
 
 /* Formerly public macros only used by flowcapio.c and rwfilterio.c */
 
@@ -214,44 +250,202 @@ RCSIDENTVAR(rcsID_SKSTREAM_PRIV_H, "$SiLK: skstream_priv.h 275df62a2e41 2017-01-
 
 
 
+/* a buffer */
+struct stream_buffer_st {
+    /**
+     *    contents of the buffer */
+    uint8_t            *b_buf;
+    /**
+     *    current read/write position in the buffer */
+    uint8_t            *b_pos;
+    /**
+     *    allocated size of the buffer */
+    size_t              b_bufsiz;
+    /**
+     *    amount of data available for reading or space available for
+     *    writing */
+    size_t              b_avail;
+    /**
+     *    for a write buffer, value to set 'avail' to after flushing
+     *    the buffer. for some read buffers, this is maximum amount of
+     *    data to read into the buffer. */
+    size_t              b_max;
+    /**
+     *    for a write buffer, offset to use for 'pos' after flushing
+     *    the buffer */
+    size_t              b_start;
+};
+typedef struct stream_buffer_st stream_buffer_t;
+
+
+/**
+ *    stream_blockbuf_t is used when reading and writing SiLK files
+ *    that are either compressed or contain block headers throughout
+ *    the stream.
+ */
+struct stream_blockbuf_st {
+    /**
+     *    Buffer containing internal (application-side) record data.
+     *    When reading data, the first few bytes of this buffer hold
+     *    the block header that was read from the stream (numbers
+     *    converted to native byte order).  When writing and stream is
+     *    not compressed, the first few bytes are reserved for the
+     *    block header so the block can be written with a single write
+     *    call. */
+    stream_buffer_t     rec_buf;
+    /**
+     *    Buffer containing internal (application-side) sidecar data.
+     *    Has the same requirements as 'rec_buf'. */
+    stream_buffer_t     sc_buf;
+    /**
+     *    A temporary buffer to that is used to hold the external
+     *    (disk-side) data when the stream is compressed. */
+    stream_buffer_t     ext_buf;
+
+    /**
+     *    Values or state required by the compression method. */
+    union comp_opts_un {
+        /* ensure the union is not empty */
+        void           *unused;
+#if SK_ENABLE_ZLIB
+        /* zlib */
+        struct zlib_st {
+            int         level;
+        } zlib;
+#endif  /* SK_ENABLE_ZLIB */
+#if SK_ENABLE_LZO
+        /* lzo */
+        struct lzo_st {
+            uint8_t    *scratch;
+        } lzo;
+#endif  /* SK_ENABLE_LZO */
+    }                   comp_opts;
+
+    /**
+     *    Length of the previous compressed block. */
+    uint32_t            prev_block_len;
+    /**
+     *    Length of the header that appears before each block. */
+    uint8_t             header_len;
+    /**
+     *    Compression method used by the stream. */
+    sk_compmethod_t     compmethod;
+    /**
+     *    The file version used by the stream. */
+    sk_file_version_t   fileversion;
+};
+typedef struct stream_blockbuf_st stream_blockbuf_t;
+
+
+
+/*
+ *    skstream_silkflow_t holds values necessary for handling SiLK
+ *    Flow records.
+ */
+struct skstream_silkflow_st {
+    /* Pointer to a function to convert an array of bytes into a record */
+    int                   (*unpack)(skstream_t*, rwRec*, uint8_t*);
+
+    /* Pointer to a function to convert a record into an array of bytes */
+    int                   (*pack)(skstream_t*, const rwRec*, uint8_t*);
+
+    /* The stream to copy the input to---for support of the --all-dest
+     * and --copy-input switches */
+    skstream_t             *copy_input;
+
+    /* Start time as recorded in file's header, or 0. For easy access */
+    sktime_t                hdr_starttime;
+
+    /* The sensor ID stored in the file's header, or
+     * SK_INVALID_SENSOR.  For easy access. */
+    sk_sensor_id_t          hdr_sensor;
+
+    /* The flowtype ID stored in the file's header, or
+     * SK_INVALID_FLOWTYPE.  For easy access. */
+    sk_flowtype_id_t        hdr_flowtype;
+
+};
+typedef struct skstream_silkflow_st skstream_silkflow_t;
+
+
+/*
+ *    skstraem_zlib_t is used when processing files whose entire
+ *    contents are compressed with gzip.
+ */
+#if SK_ENABLE_ZLIB
+struct skstream_zlib_st {
+    /* Interface to zlib */
+    z_stream            zstrm;
+    /* Pipe used for handling fixbuf output */
+    int                 pipe[2];
+    /* When reading, number of uncompressed bytes to "read" from
+     * buffer before calling uncompress (inflate()); when writing,
+     * number of uncompressed bytes to "write" into buffer before
+     * calling compress (deflate()) */
+    size_t              avail;
+    /* Current position in uncompress buffer; similar to 'avail' */
+    uint8_t            *pos;
+    size_t              comp_bufsiz;
+    /* Buffer of compressed data */
+    uint8_t            *comp_buf;
+    /* Buffer of uncompressed data */
+    uint8_t             uncomp_buf[SKSTREAM_DEFAULT_BLOCKSIZE];
+};
+typedef struct skstream_zlib_st skstream_zlib_t;
+#endif  /* SK_ENABLE_ZLIB */
+
+
+/* skstream_t */
 struct skstream_st {
     /* A FILE pointer to the file */
     FILE                   *fp;
-#if SK_ENABLE_ZLIB
+#if !SK_ENABLE_ZLIB
+    void                   *zlib;
+#else
     /* When the entire file has been compressed, we use gzread/gzwrite
      * to process the file, this is interface to those functions */
-    gzFile                  gz;
+    skstream_zlib_t        *zlib;
 #endif
+    /* Buffer used for non-SiLK streams (e.g, text files) or for SiLK
+     * streams that are not compressed and do not contain block
+     * headers. */
+    stream_buffer_t         basicbuf;
 
-    /* A handle to our own I/O buffering code */
-    sk_iobuf_t             *iobuf;
-
-    /* The full path to the file */
-    char                   *pathname;
+    /* Information required to read and write SiLK Flow File */
+    skstream_silkflow_t     silkflow;
 
     /* For a SiLK file, this holds the file's header */
     sk_file_header_t       *silk_hdr;
+
+    stream_blockbuf_t       iobuf;
+
+    /* Sidecar data */
+    const sk_sidecar_t     *sidecar;
+    /* skstream_buf_t          sidecar_buf; */
+
+    /* The full path to the file */
+    char                   *pathname;
 
     /* Number of records read or written.  For appending, this is the
      * number records added to the file. */
     uint64_t                rec_count;
 
-    /* Start time as recorded in file's header, or 0. For easy access */
-    sktime_t                hdr_starttime;
+    /* When sending textual output to a pager, the name of the pager
+     * to use */
+    char                   *pager;
 
-    /* Pointer to a function to convert an array of bytes into a record */
-    int                   (*rwUnpackFn)(skstream_t*, rwRec*, uint8_t*);
-    /* Pointer to a function to convert a record into an array of bytes */
-    int                   (*rwPackFn)(skstream_t*, const rwRec*, uint8_t*);
-    /* The stream to copy the input to---for support of the --all-dest
-     * and --copy-input switches */
-    skstream_t             *copyInputFD;
+    /* When reading textual input, the text that denotes the start of
+     * a comment. */
+    char                   *comment_start;
 
     /* An object to hold the parameter that caused the last error */
     union {
-        uint32_t        num;
+        ssize_t         num;
         const rwRec    *rec;
     }                       errobj;
+
+    /* Current position on disk */
+    off_t                   offset;
 
     /* Offset where the skIOBuf was created */
     off_t                   pre_iobuf_pos;
@@ -271,15 +465,7 @@ struct skstream_st {
     int                     fd;
 
     /* The fixed length of records of this type */
-    uint16_t                recLen;
-
-    /* The sensor ID stored in the file's header, or
-     * SK_INVALID_SENSOR.  For easy access. */
-    sk_sensor_id_t          hdr_sensor;
-
-    /* The flowtype ID stored in the file's header, or
-     * SK_INVALID_FLOWTYPE.  For easy access. */
-    sk_flowtype_id_t        hdr_flowtype;
+    uint16_t                rec_len;
 
     /* Whether stream is read, write, append. */
     skstream_mode_t         io_mode;
@@ -287,65 +473,58 @@ struct skstream_st {
     /* ipv6 policy */
     sk_ipv6policy_t         v6policy;
 
-    /* When sending textual output to a pager, the name of the pager
-     * to use */
-    char                   *pager;
-
-    /* When reading textual input, the text that denotes the start of
-     * a comment. */
-    char                   *comment_start;
-
     /* The type of data to read/write: text, silk, silk-flow, etc */
     skcontent_t             content_type;
 
     /* Set to 1 if the stream is seekable (i.e., a "real" file) */
-    unsigned                is_seekable     :1;
+    unsigned                is_seekable         :1;
 
     /* Set to 1 if the stream is a binary stream with a SiLK header */
-    unsigned                is_silk         :1;
+    unsigned                is_silk             :1;
 
     /* Set to 1 if the stream contains SiLK flow data */
-    unsigned                is_silk_flow    :1;
+    unsigned                is_silk_flow        :1;
 
     /* Set to 1 if the pager is being used for textual output. */
-    unsigned                is_pager_active :1;
+    unsigned                is_pager_active     :1;
 
     /* Set to 1 if the stream contains binary data (silk or non-silk) */
-    unsigned                is_binary       :1;
+    unsigned                is_binary           :1;
 
     /* Set to 1 if the stream is connected to a terminal (tty) */
-    unsigned                is_terminal     :1;
+    unsigned                is_terminal         :1;
 
     /* Set to 1 if data has been read-from/written-to the stream */
-    unsigned                is_dirty        :1;
+    unsigned                is_dirty            :1;
 
     /* Set to 1 if the stream has been closed */
-    unsigned                is_closed       :1;
+    unsigned                is_closed           :1;
 
     /* Set to 1 if the stream is coming from an MPI node */
-    unsigned                is_mpi          :1;
+    unsigned                is_mpi              :1;
 
     /* Set to 1 if the stream is connected to a standard I/O stream */
-    unsigned                is_stdio        :1;
+    unsigned                is_stdio            :1;
 
     /* Set to 1 if the stream is not using the IOBuf */
-    unsigned                is_unbuffered   :1;
+    unsigned                is_unbuffered       :1;
 
     /* Set to 1 if the stream has reached the end-of-file. */
-    unsigned                is_eof          :1;
-
-    /* Set to 1 if an error has occurred in an skStream* function that
-     * was called by an skIOBuf* function as part of a callback */
-    unsigned                is_iobuf_error  :1;
+    unsigned                is_eof              :1;
 
     /* Set to 1 if the silk flow data in this stream supports IPv6 */
-    unsigned                supports_ipv6   :1;
+    unsigned                supports_ipv6       :1;
 
-    /* Set to 1 if the silk header has been read from the stream */
-    unsigned                have_hdr        :1;
+    /* Set to 1 if the silk header has been read from or written to
+     * the stream */
+    unsigned                have_hdr            :1;
 
     /* Set to 1 if the data in the stream is in non-native byte order */
-    unsigned                swapFlag        :1;
+    unsigned                swap_flag           :1;
+
+    /* Whether the stream contains data block headers.  True if the
+     * file's version is SK_FILE_VERSION_BLOCK_HEADER. */
+    unsigned                use_block_hdr  :1;
 };
 /* skstream_t */
 
@@ -483,11 +662,10 @@ wwwioGetRecLen(
  */
 static int
 rwpackPackBytesPackets(
-    uint32_t               *bpp_out,
-    uint32_t               *pkts_out,
-    uint32_t               *pflag_out,
-    const rwGenericRec_V5  *rwrec);
-
+    uint32_t           *bpp_out,
+    uint32_t           *pkts_out,
+    uint32_t           *pflag_out,
+    const rwRec        *rwrec);
 
 /*
  *    Does the reverse of rwpackPackBytesPackets(): Fills in the
@@ -498,7 +676,7 @@ rwpackPackBytesPackets(
  */
 static void
 rwpackUnpackBytesPackets(
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint32_t            bpp,
     uint32_t            pkts,
     uint32_t            pflag);
@@ -533,12 +711,11 @@ rwpackUnpackBytesPackets(
  */
 static void
 rwpackPackProtoFlags(
-    uint8_t                *is_tcp_out,
-    uint8_t                *prot_flags_out,
-    uint8_t                *tcp_state_out,
-    uint8_t                *rest_flags_out,
-    const rwGenericRec_V5  *rwrec);
-
+    uint8_t            *is_tcp_out,
+    uint8_t            *prot_flags_out,
+    uint8_t            *tcp_state_out,
+    uint8_t            *rest_flags_out,
+    const rwRec        *rwrec);
 
 /*
  *    Does the reverse of rwpackPackProtoFlags(): Fills in the 'proto',
@@ -550,7 +727,7 @@ rwpackPackProtoFlags(
  */
 static void
 rwpackUnpackProtoFlags(
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t             is_tcp,
     uint8_t             prot_flags,
     uint8_t             tcp_state,
@@ -577,11 +754,10 @@ rwpackUnpackProtoFlags(
  */
 static int
 rwpackPackSbbPef(
-    uint32_t               *sbb_out,
-    uint32_t               *pef_out,
-    const rwGenericRec_V5  *rwrec,
-    sktime_t                file_start_time);
-
+    uint32_t           *sbb_out,
+    uint32_t           *pef_out,
+    const rwRec        *rwrec,
+    sktime_t            file_start_time);
 
 /*
  *    Does the reverse of rwpackPackSbbPef(): Fills in the 'sTime',
@@ -593,7 +769,7 @@ rwpackPackSbbPef(
  */
 static void
 rwpackUnpackSbbPef(
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     sktime_t            file_start_time,
     const uint32_t     *sbb,
     const uint32_t     *pef);
@@ -618,12 +794,11 @@ rwpackUnpackSbbPef(
  */
 static int
 rwpackPackTimeBytesPktsFlags(
-    uint32_t               *pkts_stime_out,
-    uint32_t               *bbe_out,
-    uint32_t               *msec_flags_out,
-    const rwGenericRec_V5  *rwrec,
-    sktime_t                file_start_time);
-
+    uint32_t           *pkts_stime_out,
+    uint32_t           *bbe_out,
+    uint32_t           *msec_flags_out,
+    const rwRec        *rwrec,
+    sktime_t            file_start_time);
 
 /*
  *    Does the reverse of rwpackPackSbbPef(): Fills in the 'sTime',
@@ -635,7 +810,7 @@ rwpackPackTimeBytesPktsFlags(
  */
 static void
 rwpackUnpackTimeBytesPktsFlags(
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     sktime_t            file_start_time,
     const uint32_t     *pkts_stime,
     const uint32_t     *bbe,
@@ -646,15 +821,14 @@ rwpackUnpackTimeBytesPktsFlags(
 #ifdef RWPACK_FLAGS_TIMES_VOLUMES
 static int
 rwpackPackFlagsTimesVolumes(
-    uint8_t                *ar,
-    const rwGenericRec_V5  *rwrec,
-    sktime_t                file_start_time,
-    size_t                  len);
-
+    uint8_t            *ar,
+    const rwRec        *rwrec,
+    sktime_t            file_start_time,
+    size_t              len);
 
 static void
 rwpackUnpackFlagsTimesVolumes(
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     const uint8_t      *ar,
     sktime_t            file_start_time,
     size_t              len,
@@ -665,17 +839,136 @@ rwpackUnpackFlagsTimesVolumes(
 #ifdef RWPACK_TIMES_FLAGS_PROTO
 static int
 rwpackPackTimesFlagsProto(
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar,
-    sktime_t                file_start_time);
-
+    const rwRec        *rwrec,
+    uint8_t            *ar,
+    sktime_t            file_start_time);
 
 static void
 rwpackUnpackTimesFlagsProto(
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     const uint8_t      *ar,
     sktime_t            file_start_time);
 #endif  /* RWPACK_TIMES_FLAGS_PROTO */
+
+
+/*
+ *    Copy the packets value from the rwRec 'pp_pkts32_rec' to the
+ *    32-bit (4 byte) value referenced by 'pp_pkts32_pos'.
+ *
+ *    If the value fits, ignore 'pp_pkts32_flag'.
+ *
+ *    If the record's value will not fit into 32 bits, set the value
+ *    referenced by 'pp_pkts32_flag' to SKSTREAM_ERR_PKTS_OVRFLO and
+ *    leave 'pp_pkts32_pos' unchanged.
+ */
+#define rwpackPackPackets32(pp_pkts32_rec, pp_pkts32_pos, pp_pkts32_flag) \
+    if (rwRecGetPkts(pp_pkts32_rec) <= UINT32_MAX) {                    \
+        const uint32_t pp_tmp32 = (uint32_t)rwRecGetPkts(pp_pkts32_rec); \
+        COPY_DATA32((pp_pkts32_pos), &pp_tmp32);                        \
+    } else {                                                            \
+        *(pp_pkts32_flag) = SKSTREAM_ERR_PKTS_OVRFLO;                   \
+    }
+
+/*
+ *    Use the 32-bit (4 byte) value referenced by 'pu_pkts32_pos' to
+ *    set the packets value on the rwRec 'pu_pkts32_rec'.
+ */
+#define rwpackUnpackPackets32(pu_pkts32_rec, pu_pkts32_pos)     \
+    {                                                           \
+        uint32_t pu_tmp32;                                      \
+        COPY_DATA32(&pu_tmp32, (pu_pkts32_pos));                \
+        rwRecSetPkts((pu_pkts32_rec), pu_tmp32);                \
+    }
+
+
+/*
+ *    Copy the bytes value from the rwRec 'pp_bytes32_rec' to the
+ *    32-bit (4 byte) value referenced by 'pp_bytes32_pos'.
+ *
+ *    If the value fits, ignore 'pp_pkts32_flag'.
+ *
+ *    If the record's value will not fit into 32 bits, set the value
+ *    referenced by 'pp_bytes32_flag' to SKSTREAM_ERR_BYTES_OVRFLO and
+ *    leave 'pp_bytes32_pos' unchanged.
+ */
+#define rwpackPackBytes32(pp_bytes32_rec, pp_bytes32_pos, pp_bytes32_flag) \
+    if (rwRecGetBytes(pp_bytes32_rec) <= UINT32_MAX) {                  \
+        const uint32_t pp_tmp32 = (uint32_t)rwRecGetBytes(pp_bytes32_rec); \
+        COPY_DATA32((pp_bytes32_pos), &pp_tmp32);                       \
+    } else {                                                            \
+        *(pp_bytes32_flag)= SKSTREAM_ERR_BYTES_OVRFLO;                  \
+    }
+
+/*
+ *    Use the 32-bit (4 byte) value referenced by 'pu_bytes32_pos' to
+ *    set the bytes value on the rwRec 'pu_bytes32_rec'.
+ */
+#define rwpackUnpackBytes32(pu_bytes32_rec, pu_bytes32_pos)     \
+    {                                                           \
+        uint32_t pu_tmp32;                                      \
+        COPY_DATA32(&pu_tmp32, (pu_bytes32_pos));               \
+        rwRecSetBytes((pu_bytes32_rec), pu_tmp32);              \
+    }
+
+
+/*
+ *    Copy the SNMP input value from the rwRec 'pp_in16_rec' to the
+ *    16-bit (2 byte) value referenced by 'pp_in16_pos'.
+ *
+ *    If the value fits, ignore 'pp_pkts32_flag'.
+ *
+ *    If the record's value will not fit into 16 bits, set the value
+ *    referenced by 'pp_in16_flag' to SKSTREAM_ERR_SNMP_OVRFLO and
+ *    leave 'pp_in16_pos' unchanged.
+ */
+#define rwpackPackInput16(pp_in16_rec, pp_in16_pos, pp_in16_flag)       \
+    if (rwRecGetInput(pp_in16_rec) <= UINT16_MAX) {                     \
+        const uint16_t pp_tmp16 = (uint16_t)rwRecGetInput(pp_in16_rec); \
+        COPY_DATA16((pp_in16_pos), &pp_tmp16);                          \
+    } else {                                                            \
+        *(pp_in16_flag)= SKSTREAM_ERR_SNMP_OVRFLO;                      \
+    }
+
+/*
+ *    Use the 16-bit (2 byte) value referenced by 'pu_in16_pos' to set
+ *    the SNMP input value on the rwRec 'pu_in16_rec'.
+ */
+#define rwpackUnpackInput16(pu_in16_rec, pu_in16_pos)   \
+    {                                                   \
+        uint16_t pu_tmp16;                              \
+        COPY_DATA16(&pu_tmp16, (pu_in16_pos));          \
+        rwRecSetInput((pu_in16_rec), pu_tmp16);         \
+    }
+
+
+/*
+ *    Copy the SNMP output value from the rwRec 'pp_out16_rec' to the
+ *    16-bit (2 byte) value referenced by 'pp_out16_pos'.
+ *
+ *    If the value fits, ignore 'pp_pkts32_flag'.
+ *
+ *    If the record's value will not fit into 16 bits, set the value
+ *    referenced by 'pp_out16_flag' to SKSTREAM_ERR_SNMP_OVRFLO and
+ *    leave 'pp_out16_pos' unchanged.
+ */
+#define rwpackPackOutput16(pp_out16_rec, pp_out16_pos, pp_out16_flag)   \
+    if (rwRecGetOutput(pp_out16_rec) <= UINT16_MAX) {                   \
+        const uint16_t pp_tmp16 = (uint16_t)rwRecGetOutput(pp_out16_rec); \
+        COPY_DATA16((pp_out16_pos), &pp_tmp16);                         \
+    } else {                                                            \
+        *(pp_out16_flag)= SKSTREAM_ERR_SNMP_OVRFLO;                     \
+    }
+
+/*
+ *    Use the 16-bit (2 byte) value referenced by 'pu_out16_pos' to set
+ *    the SNMP output value on the rwRec 'pu_out16_rec'.
+ */
+#define rwpackUnpackOutput16(pu_out16_rec, pu_out16_pos)        \
+    {                                                           \
+        uint16_t pu_tmp16;                                      \
+        COPY_DATA16(&pu_tmp16, (pu_out16_pos));                 \
+        rwRecSetOutput((pu_out16_rec), pu_tmp16);               \
+    }
 
 
 #ifdef __cplusplus

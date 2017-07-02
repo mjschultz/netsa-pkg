@@ -32,7 +32,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagbuild.c 62dfd3881f79 2017-03-21 19:33:08Z mthomas $");
+RCSIDENT("$SiLK: rwbagbuild.c 330239843b51 2017-06-23 18:42:39Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skcountry.h>
@@ -971,14 +971,12 @@ createBagFromTextBag(
     skBag_t            *bag,
     skstream_t         *stream)
 {
-#if SK_ENABLE_IPV6
     /* types of keys seen in the input */
     struct key_types {
         unsigned    num    :1;
         unsigned    ipv4   :1;
         unsigned    ipv6   :1;
     } key_types;
-#endif  /* SK_ENABLE_IPV6 */
     skBagTypedKey_t key;
     skBagTypedKey_t ipkey;
     skBagTypedCounter_t counter;
@@ -992,10 +990,8 @@ createBagFromTextBag(
     skBagErr_t err;
     int rv;
 
-#if SK_ENABLE_IPV6
     /* initialize types of keys */
     memset(&key_types, 0, sizeof(key_types));
-#endif
 
     /* set the types for the key and counter once */
     key.type = SKBAG_KEY_U32;
@@ -1075,60 +1071,6 @@ createBagFromTextBag(
         }
 
         /* parse key section of bag line */
-
-#if !SK_ENABLE_IPV6
-        /* parse as an integer, an IP, a CIDR block, or an IP wildcard */
-        rv = skStringParseIPWildcard(&ipwild, sz_key);
-        if (rv != 0) {
-            /* not parsable */
-            skAppPrintErr("Error parsing IP on line %d: %s",
-                          lc, skStringParseStrerror(rv));
-            return 1;
-        }
-        /* Add IPs from wildcard to the bag */
-        if (country_code) {
-            skIPWildcardIteratorBind(&iter, &ipwild);
-            while (skIPWildcardIteratorNext(&iter, &ipaddr)
-                   == SK_ITERATOR_OK)
-            {
-                key.val.u32 = skCountryLookupCode(&ipaddr);
-                err = skBagCounterAdd(bag, &key, &counter, NULL);
-                if (err != SKBAG_OK) {
-                    skAppPrintErr("Error adding value to bag: %s",
-                                  skBagStrerror(err));
-                    return 1;
-                }
-            }
-
-        } else if (prefix_map) {
-            skIPWildcardIteratorBind(&iter, &ipwild);
-            while (skIPWildcardIteratorNext(&iter, &ipaddr)
-                   == SK_ITERATOR_OK)
-            {
-                key.val.u32 = skPrefixMapFindValue(prefix_map, &ipaddr);
-                err = skBagCounterAdd(bag, &key, &counter, NULL);
-                if (err != SKBAG_OK) {
-                    skAppPrintErr("Error adding value to bag: %s",
-                                  skBagStrerror(err));
-                    return 1;
-                }
-            }
-
-        } else {
-            skIPWildcardIteratorBind(&iter, &ipwild);
-            while (skIPWildcardIteratorNext(&iter, &ipkey.val.addr)
-                   == SK_ITERATOR_OK)
-            {
-                err = skBagCounterAdd(bag, &ipkey, &counter, NULL);
-                if (err != SKBAG_OK) {
-                    skAppPrintErr("Error adding value to bag: %s",
-                                  skBagStrerror(err));
-                    return 1;
-                }
-            }
-        }
-
-#else  /* SK_ENABLE_IPV6 */
 
         /* do not allow a mix of integer keys with IPv6 addresses */
 
@@ -1221,8 +1163,6 @@ createBagFromTextBag(
                 }
             }
         }
-#endif  /* #else of #if !SK_ENABLE_IPV6 */
-
     }
 
     return 0;

@@ -22,7 +22,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKIPSET_H, "$SiLK: skipset.h ef5b2378ee80 2017-02-27 21:48:55Z mthomas $");
+RCSIDENTVAR(rcsID_SKIPSET_H, "$SiLK: skipset.h a97fc2c6dd5f 2017-06-23 21:44:08Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/skheader.h>
@@ -372,7 +372,7 @@ skIPSetCountIPsString(
  *    Allocate and initialize a new IPset at the location referenced
  *    specified by 'ipset'.  The set is initially empty.
  *
- *    Assuming IPv6 support is enabled in SiLK, the default behavior
+ *    The default behavior
  *    is for an IPset to be initialized to store IPv4 addresses and to
  *    convert itself to hold IPv6 addresses once an IPv6 address is
  *    inserted.  When the 'support_ipv6' parameter is non-zero, the
@@ -381,9 +381,8 @@ skIPSetCountIPsString(
  *    (See also skIPSetAutoConvertDisable().)
  *
  *    Return SKIPSET_OK on success.  Return SKIPSET_ERR_ALLOC on an
- *    allocation failure, SKIPSET_ERR_BADINPUT if the 'ipset'
- *    parameter was NULL, or SKIPSET_ERR_IPV6 if 'support_ipv6' is
- *    non-zero and SiLK was configured without IPv6 support.  Leave
+ *    allocation failure or SKIPSET_ERR_BADINPUT if the 'ipset'
+ *    parameter was NULL.  Leave
  *    the memory referenced by 'ipset' unchanged when an error code is
  *    returned.
  *
@@ -685,8 +684,6 @@ skIPSetOptionsRegister(
  *
  *    It is an error to call both this function and
  *    skIPSetOptionsRegister().
- *
- *    Since SiLK 3.11.0.
  */
 int
 skIPSetOptionsRegisterRecordVersion(
@@ -713,8 +710,6 @@ skIPSetOptionsUsage(
  *    Print usage information to the specified file handle.  This
  *    function should be paired with usage of
  *    skIPSetOptionsRegisterRecordVersion().
- *
- *    Since SiLK 3.11.0.
  */
 void
 skIPSetOptionsUsageRecordVersion(
@@ -763,7 +758,7 @@ typedef struct skipset_procstream_parm_st skipset_procstream_parm_t;
  *    processing of the IPset stops.
  *
  *    The 'fake_ipset' argument is an empty IPset that must be
- *    considered read-only. The caller can determine whether the
+ *    considered read-only. The caller may determine whether the
  *    stream is capable of containing IPv6 addresses by calling
  *    skIPSetIsV6().  Note: It is possible for an IPv6 IPset to only
  *    contain IPv4 addresses.
@@ -794,7 +789,7 @@ typedef int
  *    specified by skipset_walk_fn_t.  The callback is given an IP,
  *    its netblock prefix, and a caller-provided context pointer.  The
  *    callback and its context are specified with the 'cb_entry_func'
- *    and ;cb_entry_func_ctx' members of the 'proc_stream_settings'
+ *    and 'cb_entry_func_ctx' members of the 'proc_stream_settings'
  *    parameter, respectively.  Processing of entries continues until
  *    the stream is exhausted or until 'cb_entry_func' returns a value
  *    other than 'SKIPSET_OK'.
@@ -829,8 +824,6 @@ typedef int
  *    of the values specified for skIPSetRead() when it encounters one
  *    of those errors.  Otherwise, the return status of this function
  *    will be the return status of 'cb_init_func' or 'cb_entry_func'.
- *
- *    Since SiLK 3.11.0.
  */
 int
 skIPSetProcessStream(
@@ -851,8 +844,6 @@ skIPSetProcessStream(
  *    skIPSetProcessStream() if an IPset cannot be read from 'stream'.
  *    If 'buf' is too small to hold the number of IPs, return
  *    SKIPSET_ERR_BADINPUT.
- *
- *    Since SiLK 3.14.0.
  */
 int
 skIPSetProcessStreamCountIPs(

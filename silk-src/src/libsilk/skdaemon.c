@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skdaemon.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skdaemon.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/skdaemon.h>
 #include <silk/sklog.h>
@@ -23,19 +23,26 @@ RCSIDENT("$SiLK: skdaemon.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 /* LOCAL DEFINES AND TYPEDEFS */
 
-/* daemon context */
-typedef struct skdaemon_ctx_st {
+/* the name of global variable in the Lua config file that holds the
+ * table used to configure the daemon behavior */
+#define SKDAEMON_CONFIG_FILE_VARNAME    "daemon"
+
+/* skdaemon_ctx_t is the daemon context */
+struct skdaemon_ctx_st {
     /* location of pid file */
     char           *pidfile;
     /* variable to set to '1' once the signal handler is called */
     volatile int   *shutdown_flag;
     /* whether to chdir to the root directory (0 = yes, 1 = no) */
-    unsigned        no_chdir :1;
+    unsigned        no_chdir   :1;
     /* whether to run as a daemon (0 = yes, 1 = no) */
-    unsigned        no_daemon :1;
+    unsigned        no_daemon  :1;
     /* whether the legacy logging was provided as an option */
-    unsigned        legacy_log:1;
-} skdaemon_ctx_t;
+    unsigned        legacy_log :1;
+    /* whether the config-file is being used */
+    unsigned        config_file:1;
+};
+typedef struct skdaemon_ctx_st skdaemon_ctx_t;
 
 
 /* map a signal number to its name */
@@ -86,17 +93,33 @@ static sk_siglist_t caught_signals[] = {
 
 
 /* OPTIONS SETUP */
+
+/*
+ *    Identifiers for each option.
+ */
 typedef enum {
     OPT_PIDFILE,
     OPT_NO_CHDIR,
     OPT_NO_DAEMON
 } daemonOptionsEnum;
 
+/*
+ *    Array of options for command-line switches.  Must keep in sync
+ *    with daemonOptionsEnum above.
+ */
 static struct option daemonOptions[] = {
     {"pidfile",               REQUIRED_ARG, 0, OPT_PIDFILE},
     {"no-chdir",              NO_ARG,       0, OPT_NO_CHDIR},
     {"no-daemon",             NO_ARG,       0, OPT_NO_DAEMON},
     {0,0,0,0}                 /* sentinel */
+};
+
+/*
+ *    Array of names for configuration-file use.  Must keep in sync
+ *    with daemonOptionsEnum above.
+ */
+static const char *config_file_keys[] = {
+    "pid_file", "chdir", "fork", NULL
 };
 
 
@@ -109,6 +132,7 @@ daemonOptionsHandler(
     clientData          cData,
     int                 opt_index,
     char               *opt_arg);
+static void daemon_unknown_key_callback(const char *key, void *v_config_file);
 static int daemonWritePid(void);
 
 
@@ -205,17 +229,21 @@ daemonOptionsHandler(
     switch ((daemonOptionsEnum)opt_index) {
       case OPT_PIDFILE:
         if (skdaemon->pidfile) {
-            skAppPrintErr("The --%s switch is given multiple times",
+            skAppPrintErr("Invalid %s: Switch used multiple times",
                           daemonOptions[opt_index].name);
             return -1;
         }
         if (opt_arg[0] != '/') {
-            skAppPrintErr(("Must use full path to %s\n"
-                           "\t('%s' does not begin with a slash)"),
+            skAppPrintErr(("Invalid %s '%s': A complete path is required"
+                           " and value does not begin with a slash)"),
                           daemonOptions[opt_index].name, opt_arg);
             return -1;
         }
         skdaemon->pidfile = strdup(opt_arg);
+        if (NULL == skdaemon->pidfile) {
+            skAppPrintOutOfMemory("string");
+            return -1;
+        }
         break;
 
       case OPT_NO_CHDIR:
@@ -228,6 +256,32 @@ daemonOptionsHandler(
     }
 
     return 0;
+}
+
+
+/*
+ *  daemon_unknown_key_callback(key, v_config_file);
+ *
+ *    Print a warning about the unrecognized key 'key' in the 'daemon'
+ *    table in the Lua configuration file.  The file name is specified
+ *    in the 'v_config_file' parameter.
+ */
+static void
+daemon_unknown_key_callback(
+    const char         *key,
+    void               *v_config_file)
+{
+    const char *config_file = (const char*)v_config_file;
+
+    if (key) {
+        skAppPrintErr("Warning for configuration '%s':"
+                      " Unexpected key '%s' found in table '%s'",
+                      config_file, key, SKDAEMON_CONFIG_FILE_VARNAME);
+    } else {
+        skAppPrintErr("Warning for configuration '%s':"
+                      " Non-alphanumeric key found in table '%s'",
+                      config_file, SKDAEMON_CONFIG_FILE_VARNAME);
+    }
 }
 
 
@@ -318,6 +372,10 @@ skdaemonOptionsUsage(
 {
     int i;
 
+    if (skdaemon && skdaemon->config_file) {
+        return;
+    }
+
     sklogOptionsUsage(fh);
     for (i = 0; daemonOptions[i].name; ++i) {
         fprintf(fh, "--%s %s. ", daemonOptions[i].name,
@@ -360,12 +418,126 @@ skdaemonOptionsVerify(
 }
 
 
+/* Set daemon parameters from the configuration file */
+int
+skdaemonParseConfigFile(
+    lua_State          *L,
+    const char         *config_file)
+{
+    const char table[] = SKDAEMON_CONFIG_FILE_VARNAME;
+    const char *key;
+    const char *value;
+    size_t error_count = 0;
+    int true_false;
+    int t;
+    int retval = -1;
+
+    /* table is in the stack at index 't' */
+    lua_getglobal(L, table);
+    t = lua_gettop(L);
+
+    /* does it exist and is it a table? */
+    if (!lua_istable(L, t)) {
+        if (lua_isnil(L, t)) {
+            /* the daemon settings are optional; we are done  */
+            retval = 0;
+        } else {
+            skAppPrintErr("Error in configuration '%s':"
+                          " Variable '%s' is a %s; %s expected",
+                          config_file, table,
+                          lua_typename(L, lua_type(L, t)),
+                          lua_typename(L, LUA_TSTRING));
+        }
+        goto END;
+    }
+
+    /* check table for unrecognized keys */
+    sk_lua_check_table_unknown_keys(
+        L, t, -1, config_file_keys,
+        daemon_unknown_key_callback, (void*)config_file);
+
+    /* get daemon[pidfile] */
+    key = config_file_keys[OPT_PIDFILE];
+    lua_getfield(L, t, key);
+    if (!lua_isstring(L, -1)) {
+        if (!lua_isnil(L, -1)) {
+            skAppPrintErr(("Error in configuration '%s':"
+                           " %s['%s'] is a %s; %s expected"),
+                          config_file, table, key,
+                          lua_typename(L, lua_type(L, -1)),
+                          lua_typename(L, LUA_TSTRING));
+            ++error_count;
+        }
+        /* else value is not required, so nil is okay */
+    } else {
+        value = lua_tostring(L, -1);
+        skdaemon->pidfile = strdup(value);
+        if (NULL == skdaemon->pidfile) {
+            skAppPrintOutOfMemory("string");
+            lua_pop(L, 1);
+            goto END;
+        }
+    }
+    lua_pop(L, 1);
+
+    /* get daemon[chdir] */
+    key = config_file_keys[OPT_NO_CHDIR];
+    lua_getfield(L, t, key);
+    if (!lua_isboolean(L, -1)) {
+        if (!lua_isnil(L, -1)) {
+            skAppPrintErr(("Error in configuration '%s':"
+                           " %s['%s'] is a %s; %s expected"),
+                          config_file, table, key,
+                          lua_typename(L, lua_type(L, -1)),
+                          lua_typename(L, LUA_TBOOLEAN));
+            ++error_count;
+        }
+        /* else value is not required, so nil is okay */
+    } else {
+        true_false = lua_toboolean(L, -1);
+        skdaemon->no_chdir = !true_false;
+    }
+    lua_pop(L, 1);
+
+    /* get daemon[chdir] */
+    key = config_file_keys[OPT_NO_DAEMON];
+    lua_getfield(L, t, key);
+    if (!lua_isboolean(L, -1)) {
+        if (!lua_isnil(L, -1)) {
+            skAppPrintErr(("Error in configuration '%s':"
+                           " %s['%s'] is a %s; %s expected"),
+                          config_file, table, key,
+                          lua_typename(L, lua_type(L, -1)),
+                          lua_typename(L, LUA_TBOOLEAN));
+            ++error_count;
+        }
+        /* else value is not required, so nil is okay */
+    } else {
+        true_false = lua_toboolean(L, -1);
+        skdaemon->no_daemon = !true_false;
+    }
+    lua_pop(L, 1);
+
+    /* done */
+    if (0 == error_count) {
+        retval = 0;
+    }
+
+  END:
+    /* table should be only thing on the stack at this point */
+    assert(lua_gettop(L) == t);
+    /* pop the table */
+    lua_pop(L, 1);
+    return retval;
+}
+
+
 /* register our options and the options for logging */
 int
 skdaemonSetup(
     int                 log_features,
     int                 argc,
-    char   * const     *argv)
+    char * const       *argv)
 {
     if (skdaemon) {
         /* called mulitple times */
@@ -385,6 +557,12 @@ skdaemonSetup(
      * print the help for the --pidfile switch */
     if (log_features & SKLOG_FEATURE_LEGACY) {
         skdaemon->legacy_log = 1;
+    }
+
+    /* use the same configuration-file setting as the log */
+    if (log_features & SKLOG_FEATURE_CONFIG_FILE) {
+        skdaemon->config_file = 1;
+        return 0;
     }
 
     return skOptionsRegister(daemonOptions, &daemonOptionsHandler, NULL);
@@ -417,7 +595,7 @@ skdaemonTeardown(
 int
 skdaemonize(
     volatile int       *shutdown_flag,
-    void                (*exit_handler)(void))
+    void              (*exit_handler)(void))
 {
     char errbuf[512];
     pid_t pid;

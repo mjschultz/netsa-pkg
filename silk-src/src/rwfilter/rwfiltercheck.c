@@ -19,7 +19,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfiltercheck.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwfiltercheck.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include "rwfilter.h"
 #include <silk/skipset.h>
@@ -405,13 +405,7 @@ static filter_switch_t filterSwitch[] = {
       "\tby its standard port: HTTP=80,SMTP=25,DNS=53,etc")},
 
     {{"ip-version",         REQUIRED_ARG, 0, OPT_IP_VERSION},
-#if SK_ENABLE_IPV6
-     ("IP Version is contained in this list. Def 4,6")
-#else
-     ("IP Version is contained in this list. Def 4\n"
-      "\tIPv6 support not available. All IPv6 flows will be ignored")
-#endif
-    },
+     ("IP Version is contained in this list. Def 4,6")},
 
     {{"scc",                REQUIRED_ARG, 0, OPT_SCC},
      ("Source address maps to one of these countries, a comma\n"
@@ -891,11 +885,7 @@ filterOptionsHandler(
         {
             uint32_t *ipversion;
             uint32_t count;
-#if SK_ENABLE_IPV6
             rv = skStringParseNumberList(&ipversion, &count, opt_arg, 4, 6, 2);
-#else
-            rv = skStringParseNumberList(&ipversion, &count, opt_arg, 4, 4, 1);
-#endif
             if (rv != 0) {
                 break;
             }
@@ -951,17 +941,10 @@ filterOptionsHandler(
             if ((option_seen[OPT_ICMP_TYPE] || option_seen[OPT_ICMP_CODE])
                 && option_seen[OPT_PROTOCOL])
             {
-#if SK_ENABLE_IPV6
                 const char *proto_list = "1 or 58";
-#else
-                const char *proto_list = "1";
-#endif
 
                 if (!skBitmapGetBit((checks->proto), IPPROTO_ICMP)
-#if SK_ENABLE_IPV6
-                    && !skBitmapGetBit((checks->proto), IPPROTO_ICMPV6)
-#endif
-                    )
+                    && !skBitmapGetBit((checks->proto), IPPROTO_ICMPV6))
                 {
                     skAppPrintErr(("An --%s value was given but --%s"
                                    " does not include %s"),
@@ -1272,19 +1255,19 @@ filterCheck(
             break;
 
           case OPT_INPUT_INDEX:
-            FILTER_CHECK(skBitmapGetBit(checks->input_index,
-                                        rwRecGetInput(rwrec)));
+            FILTER_CHECK(
+                1==skBitmapGetBit(checks->input_index,rwRecGetInput(rwrec)));
             break;
 
           case OPT_OUTPUT_INDEX:
-            FILTER_CHECK(skBitmapGetBit(checks->output_index,
-                                        rwRecGetOutput(rwrec)));
+            FILTER_CHECK(
+                1==skBitmapGetBit(checks->output_index,rwRecGetOutput(rwrec)));
             break;
 
           case OPT_ANY_INDEX:
-            FILTER_CHECK(skBitmapGetBit(checks->any_index,rwRecGetInput(rwrec))
-                         || skBitmapGetBit(checks->any_index,
-                                           rwRecGetOutput(rwrec)));
+            FILTER_CHECK(
+                1==skBitmapGetBit(checks->any_index,rwRecGetInput(rwrec))
+                || 1==skBitmapGetBit(checks->any_index,rwRecGetOutput(rwrec)));
             break;
 
             /*
@@ -1989,48 +1972,41 @@ filterTeardown(
 }
 
 
-/* Return number of checks active. */
-int
-filterGetCheckCount(
-    void)
-{
-    return checks->check_count;
-}
-
-
 /*
- *  status = filterGetFGlobFilters();
- *
  *    Create filter checks that correspond to the --sensor, --class,
- *    --type switches from the fglob() code by getting those values
- *    from fglob and creating filters for them.
+ *    --type, and --flowtype switches from the fglob code by allowing
+ *    fglob to fill in bitmaps with the sensors and flowtypes to
+ *    filter over.
  */
-int
+static void
 filterGetFGlobFilters(
     void)
 {
     int rv;
 
-    /* Let fglob fill in the bitmaps with the sensors and class/types
-     * to filter over. */
-    rv = fglobSetFilters(&(checks->sID), &(checks->flow_type));
+    rv = skOptionsCtxGetFGlobFilters(optctx, &checks->sID, &checks->flow_type);
+    assert(rv >= 0 && rv <= 3);
 
-    if (rv < 0) {
-        /* error */
-        return rv;
-    }
     if (rv & 1) {
         /* need to filter over sensor */
         checks->checkSet[checks->check_count] = OPT_SENSORS;
-        checks->check_count++;
+        ++checks->check_count;
     }
     if (rv & 2) {
         /* need to filter over class/type */
         checks->checkSet[checks->check_count] = OPT_FLOW_TYPE;
-        checks->check_count++;
+        ++checks->check_count;
     }
+}
 
-    return 0;
+
+/* Return number of checks active. */
+int
+filterGetCheckCount(
+    void)
+{
+    filterGetFGlobFilters();
+    return checks->check_count;
 }
 
 

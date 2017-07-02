@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwnotroutedio.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwnotroutedio.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 /* #define RWPACK_BYTES_PACKETS          1 */
 #define RWPACK_FLAGS_TIMES_VOLUMES    1
@@ -90,16 +90,17 @@ RCSIDENT("$SiLK: rwnotroutedio.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 static int
 notroutedioRecordUnpack_V5(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         notroutedioRecordSwap_V5(ar);
     }
 
     /* sTime, elapsed, pkts, bytes, proto, tcp-flags */
-    rwpackUnpackFlagsTimesVolumes(rwrec, ar, stream->hdr_starttime, 12, 0);
+    rwpackUnpackFlagsTimesVolumes(
+        rwrec, ar, stream->silkflow.hdr_starttime, 12, 0);
 
     /* sPort, dPort */
     rwRecMemSetSPort(rwrec, &ar[12]);
@@ -110,11 +111,11 @@ notroutedioRecordUnpack_V5(
     rwRecMemSetDIPv4(rwrec, &ar[20]);
 
     /* input */
-    rwRecMemSetInput(rwrec, &ar[24]);
+    rwpackUnpackInput16(rwrec, &ar[24]);
 
     /* sensor, flow_type from file name/header */
-    rwRecSetSensor(rwrec, stream->hdr_sensor);
-    rwRecSetFlowType(rwrec, stream->hdr_flowtype);
+    rwRecSetSensor(rwrec, stream->silkflow.hdr_sensor);
+    rwRecSetFlowType(rwrec, stream->silkflow.hdr_flowtype);
 
     return SKSTREAM_OK;
 }
@@ -125,14 +126,15 @@ notroutedioRecordUnpack_V5(
  */
 static int
 notroutedioRecordPack_V5(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
     int rv = SKSTREAM_OK; /* return value */
 
     /* sTime, elapsed, pkts, bytes, proto, tcp-flags */
-    rv = rwpackPackFlagsTimesVolumes(ar, rwrec, stream->hdr_starttime, 12);
+    rv = rwpackPackFlagsTimesVolumes(
+        ar, rwrec, stream->silkflow.hdr_starttime, 12);
     if (rv) {
         return rv;
     }
@@ -146,10 +148,13 @@ notroutedioRecordPack_V5(
     rwRecMemGetDIPv4(rwrec, &ar[20]);
 
     /* input */
-    rwRecMemGetInput(rwrec, &ar[24]);
+    rwpackPackInput16(rwrec, &ar[24], &rv);
+    if (rv) {
+        return rv;
+    }
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         notroutedioRecordSwap_V5(ar);
     }
 
@@ -219,11 +224,11 @@ notroutedioRecordPack_V5(
 static int
 notroutedioRecordUnpack_V3(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         notroutedioRecordSwap_V3(ar);
     }
 
@@ -234,16 +239,16 @@ notroutedioRecordUnpack_V3(
     rwRecMemSetDPort(rwrec, &ar[10]);
 
     /* input interface */
-    rwRecMemSetInput(rwrec, &ar[24]);
+    rwpackUnpackInput16(rwrec, &ar[24]);
 
     /* sTime, pkts, bytes, elapsed, proto, tcp-flags, bpp */
-    rwpackUnpackTimeBytesPktsFlags(rwrec, stream->hdr_starttime,
+    rwpackUnpackTimeBytesPktsFlags(rwrec, stream->silkflow.hdr_starttime,
                                    (uint32_t*)&ar[12], (uint32_t*)&ar[16],
                                    (uint32_t*)&ar[20]);
 
     /* sensor, flow_type from file name/header */
-    rwRecSetSensor(rwrec, stream->hdr_sensor);
-    rwRecSetFlowType(rwrec, stream->hdr_flowtype);
+    rwRecSetSensor(rwrec, stream->silkflow.hdr_sensor);
+    rwRecSetFlowType(rwrec, stream->silkflow.hdr_flowtype);
 
     return SKSTREAM_OK;
 }
@@ -254,16 +259,16 @@ notroutedioRecordUnpack_V3(
  */
 static int
 notroutedioRecordPack_V3(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
     int rv = SKSTREAM_OK; /* return value */
 
     /* sTime, pkts, bytes, elapsed, proto, tcp-flags, bpp */
     rv = rwpackPackTimeBytesPktsFlags((uint32_t*)&ar[12], (uint32_t*)&ar[16],
                                       (uint32_t*)&ar[20],
-                                      rwrec, stream->hdr_starttime);
+                                      rwrec, stream->silkflow.hdr_starttime);
     if (rv) {
         return rv;
     }
@@ -275,10 +280,13 @@ notroutedioRecordPack_V3(
     rwRecMemGetDPort(rwrec, &ar[10]);
 
     /* input interfaces */
-    rwRecMemGetInput(rwrec, &ar[24]);
+    rwpackPackInput16(rwrec, &ar[24], &rv);
+    if (rv) {
+        return rv;
+    }
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         notroutedioRecordSwap_V3(ar);
     }
 
@@ -341,11 +349,11 @@ notroutedioRecordPack_V3(
 static int
 notroutedioRecordUnpack_V1(
     skstream_t         *stream,
-    rwGenericRec_V5    *rwrec,
+    rwRec              *rwrec,
     uint8_t            *ar)
 {
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         notroutedioRecordSwap_V1(ar);
     }
 
@@ -356,7 +364,7 @@ notroutedioRecordUnpack_V1(
     rwRecMemSetDPort(rwrec, &ar[10]);
 
     /* pkts, elapsed, sTime, bytes, bpp */
-    rwpackUnpackSbbPef(rwrec, stream->hdr_starttime,
+    rwpackUnpackSbbPef(rwrec, stream->silkflow.hdr_starttime,
                        (uint32_t*)&ar[16], (uint32_t*)&ar[12]);
 
     /* proto, flags, input interface */
@@ -365,8 +373,8 @@ notroutedioRecordUnpack_V1(
     rwRecSetInput(rwrec, ar[22]);
 
     /* sensor, flow_type from file name/header */
-    rwRecSetSensor(rwrec, stream->hdr_sensor);
-    rwRecSetFlowType(rwrec, stream->hdr_flowtype);
+    rwRecSetSensor(rwrec, stream->silkflow.hdr_sensor);
+    rwRecSetFlowType(rwrec, stream->silkflow.hdr_flowtype);
 
     return SKSTREAM_OK;
 }
@@ -377,20 +385,20 @@ notroutedioRecordUnpack_V1(
  */
 static int
 notroutedioRecordPack_V1(
-    skstream_t             *stream,
-    const rwGenericRec_V5  *rwrec,
-    uint8_t                *ar)
+    skstream_t         *stream,
+    const rwRec        *rwrec,
+    uint8_t            *ar)
 {
     int rv = SKSTREAM_OK; /* return value */
 
     /* Check sizes of fields we've expanded in later versions */
-    if (rwRecGetInput(rwrec) > 255) {
+    if (rwRecGetInput(rwrec) > 0xFF) {
         return SKSTREAM_ERR_SNMP_OVRFLO;
     }
 
     /* pkts, elapsed, sTime, bytes, bpp */
     rv = rwpackPackSbbPef((uint32_t*)&ar[16], (uint32_t*)&ar[12],
-                          rwrec, stream->hdr_starttime);
+                          rwrec, stream->silkflow.hdr_starttime);
     if (rv) {
         return rv;
     }
@@ -407,7 +415,7 @@ notroutedioRecordPack_V1(
     ar[22] = (uint8_t)rwRecGetInput(rwrec);
 
     /* swap if required */
-    if (stream->swapFlag) {
+    if (stream->swap_flag) {
         notroutedioRecordSwap_V1(ar);
     }
 
@@ -470,21 +478,21 @@ notroutedioPrepare(
     /* version check; set values based on version */
     switch (skHeaderGetRecordVersion(hdr)) {
       case 5:
-        stream->rwUnpackFn = &notroutedioRecordUnpack_V5;
-        stream->rwPackFn   = &notroutedioRecordPack_V5;
+        stream->silkflow.unpack = &notroutedioRecordUnpack_V5;
+        stream->silkflow.pack   = &notroutedioRecordPack_V5;
         break;
       case 4:
       case 3:
         /* V3 and V4 differ only in that V4 supports compression on
          * read and write; V3 supports compression only on read */
-        stream->rwUnpackFn = &notroutedioRecordUnpack_V3;
-        stream->rwPackFn   = &notroutedioRecordPack_V3;
+        stream->silkflow.unpack = &notroutedioRecordUnpack_V3;
+        stream->silkflow.pack   = &notroutedioRecordPack_V3;
         break;
       case 2:
       case 1:
         /* V1 and V2 differ only in the padding of the header */
-        stream->rwUnpackFn = &notroutedioRecordUnpack_V1;
-        stream->rwPackFn   = &notroutedioRecordPack_V1;
+        stream->silkflow.unpack = &notroutedioRecordUnpack_V1;
+        stream->silkflow.pack   = &notroutedioRecordPack_V1;
         break;
       case 0:
       default:
@@ -492,22 +500,22 @@ notroutedioPrepare(
         goto END;
     }
 
-    stream->recLen = notroutedioGetRecLen(skHeaderGetRecordVersion(hdr));
+    stream->rec_len = notroutedioGetRecLen(skHeaderGetRecordVersion(hdr));
 
     /* verify lengths */
-    if (stream->recLen == 0) {
+    if (stream->rec_len == 0) {
         skAppPrintErr("Record length not set for %s version %u",
                       FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr));
         skAbort();
     }
-    if (stream->recLen != skHeaderGetRecordLength(hdr)) {
+    if (stream->rec_len != skHeaderGetRecordLength(hdr)) {
         if (0 == skHeaderGetRecordLength(hdr)) {
-            skHeaderSetRecordLength(hdr, stream->recLen);
+            skHeaderSetRecordLength(hdr, stream->rec_len);
         } else {
             skAppPrintErr(("Record length mismatch for %s version %u\n"
                            "\tcode = %" PRIu16 " bytes;  header = %lu bytes"),
                           FILE_FORMAT, (unsigned)skHeaderGetRecordVersion(hdr),
-                          stream->recLen,
+                          stream->rec_len,
                           (unsigned long)skHeaderGetRecordLength(hdr));
             skAbort();
         }

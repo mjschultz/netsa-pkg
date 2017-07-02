@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skstream-err.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skstream-err.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include "skstream_priv.h"
 
@@ -242,18 +242,62 @@ streamLastErrFunc(
         }
         break;
 
-      case SKSTREAM_ERR_READ_SHORT: /* RWIO_ERR_READ_SHORT */
-        msg = "Read incomplete record";
+      case SKSTREAM_ERR_BLOCK_SHORT_HDR:
+        msg = "End of file while reading data block header";
         if (!stream) {
             ERR_FN(("%s", msg),
                    (ef2_ctx, "%s", msg));
         } else {
-            ERR_FN(("%s (%lu of %lu bytes) from %s",
-                    msg, (unsigned long)(stream->errobj.num),
-                    (unsigned long)stream->recLen, stream->pathname),
-                   (ef2_ctx, "%s (%lu of %lu bytes) from %s",
-                    msg, (unsigned long)(stream->errobj.num),
-                    (unsigned long)stream->recLen, stream->pathname));
+            ERR_FN(("%s (%" SK_PRIdZ " of %u bytes) from %s",
+                    msg, stream->errobj.num, stream->iobuf.header_len,
+                    stream->pathname),
+                   (ef2_ctx,
+                    "%s (%" SK_PRIdZ " of %u bytes) from %s",
+                    msg, stream->errobj.num, stream->iobuf.header_len,
+                    stream->pathname));
+        }
+        break;
+
+      case SKSTREAM_ERR_BLOCK_INCOMPLETE:
+        msg = "End of file while reading data block";
+        FILENAME_MSG(msg);
+        break;
+
+      case SKSTREAM_ERR_BLOCK_UNCOMPRESS:
+        msg = "Error while uncompressing data block";
+        FILENAME_MSG(msg);
+        break;
+
+      case SKSTREAM_ERR_BLOCK_INVALID_LEN:
+        msg = "Length of data block is invalid";
+        FILENAME_MSG(msg);
+        break;
+
+      case SKSTREAM_ERR_BLOCK_UNKNOWN_ID:
+        msg = "Data block has unknown ID";
+        FILENAME_MSG(msg);
+        break;
+
+      case SKSTREAM_ERR_BLOCK_WANTED_ID:
+        msg = "Data block ID is not what was expected";
+        FILENAME_MSG(msg);
+        break;
+
+      case SKSTREAM_ERR_READ_SHORT:
+        msg = "Read incomplete record";
+        if (!stream) {
+            ERR_FN(("%s", msg),
+                   (ef2_ctx, "%s", msg));
+        } else if (!stream->is_silk_flow) {
+            ERR_FN(("%s from %s", msg, stream->pathname),
+                   (ef2_ctx, "%s from %s", msg, stream->pathname));
+        } else {
+            ERR_FN(("%s (%" SK_PRIdZ " of %" PRIu16 " bytes) from %s",
+                    msg, stream->errobj.num, stream->rec_len,
+                    stream->pathname),
+                   (ef2_ctx, "%s (%" SK_PRIdZ " of %" PRIu16 " bytes) from %s",
+                    msg, stream->errobj.num, stream->rec_len,
+                    stream->pathname));
         }
         break;
 
@@ -316,9 +360,9 @@ streamLastErrFunc(
                    (ef2_ctx, "%s", msg));
         } else {
             skStreamGetLimit(stream, errcode, &limit);
-            ERR_FN(("%s '%s': %u > %" PRId64, msg,
+            ERR_FN(("%s '%s': %" PRIu64 " > %" PRId64, msg,
                     stream->pathname, rwRecGetPkts(stream->errobj.rec), limit),
-                   (ef2_ctx, "%s '%s': %u > %" PRId64, msg,
+                   (ef2_ctx, "%s '%s': %" PRIu64 " > %" PRId64, msg,
                     stream->pathname, rwRecGetPkts(stream->errobj.rec),limit));
         }
         break;
@@ -334,11 +378,11 @@ streamLastErrFunc(
                    (ef2_ctx, "%s", msg));
         } else {
             skStreamGetLimit(stream, errcode, &limit);
-            ERR_FN(("%s '%s': %u > %" PRId64, msg,
+            ERR_FN(("%s '%s': %" PRIu64 " > %" PRId64, msg,
                     stream->pathname, (rwRecGetBytes(stream->errobj.rec)
                                        / rwRecGetPkts(stream->errobj.rec)),
                     limit),
-                   (ef2_ctx, "%s '%s': %u > %" PRId64, msg,
+                   (ef2_ctx, "%s '%s': %" PRIu64 " > %" PRId64, msg,
                     stream->pathname, (rwRecGetBytes(stream->errobj.rec)
                                        / rwRecGetPkts(stream->errobj.rec)),
                     limit));
@@ -358,9 +402,9 @@ streamLastErrFunc(
                 snmp_str = "output";
                 snmp_val = rwRecGetOutput(stream->errobj.rec);
             }
-            ERR_FN(("%s '%s': %s %" PRIu16 " > %" PRId64, msg,
+            ERR_FN(("%s '%s': %s %u > %" PRId64, msg,
                     stream->pathname, snmp_str, snmp_val, limit),
-                   (ef2_ctx, "%s '%s': %s %" PRIu16 " > %" PRId64, msg,
+                   (ef2_ctx, "%s '%s': %s %u > %" PRId64, msg,
                     stream->pathname, snmp_str, snmp_val, limit));
         }
         break;
@@ -402,19 +446,33 @@ streamLastErrFunc(
             ERR_FN(("%s", msg),
                    (ef2_ctx, "%s", msg));
         } else {
-            ERR_FN(("%s in file '%s': %u > %u", msg,
+            ERR_FN(("%s in file '%s': %" PRIu64 " > %" PRIu64 "", msg,
                     stream->pathname,
-                    (unsigned int)rwRecGetPkts(stream->errobj.rec),
-                    (unsigned int)rwRecGetBytes(stream->errobj.rec)),
-                   (ef2_ctx, "%s in file '%s': %u > %u", msg,
+                    rwRecGetPkts(stream->errobj.rec),
+                    rwRecGetBytes(stream->errobj.rec)),
+                   (ef2_ctx, "%s in file '%s': %" PRIu64 " > %" PRIu64 "", msg,
                     stream->pathname,
-                    (unsigned int)rwRecGetPkts(stream->errobj.rec),
-                    (unsigned int)rwRecGetBytes(stream->errobj.rec)));
+                    rwRecGetPkts(stream->errobj.rec),
+                    rwRecGetBytes(stream->errobj.rec)));
         }
         break;
 
       case SKSTREAM_ERR_UNSUPPORT_IPV6:
         FILENAME_MSG("Record has an unsupported IPv6 address");
+        break;
+
+      case SKSTREAM_ERR_BYTES_OVRFLO:
+        msg = "Record's byte count greater than that allowed in file";
+        if (!stream) {
+            ERR_FN(("%s", msg),
+                   (ef2_ctx, "%s", msg));
+        } else {
+            skStreamGetLimit(stream, errcode, &limit);
+            ERR_FN(("%s '%s': %" PRIu64 " > %" PRId64, msg,
+                    stream->pathname, rwRecGetBytes(stream->errobj.rec), limit),
+                   (ef2_ctx, "%s '%s': %" PRIu64 " > %" PRId64, msg,
+                    stream->pathname, rwRecGetBytes(stream->errobj.rec),limit));
+        }
         break;
 
       case SKSTREAM_ERR_ALLOC:
@@ -427,14 +485,14 @@ streamLastErrFunc(
         break;
 
       case SKSTREAM_ERR_BAD_MAGIC:
-        FILENAME_MSG("File does not appear to be a SiLK data file");
+        FILENAME_MSG("Stream is not in a format SiLK undertands");
         break;
 
       case SKSTREAM_ERR_CLOSED:
         FILENAME_MSG("Cannot modify a stream once it is closed");
         break;
 
-      case SKSTREAM_ERR_EOF:    /* RWIO_ERR_READ_EOF */
+      case SKSTREAM_ERR_EOF:
         FILENAME_MSG("Reached end of file");
         break;
 
@@ -445,20 +503,6 @@ streamLastErrFunc(
       case SKSTREAM_ERR_INVALID_INPUT:
         ERR_FN(("Argument's value is invalid"),
                (ef2_ctx, "Argument's value is invalid"));
-        break;
-
-      case SKSTREAM_ERR_IOBUF:
-        if (!stream) {
-            ERR_FN(("Error reading/writing iobuffer"),
-                   (ef2_ctx, "Error reading/writing iobuffer"));
-        } else {
-            ERR_FN(("Error %s iobuffer for '%s': %s",
-                    ((stream->io_mode == SK_IO_READ) ? "reading" : "writing"),
-                    stream->pathname, skIOBufStrError(stream->iobuf)),
-                   (ef2_ctx, "Error %s iobuffer for '%s': %s",
-                    ((stream->io_mode == SK_IO_READ) ? "reading" : "writing"),
-                    stream->pathname, skIOBufStrError(stream->iobuf)));
-        }
         break;
 
       case SKSTREAM_ERR_ISTERMINAL:
@@ -568,6 +612,45 @@ streamLastErrFunc(
         STRERROR_MSG("Cannot set length of file");
         break;
 
+#if 0
+        /* FIXME: Move these into skfixstream.c. */
+      case SKSTREAM_ERR_GERROR:
+        if (!stream || !stream->ipfix.gerr) {
+            msg = "Cannot process IPFIX stream";
+            ERR_FN(("%s", msg),
+                   (ef2_ctx, "%s", msg));
+        } else {
+            if (SK_IO_READ == stream->io_mode) {
+                msg = "Cannot read from IPFIX stream";
+            } else {
+                msg = "Cannot write to IPFIX stream";
+            }
+            ERR_FN(("%s '%s': %s",
+                    msg, stream->pathname, stream->ipfix.gerr->message),
+                   (ef2_ctx, "%s '%s': %s",
+                    msg, stream->pathname, stream->ipfix.gerr->message));
+        }
+        break;
+
+      case SKSTREAM_ERR_SCHEMA:
+        msg = "Cannot perform schema operation";
+        if (!stream) {
+            ERR_FN(("%s", msg),
+                   (ef2_ctx, "%s", msg));
+        } else {
+            ERR_FN(("%s for '%s': %" SK_PRIdZ,
+                    msg, stream->pathname, stream->errobj.num),
+                   (ef2_ctx, "%s for '%s': %" SK_PRIdZ,
+                    msg, stream->pathname, stream->errobj.num));
+        }
+        break;
+#endif  /* 0 */
+
+      case SKSTREAM_ERR_BAD_COMPRESSION_SIZE:
+        msg = "Bad size in compression header";
+        FILENAME_MSG("Bad size in compression header");
+        break;
+
       case SKSTREAM_ERR_COMPRESS_INVALID:
         msg = "Specified compression identifier is not recognized";
         if (!stream) {
@@ -667,8 +750,8 @@ streamLastErrFunc(
             int zerr = 0;
             const char *zerr_msg = NULL;
 #if SK_ENABLE_ZLIB
-            if (stream->gz) {
-                zerr_msg = gzerror(stream->gz, &zerr);
+            if (stream->zlib && stream->zlib->zstrm.msg) {
+                zerr_msg = stream->zlib->zstrm.msg;
             } else
 #endif  /* SK_ENABLE_ZLIB */
             {

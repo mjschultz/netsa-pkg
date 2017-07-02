@@ -9,7 +9,6 @@ my $rwcount = check_silk_app('rwcount');
 my %file;
 $file{v6data} = get_data_or_exit77('v6data');
 $file{empty} = get_data_or_exit77('empty');
-check_features(qw(ipv6));
 my $cmd = "$rwcount --bin-size=3600 --load-scheme=1 $file{v6data} $file{empty} $file{v6data} $file{empty}";
 my $md5 = "11151f02e3e150ffd4b2915cd8d4f190";
 

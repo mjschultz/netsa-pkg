@@ -4,7 +4,7 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in ../LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: ax_pkg_check_gnutls.m4 275df62a2e41 2017-01-05 17:30:40Z mthomas $")
+dnl RCSIDENT("$SiLK: ax_pkg_check_gnutls.m4 efd886457770 2017-06-21 18:43:23Z mthomas $")
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +81,7 @@ AC_DEFUN([AX_PKG_CHECK_GNUTLS],[
                 (${PKG_CONFIG} --libs gnutls) >/dev/null 2>&AS_MESSAGE_LOG_FD
                 sk_pkg_status=$?
                 echo "${as_me}:${LINENO}: \$? = ${sk_pkg_status}" >&AS_MESSAGE_LOG_FD
-    
+
                 if test 0 -eq ${sk_pkg_status}
                 then
                     AC_MSG_RESULT([yes])

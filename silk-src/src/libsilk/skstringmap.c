@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skstringmap.c a0772d608106 2017-02-14 15:15:29Z mthomas $");
+RCSIDENT("$SiLK: skstringmap.c d611b98fcd45 2017-06-23 14:59:37Z mthomas $");
 
 #include <silk/skdllist.h>
 #include <silk/skstringmap.h>
@@ -1389,6 +1389,7 @@ skStringMapPrintDetailedUsage(
     const sk_stringmap_t   *str_map,
     FILE                   *fh)
 {
+    const char indent[] = "  ";
     const int MIN_DESCRIPTION_WDITH = 20;
     const char *alias_sep[2] = {"Alias: ", ","};
     const char post_name[] = " - ";
@@ -1399,6 +1400,7 @@ skStringMapPrintDetailedUsage(
     sk_stringmap_entry_t *entry;
     sk_stringmap_entry_t *next_entry;
     sk_dll_iter_t node;
+    const int indent_len = strlen(indent); /* assumes no TABs */
     int newline_description = 0;
     int len;
     int continue_len;
@@ -1409,7 +1411,7 @@ skStringMapPrintDetailedUsage(
     int done;
 
     if (NULL == str_map) {
-        fprintf(fh, "\t[Fields not available]\n");
+        fprintf(fh, "%s[Fields not available]\n", indent);
         return;
     }
 
@@ -1417,7 +1419,7 @@ skStringMapPrintDetailedUsage(
      * longest primary field name */
     skDLLAssignIter(&node, (sk_stringmap_t*)str_map);
     if (skDLLIterForward(&node, (void **)&entry)) {
-        fprintf(fh, "\t[No fields defined]\n");
+        fprintf(fh, "%s[No fields defined]\n", indent);
         return;
     }
     name_len = strlen(entry->name);
@@ -1439,7 +1441,7 @@ skStringMapPrintDetailedUsage(
     descript_len = sizeof(line_buf) - continue_len;
     if (descript_len < MIN_DESCRIPTION_WDITH) {
         newline_description = 1;
-        continue_len = 8 + strlen(post_name);
+        continue_len = indent_len + strlen(post_name);
         descript_len = sizeof(line_buf) - continue_len;
     }
     assert(descript_len > 0);
@@ -1468,11 +1470,11 @@ skStringMapPrintDetailedUsage(
 
         /* print the entry's name */
         if (newline_description) {
-            fprintf(fh, "\t%s\n\t%*s",
-                    entry->name, continue_len, post_name);
+            fprintf(fh, "%s%s\n%s%*s",
+                    indent, entry->name, indent, continue_len, post_name);
         } else {
-            fprintf(fh, "\t%*s%s",
-                    -name_len, entry->name, post_name);
+            fprintf(fh, "%s%*s%s",
+                    indent, -name_len, entry->name, post_name);
         }
         /* handle the description, line wrapping as needed */
         sp = (const char*)entry->description;
@@ -1496,8 +1498,8 @@ skStringMapPrintDetailedUsage(
                     fprintf(fh, "%s. %s\n", sp, alias_buf);
                 } else {
                     /* print description and alias on two lines */
-                    fprintf(fh, "%s\n\t%*s%s\n",
-                            sp, continue_len, "", alias_buf);
+                    fprintf(fh, "%s\n%s%*s%s\n",
+                            sp, indent, continue_len, "", alias_buf);
                 }
                 break;
             }
@@ -1516,8 +1518,8 @@ skStringMapPrintDetailedUsage(
                     if (0 == alias_len) {
                         fprintf(fh, "%s\n", sp);
                     } else {
-                        fprintf(fh, "%s\n\t%*s%s\n",
-                                sp, continue_len, "", alias_buf);
+                        fprintf(fh, "%s\n%s%*s%s\n",
+                                sp, indent, continue_len, "", alias_buf);
                     }
                     break;
                 }
@@ -1531,7 +1533,7 @@ skStringMapPrintDetailedUsage(
             strncpy(line_buf, sp, (cp - sp));
             line_buf[(cp - sp)] = '\0';
             fprintf(fh, "%s\n", line_buf);
-            fprintf(fh, "\t%*s", continue_len, "");
+            fprintf(fh, "%s%*s", indent, continue_len, "");
             sp = cp + 1;
         }
     }

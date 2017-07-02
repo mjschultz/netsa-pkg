@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWPMATCH_H, "$SiLK: rwppacketheaders.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_RWPMATCH_H, "$SiLK: rwppacketheaders.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #ifdef SK_HAVE_PCAP_PCAP_H
 #include <pcap/pcap.h>

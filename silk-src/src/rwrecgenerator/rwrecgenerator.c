@@ -26,9 +26,8 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwrecgenerator.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
+RCSIDENT("$SiLK: rwrecgenerator.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
-#include <silk/rwascii.h>
 #include <silk/rwrec.h>
 #include <silk/skbag.h>
 #include <silk/skipaddr.h>
@@ -39,6 +38,7 @@ RCSIDENT("$SiLK: rwrecgenerator.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
 #include <silk/skstream.h>
 #include <silk/skstringmap.h>
 #include <silk/utils.h>
+#include "rwascii.h"
 #include "stream-cache.h"
 #include "skheap-rwrec.h"
 
@@ -145,8 +145,8 @@ static int  initSubprocStructure(void);
 static void emptyProcessingDirectory(void);
 static skstream_t *
 openIncrementalFile(
-    const cache_key_t  *key,
-    void               *v_file_format);
+    const sksite_repo_key_t    *key,
+    void                       *v_file_format);
 static int generateDns(const skipaddr_t *ip1, const skipaddr_t *ip2);
 static int generateFtp(const skipaddr_t *ip1, const skipaddr_t *ip2);
 static int generateHttp(const skipaddr_t *ip1, const skipaddr_t *ip2);
@@ -287,16 +287,12 @@ static sk_fileptr_t text_output;
  * --ip-format switch. */
 static uint32_t ip_format = SKIPADDR_CANONICAL;
 
-/* flags when registering --ip-format */
-static const unsigned int ip_format_register_flags =
-    (SK_OPTION_IP_FORMAT_INTEGER_IPS | SK_OPTION_IP_FORMAT_ZERO_PAD_IPS);
-
 /* when writing textual output, how to print timestamps.  set by the
  * --timestamp-format switch. */
 static uint32_t time_flags = 0;
 
 /* flags when registering --timestamp-format */
-static const uint32_t time_register_flags = SK_OPTION_TIMESTAMP_OPTION_EPOCH;
+static const uint32_t time_register_flags = 0;
 
 /* when generating incremental files (like rwflowpack creates),
  * specifies the directory in which to copy them at the flush timeout.
@@ -683,7 +679,7 @@ appSetup(
         || skCompMethodOptionsRegister(&comp_method)
         || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE)
         || skOptionsTimestampFormatRegister(&time_flags, time_register_flags)
-        || skOptionsIPFormatRegister(&ip_format, ip_format_register_flags))
+        || skOptionsIPFormatRegister(&ip_format))
     {
         skAppPrintErr("Unable to register options");
         appExit(EXIT_FAILURE);
@@ -1364,8 +1360,8 @@ emptyProcessingDirectory(
  */
 static skstream_t *
 openIncrementalFile(
-    const cache_key_t  *key,
-    void               *v_file_format)
+    const sksite_repo_key_t    *key,
+    void                       *v_file_format)
 {
     char filename[PATH_MAX];
     char tmpbuf[PATH_MAX];
@@ -1379,9 +1375,7 @@ openIncrementalFile(
     /* generate path to the file in the data repository, then replace
      * everything excpet the filename with the processing
      * directory */
-    sksiteGeneratePathname(tmpbuf, sizeof(tmpbuf),
-                           key->flowtype_id, key->sensor_id,
-                           key->time_stamp, "", NULL, &fname);
+    sksiteGeneratePathname(tmpbuf, sizeof(tmpbuf), key, "", NULL, &fname);
     snprintf(filename, sizeof(filename), "%s/%s",
              processing_directory, fname);
 
@@ -1412,8 +1406,7 @@ openIncrementalFile(
         hdr = skStreamGetSilkHeader(stream);
         if ((rv = skHeaderSetFileFormat(hdr, format))
             || (rv = skHeaderSetCompressionMethod(hdr, comp_method))
-            || (rv = skHeaderAddPackedfile(hdr, key->time_stamp,
-                                           key->flowtype_id, key->sensor_id))
+            || (rv = skHeaderAddPackedfile(hdr, key))
             || (rv = skStreamWriteSilkHeader(stream)))
         {
             goto END;
@@ -1581,12 +1574,12 @@ writeRecord(
 
     if (output_directory) {
         cache_entry_t *entry;
-        cache_key_t key;
+        sksite_repo_key_t key;
 
         key.flowtype_id = ft;
         key.sensor_id = sensor;
-        key.time_stamp = (rwRecGetStartTime(rec)
-                          - (rwRecGetStartTime(rec) % MILLISEC_PER_HOUR));
+        key.timestamp = (rwRecGetStartTime(rec)
+                         - (rwRecGetStartTime(rec) % MILLISEC_PER_HOUR));
 
         if (skCacheLookupOrOpenAdd(cache, &key, &format, &entry)) {
             WARNINGMSG("Unable to open file");

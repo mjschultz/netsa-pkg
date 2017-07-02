@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skplugin-test.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skplugin-test.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/skplugin.h>
 #include <silk/utils.h>
@@ -174,7 +174,7 @@ static uint64_t
 test_list(
     const rwRec        *rec)
 {
-    uint32_t bytes = rwRecGetBytes(rec);
+    uint64_t bytes = rwRecGetBytes(rec);
 
     if (bytes < 100) {
         return 0;

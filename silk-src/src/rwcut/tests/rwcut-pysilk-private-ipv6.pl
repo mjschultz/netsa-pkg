@@ -13,8 +13,7 @@ $ENV{PYTHONPATH} = $SiLKTests::testsdir.((defined $ENV{PYTHONPATH}) ? ":$ENV{PYT
 add_plugin_dirs('/src/pysilk');
 check_features(qw(ipv6));
 
-skip_test('Cannot use --python-file') 
-    unless check_exit_status(qq|$rwcut --python-file=$file{pysilk_plugin} --help|);
+check_python_plugin($rwcut);
 my $cmd = "$rwcut --python-file=$file{pysilk_plugin} --fields=sip,dip,sport,dport,server_ipv6 --num-recs=10000 $file{v6data}";
 my $md5 = "309c87650f4629f4b0fccdb79419a5c4";
 

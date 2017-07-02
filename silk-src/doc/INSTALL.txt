@@ -1,0 +1,154 @@
+The following is a quick-start guide for installing SiLK on a single
+machine.  There are no detailed instructions for installing SiLK 4.x.
+Detailed instructions for SiLK 3.x are in the SiLK Install Handbook,
+which is available at
+http://tools.netsa.cert.org/silk/silk-install-handbook.html.
+
+
+WARNING
+
+SiLK 4.x is beta software.  The applications have been lightly tested.
+Some applications may change in incompatible ways in future releases.
+
+The analysis tools in SiLK 4.x are largely compatible with those in
+SiLK 3.x, though SiLK 4.x removes command line switches that were
+marked as deprecated in SiLK 3.x.
+
+The configuration of rwflowpack has radically changed from SiLK 3.x.
+The flowcap and rwflowappend tools no longer exist.
+
+Replacing a SiLK 3.x installation with SiLK 4.x is not recommended
+without substantial testing first.
+
+
+PREREQUISITES
+
+The following software is required:
+
+  * libfixbuf 1.7.0 or later (http://tools.netsa.cert.org/libfixbuf/)
+  * glib2
+
+The following packages are recommended.
+
+  * libpcap
+  * zlib compression library
+  * LZO compression library
+  * Snappy compression library
+  * Python 2.6 or later (Python 3.x is supported)
+
+Some systems put the header files for these packages into a separate
+package whose name ends with "-dev" or "-devel".  Install those
+versions of each package if you are on such a system.
+
+Ensure the libfixbuf library is known to the pkg-config tool by
+running
+
+  pkg-config --modversion libfixbuf
+
+If you do not see the version number of libfixbuf, set
+PKG_CONFIG_PATH environment variable to the directory containing the
+libfixbuf.pc file.  Normally that directory is "$prefix/lib/pkgconfig"
+where $prefix is where libfixbuf is installed.
+
+
+SOURCE CODE CONFIGURATION
+
+Change directory into top of the SiLK source tree and use the
+following to configure SiLK:
+
+  ./configure --enable-data-rootdir=/data   \
+      --prefix=/usr/local                   \
+      --with-python --with-python-prefix    \
+      --enable-silent-rules
+
+That command configures SiLK with Python support, installs SiLK in the
+"/usr/local" directory tree, and tells SiLK to find its data files in
+the directory "/data".  Here is an explanation of the switches:
+
+  --enable-data-rootdir=DIRECTORY
+      A default location for the data repository is compiled into the
+      SiLK tools.  This location can be changed at run-time by
+      specifying environment variables, but it may be more convenient
+      to choose that location now.  The --enable-data-rootdir switch
+      specifies that location.  If not specified, then "/data" is the
+      default.
+
+  --prefix=DIRECTORY
+      This switch tells configure the directory tree to use when
+      installing the tools; in the example, they are installed under
+      the "/usr/local" directory, e.g., /usr/local/bin/rwfilter.  If
+      the switch is not specified, then "/usr/local" is the default.
+
+  --with-python
+      By default, PySiLK support is not included in SiLK.  To add
+      PySiLK support, you must specify --with-python.  To use a
+      particular python release, specify that as the argument to this
+      switch, such as --with-python=/usr/local/bin/python2.7.
+
+  --enable-python-prefix
+      You must decided where to install the PySiLK support files.
+      There are two common options: (1)You may install support files
+      in the same location as the other Python files (for example, in
+      the "/usr/lib/pythonX.Y" directory where X.Y is the version of
+      Python).  (2)You may installed them under the directory you
+      specified to --prefix ("/usr/local/lib/pythonX.Y").  For
+      Option-1, do not specify this switch.  For Option-2, specify the
+      switch without an argument.  It is easier for Python to find the
+      files if they are with the other Python support files
+      (Option-1), but that requires that you have write access to that
+      directory.  If the files are with the other SiLK files, you must
+      specify the PYTHONPATH environment variable to the correct
+      directory so Python is able to find the files.
+
+  --enable-silent-rules
+      This reduces the verbosity of the "make" process.  If there is
+      an error during building, you may run "make V=1" to see all the
+      commands that the silent-rules setting hides.
+
+Most other libraries SiLK is able to detect on its own.  If the
+configure script cannot find a library, you may need to provide
+specific switches to help the configure script find it.  Run
+"./configure --help" for details.
+
+Here is a suggestion if you are on a system where many libraries are
+installed in a particular tree that configure does not search by
+default.  (For example, if you use MacPorts do download third party
+libraries, those are installed under /opt/local.)  To have the
+configure script find libraries and headers under the "/opt/local"
+tree, add the following to the end of the configure invocation:
+
+  CPPFLAGS='-I/opt/local/include' LDFLAGS='-L/opt/local/lib'
+
+
+BUILD AND INSTALL
+
+To build SiLK, run
+
+  make
+
+To install SiLK, run
+
+  make install
+
+Depending on the --prefix you specified, you may need either to use
+"sudo" when running "make install" or to become the root user prior to
+running "make install".
+
+
+POST-INSTALL CONFIGURATION
+
+If you are installing SiLK 4.x and using a SiLK 3.x repository, you
+may point SiLK 4.x at the SiLK 3.x repository and the analysis tools
+will work.
+
+If you are installing a new SiLK 4.x installation, see Chapter 3 of
+the SiLK Installation Handbook for instructions on configuring the
+analysis tools of SiLK.
+
+To use rwflowpack in SiLK 4.x, you must write a Lua configuration
+file.  See the rwflowpack manual page for additional information.
+
+Chapters 1 and 4--7 of the SiLK Installation Handbook give an idea of
+the configuration possibilities for using SiLK to capture data, but
+the configuration of SiLK 4.x is very different than the instructions
+given in the Handbook.

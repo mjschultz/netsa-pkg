@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsiteinfo.c 4a14e7ea8fe2 2017-03-13 20:17:43Z mthomas $");
+RCSIDENT("$SiLK: rwsiteinfo.c fc8761f1d6b8 2017-06-23 16:42:19Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/skmempool.h>
@@ -1314,6 +1314,7 @@ rws_repo_scan_callback(
     struct FTW         *info)
 {
     rws_repo_file_t *found;
+    sksite_repo_key_t repo_key;
     sktime_t startdate;
 
     /* UNUSED.  FIXME: Maybe reject files smaller than a certain
@@ -1323,13 +1324,14 @@ rws_repo_scan_callback(
     if (FTW_F != flag) {
         return 0;
     }
-    if (sksiteParseFilename(
-            &repo_new_file->rf_flowtype, &repo_new_file->rf_sensor,
-            &startdate, NULL, &path[info->base])
+    if (sksiteParseFilename(&path[info->base], &repo_key, NULL)
         == SK_INVALID_FLOWTYPE)
     {
         return 0;
     }
+    repo_new_file->rf_flowtype = repo_key.flowtype_id;
+    repo_new_file->rf_sensor = repo_key.sensor_id;
+    startdate = repo_key.timestamp;
     found = (rws_repo_file_t*)rbsearch(repo_new_file, rb_repo);
     if (NULL == found) {
         skAppPrintOutOfMemory("rbsearch");

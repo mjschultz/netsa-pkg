@@ -234,6 +234,15 @@ the annotations from the source files to the destination files.  The
 annotations are stored in individual header entries and this field
 displays those entries.
 
+=item B<sidecar>
+
+SiLK 4.0.0 introduced sidecar fields as a way to augment a SiLK Flow
+record with additional data.  This field displays a description of the
+sidecar fields that may be present on the (some of the) records in the
+file.  For each file, its name and type are shown.  The IPFIX element
+ID and enterprise ID for that field are printed when they are
+specified in the file's header.
+
 =item B<ipset>
 
 SiLK 3.0.0 and SiLK 3.7.0 introduced new output formats for IPset data
@@ -281,6 +290,29 @@ flowtype, the B<silk.conf(5)> file must be accessible.)
 
 When B<flowcap(8)> creates a SiLK flow file, it adds a header entry
 specifying the name of the probe from which the data was collected.
+
+=back
+
+B<rwfileinfo> understands IPFIX files.  When an IPFIX file is
+specified on the command line, B<rwfileinfo> prints its format as
+C<IPFIX>, the size of the file (C<file-size>), the number of records
+in the file (C<count-records>), and the following fields:
+
+=over 4
+
+=item B<export-time>
+
+Each IPFIX message has a timestamp, and this field shows the timestamp
+of the first message in the IPFIX file.
+
+=item B<schemas>
+
+Each IPFIX template (which SiLK calls a schema) in the file is
+printed.  The output for each schema consists of the template ID, the
+number of fields in the schema, the length of a record uses the
+schema, the number of (top-level) records in the file that use that
+schema, and, for each information element in the schema, its name, its
+enterprise ID if non-standard, its element id, and its length.
 
 =back
 
@@ -392,10 +424,18 @@ of IP addresses (IPv4 or IPv6).
 
 For a bag file, the type and size of the key and of the counter.
 
-=item aggregate-bag,18
+=item sidecar,19
 
-For an aggregate bag file, the field types that comprise the key and
-the counter.
+A description of the sidecar fields the file supports.
+
+=item export-time,20
+
+For an IPFIX file, the export time of the first message in the file.
+
+=item schemas,21
+
+For an IPFIX file, the schemas (templates) in the file and the number
+of records that use each schema.
 
 =back
 
@@ -426,7 +466,7 @@ Read the names of the input files from I<FILENAME> or from the
 standard input if I<FILENAME> is not provided.  The input is expected
 to have one filename per line.  B<rwfileinfo> opens each named file in
 turn and prints its information as if the filenames had been listed on
-the command line.  I<Since S<SiLK 3.15.0>.>
+the command line.
 
 =item B<--help>
 
@@ -535,7 +575,7 @@ B<rwflowpack(8)>, B<silk(7)>, B<gzip(1)>
 
 =cut
 
-$SiLK: rwfileinfo.pod 92ab6152d2f4 2017-03-21 19:49:03Z mthomas $
+$SiLK: rwfileinfo.pod ff3b862e55a9 2017-06-23 18:46:19Z mthomas $
 
 Local Variables:
 mode:text

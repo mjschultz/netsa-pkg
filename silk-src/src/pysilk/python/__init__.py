@@ -8,7 +8,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: __init__.py 275df62a2e41 2017-01-05 17:30:40Z mthomas $
+# $SiLK: __init__.py efd886457770 2017-06-21 18:43:23Z mthomas $
 #######################################################################
 
 import sys
@@ -37,23 +37,9 @@ else:
 
 import silk.site
 from silk.fglob import FGlob
+from numbers import Integral
 
 # Differences between versions of Python
-if sys.hexversion < 0x02060000:
-    # Python 2.[45]
-    Integral = (int, long)
-    def next(it):
-        return it.next()
-else:
-    from numbers import Integral
-
-if sys.hexversion < 0x02050000:
-    def any(iterable):
-        for element in iterable:
-            if element:
-                return True
-        return False
-
 if sys.hexversion >= 0x03000000:
     # Python 3.x
     basestring = str
@@ -72,12 +58,9 @@ __all__ = ['IPAddr', 'IPv4Addr', 'IPv6Addr',
            'BAG_COUNTER_MAX',
            'IGNORE', 'ASV4', 'MIX', 'FORCE', 'ONLY',
            'READ', 'WRITE', 'APPEND',
-           'DEFAULT', 'NO_COMPRESSION', 'ZLIB', 'LZO1X', 'SNAPPY',
-           'FIN', 'SYN', 'RST', 'PSH', 'ACK', 'URG', 'ECE', 'CWR',
+           'DEFAULT', 'NO_COMPRESSION', 'ZLIB', 'LZO1X', 'SNAPPY'
            'TCP_FIN', 'TCP_SYN', 'TCP_RST', 'TCP_PSH',
            'TCP_ACK', 'TCP_URG', 'TCP_ECE', 'TCP_CWR',
-           'sensors', 'classes', 'classtypes',
-           'init_site', 'have_site_config',
            'silk_version',
            'initial_tcpflags_enabled', 'ipv6_enabled',
            'init_country_codes', 'FGlob']
@@ -774,20 +757,6 @@ class Bag(pysilk.BagBase):
         bag.set_info(key_type=key_type)
         return bag
 
-    @classmethod
-    def load_ipaddr(cls, fname):
-        """
-        Bag.load_ipaddr(filename) -> Bag -- Load an IP address bag from a file
-        """
-        return cls.load(fname, key_type=IPv4Addr)
-
-    @classmethod
-    def load_integer(cls, fname):
-        """
-        Bag.load_integer(filename) -> Bag -- Load a integer bag from a file
-        """
-        return cls.load(fname, key_type=long)
-
     def set_info(self, **kwds):
         pysilk.BagBase.set_info(self, **kwds)
         if kwds.get('key_type') is not None:
@@ -1203,52 +1172,6 @@ TCP_ACK = TCPFlags('A')
 TCP_URG = TCPFlags('U')
 TCP_ECE = TCPFlags('E')
 TCP_CWR = TCPFlags('C')
-
-# Deprecated names as of SiLK 3.0.0
-FIN = TCP_FIN
-SYN = TCP_SYN
-RST = TCP_RST
-PSH = TCP_PSH
-ACK = TCP_ACK
-URG = TCP_URG
-ECE = TCP_ECE
-CWR = TCP_CWR
-
-def classes():
-    # Deprecated in SiLK 3.0.0
-    warnings.warn("Use of classes() from the silk module is deprecated.  "
-                  "Please use silk.site.classes() instead.",
-                  DeprecationWarning)
-    return silk.site.classes()
-
-def sensors():
-    # Deprecated in SiLK 3.0.0
-    warnings.warn("Use of sensors() from the silk module is deprecated.  "
-                  "Please use silk.site.sensors() instead.",
-                  DeprecationWarning)
-    return silk.site.sensors()
-
-def classtypes():
-    # Deprecated in SiLK 3.0.0
-    warnings.warn("Use of classtypes() from the silk module is deprecated.  "
-                  "Please use silk.site.classtypes() instead.",
-                  DeprecationWarning)
-    return silk.site.classtypes()
-
-def init_site(*args, **kwds):
-    # Deprecated in SiLK 3.0.0
-    warnings.warn("Use of init_site() from the silk module is deprecated.  "
-                  "Please use silk.site.init_site() instead.",
-                  DeprecationWarning)
-    return silk.site.init_site(*args, **kwds)
-
-def have_site_config():
-    # Deprecated in SiLK 3.0.0
-    warnings.warn("Use of have_site_config() from the silk module is "
-                  "deprecated.  "
-                  "Please use silk.site.have_site_config() instead.",
-                  DeprecationWarning)
-    return silk.site.have_site_config()
 
 
 def get_configuration(name=None):

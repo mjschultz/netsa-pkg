@@ -34,8 +34,8 @@ into a flowtype.  Each flowtype has a unique name and numeric ID.
 
 =back
 
-Note that the binary form of SiLK flow records represent the sensor
-and flowtype by their numeric IDs, not by their names.
+Note that the SiLK flow records represent the sensor and flowtype by
+their numeric IDs, not by their names.
 
 For historic reasons, one rarely speaks of the flowtype of a SiLK Flow
 record, but instead refers to its I<class> and I<type>.  Every
@@ -100,10 +100,6 @@ B<rwfglob>
 the layout of the directory tree for the SiLK archive relative to the
 root directory
 
-=item *
-
-a default value for the B<--packing-logic> switch to B<rwflowpack(8)>
-
 =back
 
 In normal usage, the C<silk.conf> file will be located at the root of
@@ -157,23 +153,11 @@ files.
 
 =item *
 
-The packing logic plug-in file, F<packlogic-*.so> (e.g.,
-B<packlogic-twoway(3)>, B<packlogic-generic(3)>), used by
-B<rwflowpack(8)> checks for specific class names, type names, and
-flowtype names at start up, and it will exit with an error if the
-names it expects do not exist.  In addition, it checks that the
-flowtype IDs it has match with those in the C<silk.conf> file.  When
-new flowtypes are added, the F<packlogic-*.so> file will need to be
-updated if B<rwflowpack> is to generate SiLK Flow records with the new
-flowtype.
-
-=item *
-
 When B<rwflowpack> reads incoming flow records, those records are
-associated with a sensor name as determined by the B<sensor.conf(5)>
+associated with a sensor name as determined by its configuration
 file.  B<rwflowpack> uses the C<silk.conf> file to map the sensor name
 to the sensor ID, and it stores the sensor ID in the SiLK records it
-creates.  Changes to the C<silk.conf> and C<sensor.conf> files may
+creates.  Changes to the C<silk.conf> and B<rwflowpack> configuration files may
 need to be coordinated.
 
 =back
@@ -202,8 +186,7 @@ inside a quoted string.
 For the commands supported by C<silk.conf> and described below, unless
 a command explicitly states that it is used by particular
 applications, it should be considered used by all of the SiLK analysis
-tools and the packing tools B<flowcap(8)>, B<rwflowpack(8)>, and
-B<rwflowappend(8)>.
+tools and the packing tool B<rwflowpack(8)>.
 
 There are three contexts for commands: top-level, class block, and
 group block contexts.  The class block and group block contexts are
@@ -269,23 +252,11 @@ must be declared before they may be referenced.)
 
 B<Example:> include "silk-2.conf"
 
-=item B<packing-logic> B<">I<file-name>B<">
-
-The C<packing-logic> command provides a default value for the
-B<--packing-logic> switch on B<rwflowpack(8)>.  The value is the path
-to a plug-in that B<rwflowpack> loads; the plug-in provides functions
-that determine into which class and type a flow record will be
-categorized.  The path specified here will be ignored when the
-B<--packing-logic> switch is explicitly specified to B<rwflowpack> or
-when SiLK has been configured with hard-coded packing logic.
-
-B<Example>: packing-logic "packlogic-twoway.so"
-
 =item B<path-format> B<">I<format-string>B<">
 
 File and directory locations relative to the I<SILK_DATA_ROOTDIR> may
 be defined using the C<path-format> command.  The C<path-format> is
-used by B<rwflowpack> and B<rwflowappend(8)> when writing data to the
+used by B<rwflowpack> when writing data to the
 data repository, and it is used by B<rwfilter> and B<rwfglob> when
 reading or listing files in the data repository.  This command takes a
 format string specification that supports the following
@@ -435,11 +406,11 @@ B<Example:> default-types in inweb
 =item B<sensors> I<sensor-name-or-group-ref> I<...>
 
 The C<sensors> command is used to associate sensors with a class.  In
-short, to declare that these sensors have data for this class.  Each
-item in the list must be either the name of a sensor or the name of a
-sensor group preceded by an at (C<@>) character.  When you add a
-sensor group, it is the same as individually adding each sensor in
-that group to the class.
+short, to declare that these sensors have data for this class.
+Sensors may be listed by name or numeric ID, and sensor groups may
+also be added by prefixing their names with an at (C<@>) character.
+When you add a sensor group, it is the same as individually adding
+each sensor in that group to the class.
 
 B<Example:> sensors my-sensor-1 my-sensor-2 @my-group-1
 
@@ -488,10 +459,10 @@ B<Example:> end group
 =item B<sensors> I<sensor-name-or-group-ref> I<...>
 
 Sensors are associated with a sensor group by means of the C<sensors>
-command within a group block.  Each item in the list must be either
-the name of a sensor or the name of a sensor group preceded by an at
-(C<@>) character.  When you add a sensor group, it is the same as
-individually adding each sensor in that group to the group being
+command within a group block.  Sensors may be listed by name or
+numeric ID, and sensor groups may also be added by prefixing their
+names with an at (C<@>) character.  When you add a sensor group, it is
+the same as individually adding each sensor to the group being
 defined.
 
 B<Example:> sensors my-sensor-1 my-sensor-2 @my-group-1
@@ -500,14 +471,13 @@ B<Example:> sensors my-sensor-1 my-sensor-2 @my-group-1
 
 =head1 SEE ALSO
 
-B<rwfilter(1)>, B<rwfglob(1)>, B<rwsiteinfo(1)>, B<sensor.conf(5)>,
-B<flowcap(8)>, B<rwflowpack(8)>,B<packlogic-twoway(3)>,
-B<packlogic-generic(3)>, B<rwflowappend(8)>, B<silk(7)>,
+B<rwfilter(1)>, B<rwfglob(1)>, B<rwsiteinfo(1)>,
+B<rwflowpack(8)>, B<silk(7)>,
 I<SiLK Installation Handbook>
 
 =cut
 
-$SiLK: silk.conf.pod 78f2e6a72fd8 2016-02-04 15:19:35Z mthomas $
+$SiLK: silk.conf.pod 2388e0826cdc 2016-07-20 16:31:42Z mthomas $
 
 Local Variables:
 mode:text

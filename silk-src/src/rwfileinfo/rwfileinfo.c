@@ -19,8 +19,12 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfileinfo.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
+RCSIDENT("$SiLK: rwfileinfo.c d1637517606d 2017-06-23 16:51:31Z mthomas $");
 
+#include <silk/skfixstream.h>
+#include <silk/skipfixcert.h>
+#include <silk/skredblack.h>
+#include <silk/skschema.h>
 #include <silk/sksite.h>
 #include <silk/skstream.h>
 #include <silk/skstringmap.h>
@@ -62,8 +66,21 @@ enum rwinfo_id {
     RWINFO_PREFIX_MAP,
     RWINFO_IPSET,
     RWINFO_BAG,
-    RWINFO_AGGBAG
+    RWINFO_SIDECAR,
+    RWINFO_EXPORT_TIME,
+    RWINFO_SCHEMAS
 };
+
+/* Used to keep track of the schemas we read from IPFIX files. */
+struct schema_info_st {
+    uint64_t            rec_count;
+    const sk_schema_t  *schema;
+    uint16_t            tid;
+};
+typedef struct schema_info_st schema_info_t;
+
+
+/* LOCAL VARIABLES */
 
 /*
  *    Fields names, IDs, descriptions, and optional titles (name is
@@ -186,18 +203,27 @@ static const sk_stringmap_entry_t rwinfo_entry[] = {
      NULL},
     {"17",  RWINFO_BAG, NULL, NULL},
 
-    {"aggregate-bag",
-     RWINFO_AGGBAG,
-     ("For an aggregate bag file, the types of the key and the counter"),
+    {"sidecar",
+     RWINFO_SIDECAR,
+     ("A description of the sidecar fields the file supports"),
      NULL},
-    {"18",  RWINFO_AGGBAG, NULL, NULL},
+    {"19",  RWINFO_SIDECAR, NULL, NULL},
+
+    {"export-time",
+     RWINFO_EXPORT_TIME,
+     ("For an IPFIX file, the export time of the first message"),
+     NULL},
+    {"20",  RWINFO_EXPORT_TIME, NULL, NULL},
+
+    {"schemas",
+     RWINFO_SCHEMAS,
+     ("For an IPFIX file, each schema (template) in the file and"
+      " the number of records that use that schema"),
+     NULL},
+    {"21",  RWINFO_SCHEMAS, NULL, NULL},
 
     SK_STRINGMAP_SENTINEL
 };
-
-
-
-/* LOCAL VARIABLES */
 
 /* string map used to parse the list of fields */
 static sk_stringmap_t *avail_fields = NULL;
@@ -358,6 +384,8 @@ appSetup(
     skAppVerifyFeatures(&features, NULL);
     skOptionsSetUsageCallback(&appUsageLong);
 
+    skipfix_initialize(0);
+
     optctx_flags = (SK_OPTIONS_CTX_INPUT_BINARY | SK_OPTIONS_CTX_XARGS);
 
     /* register the options */
@@ -508,6 +536,276 @@ parseFields(
 
 
 /*
+ *    If 'count' is 0, print the title for the 'id' entry unless
+ *    no-titles was requested.
+ *
+ *    If 'count' is non-0 and no-titles was not requested, print
+ *    spaces so multiple-header entries are aligned.
+ */
+static void
+printLabel(
+    sk_stringmap_id_t   id,
+    int64_t             count)
+{
+    sk_stringmap_iter_t *iter;
+    sk_stringmap_entry_t *entry;
+
+    if (!no_titles) {
+        if (0 != count) {
+            printf(LABEL_FMT, "");
+        } else {
+            /* it seems like iterating over the rwinfo_entry[] array
+             * to find the entry would be easier.... */
+            skStringMapGetByID(avail_fields, id, &iter);
+            assert(iter);
+            skStringMapIterNext(iter, &entry, NULL);
+            assert(entry);
+            if (entry->userdata) {
+                printf(LABEL_FMT, (const char *)entry->userdata);
+            } else {
+                printf(LABEL_FMT, entry->name);
+            }
+            skStringMapIterDestroy(iter);
+        }
+    }
+}
+
+
+/*
+ *    Free the schema_info_t object 'v_info'.  This is normally called
+ *    by the red-black tree code.
+ */
+static void
+schema_info_free(
+    void               *v_info)
+{
+    schema_info_t *info = (schema_info_t*)v_info;
+
+    sk_schema_destroy((sk_schema_t*)info->schema);
+    free(info);
+}
+
+
+/*
+ *    The comparitor function for schema_info_t objects used by the
+ *    red-black tree.  The comparitor sorts the objects by the address
+ *    of the sk_schema_t.
+ */
+static int
+schema_info_cmp(
+    const void         *v_a,
+    const void         *v_b,
+    const void  UNUSED(*v))
+{
+    const sk_schema_t *a = ((const schema_info_t*)v_a)->schema;
+    const sk_schema_t *b = ((const schema_info_t*)v_b)->schema;
+
+    return ((a < b) ? -1 : (a > b));
+}
+
+
+/*
+ *    A callback funtion invoked by skstream when it creates a new
+ *    schema from an IPFIX template.  This callback creates a
+ *    schema_info_t object and stores the object in the red-black
+ *    tree, which is provided in the 'v_rbt' parameter.
+ */
+static void
+new_schema_callback(
+    sk_schema_t        *schema,
+    uint16_t            tid,
+    void               *v_rbt)
+{
+    sk_rbtree_t *rbt = (sk_rbtree_t*)v_rbt;
+    schema_info_t *info;
+
+    info = sk_alloc(schema_info_t);
+    info->schema = sk_schema_clone(schema);
+    info->tid = tid;
+
+    sk_rbtree_insert(rbt, info, NULL);
+}
+
+
+/*
+ *    Process an IPFIX file.  Update 'recs' with the number of records
+ *    in the file and 'bytes' with the size of the file.
+ */
+static int
+printFileInfoIpfix(
+    const char         *path,
+    int64_t            *recs,
+    int64_t            *bytes)
+{
+    char name[128];
+    char size[20];
+    const sk_field_t *field;
+    sk_field_ident_t ident;
+    sk_fixstream_t *stream = NULL;
+    const sk_fixrec_t *rec;
+    sk_rbtree_t *rb;
+    sk_rbtree_iter_t *rbiter;
+    schema_info_t target_info;
+    schema_info_t *info;
+    sktime_t export_time;
+    size_t i;
+    int64_t rec_count;
+    fbInfoModel_t *info_model;
+    int rv;
+
+    rec_count = 0;
+
+    /* Create a redblack tree to hold the schemas */
+    sk_rbtree_create(&rb, &schema_info_cmp, schema_info_free, NULL);
+
+    /* Prepare the information model */
+    info_model = skipfix_information_model_create(0);
+
+    if ((rv = sk_fixstream_create(&stream))
+        || (rv = sk_fixstream_bind(stream, path, SK_IO_READ))
+        || (rv = sk_fixstream_set_info_model(stream, info_model))
+        || (rv = sk_fixstream_open(stream))
+        || (rv = sk_fixstream_set_schema_cb(
+                stream, new_schema_callback, (void*)rb)))
+    {
+        skAppPrintErr("%s", sk_fixstream_strerror(stream));
+        sk_fixstream_destroy(&stream);
+        sk_rbtree_destroy(&rb);
+        skipfix_information_model_destroy(info_model);
+        return -1;
+    }
+
+    /* Since an empty file can be successfully opened as an IPFIX
+     * file, attempt to read a record before declaring the type to be
+     * IPFIX */
+    rv = sk_fixstream_read_record(stream, &rec);
+    if (rv != SKSTREAM_OK) {
+        if (rv != SKSTREAM_ERR_EOF) {
+            skAppPrintErr("%s", sk_fixstream_strerror(stream));
+            sk_fixstream_destroy(&stream);
+            sk_rbtree_destroy(&rb);
+            skipfix_information_model_destroy(info_model);
+            return -1;
+        }
+        /* distinguish between an IPFIX file with templates and no
+         * records and a completely empty file */
+        if (0 == sk_rbtree_size(rb)) {
+            /* sk_fixstream_printLastErr( */
+            /*     stream, SKSTREAM_ERR_BAD_MAGIC, &skAppPrintErr); */
+            sk_fixstream_destroy(&stream);
+            sk_rbtree_destroy(&rb);
+            skipfix_information_model_destroy(info_model);
+            return -1;
+        }
+    }
+
+    export_time = sk_fixstream_get_last_export_time(stream);
+
+    /* FIXME: Perhaps print the first observation domain; currently I
+     * do not believe there is a way for us to get it. */
+
+    /* print file name */
+    if (!no_titles) {
+        printf("%s:\n", path);
+    }
+
+    if (skBitmapGetBit(print_fields, RWINFO_FORMAT)) {
+        printLabel(RWINFO_FORMAT, 0);
+        printf("%s\n", "IPFIX");
+    }
+
+    target_info.schema = NULL;
+    info = &target_info;
+
+    /* first record was read above; cannot use a do{}while here, since
+     * the file may contain valid templates and no valid records */
+    while (SKSTREAM_OK == rv) {
+        if (info->schema != sk_fixrec_get_schema(rec)) {
+            target_info.schema = sk_fixrec_get_schema(rec);
+            info = (schema_info_t*)sk_rbtree_find(rb, &target_info);
+            if (!info) {
+                skAbort();
+            }
+        }
+        ++rec_count;
+        ++info->rec_count;
+
+        /* FIXME: If the record contains a list, increment the counts
+         * for the shcemas used by the elements of the list. */
+
+        rv = sk_fixstream_read_record(stream, &rec);
+    }
+    if (SKSTREAM_ERR_EOF != rv) {
+        skAppPrintErr("%s", sk_fixstream_strerror(stream));
+    }
+    sk_fixstream_destroy(&stream);
+
+    if (skBitmapGetBit(print_fields, RWINFO_FILE_SIZE)) {
+        printLabel(RWINFO_COUNT_RECORDS, 0);
+        printf(("%" PRId64 "\n"), rec_count);
+        *recs += rec_count;
+    }
+
+    if (skBitmapGetBit(print_fields, RWINFO_FILE_SIZE)) {
+        int64_t sz = (int64_t)skFileSize(path);
+        printLabel(RWINFO_FILE_SIZE, 0);
+        printf(("%" PRId64 "\n"), sz);
+        *bytes += sz;
+    }
+
+    if (skBitmapGetBit(print_fields, RWINFO_EXPORT_TIME)) {
+        /* print the export time */
+        if (!no_titles) {
+            printf(LABEL_FMT, "export-time");
+        }
+        printf("%s\n", sktimestamp(export_time, SKTIMESTAMP_NOMSEC));
+    }
+
+    if (skBitmapGetBit(print_fields, RWINFO_SCHEMAS)) {
+        /* Print information for each schema */
+        rbiter = sk_rbtree_iter_create();
+        for (info = (schema_info_t*)sk_rbtree_iter_bind_first(rbiter, rb);
+             info != NULL;
+             info = (schema_info_t*)sk_rbtree_iter_next(rbiter))
+        {
+            printf(("Schema 0x%04x   field_count = %u, "
+                    "rec_len = %" SK_PRIuZ ", rec_count = %" PRIu64 "\n"),
+                   info->tid, sk_schema_get_count(info->schema),
+                   sk_schema_get_record_length(info->schema), info->rec_count);
+            rec_count += info->rec_count;
+            for (i = 0; i < sk_schema_get_count(info->schema); ++i) {
+                field = sk_schema_get_field(info->schema, i);
+                ident = sk_field_get_ident(field);
+                if (SK_FIELD_IDENT_GET_PEN(ident)) {
+                    snprintf(name, sizeof(name), "%s (%u/%u)",
+                             sk_field_get_name(field),
+                             SK_FIELD_IDENT_GET_PEN(ident),
+                             SK_FIELD_IDENT_GET_ID(ident));
+                } else {
+                    snprintf(name, sizeof(name), "%s (%u)",
+                             sk_field_get_name(field),
+                             SK_FIELD_IDENT_GET_ID(ident));
+                }
+                if (UINT16_MAX == sk_field_get_length(field)) {
+                    snprintf(size, sizeof(size), "%s", "VARIABLE");
+                } else {
+                    snprintf(size, sizeof(size), "%u",
+                             sk_field_get_length(field));
+                }
+                printf("%16s%-54.54s%9s\n", "", name, size);
+            }
+        }
+        sk_rbtree_iter_free(rbiter);
+    }
+
+    sk_rbtree_destroy(&rb);
+    skipfix_information_model_destroy(info_model);
+
+    return 0;
+}
+
+
+/*
  *  status = getNumberRecs(stream, record_size, &count);
  *
  *    Given 'stream' to the opened file, read the file to determine
@@ -560,42 +858,6 @@ getNumberRecs(
 
 
 /*
- *    If 'count' is 0, print the title for the 'id' entry unless
- *    no-titles was requested.
- *
- *    If 'count' is non-0 and no-titles was not requested, print
- *    spaces so multiple-header entries are aligned.
- */
-static void
-printLabel(
-    sk_stringmap_id_t   id,
-    int64_t             count)
-{
-    sk_stringmap_iter_t *iter;
-    sk_stringmap_entry_t *entry;
-
-    if (!no_titles) {
-        if (0 != count) {
-            printf(LABEL_FMT, "");
-        } else {
-            /* it seems like iterating over the rwinfo_entry[] array
-             * to find the entry would be easier.... */
-            skStringMapGetByID(avail_fields, id, &iter);
-            assert(iter);
-            skStringMapIterNext(iter, &entry, NULL);
-            assert(entry);
-            if (entry->userdata) {
-                printf(LABEL_FMT, (const char *)entry->userdata);
-            } else {
-                printf(LABEL_FMT, entry->name);
-            }
-            skStringMapIterDestroy(iter);
-        }
-    }
-}
-
-
-/*
  *  status = printFileInfo(info, &total_recs, &total_bytes);
  *
  *    Given the file information in the 'info' structure, print the
@@ -615,27 +877,32 @@ printFileInfo(
     int count;
     int64_t rec_count;
     skstream_t *stream = NULL;
-    sk_file_header_t *hdr;
+    sk_file_header_t *hdr = NULL;
     sk_header_entry_t *he;
     sk_hentry_iterator_t iter;
     int rv = SKSTREAM_OK;
     int retval = 0;
 
-    if (SKSTREAM_OK == rv) {
-        rv = skStreamCreate(&stream, SK_IO_READ, SK_CONTENT_SILK);
-    }
-    if (SKSTREAM_OK == rv) {
-        rv = skStreamBind(stream, path);
-    }
-    if (SKSTREAM_OK == rv) {
-        rv = skStreamOpen(stream);
-    }
-    if (SKSTREAM_OK == rv) {
-        rv = skStreamReadSilkHeaderStart(stream);
+    /* Open the file or return if we cannot */
+    if ((rv = skStreamCreate(&stream, SK_IO_READ, SK_CONTENT_SILK))
+        || (rv = skStreamBind(stream, path))
+        || (rv = skStreamOpen(stream)))
+    {
+        skStreamPrintLastErr(stream, rv, &skAppPrintErr);
+        skStreamDestroy(&stream);
+        return -1;
     }
 
-    /* Give up if we can't read the beginning of the silk header */
+    /* Attempt to read the header */
+    rv = skStreamReadSilkHeaderStart(stream);
     if (rv != SKSTREAM_OK) {
+        if ((SKSTREAM_ERR_BAD_MAGIC == rv
+             || SKSTREAM_ERR_UNSUPPORT_CONTENT == rv)
+            && skStreamIsSeekable(stream))
+        {
+            skStreamDestroy(&stream);
+            return printFileInfoIpfix(path, recs, bytes);
+        }
         skStreamPrintLastErr(stream, rv, &skAppPrintErr);
         skStreamDestroy(&stream);
         return -1;
@@ -665,12 +932,29 @@ printFileInfo(
         /* unknown or unavailable compression-method.  disable
          * printing of record count */
         skStreamPrintLastErr(stream, rv, &skAppPrintErr);
-        retval = -1;
+        hdr = skStreamGetSilkHeader(stream);
+        if (NULL == hdr) {
+            skStreamDestroy(&stream);
+            return -1;
+        }
         skBitmapClearBit(print_fields, RWINFO_COUNT_RECORDS);
+        retval = -1;
         break;
       default:
         /* print an error but continue */
         skStreamPrintLastErr(stream, rv, &skAppPrintErr);
+        if (NULL == hdr) {
+            hdr = skStreamGetSilkHeader(stream);
+            if (NULL == hdr) {
+                skStreamDestroy(&stream);
+                return -1;
+            }
+        }
+        skBitmapClearBit(print_fields, RWINFO_HEADER_LENGTH);
+        skBitmapClearBit(print_fields, RWINFO_RECORD_LENGTH);
+        skBitmapClearBit(print_fields, RWINFO_RECORD_VERSION);
+        skBitmapClearBit(print_fields, RWINFO_SILK_VERSION);
+        skBitmapClearBit(print_fields, RWINFO_COUNT_RECORDS);
         retval = -1;
         break;
     }
@@ -798,11 +1082,11 @@ printFileInfo(
         }
     }
 
-    if (skBitmapGetBit(print_fields, RWINFO_AGGBAG)) {
+    if (skBitmapGetBit(print_fields, RWINFO_SIDECAR)) {
         count = 0;
-        skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_AGGBAG_ID);
+        skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_SIDECAR_ID);
         while ((he = skHeaderIteratorNext(&iter)) != NULL) {
-            printLabel(RWINFO_AGGBAG, 0);
+            printLabel(RWINFO_SIDECAR, count);
             skHeaderEntryPrint(he, stdout);
             printf("\n");
             ++count;
@@ -857,11 +1141,11 @@ int main(int argc, char **argv)
     int64_t total_bytes = 0;
     int64_t total_recs = 0;
     int rv = EXIT_SUCCESS;
-    char *path;
+    char path[PATH_MAX];
 
     appSetup(argc, argv);       /* never returns on error */
 
-    while (skOptionsCtxNextArgument(optctx, &path) == 0) {
+    while (skOptionsCtxNextArgument(optctx, path, sizeof(path)) == 0) {
         if (printFileInfo(path, &total_recs, &total_bytes)) {
             rv = EXIT_FAILURE;
         }

@@ -15,7 +15,7 @@
 #include <Python.h>
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: silkpython.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: silkpython.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skplugin.h>
@@ -1654,26 +1654,6 @@ silkpython_bin_compare(
         exit(EXIT_FAILURE);
     }
 
-    /* PyNumber_AsSsize_t does not exist in Python 2.4.  PyObject_Cmp
-     * does not exist in Python 3.x. */
-#if PY_VERSION_HEX < 0x02050000
-    {
-        int rv;
-        PyObject *zero = PyInt_FromLong(0);
-        if (zero == NULL) {
-            PyErr_Print();
-            PyErr_Clear();
-            exit(EXIT_FAILURE);
-        }
-        rv = PyObject_Cmp(retval, zero, val);
-        Py_DECREF(retval);
-        if (rv) {
-            PyErr_Print();
-            PyErr_Clear();
-            exit(EXIT_FAILURE);
-        }
-    }
-#else  /* PY_VERSION_HEX >= 0x02050000 */
     {
         Py_ssize_t rv = PyNumber_AsSsize_t(retval, NULL);
         Py_DECREF(retval);
@@ -1686,7 +1666,6 @@ silkpython_bin_compare(
             *val = 0;
         }
     }
-#endif  /* PY_VERSION_HEX */
 
     return SKPLUGIN_OK;
 }

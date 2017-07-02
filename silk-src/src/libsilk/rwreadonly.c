@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwreadonly.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwreadonly.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skstream.h>
@@ -40,6 +40,8 @@ int main(int argc, char **argv)
 
     skAppRegister(argv[0]);
     skAppVerifyFeatures(&features, NULL);
+
+    rwRecInitialize(&rwrec, NULL);
 
     for (i = 1; i < (unsigned int)argc; ++i) {
         stream = NULL;

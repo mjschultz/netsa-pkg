@@ -7,8 +7,8 @@ B<silk_config> - Print SiLK compiling and linking information
 =head1 SYNOPSIS
 
   silk_config [--silk-version] [--compiler] [--cflags] [--include]
-         [--libs] [--libsilk-libs] [--libsilk-thrd-libs]
-         [--libflowsource-libs] [--data-rootdir] [--python-site-dir]
+         [--libs] [--libsilk-libs] [--libflowsource-libs]
+         [--data-rootdir] [--python-site-dir]
 
   silk_config --help
 
@@ -63,12 +63,6 @@ This switch is an alias for B<--libsilk-libs>.
 Print the linker flags (that is, the B<-L> and B<-l> switches) to use
 when linking a program against F<libsilk.so>.
 
-=item B<--libsilk-thrd-libs>
-
-Print the linker flags to use when linking a program against
-F<libsilk-thrd.so>.  Few external programs will need to use this
-library.
-
 =item B<--libflowsource-libs>
 
 Print the linker flags to use when linking a program against
@@ -105,7 +99,7 @@ B<silk.conf(5)>, B<silk(7)>
 
 =cut
 
-$SiLK: silk_config.pod 9b1a7208f21f 2013-12-09 18:20:36Z mthomas $
+$SiLK: silk_config.pod 04f844ac14ad 2014-04-02 16:59:49Z mthomas $
 
 Local Variables:
 mode:text

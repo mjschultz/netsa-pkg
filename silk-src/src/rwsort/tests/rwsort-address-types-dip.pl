@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 # MD5: 930654107271efc09aefc99fd57eee7d
-# TEST: ./rwsort --fields=dtype ../../tests/data.rwf | ../rwstats/rwuniq --fields=dtype --values=dip-distinct --delimited --ipv6=ignore --presorted-input
+# TEST: ./rwsort --fields=dtype ../../tests/data.rwf | ../rwuniq/rwuniq --fields=dtype --values=dip-distinct --delimited --ipv6=ignore --presorted-input
 
 use strict;
 use SiLKTests;

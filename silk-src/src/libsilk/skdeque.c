@@ -8,9 +8,11 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skdeque.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skdeque.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
+/* #define SKTHREAD_DEBUG_MUTEX 1 */
 #include <silk/skdeque.h>
+#include <silk/skthread.h>
 
 
 /*
@@ -32,28 +34,124 @@ RCSIDENT("$SiLK: skdeque.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
  */
 
 
-/* typedef struct sk_deque_st *skDeque_t;  // skdeque.h  */
+/* *** typedefs for manipulation functions *** */
+
+/*
+ *    Block 'deque' if flag is true; unblock 'deque' if 'flag' is
+ *    false.
+ */
+typedef skDQErr_t
+(*dq_fn_block)(
+    sk_deque_t         *deque,
+    uint8_t             flag);
+
+/*
+ *   Free all the items in 'deque' and destroy 'deque'.
+ */
+typedef skDQErr_t
+(*dq_fn_destroy)(
+    sk_deque_t         *deque);
+
+/*
+ *   Join the first element of 'back' to final element of 'front'.
+ */
+typedef skDQErr_t
+(*dq_fn_join)(
+    sk_deque_t         *front,
+    sk_deque_t         *back);
+
+/*
+ *    Fill 'item' with the first element (when 'front' is true) or the
+ *    final element (when 'front' is false') in 'deque' leaving the
+ *    item in the deque.  If the deque is empty, return SKDQ_EMPTY.
+ */
+typedef skDQErr_t
+(*dq_fn_peek)(
+    sk_deque_t         *deque,
+    void              **item,
+    uint8_t             front);
+
+/*
+ *    Fill 'item' with the first element (when 'front' is true) or the
+ *    final element (when 'front' is false') in 'deque' removing the
+ *    item from the deque.  If the deque is empty and 'block' is
+ *    false, return SKDQ_EMPTY.  Otherwise, wait for no more than
+ *    'seconds' seconds for an item to appear, or wait indefinitely
+ *    when 'seconds' is 0.
+ */
+typedef skDQErr_t
+(*dq_fn_pop)(
+    sk_deque_t         *deque,
+    void              **item,
+    uint8_t             block,
+    uint8_t             front,
+    uint32_t            seconds);
+
+/*
+ *    Add 'item' to 'deque'.  Put 'item' at the front of the deque
+ *    when 'front' is true or at the end of 'deque' when 'front' is
+ *    false.
+ */
+typedef skDQErr_t
+(*dq_fn_push)(
+    sk_deque_t         *deque,
+    void               *item,
+    uint8_t             front);
+
+/*
+ *    Return the number of elements in 'deque'.
+ */
+typedef uint32_t
+(*dq_fn_size)(
+    sk_deque_t         *deque);
+
+/*
+ *    Return SKDQ_EMPTY if 'deque' is empty or 'SKDQ_SUCCESS'
+ *    otherwise.
+ */
+typedef skDQErr_t
+(*dq_fn_status)(
+    sk_deque_t         *deque);
+
+
+/* typedef struct sk_deque_st sk_deque_t;  // skdeque.h  */
 
 /* Deque data structure */
-typedef struct sk_deque_st {
+struct sk_deque_st {
+    /* Function pointers to either the std_* functions or the merged_*
+     * functions defined below depending on the type of deque. */
     struct methods_st {
-        skDQErr_t (*block)(skDeque_t self, uint8_t flag);
-        skDQErr_t (*destroy)(skDeque_t self);
-        skDQErr_t (*peek)(skDeque_t self, void **item, uint8_t front);
-        skDQErr_t (*pop)(skDeque_t self, void **item, uint8_t block,
-                         uint8_t front, uint32_t seconds);
-        skDQErr_t (*push)(skDeque_t self, void *item, uint8_t front);
-        uint32_t  (*size)(skDeque_t self);
-        skDQErr_t (*status)(skDeque_t self);
+        dq_fn_block         block;
+        dq_fn_destroy       destroy;
+        dq_fn_join          join;
+        dq_fn_peek          peek;
+        dq_fn_pop           pop;
+        dq_fn_push          push;
+        dq_fn_size          size;
+        dq_fn_status        status;
     }                   methods;
 
+    /* The mutex for this deque object */
     pthread_mutex_t     mutex_data; /* mutex storage */
+
+    /* The condition variable for this deque object */
+    pthread_cond_t      cond_data;
+
+    /* When this deque is part of a merged deque, the 'mutex' variable
+     * points to the 'mutex_data' on the merged deque; otherwise,
+     * 'mutex' is the address of the 'mutex_data' above. */
     pthread_mutex_t    *mutex;      /* mutex */
-    pthread_cond_t      cond_data;  /* condition variable storage */
-    pthread_cond_t     *cond;       /* condition variable */
-    void               *data;       /* data (NULL == destroyed) */
-    uint8_t             ref;        /* reference count */
-} sk_deque_t;
+
+    /* Similar to 'mutex' for the condition variable */
+    pthread_cond_t     *cond;
+
+    /* Pointer to either an 'skdq_std_t' for a standard deque or an
+     * 'skdq_merged_t' for a merged deque. */
+    void               *data;
+
+    /* Reference count */
+    uint8_t             ref;
+};
 
 /* Deque item */
 typedef struct skdq_item_st skdq_item_t;
@@ -69,16 +167,19 @@ struct skdq_item_st {
  *  ******************************************************************
  */
 
-/* Standard deque */
-typedef struct skdq_std_st {
+/*
+ *    skdq_std_t is a normal (non-merged) deque.
+ */
+struct skdq_std_st {
     skdq_item_t    *dir[2];     /* 0 == back, 1 == front */
     uint32_t        size;
     uint8_t         blocked;
-} skdq_std_t;
+};
+typedef struct skdq_std_st skdq_std_t;
 
 static skDQErr_t
 std_block(
-    skDeque_t           self,
+    sk_deque_t         *self,
     uint8_t             flag)
 {
     skdq_std_t *q = (skdq_std_t *)self->data;
@@ -89,7 +190,7 @@ std_block(
 
     q->blocked = flag;
     if (!flag) {
-        pthread_cond_broadcast(self->cond);
+        MUTEX_BROADCAST(self->cond);
     }
 
     return SKDQ_SUCCESS;
@@ -97,7 +198,7 @@ std_block(
 
 static uint32_t
 std_size(
-    skDeque_t           self)
+    sk_deque_t         *self)
 {
     skdq_std_t *q = (skdq_std_t *)self->data;
 
@@ -106,7 +207,7 @@ std_size(
 
 static skDQErr_t
 std_status(
-    skDeque_t           self)
+    sk_deque_t         *self)
 {
     skdq_std_t *q = (skdq_std_t *)self->data;
 
@@ -121,7 +222,7 @@ std_status(
 
 static skDQErr_t
 std_peek(
-    skDeque_t           self,
+    sk_deque_t         *self,
     void              **item,
     uint8_t             front)
 {
@@ -142,7 +243,7 @@ std_peek(
 
 static skDQErr_t
 std_pop(
-    skDeque_t           self,
+    sk_deque_t         *self,
     void              **item,
     uint8_t             block,
     uint8_t             f,
@@ -170,7 +271,7 @@ std_pop(
                     return SKDQ_TIMEDOUT;
                 }
             } else {
-                pthread_cond_wait(self->cond, self->mutex);
+                MUTEX_WAIT(self->cond, self->mutex);
             }
         }
         if (self->data && !q->blocked) {
@@ -205,7 +306,7 @@ std_pop(
 
 static skDQErr_t
 std_push(
-    skDeque_t           self,
+    sk_deque_t         *self,
     void               *item,
     uint8_t             f)
 {
@@ -232,7 +333,7 @@ std_push(
         t->dir[b]->dir[f] = t;
     } else {
         q->dir[b] = t;
-        pthread_cond_broadcast(self->cond);
+        MUTEX_BROADCAST(self->cond);
     }
 
     q->size++;
@@ -242,7 +343,7 @@ std_push(
 
 static skDQErr_t
 std_destroy(
-    skDeque_t           self)
+    sk_deque_t         *self)
 {
     skdq_std_t *q = (skdq_std_t *)self->data;
     skdq_item_t *t, *x;
@@ -263,16 +364,49 @@ std_destroy(
     return SKDQ_SUCCESS;
 }
 
+static skDQErr_t
+std_join(
+    sk_deque_t         *front,
+    sk_deque_t         *back)
+{
+    skdq_std_t *fq = (skdq_std_t *)front->data;
+    skdq_std_t *bq = (skdq_std_t *)back->data;
+
+    if (fq == NULL || bq == NULL) {
+        return SKDQ_ERROR;
+    }
+
+    if (0 == fq->size) {
+        /* have fq take over bq */
+        fq->dir[0] = bq->dir[0];
+        fq->dir[1] = bq->dir[1];
+    } else {
+        /* join the two lists */
+        bq->dir[1]->dir[1] = fq->dir[0];
+        fq->dir[0]->dir[0] = bq->dir[1];
+        fq->dir[0] = bq->dir[0];
+    }
+    fq->size += bq->size;
+
+    /* set the back deque to be empty */
+    bq->dir[0] = bq->dir[1] = NULL;
+    bq->size = 0;
+
+    MUTEX_BROADCAST(front->cond);
+
+    return SKDQ_SUCCESS;
+}
+
 /* Create a standard deque */
-skDeque_t
+sk_deque_t*
 skDequeCreate(
     void)
 {
-    skDeque_t deque;
+    sk_deque_t *deque;
     skdq_std_t *data;
 
     /* memory allocation */
-    if ((deque = (skDeque_t)malloc(sizeof(sk_deque_t))) == NULL) {
+    if ((deque = (sk_deque_t*)malloc(sizeof(sk_deque_t))) == NULL) {
         return NULL;
     }
     if ((data = (skdq_std_t *)malloc(sizeof(skdq_std_t))) == NULL) {
@@ -287,17 +421,18 @@ skDequeCreate(
 
     /* Initialize deque */
     deque->ref = 1;
-    pthread_mutex_init(&deque->mutex_data, NULL);
+    MUTEX_INIT(&deque->mutex_data);
     pthread_cond_init(&deque->cond_data, NULL);
     deque->mutex = &deque->mutex_data;
     deque->cond = &deque->cond_data;
-    deque->methods.status = std_status;
-    deque->methods.pop = std_pop;
-    deque->methods.peek = std_peek;
-    deque->methods.push = std_push;
-    deque->methods.destroy = std_destroy;
     deque->methods.block = std_block;
+    deque->methods.destroy = std_destroy;
+    deque->methods.join = std_join;
+    deque->methods.peek = std_peek;
+    deque->methods.pop = std_pop;
+    deque->methods.push = std_push;
     deque->methods.size = std_size;
+    deque->methods.status = std_status;
     deque->data = (void *)data;
 
     return deque;
@@ -310,13 +445,18 @@ skDequeCreate(
  *  ******************************************************************
  */
 
-typedef struct skdq_merged_st {
-    skDeque_t q[2];             /* 0 == back, 1 == front */
-} skdq_merged_t;
+/*
+ *    skdq_merged_t is a pair of deque objects (which themselves could
+ *    be merged deques).
+ */
+struct skdq_merged_st {
+    sk_deque_t *q[2];           /* 0 == back, 1 == front */
+};
+typedef struct skdq_merged_st skdq_merged_t;
 
 static skDQErr_t
 merged_block(
-    skDeque_t           self,
+    sk_deque_t         *self,
     uint8_t             flag)
 {
     skdq_merged_t *q = (skdq_merged_t *)self->data;
@@ -336,7 +476,7 @@ merged_block(
 
 static uint32_t
 merged_size(
-    skDeque_t           self)
+    sk_deque_t         *self)
 {
     skdq_merged_t *q = (skdq_merged_t *)self->data;
 
@@ -345,7 +485,7 @@ merged_size(
 
 static skDQErr_t
 merged_status(
-    skDeque_t           self)
+    sk_deque_t         *self)
 {
     skdq_merged_t *q = (skdq_merged_t *)self->data;
     skDQErr_t retval;
@@ -363,7 +503,7 @@ merged_status(
 
 static skDQErr_t
 merged_peek(
-    skDeque_t           self,
+    sk_deque_t         *self,
     void              **item,
     uint8_t             f)
 {
@@ -386,7 +526,7 @@ merged_peek(
 
 static skDQErr_t
 merged_pop(
-    skDeque_t           self,
+    sk_deque_t         *self,
     void              **item,
     uint8_t             block,
     uint8_t             f,
@@ -414,7 +554,7 @@ merged_pop(
                     return SKDQ_TIMEDOUT;
                 }
             } else {
-                pthread_cond_wait(self->cond, self->mutex);
+                MUTEX_WAIT(self->cond, self->mutex);
             }
         }
     }
@@ -439,7 +579,7 @@ merged_pop(
 
 static skDQErr_t
 merged_push(
-    skDeque_t           self,
+    sk_deque_t         *self,
     void               *item,
     uint8_t             f)
 {
@@ -454,7 +594,7 @@ merged_push(
 
 static skDQErr_t
 merged_destroy(
-    skDeque_t           self)
+    sk_deque_t         *self)
 {
     skdq_merged_t *q = (skdq_merged_t *)self->data;
     uint8_t i;
@@ -474,15 +614,34 @@ merged_destroy(
     return SKDQ_SUCCESS;
 }
 
+static skDQErr_t
+merged_join(
+    sk_deque_t         *front,
+    sk_deque_t         *back)
+{
+    skdq_merged_t *fq = (skdq_merged_t *)front->data;
+    skdq_merged_t *bq = (skdq_merged_t *)back->data;
+
+    if (fq == NULL || bq == NULL) {
+        return SKDQ_ERROR;
+    }
+
+    fq->q[1]->methods.join(fq->q[1], bq->q[1]);
+    fq->q[0]->methods.join(fq->q[0], bq->q[0]);
+
+    return SKDQ_SUCCESS;
+}
+
+
 /* Creates a new pseudo-deque which acts like a deque with all the
  * elements of q1 in front of q2.  q1 and q2 continue behaving
  * normally. */
-skDeque_t
+sk_deque_t*
 skDequeCreateMerged(
-    skDeque_t           q1,
-    skDeque_t           q2)
+    sk_deque_t         *q1,
+    sk_deque_t         *q2)
 {
-    volatile skDeque_t deque;
+    sk_deque_t * volatile deque;
     skdq_merged_t *data;
     pthread_mutex_t *mutex;
     pthread_cond_t *cond;
@@ -494,7 +653,7 @@ skDequeCreateMerged(
     }
 
     /* memory allocation */
-    if ((deque = (skDeque_t)malloc(sizeof(sk_deque_t))) == NULL) {
+    if ((deque = (sk_deque_t*)malloc(sizeof(sk_deque_t))) == NULL) {
         return NULL;
     }
     if ((data = (skdq_merged_t *)malloc(sizeof(skdq_merged_t))) == NULL) {
@@ -517,27 +676,29 @@ skDequeCreateMerged(
 
     /* Initialize deque */
     deque->ref = 1;
-    pthread_mutex_init(&deque->mutex_data, NULL);
+    MUTEX_INIT(&deque->mutex_data);
     pthread_cond_init(&deque->cond_data, NULL);
     deque->mutex = &deque->mutex_data;
     deque->cond = &deque->cond_data;
-    deque->methods.status = merged_status;
-    deque->methods.pop = merged_pop;
-    deque->methods.peek = merged_peek;
-    deque->methods.push = merged_push;
-    deque->methods.destroy = merged_destroy;
     deque->methods.block = merged_block;
+    deque->methods.destroy = merged_destroy;
+    deque->methods.join = merged_join;
+    deque->methods.peek = merged_peek;
+    deque->methods.pop = merged_pop;
+    deque->methods.push = merged_push;
     deque->methods.size = merged_size;
+    deque->methods.status = merged_status;
     deque->data = (void *)data;
 
     /** Reorganize subdeques' mutexes and condition variables **/
 
     /* Lock our own */
-    pthread_mutex_lock(deque->mutex);
+    MUTEX_LOCK(deque->mutex);
 
     for (i = 0; i <= 1; ++i) {
         /* Grab q[i] */
-        pthread_mutex_lock(data->q[i]->mutex);
+        MUTEX_LOCK(data->q[i]->mutex);
+        /* Note its current settings */
         mutex = data->q[i]->mutex;
         cond = data->q[i]->cond;
         /* Fix its mutex and condition variable to be ours */
@@ -545,12 +706,12 @@ skDequeCreateMerged(
         data->q[i]->cond = deque->cond;
         /* Wake up anything waiting on it so they pick up the new
          * condition variable. */
-        pthread_cond_broadcast(cond);
+        MUTEX_BROADCAST(cond);
         /* Unlock */
-        pthread_mutex_unlock(mutex);
+        MUTEX_UNLOCK(mutex);
     }
 
-    pthread_mutex_unlock(deque->mutex);
+    MUTEX_UNLOCK(deque->mutex);
 
     return deque;
 }
@@ -564,22 +725,22 @@ skDequeCreateMerged(
 
 /* Creates a copy of a deque.  Operations on both deques will affect
  * each other. */
-skDeque_t
+sk_deque_t*
 skDequeCopy(
-    volatile skDeque_t  deque)
+    sk_deque_t * volatile   deque)
 {
     int die = 0;
 
     if (deque == NULL || deque->data == NULL) {
         return NULL;
     }
-    pthread_mutex_lock(deque->mutex);
+    MUTEX_LOCK(deque->mutex);
     if (deque->data == NULL) {
         die = 1;
     } else {
         deque->ref++;
     }
-    pthread_mutex_unlock(deque->mutex);
+    MUTEX_UNLOCK(deque->mutex);
 
     if (die) {
         return NULL;
@@ -592,7 +753,7 @@ skDequeCopy(
  * within the deque). */
 skDQErr_t
 skDequeDestroy(
-    skDeque_t           deque)
+    sk_deque_t         *deque)
 {
     int destroy;
 
@@ -600,7 +761,7 @@ skDequeDestroy(
         return SKDQ_ERROR;
     }
 
-    pthread_mutex_lock(deque->mutex);
+    MUTEX_LOCK(deque->mutex);
 
     if ((destroy = (--deque->ref == 0))) {
         /* Call destructor method */
@@ -610,16 +771,16 @@ skDequeDestroy(
         deque->data = NULL;
 
         /* Give all the condition waiting threads a chance to exit. */
-        pthread_cond_broadcast(deque->cond);
+        MUTEX_BROADCAST(deque->cond);
     }
 
-    pthread_mutex_unlock(deque->mutex);
+    MUTEX_UNLOCK(deque->mutex);
 
     if (destroy) {
-        while (pthread_mutex_destroy(deque->mutex) == EBUSY)
+        while (MUTEX_DESTROY(deque->mutex) == EBUSY)
             ; /* empty */
         while (pthread_cond_destroy(deque->cond) == EBUSY) {
-            pthread_cond_broadcast(deque->cond);
+            MUTEX_BROADCAST(deque->cond);
         }
         free(deque);
     }
@@ -630,30 +791,30 @@ skDequeDestroy(
 
 skDQErr_t
 skDequeBlock(
-    skDeque_t           deque)
+    sk_deque_t         *deque)
 {
     skDQErr_t retval;
 
-    pthread_mutex_lock(deque->mutex);
+    MUTEX_LOCK(deque->mutex);
 
     retval = deque->methods.block(deque, 1);
 
-    pthread_mutex_unlock(deque->mutex);
+    MUTEX_UNLOCK(deque->mutex);
 
     return retval;
 }
 
 skDQErr_t
 skDequeUnblock(
-    skDeque_t           deque)
+    sk_deque_t         *deque)
 {
     skDQErr_t retval;
 
-    pthread_mutex_lock(deque->mutex);
+    MUTEX_LOCK(deque->mutex);
 
     retval = deque->methods.block(deque, 0);
 
-    pthread_mutex_unlock(deque->mutex);
+    MUTEX_UNLOCK(deque->mutex);
 
     return retval;
 }
@@ -662,15 +823,15 @@ skDequeUnblock(
 /* Return the size of a deque. */
 uint32_t
 skDequeSize(
-    skDeque_t           deque)
+    sk_deque_t         *deque)
 {
     uint32_t retval;
 
-    pthread_mutex_lock(deque->mutex);
+    MUTEX_LOCK(deque->mutex);
 
     retval = deque->methods.size(deque);
 
-    pthread_mutex_unlock(deque->mutex);
+    MUTEX_UNLOCK(deque->mutex);
 
     return retval;
 }
@@ -679,15 +840,15 @@ skDequeSize(
 /* Return the status of a deque. */
 skDQErr_t
 skDequeStatus(
-    skDeque_t           deque)
+    sk_deque_t         *deque)
 {
     skDQErr_t retval;
 
-    pthread_mutex_lock(deque->mutex);
+    MUTEX_LOCK(deque->mutex);
 
     retval = deque->methods.status(deque);
 
-    pthread_mutex_unlock(deque->mutex);
+    MUTEX_UNLOCK(deque->mutex);
 
     return retval;
 }
@@ -696,17 +857,17 @@ skDequeStatus(
 /* Peek at an element from a deque. */
 static skDQErr_t
 sk_deque_peek(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item,
     uint8_t             front)
 {
     skDQErr_t retval;
 
-    pthread_mutex_lock(deque->mutex);
+    MUTEX_LOCK(deque->mutex);
 
     retval = deque->methods.peek(deque, item, front);
 
-    pthread_mutex_unlock(deque->mutex);
+    MUTEX_UNLOCK(deque->mutex);
 
     return retval;
 }
@@ -715,14 +876,14 @@ sk_deque_peek(
  * SKDQ_EMPTY if the deque is empty.  */
 skDQErr_t
 skDequeFront(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item)
 {
     return sk_deque_peek(deque, item, 1);
 }
 skDQErr_t
 skDequeBack(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item)
 {
     return sk_deque_peek(deque, item, 0);
@@ -732,7 +893,7 @@ skDequeBack(
 /* Pop an element from a deque.  */
 static skDQErr_t
 sk_deque_pop(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item,
     uint8_t             block,
     uint8_t             front,
@@ -740,11 +901,11 @@ sk_deque_pop(
 {
     skDQErr_t retval;
 
-    pthread_mutex_lock(deque->mutex);
+    MUTEX_LOCK(deque->mutex);
 
     retval = deque->methods.pop(deque, item, block, front, seconds);
 
-    pthread_mutex_unlock(deque->mutex);
+    MUTEX_UNLOCK(deque->mutex);
 
     return retval;
 }
@@ -758,21 +919,21 @@ sk_deque_pop(
  */
 skDQErr_t
 skDequePopFront(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item)
 {
     return sk_deque_pop(deque, item, 1, 1, 0);
 }
 skDQErr_t
 skDequePopFrontNB(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item)
 {
     return sk_deque_pop(deque, item, 0, 1, 0);
 }
 skDQErr_t
 skDequePopFrontTimed(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item,
     uint32_t            seconds)
 {
@@ -780,21 +941,21 @@ skDequePopFrontTimed(
 }
 skDQErr_t
 skDequePopBack(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item)
 {
     return sk_deque_pop(deque, item, 1, 0, 0);
 }
 skDQErr_t
 skDequePopBackNB(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item)
 {
     return sk_deque_pop(deque, item, 0, 0, 0);
 }
 skDQErr_t
 skDequePopBackTimed(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void              **item,
     uint32_t            seconds)
 {
@@ -805,17 +966,17 @@ skDequePopBackTimed(
 /* Push an element onto a deque. */
 static skDQErr_t
 sk_deque_push(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void               *item,
     uint8_t             front)
 {
     skDQErr_t retval;
 
-    pthread_mutex_lock(deque->mutex);
+    MUTEX_LOCK(deque->mutex);
 
     retval = deque->methods.push(deque, item, front);
 
-    pthread_mutex_unlock(deque->mutex);
+    MUTEX_UNLOCK(deque->mutex);
 
     return retval;
 }
@@ -823,17 +984,65 @@ sk_deque_push(
 /* Push an item onto a deque. */
 skDQErr_t
 skDequePushFront(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void               *item)
 {
     return sk_deque_push(deque, item, 1);
 }
 skDQErr_t
 skDequePushBack(
-    skDeque_t           deque,
+    sk_deque_t         *deque,
     void               *item)
 {
     return sk_deque_push(deque, item, 0);
+}
+
+
+skDQErr_t
+skDequeJoin(
+    sk_deque_t         *front,
+    sk_deque_t         *back)
+{
+    skdq_merged_t *mq;
+    skDQErr_t retval;
+
+    MUTEX_LOCK(front->mutex);
+    MUTEX_LOCK(back->mutex);
+
+    if (0 == back->methods.size(back)) {
+        /* when back is empty, there is nothing to do */
+        retval = SKDQ_SUCCESS;
+
+    } else if (front->methods.join == back->methods.join) {
+        /* when the deques use the same join() method, call it */
+        retval = front->methods.join(front, back);
+
+    } else if (front->methods.join == merged_join) {
+        /* when the 'front' deque is merged, join its back deque with
+         * the 'back' deque passed into this function */
+        assert(back->methods.join == std_join);
+        mq = (skdq_merged_t *)front->data;
+
+        retval = mq->q[0]->methods.join(mq->q[0], back);
+
+    } else if (front->methods.join == std_join) {
+        /* when the 'front' deque is a standard deque, join both
+         * members of the 'back' deque to it */
+        assert(back->methods.join == merged_join);
+        mq = (skdq_merged_t *)back->data;
+
+        retval = front->methods.join(front, mq->q[1]);
+        if (SKDQ_SUCCESS == retval) {
+            retval = front->methods.join(front, mq->q[0]);
+        }
+
+    } else {
+        skAbort();
+    }
+
+    MUTEX_UNLOCK(back->mutex);
+    MUTEX_UNLOCK(front->mutex);
+    return retval;
 }
 
 

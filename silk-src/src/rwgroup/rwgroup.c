@@ -41,7 +41,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwgroup.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwgroup.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include "rwgroup.h"
 
@@ -60,8 +60,8 @@ RCSIDENT("$SiLK: rwgroup.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 uint32_t num_fields = 0;
 
 /* IDs of the fields to group by; skStringMapParse() sets it; values
- * are from the rwrec_printable_fields_t enum and from values that
- * come from plug-ins. */
+ * are from the rwrec_field_id_t enum and from values that come from
+ * plug-ins. */
 uint32_t *id_fields = NULL;
 
 /* the size of a "node".  Because the output from rwgroup is SiLK
@@ -153,20 +153,6 @@ int objective = 0;
         }                                                       \
     }
 
-#if !SK_ENABLE_IPV6
-/* compare two IPv4 addresses masked by same value */
-#define RETURN_IF_IPS_OUTSIDE_DELTA(func, rec_a, rec_b) \
-    {                                                   \
-        uint32_t val_a, val_b;                          \
-        val_a = delta_value & func((rwRec*)(rec_a));    \
-        val_b = delta_value & func((rwRec*)(rec_b));    \
-        if (val_a < val_b) {                            \
-            return -2;                                  \
-        } else if (val_a > val_b) {                     \
-            return 2;                                   \
-        }                                               \
-    }
-#else
 /* compare two skipaddr_t's masked by an skipaddr_t */
 #define RETURN_IF_IPS_OUTSIDE_DELTA(func, rec_a, rec_b) \
     {                                                   \
@@ -181,7 +167,6 @@ int objective = 0;
             return (cmp);                               \
         }                                               \
     }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 static uint8_t
@@ -223,27 +208,15 @@ rwrecCompare(
     for (i = 0; i < num_fields; i++) {
         switch (id_fields[i]) {
           case RWREC_FIELD_SIP:
-#if !SK_ENABLE_IPV6
-            RETURN_IF_SORTED(rwRecGetSIPv4, a, b);
-#else
             RETURN_IF_SORTED_IPS(rwRecMemGetSIP, a, b);
-#endif /* SK_ENABLE_IPV6 */
             break;
 
           case RWREC_FIELD_DIP:
-#if !SK_ENABLE_IPV6
-            RETURN_IF_SORTED(rwRecGetDIPv4, a, b);
-#else
             RETURN_IF_SORTED_IPS(rwRecMemGetDIP, a, b);
-#endif /* SK_ENABLE_IPV6 */
             break;
 
           case RWREC_FIELD_NHIP:
-#if !SK_ENABLE_IPV6
-            RETURN_IF_SORTED(rwRecGetNhIPv4, a, b);
-#else
             RETURN_IF_SORTED_IPS(rwRecMemGetNhIP, a, b);
-#endif /* SK_ENABLE_IPV6 */
             break;
 
           case RWREC_FIELD_SPORT:
@@ -271,17 +244,14 @@ rwrecCompare(
             break;
 
           case RWREC_FIELD_STIME:
-          case RWREC_FIELD_STIME_MSEC:
             RETURN_IF_SORTED(rwRecGetStartTime, a, b);
             break;
 
           case RWREC_FIELD_ELAPSED:
-          case RWREC_FIELD_ELAPSED_MSEC:
             RETURN_IF_SORTED(rwRecGetElapsed, a, b);
             break;
 
           case RWREC_FIELD_ETIME:
-          case RWREC_FIELD_ETIME_MSEC:
             RETURN_IF_SORTED(rwRecGetEndTime, a, b);
             break;
 
@@ -356,27 +326,15 @@ rwrecCompare(
 
     switch (delta_field) {
       case RWREC_FIELD_SIP:
-#if !SK_ENABLE_IPV6
-        RETURN_IF_IPS_OUTSIDE_DELTA(rwRecGetSIPv4, a, b);
-#else
         RETURN_IF_IPS_OUTSIDE_DELTA(rwRecMemGetSIP, a, b);
-#endif /* SK_ENABLE_IPV6 */
         break;
 
       case RWREC_FIELD_DIP:
-#if !SK_ENABLE_IPV6
-        RETURN_IF_IPS_OUTSIDE_DELTA(rwRecGetDIPv4, a, b);
-#else
         RETURN_IF_IPS_OUTSIDE_DELTA(rwRecMemGetDIP, a, b);
-#endif /* SK_ENABLE_IPV6 */
         break;
 
       case RWREC_FIELD_NHIP:
-#if !SK_ENABLE_IPV6
-        RETURN_IF_IPS_OUTSIDE_DELTA(rwRecGetNhIPv4, a, b);
-#else
         RETURN_IF_IPS_OUTSIDE_DELTA(rwRecMemGetNhIP, a, b);
-#endif /* SK_ENABLE_IPV6 */
         break;
 
       case RWREC_FIELD_SPORT:
@@ -404,17 +362,14 @@ rwrecCompare(
         break;
 
       case RWREC_FIELD_STIME:
-      case RWREC_FIELD_STIME_MSEC:
         RETURN_IF_VALUE_OUTSIDE_DELTA(rwRecGetStartTime, a, b);
         break;
 
       case RWREC_FIELD_ELAPSED:
-      case RWREC_FIELD_ELAPSED_MSEC:
         RETURN_IF_VALUE_OUTSIDE_DELTA(rwRecGetElapsed, a, b);
         break;
 
       case RWREC_FIELD_ETIME:
-      case RWREC_FIELD_ETIME_MSEC:
         RETURN_IF_VALUE_OUTSIDE_DELTA(rwRecGetEndTime, a, b);
         break;
 
@@ -521,6 +476,10 @@ groupInput(
     memset(&rec_buf, 0, sizeof(rec_buf));
 #endif  /* SK_HAVE_ALIGNED_ACCESS_REQUIRED */
 
+    rwRecInitialize(summary_rec, NULL);
+    rwRecInitialize((rwRec *)last_rec, NULL);
+    rwRecInitialize((rwRec *)cur_rec, NULL);
+
     /* number of records in the current group, used to see if we have
      * met the threshold, and used as index into the thresh_buf when
      * we are not summarizing */
@@ -617,7 +576,7 @@ groupInput(
             } else {
                 /* add record to summary_rec, handling overflow */
                 sktime_t sttime = 0, summary_etime = 0, cur_etime;
-                uint32_t bytes = 0, pkts = 0;
+                uint64_t bytes = 0, pkts = 0;
                 int overflow = 0;
 
                 /* use a do{}while(0) so we can break on the first
@@ -626,7 +585,7 @@ groupInput(
                     /* check for overflow in bytes, most likely place
                      * for an overflow to occur */
                     bytes = rwRecGetBytes((rwRec*)cur_rec);
-                    if (UINT32_MAX - bytes < rwRecGetBytes(summary_rec)) {
+                    if (UINT64_MAX - bytes < rwRecGetBytes(summary_rec)) {
                         overflow = 1;
                         break;
                     }
@@ -657,7 +616,7 @@ groupInput(
                     /* check for overflow in packets.  should never
                      * happen since we should have bytes > packets */
                     pkts = rwRecGetPkts((rwRec*)cur_rec);
-                    if (UINT32_MAX - pkts < rwRecGetPkts(summary_rec)) {
+                    if (UINT64_MAX - pkts < rwRecGetPkts(summary_rec)) {
                         overflow = 1;
                         break;
                     }

@@ -45,7 +45,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwdedupe.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwdedupe.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include "rwdedupe.h"
 #include <silk/skheap.h>
@@ -61,8 +61,11 @@ RCSIDENT("$SiLK: rwdedupe.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 uint32_t num_fields = 0;
 
 /* IDs of the fields to sort over; values are from the
- * rwrec_printable_fields_t enum. */
-uint32_t sort_fields[RWREC_PRINTABLE_FIELD_COUNT];
+ * rwrec_field_id_t enum. */
+uint32_t sort_fields[RWREC_FIELD_ID_COUNT];
+
+/* for looping over the input streams */
+sk_flow_iter_t *flowiter = NULL;
 
 /* output stream */
 skstream_t *out_stream = NULL;
@@ -116,13 +119,6 @@ flow_delta_t delta;
         return 1;                                               \
     }
 
-#if !SK_ENABLE_IPV6
-#define compareIPs(ipa, ipb)                            \
-    ((skipaddrGetV4(ipa) < skipaddrGetV4(ipb))          \
-     ? -1                                               \
-     : (skipaddrGetV4(ipa) > skipaddrGetV4(ipb)))
-#endif
-
 #define RETURN_IF_SORTED_IPS(func, rec_a, rec_b)        \
     {                                                   \
         skipaddr_t ip_a, ip_b;                          \
@@ -136,7 +132,6 @@ flow_delta_t delta;
     }
 
 
-#if SK_ENABLE_IPV6
 static int
 compareIPs(
     const skipaddr_t   *ipa,
@@ -163,7 +158,6 @@ compareIPs(
             ? -1
             : (skipaddrGetV4(ipa) > skipaddrGetV4(ipb)));
 }
-#endif  /* SK_ENABLE_IPV6 */
 
 
 /*
@@ -222,12 +216,10 @@ rwrecCompare(
             break;
 
           case RWREC_FIELD_STIME:
-          case RWREC_FIELD_STIME_MSEC:
             RETURN_IF_SORTED_DELTA(rwRecGetStartTime, a, b, delta.d_stime);
             break;
 
           case RWREC_FIELD_ELAPSED:
-          case RWREC_FIELD_ELAPSED_MSEC:
             RETURN_IF_SORTED_DELTA(rwRecGetElapsed, a, b, delta.d_elapsed);
             break;
 
@@ -455,18 +447,6 @@ mergeFiles(
                 /* write the record to intermediate tmp file */
                 rv = skStreamWrite(fp_intermediate, lowest_rec, NODE_SIZE);
                 if (NODE_SIZE != rv) {
-                    if (rv > 0) {
-                        snprintf(
-                            errbuf, sizeof(errbuf),
-                            "Short write %" SK_PRIdZ "/%" SK_PRIuZ " to '%s'",
-                            rv,NODE_SIZE,skStreamGetPathname(fp_intermediate));
-                    } else {
-                        skStreamLastErrMessage(
-                            fps[open_count], rv, errbuf, sizeof(errbuf));
-                    }
-                    skAppPrintErr("Error writing to temporary file: %s",
-                                  errbuf);
-                    skStreamDestroy(&fp_intermediate);
                     skAppPrintSyserror(
                         "Error writing record to temporary file '%s'",
                         skTempFileGetName(tmpctx, tmp_idx_intermediate));
@@ -575,7 +555,7 @@ mergeFiles(
 
 
 /*
- *  sortRandom();
+ *  sortRandom(argc, argv);
  *
  *    Don't make any assumptions about the input.  Store the input
  *    records in a large buffer, and sort those in-core records once
@@ -588,18 +568,29 @@ mergeFiles(
  */
 static void
 sortRandom(
-    void)
+    int                 argc,
+    char              **argv)
 {
+    /* index of last used temporary file; -1 == not used */
     int temp_file_idx = -1;
-    skstream_t *input_stream = NULL;/* input stream */
-    uint8_t *record_buffer = NULL;  /* Region of memory for records */
-    uint8_t *cur_node = NULL;       /* Ptr into record_buffer */
-    uint8_t *next_node = NULL;      /* Ptr into record_buffer */
-    size_t buffer_max_recs;         /* max buffer size (in number of recs) */
-    size_t buffer_recs;             /* current buffer size (# records) */
-    size_t buffer_chunk_recs;       /* how to grow from current to max buf */
-    size_t num_chunks;              /* how quickly to grow buffer */
-    size_t record_count = 0;        /* Number of records read */
+    /* region of memory for records */
+    rwRec *record_buffer = NULL;
+    /* current size of 'record_buffer' (as a number of recs) */
+    size_t buffer_recs;
+    /* maximum allowed size of 'recprd_buffer' (number of recs) */
+    size_t buffer_max_recs;
+    /* step size to take to get to buffer_max_recs (num recs) */
+    size_t buffer_chunk_recs;
+    /* how quickly to grow to 'buffer_max_recs' */
+    size_t num_chunks;
+    /* current positon in the current 'record_buffer' */
+    rwRec *cur_rec;
+    /* next positon in the current 'record_buffer' */
+    rwRec *next_rec;
+    /* number of records currently in memory */
+    size_t record_count;
+    /* pointer to record held by stream */
+    ssize_t in_rv;
     ssize_t rv;
 
     /* Determine the maximum number of records that will fit into the
@@ -629,7 +620,7 @@ sortRandom(
                    "\nbuffer_chunk_recs = %" SK_PRIuZ),
                   num_chunks, buffer_chunk_recs));
 
-        record_buffer = (uint8_t*)malloc(NODE_SIZE * buffer_chunk_recs);
+        record_buffer = (rwRec *)malloc(buffer_chunk_recs * NODE_SIZE);
         if (record_buffer) {
             /* malloc was successful */
             break;
@@ -649,42 +640,19 @@ sortRandom(
     buffer_recs = buffer_chunk_recs;
     TRACEMSG((("buffer_recs = %" SK_PRIuZ), buffer_recs));
 
-    /* open first file */
-    rv = appNextInput(&input_stream);
-    if (rv < 0) {
-        free(record_buffer);
-        appExit(EXIT_FAILURE);
-    }
-
+    rwRecInitializeArray(record_buffer, NULL, buffer_recs);
+    cur_rec = record_buffer;
     record_count = 0;
-    cur_node = record_buffer;
-    while (input_stream != NULL) {
-        /* read record */
-        if ((rv = skStreamReadRecord(input_stream, (rwRec*)cur_node))
-            != SKSTREAM_OK)
-        {
-            if (rv != SKSTREAM_ERR_EOF) {
-                skStreamPrintLastErr(input_stream, rv, &skAppPrintErr);
-            }
-            /* end of file: close current and open next */
-            skStreamDestroy(&input_stream);
-            rv = appNextInput(&input_stream);
-            if (rv < 0) {
-                free(record_buffer);
-                appExit(EXIT_FAILURE);
-            }
-            continue;
-        }
 
+    while ((in_rv = sk_flow_iter_get_next_rec(flowiter, cur_rec)) == 0) {
         ++record_count;
-        cur_node += NODE_SIZE;
-
+        ++cur_rec;
         if (record_count == buffer_recs) {
             /* Filled the current buffer */
 
             /* If buffer not at max size, see if we can grow it */
             if (buffer_recs < buffer_max_recs) {
-                uint8_t *old_buf = record_buffer;
+                rwRec *old_buf = record_buffer;
 
                 /* add a chunk of records.  if we are near the max,
                  * set the size to the max */
@@ -697,12 +665,14 @@ sortRandom(
                           buffer_recs, NODE_SIZE * buffer_recs));
 
                 /* attempt to grow */
-                record_buffer = (uint8_t*)realloc(record_buffer,
-                                                  NODE_SIZE * buffer_recs);
+                record_buffer = (rwRec *)realloc(record_buffer,
+                                                 NODE_SIZE * buffer_recs);
                 if (record_buffer) {
-                    /* Success, make certain cur_node points into the
-                     * new buffer */
-                    cur_node = (record_buffer + (record_count * NODE_SIZE));
+                    /* Success, initialize new records and make
+                     * certain cur_rec points into the new buffer */
+                    cur_rec = record_buffer + record_count;
+                    rwRecInitializeArray(cur_rec, NULL,
+                                         (buffer_recs - record_count));
                 } else {
                     /* Unable to grow it */
                     TRACEMSG(("realloc() failed"));
@@ -733,9 +703,13 @@ sortRandom(
 
                 /* Reset record buffer to 'empty' */
                 record_count = 0;
-                cur_node = record_buffer;
+                cur_rec = record_buffer;
             }
         }
+    }
+    if (SKSTREAM_ERR_EOF != in_rv) {
+        free(record_buffer);
+        appExit(EXIT_FAILURE);
     }
 
     /* Sort (and maybe store) last batch of records */
@@ -758,6 +732,15 @@ sortRandom(
         }
     }
 
+    /* no more input.  add final information to header */
+    if ((rv = skHeaderAddInvocation(skStreamGetSilkHeader(out_stream),
+                                    1, argc, argv))
+        || (rv = skOptionsNotesAddToStream(out_stream)))
+    {
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+        exit(EXIT_FAILURE);
+    }
+
     /* Generate the output */
 
     if (record_count == 0 && temp_file_idx == -1) {
@@ -775,12 +758,12 @@ sortRandom(
                    " the result to '%s'"),
                   record_count, skStreamGetPathname(out_stream)));
         /* get first two records from the sorted buffer */
-        cur_node = record_buffer;
-        next_node = record_buffer + NODE_SIZE;
-        for (c = 1; c < record_count; ++c, next_node += NODE_SIZE) {
-            if (0 != rwrecCompare(cur_node, next_node)) {
+        cur_rec = record_buffer;
+        next_rec = record_buffer + 1;
+        for (c = 1; c < record_count; ++c, ++next_rec) {
+            if (0 != rwrecCompare(cur_rec, next_rec)) {
                 /* records differ. print earlier record */
-                rv = skStreamWriteRecord(out_stream, (rwRec*)cur_node);
+                rv = skStreamWriteRecord(out_stream, cur_rec);
                 if (0 != rv) {
                     skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
                     if (SKSTREAM_ERROR_IS_FATAL(rv)) {
@@ -788,12 +771,12 @@ sortRandom(
                         appExit(EXIT_FAILURE);
                     }
                 }
-                cur_node = next_node;
+                cur_rec = next_rec;
             }
             /* else records are duplicates: ignore latter record */
         }
         /* print remaining record */
-        rv = skStreamWriteRecord(out_stream, (rwRec*)cur_node);
+        rv = skStreamWriteRecord(out_stream, cur_rec);
         if (0 != rv) {
             skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
             if (SKSTREAM_ERROR_IS_FATAL(rv)) {
@@ -822,7 +805,7 @@ int main(int argc, char **argv)
 
     appSetup(argc, argv);                 /* never returns on error */
 
-    sortRandom();
+    sortRandom(argc, argv);
 
     /* close the file */
     if ((rv = skStreamClose(out_stream))

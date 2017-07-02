@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skpolldir-test.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skpolldir-test.c efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/skpolldir.h>
 #include <silk/sklog.h>
@@ -61,6 +61,7 @@ logprefix(
 int main(int argc, char **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
+    skPollDirErr_t pderr;
     const char *dirname;
     uint32_t interval = 5;
     char path[PATH_MAX];
@@ -113,15 +114,26 @@ int main(int argc, char **argv)
 
     pd = skPollDirCreate(dirname, interval);
     if (pd == NULL) {
-        skAppPrintErr("Failed to set up polling for directory %s", dirname);
+        skAppPrintErr("Failed to set up polling for directory '%s'", dirname);
+        return EXIT_FAILURE;
+    }
+    pderr = skPollDirStart(pd);
+    if (PDERR_NONE != pderr) {
+        skAppPrintErr("Failed to start polling for directory '%s': %s",
+                      skPollDirGetDir(pd), ((PDERR_SYSTEM == pderr)
+                                            ? strerror(errno)
+                                            : skPollDirStrError(pderr)));
+        skPollDirDestroy(pd);
+        pd = NULL;
         return EXIT_FAILURE;
     }
 
     printf("%s: Polling '%s' every %" PRIu32 " seconds\n",
            skAppName(), dirname, interval);
-    while (PDERR_NONE == skPollDirGetNextFile(pd, path, &file)) {
+    while (PDERR_NONE == (pderr = skPollDirGetNextFile(pd, path, &file))) {
         printf("%s\n", file);
     }
+    printf("%s: Stopping due to %s\n", skAppName(), skPollDirStrError(pderr));
 
     skPollDirDestroy(pd);
     pd = NULL;

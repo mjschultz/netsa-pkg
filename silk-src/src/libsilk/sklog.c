@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sklog.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: sklog.c 21315f05de74 2017-06-26 20:03:25Z mthomas $");
 
 #include <silk/sklog.h>
 #include <silk/skstringmap.h>
@@ -45,10 +45,6 @@ RCSIDENT("$SiLK: sklog.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 /* when using log rotation, the suffix to add to file names */
 #define SKLOG_SUFFIX ".log"
 
-/* the program to use to compress the logs after rotating, or
- * undefined to not compress the older log files */
-#define SKLOG_COMPRESSOR "gzip"
-
 /* default log level */
 #define SKLOG_DEFAULT_LEVEL    LOG_INFO
 
@@ -57,6 +53,10 @@ RCSIDENT("$SiLK: sklog.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 /* default syslog options */
 #define SKLOG_SYSOPTIONS   LOG_PID
+
+/* the name of global variable in the Lua config file that holds the
+ * table used to configure logging */
+#define SKLOG_CONFIG_FILE_VARNAME  "log"
 
 /* number of command-line/config-file options; must agree with
  * logOptions[] and other logOptions* constants. */
@@ -78,14 +78,13 @@ RCSIDENT("$SiLK: sklog.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
         va_end(_args);                          \
     }
 
-/* invoke the lock and unlock functions if they are defined */
-#define SKLOG_LOCK()                                    \
-    if ( !logctx->l_lock_fn) { /*no-op*/ }              \
-    else { logctx->l_lock_fn(logctx->l_lock_data); }
-#define SKLOG_UNLOCK()                                  \
-    if ( !logctx->l_unlock_fn) { /*no-op*/ }            \
-    else { logctx->l_unlock_fn(logctx->l_lock_data); }
-
+/* invoke the lock and unlock functions */
+#define SKLOG_LOCK()                                                    \
+    (logctx->l_lock_disabled ? 0 : pthread_mutex_lock(&logctx->l_mutex))
+#define SKLOG_TRY_LOCK()                                                \
+    (logctx->l_lock_disabled ? 0 : pthread_mutex_trylock(&logctx->l_mutex))
+#define SKLOG_UNLOCK()                                                  \
+    (logctx->l_lock_disabled ? 0 : pthread_mutex_unlock(&logctx->l_mutex))
 
 
 /* possible logging destinations */
@@ -136,7 +135,7 @@ typedef struct sklog_rotated_st {
     /* time of next scheduled log rotation */
     time_t          rolltime;
     /* user command to run on the closed log file; if NULL, compress
-     * the file using SKLOG_COMPRESSOR */
+     * the file using SK_LOG_COMPRESSOR */
     const char     *post_rotate;
     /* the directory in which to write all log files */
     char            dir[PATH_MAX];
@@ -159,12 +158,8 @@ typedef struct sklog_context_st {
     /* function to call to write a message to the log; varies
      * depending on type of log being used */
     sklog_fn_t      l_func;
-    /* functions to call to lock and unlock the log. */
-    sklog_lock_fn_t l_lock_fn;
-    sklog_lock_fn_t l_unlock_fn;
-    sklog_lock_fn_t l_trylock_fn;
-    /* data passed to the l_lock_fn() and l_unlock_fn(). */
-    void           *l_lock_data;
+    /* mutex for writing to the log */
+    pthread_mutex_t l_mutex;
     /* the command line invocation of the application */
     char           *l_cmd;
     /* which levels of messages to log */
@@ -175,6 +170,9 @@ typedef struct sklog_context_st {
     unsigned        l_open :1;
     /* whether stdout/stderr go to the log */
     unsigned        l_dup_stdout :1;
+    /* whether locking of the log file is disabled (0 == use the lock,
+     * 1 == ignore the lock) */
+    unsigned        l_lock_disabled :1;
     /* which log destination is being used */
     sklog_dest_t    l_dest;
 } sklog_context_t;
@@ -273,11 +271,21 @@ static struct option logOptions[] = {
     {0,0,0,0}           /* sentinel entry */
 };
 
+/*
+ *    Array of names for configuration-file use.  Must keep in sync
+ *    with logOptionsEnum and logOptionsIsUsed above.
+ */
+static const char *config_file_keys[] = {
+    "directory", "basename", "post_rotate", "pathname",
+    "destination", "level", "sysfacility", NULL
+};
+
 
 
 /* LOCAL FUNCTION PROTOTYPES */
 
 static void logCompress(char *file);
+static char* logFillParamName(char *buf, size_t len, logOptionsEnum e, int dd);
 static size_t logMakeStamp(char *buf, size_t buflen);
 static int logOptionsHandler(clientData cData, int opt_index, char *opt_arg);
 static void logRotatedLog(int priority, const char *fmt, va_list args);
@@ -287,6 +295,7 @@ static void logSimpleLog(int priority, const char *fmt, va_list args);
 static int logSimpleOpen(void);
 static int logStringifyCommand(int argc, char * const *argv);
 static void logSimpleVPrintf(int priority, const char *fmt, va_list args);
+static void log_unknown_key_callback(const char *key, void *v_config_file);
 static void logVSyslog(int priority, const char *fmt, va_list args);
 static void logWriteCommandLine(void);
 
@@ -393,91 +402,10 @@ DEBUGMSG(
 #endif
 
 
-int
-EMERGMSG_v(
-    const char         *fmt,
-    va_list             args)
-{
-    SKLOG_CALL_LOGGER(LOG_EMERG, fmt, args);
-    return 0;
-}
-
-
-int
-ALERTMSG_v(
-    const char         *fmt,
-    va_list             args)
-{
-    SKLOG_CALL_LOGGER(LOG_ALERT, fmt, args);
-    return 0;
-}
-
-
-int
-CRITMSG_v(
-    const char         *fmt,
-    va_list             args)
-{
-    SKLOG_CALL_LOGGER(LOG_CRIT, fmt, args);
-    return 0;
-}
-
-
-int
-ERRMSG_v(
-    const char         *fmt,
-    va_list             args)
-{
-    SKLOG_CALL_LOGGER(LOG_ERR, fmt, args);
-    return 0;
-}
-
-
-int
-WARNINGMSG_v(
-    const char         *fmt,
-    va_list             args)
-{
-    SKLOG_CALL_LOGGER(LOG_WARNING, fmt, args);
-    return 0;
-}
-
-
-int
-NOTICEMSG_v(
-    const char         *fmt,
-    va_list             args)
-{
-    SKLOG_CALL_LOGGER(LOG_NOTICE, fmt, args);
-    return 0;
-}
-
-
-int
-INFOMSG_v(
-    const char         *fmt,
-    va_list             args)
-{
-    SKLOG_CALL_LOGGER(LOG_INFO, fmt, args);
-    return 0;
-}
-
-
-int
-DEBUGMSG_v(
-    const char         *fmt,
-    va_list             args)
-{
-    SKLOG_CALL_LOGGER(LOG_DEBUG, fmt, args);
-    return 0;
-}
-
-
-
 /*
  *  logCompress(file);
  *
- *    Run the user's post-rotate command or the SKLOG_COMPRESSOR
+ *    Run the user's post-rotate command or the SK_LOG_COMPRESSOR
  *    command to compress the log file 'file'.  Will call free() on
  *    the 'file' parameter.
  */
@@ -485,157 +413,91 @@ static void
 logCompress(
     char               *file)
 {
-    pid_t pid;
-    char *expanded_cmd = NULL;
+    char name1[256];
+    long pid;
 
     if (file == NULL) {
         INFOMSG("logCompress passed NULL pointer");
         return;
     }
 
-    if (NULL != logctx->l_rot.post_rotate) {
-        size_t len;
-        size_t file_len;
-        const char *cp;
-        const char *sp;
-        char *exp_cp;
+    if (NULL == logctx->l_rot.post_rotate) {
+#ifndef SK_LOG_COMPRESSOR
+        free(file);
+        return;
+#else
+        char *command[4];
+        command[0] = (char *)SK_LOG_COMPRESSOR;
+        command[1] = (char *)"-f";
+        command[2] = file;
+        command[3] = (char *)NULL;
+        pid = skSubcommandExecute(command);
+        free(file);
+#endif  /* SK_LOG_COMPRESSOR */
 
-        /* do nothing if post-rotate command is empty string */
-        if ('\0' == logctx->l_rot.post_rotate[0]) {
-            free(file);
-            return;
-        }
+    } else if ('\0' == logctx->l_rot.post_rotate) {
+        /* do nothing when post-rotate command is empty string */
+        free(file);
+        return;
 
-        /* Determine length of buffer needed to hold the expanded
-         * command string and allocate it. */
-        cp = logctx->l_rot.post_rotate;
-        len = strlen(cp);
-        file_len = strlen(file);
-        while (NULL != (cp = strchr(cp, '%'))) {
-            ++cp;
-            switch (*cp) {
-              case '%':
-                --len;
-                break;
-              case 's':
-                len += file_len - 2;
-                break;
-              default:
-                skAbortBadCase((int)(*cp));
-            }
-            ++cp;
-        }
-        expanded_cmd = (char*)malloc(len + 1);
-        if (expanded_cmd == NULL) {
+    } else {
+        char *expanded_cmd;
+
+        logFillParamName(name1, sizeof(name1), OPT_LOG_POST_ROTATE, 1);
+
+        expanded_cmd = skSubcommandStringFill(logctx->l_rot.post_rotate,
+                                              "s", file);
+        free(file);
+        if (NULL == expanded_cmd) {
             WARNINGMSG("Unable to allocate memory to create command string");
-            free(file);
             return;
         }
-
-        /* Copy command into buffer, handling %-expansions */
-        cp = logctx->l_rot.post_rotate;
-        exp_cp = expanded_cmd;
-        while (NULL != (sp = strchr(cp, '%'))) {
-            /* copy text we just jumped over */
-            strncpy(exp_cp, cp, sp - cp);
-            exp_cp += (sp - cp);
-            /* handle conversion */
-            switch (*(sp+1)) {
-              case '%':
-                *exp_cp = '%';
-                ++exp_cp;
-                break;
-              case 's':
-                strcpy(exp_cp, file);
-                exp_cp += file_len;
-                break;
-              default:
-                skAbortBadCase((int)(*(sp+1)));
-            }
-            cp = sp + 2;
-            assert(len >= (size_t)(exp_cp - expanded_cmd));
-        }
-        strcpy(exp_cp, cp);
-        expanded_cmd[len] = '\0';
-    }
-#ifndef SKLOG_COMPRESSOR
-    else {
-        free(file);
-        return;
-    }
-#endif
-
-    /* Fork */
-    pid = fork();
-    if (pid == -1) {
-        ERRMSG("Could not fork for %s command: %s",
-               logOptions[OPT_LOG_POST_ROTATE].name, strerror(errno));
+        DEBUGMSG("Running %s: %s", name1, expanded_cmd);
+        pid = skSubcommandExecuteShell(expanded_cmd);
         free(expanded_cmd);
-        free(file);
-        return;
     }
 
-    /* Parent (original process) reaps Child 1 and returns */
-    if (pid != 0) {
-        free(expanded_cmd);
-        free(file);
-        /* Wait for Child 1 to exit. */
-        while (waitpid(pid, NULL, 0) == -1) {
-            if (EINTR != errno) {
-                NOTICEMSG("Error waiting for child %ld: %s",
-                          (long)pid, strerror(errno));
-                break;
-            }
-        }
-        return;
+    switch (pid) {
+      case -1:
+        ERRMSG("Unable to fork to run command: %s", strerror(errno));
+        break;
+      case -2:
+        NOTICEMSG("Error waiting for child: %s", strerror(errno));
+        break;
+      default:
+        assert(pid > 0);
+        break;
     }
+}
 
-    /* Change our process group, so a server program using this
-     * library that is waiting for any of its children (by process
-     * group) won't wait for this child. */
-    setpgid(0, 0);
 
-    /* Disable/Ignore locking of the log file; disable log rotation */
-    sklogSetLocking(NULL, NULL, NULL, NULL);
-    sklogDisableRotation();
+/*
+ *    Fill 'buf' (which has length 'buflen') with the name of the
+ *    configuration file parameter or switch name whose ID is 'key'
+ *    depending on whether configuration file support is available.
+ *    If 'double_dash' is non-zero and a switch is being returned,
+ *    precede the switch with "--".
+ *
+ *    Return the 'buf'.
+ */
+static char*
+logFillParamName(
+    char               *buf,
+    size_t              buflen,
+    logOptionsEnum      key,
+    int                 double_dash)
+{
+    assert(logctx);
+    assert(buf);
 
-    /* Child 1 forks to create Child 2 */
-    pid = fork();
-    if (pid == -1) {
-        ERRMSG("Child could not fork for %s command: %s",
-               logOptions[OPT_LOG_POST_ROTATE].name, strerror(errno));
-        _exit(EXIT_FAILURE);
+    if (logctx->l_features & SKLOG_FEATURE_CONFIG_FILE) {
+        snprintf(buf, buflen, "%s['%s']",
+                 SKLOG_CONFIG_FILE_VARNAME, config_file_keys[key]);
+    } else {
+        snprintf(buf, buflen, "%s%s",
+                 (double_dash ? "--" : ""), logOptions[key].name);
     }
-
-    /* Child 1 immediately exits, so Parent can stop waiting */
-    if (pid != 0) {
-        _exit(EXIT_SUCCESS);
-    }
-
-    /* Child 2 executes the compression or log-post-rotate command */
-    if (NULL != logctx->l_rot.post_rotate) {
-        DEBUGMSG("Invoking command: %s", expanded_cmd);
-
-        /* Execute the command */
-        if (execl("/bin/sh", "sh", "-c", expanded_cmd, (char*)NULL)
-            == -1)
-        {
-            ERRMSG("Error invoking /bin/sh: %s", strerror(errno));
-            _exit(EXIT_FAILURE);
-        }
-    }
-#ifdef SKLOG_COMPRESSOR
-    else if (execlp(SKLOG_COMPRESSOR, SKLOG_COMPRESSOR, "-f", file,(char*)NULL)
-             == -1)
-    {
-        ERRMSG("Error invoking '%s': %s",
-               SKLOG_COMPRESSOR, strerror(errno));
-        _exit(EXIT_FAILURE);
-    }
-#endif /* SKLOG_COMPRESSOR */
-
-    /* Should never get here. */
-    skAbort();
+    return buf;
 }
 
 
@@ -683,7 +545,11 @@ logOptionsHandler(
     assert(ctx);
     assert(opt_index < (int)(sizeof(ctx->l_opt_values)/sizeof(char*)));
 
-    ctx->l_opt_values[opt_index] = opt_arg;
+    ctx->l_opt_values[opt_index] = strdup(opt_arg);
+    if (NULL == ctx->l_opt_values[opt_index]) {
+        skAppPrintOutOfMemory(NULL);
+        return -1;
+    }
     return 0;
 }
 
@@ -700,8 +566,9 @@ logOptionsSetup(
     unsigned int opt_count = 0;
     unsigned int i;
 
-    assert(NUM_OPTIONS == (sizeof(logOptions)/sizeof(struct option) - 1));
     assert(NUM_OPTIONS == (sizeof(logOptionsIsUsed)/sizeof(int)));
+    assert(NUM_OPTIONS + 1 == sizeof(logOptions)/sizeof(struct option));
+    assert(NUM_OPTIONS + 1 == sizeof(config_file_keys)/sizeof(char*));
 
     /* loop through the options, copying those that the caller needs
      * into 'options_used'.  'opt_count' is the number of 'struct
@@ -733,6 +600,11 @@ logOptionsSetup(
 
 /*
  *  logRotatedLog(priority, fmt, args);
+ *
+ *    Write a log message to a file that may need to be rotated.
+ *
+ *    The logctx->l_func is set to this function when log rotation is
+ *    enabled.
  *
  *    Lock the mutex for the log.  If the rollover-time for the log
  *    has passed call logRotatedOpen() to open a new log file.  Use
@@ -911,6 +783,12 @@ logSimpleClose(
 /*
  *  logSimpleLog(priority, fmt, args);
  *
+ *    Write a log message to a file that does not get rotated.
+ *
+ *    The logctx->l_func is set to this function when log messages are
+ *    written to a single file, to standard output, or to standard
+ *    error.
+ *
  *    Lock the mutex for the log and call logSimpleVPrintf() to print
  *    a message to the log.
  */
@@ -1067,9 +945,40 @@ logStringifyCommand(
 }
 
 
+/*
+ *  log_unknown_key_callback(key, v_config_file);
+ *
+ *    Print a warning about the unrecognized key 'key' in the 'log'
+ *    table in the Lua configuration file.  The file name is specified
+ *    in the 'v_config_file' parameter.
+ */
+static void
+log_unknown_key_callback(
+    const char         *key,
+    void               *v_config_file)
+{
+    const char *config_file = (const char*)v_config_file;
+
+    if (key) {
+        skAppPrintErr("Warning for configuration '%s':"
+                      " Unexpected key '%s' found in table '%s'",
+                      config_file, key, SKLOG_CONFIG_FILE_VARNAME);
+    } else {
+        skAppPrintErr("Warning for configuration '%s':"
+                      " Non-alphanumeric key found in table '%s'",
+                      config_file, SKLOG_CONFIG_FILE_VARNAME);
+    }
+}
+
+
 SK_DIAGNOSTIC_FORMAT_NONLITERAL_PUSH
 /*
  *  logVSyslog(priority, fmt, args);
+ *
+ *    Write a log message to syslog.
+ *
+ *    The logctx->l_func is set to this function when writing to
+ *    syslog and the OS does not provide vsyslog().
  *
  *    Create a message using the format 'fmt' and variable list
  *    'args', then write that message to syslog() with the specified
@@ -1141,16 +1050,12 @@ sklogNonBlock(
           case SKLOG_DEST_STDOUT:
           case SKLOG_DEST_STDERR:
           case SKLOG_DEST_DIRECTORY:
-            if (logctx->l_trylock_fn) {
-                if (0 != logctx->l_trylock_fn(logctx->l_lock_data)) {
-                    /* cannot get lock */
-                    break;
-                }
+            if (0 != SKLOG_TRY_LOCK()) {
+                /* cannot get lock */
+                break;
             }
             logSimpleVPrintf(priority, fmt, args);
-            if (logctx->l_unlock_fn) {
-                logctx->l_unlock_fn(logctx->l_lock_data);
-            }
+            SKLOG_UNLOCK();
             break;
 
           case SKLOG_DEST_BOTH:
@@ -1217,6 +1122,16 @@ sklogCommandLine(
     }
 
     return;
+}
+
+
+void
+sklogDisableLocking(
+    void)
+{
+    if (logctx) {
+        logctx->l_lock_disabled = 1;
+    }
 }
 
 
@@ -1393,16 +1308,19 @@ void
 sklogOptionsUsage(
     FILE               *fp)
 {
-#ifdef SKLOG_COMPRESSOR
-    const char *post_rotate = SKLOG_COMPRESSOR " -f %s";
+#ifdef SK_LOG_COMPRESSOR
+    const char *post_rotate = SK_LOG_COMPRESSOR " -f %s";
 #else
-    const char *post_rotate = "\"\"";
+    const char *post_rotate = "";
 #endif
     int i, j;
     int features = INT32_MAX;
 
     if (logctx) {
         features = logctx->l_features;
+        if (features & SKLOG_FEATURE_CONFIG_FILE) {
+            return;
+        }
     }
 
     for (i = 0; logOptions[i].name; ++i) {
@@ -1429,11 +1347,12 @@ sklogOptionsUsage(
 
           case OPT_LOG_POST_ROTATE:
             fprintf(fp,
-                    ("Run this command on the previous day's log file after\n"
-                     "\tlog rotatation. Def. '%s'. Each \"%%s\" in the"
-                     " command is replaced\n"
-                     "\tby the file's complete path."
-                     " Empty string denotes no action"),
+                    ("Run this command on the previous day's log file\n"
+                     "\tafter log rotatation."
+                     " Each \"%%s\" in the command is replaced by the\n"
+                     "\tfile's complete path."
+                     " When set to the empty string, no action is\n"
+                     "\ttaken. Def. '%s'"),
                     post_rotate);
             break;
 
@@ -1498,8 +1417,12 @@ int
 sklogOptionsVerify(
     void)
 {
+    char name1[256];
+    char name2[256];
+    char name3[256];
     int dest_count = 0;
     int err_count = 0;
+    size_t i;
 
     if (!logctx) {
         skAppPrintErr("Must setup the log before verifying");
@@ -1523,31 +1446,35 @@ sklogOptionsVerify(
         if ((logctx->l_features & (SKLOG_FEATURE_LEGACY|SKLOG_FEATURE_SYSLOG))
             == (SKLOG_FEATURE_LEGACY|SKLOG_FEATURE_SYSLOG))
         {
-            skAppPrintErr("One of --%s, --%s, or --%s is required",
-                          logOptions[OPT_LOG_DIRECTORY].name,
-                          logOptions[OPT_LOG_PATHNAME].name,
-                          logOptions[OPT_LOG_DESTINATION].name);
+            logFillParamName(name1, sizeof(name1), OPT_LOG_DIRECTORY, 1);
+            logFillParamName(name2, sizeof(name2), OPT_LOG_PATHNAME, 1);
+            logFillParamName(name3, sizeof(name3), OPT_LOG_DESTINATION, 1);
+            skAppPrintErr("One of %s, %s, or %s is required",
+                          name1, name2, name3);
         } else if (logctx->l_features & SKLOG_FEATURE_LEGACY) {
-            skAppPrintErr("Either --%s or --%s is required",
-                          logOptions[OPT_LOG_DIRECTORY].name,
-                          logOptions[OPT_LOG_PATHNAME].name);
+            logFillParamName(name1, sizeof(name1), OPT_LOG_DIRECTORY, 1);
+            logFillParamName(name2, sizeof(name2), OPT_LOG_PATHNAME, 1);
+            skAppPrintErr("Either %s or %s is required",
+                          name1, name2);
         } else if (logctx->l_features & SKLOG_FEATURE_SYSLOG) {
-            skAppPrintErr("The --%s switch is required",
-                          logOptions[OPT_LOG_DESTINATION].name);
+            logFillParamName(name1, sizeof(name1), OPT_LOG_DESTINATION, 1);
+            skAppPrintErr("Must provide a value for %s", name1);
         }
     } else if (dest_count > 1) {
         ++err_count;
         if ((logctx->l_features & (SKLOG_FEATURE_LEGACY|SKLOG_FEATURE_SYSLOG))
             == (SKLOG_FEATURE_LEGACY|SKLOG_FEATURE_SYSLOG))
         {
-            skAppPrintErr("Only one of --%s, --%s, or --%s may be specified",
-                          logOptions[OPT_LOG_DIRECTORY].name,
-                          logOptions[OPT_LOG_PATHNAME].name,
-                          logOptions[OPT_LOG_DESTINATION].name);
+            logFillParamName(name1, sizeof(name1), OPT_LOG_DIRECTORY, 1);
+            logFillParamName(name2, sizeof(name2), OPT_LOG_PATHNAME, 1);
+            logFillParamName(name3, sizeof(name3), OPT_LOG_DESTINATION, 1);
+            skAppPrintErr("Only one of %s, %s, or %s may be specified",
+                          name1, name2, name3);
         } else if (logctx->l_features & SKLOG_FEATURE_LEGACY) {
-            skAppPrintErr("Only one of --%s or --%s may be specified",
-                          logOptions[OPT_LOG_DIRECTORY].name,
-                          logOptions[OPT_LOG_PATHNAME].name);
+            logFillParamName(name1, sizeof(name1), OPT_LOG_DIRECTORY, 1);
+            logFillParamName(name2, sizeof(name2), OPT_LOG_PATHNAME, 1);
+            skAppPrintErr("Only one of %s or %s may be specified",
+                          name1, name2);
         } else {
             skAbort();
         }
@@ -1557,17 +1484,19 @@ sklogOptionsVerify(
         && !logctx->l_opt_values[OPT_LOG_DIRECTORY])
     {
         ++err_count;
-        skAppPrintErr("May only use --%s when --%s is specified",
-                      logOptions[OPT_LOG_BASENAME].name,
-                      logOptions[OPT_LOG_DIRECTORY].name);
+        logFillParamName(name1, sizeof(name1), OPT_LOG_BASENAME, 1);
+        logFillParamName(name2, sizeof(name2), OPT_LOG_DIRECTORY, 1);
+        skAppPrintErr("May only use %s when %s is specified",
+                      name1, name2);
     }
     if (logctx->l_opt_values[OPT_LOG_POST_ROTATE]
         && !logctx->l_opt_values[OPT_LOG_DIRECTORY])
     {
         ++err_count;
-        skAppPrintErr("May only use --%s when --%s is specified",
-                      logOptions[OPT_LOG_POST_ROTATE].name,
-                      logOptions[OPT_LOG_DIRECTORY].name);
+        logFillParamName(name1, sizeof(name1), OPT_LOG_POST_ROTATE, 1);
+        logFillParamName(name2, sizeof(name2), OPT_LOG_DIRECTORY, 1);
+        skAppPrintErr("May only use %s when %s is specified",
+                      name1, name2);
     }
 
     if (logctx->l_opt_values[OPT_LOG_DIRECTORY]) {
@@ -1587,10 +1516,10 @@ sklogOptionsVerify(
     if (logctx->l_opt_values[OPT_LOG_PATHNAME]) {
         if (logctx->l_opt_values[OPT_LOG_PATHNAME][0] != '/') {
             ++err_count;
+            logFillParamName(name1, sizeof(name1), OPT_LOG_PATHNAME, 0);
             skAppPrintErr(("Invalid %s '%s': A complete path is required"
                            " and value does not begin with a slash"),
-                          logOptions[OPT_LOG_PATHNAME].name,
-                          logctx->l_opt_values[OPT_LOG_PATHNAME]);
+                          name1, logctx->l_opt_values[OPT_LOG_PATHNAME]);
         } else if (sklogSetDestination(logctx->l_opt_values[OPT_LOG_PATHNAME]))
         {
             ++err_count;
@@ -1614,10 +1543,106 @@ sklogOptionsVerify(
         }
     }
 
+    /* no more need for the arguments to the options */
+    for (i = 0; i < NUM_OPTIONS; ++i) {
+        if (logctx->l_opt_values[i]) {
+            free((void*)logctx->l_opt_values[i]);
+            logctx->l_opt_values[i] = NULL;
+        }
+    }
+
     if (err_count) {
         return -1;
     }
     return 0;
+}
+
+
+/* Set logging parameters from the configuration file */
+int
+sklogParseConfigFile(
+    lua_State          *L,
+    const char         *config_file)
+{
+    const char table[] = SKLOG_CONFIG_FILE_VARNAME;
+    const char *key;
+    const char *value;
+    size_t error_count = 0;
+    size_t i;
+    int t;
+    int retval = -1;
+
+    /* table is in the stack at index 't' */
+    lua_getglobal(L, table);
+    t = lua_gettop(L);
+
+    /* does it exist and is it a table? */
+    if (lua_isnil(L, t)) {
+        skAppPrintErr("Error in configuration '%s':"
+                      " Required variable %s was not specified",
+                      config_file, table);
+        goto END;
+    }
+    if (!lua_istable(L, t)) {
+        skAppPrintErr("Error in configuration '%s':"
+                      " Variable '%s' is not a table",
+                      config_file, table);
+        goto END;
+    }
+
+    /* check table for unrecognized keys */
+    sk_lua_check_table_unknown_keys(
+        L, t, -1, config_file_keys,
+        log_unknown_key_callback, (void*)config_file);
+
+    for (i = 0; config_file_keys[i]; ++i) {
+        key = config_file_keys[i];
+        lua_getfield(L, t, key);
+        if (!lua_isstring(L, -1)) {
+            if (!lua_isnil(L, -1)) {
+                skAppPrintErr(("Error in configuration '%s':"
+                               " %s['%s'] is a %s; %s expected"),
+                              config_file, table, key,
+                              lua_typename(L, lua_type(L, -1)),
+                              lua_typename(L, LUA_TSTRING));
+                ++error_count;
+            }
+            lua_pop(L, 1);
+            continue;
+        }
+        if (!(logctx->l_features & logOptionsIsUsed[i])) {
+            skAppPrintErr("Warning in configuration '%s': %s['%s'] is ignored",
+                          config_file, table, key);
+            lua_pop(L, 1);
+            continue;
+        }
+        value = lua_tostring(L, -1);
+        if ('\0' == value[0]) {
+            skAppPrintErr(("Error in configuration '%s':"
+                           " %s['%s'] is the empty string"),
+                          config_file, table, key);
+            ++error_count;
+        } else {
+            logctx->l_opt_values[i] = strdup(value);
+            if (NULL == logctx->l_opt_values[i]) {
+                skAppPrintOutOfMemory(NULL);
+                lua_pop(L, 1);
+                goto END;
+            }
+        }
+        lua_pop(L, 1);
+    }
+
+    if (0 == error_count) {
+        retval = 0;
+    }
+
+  END:
+    /* table should be only thing on the stack at this point */
+    assert(lua_gettop(L) == t);
+    /* pop the table */
+    lua_pop(L, 1);
+    return retval;
 }
 
 
@@ -1700,11 +1725,23 @@ sklogRedirectStandardStreams(
     return rv;
 }
 
+
+void
+sklogReenableLocking(
+    void)
+{
+    if (logctx) {
+        logctx->l_lock_disabled = 0;
+    }
+}
+
+
 /* set the destination */
 int
 sklogSetDestination(
     const char         *destination)
 {
+    char name1[256];
     sk_stringmap_t *str_map = NULL;
     sk_stringmap_status_t rv_map;
     sk_stringmap_entry_t *map_entry;
@@ -1714,8 +1751,11 @@ sklogSetDestination(
         skAppPrintErr("Must setup the log before setting the destination");
         return -1;
     }
+
+    logFillParamName(name1, sizeof(name1), OPT_LOG_DESTINATION, 0);
+
     if (logctx->l_open) {
-        skAppPrintErr("Cannot set destination after opening log");
+        skAppPrintErr("Cannot set %s after opening log", name1);
         return -1;
     }
 
@@ -1725,13 +1765,13 @@ sklogSetDestination(
         if (skDirExists(destination)) {
             skAppPrintErr(("Invalid %s '%s':"
                            " Value must name a file, not a directory"),
-                          logOptions[OPT_LOG_DESTINATION].name, destination);
+                          name1, destination);
             return -1;
         }
         strncpy(logctx->l_sim.path, destination, sizeof(logctx->l_sim.path));
         if ('\0' != logctx->l_sim.path[sizeof(logctx->l_sim.path)-1]) {
             skAppPrintErr("Invalid %s: The path is too long",
-                          logOptions[OPT_LOG_DESTINATION].name);
+                          name1);
             return -1;
         }
         return 0;
@@ -1757,20 +1797,19 @@ sklogSetDestination(
 
       case SKSTRINGMAP_PARSE_AMBIGUOUS:
         skAppPrintErr("Invalid %s '%s': Value is ambiguous",
-                      logOptions[OPT_LOG_DESTINATION].name, destination);
+                      name1, destination);
         goto END;
 
       case SKSTRINGMAP_PARSE_NO_MATCH:
         skAppPrintErr(("Invalid %s '%s': Value is not a complete path and"
                        " does not match known keys"),
-                      logOptions[OPT_LOG_DESTINATION].name, destination);
+                      name1, destination);
         goto END;
 
       default:
         skAppPrintErr(("Invalid %s '%s':"
-                       "Unexpected return value from string-map parser (%d)"),
-                      logOptions[OPT_LOG_DESTINATION].name, destination,
-                      rv_map);
+                       " Unexpected return value from string-map parser (%d)"),
+                      name1, destination, rv_map);
         goto END;
     }
 
@@ -1794,12 +1833,17 @@ sklogSetDirectory(
     const char         *dir_name,
     const char         *base_name)
 {
+    char name1[256];
+
     if (!logctx) {
         skAppPrintErr("Must setup the log before setting the directory");
         return -1;
     }
+
+    logFillParamName(name1, sizeof(name1), OPT_LOG_DIRECTORY, 0);
+
     if (logctx->l_open) {
-        skAppPrintErr("Cannot set directory after opening log.");
+        skAppPrintErr("Cannot set %s after opening log.", name1);
         return -1;
     }
 
@@ -1807,13 +1851,14 @@ sklogSetDirectory(
     if (base_name == NULL || base_name[0] == '\0') {
         base_name = skAppName();
     } else if (strchr(base_name, '/')) {
+        logFillParamName(name1, sizeof(name1), OPT_LOG_BASENAME, 0);
         skAppPrintErr("Invalid %s '%s': Value may not contain '/'",
-                      logOptions[OPT_LOG_BASENAME].name, base_name);
+                      name1, base_name);
         return -1;
     }
 
     /* verify directory name */
-    if (skOptionsCheckDirectory(dir_name, logOptions[OPT_LOG_DIRECTORY].name)){
+    if (skOptionsCheckDirectory(dir_name, name1)) {
         return -1;
     }
 
@@ -1821,15 +1866,16 @@ sklogSetDirectory(
     strncpy(logctx->l_rot.dir, dir_name, sizeof(logctx->l_rot.dir));
     if ('\0' != logctx->l_rot.dir[sizeof(logctx->l_rot.dir)-1]) {
         skAppPrintErr("Invalid %s '%s': Value is too long",
-                      logOptions[OPT_LOG_DIRECTORY].name, dir_name);
+                      name1, dir_name);
         return -1;
     }
 
     /* copy base name */
     strncpy(logctx->l_rot.basename, base_name, sizeof(logctx->l_rot.basename));
     if ('\0' != logctx->l_rot.basename[sizeof(logctx->l_rot.basename)-1]) {
+        logFillParamName(name1, sizeof(name1), OPT_LOG_BASENAME, 0);
         skAppPrintErr("Invalid %s '%s': Value is too long",
-                      logOptions[OPT_LOG_BASENAME].name, base_name);
+                      name1, base_name);
         return -1;
     }
 
@@ -1843,12 +1889,18 @@ int
 sklogSetFacility(
     int                 facility)
 {
+    char name1[256];
+    char name2[256];
+
     if (!logctx) {
         skAppPrintErr("Must setup the log before setting the facility");
         return -1;
     }
+
+    logFillParamName(name1, sizeof(name1), OPT_LOG_SYSFACILITY, 0);
+
     if (logctx->l_open) {
-        skAppPrintErr("Cannot set facility after opening log.");
+        skAppPrintErr("Cannot set %s after opening log.", name1);
         return -1;
     }
 
@@ -1859,8 +1911,9 @@ sklogSetFacility(
         return 0;
     }
 
-    skAppPrintErr("Cannot set facility unless %s is 'syslog' or 'both'",
-                  logOptions[OPT_LOG_DESTINATION].name);
+    logFillParamName(name2, sizeof(name2), OPT_LOG_DESTINATION, 0);
+    skAppPrintErr("Cannot set %s unless %s is 'syslog' or 'both'",
+                  name1, name2);
     return -1;
 }
 
@@ -1870,6 +1923,7 @@ int
 sklogSetFacilityByName(
     const char         *name_or_number)
 {
+    char name1[256];
     sk_stringmap_t *str_map = NULL;
     sk_stringmap_status_t rv_map;
     sk_stringmap_entry_t *found_entry;
@@ -1880,6 +1934,8 @@ sklogSetFacilityByName(
         skAppPrintErr("Must setup the log before setting the facility");
         return -1;
     }
+
+    logFillParamName(name1, sizeof(name1), OPT_LOG_SYSFACILITY, 0);
 
     /* try to parse the facility as a number */
     rv = skStringParseUint32(&facility, name_or_number, 0, INT32_MAX);
@@ -1893,8 +1949,7 @@ sklogSetFacilityByName(
      * indicates an error */
     if (rv != SKUTILS_ERR_BAD_CHAR) {
         skAppPrintErr("Invalid %s '%s': %s",
-                      logOptions[OPT_LOG_SYSFACILITY].name, name_or_number,
-                      skStringParseStrerror(rv));
+                      name1, name_or_number, skStringParseStrerror(rv));
         return -1;
     }
 
@@ -1919,19 +1974,18 @@ sklogSetFacilityByName(
 
       case SKSTRINGMAP_PARSE_AMBIGUOUS:
         skAppPrintErr("Invalid %s '%s': Value is ambiguous",
-                      logOptions[OPT_LOG_SYSFACILITY].name, name_or_number);
+                      name1, name_or_number);
         break;
 
       case SKSTRINGMAP_PARSE_NO_MATCH:
         skAppPrintErr("Invalid %s '%s': Value is not recognized",
-                      logOptions[OPT_LOG_SYSFACILITY].name, name_or_number);
+                      name1, name_or_number);
         break;
 
       default:
         skAppPrintErr(("Invalid %s '%s':"
                        " Unexpected return value from string-map parser (%d)"),
-                      logOptions[OPT_LOG_SYSFACILITY].name, name_or_number,
-                      rv_map);
+                      name1, name_or_number, rv_map);
         break;
     }
 
@@ -1948,6 +2002,7 @@ int
 sklogSetLevel(
     const char         *level)
 {
+    char name1[256];
     sk_stringmap_t *str_map = NULL;
     sk_stringmap_status_t rv_map;
     sk_stringmap_entry_t *found_entry;
@@ -1957,6 +2012,8 @@ sklogSetLevel(
         skAppPrintErr("Must setup the log before setting the level");
         return -1;
     }
+
+    logFillParamName(name1, sizeof(name1), OPT_LOG_LEVEL, 0);
 
     /* create a stringmap of the available levels */
     if (SKSTRINGMAP_OK != skStringMapCreate(&str_map)) {
@@ -1977,18 +2034,18 @@ sklogSetLevel(
 
       case SKSTRINGMAP_PARSE_AMBIGUOUS:
         skAppPrintErr("Invalid %s '%s': Value is ambiguous",
-                      logOptions[OPT_LOG_LEVEL].name, level);
+                      name1, level);
         break;
 
       case SKSTRINGMAP_PARSE_NO_MATCH:
         skAppPrintErr("Invalid %s '%s': Value is not recognized",
-                      logOptions[OPT_LOG_LEVEL].name, level);
+                      name1, level);
         break;
 
       default:
         skAppPrintErr(("Invalid %s '%s':"
                        " Unexpected return value from string-map parser (%d)"),
-                      logOptions[OPT_LOG_LEVEL].name, level, rv_map);
+                      name1, level, rv_map);
         break;
     }
 
@@ -1997,26 +2054,6 @@ sklogSetLevel(
         skStringMapDestroy(str_map);
     }
     return rv;
-}
-
-
-/* set lock and unlock functions */
-int
-sklogSetLocking(
-    sklog_lock_fn_t     locker,
-    sklog_lock_fn_t     unlocker,
-    sklog_lock_fn_t     try_locker,
-    void               *data)
-{
-    if (!logctx) {
-        skAppPrintErr("Must setup the log before setting lock functions");
-        return -1;
-    }
-    logctx->l_lock_fn = locker;
-    logctx->l_unlock_fn = unlocker;
-    logctx->l_trylock_fn = try_locker;
-    logctx->l_lock_data = data;
-    return 0;
 }
 
 
@@ -2057,12 +2094,16 @@ int
 sklogSetPostRotateCommand(
     const char         *command)
 {
-    const char *cp;
+    char name1[256];
+    size_t pos;
 
     if (!logctx) {
         skAppPrintErr("Must setup the log before setting post-rotate command");
         return -1;
     }
+
+    logFillParamName(name1, sizeof(name1), OPT_LOG_POST_ROTATE, 0);
+
     if (logctx->l_dest != SKLOG_DEST_DIRECTORY) {
         skAppPrintErr("Post-rotate command is ignored unless"
                       " log-rotation is used");
@@ -2077,31 +2118,24 @@ sklogSetPostRotateCommand(
         return 0;
     }
 
-    cp = command;
-    while (NULL != (cp = strchr(cp, '%'))) {
-        ++cp;
-        switch (*cp) {
-          case '%':
-          case 's':
-            ++cp;
-            break;
-          case '\0':
+    pos = skSubcommandStringCheck(command, "s");
+    if (pos) {
+        if ('\0' == command[pos]) {
             skAppPrintErr(("Invalid %s command '%s':"
                            " '%%' appears at end of string"),
-                          logOptions[OPT_LOG_POST_ROTATE].name, command);
-            return -1;
-          default:
+                          name1, command);
+        } else {
             skAppPrintErr(("Invalid %s command '%s':"
                            " Unknown conversion '%%%c'"),
-                          logOptions[OPT_LOG_POST_ROTATE].name, command, *cp);
-            return -1;
+                          name1, command, command[pos]);
         }
+        return -1;
     }
 
     logctx->l_rot.post_rotate = strdup(command);
     if (NULL == logctx->l_rot.post_rotate) {
         skAppPrintErr("Unable to allocate space for %s command",
-                      logOptions[OPT_LOG_POST_ROTATE].name);
+                      name1);
         return -1;
     }
 
@@ -2152,6 +2186,7 @@ sklogSetup(
     logctx->l_sys.options = SKLOG_SYSOPTIONS;
     logctx->l_sys.facility = SKLOG_SYSFACILITY;
     logctx->l_features = feature_flags;
+    pthread_mutex_init(&logctx->l_mutex, NULL);
 
     if (logOptionsSetup(feature_flags)) {
         return -1;
@@ -2166,6 +2201,8 @@ void
 sklogTeardown(
     void)
 {
+    size_t i;
+
     if (logctx == NULL) {
         /* either never set up or already shut down */
         return;
@@ -2179,8 +2216,94 @@ sklogTeardown(
     if (logctx->l_rot.post_rotate) {
         free((char*)logctx->l_rot.post_rotate);
     }
+    for (i = 0; i < NUM_OPTIONS; ++i) {
+        if (logctx->l_opt_values[i]) {
+            free((void*)logctx->l_opt_values[i]);
+        }
+    }
+
     memset(logctx, 0, sizeof(sklog_context_t));
     logctx = NULL;
+}
+
+
+int
+EMERGMSG_v(
+    const char         *fmt,
+    va_list             args)
+{
+    SKLOG_CALL_LOGGER(LOG_EMERG, fmt, args);
+    return 0;
+}
+
+
+int
+ALERTMSG_v(
+    const char         *fmt,
+    va_list             args)
+{
+    SKLOG_CALL_LOGGER(LOG_ALERT, fmt, args);
+    return 0;
+}
+
+
+int
+CRITMSG_v(
+    const char         *fmt,
+    va_list             args)
+{
+    SKLOG_CALL_LOGGER(LOG_CRIT, fmt, args);
+    return 0;
+}
+
+
+int
+ERRMSG_v(
+    const char         *fmt,
+    va_list             args)
+{
+    SKLOG_CALL_LOGGER(LOG_ERR, fmt, args);
+    return 0;
+}
+
+
+int
+WARNINGMSG_v(
+    const char         *fmt,
+    va_list             args)
+{
+    SKLOG_CALL_LOGGER(LOG_WARNING, fmt, args);
+    return 0;
+}
+
+
+int
+NOTICEMSG_v(
+    const char         *fmt,
+    va_list             args)
+{
+    SKLOG_CALL_LOGGER(LOG_NOTICE, fmt, args);
+    return 0;
+}
+
+
+int
+INFOMSG_v(
+    const char         *fmt,
+    va_list             args)
+{
+    SKLOG_CALL_LOGGER(LOG_INFO, fmt, args);
+    return 0;
+}
+
+
+int
+DEBUGMSG_v(
+    const char         *fmt,
+    va_list             args)
+{
+    SKLOG_CALL_LOGGER(LOG_DEBUG, fmt, args);
+    return 0;
 }
 
 

@@ -1,5 +1,5 @@
 #! /usr/bin/perl -w
-# MD5: 3419420e6c3041b892f59c26c02a67a1
+# MD5: 4730da640d37a6faf8103b21c5739d8c
 # TEST: ../rwfilter/rwfilter --type=in,inweb --pass=stdout ../../tests/data-v6.rwf | ../rwsort/rwsort --pmap-file=service-port:../../tests/proto-port-map.pmap --pmap-file=../../tests/ip-map-v6.pmap --fields=src-service-host,src-service-port | ./rwgroup --pmap-file=service-port:../../tests/proto-port-map.pmap --pmap-file=../../tests/ip-map-v6.pmap --id-fields=src-service-host,src-service-port | ../rwcat/rwcat --compression-method=none --byte-order=little
 
 use strict;
@@ -15,6 +15,6 @@ $file{v6_ip_map} = get_data_or_exit77('v6_ip_map');
 $file{proto_port_map} = get_data_or_exit77('proto_port_map');
 check_features(qw(ipv6));
 my $cmd = "$rwfilter --type=in,inweb --pass=stdout $file{v6data} | $rwsort --pmap-file=service-port:$file{proto_port_map} --pmap-file=$file{v6_ip_map} --fields=src-service-host,src-service-port | $rwgroup --pmap-file=service-port:$file{proto_port_map} --pmap-file=$file{v6_ip_map} --id-fields=src-service-host,src-service-port | $rwcat --compression-method=none --byte-order=little";
-my $md5 = "3419420e6c3041b892f59c26c02a67a1";
+my $md5 = "4730da640d37a6faf8103b21c5739d8c";
 
 check_md5_output($md5, $cmd);

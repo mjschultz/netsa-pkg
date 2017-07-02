@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKTIMER_H, "$SiLK: sktimer.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_SKTIMER_H, "$SiLK: sktimer.h efd886457770 2017-06-21 18:43:23Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -30,7 +30,7 @@ RCSIDENTVAR(rcsID_SKTIMER_H, "$SiLK: sktimer.h 275df62a2e41 2017-01-05 17:30:40Z
  *
  *    Implemention of a timer.
  *
- *    This file is part of libsilk-thrd.
+ *    This file is part of libsilk.
  *
  *    Each timer runs in a separate thread.  The timer invokes the
  *    specified callback functions after a given amount of time unless
@@ -64,42 +64,32 @@ typedef skTimerRepeat_t (*skTimerFn_t)(
  *    The type of timer handles.
  */
 typedef struct sk_timer_st *skTimer_t;
-
-
-/**
- *    Creates a timer.  The timer starts at time 'start'.  After the
- *    number of seconds determined by the parameter 'secs' has passed,
- *    the callback function 'call_back' will be executed with
- *    'client_data' passed as an argument to it.
- *
- *    Based on the return value of the callback, the timer will repeat
- *    or stop.  The timer handle is passed back as the 'timer' value.
- *    Returns zero on success, non-zero on failure.
- */
-int
-skTimerCreateAtTime(
-    skTimer_t          *timer,
-    uint32_t            secs,
-    sktime_t            start,
-    skTimerFn_t         callback,
-    void               *client_data);
+typedef struct sk_timer_st sk_timer_t;
 
 /**
- *    Creates a timer.  The timer starts immediately after creation.
- *    After the number of seconds determined by the parameter 'secs'
- *    has passed, the callback function 'call_back' will be executed
- *    with 'client_data' passed as an argument to it.
+ *    Create a timer.  The timer handle is stored in the location
+ *    referenced by 'timer'.  Return zero on success, non-zero on
+ *    failure.
+ *
+ *    If 'start' is 0, the timer starts immediately after creation;
+ *    otherwise, the timer starts at time 'start'.
+ *
+ *    After the number of seconds determined by the parameter
+ *    'interval' has passed, the callback function 'call_back' will be
+ *    executed with 'client_data' passed as an argument to it.
  *
  *    Based on the return value of the callback, the timer will repeat
- *    or stop.  The timer handle is passed back as the 'timer' value.
- *    Returns zero on success, non-zero on failure.
+ *    (when the callback returns SK_TIMER_REPEAT) or stop (when the
+ *    callback returns SK_TIMER_END).
+ *
  */
 int
 skTimerCreate(
-    skTimer_t          *timer,
-    uint32_t            secs,
+    sk_timer_t        **timer,
+    uint32_t            interval,
     skTimerFn_t         callback,
-    void               *client_data);
+    void               *client_data,
+    sktime_t            start);
 
 
 /**
@@ -108,7 +98,7 @@ skTimerCreate(
  */
 int
 skTimerDestroy(
-    skTimer_t           timer);
+    sk_timer_t         *timer);
 
 #ifdef __cplusplus
 }
