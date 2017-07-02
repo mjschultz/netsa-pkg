@@ -4,14 +4,14 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: configure.ac e4c6d3d38708 2017-03-24 22:01:06Z mthomas $")
+dnl RCSIDENT("$SiLK: configure.ac 0d61d1fd9e1f 2017-06-29 17:05:33Z mthomas $")
 
 AC_PREREQ(2.64)
-AC_INIT([SiLK],[3.15.0],[netsa-help@cert.org],[silk],[http://tools.netsa.cert.org/silk/])
+AC_INIT([SiLK],[3.16.0],[netsa-help@cert.org],[silk],[http://tools.netsa.cert.org/silk/])
 AC_COPYRIGHT([Copyright (C) 2001-2017 by Carnegie Mellon University
 GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
 Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013])
-AC_REVISION($SiLK: configure.ac e4c6d3d38708 2017-03-24 22:01:06Z mthomas $)
+AC_REVISION($SiLK: configure.ac 0d61d1fd9e1f 2017-06-29 17:05:33Z mthomas $)
 AC_CONFIG_SRCDIR([src/libsilk/silk.h])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_CONFIG_MACRO_DIR([m4])
@@ -113,7 +113,6 @@ dnl AC_CHECK_PROGS(AR,ar)
 dnl AC_CHECK_PROGS(BZIP,bzip2)
 dnl AC_CHECK_PROGS(CP,cp)
 dnl AC_CHECK_PROGS(FIND,find)
-dnl AC_CHECK_PROGS(GZIP,gzip)
 dnl AC_CHECK_PROGS(LDCONFIG,ldconfig)
 dnl AC_CHECK_PROGS(LN,ln)
 dnl AC_CHECK_PROGS(LD,ld)
@@ -121,11 +120,20 @@ dnl AC_CHECK_PROGS(MAKEDEPEND,makedepend)
 dnl AC_CHECK_PROGS(MD5,md5 md5sum)
 dnl AC_CHECK_PROGS(MKDIR,mkdir)
 dnl AC_CHECK_PROGS(MV,mv)
-AC_ARG_VAR(PERL, [The full path to the Perl interpreter to use])
-AC_PATH_PROGS(PERL,perl perl5,[/usr/bin/perl])
-AC_CHECK_PROGS(POD2HTML,pod2html)
-AC_CHECK_PROGS(POD2MAN,pod2man)
-AC_CHECK_PROGS(PODSELECT,podselect)
+
+AC_ARG_VAR([GZIP],[The full path to the program to use to compress log files])
+AC_PATH_PROG([GZIP], [gzip])
+if test "X${GZIP}" != X
+then
+    AC_DEFINE_UNQUOTED([LOG_COMPRESSOR], ["${GZIP}"],
+        [The full path to the program to use to compress log files])
+fi
+
+AC_ARG_VAR([PERL], [The full path to the Perl interpreter to use])
+AC_PATH_PROGS([PERL], [perl perl5], [/usr/bin/perl])
+AC_CHECK_PROGS([POD2HTML], [pod2html])
+AC_CHECK_PROGS([POD2MAN], [pod2man])
+AC_CHECK_PROGS([PODSELECT], [podselect])
 # if pod2man is not found, do not build the man pages
 AM_CONDITIONAL([HAVE_POD2MAN], [test -n "$POD2MAN"])
 AM_CONDITIONAL([HAVE_PODSELECT], [test -n "$PODSELECT"])
@@ -197,6 +205,11 @@ dnl AC_HEADER_STAT
 dnl AC_HEADER_STDBOOL
 AC_CHECK_HEADERS([arpa/inet.h assert.h ctype.h errno.h fcntl.h float.h glob.h inttypes.h limits.h locale.h malloc.h math.h memory.h netdb.h netinet/in.h netinet/tcp.h pthread.h regex.h signal.h stdarg.h stddef.h stdint.h stdio.h stdlib.h string.h strings.h sys/mman.h sys/msg.h sys/resource.h sys/select.h sys/socket.h sys/statvfs.h sys/time.h sys/types.h sys/uio.h sys/un.h sys/wait.h unistd.h])
 
+# Handle the missing environ global on macOS
+AC_CHECK_DECLS([environ], ,
+    [AC_CHECK_DECLS([_NSGetEnviron], , , [#include <crt_externs.h>
+    ])])
+
 
 # LIBRARY CHECKS
 
@@ -217,7 +230,6 @@ AM_CONDITIONAL([NEED_GETOPT_LONG_ONLY],
 
 # Large file support
 AC_SYS_LARGEFILE
-
 
 # External libraries/packages
 AX_CHECK_PTHREAD

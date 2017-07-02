@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: udpsource.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: udpsource.c b1f14bba708e 2017-06-28 15:29:44Z mthomas $");
 
 #if SK_ENABLE_ZLIB
 #include <zlib.h>
@@ -686,7 +686,7 @@ updSourceBaseAddUDPSource(
         }
 
         for (j = 0; j < accept_from_count; ++j) {
-            for (i = 0; i < skSockaddrArraySize(accept_from[j]); ++i) {
+            for (i = 0; i < skSockaddrArrayGetSize(accept_from[j]); ++i) {
                 peeraddr = ((peeraddr_source_t*)
                             calloc(1, sizeof(peeraddr_source_t)));
                 if (peeraddr == NULL) {
@@ -808,7 +808,7 @@ udpSourceCreateFromSockaddr(
     }
 
     /* If not, attempt to bind the address/port pairs */
-    pfd_array = (struct pollfd*)calloc(skSockaddrArraySize(listen_address),
+    pfd_array = (struct pollfd*)calloc(skSockaddrArrayGetSize(listen_address),
                                        sizeof(struct pollfd));
     if (pfd_array == NULL) {
         goto END;
@@ -820,9 +820,9 @@ udpSourceCreateFromSockaddr(
     arrayport = 0;
 
     DEBUGMSG(("Attempting to bind %" PRIu32 " addresses for %s"),
-             skSockaddrArraySize(listen_address),
-             skSockaddrArrayNameSafe(listen_address));
-    for (i = 0; i < skSockaddrArraySize(listen_address); i++) {
+             skSockaddrArrayGetSize(listen_address),
+             skSockaddrArrayGetHostPortPair(listen_address));
+    for (i = 0; i < skSockaddrArrayGetSize(listen_address); i++) {
         char addr_name[PATH_MAX];
         struct pollfd *pfd = &pfd_array[i];
         uint16_t port;
@@ -839,7 +839,7 @@ udpSourceCreateFromSockaddr(
             continue;
         }
         /* Bind socket to port */
-        if (bind(pfd->fd, &addr->sa, skSockaddrLen(addr)) == -1) {
+        if (bind(pfd->fd, &addr->sa, skSockaddrGetLen(addr)) == -1) {
             DEBUGMSG("Skipping %s: Unable to bind: %s",
                      addr_name, strerror(errno));
             close(pfd->fd);
@@ -850,7 +850,7 @@ udpSourceCreateFromSockaddr(
         pfd_valid++;
         pfd->events = POLLIN;
 
-        port = skSockaddrPort(addr);
+        port = skSockaddrGetPort(addr);
         if (0 == arrayport) {
             arrayport = port;
         } else {
@@ -861,18 +861,18 @@ udpSourceCreateFromSockaddr(
 
     if (pfd_valid == 0) {
         ERRMSG("Failed to bind any addresses for %s",
-               skSockaddrArrayNameSafe(listen_address));
+               skSockaddrArrayGetHostPortPair(listen_address));
         goto END;
     }
 
     DEBUGMSG(("Bound %" PRIu32 "/%" PRIu32 " addresses for %s"),
-             (uint32_t)pfd_valid, skSockaddrArraySize(listen_address),
-             skSockaddrArrayNameSafe(listen_address));
+             (uint32_t)pfd_valid, skSockaddrArrayGetSize(listen_address),
+             skSockaddrArrayGetHostPortPair(listen_address));
 
     assert(arrayport != 0);
-    base = udpSourceCreateBase(skSockaddrArrayNameSafe(listen_address),
+    base = udpSourceCreateBase(skSockaddrArrayGetHostname(listen_address),
                                arrayport, pfd_array,
-                               skSockaddrArraySize(listen_address),
+                               skSockaddrArrayGetSize(listen_address),
                                pfd_valid, itemsize);
     if (base == NULL) {
         goto END;
@@ -967,7 +967,7 @@ udpSourceCreateFromUnixDomain(
     strncpy(addr.un.sun_path, uds, sizeof(addr.un.sun_path) - 1);
 
     /* Bind socket to port */
-    if (bind(sock, &addr.sa, skSockaddrLen(&addr)) == -1) {
+    if (bind(sock, &addr.sa, skSockaddrGetLen(&addr)) == -1) {
         ERRMSG("Failed to bind address '%s': %s", uds, strerror(errno));
         goto ERROR;
     }
@@ -1196,7 +1196,7 @@ skUDPSourceDestroy(
         /* Remove the source's accept-from-host addresses from
          * base->addr_to_source */
         for (j = 0; j < accept_from_count; ++j) {
-            for (i = 0; i < skSockaddrArraySize(accept_from[j]); ++i) {
+            for (i = 0; i < skSockaddrArrayGetSize(accept_from[j]); ++i) {
                 target.addr = skSockaddrArrayGet(accept_from[j], i);
                 found = ((const peeraddr_source_t *)
                          rbdelete(&target, base->addr_to_source));

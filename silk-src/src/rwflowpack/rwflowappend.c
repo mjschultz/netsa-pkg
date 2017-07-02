@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwflowappend.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwflowappend.c 4ba08a73ecbf 2017-05-05 22:05:45Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/rwrec.h>
@@ -629,7 +629,7 @@ appOptionsHandler(
         if (verifyCommandString(opt_arg, appOptions[opt_index].name)) {
             return 1;
         }
-        archiveDirectorySetPostCommand(opt_arg);
+        archiveDirectorySetPostCommand(opt_arg, appOptions[opt_index].name);
         break;
 
       case OPT_HOUR_FILE_COMMAND:
@@ -1336,7 +1336,8 @@ appender_main(
 
         /* Run command if this is a new hourly file */
         if (state->pos == 0 && hour_file_command) {
-            runCommand(hour_file_command, state->out_path);
+            runCommand(appOptions[OPT_HOUR_FILE_COMMAND].name,
+                       hour_file_command, state->out_path);
         }
 
         destroyInputStream(state, APPENDER_FILE_ARCHIVE);

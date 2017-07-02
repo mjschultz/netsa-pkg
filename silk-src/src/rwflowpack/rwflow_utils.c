@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwflow_utils.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwflow_utils.c 4ba08a73ecbf 2017-05-05 22:05:45Z mthomas $");
 
 #include <silk/sklog.h>
 #include <silk/utils.h>
@@ -44,6 +44,10 @@ static const char *archive_directory = NULL;
 
 /* command to run on archived files */
 static const char *post_archive_command = NULL;
+
+/* the switch that the user gives to set the post_archive_command;
+ * used in a DEBUGMSG */
+static const char *post_archive_switch_name = NULL;
 
 /* whether to remove files when archive_directory is NULL. */
 static int remove_when_archive_null = 1;
@@ -303,36 +307,25 @@ verifyCommandString(
     const char         *command,
     const char         *switch_name)
 {
-    const char *cp = command;
+    size_t rv;
 
-    while (NULL != (cp = strchr(cp, '%'))) {
-        ++cp;
-        switch (*cp) {
-          case '%':
-          case 's':
-            ++cp;
-            break;
-          case '\0':
-            if (switch_name) {
-                skAppPrintErr(("Invalid %s '%s':"
-                               " '%%' appears at end of string"),
-                              switch_name, command);
-            }
-            return -1;
-          default:
-            if (switch_name) {
-                skAppPrintErr("Invalid %s '%s': Unknown conversion '%%%c'",
-                              switch_name, command, *cp);
-            }
-            return -1;
+    rv = skSubcommandStringCheck(command, "s");
+    if (rv) {
+        if ('\0' == command[rv]) {
+            skAppPrintErr("Invalid %s '%s': '%%' appears at end of string",
+                          switch_name, command);
+        } else {
+            skAppPrintErr("Invalid %s '%s': Unknown conversion '%%%c'",
+                          switch_name, command, command[rv]);
         }
+        return -1;
     }
     return 0;
 }
 
 
 /*
- *  runCommand(command, filename);
+ *  runCommand(switch_name, command, filename);
  *
  *    Spawn a new subprocess to run 'command'.  Formatting directives
  *    in 'command' may be expanded to hold to a 'filename'.
@@ -345,126 +338,33 @@ verifyCommandString(
  */
 void
 runCommand(
+    const char         *switch_name,
     const char         *command,
     const char         *file)
 {
-    sigset_t sigs;
-    pid_t pid;
-    size_t len;
-    size_t file_len;
-    const char *cp;
-    const char *sp;
     char *expanded_cmd;
-    char *exp_cp;
+    long rv;
 
-    /* Determine length of buffer needed to hold the expanded command
-     * string and allocate it. */
-    len = strlen(command);
-    file_len = strlen(file);
-    cp = command;
-    while (NULL != (cp = strchr(cp, '%'))) {
-        ++cp;
-        switch (*cp) {
-          case '%':
-            --len;
-            break;
-          case 's':
-            len += file_len - 2;
-            break;
-          default:
-            skAbortBadCase((int)(*cp));
-        }
-        ++cp;
-    }
-    expanded_cmd = (char*)malloc(len + 1);
-    if (expanded_cmd == NULL) {
+    expanded_cmd = skSubcommandStringFill(command, "s", file);
+    if (NULL == expanded_cmd) {
         WARNINGMSG("Unable to allocate memory to create command string");
         return;
     }
 
-    /* Parent (original process) forks to create Child 1 */
-    pid = fork();
-    if (-1 == pid) {
-        ERRMSG("Could not fork to run command: %s", strerror(errno));
-        free(expanded_cmd);
-        return;
+    DEBUGMSG("Running %s: %s", switch_name, expanded_cmd);
+    rv = skSubcommandExecuteShell(expanded_cmd);
+    switch (rv) {
+      case -1:
+        ERRMSG("Unable to fork to run %s: %s", switch_name, strerror(errno));
+        break;
+      case -2:
+        NOTICEMSG("Error waiting for child: %s", strerror(errno));
+        break;
+      default:
+        assert(rv > 0);
+        break;
     }
-
-    /* Parent reaps Child 1 and returns */
-    if (0 != pid) {
-        free(expanded_cmd);
-        /* Wait for Child 1 to exit. */
-        while (waitpid(pid, NULL, 0) == -1) {
-            if (EINTR != errno) {
-                NOTICEMSG("Error waiting for child %ld: %s",
-                          (long)pid, strerror(errno));
-                break;
-            }
-        }
-        return;
-    }
-
-    /* Disable/Ignore locking of the log file; disable log rotation */
-    sklogSetLocking(NULL, NULL, NULL, NULL);
-    sklogDisableRotation();
-
-    /* Child 1 forks to create Child 2 */
-    pid = fork();
-    if (pid == -1) {
-        ERRMSG("Child could not fork for to run command: %s", strerror(errno));
-        _exit(EXIT_FAILURE);
-    }
-
-    /* Child 1 immediately exits, so Parent can stop waiting */
-    if (pid != 0) {
-        _exit(EXIT_SUCCESS);
-    }
-
-    /* Only Child 2 makes it here */
-
-    /* Unmask signals */
-    sigemptyset(&sigs);
-    sigprocmask(SIG_SETMASK, &sigs, NULL);
-
-    /* Copy command into buffer, handling %-expansions */
-    cp = command;
-    exp_cp = expanded_cmd;
-    while (NULL != (sp = strchr(cp, '%'))) {
-        /* copy text we just jumped over */
-        strncpy(exp_cp, cp, sp - cp);
-        exp_cp += (sp - cp);
-        /* handle conversion */
-        switch (*(sp+1)) {
-          case '%':
-            *exp_cp = '%';
-            ++exp_cp;
-            break;
-          case 's':
-            strcpy(exp_cp, file);
-            exp_cp += file_len;
-            break;
-          default:
-            skAbortBadCase((int)(*(sp+1)));
-        }
-        cp = sp + 2;
-        assert(len >= (size_t)(exp_cp - expanded_cmd));
-    }
-    strcpy(exp_cp, cp);
-    expanded_cmd[len] = '\0';
-
-    DEBUGMSG("Invoking command: %s", expanded_cmd);
-
-    /* Execute the command */
-    if (execl("/bin/sh", "sh", "-c", expanded_cmd, (char*)NULL)
-        == -1)
-    {
-        ERRMSG(("Error invoking /bin/sh: %s"),
-               strerror(errno));
-        _exit(EXIT_FAILURE);
-    }
-
-    /* Should never get here. */
-    skAbort();
+    free(expanded_cmd);
 }
 
 
@@ -564,9 +464,11 @@ archiveDirectoryIsSet(
 /* set the command to run after archiving a file */
 void
 archiveDirectorySetPostCommand(
-    const char         *command)
+    const char         *command,
+    const char         *switch_name)
 {
     post_archive_command = command;
+    post_archive_switch_name = switch_name;
 }
 
 
@@ -663,7 +565,7 @@ archiveDirectoryInsertOrRemove(
     }
 
     if (post_archive_command) {
-        runCommand(post_archive_command, path);
+        runCommand(post_archive_switch_name, post_archive_command, path);
     }
 
     return 0;

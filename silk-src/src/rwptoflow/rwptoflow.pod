@@ -483,15 +483,15 @@ to the file F<good.pcap>:
 
  $ rwptoflow data.pcap --packet-pass=good.pcap --flow-out=data.rw
 
-Use B<rwfilter> to partition the SiLK Flows records, writing those
+Use B<rwfilter(1)> to partition the SiLK Flows records, writing those
 records whose source IPs are found in the IPset file F<sip.set> to
 F<filtered.rw>:
 
  $ rwfilter --sipset=sip.set --pass=filtered.rw  data.rw
 
-Match the capture file, F<good.pcap>, against the filtered SiLK file,
-in affect generating a capture file which has been filtered by
-F<sip.set>:
+Use B<rwpmatch(1)> to match the capture file, F<good.pcap>, against
+the filtered SiLK file, in affect generating a capture file which has
+been filtered by F<sip.set>:
 
  $ rwpmatch --flow-file=filtered.rw good.pcap > filtered.pcap
 
@@ -519,9 +519,9 @@ SiLK 3.13.0.>
 
 =head1 SEE ALSO
 
-B<rwpmatch(1)>, B<rwpdedupe(1)>, B<rwfileinfo(1)>, B<silk(7)>,
-B<rwp2yaf2silk(1)>, B<rwipfix2silk(1)>, B<yaf(1)>, B<tcpdump(1)>,
-B<pcap(3)>, B<mergecap(1)>, B<zlib(3)>
+B<rwpmatch(1)>, B<rwpdedupe(1)>, B<rwfilter(1)>, B<rwfileinfo(1)>,
+B<rwp2yaf2silk(1)>, B<rwipfix2silk(1)>, B<silk(7)>, B<yaf(1)>,
+B<tcpdump(1)>, B<pcap(3)>, B<mergecap(1)>, B<zlib(3)>
 
 =head1 NOTES
 
@@ -535,7 +535,7 @@ flow file.
 
 =cut
 
-$SiLK: rwptoflow.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
+$SiLK: rwptoflow.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
 
 Local Variables:
 mode:text

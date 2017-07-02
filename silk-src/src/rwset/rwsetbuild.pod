@@ -115,6 +115,11 @@ Only valid when B<--ip-ranges> is specified.
 If an IP address cannot be parsed, B<rwsetbuild> exits with an
 error.
 
+Use B<rwsetcat(1)> to see the contents of an IPset file.  To check for
+a specific IP address in an IPset, use B<rwsetmember(1)>.
+B<rwsettool(1)> manipulates IPset files.  To build an IPset file from
+SiLK Flow data, use B<rwset(1)>.
+
 =head1 OPTIONS
 
 Option names may be abbreviated if the abbreviation is unique or is an
@@ -155,23 +160,23 @@ Use the default version for an IPv4 IPset and an IPv6 IPset, currently
 
 =item S< 2 >
 
-Create a file that may hold only IPv4 adresses and is readable by all
+Create a file that may hold only IPv4 addresses and is readable by all
 versions of SiLK.
 
 =item S< 3 >
 
-Create a file that may hold IPv4 or IPv6 adresses and is readable by
+Create a file that may hold IPv4 or IPv6 addresses and is readable by
 S<SiLK 3.0> and later.
 
 =item S< 4 >
 
-Create a file that may hold IPv4 or IPv6 adresses and is readable by
+Create a file that may hold IPv4 or IPv6 addresses and is readable by
 S<SiLK 3.7> and later.  These files are more compact that version 3
 and often more compact than version 2.
 
 =item S< 5 >
 
-Create a file that may hold only IPv6 adresses and is readable by
+Create a file that may hold only IPv6 addresses and is readable by
 S<SiLK 3.14> and later.  When this version is specified, IPsets
 containing only IPv4 addresses are written in version 4.  These files
 are usually more compact that version 4.
@@ -354,7 +359,7 @@ environment variable.  Version 5 was added in S<SiLK 3.14>.
 
 =cut
 
-$SiLK: rwsetbuild.pod 88cee5c95d36 2016-10-31 16:57:21Z mthomas $
+$SiLK: rwsetbuild.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
 
 Local Variables:
 mode:text

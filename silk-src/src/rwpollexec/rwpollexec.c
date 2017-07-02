@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpollexec.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwpollexec.c 6d21d1f3d455 2017-06-28 16:32:15Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skthread.h>
@@ -713,6 +713,12 @@ verify_command_string(
     const char         *cmd)
 {
     const char *cp = cmd;
+
+    if (!*cmd) {
+        skAppPrintErr("Invalid %s: Empty string",
+                      appOptions[OPT_COMMAND].name);
+        return -1;
+    }
 
     while (NULL != (cp = strchr(cp, '%'))) {
         ++cp;

@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwipfix2silk.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwipfix2silk.c 356e9eaedd8b 2017-04-27 19:34:48Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/rwrec.h>
@@ -90,10 +90,11 @@ static struct option appOptions[] = {
 };
 
 static const char *appHelp[] = {
-    ("Write the SiLK Flow records to the specified path.\n\tDef. stdout"),
-    ("Specify value to store in 'input' and 'output'\n"
-     "\tfields.  Def. snmp.  Choices: snmp, vlan"),
-    "Print the number of records written. Def. No.",
+    ("Write the SiLK Flow records to the specified stream or\n"
+     "\tfile path. Def. stdout"),
+    ("Specify the value to store in the 'input' and\n"
+     "\t'output' fields.  Def. snmp.  Choices: snmp, vlan"),
+    "Print the number of records written. Def. No",
     ("Write messages about number of records read from each\n"
      "\tinput and messages about ignored IPFIX records to the specified\n"
      "\tlocation. Def. none. Choices: none, stdout, stderr, or a filename"),
@@ -282,11 +283,10 @@ appSetup(
     if (skpcSetup()) {
         exit(EXIT_FAILURE);
     }
-    if (skpcProbeCreate(&probe)) {
+    if (skpcProbeCreate(&probe, PROBE_ENUM_IPFIX)) {
         exit(EXIT_FAILURE);
     }
     skpcProbeSetName(probe, skAppName());
-    skpcProbeSetType(probe, PROBE_ENUM_IPFIX);
     skpcProbeSetPollDirectory(probe, "/dev/null");
     if (parseLogFlags(log_flags)) {
         exit(EXIT_FAILURE);

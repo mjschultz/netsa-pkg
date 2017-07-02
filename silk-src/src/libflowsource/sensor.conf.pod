@@ -1406,7 +1406,7 @@ The B<quirks> command was introduced in SiLK 3.8.0.
 
 =cut
 
-$SiLK: sensor.conf.pod d8ee22371cf3 2017-03-23 22:39:48Z mthomas $
+$SiLK: sensor.conf.pod 97a30a8874f3 2017-05-02 16:49:05Z mthomas $
 
 Local Variables:
 mode:text

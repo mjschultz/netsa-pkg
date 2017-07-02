@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 006bf6dc14e3 2013-01-22 20:56:29Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 89b3ca5a7207 2017-06-01 19:19:24Z mthomas $");
 
 # Installed Targets
 
@@ -39,7 +39,6 @@ TESTS = \
 	tests/rwswapbytes-no-switches.pl \
 	tests/rwswapbytes-null-input.pl \
 	tests/rwswapbytes-no-files.pl \
-	tests/rwswapbytes-no-dest.pl \
 	tests/rwswapbytes-big-empty.pl \
 	tests/rwswapbytes-little-empty.pl \
 	tests/rwswapbytes-swap-empty.pl \

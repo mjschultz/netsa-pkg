@@ -117,8 +117,9 @@ unique map-name.  The switch has two forms:
 =item B<--pmap-file>=I<MAPNAME>:I<FILENAME>
 
 I<FILENAME> refers to a prefix map file generated using
-B<rwpmapbuild>.  I<MAPNAME> is a name that will be used to refer to
-the fields or options specific to that prefix map.
+B<rwpmapbuild>.  I<MAPNAME> is a name that may be used to refer to the
+fields or options specific to that prefix map.  Specify I<FILENAME> as
+C<-> or C<stdin> to read the prefix map from the standard input.
 
 =item B<--pmap-file>=I<FILENAME>
 
@@ -126,7 +127,9 @@ When a I<MAPNAME> is not specified explicitly as part of the argument,
 the prefix map file is checked to determine if a map-name was set when
 the prefix map was created (see B<rwpmapbuild>).  If so, that map-name
 is used.  If not, the prefix map is processed in legacy mode for
-backward compatibility.  See L</LEGACY> below for more information.
+backward compatibility.  See L</LEGACY> below for more information.  A
+prefix map's map-name is printed by the B<rwfileinfo(1)> command or by
+specifying B<--output-types=mapname> to B<rwpmapcat>.
 
 =back
 
@@ -139,28 +142,28 @@ I<in part> on the map-name of the prefix map.
 
 =over 4
 
-=item B<--pmap-src-I<MAPNAME>>=I<LABELS>
+=item B<--pmap-src-I<map-name>>=I<LABELS>
 
-If the prefix map associated with I<MAPNAME> is an IP prefix map, this
+If the prefix map associated with I<map-name> is an IP prefix map, this
 matches records with a source address that maps to a label contained
 in the list of labels in I<LABELS>.
 
-If the prefix map associated with I<MAPNAME> is a proto-port prefix
+If the prefix map associated with I<map-name> is a proto-port prefix
 map, this matches records with a protocol and source port combination
 that maps to a label contained in the list of labels in I<LABELS>.
 
-=item B<--pmap-dst-I<MAPNAME>>=I<LABELS>
+=item B<--pmap-dst-I<map-name>>=I<LABELS>
 
-Similar to B<--pmap-src-I<MAPNAME>>, but uses the destination IP or
+Similar to B<--pmap-src-I<map-name>>, but uses the destination IP or
 the protocol and destination port.
 
-=item B<--pmap-any-I<MAPNAME>>=I<LABELS>
+=item B<--pmap-any-I<map-name>>=I<LABELS>
 
-If the prefix map associated with I<MAPNAME> is an IP prefix map, this
+If the prefix map associated with I<map-name> is an IP prefix map, this
 matches records with a source or destination address that maps to a
 label contained in the list of labels in I<LABELS>.
 
-If the prefix map associated with I<MAPNAME> is a proto-port prefix
+If the prefix map associated with I<map-name> is a proto-port prefix
 map, this matches records with a protocol and a source or destination
 port combination that maps to a label contained in the list of labels
 in I<LABELS>.
@@ -180,23 +183,23 @@ the prefix map.
 =item B<--fields>=I<FIELDS>
 
 I<FIELDS> refers to a list of fields to use for the operation.  Each
-prefix map associated with I<MAPNAME> creates two additional fields,
-C<src-I<MAPNAME>> and C<dst-I<MAPNAME>>, available for display,
+prefix map associated with I<map-name> creates two additional fields,
+C<src-I<map-name>> and C<dst-I<map-name>>, available for display,
 sorting, and counting using the B<rwcut>, B<rwgroup>, B<rwsort>,
 B<rwstats>, and B<rwuniq> tools.
 
 =over 4
 
-=item B<src-I<MAPNAME>>
+=item B<src-I<map-name>>
 
 The value for the source from the prefix map file associated with
-I<MAPNAME>.  For an IP-based prefix map file, this corresponds to the
+I<map-name>.  For an IP-based prefix map file, this corresponds to the
 source IP.  For a proto-port prefix map, it is the
 protocol/source-port.
 
-=item B<dst-I<MAPNAME>>
+=item B<dst-I<map-name>>
 
-As B<src-I<MAPNAME>> for the destination IP address or
+As B<src-I<map-name>> for the destination IP address or
 protocol/destination-port.  It I<is> possible to encode type and code
 in a proto-port prefix map, but it will only work when used for the
 protocol/destination-port.
@@ -416,11 +419,11 @@ switch.
 
 B<rwcut(1)>, B<rwfilter(1)>, B<rwgroup(1)>, B<rwpmapbuild(1)>,
 B<rwpmapcat(1)>, B<rwpmaplookup(1)>, B<rwsort(1)>, B<rwstats(1)>,
-B<rwuniq(1)>, B<silk(7)>
+B<rwuniq(1)>, B<rwfileinfo(1)>, B<silk(7)>
 
 =cut
 
-$SiLK: pmapfilter.pod cd09f0a5fcc6 2014-06-14 15:43:33Z mthomas $
+$SiLK: pmapfilter.pod 118af073bc56 2017-06-05 18:13:10Z mthomas $
 
 Local Variables:
 mode:text

@@ -9,7 +9,7 @@ my $rwstats = check_silk_app('rwstats');
 my $rwfilter = check_silk_app('rwfilter');
 my %file;
 $file{data} = get_data_or_exit77('data');
-my $cmd = "$rwfilter --dport=68 --fail=- $file{data} | ./rwstats --fields=proto,iType,iCode,dport --count=16";
+my $cmd = "$rwfilter --dport=68 --fail=- $file{data} | $rwstats --fields=proto,iType,iCode,dport --count=16";
 my $md5 = "b7eb674a49a5a452eee1aac031dd08cf";
 
 check_md5_output($md5, $cmd);

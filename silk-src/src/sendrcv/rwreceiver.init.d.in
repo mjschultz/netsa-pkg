@@ -1,14 +1,23 @@
 #!/bin/sh
 
 #######################################################################
-# RCSIDENT("$SiLK: rwreceiver.init.d.in 02367a659674 2016-05-05 20:17:43Z mthomas $")
+# RCSIDENT("$SiLK: rwreceiver.init.d.in 7e4bf7c4f743 2017-05-09 20:29:51Z mthomas $")
 #######################################################################
 
 # rwreceiver start/control script
 #
 # /etc/init.d/@myprog@
 # chkconfig: - 20 95
-# description: Start @myprog@ program
+# description: SiLK network transfer receiving daemon
+# processname: @myprog@
+### BEGIN INIT INFO
+# Provides: @myprog@
+# Required-Start: $local_fs $remote_fs $network $named $syslog $time
+# Required-Stop: $local_fs $remote_fs $network $named $syslog $time
+# Short-Description: start and stop SiLK @myprog@ daemon
+# Description: SiLK daemon to accept files transferred across the network
+#              from one or more rwsender processes
+### END INIT INFO
 
 MYNAME=@myprog@
 
@@ -400,13 +409,18 @@ case "$1" in
     RETVAL=$?
     ;;
 
+  force-reload)
+    (restart)
+    RETVAL=$?
+    ;;
+
   status)
     (status)
     RETVAL=$?
     ;;
 
   *)
-    echo $"Usage: $0 {start|stop|status|restart}"
+    echo $"Usage: $0 {start|stop|status|restart|force-reload}"
     RETVAL=1
     ;;
 esac

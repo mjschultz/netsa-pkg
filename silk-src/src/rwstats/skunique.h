@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKUNIQUE_H, "$SiLK: skunique.h 9d04be8e27ff 2017-01-05 19:09:17Z mthomas $");
+RCSIDENTVAR(rcsID_SKUNIQUE_H, "$SiLK: skunique.h 178ff612aa51 2017-06-20 14:55:12Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -676,6 +676,24 @@ skUniqueSetFields(
     const sk_fieldlist_t   *distinct_fields,
     const sk_fieldlist_t   *agg_value_fields);
 
+
+/*
+ *  ok = skUniqueEnableTotalDistinct(uniq);
+ *
+ *    Tell the unique object 'uniq' that it should compute the number
+ *    of distinct values for the first distinct field across all
+ *    records.
+ *
+ *    The caller may use skUniqueGetTotalDistinctCount() to get the
+ *    distinct count after skUniquePrepareForOutput() has been called.
+ *
+ *    Return an error if this function is called after
+ *    skUniquePrepareForInput() has been called.
+ */
+int
+skUniqueEnableTotalDistinct(
+    sk_unique_t        *uniq);
+
 /*
  *  ok = skUniquePrepareForInput(uniq);
  *
@@ -733,6 +751,19 @@ skUniqueAddRecord(
     const rwRec        *rwrec);
 
 /*
+ *  count = skUniqueGetTotalDistinctCount(uniq);
+ *
+ *    Return the number of distinct values seen for the first
+ *    distinct_field across all flow records.
+ *
+ *    Return UINT64_MAX if this function is called before calling
+ *    skUniquePrepareForOutput().
+ */
+uint64_t
+skUniqueGetTotalDistinctCount(
+    sk_unique_t        *uniq);
+
+/*
  *  ok = skUniqueIteratorCreate(uniq, &iter);
  *
  *    Create a new iterator that can be used to get the bins from the
@@ -764,16 +795,6 @@ skUniqueIteratorCreate(
     }
 
 /*
- *  ok = skUniqueIteratorReset(iter);
- *
- *    Reset the iterator 'iter' so it can loop through the entries in
- *    the unique object another time.  May return -1 if there is an
- *    error allocating memory for the iterator.
- */
-#define skUniqueIteratorReset(uniqit_iter)      \
-    ((uniqit_iter)->reset_fn(uniqit_iter))
-
-/*
  *  ok = skUniqueIteratorNext(iter, &key_fields_buf, &distinct_fields_buf, &value_fields_buf);
  *
  *    Set the pointers referenced by 'key_fields_buf',
@@ -796,14 +817,6 @@ skUniqueIteratorCreate(
  */
 typedef void (*sk_uniqiter_free_fn_t)(
     sk_unique_iterator_t          **iter);
-
-/*
- *    PRIVATE.  For internal use only.
- *
- *    Specify the signature for the function to reset an iterator.
- */
-typedef int (*sk_uniqiter_reset_fn_t)(
-    sk_unique_iterator_t           *iter);
 
 /*
  *    PRIVATE.  For internal use only.
@@ -833,7 +846,6 @@ typedef int (*sk_uniqiter_next_fn_t)(
  *    an sk_unique_t.
  */
 struct sk_unique_iterator_st {
-    sk_uniqiter_reset_fn_t  reset_fn;
     sk_uniqiter_next_fn_t   next_fn;
     sk_uniqiter_free_fn_t   free_fn;
 };
@@ -949,6 +961,35 @@ skPresortedUniqueSetFields(
     const sk_fieldlist_t   *key_fields,
     const sk_fieldlist_t   *distinct_fields,
     const sk_fieldlist_t   *agg_value_fields);
+
+/*
+ *  ok = skPresortedUniqueEnableTotalDistinct(uniq);
+ *
+ *    Tell the unique object 'ps_uniq' that it should compute the
+ *    number of distinct values for the first distinct field across
+ *    all records.
+ *
+ *    The caller may use skPresortedUniqueGetTotalDistinctCount() to
+ *    get the distinct count once skPresortedUniqueProcess() has
+ *    returned.
+ *
+ *    Return an error if this function is called after
+ *    skPresortedUniqueProcess() has been called.
+ */
+int
+skPresortedUniqueEnableTotalDistinct(
+    sk_sort_unique_t   *ps_uniq);
+
+/*
+ *  count = skPresortedUniqueGetTotalDistinctCount(ps_uniq);
+ *
+ *    Return the number of distinct values seen for the first distinct
+ *    field across all flow records.  This should be called once
+ *    skPresortedUniqueProcess() has returned.
+ */
+uint64_t
+skPresortedUniqueGetTotalDistinctCount(
+    sk_sort_unique_t   *ps_uniq);
 
 /*
  *  ok = skPresortedUniqueAddInputFile(ps_uniq, filename);

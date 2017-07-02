@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 3fdcfb53fad6 2016-09-28 15:25:10Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 9a4f4ca2d067 2017-06-21 17:41:59Z mthomas $");
 
 # Installed Targets
 
@@ -37,8 +37,12 @@ include $(top_srcdir)/lib-deps.mk
 
 # Tests
 
+if RUN_EXTRA_CHECKS
+more_data = $(SILK_TESTSIPS004)
+endif
+
 # Required files; variables defined in ../../build.mk
-check_DATA = $(SILK_TESTSDIR) $(SILK_TESTDATA)
+check_DATA = $(SILK_TESTSDIR) $(SILK_TESTDATA) $(more_data)
 
 EXTRA_DIST += $(TESTS)
 
@@ -199,8 +203,12 @@ TESTS = \
 	tests/rwuniq-pysilk-simple-agg.pl
 
 EXTRA_TESTS = \
+	tests/rwstats-dist-sip-random.pl \
+	tests/rwstats-dist-sip-presort.pl \
 	tests/rwstats-flowrate-pps.pl \
 	tests/rwstats-flowrate-bps.pl \
+	tests/rwuniq-many-dist-random.pl \
+	tests/rwuniq-many-dist-presort.pl \
 	tests/rwuniq-flowrate-pps.pl \
 	tests/rwuniq-flowrate-bps.pl
 EXTRA_DIST += $(EXTRA_TESTS)

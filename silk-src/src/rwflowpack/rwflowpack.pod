@@ -223,8 +223,8 @@ given below (L</Flowcap Files Collection Switches
 
 Setting the input-mode to C<pdufile> tells B<rwflowpack> to read a
 single file containing NetFlow v5 PDU records and then exit.
-B<rwflowpack> will not become a daemon in this input-mode; instead it
-will remain in the foreground, process the NetFlow file, and exit.
+B<rwflowpack> does not become a daemon in this input-mode; instead it
+remains in the foreground, processes the NetFlow file, and exits.
 
 The file must be in the format created by NetFlow Collector: The
 file's size must be an integer multiple of 1464, where each 1464 byte
@@ -271,8 +271,8 @@ them.
 
 Since no categorization occurs in C<respool> input-mode, the
 B<--sensor-configuration> and B<--packing-logic> switches are not
-required, and their use will cause B<rwflowpack> to exit with an error
-code.
+required and not allowed, and their presence causes B<rwflowpack> to
+exit with an error code.
 
 =back
 
@@ -325,11 +325,11 @@ B<rwflowpack> closes all the working files and moves them over the
 place holder files.  Once B<rwflowpack> has closed and moved a working
 file, it no longer takes responsibility for it.
 
-The B<rwflowappend> process can poll the incremental-directory itself,
-or another process can poll that directory and pass the files to
+The B<rwflowappend> process may poll the incremental-directory itself,
+or another process may poll that directory and pass the files to
 B<rwflowappend>.  If B<rwflowpack> and B<rwflowappend> are on
-different machines, an B<rwsender(8)>/B<rwreceiver(8)> pair can move
-the files between the machines.
+different machines, an B<rwsender(8)>/B<rwreceiver(8)> pair may be
+used to move the files between the machines.
 
 Additional reasons one may want to use C<incremental-files>
 output-mode are to support having multiple data repositories or to
@@ -373,16 +373,16 @@ configuring each mode are described in the sections below.
 
 =item B<--input-mode>=I<MODE>
 
-Determine how B<rwflowpack> will gather data.  The default input
-I<MODE> is C<stream>.  The available input-modes are C<stream>,
-C<fcfiles>, C<pdufile>, and C<respool>.
+Determine how B<rwflowpack> gathers data.  The default input I<MODE>
+is C<stream>.  The available input-modes are C<stream>, C<fcfiles>,
+C<pdufile>, and C<respool>.
 
 =item B<--output-mode>=I<MODE>
 
-Determines what B<rwflowpack> will do with the data as it is packed
-into SiLK binary files.  The default output I<MODE> is
-C<local-storage>.  The available output-modes are C<local-storage>,
-C<incremental-files> and C<sending>.
+Determine what B<rwflowpack> does with the data as it is packed into
+SiLK binary files.  The default output I<MODE> is C<local-storage>.
+The available output-modes are C<local-storage>, C<incremental-files>
+and C<sending>.
 
 =back
 
@@ -416,31 +416,32 @@ specified to the B<configure> script), this switch will not be present
 on B<rwflowpack>.  A default value for this switch may be specified in
 the B<silk.conf(5)> site configuration file (see the description of
 the B<--site-config-file> switch).  When I<PLUGIN> does not contain a
-slash (C</>), B<rwflowpack> will attempt to find a file named
-I<PLUGIN> in the directories listed in the L</FILES> section.  If
-B<rwflowpack> finds the file, it uses that path.  If I<PLUGIN>
-contains a slash or if B<rwflowpack> does not find the file,
-B<rwflowpack> relies on your operating system's B<dlopen(3)> call to
-find the file.  When the SILK_PLUGIN_DEBUG environment variable is
-non-empty, B<rwflowpack> prints status messages to the standard error
-as it attempts to find and open each of its plug-ins.  B<rwflowpack>
-will exit if it does not have access to the packing logic functions.
+slash (C</>), B<rwflowpack> attempts to find a file named I<PLUGIN> in
+the directories listed in the L</FILES> section.  If B<rwflowpack>
+finds the file, it uses that path.  If I<PLUGIN> contains a slash or
+if B<rwflowpack> does not find the file, B<rwflowpack> relies on your
+operating system's B<dlopen(3)> call to find the file.  When the
+SILK_PLUGIN_DEBUG environment variable is non-empty, B<rwflowpack>
+prints status messages to the standard error as it attempts to find
+and open each of its plug-ins.  B<rwflowpack> exits if it does not
+have access to the packing logic functions.
 
 =item B<--sensor-name>=I<SENSOR>
 
 Cause B<rwflowpack> to ignore all probes in the sensor configuration
-file except the probes for I<SENSOR>.  Only data for this sensor will
-be collected.  This allows a common configuration file to be used by
+file except the probes for I<SENSOR>.  Only data for I<SENSOR> is
+collected.  This allows a common configuration file to be used by
 multiple B<rwflowpack> invocations, yet also allow each B<rwflowpack>
 instance only collect data for a single sensor.  There must be a
 sensor definition for I<SENSOR> in the configuration file.  When this
-switch is not present, B<rwflowpack> will collect and pack data for
-all sensors.
+switch is not present, B<rwflowpack> collects and packs data for all
+sensors.
 
 =item B<--polling-interval>=I<NUMBER>
 
-Specify the number of seconds B<rwflowpack> will wait between queries
-of the C<poll-directory>s.  This defaults to 15 seconds.
+Specify the number of seconds B<rwflowpack> waits between scans of the
+directories specified by the C<poll-directory> settings of the probes
+in the F<sensor.conf> file.  The default is 15 seconds.
 
 =back
 
@@ -455,18 +456,23 @@ B<--incoming-directory> switches are required.
 
 =item B<--sensor-configuration>=I<FILE_PATH>
 
-Give the path to the configuration file that B<rwflowpack> will
-consult to determine whether a record represents an incoming or
-outgoing flow.  The complete syntax of the configuration file is
-described in the B<sensor.conf(5)> manual page; see also the I<SiLK
-Installation Handbook>.
+Give the path to the configuration file that B<rwflowpack> consults to
+determine whether a record represents an incoming or outgoing flow.
+The complete syntax of the configuration file is described in the
+B<sensor.conf(5)> manual page; see also the I<SiLK Installation
+Handbook>.
 
 =item B<--incoming-directory>=I<DIR_PATH>
 
-Name the full path of the directory which B<rwflowpack> will monitor
-for files created by B<flowcap>.  Once processed by B<rwflowpack>,
-files are moved from this directory to the archive-directory, if it
-has been specified.
+Periodically scan the directory I<DIR_PATH> for files that have been
+created by B<flowcap>.  As B<rwflowpack> scans I<DIR_PATH>, it
+ignores a file if its name begins with a dot (C<.>) or if its size is
+0 bytes.  When a file is first detected, B<rwflowpack> records its
+size, and the file must have the same size for two consecutive scans
+before B<rwflowpack> processes it.  After the file is successfully
+processed, B<rwflowpack> either moves it to the archive-directory or
+deletes it.  The interval between scans is set by
+B<--polling-interval>.  I<DIR_PATH> must be a complete directory path.
 
 =item B<--packing-logic>=I<PLUGIN>
 
@@ -475,7 +481,7 @@ logic.  For more detail, see the description above.
 
 =item B<--polling-interval>=I<NUMBER>
 
-Specify the number of seconds B<rwflowpack> will wait between polls of
+Specify the number of seconds B<rwflowpack> waits between polls of
 the incoming-directory for new files created by B<flowcap>.  If not
 given, the default value is 15 seconds.
 
@@ -494,9 +500,8 @@ available in C<pdufile> input-mode:
 
 =item B<--sensor-configuration>=I<FILE_PATH>
 
-Give the path to the configuration file that B<rwflowpack> will
-consult to determine whether a record represents an incoming or
-outgoing flow.
+Give the path to the configuration file that B<rwflowpack> consults to
+determine whether a record represents an incoming or outgoing flow.
 
 =item B<--netflow-file>=I<FILE_PATH>
 
@@ -531,16 +536,20 @@ details.)  The first of the following switches is required:
 
 =item B<--incoming-directory>=I<DIR_PATH>
 
-Name the full path of the directory which B<rwflowpack> will monitor
-for SiLK Flow files.  Once processed by B<rwflowpack>, files are moved
-from this directory to the archive-directory, if it has been
-specified.
+Periodically scan the directory I<DIR_PATH> for SiLK Flow files to
+process.  As B<rwflowpack> scans I<DIR_PATH>, it ignores a file if its
+name begins with a dot (C<.>) or if its size is 0 bytes.  When a file
+is first detected, B<rwflowpack> records its size, and the file must
+have the same size for two consecutive scans before B<rwflowpack> will
+process it.  After the file is successfully processed, B<rwflowpack>
+either moves it to the archive-directory or deletes it.  The interval
+between scans is set by B<--polling-interval>.  I<DIR_PATH> must be a
+complete directory path.
 
 =item B<--polling-interval>=I<NUMBER>
 
-Specify the number of seconds B<rwflowpack> will wait between polls of
-the incoming-directory.  If not given, the default value is 15
-seconds.
+Specify the number of seconds B<rwflowpack> waits between polls of the
+incoming-directory.  If not given, the default value is 15 seconds.
 
 =back
 
@@ -556,8 +565,8 @@ output-mode, the following switch is required:
 =item B<--root-directory>=I<DIR_PATH>
 
 Name the full path of the SILK_DATA_ROOTDIR; that is, the directory
-under which the files containing the packed SiLK Flow records will be
-stored.  B<rwflowpack> will create subdirectories below I<DIR_PATH>
+under which the files containing the packed SiLK Flow records are
+stored.  B<rwflowpack> creates subdirectories below I<DIR_PATH>
 based on the data received and the B<path-format> setting in the
 B<silk.conf(5)> file.
 
@@ -628,7 +637,7 @@ write lock on an data file prior to writing records to it.  The write
 lock prevents two instances of B<rwflowpack> from writing to the same
 data file simultaneously.  However, attempting to use a write lock on
 some file systems causes B<rwflowpack> to exit with an error, and this
-switch can be use when writing data to these file systems.
+switch may be used when writing data to these file systems.
 
 =item B<--flush-timeout>=I<VAL>
 
@@ -646,7 +655,7 @@ details.
 Set the maximum number of data files to have open for writing at any
 one time to I<VAL>.  If not specified, the default is 128 files.  The
 minimum file cache size is 4.  This switch also determines how many
-files B<rwflowpack> will read from simultaneously when using probes
+files B<rwflowpack> reads from simultaneously when using probes
 that poll directories for files (see B<sensor.conf(5)>).  The maximum
 number of input files open at any one time is limited to one eighth of
 I<VAL> (with a minimum of 2), and the number of directory polling
@@ -663,8 +672,8 @@ IP address.  (When the F<sensor.conf> file contains an
 C<interface-values> attribute whose value is C<vlan>, the input and
 output fields contain the vlan IDs instead of SNMP interface values.)
 The extra data produced by this switch is useful for determining why
-traffic is being stored in certain files.  Note that this switch will
-only affect newly created files.  New records will always be appended
+traffic is being stored in certain files.  Note that this switch
+only affects newly created files.  New records are always appended
 to an existing file in the file's current output format to maintain
 file integrity.
 
@@ -787,7 +796,7 @@ switch is present.
 When archiving input files via the B<--archive-directory> switch, move
 the files into the top of the archive-directory, not into
 subdirectories of the archive-directory.  This switch has no effect if
-B<--archive-directory> is not also specified.  This switch can be used
+B<--archive-directory> is not also specified.  This switch may be used
 to allow another process to watch for new files appearing in the
 archive-directory.
 
@@ -795,12 +804,12 @@ archive-directory.
 
 Run I<COMMAND> on each input file after B<rwflowpack> has successfully
 processed the file and moved the file into the archive-directory.
-Each occurrence of the string C<%s> in I<COMMAND> will be replaced
-with the full path to the input file in the archive-directory, and
-each occurrence of C<%%> will be replaced with C<%>.  If any other
-character follows C<%>, B<rwflowpack> exits with an error.  When using
-this feature, the B<--archive-directory> switch must be specified.
-See also the B<rwpollexec(8)> daemon.
+Each occurrence of the string C<%s> in I<COMMAND> is replaced with the
+full path to the input file in the archive-directory, and each
+occurrence of C<%%> is replaced with C<%>.  If any other character
+follows C<%>, B<rwflowpack> exits with an error.  When using this
+feature, the B<--archive-directory> switch must be specified.  See
+also the B<rwpollexec(8)> daemon.
 
 =back
 
@@ -874,9 +883,9 @@ The following set of switches is optional:
 
 =item B<--log-level>=I<LEVEL>
 
-Set the severity of messages that will be logged.  The levels from
-most severe to least are: C<emerg>, C<alert>, C<crit>, C<err>,
-C<warning>, C<notice>, C<info>, C<debug>.  The default is C<info>.
+Set the severity of messages that are logged.  The levels from most
+severe to least are: C<emerg>, C<alert>, C<crit>, C<err>, C<warning>,
+C<notice>, C<info>, C<debug>.  The default is C<info>.
 
 =item B<--log-sysfacility>=I<NUMBER>
 
@@ -899,11 +908,11 @@ Run I<COMMAND> on the previous day's log file after log rotation.
 When this switch is not specified, the previous day's log file is
 compressed with B<gzip(1)>.  When the switch is specified and
 I<COMMAND> is the empty string, no action is taken on the log file.
-Each occurrence of the string C<%s> in I<COMMAND> will be replaced
-with the full path to the log file, and each occurrence of C<%%> will
-be replaced with C<%>.  If any other character follows C<%>,
-B<rwflowpack> exits with an error.  Specifying this switch without
-also using B<--log-directory> is an error.
+Each occurrence of the string C<%s> in I<COMMAND> is replaced with the
+full path to the log file, and each occurrence of C<%%> is replaced
+with C<%>.  If any other character follows C<%>, B<rwflowpack> exits
+with an error.  Specifying this switch without also using
+B<--log-directory> is an error.
 
 =item B<--pidfile>=I<FILE_PATH>
 
@@ -1115,7 +1124,7 @@ attempt to write to the same hourly file simultaneously.
 
 =cut
 
-$SiLK: rwflowpack.pod d8ee22371cf3 2017-03-23 22:39:48Z mthomas $
+$SiLK: rwflowpack.pod 6d21d1f3d455 2017-06-28 16:32:15Z mthomas $
 
 Local variables:
 mode:text

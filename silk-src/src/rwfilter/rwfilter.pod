@@ -1067,45 +1067,44 @@ mapping file.
 
 =over 4
 
-=item B<--pmap-file>=I<MAPNAME>:I<PATH>
-
 =item B<--pmap-file>=I<PATH>
 
-Instruct B<rwfilter> to load the mapping file located at I<PATH> and
-create new switches B<--pmap-src-I<MAPNAME>>,
-B<--pmap-dst-I<MAPNAME>>, and B<--pmap-any-I<MAPNAME>>.  When
-I<MAPNAME> is provided, it is used to refer to the switches
-specific to that prefix map.  If I<MAPNAME> is not provided,
-B<rwfilter> checks the prefix map file to see if a map-name was
-specified when the file was created.  If no map-name is available,
-B<rwfilter> creates legacy switches as described below.  Multiple
-B<--pmap-file> switches are supported as long as each uses a unique
-map-name.  The B<--pmap-file> switch(es) must precede all other
+=item B<--pmap-file>=I<MAPNAME>:I<PATH>
+
+Load the prefix map file located at I<PATH> and create partitioning
+switches named B<--pmap-src-I<map-name>>, B<--pmap-dst-I<map-name>>,
+and B<--pmap-any-I<map-name>> where I<map-name> is either the
+I<MAPNAME> part of the argument or the map-name specified when the
+file was created (see B<rwpmapbuild(1)>).  If no map-name is
+available, B<rwfilter> creates switch names as described below
+(B<--pmap-saddress>, B<--pmap-sport-proto>, etc).  Specify I<PATH> as
+C<-> or C<stdin> to read from the standard input.  The switch may be
+repeated to load multiple prefix map files; each file must have a
+unique map-name.  The B<--pmap-file> switch(es) must precede all other
 B<--pmap-*> switches.  For more information, see B<pmapfilter(3)>.
 
-=item B<--pmap-src-I<MAPNAME>>=I<LABELS>
+=item B<--pmap-src-I<map-name>>=I<LABELS>
 
-If the prefix map associated with I<MAPNAME> is an IP prefix map, this
-matches records with a source IPv4 address that maps to a label
+If the prefix map associated with I<map-name> is an IP prefix map,
+this matches records with a source IPv4 address that maps to a label
 contained in the list of labels in I<LABELS>.
-
-If the prefix map associated with I<MAPNAME> is a proto-port prefix
+If the prefix map associated with I<map-name> is a proto-port prefix
 map, this matches records with a protocol and source port combination
 that maps to a label contained in the list of labels in I<LABELS>.
 
-=item B<--pmap-dst-I<MAPNAME>>=I<LABELS>
+=item B<--pmap-dst-I<map-name>>=I<LABELS>
 
-Similar to B<--pmap-src-I<MAPNAME>>, but uses the destination IP or
+Similar to B<--pmap-src-I<map-name>>, but uses the destination IP or
 the protocol and destination port.
 
-=item B<--pmap-any-I<MAPNAME>>=I<LABELS>
+=item B<--pmap-any-I<map-name>>=I<LABELS>
 
-If the prefix map associated with I<MAPNAME> is an IP prefix map, this
-matches records with a source IP address or a destination IP address
-that maps to a label contained in the list of labels in I<LABELS>.
-
-If the prefix map associated with I<MAPNAME> is a port/protocol prefix
-map, this matches records with a protocol and source port or
+If the prefix map associated with I<map-name> is an IP prefix map,
+this matches records with a source IP address or a destination IP
+address that maps to a label contained in the list of labels in
+I<LABELS>.
+If the prefix map associated with I<map-name> is a port/protocol
+prefix map, this matches records with a protocol and source port or
 destination port combination that maps to a label contained in the
 list of labels in I<LABELS>.
 
@@ -1116,10 +1115,9 @@ list of labels in I<LABELS>.
 =item B<--pmap-any-address>=I<LABELS>
 
 These are deprecated switches created by B<pmapfilter> that correspond
-to B<--pmap-src-I<MAPNAME>>, B<--pmap-dst-I<MAPNAME>>, and
-B<--pmap-any-I<MAPNAME>>, respectively.  These switches are available
-when an IP prefix map is used that is not associated with a
-I<MAPNAME>.
+to B<--pmap-src-I<map-name>>, B<--pmap-dst-I<map-name>>, and
+B<--pmap-any-I<map-name>>, respectively.  These switches are available
+when an IP prefix map is used that is not associated with a map-name.
 
 =item B<--pmap-sport-proto>=I<LABELS>
 
@@ -1128,10 +1126,10 @@ I<MAPNAME>.
 =item B<--pmap-any-port-proto>=I<LABELS>
 
 These are deprecated switches created by B<pmapfilter> that correspond
-to B<--pmap-src-I<MAPNAME>>, B<--pmap-dst-I<MAPNAME>>, and
-B<--pmap-any-I<MAPNAME>>, respectively.  These switches are available
+to B<--pmap-src-I<map-name>>, B<--pmap-dst-I<map-name>>, and
+B<--pmap-any-I<map-name>>, respectively.  These switches are available
 when a proto-port prefix map is used that is not associated with a
-I<MAPNAME>.
+map-name.
 
 =item B<--scc>=I<COUNTRY_CODE_LIST>
 
@@ -2006,16 +2004,17 @@ information.
 =head1 SEE ALSO
 
 B<rwcut(1)>, B<rwfglob(1)>, B<rwfileinfo(1)>, B<rwset(1)>,
-B<rwtuc(1)>, B<rwsetbuild(1)>, B<rwsiteinfo(1)>, B<addrtype(3)>,
-B<ccfilter(3)>, B<flowrate(3)>, B<ipafilter(3)>, B<pmapfilter(3)>,
-B<pysilk(3)>, B<silkpython(3)>, B<silk-plugin(3)>, B<silk.conf(5)>,
-B<sensor.conf(5)>, B<silk(7)>, B<rwflowpack(8)>, B<yaf(1)>,
-B<applabel(1)>, B<zlib(3)>, B<dlopen(3)>, B<tzset(3)>, B<environ(7)>,
-I<Analysts' Handbook: Using SiLK for Network Traffic Analysis>
+B<rwtuc(1)>, B<rwsetbuild(1)>, B<rwsiteinfo(1)>, B<rwpmapbuild(1)>,
+B<addrtype(3)>, B<ccfilter(3)>, B<flowrate(3)>, B<ipafilter(3)>,
+B<pmapfilter(3)>, B<pysilk(3)>, B<silkpython(3)>, B<silk-plugin(3)>,
+B<silk.conf(5)>, B<sensor.conf(5)>, B<silk(7)>, B<rwflowpack(8)>,
+B<yaf(1)>, B<applabel(1)>, B<zlib(3)>, B<dlopen(3)>, B<tzset(3)>,
+B<environ(7)>, I<Analysts' Handbook: Using SiLK for Network Traffic
+Analysis>
 
 =cut
 
-$SiLK: rwfilter.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwfilter.pod 118af073bc56 2017-06-05 18:13:10Z mthomas $
 
 Local Variables:
 mode:text

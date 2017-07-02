@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconf.c d8ee22371cf3 2017-03-23 22:39:48Z mthomas $");
+RCSIDENT("$SiLK: probeconf.c b1f14bba708e 2017-06-28 15:29:44Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/probeconf.h>
@@ -53,7 +53,7 @@ RCSIDENT("$SiLK: probeconf.c d8ee22371cf3 2017-03-23 22:39:48Z mthomas $");
 
 
 /* a map between probe types and printable names */
-static struct probe_type_name_map_st {
+static const struct probe_type_name_map_st {
     const char         *name;
     skpc_probetype_t    value;
 } probe_type_name_map[] = {
@@ -70,9 +70,8 @@ static struct probe_type_name_map_st {
     {NULL,          PROBE_ENUM_INVALID}
 };
 
-
 /* a map between protocols and printable names */
-static struct skpc_protocol_name_map_st {
+static const struct skpc_protocol_name_map_st {
     const char     *name;
     uint8_t         num;
     skpc_proto_t    value;
@@ -83,6 +82,41 @@ static struct skpc_protocol_name_map_st {
 
     /* sentinel */
     {NULL,     0, SKPC_PROTO_UNSET}
+};
+
+/* a map between the probe log-flags values and printable names */
+static const struct skpc_log_flags_map_st {
+    const char     *name;
+    uint8_t         flag;
+} skpc_log_flags_map[] = {
+    {"all",                 SOURCE_LOG_ALL},
+    {"bad",                 SOURCE_LOG_BAD},
+    {"default",             SOURCE_LOG_DEFAULT},
+    {"firewall-event",      SOURCE_LOG_FIREWALL},
+#ifdef SOURCE_LOG_LIBFIXBUF
+    {"libfixbuf",           SOURCE_LOG_LIBFIXBUF},
+#endif  /* SOURCE_LOG_LIBFIXBUF */
+    {"missing",             SOURCE_LOG_MISSING},
+    {"none",                SOURCE_LOG_NONE},
+    {"record-timestamps",   SOURCE_LOG_TIMESTAMPS},
+    {"sampling",            SOURCE_LOG_SAMPLING},
+#ifdef SOURCE_LOG_TEMPLATES
+    {"show-templates",      SOURCE_LOG_TEMPLATES},
+#endif  /* SOURCE_LOG_TEMPLATES */
+    {NULL,                  0}
+};
+
+/* a map between the probe quirks values and printable names */
+static const struct skpc_quirks_map_st {
+    const char     *name;
+    uint8_t         flag;
+} skpc_quirks_map[] = {
+    {"firewall-event",          SKPC_QUIRK_FW_EVENT},
+    {"missing-ips",             SKPC_QUIRK_MISSING_IPS},
+    {"nf9-sysuptime-seconds",   SKPC_QUIRK_NF9_SYSUPTIME_SECS},
+    {"none",                    SKPC_QUIRK_NONE},
+    {"zero-packets",            SKPC_QUIRK_ZERO_PACKETS},
+    {NULL,                      0}
 };
 
 
@@ -576,18 +610,23 @@ skpcNetworkLookupByID(
 /* Create a probe */
 int
 skpcProbeCreate(
-    skpc_probe_t      **probe)
+    skpc_probe_t      **probe,
+    skpc_probetype_t    probe_type)
 {
     assert(probe);
+
+    if (NULL == skpcProbetypeEnumtoName(probe_type)) {
+        return -1;
+    }
 
     (*probe) = (skpc_probe_t*)calloc(1, sizeof(skpc_probe_t));
     if (NULL == (*probe)) {
         return -1;
     }
 
-    (*probe)->probe_type = PROBE_ENUM_INVALID;
+    (*probe)->probe_type = probe_type;
     (*probe)->protocol = SKPC_PROTO_UNSET;
-    (*probe)->log_flags = SOURCE_LOG_DEFAULT;
+    skpcProbeAddLogFlag(*probe, "default");
 
     return 0;
 }
@@ -692,20 +731,6 @@ skpcProbeGetType(
 }
 #endif  /* skpcProbeGetType */
 
-int
-skpcProbeSetType(
-    skpc_probe_t       *probe,
-    skpc_probetype_t    probe_type)
-{
-    assert(probe);
-
-    if (NULL == skpcProbetypeEnumtoName(probe_type)) {
-        return -1;
-    }
-    probe->probe_type = probe_type;
-    return 0;
-}
-
 
 /* Get and set the probe's protocol */
 skpc_proto_t
@@ -747,60 +772,37 @@ skpcProbeAddLogFlag(
     skpc_probe_t       *probe,
     const char         *log_flag)
 {
+    size_t i;
+    int rv;
+
     assert(probe);
 
-    if (!log_flag) {
+    if (NULL == log_flag) {
         return -1;
     }
-    if (0 == strcmp(log_flag, "none")) {
-        if (probe->log_flags) {
-            /* invalid combination */
-            return -2;
+
+    rv = 1;
+    for (i = 0; skpc_log_flags_map[i].name != NULL; ++i) {
+        /* assert names in table are sorted alphabetically */
+        assert(NULL == skpc_log_flags_map[i + 1].name
+               || strcmp(skpc_log_flags_map[i].name,
+                         skpc_log_flags_map[i + 1].name) < 0);
+        rv = strcmp(log_flag, skpc_log_flags_map[i].name);
+        if (rv <= 0) {
+            break;
         }
-        return 0;
     }
-    if (0 == strcmp(log_flag, "all")) {
-        probe->log_flags |= SOURCE_LOG_ALL;
-        return 0;
+    if (0 != rv) {
+        /* unrecognized log-flag */
+        return -1;
     }
-    if (0 == strcmp(log_flag, "bad")) {
-        probe->log_flags |= SOURCE_LOG_BAD;
-        return 0;
+    if (SOURCE_LOG_NONE == skpc_log_flags_map[i].flag && probe->log_flags) {
+        assert(0 == strcmp("none", log_flag));
+        /* invalid combination */
+        return -2;
     }
-    if (0 == strcmp(log_flag, "default")) {
-        probe->log_flags |= SOURCE_LOG_DEFAULT;
-        return 0;
-    }
-    if (0 == strcmp(log_flag, "firewall-event")) {
-        probe->log_flags |= SOURCE_LOG_FIREWALL;
-        return 0;
-    }
-#ifdef SOURCE_LOG_LIBFIXBUF
-    if (0 == strcmp(log_flag, "libfixbuf")) {
-        probe->log_flags |= SOURCE_LOG_LIBFIXBUF;
-        return 0;
-    }
-#endif
-    if (0 == strcmp(log_flag, "missing")) {
-        probe->log_flags |= SOURCE_LOG_MISSING;
-        return 0;
-    }
-    if (0 == strcmp(log_flag, "record-timestamps")) {
-        probe->log_flags |= SOURCE_LOG_TIMESTAMPS;
-        return 0;
-    }
-    if (0 == strcmp(log_flag, "sampling")) {
-        probe->log_flags |= SOURCE_LOG_SAMPLING;
-        return 0;
-    }
-#ifdef SOURCE_LOG_TEMPLATES
-    if (0 == strcmp(log_flag, "show-templates")) {
-        probe->log_flags |= SOURCE_LOG_TEMPLATES;
-        return 0;
-    }
-#endif
-    /* unrecognized log-flag */
-    return -1;
+    probe->log_flags |= skpc_log_flags_map[i].flag;
+    return 0;
 }
 
 int
@@ -859,36 +861,37 @@ skpcProbeAddQuirk(
     skpc_probe_t       *probe,
     const char         *quirk)
 {
+    size_t i;
+    int rv;
+
     assert(probe);
 
     if (NULL == quirk) {
         return -1;
     }
-    if (0 == strcmp(quirk, "none")) {
-        if (probe->quirks) {
-            /* invalid combination */
-            return -2;
+
+    rv = 1;
+    for (i = 0; skpc_quirks_map[i].name != NULL; ++i) {
+        /* assert names in table are sorted alphabetically */
+        assert(NULL == skpc_quirks_map[i + 1].name
+               || strcmp(skpc_quirks_map[i].name,
+                         skpc_quirks_map[i + 1].name) < 0);
+        rv = strcmp(quirk, skpc_quirks_map[i].name);
+        if (rv <= 0) {
+            break;
         }
-        return 0;
     }
-    if (0 == strcmp(quirk, "firewall-event")) {
-        probe->quirks |= SKPC_QUIRK_FW_EVENT;
-        return 0;
+    if (0 != rv) {
+        /* unrecognized quirk */
+        return -1;
     }
-    if (0 == strcmp(quirk, "missing-ips")) {
-        probe->quirks |= SKPC_QUIRK_MISSING_IPS;
-        return 0;
+    if (SKPC_QUIRK_NONE == skpc_quirks_map[i].flag && probe->quirks) {
+        assert(0 == strcmp("none", quirk));
+        /* invalid combination */
+        return -2;
     }
-    if (0 == strcmp(quirk, "zero-packets")) {
-        probe->quirks |= SKPC_QUIRK_ZERO_PACKETS;
-        return 0;
-    }
-    if (0 == strcmp(quirk, "nf9-sysuptime-seconds")) {
-        probe->quirks |= SKPC_QUIRK_NF9_SYSUPTIME_SECS;
-        return 0;
-    }
-    /* unrecognized quirk */
-    return -1;
+    probe->quirks |= skpc_quirks_map[i].flag;
+    return 0;
 }
 
 int
@@ -1523,8 +1526,8 @@ skpcProbeVerify(
     /* when listen-as-host is specified, listen-on-port must be as
      * well */
     if ((probe->listen_addr != NULL)
-        && (skSockaddrArraySize(probe->listen_addr) > 0)
-        && (skSockaddrPort(skSockaddrArrayGet(probe->listen_addr, 0)) == 0))
+        && (skSockaddrArrayGetSize(probe->listen_addr) > 0)
+        && (skSockaddrGetPort(skSockaddrArrayGet(probe->listen_addr, 0)) == 0))
     {
             skAppPrintErr(("Error verifying probe '%s':\n"
                            "\tThe listen-on-port clause is required when"
@@ -1690,6 +1693,111 @@ skpcProbeVerify(
 
     probe->verified = 1;
     return 0;
+}
+
+
+void
+skpcProbePrint(
+    const skpc_probe_t *probe,
+    sk_msg_fn_t         printer)
+{
+    char name[PATH_MAX];
+    char log_flags[PATH_MAX];
+    char quirks[PATH_MAX];
+    char *accept_list;
+    const char *label;
+    size_t len;
+    char *s;
+    size_t i;
+    size_t bits;
+    ssize_t t;
+
+    /* fill 'name' with name and type of probe */
+    snprintf(name, sizeof(name), "'%s': %s probe;",
+             probe->probe_name ? probe->probe_name  : "<EMPTY_NAME>",
+             skpcProbetypeEnumtoName(probe->probe_type));
+
+    /* fill 'log_flags' with the log flags, if any */
+    label = "; log-flags:";
+    log_flags[0] = '\0';
+    len = sizeof(log_flags);
+    s = log_flags;
+    for (i = 0; skpc_log_flags_map[i].name; ++i) {
+        BITS_IN_WORD32(&bits, skpc_log_flags_map[i].flag);
+        if ((1 == bits) && (probe->log_flags & skpc_log_flags_map[i].flag)) {
+            t = snprintf(s, len, "%s %s", label, skpc_log_flags_map[i].name);
+            if ((size_t)t < len) {
+                len -= t;
+                s += t;
+                assert((size_t)(s - log_flags) == (sizeof(log_flags) - len));
+            }
+            label = "";
+        }
+    }
+
+    /* fill 'quirks' with the quirks, if any */
+    label = "; quirks:";
+    quirks[0] = '\0';
+    len = sizeof(quirks);
+    s = quirks;
+    for (i = 0; skpc_quirks_map[i].name; ++i) {
+        BITS_IN_WORD32(&bits, skpc_quirks_map[i].flag);
+        if ((1 == bits) && (probe->quirks & skpc_quirks_map[i].flag)) {
+            t = snprintf(s, len, "%s %s", label, skpc_quirks_map[i].name);
+            if ((size_t)t < len) {
+                len -= t;
+                s += t;
+                assert((size_t)(s - quirks) == (sizeof(quirks) - len));
+            }
+            label = "";
+        }
+    }
+
+    accept_list = NULL;
+    if (probe->accept_from_addr) {
+        label = "; accept-from:";
+        len = probe->accept_from_addr_count * PATH_MAX * sizeof(char);
+        accept_list = s = (char *)malloc(len);
+        if (NULL == accept_list) {
+            goto SKIP_FOR;
+        }
+        for (i = 0; i < probe->accept_from_addr_count; ++i) {
+            t = (snprintf(
+                     s, len, "%s %s", label,
+                     skSockaddrArrayGetHostname(probe->accept_from_addr[i])));
+            if ((size_t)t < len) {
+                len -= t;
+                s += t;
+            }
+            label = "";
+        }
+      SKIP_FOR: ;
+    }
+
+
+    /* print result, branching based on collection mechanism */
+    if (probe->file_source) {
+        printer("%s file: '%s'%s%s",
+                name, probe->file_source, log_flags, quirks);
+    } else if (probe->poll_directory) {
+        printer("%s poll: '%s'%s%s",
+                name, probe->poll_directory, log_flags, quirks);
+    } else if (probe->unix_domain_path) {
+        printer("%s listen: '%s'%s%s",
+                name, probe->poll_directory, log_flags, quirks);
+    } else if (probe->listen_addr) {
+        printer("%s listen: %s/%s%s%s%s",
+                name, skSockaddrArrayGetHostPortPair(probe->listen_addr),
+                ((SKPC_PROTO_TCP == probe->protocol)
+                 ? "tcp" : ((SKPC_PROTO_UDP == probe->protocol)
+                            ? "udp" : ((SKPC_PROTO_SCTP == probe->protocol)
+                                       ? "sctp"
+                                       : ""))),
+                accept_list ? accept_list : "", log_flags, quirks);
+    } else {
+        printer("%s", name);
+    }
+    free(accept_list);
 }
 
 
@@ -3331,7 +3439,7 @@ skpc_probetype_t
 skpcProbetypeNameToEnum(
     const char         *name)
 {
-    struct probe_type_name_map_st *entry;
+    const struct probe_type_name_map_st *entry;
 
     if (name) {
         for (entry = probe_type_name_map; entry->name; ++entry) {
@@ -3349,7 +3457,7 @@ const char *
 skpcProbetypeEnumtoName(
     skpc_probetype_t    type)
 {
-    struct probe_type_name_map_st *entry;
+    const struct probe_type_name_map_st *entry;
 
     for (entry = probe_type_name_map; entry->name; ++entry) {
         if (type == entry->value) {
@@ -3388,7 +3496,7 @@ skpc_proto_t
 skpcProtocolNameToEnum(
     const char         *name)
 {
-    struct skpc_protocol_name_map_st *entry;
+    const struct skpc_protocol_name_map_st *entry;
     uint32_t num;
 
     if (NULL != name) {
@@ -3418,7 +3526,7 @@ const char *
 skpcProtocolEnumToName(
     skpc_proto_t        protocol)
 {
-    struct skpc_protocol_name_map_st *entry;
+    const struct skpc_protocol_name_map_st *entry;
 
     for (entry = skpc_protocol_name_map; entry->name; ++entry) {
         if (protocol == entry->value) {

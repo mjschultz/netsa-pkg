@@ -4,7 +4,7 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in ../LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: silkconfig.m4 275df62a2e41 2017-01-05 17:30:40Z mthomas $")
+dnl RCSIDENT("$SiLK: silkconfig.m4 17b7cefbfcdb 2017-05-05 18:15:16Z mthomas $")
 
 # ---------------------------------------------------------------------------
 # SILK_AC_COMPILER
@@ -1085,7 +1085,7 @@ AC_DEFUN([SILK_AC_ARG_WITH_PYTHON],[
     python_info="${srcdir}/$PYTHON_INFO_PROG"
 
     # Possible names for the python interpreter
-    python_names="python python2 python3 python2.7 python2.6 python3.2 python3.1 python3.0 python2.5 python2.4 no"
+    python_names="python python2 python3 python2.7 python2.6 python3.7 python3.6 python3.5 python3.4 python3.3 python3.2 python3.1 python3.0 python2.5 python2.4 no"
 
     AC_ARG_VAR([PYTHON], [The Python interpreter to use for PySiLK support when no interpreter is specified to --with-python; must be Python 2.4 or later.])
 
