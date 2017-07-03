@@ -24,17 +24,24 @@ B<rwbagtool> - Perform high-level operations on binary Bag files
 
 =head1 DESCRIPTION
 
-B<rwbagtool> performs various operations on Bags.  It can add Bags
-together, subtract a subset of data from a Bag, perform key
-intersection of a Bag with an IP set, extract the key list of a Bag as
-an IP set, or filter Bag records based on their counter value.
+B<rwbagtool> performs various operations on binary Bag files and
+creates a new Bag file.  A Bag is a set where each key is associated
+with a counter.  B<rwbag(1)> and B<rwbagbuild(1)> are the primary
+tools used to create a Bag file.  B<rwbagcat(1)> prints a binary Bag
+file as text.
 
-I<BAGFILE> is a the name of a file or a named pipe, or the names
-C<stdin> or C<-> to have B<rwbagtool> read from the standard input.
-If no Bag file names are given on the command line, B<rwbagtool>
-attempts to read a Bag from the standard input.  If I<BAGFILE> does
-not contain a Bag, B<rwbagtool> prints an error to stderr and exits
-abnormally.
+B<rwbagtool> can add Bags together, subtract a subset of data from a
+Bag, divide a Bag by another, compare the counters of two Bag files,
+perform key intersection of a Bag with an IPset, extract the keys of a
+Bag as an IPset, or filter Bag entries based on their key or counter
+values.
+
+In the command synopsis above, I<BAGFILE> is a the name of a file or a
+named pipe, or the names C<stdin> or C<-> to have B<rwbagtool> read
+from the standard input.  If no Bag file names are given on the
+command line, B<rwbagtool> attempts to read a Bag from the standard
+input.  If I<BAGFILE> does not contain a Bag, B<rwbagtool> prints an
+error to stderr and exits abnormally.
 
 =head1 OPTIONS
 
@@ -54,53 +61,61 @@ summed.
 =item B<--add>
 
 Sum the counters for each key for all Bag files given on the command
-line.  If a key does not exist, it has a counter of zero.  If no other
-operation is specified, the add operation is the default.
+line.  At least one Bag file must be specified, and any number of
+additional Bag files may be given.  If a key is not present in an
+input file, a counter of zero is used.  When no operation switch is
+specified on the command line, the add operation is the default.
 
 =item B<--subtract>
 
-Subtract from the first Bag file all subsequent Bag files.  If a key
-does not appear in the first Bag file, B<rwbagtool> assumes it has a
-value of 0.  If any counter subtraction results in a negative number,
-the key will not appear in the resulting Bag file.
+Subtract from the first Bag file all subsequent Bag files.  At least
+one Bag file must be specified, and any number of additional Bag files
+may be given.  If a key does not appear in the first Bag file,
+B<rwbagtool> assumes it has a value of 0.  If subtracting a key's
+counters results in a non-positive number, the key does appear in the
+resulting Bag file.
 
 =item B<--minimize>
 
 Cause the output to contain the minimum counter seen for each key.
-Keys that do not appear in all input Bags will not appear in the
-output.
+Keys that do not appear in all input Bags do not appear in the output.
+At least one Bag file must be specified, and any number of additional
+Bag files may be given.
 
 =item B<--maximize>
 
 Cause the output to contain the maximum counter seen for each key.
-The output will contain each key that appears in any input Bag.
+The output contains each key that appears in any input Bag.  At least
+one Bag file must be specified, and any number of additional Bag files
+may be given.
 
 =item B<--divide>
 
 Divide the first Bag file by the second Bag file.  It is an error if
-more than two Bag files are specified.  Every key in the first Bag
-file must appear in the second file; the second Bag may have keys that
-do not appear in the first, and those keys will not appear in the
-output.  Since Bags do not support floating point numbers, the result
-of the division is rounded to the nearest integer (values ending in
-C<.5> are rounded up).  If the result of the division is less than
-0.5, the key will not appear in the output.
+only one Bag file or more than two Bag files are given.  Every key in
+the first Bag file must appear in the second file; the second Bag may
+have keys that do not appear in the first, and those keys do not
+appear in the output.  Since Bags do not support floating point
+numbers, the result of the division is rounded to the nearest integer
+(values ending in C<.5> are rounded up).  If the result of the
+division is less than 0.5, the key does not appear in the output.
 
 =item B<--scalar-multiply>=I<VALUE>
 
 Multiply each counter in the Bag file by the scalar I<VALUE>, where
 I<VALUE> is an integer in the range 1 to 18446744073709551615.  This
-switch accepts a single Bag as input.
+switch requires a single Bag as input.
 
 =item B<--compare>=I<OPERATION>
 
 Compare the key/counter pairs in exactly two Bag files.  It is an
-error if more than two Bag files are specified.  The keys in the
-output Bag will only be those whose counter in the first Bag is
-I<OPERATION> the counter in the second Bag.  The counters for all keys
-in the output will be 1.  Any key that does not appear in both input
-Bag files will not appear in the result.  The possible I<OPERATION>
-values are the strings:
+error if only one Bag file or more than two Bag files are specified.
+The keys in the output Bag are only those for which the comparison
+denoted by I<OPERATION> is true when comparing the key's counter in
+the first Bag with the key's counter in the second Bag.  The counters
+for all keys in the output have the value 1.  Any key that does not
+appear in both input Bag files does not appear in the result.  The
+possible I<OPERATION> values are the strings:
 
 =over 4
 
@@ -154,25 +169,25 @@ B<not> match an entry in I<SETFILE>.
 
 =item B<--mincounter>=I<VALUE>
 
-Cause the output to contain only those records whose counter value is
+Cause the output to contain only those entries whose counter value is
 I<VALUE> or higher.  The allowable range is 1 to the maximum counter
 value; the default is 1.
 
 =item B<--maxcounter>=I<VALUE>
 
-Cause the output to contain only those records whose counter value is
+Cause the output to contain only those entries whose counter value is
 I<VALUE> or lower.  The allowable range is 1 to the maximum counter
 value; the default is the maximum counter value.
 
 =item B<--minkey>=I<VALUE>
 
-Cause the output to contain only those records whose key value is
+Cause the output to contain only those entries whose key value is
 I<VALUE> or higher.  Default is 0 (or 0.0.0.0).  Accepts input as an
 integer or as an IP address in dotted decimal notation.
 
 =item B<--maxkey>=I<VALUE>
 
-Cause the output to contain only those records whose key value is
+Cause the output to contain only those entries whose key value is
 I<VALUE> or higher.  Default is 4294967295 (or 255.255.255.255).
 Accepts input as an integer or as an IP address in dotted decimal
 notation.
@@ -191,8 +206,11 @@ Generate a new Bag whose keys are the counters in the intermediate Bag
 and whose counter is the number of times the counter was seen.  For
 example, this turns the Bag {sip:flow} into the Bag {flow:count(sip)}.
 Any counter in the intermediate Bag that is larger than the maximum
-possible key will be attributed to the maximum key; to prevent this,
-specify C<--maxcounter=4294967295>.
+possible key is attributed to the counter for the maximum key; to
+prevent this, specify C<--maxcounter=4294967295> which removes all
+key-counter pairs whose counters do not fit into a key.  (The
+B<--bin-ips> switch on B<rwbagcat(1)> allows one to invert a Bag file
+as it is being printed.)
 
 =item B<--coverset>
 
@@ -216,23 +234,23 @@ Use the default version for an IPv4 IPset and an IPv6 IPset, currently
 
 =item S< 2 >
 
-Create a file that may hold only IPv4 adresses and is readable by all
+Create a file that may hold only IPv4 addresses and is readable by all
 versions of SiLK.
 
 =item S< 3 >
 
-Create a file that may hold IPv4 or IPv6 adresses and is readable by
+Create a file that may hold IPv4 or IPv6 addresses and is readable by
 S<SiLK 3.0> and later.
 
 =item S< 4 >
 
-Create a file that may hold IPv4 or IPv6 adresses and is readable by
+Create a file that may hold IPv4 or IPv6 addresses and is readable by
 S<SiLK 3.7> and later.  These files are more compact that version 3
 and often more compact than version 2.
 
 =item S< 5 >
 
-Create a file that may hold only IPv6 adresses and is readable by
+Create a file that may hold only IPv6 addresses and is readable by
 S<SiLK 3.14> and later.  When this version is specified, IPsets
 containing only IPv4 addresses are written in version 4.  These files
 are usually more compact that version 4.
@@ -344,10 +362,17 @@ The examples assume the following contents for the files:
   7|  23|     8|   2|     7|  12|     7|   4|          8
   8|   2|                 9|   8|     8|   6|
 
-=head2 Adding Bag files
+The examples use B<rwbagcat(1)> to print the contents of the Bag
+files.
+
+=head2 Adding Bag Files
+
+Adding Bag files produces a Bag whose keys are the set union of the
+keys in the input Bags.  The counter for each key is the sum of the
+key's counters in each input Bag.
 
  $ rwbagtool --add Bag1.bag Bag2.bag > Bag-sum.bag
- $ rwbagcat --integer-keys Bag-sum.bag
+ $ rwbagcat --key-format=decimal Bag-sum.bag
   1|   1|
   3|  10|
   4|   9|
@@ -356,7 +381,7 @@ The examples assume the following contents for the files:
   8|   4|
 
  $ rwbagtool --add Bag1.bag Bag2.bag Bag3.bag > Bag-sum2.bag
- $ rwbagcat --integer-keys Bag-sum2.bag
+ $ rwbagcat --key-format=decimal Bag-sum2.bag
   1|   1|
   2|   8|
   3|  10|
@@ -368,28 +393,43 @@ The examples assume the following contents for the files:
 
 =head2 Subtracting Bag Files
 
- $ rwbagtool --sub Bag1.bag Bag2.bag > Bag-diff.bag
- $ rwbagcat --integer-keys Bag-diff.bag
+The B<--subtract> switch subtracts from the key/counter pairs in the
+first Bag file the key/counter pairs in all other Bag file arguments.
+Keys that are not present in the first argument are ignored.  If
+subtraction results in a counter value of zero or less, the key is
+removed from the result.
+
+ $ rwbagtool --subtract Bag1.bag Bag2.bag > Bag-diff.bag
+ $ rwbagcat --key-format=decimal Bag-diff.bag
   3|  10|
   4|   5|
   6|  14|
 
- $ rwbagtool --sub Bag2.bag Bag1.bag > Bag-diff2.bag
- $ rwbagcat --integer-keys Bag-diff2.bag
+ $ rwbagtool --subtract Bag2.bag Bag1.bag > Bag-diff2.bag
+ $ rwbagcat --key-format=decimal Bag-diff2.bag
   1|   1|
   7|   9|
 
 =head2 Getting the Minimum Value
 
+The output produced by the B<--minimize> switch contains only the keys
+that appear in all of input Bags.  For each key, the counter is the
+minimum value for that key in any input Bag.
+
  $ rwbagtool --minimize Bag1.bag Bag2.bag Bag3.bag > Bag-min.bag
- $ rwbagcat --integer-keys Bag-min.bag
+ $ rwbagcat --key-format=decimal Bag-min.bag
   4|   2|
   7|  12|
 
 =head2 Getting the Maximum Value
 
+The keys of the Bag file produced by B<--maximize> are the same as the
+keys produced by B<--add>; that is, the union of all keys in the input
+files.  For each key, its counter is the maximum value seen for that
+key in any single input Bag file.
+
  $ rwbagtool --maximize Bag1.bag Bag2.bag Bag3.bag > Bag-max.bag
- $ rwbagcat --integer-keys Bag-max.bag
+ $ rwbagcat --key-format=decimal Bag-max.bag
   1|   1|
   2|   8|
   3|  10|
@@ -401,76 +441,134 @@ The examples assume the following contents for the files:
 
 =head2 Dividing Bag Files
 
+The B<--divide> switch requires exactly two Bag files as input.  The
+keys in the first Bag argument must be either the same as or a subset
+of those in the second argument.  The counter for each key in the
+first Bag file is divided by that key's counter in the second file.
+If the result of the division is less than 0.5, the key is not
+included in the output.
+
  $ rwbagtool --divide Bag2.bag Bag4.bag > Bag-div1.bag
- $ rwbagcat --integer-keys Bag-div1.bag
+ $ rwbagcat --key-format=decimal Bag-div1.bag
    1|   1|
    4|   1|
    7|   8|
 
-However, when the order is reversed:
+When the order of the Bag file arguments is reversed an error is
+reported.
 
  $ rwbagtool --divide Bag4.bag Bag2.bag > Bag-div2.bag
  rwbagtool: Error dividing bags; key 6 not in divisor bag
 
 To work around this issue, use the B<--coverset> switch to create a
-copy of F<Bag4.bag> that contains only the keys in F<Bag2.bag>
+copy of F<Bag4.bag> that contains only the keys in F<Bag2.bag>.
 
  $ rwbagtool --coverset Bag2.bag > Bag2-keys.set
- $ rwbagtool --intersect=Bag2-keys.set  Bag4.bag  > Bag4-small.bag
+ $ rwbagtool --intersect=Bag2-keys.set  Bag4.bag > Bag4-small.bag
  $ rwbagtool --divide Bag4-small.bag Bag2.bag > Bag-div2.bag
- $ rwbagcat --integer-keys Bag-div2.bag
+ $ rwbagcat --key-format=decimal Bag-div2.bag
    1|   1|
    4|   2|
    8|   3|
 
-Or, in a single piped command without writing the IPset to disk:
+The following command is the same as the above except the IPset and
+Bag files are piped between the tools instead of being written to
+disk:
 
  $ rwbagtool --coverset Bag2.bag                \
    | rwbagtool --intersect=-  Bag4.bag          \
    | rwbagtool --divide -  Bag2.bag             \
-   | rwbagcat --integer-keys
+   | rwbagcat --key-format=decimal
    1|   1|
    4|   2|
    8|   3|
 
 =head2 Scalar Multiplication
 
+The B<--scalar-multiply> switch multiplies each counter in the input
+Bag by the specified value.  Exactly one Bag file argument is
+required.
+
  $ rwbagtool --scalar-multiply=7 Bag1.bag > Bag-multiply.bag
- $ rwbagcat --integer-keys Bag-multiply.bag
+ $ rwbagcat --key-format=decimal Bag-multiply.bag
   3|  70|
   4|  49|
   6|  98|
   7| 161|
   8|  14|
 
+Use two B<rwbagtool> commands if multiple operations are desired.
+
+ $ rwbagtool --add Bag1.bag Bag2.bag   \
+   | rwbagtool --scalar-multiply=3 --output-path=Bag12-multi.bag
+ $ rwbagcat --key-format=decimal Bag12-multi.bag
+  1|   3|
+  3|  30|
+  4|  27|
+  6|  42|
+  7| 165|
+  8|  12|
+
 =head2 Comparing Bag Files
 
+The B<--compare> switch takes an argument that specifies how to
+compare the counters in two Bag files, and it requires exactly two Bag
+files as input.  For each key that appears in both Bag files, the
+counter value in the first file is compared to counter value in the
+second file.  If the comparison is true, the key appears in the
+resulting Bag file with a counter of 1.  If the comparison is false,
+the key is not present in the output file.  Keys that appear in only
+one of the input files are ignored.
+
+The following comparisons operate on F<Bag1.bag> and F<Bag2.bag> which
+have as common keys 4, 7, and 8.
+
+Find counters in F<Bag1.bag> that are less than those in F<Bag2.bag>:
+
  $ rwbagtool --compare=lt Bag1.bag Bag2.bag > Bag-lt.bag
- $ rwbagcat --integer-keys Bag-lt.bag
+ $ rwbagcat --key-format=decimal Bag-lt.bag
   7|   1|
+
+Find counters in F<Bag1.bag> that are less than or equal to those in
+F<Bag2.bag>:
 
  $ rwbagtool --compare=le Bag1.bag Bag2.bag > Bag-le.bag
- $ rwbagcat --integer-keys Bag-le.bag
+ $ rwbagcat --key-format=decimal Bag-le.bag
   7|   1|
   8|   1|
 
+Find counters in F<Bag1.bag> that are equal to those in F<Bag2.bag>:
+
  $ rwbagtool --compare=eq Bag1.bag Bag2.bag > Bag-eq.bag
- $ rwbagcat --integer-keys Bag-eq.bag
+ $ rwbagcat --key-format=decimal Bag-eq.bag
   8|   1|
 
+Find counters in F<Bag1.bag> that are greater than or equal to those
+in F<Bag2.bag>:
+
  $ rwbagtool --compare=ge Bag1.bag Bag2.bag > Bag-ge.bag
- $ rwbagcat --integer-keys Bag-ge.bag
+ $ rwbagcat --key-format=decimal Bag-ge.bag
   4|   1|
   8|   1|
 
+Find counters in F<Bag1.bag> that are greater than those in
+F<Bag2.bag>:
+
  $ rwbagtool --compare=gt Bag1.bag Bag2.bag > Bag-gt.bag
- $ rwbagcat --integer-keys Bag-gt.bag
+ $ rwbagcat --key-format=decimal Bag-gt.bag
   4|   1|
 
 =head2 Making a Cover Set
 
+A I<cover set> is an IPset file that contains the keys that are
+present in any of the input Bag files.  In other words, it is the
+union of the keys converted to an IPset.  Since an operation switch is
+not provided in this command, an implicit B<--add> operation is
+performed on the Bag files prior to creating the cover set.
+(B<rwsetcat(1)> prints the contents of an IPset file as text.)
+
  $ rwbagtool --coverset Bag1.bag Bag2.bag Bag3.bag > Cover.set
- $ rwsetcat --integer-keys Cover.set
+ $ rwsetcat --key-format=decimal Cover.set
   1
   2
   3
@@ -480,10 +578,31 @@ Or, in a single piped command without writing the IPset to disk:
   8
   9
 
+One use of a cover set is to limit the contents of a Bag file to keys
+that are present in a second Bag file:
+
+ $ rwbagtool --coverset --output-path=Cover.set Bag1.bag
+ $ rwbagtool --intersect=Cover.set Bag2.bag > Bag1-mask-Bag2.bag
+ $ rwbagcat --key-format=decimal Bag1-mask-Bag2.bag
+  4|   2|
+  7|  32|
+  8|   2|
+
+To mask the contents of F<Bag2.bag> by the keys that are not present
+in F<Bag1.bag>:
+
+ $ rwbagtool --complement-intersect=Cover.set Bag2.bag \
+        > Bag1-notmask-Bag2.bag
+ $ rwbagcat --key-format=decimal Bag1-notmask-Bag2.bag
+  1|   1|
+
 =head2 Inverting a Bag
 
+The output of the B<--invert> switch is a Bag file that counts the
+number of times each counter is present in the input Bag file.
+
  $ rwbagtool --invert Bag1.bag > Bag-inv1.bag
- $ rwbagcat --integer-keys Bag-inv1.bag
+ $ rwbagcat --key-format=decimal Bag-inv1.bag
   2|   1|
   7|   1|
  10|   1|
@@ -491,52 +610,137 @@ Or, in a single piped command without writing the IPset to disk:
  23|   1|
 
  $ rwbagtool --invert Bag2.bag > Bag-inv2.bag
- $ rwbagcat --integer-keys Bag-inv2.bag
+ $ rwbagcat --key-format=decimal Bag-inv2.bag
   1|   1|
   2|   2|
  32|   1|
 
  $ rwbagtool --invert Bag3.bag > Bag-inv3.bag
- $ rwbagcat --integer-keys Bag-inv3.bag
+ $ rwbagcat --key-format=decimal Bag-inv3.bag
   8|   2|
  10|   1|
  12|   1|
  14|   1|
 
+When multiple Bag files are specified on the command line, the files
+are added prior to creating the inverted Bag.  Even though the counter
+2 appears three times in the files F<Bag1.bag> and F<Bag2.bag>, the
+key 2 is not present in the following since the add operation is
+performed first.
+
+ $ rwbagtool --invert Bag1.bag Bag2.bag   \
+   | rwbagcat --key-format=decimal
+  1|   1|
+  4|   1|
+  9|   1|
+ 10|   1|
+ 14|   1|
+ 55|   1|
+
 =head2 Masking Bag Files
 
+The B<--intersect> switch takes an IPset file as an argument and
+limits the keys of the Bag produced by B<rwbagtool> to only those keys
+that appear in the IPset file.
+
  $ rwbagtool --intersect=Mask.set Bag1.bag > Bag-mask.bag
- $ rwbagcat --integer-keys Bag-mask.bag
+ $ rwbagcat --key-format=decimal Bag-mask.bag
   4|   7|
   6|  14|
   8|   2|
 
+The B<--complement-intersect> switch limits the output to only those
+keys that do not appear in the IPset file.
+
  $ rwbagtool --complement-intersect=Mask.set Bag1.bag > Bag-mask2.bag
- $ rwbagcat --integer-keys Bag-mask2.bag
+ $ rwbagcat --key-format=decimal Bag-mask2.bag
   3|  10|
   7|  23|
 
+See also the next section.
+
 =head2 Restricting the Output
 
+In addition to limiting the result of B<rwbagtool> to keys that appear
+or do not appear in an IPset file (cf. previous section), numeric
+limits may be used to restrict the keys or counters that in the
+resulting Bag file with use of the B<--minkey>, B<--maxkey>,
+B<--mincounter>, and B<--maxcounter> switches.
+
  $ rwbagtool --add --maxkey=5 Bag1.bag Bag2.bag > Bag-res1.bag
- $ rwbagcat --integer-keys Bag-res1.bag
+ $ rwbagcat --key-format=decimal Bag-res1.bag
   1|   1|
   3|  10|
   4|   9|
 
  $ rwbagtool --minkey=3 --maxkey=6 Bag1.bag > Bag-res2.bag
- $ rwbagcat --integer-keys Bag-res2.bag
+ $ rwbagcat --key-format=decimal Bag-res2.bag
   3|  10|
   4|   9|
   6|  14|
 
  $ rwbagtool --mincounter=20 Bag1.bag Bag2.bag > Bag-res3.bag
- $ rwbagcat --integer-keys Bag-res3.bag
+ $ rwbagcat --key-format=decimal Bag-res3.bag
   7|  55|
 
- $ rwbagtool --sub --maxcounter=9 Bag1.bag Bag2.bag > Bag-res4.bag
- $ rwbagcat --integer-keys Bag-res4.bag
+ $ rwbagtool --subtract --maxcounter=9 Bag1.bag Bag2.bag  \
+        > Bag-res4.bag
+ $ rwbagcat --key-format=decimal Bag-res4.bag
   4|   5|
+
+=head2 Changing a File's Format
+
+To share a Bag file with a user who has a version of SiLK that
+includes different compression libraries, it may be necessary to
+change the the compression-method of the Bag.
+
+It is not possible to change the compression-method directly.  A new
+file must be created first, and then you may then replace the old file
+with the new file.
+
+To create a new file that uses a different compression-method of the
+Bag file F<A.bag>, use B<rwbagtool> with the B<--add> switch and
+specify the desired argument:
+
+ $ rwbagtool --add --compression=none --output-path=A1.bag A.bag
+
+=head2 Changing the Key Type or Counter Type
+
+Unfortunately, the Bag tools do not allow changing the key type or
+counter type of a Bag file.  To change the types, use B<rwbagcat(1)>
+to write the Bag as text and B<rwbagbuild(1)> to convert the text back
+to a Bag file.
+
+ $ rwbagcat Bag1.bag    \
+   | rwbagbuild --bag-input=- --output-path=Bag1-typed.bag  \
+        --key-type=sport --counter-type=sum-bytes
+
+Use B<rwfileinfo(1)> to see the type of the key and counter.
+
+ $ rwfileinfo --field=bag Bag1-typed.bag
+ Bag1-typed.bag:
+   bag          key: sPort @ 4 octets; counter: sum-bytes @ 8 octets
+
+Alternatively, one may use PySiLK (see pysilk(3)) to modify the key
+type and counter type.
+
+ $ cat bag-type.py
+ import sys
+ from silk import *
+
+ key_type = sys.argv[1]
+ counter_type = sys.argv[2]
+ old_file = sys.argv[3]
+ new_file = sys.argv[4]
+
+ old = Bag.load(old_file, key_type=IPv4Addr)
+ new = Bag(old, key_type=key_type, counter_type=counter_type)
+ new.save(new_file)
+ $
+ $ python bag-type.py sipv4 sum-packets Bag1.bag Bag1-type2.bag
+ $ rwfileinfo --field=bag Bag1-type2.bag
+ Bag1-type2.bag:
+   bag          key: sIPv4 @ 4 octets; counter: sum-packets @ 8 octets
 
 =head1 ENVIRONMENT
 
@@ -568,7 +772,7 @@ B<rwset(1)>, B<rwsetbuild(1)>, B<rwsetcat(1)>, B<silk(7)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwbagtool.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwbagtool.pod 09f321e0f944 2017-05-23 18:34:32Z mthomas $
 
 Local Variables:
 mode:text

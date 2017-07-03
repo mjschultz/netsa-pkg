@@ -1,0 +1,189 @@
+=pod
+
+=head1 NAME
+
+B<app-mismatch> - SiLK plug-in to find services on unusual ports
+
+=head1 SYNOPSIS
+
+  rwfilter --plugin=app-mismatch.so ...
+
+=head1 DESCRIPTION
+
+The B<app-mismatch> plug-in adds a partitioning rule to B<rwfilter(1)>
+that helps to find services running on unusual port numbers.
+
+Specifically, when the B<app-mismatch> plug-in is loaded into
+B<rwfilter(1)>, B<rwfilter> adds a partitioning rule that passes a
+record when the record's application field (the B<applabel(1)> value
+determined by B<yaf(1)>) is set and the value does not match the value
+of either the source port or destination port.
+
+The plug-in causes B<rwfilter> to write each record that meets any of
+these criteria to the location specified by the B<--fail-destination>
+switch:
+
+=over 4
+
+=item *
+
+the C<protocol> field has a value other than 6 or 17 (TCP or UDP)
+
+=item *
+
+the C<application> field has the value 0, indicating that the
+application labeling feature was disabled or that it was unable to
+determine the type of application
+
+=item *
+
+the C<application> field value is equal to either the C<sPort> or the
+C<dPort> field, indicating the type of traffic appears to be
+consistent with what would be expected
+
+=back
+
+The remaining records are either TCP or UDP records where the
+application field is set and its value is different than that in the
+source and destination port.  These records are written to the
+location specified by the B<--pass-destination> switch.
+
+=head1 OPTIONS
+
+The B<app-mismatch> plug-in does not add any additional switches to
+B<rwfilter> nor modify any field.
+
+=head1 EXAMPLES
+
+In the following examples, the dollar sign (C<$>) represents the shell
+prompt.  The text after the dollar sign represents the command line.
+Lines have been wrapped for improved readability, and the back slash
+(C<\>) is used to indicate a wrapped line.
+
+The F<app-mismatch.so> plug-in must be explicitly loaded into
+B<rwfilter(1)> using the B<--plugin> switch.  The plug-in becomes
+active once it is loaded and no additional switches are required.
+
+The following searches the SiLK Flow file F<data.rw> for services that
+appear to be running on unusual or non-typical ports.  To get a quick
+summary of the data, the output from B<rwfilter> is piped into
+B<rwuniq(1)>:
+
+ $ rwfilter --plugin=app-mismatch.so --print-stat --pass=- data.rw \
+   | rwuniq --fields=application,sPort,dPort | head
+ Files     1.  Read      24494.  Pass        890. Fail       23604.
+ appli|sPort|dPort|   Records|
+    53|62579| 5355|         1|
+    53|55188| 5355|         1|
+    53|57807| 5355|         1|
+    53|54898| 5355|         1|
+    80| 1171|  591|         1|
+    53| 5355|50478|         1|
+    53|64981| 5355|         1|
+   139|52845|  445|         1|
+    53|52536| 5355|         1|
+
+As seen in the output of the B<--print-stat> switch from B<rwfilter>,
+the plug-in failed 23,604 records.  Some of those records have
+protocols other than TCP and UDP, and some records have an application
+value of zero.  Adding additional B<rwfilter> invocations provides a
+way to get count for each:
+
+ $ rwfilter --protocol=6,17 --print-stat --pass=- data.rw       \
+   | rwfilter --application=1- --print-stat --pass=- -          \
+   | rwfilter --plugin=app-mismatch.so --print-stat --pass=- -  \
+   | rwuniq --fields=application,sPort,dPort --pager= | head
+ Files     1.  Read      24494.  Pass      24420. Fail          74.
+ Files     1.  Read      24420.  Pass      14228. Fail       10192.
+ Files     1.  Read      14228.  Pass        890. Fail       13338.
+ appli|sPort|dPort|   Records|
+    53|62579| 5355|         1|
+    53|55188| 5355|         1|
+    53|57807| 5355|         1|
+    53|54898| 5355|         1|
+    80| 1171|  591|         1|
+    53| 5355|50478|         1|
+    53|64981| 5355|         1|
+   139|52845|  445|         1|
+    53|52536| 5355|         1|
+
+All but 74 records were either TCP or UDP.  For the TCP and UDP
+records, 10,192 had an application label of 0.  There were 13,338
+records where the application label matched the port number.  Change
+the final B<rwfilter> invocation to use B<--fail-destination> to see
+those records:
+
+ $ rwfilter --protocol=6,17 --print-stat --pass=- data.rw       \
+   | rwfilter --application=1- --print-stat --pass=- -          \
+   | rwfilter --plugin=app-mismatch.so --print-stat --pass=- -  \
+   | rwuniq --fields=application,sPort,dPort --pager= | head
+ Files     1.  Read      24494.  Pass      24420. Fail          74.
+ Files     1.  Read      24420.  Pass      14228. Fail       10192.
+ Files     1.  Read      14228.  Pass        890. Fail       13338.
+ appli|sPort|dPort|   Records|
+   443|  443|53257|         1|
+    80|54123|   80|         2|
+    80|52322|   80|         1|
+    80|54749|   80|         1|
+    80|   80|52885|         3|
+    80|   80|54204|         1|
+    53|   53|55964|         1|
+    80|53497|   80|         1|
+    80|54122|   80|         2|
+
+=head1 ENVIRONMENT
+
+=over 4
+
+=item SILK_PATH
+
+This environment variable gives the root of the install tree.  When
+searching for plug-ins, a SiLK application may use this environment
+variable.  See the L</FILES> section for details.
+
+=item SILK_PLUGIN_DEBUG
+
+When set to 1, the SiLK applications print status messages to the
+standard error as they attempt to find and open the F<app-mismatch.so>
+plug-in.  A typical invocation using this variable is:
+
+ env SILK_PLUGIN_DEBUG=1 rwfilter --plugin=app-mismatch.so --version
+
+=back
+
+=head1 FILES
+
+=over 4
+
+=item F<${SILK_PATH}/lib64/silk/app-mismatch.so>
+
+=item F<${SILK_PATH}/lib64/app-mismatch.so>
+
+=item F<${SILK_PATH}/lib/silk/app-mismatch.so>
+
+=item F<${SILK_PATH}/lib/app-mismatch.so>
+
+=item F<@prefix@/lib64/silk/app-mismatch.so>
+
+=item F<@prefix@/lib64/app-mismatch.so>
+
+=item F<@prefix@/lib/silk/app-mismatch.so>
+
+=item F<@prefix@/lib/app-mismatch.so>
+
+Possible locations for the plug-in.
+
+=back
+
+=head1 SEE ALSO
+
+B<rwfilter(1)>, B<rwuniq(1)>, B<silk(7)>, B<yaf(1)>, B<applabel(1)>
+
+=cut
+
+$SiLK: app-mismatch.pod 0a5374cd2f26 2017-05-09 17:11:42Z mthomas $
+
+Local Variables:
+mode:text
+indent-tabs-mode:nil
+End:

@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpdu2silk.c 57cd46fed37f 2017-03-13 21:54:02Z mthomas $");
+RCSIDENT("$SiLK: rwpdu2silk.c de8fdd9e63cf 2017-04-27 19:11:35Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/rwrec.h>
@@ -268,11 +268,10 @@ appSetup(
     if (skpcSetup()) {
         exit(EXIT_FAILURE);
     }
-    if (skpcProbeCreate(&probe)) {
+    if (skpcProbeCreate(&probe, PROBE_ENUM_NETFLOW_V5)) {
         exit(EXIT_FAILURE);
     }
     skpcProbeSetName(probe, skAppName());
-    skpcProbeSetType(probe, PROBE_ENUM_NETFLOW_V5);
     skpcProbeSetFileSource(probe, "/dev/null");
     if (parseLogFlags(log_flags)) {
         exit(EXIT_FAILURE);

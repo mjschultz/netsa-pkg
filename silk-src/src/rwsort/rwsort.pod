@@ -301,26 +301,29 @@ F<country_codes.pmap> mapping file, as described in B<ccfilter(3)>.
 
 as B<scc> for the destination IP
 
-=item src-I<MAPNAME>
+=item src-I<map-name>
 
-value determined by passing the source IP or the protocol/source-port
-to the user-defined mapping defined in the prefix map associated with
-I<MAPNAME>.  See the description of the B<--pmap-file> switch below
-and the B<pmapfilter(3)> manual page.
+label contained in the prefix map file associated with I<map-name>.
+If the prefix map is for IP addresses, the label is that associated
+with the source IP address.  If the prefix map is for protocol/port
+pairs, the label is that associated with the protocol and source port.
+See also the description of the B<--pmap-file> switch below and the
+B<pmapfilter(3)> manual page.
 
-=item dst-I<MAPNAME>
+=item dst-I<map-name>
 
-as B<src-I<MAPNAME>> for the destination IP or
-protocol/destination-port.
+as B<src-I<map-name>> for the destination IP address or the protocol
+and destination port.
 
 =item sval
 
+as B<src-I<map-name>> when no map-name is associated with the prefix
+map file
+
 =item dval
 
-These are deprecated field names created by B<pmapfilter> that
-correspond to B<src-I<MAPNAME>> and B<dst-I<MAPNAME>>, respectively.
-These fields are available when a prefix map is used that is
-not associated with a I<MAPNAME>.
+as B<dst-I<map-name>> when no map-name is associated with the prefix
+map file
 
 =back
 
@@ -510,20 +513,19 @@ allow the output to include descriptions of those fields.
 Print the version number and information about how SiLK was
 configured, then exit the application.
 
-=item B<--pmap-file>=I<MAPNAME>:I<PATH>
-
 =item B<--pmap-file>=I<PATH>
 
-Instruct B<rwsort> to load the mapping file located at I<PATH> and
-create the src-I<MAPNAME> and dst-I<MAPNAME> fields.  When I<MAPNAME>
-is provided explicitly, it will be used to refer to the fields
-specific to that prefix map.  If I<MAPNAME> is not provided, B<rwsort>
-will check the prefix map file to see if a map-name was specified when
-the file was created.  If no map-name is available, B<rwsort> creates
-the fields sval and dval.  Multiple B<--pmap-file> switches are
-supported as long as each uses a unique value for map-name.  The
-B<--pmap-file> switch(es) must precede the B<--fields> switch.  For
-more information, see B<pmapfilter(3)>.
+=item B<--pmap-file>=I<MAPNAME>:I<PATH>
+
+Load the prefix map file located at I<PATH> and create fields named
+src-I<map-name> and dst-I<map-name> where I<map-name> is either the
+I<MAPNAME> part of the argument or the map-name specified when the
+file was created (see B<rwpmapbuild(1)>).  If no map-name is
+available, B<rwsort> names the fields C<sval> and C<dval>.  Specify
+I<PATH> as C<-> or C<stdin> to read from the standard input.  The
+switch may be repeated to load multiple prefix map files, but each
+prefix map must use a unique map-name.  The B<--pmap-file> switch(es)
+must precede the B<--fields> switch.  See also B<pmapfilter(3)>.
 
 =item B<--python-file>=I<PATH>
 
@@ -732,10 +734,11 @@ Directory in which to create temporary files.
 
 =head1 SEE ALSO
 
-B<rwcut(1)>, B<rwfileinfo(1)>, B<rwstats(1)>, B<rwuniq(1)>,
-B<addrtype(3)>, B<ccfilter(3)>, B<pmapfilter(3)>, B<pysilk(3)>,
-B<silkpython(3)>, B<silk-plugin(3)>, B<sensor.conf(5)>,
-B<rwflowpack(8)>, B<silk(7)>, B<yaf(1)>, B<dlopen(3)>, B<zlib(3)>
+B<rwcount(1)>, B<rwcut(1)>, B<rwfileinfo(1)>, B<rwstats(1)>,
+B<rwuniq(1)>, B<rwpmapbuild(1)>, B<addrtype(3)>, B<ccfilter(3)>,
+B<pmapfilter(3)>, B<pysilk(3)>, B<silkpython(3)>, B<silk-plugin(3)>,
+B<sensor.conf(5)>, B<rwflowpack(8)>, B<silk(7)>, B<yaf(1)>,
+B<dlopen(3)>, B<zlib(3)>
 
 =head1 NOTES
 
@@ -761,7 +764,7 @@ sorted by providing the B<--presorted-input> switch.
 
 =cut
 
-$SiLK: rwsort.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwsort.pod 118af073bc56 2017-06-05 18:13:10Z mthomas $
 
 Local Variables:
 mode:text

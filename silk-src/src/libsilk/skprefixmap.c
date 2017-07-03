@@ -72,7 +72,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skprefixmap.c 9dd70c6ccd3b 2017-03-14 15:42:18Z mthomas $");
+RCSIDENT("$SiLK: skprefixmap.c f4bda4d34f32 2017-04-13 16:35:04Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/rwrec.h>
@@ -731,7 +731,8 @@ prefixMapHentryCreate(
         return NULL;
     }
     pn_hdr->he_spec.hes_id  = SK_HENTRY_PREFIXMAP_ID;
-    pn_hdr->he_spec.hes_len = sizeof(sk_hentry_prefixmap_t) + len;
+    pn_hdr->he_spec.hes_len = (sizeof(sk_header_entry_spec_t)
+                               + sizeof(pn_hdr->version) + len);
 
     pn_hdr->version = 1;
     pn_hdr->mapname = strdup(mapname);
@@ -761,10 +762,8 @@ prefixMapHentryFree(
     if (pn_hdr) {
         assert(skHeaderEntryGetTypeId(pn_hdr) == SK_HENTRY_PREFIXMAP_ID);
         pn_hdr->he_spec.hes_id = UINT32_MAX;
-        if (pn_hdr->mapname) {
-            free(pn_hdr->mapname);
-            pn_hdr->mapname = NULL;
-        }
+        free(pn_hdr->mapname);
+        pn_hdr->mapname = NULL;
         free(pn_hdr);
     }
 }

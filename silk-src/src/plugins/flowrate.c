@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: flowrate.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: flowrate.c c3d10f53bec8 2017-06-01 17:58:29Z mthomas $");
 
 #include <silk/skplugin.h>
 #include <silk/rwrec.h>
@@ -50,6 +50,14 @@ RCSIDENT("$SiLK: flowrate.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 #define PAYLOAD_BYTES_AGG      14
 #define PAYLOAD_RATE_AGG       15
 
+/* when a record's duration is 0 and a rate is being computed, assume
+ * the duration is this number of MICRO (1e-6) seconds.  May be
+ * changed via the --flowrate-zero-duration switch. */
+#define ZERO_DURATION_DEFAULT 400
+
+/* string version of ZERO_DURATION_DEFAULT for usage output */
+#define ZERO_DURATION_STRING  "400"
+
 /* the size of the binary value used as a key in rwsort, rwstats, and
  * rwuniq */
 #define RATE_BINARY_SIZE_KEY  sizeof(uint64_t)
@@ -75,29 +83,38 @@ RCSIDENT("$SiLK: flowrate.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 /* make values in rwcut consistent with those in rwuniq */
 #define TRUNC_PRECISION(v)      UINT64_TO_DOUBLE(DOUBLE_TO_UINT64(v))
 
-/* how to calculate the packets per second.  rwRecGetElapsed() returns
- * the value in milliseconds.  If the elapsed time is 0, just return
- * the packet count. */
-#define PCKT_RATE_DOUBLE(r)                                             \
-    ((rwRecGetElapsed(r) == 0)                                          \
-     ? rwRecGetPkts(r)                                                  \
-     : ((double)(rwRecGetPkts(r)) * 1000.0 / (double)(rwRecGetElapsed(r))))
+/* return a record's duration as a number of MICRO (1e-6) seconds.
+ * SiLK stores duration as a number of MILLI (1e-3) seconds.  Use
+ * zero_duration if the record's duration is 0. */
+#define RWREC_MICRO_DURATION(r)                                         \
+    ((rwRecGetElapsed(r) > 0) ? (rwRecGetElapsed(r) * 1000) : zero_duration)
 
-/* as above, but for bytes-per-second */
-#define BYTE_RATE_DOUBLE(r)                                             \
-    ((rwRecGetElapsed(r) == 0)                                          \
-     ? rwRecGetBytes(r)                                                 \
-     : ((double)(rwRecGetBytes(r)) * 1000.0 / (double)(rwRecGetElapsed(r))))
+/* compute a rate as a double given a volume and a duration as a
+ * number of MICRO (1e-6) seconds.  Assumes duration is non-zero. */
+#define COMPUTE_RATE(v, us)                     \
+     ((double)(v) * 1e+6 / (double)(us))
 
-/* as above, for the payload-rate */
-#define PAYLOAD_RATE_DOUBLE(r)                                          \
-    ((rwRecGetElapsed(r) == 0)                                          \
-     ? getPayload(r)                                                    \
-     : ((double)getPayload(r) * 1000.0 / (double)(rwRecGetElapsed(r))))
+/* compute a bytes-per-packet ratio as a double given the number of
+ * bytes and the number of packets.  Assumes packet count is
+ * non-zero. */
+#define COMPUTE_BPP(b, p)                       \
+    ((double)(b) / (double)(p))
 
-/* how to calculate bytes-per-packet */
-#define BYTES_PER_PACKET_DOUBLE(r)                              \
-    ((double)rwRecGetBytes(r) / (double)rwRecGetPkts(r))
+/* calculate the packets per second of a single record */
+#define PCKT_RATE_RWREC(r)                             \
+    COMPUTE_RATE(rwRecGetPkts(r), RWREC_MICRO_DURATION(r))
+
+/* calculate the bytes per second of a single record */
+#define BYTE_RATE_RWREC(r)                             \
+    COMPUTE_RATE(rwRecGetBytes(r), RWREC_MICRO_DURATION(r))
+
+/* calculate the payload-bytes per second of a single record */
+#define PAYLOAD_RATE_RWREC(r)                          \
+    COMPUTE_RATE(getPayload(r), RWREC_MICRO_DURATION(r))
+
+/* calculate the bytes per packet ratio of a single record */
+#define BYTES_PER_PACKET_RWREC(r)                      \
+    COMPUTE_BPP(rwRecGetBytes(r), rwRecGetPkts(r))
 
 
 /* ah the joys of the C preprocessor...  this mess is here to allow us
@@ -131,6 +148,10 @@ typedef struct u64_range_st {
 
 /* LOCAL VARIABLES */
 
+/* the duration to use when a flow record's duration is 0.  may be set
+ * by the --flowrate-zero-duration switch */
+static uint64_t zero_duration = ZERO_DURATION_DEFAULT;
+
 /* for filtering, pass records whose packets-per-second,
  * bytes-per-second, payload-bytes, and payload-bytes-per-second
  * values fall within these ranges. */
@@ -140,6 +161,7 @@ static double_range_t payload_rate = {0, DBL_MAX, 0};
 static u64_range_t payload_bytes = {0, UINT64_MAX, 0};
 
 typedef enum plugin_options_en {
+    OPT_FLOWRATE_ZERO_DURATION,
     OPT_PACKETS_PER_SECOND,
     OPT_BYTES_PER_SECOND,
     OPT_PAYLOAD_BYTES,
@@ -147,14 +169,18 @@ typedef enum plugin_options_en {
 } plugin_options_enum;
 
 static struct option plugin_options[] = {
-    {"packets-per-second",  REQUIRED_ARG, 0, OPT_PACKETS_PER_SECOND},
-    {"bytes-per-second",    REQUIRED_ARG, 0, OPT_BYTES_PER_SECOND},
-    {"payload-bytes",       REQUIRED_ARG, 0, OPT_PAYLOAD_BYTES},
-    {"payload-rate",        REQUIRED_ARG, 0, OPT_PAYLOAD_RATE},
-    {0, 0, 0, 0}            /* sentinel */
+    {"flowrate-zero-duration",  REQUIRED_ARG, 0, OPT_FLOWRATE_ZERO_DURATION},
+    {"packets-per-second",      REQUIRED_ARG, 0, OPT_PACKETS_PER_SECOND},
+    {"bytes-per-second",        REQUIRED_ARG, 0, OPT_BYTES_PER_SECOND},
+    {"payload-bytes",           REQUIRED_ARG, 0, OPT_PAYLOAD_BYTES},
+    {"payload-rate",            REQUIRED_ARG, 0, OPT_PAYLOAD_RATE},
+    {0, 0, 0, 0}                /* sentinel */
 };
 
 static const char *plugin_help[] = {
+    ("Assume a flow's duration is this number of\n"
+     "\tmicroseconds when computing a rate and the flow's given duration\n"
+     "\tis 0 milliseconds.  Min 1.  Def. " ZERO_DURATION_STRING),
     "Packets-per-second is within decimal range X-Y.",
     "Bytes-per-second is within decimal range X-Y.",
     "Payload-byte count is within integer range X-Y.",
@@ -162,7 +188,8 @@ static const char *plugin_help[] = {
     NULL
 };
 
-/* fields for rwcut, rwuniq, etc */
+/* fields for rwcut, rwuniq, etc.  this array contains both key fields
+ * and aggregate value fields */
 static struct plugin_fields_st {
     const char *name;
     uint32_t    val;
@@ -227,6 +254,15 @@ optionsHandler(
     int rv;
 
     switch (opt_index) {
+      case OPT_FLOWRATE_ZERO_DURATION:
+        rv = skStringParseUint64(&zero_duration, opt_arg, 1, 0);
+        if (rv) {
+            goto PARSE_ERROR;
+        }
+        /* this argument is used by all applications; do not register
+         * the plug-in as a filter */
+        return SKPLUGIN_OK;
+
       case OPT_PAYLOAD_BYTES:
         rv = skStringParseRange64(&payload_bytes.min, &payload_bytes.max,
                                   opt_arg, 0, 0, SKUTILS_RANGE_SINGLE_OPEN);
@@ -371,7 +407,7 @@ filter(
 
     /* filter by payload-rate */
     if (payload_rate.is_active) {
-        rate = PAYLOAD_RATE_DOUBLE(rwrec);
+        rate = PAYLOAD_RATE_RWREC(rwrec);
         if (rate < payload_rate.min || rate > payload_rate.max) {
             /* failed */
             return SKPLUGIN_FILTER_FAIL;
@@ -380,7 +416,7 @@ filter(
 
     /* filter by packets-per-second */
     if (pckt_rate.is_active) {
-        rate = PCKT_RATE_DOUBLE(rwrec);
+        rate = PCKT_RATE_RWREC(rwrec);
         if (rate < pckt_rate.min || rate > pckt_rate.max) {
             /* failed */
             return SKPLUGIN_FILTER_FAIL;
@@ -389,7 +425,7 @@ filter(
 
     /* filter by bytes-per-second */
     if (byte_rate.is_active) {
-        rate = BYTE_RATE_DOUBLE(rwrec);
+        rate = BYTE_RATE_RWREC(rwrec);
         if (rate < byte_rate.min || rate > byte_rate.max) {
             /* failed */
             return SKPLUGIN_FILTER_FAIL;
@@ -422,22 +458,22 @@ recToTextKey(
 
       case PAYLOAD_RATE_KEY:
         snprintf(text_value, text_size, FORMAT_PRECISION,
-                 TRUNC_PRECISION(PAYLOAD_RATE_DOUBLE(rwrec)));
+                 TRUNC_PRECISION(PAYLOAD_RATE_RWREC(rwrec)));
         return SKPLUGIN_OK;
 
       case PCKTS_PER_SEC_KEY:
         snprintf(text_value, text_size, FORMAT_PRECISION,
-                 TRUNC_PRECISION(PCKT_RATE_DOUBLE(rwrec)));
+                 TRUNC_PRECISION(PCKT_RATE_RWREC(rwrec)));
         return SKPLUGIN_OK;
 
       case BYTES_PER_SEC_KEY:
         snprintf(text_value, text_size, FORMAT_PRECISION,
-                 TRUNC_PRECISION(BYTE_RATE_DOUBLE(rwrec)));
+                 TRUNC_PRECISION(BYTE_RATE_RWREC(rwrec)));
         return SKPLUGIN_OK;
 
       case BYTES_PER_PACKET_KEY:
         snprintf(text_value, text_size, FORMAT_PRECISION,
-                 TRUNC_PRECISION(BYTES_PER_PACKET_DOUBLE(rwrec)));
+                 TRUNC_PRECISION(BYTES_PER_PACKET_RWREC(rwrec)));
         return SKPLUGIN_OK;
 
     }
@@ -466,16 +502,16 @@ recToBinKey(
         val_u64 = getPayload(rwrec);
         break;
       case PAYLOAD_RATE_KEY:
-        val_u64 = DOUBLE_TO_UINT64(PAYLOAD_RATE_DOUBLE(rwrec));
+        val_u64 = DOUBLE_TO_UINT64(PAYLOAD_RATE_RWREC(rwrec));
         break;
       case PCKTS_PER_SEC_KEY:
-        val_u64 = DOUBLE_TO_UINT64(PCKT_RATE_DOUBLE(rwrec));
+        val_u64 = DOUBLE_TO_UINT64(PCKT_RATE_RWREC(rwrec));
         break;
       case BYTES_PER_SEC_KEY:
-        val_u64 = DOUBLE_TO_UINT64(BYTE_RATE_DOUBLE(rwrec));
+        val_u64 = DOUBLE_TO_UINT64(BYTE_RATE_RWREC(rwrec));
         break;
       case BYTES_PER_PACKET_KEY:
-        val_u64 = DOUBLE_TO_UINT64(BYTES_PER_PACKET_DOUBLE(rwrec));
+        val_u64 = DOUBLE_TO_UINT64(BYTES_PER_PACKET_RWREC(rwrec));
         break;
       default:
         return SKPLUGIN_ERR_FATAL;
@@ -543,21 +579,21 @@ addRecToBinAgg(
       case PAYLOAD_RATE_AGG:
         memcpy(val, dest, RATE_BINARY_SIZE_AGG);
         val[0] += getPayload(rwrec);
-        val[1] += rwRecGetElapsed(rwrec);
+        val[1] += RWREC_MICRO_DURATION(rwrec);
         memcpy(dest, val, RATE_BINARY_SIZE_AGG);
         return SKPLUGIN_OK;
 
       case PCKTS_PER_SEC_AGG:
         memcpy(val, dest, RATE_BINARY_SIZE_AGG);
         val[0] += rwRecGetPkts(rwrec);
-        val[1] += rwRecGetElapsed(rwrec);
+        val[1] += RWREC_MICRO_DURATION(rwrec);
         memcpy(dest, val, RATE_BINARY_SIZE_AGG);
         return SKPLUGIN_OK;
 
       case BYTES_PER_SEC_AGG:
         memcpy(val, dest, RATE_BINARY_SIZE_AGG);
         val[0] += rwRecGetBytes(rwrec);
-        val[1] += rwRecGetElapsed(rwrec);
+        val[1] += RWREC_MICRO_DURATION(rwrec);
         memcpy(dest, val, RATE_BINARY_SIZE_AGG);
         return SKPLUGIN_OK;
 
@@ -591,19 +627,14 @@ binToTextAgg(
       case PCKTS_PER_SEC_AGG:
       case BYTES_PER_SEC_AGG:
         memcpy(val, bin, RATE_BINARY_SIZE_AGG);
-        if (val[1]) {
-            snprintf(text_value, text_size, FORMAT_PRECISION,
-                     TRUNC_PRECISION((double)val[0] * 1000.0 / val[1]));
-        } else {
-            snprintf(text_value, text_size, FORMAT_PRECISION,
-                     (double)val[0]);
-        }
+        snprintf(text_value, text_size, FORMAT_PRECISION,
+                 TRUNC_PRECISION(COMPUTE_RATE(val[0], val[1])));
         return SKPLUGIN_OK;
 
       case BYTES_PER_PACKET_AGG:
         memcpy(val, bin, RATE_BINARY_SIZE_AGG);
         snprintf(text_value, text_size, FORMAT_PRECISION,
-                 TRUNC_PRECISION((double)val[0] / val[1]));
+                 TRUNC_PRECISION(COMPUTE_BPP(val[0], val[1])));
         return SKPLUGIN_OK;
     }
 
@@ -658,11 +689,7 @@ binCompareAgg(
       case PAYLOAD_BYTES_AGG:
         memcpy(val_a, bin_a, sizeof(uint64_t));
         memcpy(val_b, bin_b, sizeof(uint64_t));
-        if (val_a[0] < val_b[0]) {
-            *cmp = -1;
-        } else {
-            *cmp = (val_a[0] > val_b[0]);
-        }
+        *cmp = ((val_a[0] < val_b[0]) ? -1 : (val_a[0] > val_b[0]));
         return SKPLUGIN_OK;
 
       case PAYLOAD_RATE_AGG:
@@ -670,25 +697,17 @@ binCompareAgg(
       case BYTES_PER_SEC_AGG:
         memcpy(val_a, bin_a, RATE_BINARY_SIZE_AGG);
         memcpy(val_b, bin_b, RATE_BINARY_SIZE_AGG);
-        ratio_a = (double)val_a[0] / (val_a[1] ? val_a[1] : 1.0);
-        ratio_b = (double)val_b[0] / (val_b[1] ? val_b[1] : 1.0);
-        if (ratio_a < ratio_b) {
-            *cmp = -1;
-        } else {
-            *cmp = (ratio_a > ratio_b);
-        }
+        ratio_a = COMPUTE_RATE(val_a[0], val_a[1]);
+        ratio_b = COMPUTE_RATE(val_b[0], val_b[1]);
+        *cmp = ((ratio_a < ratio_b) ? -1 : (ratio_a > ratio_b));
         return SKPLUGIN_OK;
 
       case BYTES_PER_PACKET_AGG:
         memcpy(val_a, bin_a, RATE_BINARY_SIZE_AGG);
         memcpy(val_b, bin_b, RATE_BINARY_SIZE_AGG);
-        ratio_a = (double)val_a[0] / val_a[1];
-        ratio_b = (double)val_b[0] / val_b[1];
-        if (ratio_a < ratio_b) {
-            *cmp = -1;
-        } else {
-            *cmp = (ratio_a > ratio_b);
-        }
+        ratio_a = COMPUTE_BPP(val_a[0], val_a[1]);
+        ratio_b = COMPUTE_BPP(val_b[0], val_b[1]);
+        *cmp = ((ratio_a < ratio_b) ? -1 : (ratio_a > ratio_b));
         return SKPLUGIN_OK;
     }
     return SKPLUGIN_ERR_FATAL;
@@ -720,10 +739,10 @@ SKPLUGIN_SETUP_FN(
     assert((sizeof(plugin_options)/sizeof(struct option))
            == (sizeof(plugin_help)/sizeof(char*)));
 
-    /* register the options to use for rwfilter.  when the option is
-     * given, we will call skpinRegFilter() to register the filter
-     * function. */
-    for (i = 0; plugin_options[i].name; ++i) {
+    /* register the options for rwfilter.  when the option is given,
+     * we call skpinRegFilter() to register the filter function.
+     * NOTE: Skip the first entry in the plugin_options[] array. */
+    for (i = 1; plugin_options[i].name; ++i) {
         rv = skpinRegOption2(plugin_options[i].name,
                              plugin_options[i].has_arg, plugin_help[i],
                              NULL, &optionsHandler,
@@ -732,6 +751,18 @@ SKPLUGIN_SETUP_FN(
         if (SKPLUGIN_OK != rv && SKPLUGIN_ERR_DID_NOT_REGISTER != rv) {
             return rv;
         }
+    }
+
+    /* the first entry in the plugin_options[] array is usable by all
+     * applications */
+    rv = skpinRegOption2(plugin_options[0].name,
+                         plugin_options[0].has_arg, plugin_help[0],
+                         NULL, &optionsHandler,
+                         (void*)&plugin_options[0].val,
+                         3, SKPLUGIN_FN_FILTER, SKPLUGIN_FN_REC_TO_TEXT,
+                         SKPLUGIN_FN_REC_TO_BIN);
+    if (SKPLUGIN_OK != rv && SKPLUGIN_ERR_DID_NOT_REGISTER != rv) {
+        return rv;
     }
 
     /* register the key fields to use for rwcut, rwuniq, rwsort,

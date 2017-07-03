@@ -203,21 +203,40 @@ file is created by B<rwpmapbuild(1)>.
 
 I<Run Time Plug-Ins>
 
-These plug-ins must be explicitly loaded into an application using the
-application's B<--plugin> switch.
+To use most of these plug-ins, the plug-in must be explicitly loaded
+into an application by using the application's B<--plugin> switch and
+giving the plug-in's library name or path as the argument.  For a
+plug-in named I<NAME>, the library is typically named F<NAME.so>.
 
-B<flowkey(3)>. The flowkey plug-in, which must be loaded explicitly,
-adds a switch and a field that computes a 32-bit hash for a flow
-record using the same algorithm as YAF uses for its flow key utility
-B<getFlowKeyHash(1)>.  I<Since SiLK 3.15.0.>
+B<app-mismatch(3)>. The application-mismatch plug-in helps to find
+services running on unusual or non-typical ports by causing
+B<rwfilter(1)> to only pass a flow record when the record's
+application field is non-zero and its value is different than that in
+the source port and destination port fields.
 
-B<flowrate(3)>.  The flowrate plug-in, which must be loaded
-explicitly, adds switches and fields to compute packets/second,
-bytes/second, bytes/packet, payload-bytes, and payload-bytes/second.
+B<conficker-c(3)>. The conficker-c plug-in was written in March 2009
+to detect traffic that matches the signature of the .C variant of the
+Conficker worm.
+
+B<cutmatch(3)>. The cutmatch plug-in creates a field in B<rwcut(1)>
+that provides a more user-friendly representation of the match
+parameter value that B<rwmatch(1)> writes into a SiLK Flow record's
+next hop IP field.
+
+B<flowkey(3)>. The flowkey plug-in adds a switch and a field that
+computes a 32-bit hash for a flow record using the same algorithm as
+YAF uses for its flow key utility B<getFlowKeyHash(1)>.
+I<Since SiLK 3.15.0.>
+
+B<flowrate(3)>.  The flowrate plug-in adds switches and fields to
+compute packets/second, bytes/second, bytes/packet, payload-bytes, and
+payload-bytes/second.
 
 B<int-ext-fields(3)>.  The internal/external plug-in makes available
 fields containing internal and external IPs and ports (int-ip, ext-ip,
-int-port, and ext-port).
+int-port, and ext-port).  It can be used to print, sort by, or group
+by the internal or external IP or port, which is useful when a single
+flow file contains flows in multiple directions.  I<Since SiLK 3.0.0.>
 
 B<ipafilter(3)>.  The IPA (IP Association) plug-in works with
 B<rwfilter> to partition flows based on data in an IPA data store.
@@ -763,7 +782,7 @@ L<http://tools.netsa.cert.org/silk/>
 
 =cut
 
-$SiLK: silk.pod 7f87df5c3e66 2017-03-24 21:16:58Z mthomas $
+$SiLK: silk.pod 0a5374cd2f26 2017-05-09 17:11:42Z mthomas $
 
 Local Variables:
 mode:text

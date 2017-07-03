@@ -1,14 +1,23 @@
 #!/bin/sh
 
 #######################################################################
-# RCSIDENT("$SiLK: rwflowpack.init.d.in 02367a659674 2016-05-05 20:17:43Z mthomas $")
+# RCSIDENT("$SiLK: rwflowpack.init.d.in 7e4bf7c4f743 2017-05-09 20:29:51Z mthomas $")
 #######################################################################
 
 # rwflowpack start/control script
 #
 # /etc/init.d/@myprog@
 # chkconfig: - 20 95
-# description: Start @myprog@ program
+# description: SiLK network flow capturing, categorizing, and packing daemon
+# processname: @myprog@
+### BEGIN INIT INFO
+# Provides: @myprog@
+# Required-Start: $local_fs $remote_fs $network $named $syslog $time
+# Required-Stop: $local_fs $remote_fs $network $named $syslog $time
+# Short-Description: start and stop SiLK @myprog@ daemon
+# Description: SiLK daemon to collect network flow data, categorize it by
+#              where it was collected, and store it in SiLK Flow files
+### END INIT INFO
 
 MYNAME=@myprog@
 
@@ -387,13 +396,18 @@ case "$1" in
     RETVAL=$?
     ;;
 
+  force-reload)
+    (restart)
+    RETVAL=$?
+    ;;
+
   status)
     (status)
     RETVAL=$?
     ;;
 
   *)
-    echo $"Usage: $0 {start|stop|status|restart}"
+    echo $"Usage: $0 {start|stop|status|restart|force-reload}"
     RETVAL=1
     ;;
 esac

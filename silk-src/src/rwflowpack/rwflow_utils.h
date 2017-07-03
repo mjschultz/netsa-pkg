@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWFLOW_UTILS_H, "$SiLK: rwflow_utils.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_RWFLOW_UTILS_H, "$SiLK: rwflow_utils.h 4ba08a73ecbf 2017-05-05 22:05:45Z mthomas $");
 
 /*
 **  rwflow_utils.h
@@ -74,13 +74,16 @@ verifyCommandString(
 
 
 /*
- *  runCommand(command, file);
+ *  runCommand(switch_name, command, file);
  *
  *    Run the command specified in 'command' in a subprocess.  The
- *    string "%s" in 'command' will be replaced by 'filename'.
+ *    string "%s" in 'command' will be replaced by 'filename'.  The
+ *    switch_name is used in a debugging log message to report the
+ *    command being run.
  */
 void
 runCommand(
+    const char         *switch_name,
     const char         *command,
     const char         *file);
 
@@ -157,15 +160,18 @@ archiveDirectorySetPath(
 
 
 /*
- *  archiveDirectorySetPostCommand(command);
+ *  archiveDirectorySetPostCommand(command, switch_name);
  *
  *    Specify 'command' as a command to run on files that get copied
  *    into the archive-directory.  The string "%s" in command will be
- *    replaced with the path to the archived file.
+ *    replaced with the path to the archived file.  'switch_name' is
+ *    used in a debug log message to report that 'command' is being
+ *    run.
  */
 void
 archiveDirectorySetPostCommand(
-    const char         *command);
+    const char         *command,
+    const char         *switch_name);
 
 
 /*

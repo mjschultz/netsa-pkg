@@ -268,11 +268,11 @@ Possible locations for the plug-in.
 =head1 SEE ALSO
 
 B<rwcut(1)>, B<rwgroup(1)>, B<rwsort(1)>, B<rwstats(1)>, B<rwuniq(1)>,
-B<silk.conf(5)>, B<silk(7)>
+B<silk.conf(5)>, B<packlogic-twoway(3)>, B<silk(7)>
 
 =cut
 
-$SiLK: int-ext-fields.pod cd09f0a5fcc6 2014-06-14 15:43:33Z mthomas $
+$SiLK: int-ext-fields.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
 
 Local Variables:
 mode:text

@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pdureader.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: pdureader.c b1f14bba708e 2017-06-28 15:29:44Z mthomas $");
 
 #include "rwflowpack_priv.h"
 
@@ -90,10 +90,9 @@ readerStart(
      * connection, get it for logging */
     skpcProbeGetListenOnSockaddr(fproc->probe, &bind_addr);
 
-    INFOMSG(("Creating " INPUT_MODE_TYPE_NAME " for probe '%s' on %s:%d"),
+    INFOMSG(("Creating " INPUT_MODE_TYPE_NAME " for probe '%s' on %s"),
             skpcProbeGetName(fproc->probe),
-            skSockaddrArrayNameSafe(bind_addr),
-            skSockaddrPort(skSockaddrArrayGet(bind_addr, 0)));
+            skSockaddrArrayGetHostPortPair(bind_addr));
 
     /* create the source */
     params.max_pkts = BUF_REC_COUNT;
@@ -106,10 +105,9 @@ readerStart(
 
     /* failed.  print error */
     if (0 == skpcProbeGetListenOnSockaddr(fproc->probe, &bind_addr)) {
-        ERRMSG("Could not create " INPUT_MODE_TYPE_NAME " for '%s' on %s:%d",
+        ERRMSG("Could not create " INPUT_MODE_TYPE_NAME " for '%s' on %s",
                skpcProbeGetName(fproc->probe),
-               skSockaddrArrayNameSafe(bind_addr),
-               skSockaddrPort(skSockaddrArrayGet(bind_addr, 0)));
+               skSockaddrArrayGetHostPortPair(bind_addr));
     } else {
         ERRMSG("Probe '%s' not configured for listening to network",
                skpcProbeGetName(fproc->probe));

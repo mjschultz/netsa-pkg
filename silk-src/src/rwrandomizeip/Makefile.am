@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 006bf6dc14e3 2013-01-22 20:56:29Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 89b3ca5a7207 2017-06-01 19:19:24Z mthomas $");
 
 # Installed Targets
 
@@ -38,7 +38,6 @@ TESTS = \
 	tests/rwrandomizeip-version.pl \
 	tests/rwrandomizeip-lone-command.pl \
 	tests/rwrandomizeip-null-input.pl \
-	tests/rwrandomizeip-no-dest.pl \
 	tests/rwrandomizeip-empty-input.pl
 
 # The following rely on random() which is not consistent across

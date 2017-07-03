@@ -22,7 +22,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKHEAP_H, "$SiLK: skheap.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_SKHEAP_H, "$SiLK: skheap.h ccc8b87f4b6c 2017-06-20 14:55:57Z mthomas $");
 
 /**
  *  @file
@@ -161,6 +161,9 @@ skHeapCreate2(
  *    Set the number of entries in the heap to 0, effectively emptying
  *    the heap.  This function does not modify the bytes in the data
  *    array.
+ *
+ *    (To determine if the heap is empty, compare the return value of
+ *    skHeapGetNumberEntries() to zero.)
  */
 void
 skHeapEmpty(

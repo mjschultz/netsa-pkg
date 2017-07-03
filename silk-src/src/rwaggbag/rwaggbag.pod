@@ -456,11 +456,12 @@ B<rwaggbag> and the other Aggregate Bag tools were introduced in SiLK
 
 B<rwaggbagbuild(1)>, B<rwaggbagcat(1)>, B<rwaggbagtool(1)>,
 B<rwbag(1)>, B<rwfileinfo(1)>, B<rwfilter(1)>, B<rwnetmask(1)>,
-B<rwset(1)>, B<rwuniq(1)>, B<sensor.conf(5)>, B<silk(7)>, B<zlib(3)>
+B<rwset(1)>, B<rwuniq(1)>, B<sensor.conf(5)>, B<silk(7)>, B<yaf(1)>,
+B<zlib(3)>
 
 =cut
 
-$SiLK: rwaggbag.pod 19097c33c9cb 2017-03-24 19:36:51Z mthomas $
+$SiLK: rwaggbag.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
 
 Local Variables:
 mode:text

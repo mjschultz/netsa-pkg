@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: build.mk b4d1f1d9c507 2014-07-28 19:37:42Z mthomas $")
+# RCSIDENT("$SiLK: build.mk 9a4f4ca2d067 2017-06-21 17:41:59Z mthomas $")
 #
 #  This file contains common rules included into every Makefile.in
 
@@ -231,6 +231,10 @@ $(SILK_SENDRCVDATA):
 SILK_TESTSETS = $(top_builddir)/tests/made-set-files
 $(SILK_TESTSETS):
 	cd $(top_builddir)/tests && $(MAKE) made-set-files
+
+SILK_TESTSIPS004 = $(top_builddir)/tests/sips-004-008.rw
+$(SILK_TESTSIPS004):
+	cd $(top_builddir)/tests && $(MAKE) sips-004-008.rw
 
 # Ensure the local 'tests' directory exists
 SILK_TESTSDIR = ./tests/touch-dir

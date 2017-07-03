@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 251ae5221d1f 2016-01-19 21:55:49Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 9a4f4ca2d067 2017-06-21 17:41:59Z mthomas $");
 
 # The targets in this file are used only by "make check" (and support
 # targest things like "make clean" and "make dist")
@@ -16,7 +16,7 @@ check_DATA = silk.conf made-test-data empty.rwf \
 # additional files that may be created by hand or by "make check" in
 # particular directories
 other_files = data.txt columnar-data.txt data-v6.txt columnar-data-v6.txt \
-	 scandata.rwf small.pdu \
+	 scandata.rwf sips-004-008.rw small.pdu \
 	 $(TEST_BAG_FILES) $(TEST_CC_FILES) \
 	 $(TEST_PMAP_FILES) $(TEST_SET_FILES)
 
@@ -36,9 +36,29 @@ silk.conf: $(test_silk_conf)
 	cp $(test_silk_conf) $@
 
 
-# building SiLK flow files from text requires rwtuc
+# SiLK Applications required to build files used during tests and the
+# rules to build the applications
+
+RWBAGBUILD = $(top_builddir)/src/rwbag/rwbagbuild
+RWCAT = $(top_builddir)/src/rwcat/rwcat
+RWGEOIP2CCMAP = $(top_builddir)/src/rwpmap/rwgeoip2ccmap
+RWPMAPBUILD = $(top_builddir)/src/rwpmap/rwpmapbuild
+RWSETBUILD = $(top_builddir)/src/rwset/rwsetbuild
+RWSETCAT   = $(top_builddir)/src/rwset/rwsetcat
 RWTUC = $(top_builddir)/src/rwtuc/rwtuc
 
+$(RWBAGBUILD):
+	cd $(top_builddir)/src/rwbag && $(MAKE) rwbagbuild
+$(RWCAT):
+	cd $(top_builddir)/src/rwcat && $(MAKE) rwcat
+$(RWGEOIP2CCMAP):
+	cd $(top_builddir)/src/rwpmap && $(MAKE) rwgeoip2ccmap
+$(RWPMAPBUILD):
+	cd $(top_builddir)/src/rwpmap && $(MAKE) rwpmapbuild
+$(RWSETBUILD):
+	cd $(top_builddir)/src/rwset && $(MAKE) rwsetbuild
+$(RWSETCAT):
+	cd $(top_builddir)/src/rwset && $(MAKE) rwsetcat
 $(RWTUC):
 	cd $(top_builddir)/src/rwtuc && $(MAKE) rwtuc
 
@@ -95,10 +115,6 @@ endif
 TEST_SET_FILES_SOURCE = set1-v4.txt set2-v4.txt set3-v4.txt set4-v4.txt \
 	 set1-v6.txt set2-v6.txt set3-v6.txt set4-v6.txt
 
-RWSETBUILD = $(top_builddir)/src/rwset/rwsetbuild
-
-$(RWSETBUILD):
-	cd $(top_builddir)/src/rwset && $(MAKE) rwsetbuild
 
 $(TEST_SET_FILES): $(RWSETBUILD)
 
@@ -120,11 +136,6 @@ TEST_BAG_FILES += bag1-v6.bag bag2-v6.bag bag3-v6.bag
 endif
 TEST_BAG_FILES_SOURCE = bag1-v4.txt bag2-v4.txt bag3-v4.txt \
 	 bag1-v6.txt bag2-v6.txt bag3-v6.txt
-
-RWBAGBUILD = $(top_builddir)/src/rwbag/rwbagbuild
-
-$(RWBAGBUILD):
-	cd $(top_builddir)/src/rwbag && $(MAKE) rwbagbuild
 
 $(TEST_BAG_FILES): $(RWBAGBUILD)
 
@@ -150,6 +161,15 @@ scandata.rwf: $(RWTUC) silk.conf $(make_scans)
 	-rm -f $@
 	$(MAKE_SCANDATA_RWF)
 
+sips-004-008.rw: $(RWCAT) $(RWSETBUILD) $(RWSETCAT) $(RWTUC) silk.conf
+	-rm -f $@
+	echo 4.0.0.0/6 \
+	| $(RWSETBUILD) \
+	| $(RWSETCAT) --cidr=0 \
+	| $(RWTUC) --fields=sip --stime=1000000000 \
+	| $(RWCAT) --ipv4-output --compression=best --output-path=$@ \
+	|| { rm -f $@ ; exit 1; }
+
 # for testing rwguess and rwflowpack
 small.pdu: $(make_flows)
 	-rm -f $@
@@ -166,11 +186,6 @@ if SK_ENABLE_IPV6
 TEST_CC_FILES += fake-cc-v6.pmap
 endif
 TEST_CC_FILES_SOURCE = fake-cc.csv fake-cc-v6.csv
-
-RWGEOIP2CCMAP = $(top_builddir)/src/rwpmap/rwgeoip2ccmap
-
-$(RWGEOIP2CCMAP):
-	cd $(top_builddir)/src/rwpmap && $(MAKE) rwgeoip2ccmap
 
 fake-cc.pmap: $(RWGEOIP2CCMAP) fake-cc.csv
 	-rm -f $@
@@ -195,11 +210,6 @@ TEST_PMAP_FILES += ip-map-v6.pmap
 endif
 TEST_PMAP_FILES_SOURCE = address_types.txt ip-map.txt ip-map-v6.txt \
 	 proto-port-map.txt
-
-RWPMAPBUILD = $(top_builddir)/src/rwpmap/rwpmapbuild
-
-$(RWPMAPBUILD):
-	cd $(top_builddir)/src/rwpmap && $(MAKE) rwpmapbuild
 
 $(TEST_PMAP_FILES): $(RWPMAPBUILD)
 

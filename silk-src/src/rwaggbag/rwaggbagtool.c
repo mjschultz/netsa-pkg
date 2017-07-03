@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaggbagtool.c 87af96d1b613 2017-03-24 17:23:34Z mthomas $");
+RCSIDENT("$SiLK: rwaggbagtool.c 7a9876ac5e52 2017-05-23 22:09:29Z mthomas $");
 
 #include <silk/skaggbag.h>
 #include <silk/skbag.h>
@@ -249,6 +249,7 @@ appUsageLong(
     }
     skOptionsNotesUsage(fh);
     skCompMethodOptionsUsage(fh);
+    sksiteOptionsUsage(fh);
 }
 
 
@@ -319,7 +320,8 @@ appSetup(
         || skIPSetOptionsRegisterRecordVersion(&ipset_options,
                                                "ipset-record-version")
         || skOptionsNotesRegister(&note_strip)
-        || skCompMethodOptionsRegister(&comp_method))
+        || skCompMethodOptionsRegister(&comp_method)
+        || sksiteOptionsRegister(SK_SITE_FLAG_CONFIG_FILE))
     {
         skAppPrintErr("Unable to register options");
         exit(EXIT_FAILURE);
@@ -1342,7 +1344,7 @@ abtoolToBag(
 /*
  *    Create an IPset file from the global AggBag 'out_ab'.  This
  *    function expects the AggBag to have two fields, where the first
- *    field is the IP adress to write to the IPset.  After creating
+ *    field is the IP address to write to the IPset.  After creating
  *    the IPset, write it to the output streaam.
  */
 static int

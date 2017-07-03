@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwreceiver.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwreceiver.c 6d21d1f3d455 2017-06-28 16:32:15Z mthomas $");
 
 #include <silk/skdaemon.h>
 #include <silk/skdllist.h>
@@ -111,6 +111,9 @@ static int unique_duplicates = 0;
  * sending the same file */
 static sk_dllist_t *open_file_list;
 
+/* Conversion characters supported in post_command */
+static const char *post_command_conversions = "sI";
+
 /* Command, supplied by user, to run whenever a file is received */
 static const char *post_command = NULL;
 
@@ -188,7 +191,6 @@ static const char *appHelp[] = {
 /* LOCAL FUNCTION PROTOTYPES */
 
 static int  appOptionsHandler(clientData cData, int opt_index, char *opt_arg);
-static int  verifyCommandString(const char *command);
 static int  rwreceiverVerifyOptions(void);
 #ifdef SK_HAVE_STATVFS
 static int checkDiskSpace(uint64_t size);
@@ -450,7 +452,21 @@ appOptionsHandler(
         break;
 
       case OPT_POST_COMMAND:
-        if (verifyCommandString(opt_arg)) {
+        if (!*opt_arg) {
+            skAppPrintErr("Invalid %s: Empty string",
+                          appOptions[opt_index].name);
+            return 1;
+        }
+        rv = skSubcommandStringCheck(opt_arg, post_command_conversions);
+        if (rv) {
+            if ('\0' == opt_arg[rv]) {
+                skAppPrintErr(("Invalid %s '%s':"
+                               " '%%' appears at end of string"),
+                              appOptions[opt_index].name, opt_arg);
+            } else {
+                skAppPrintErr("Invalid %s '%s': Unknown conversion '%%%c'",
+                              appOptions[opt_index].name, opt_arg,opt_arg[rv]);
+            }
             return 1;
         }
         post_command = opt_arg;
@@ -487,44 +503,6 @@ appOptionsHandler(
     return 1;
 #endif
 }
-
-
-/*
- *  status = verifyCommandString(command);
- *
- *    Verify the the command string specified in 'command' does not
- *    contain unknown conversions.  If 'command' is valid, return 0.
- *
- *    If 'command' is not valid, print an error and return -1.
- */
-static int
-verifyCommandString(
-    const char         *command)
-{
-    const char *cp = command;
-
-    while (NULL != (cp = strchr(cp, '%'))) {
-        ++cp;
-        switch (*cp) {
-          case '%':
-          case 'I':
-          case 's':
-            ++cp;
-            break;
-          case '\0':
-            skAppPrintErr(("Invalid %s '%s':"
-                           " '%%' appears at end of string"),
-                          appOptions[OPT_POST_COMMAND].name, command);
-            return -1;
-          default:
-            skAppPrintErr("Invalid %s '%s': Unknown conversion '%%%c'",
-                          appOptions[OPT_POST_COMMAND].name, command, *cp);
-            return -1;
-        }
-    }
-    return 0;
-}
-
 
 
 static int
@@ -638,144 +616,47 @@ checkDiskSpace(
 
 
 /*
- *  runPostCommand(command, filename, ident);
+ *  runPostCommand(filename, ident);
  *
- *    Spawn a new subprocess to run 'command'.  Formatting directives
- *    in 'command' may be expanded to hold to the 'filename' that has
- *    just been received and the 'ident' of the rwsender that sent the
- *    file.
+ *    Spawn a new subprocess to run 'post_command'.  Formatting
+ *    directives in 'post_command' may be expanded to hold to the
+ *    'filename' that has just been received and the 'ident' of the
+ *    rwsender that sent the file.
  */
 static void
 runPostCommand(
-    const char         *command,
     const char         *file,
     const char         *ident)
 {
-    sigset_t sigs;
-    pid_t pid;
-    size_t len;
-    size_t file_len;
-    size_t ident_len;
-    const char *cp;
-    const char *sp;
     char *expanded_cmd;
-    char *exp_cp;
+    long rv;
 
-    /* Determine length of buffer needed for the expanded command
-     * string and allocate it.  */
-    len = strlen(command);
-    file_len = strlen(file);
-    ident_len = strlen(ident);
-    cp = command;
-    while (NULL != (cp = strchr(cp, (int)'%'))) {
-        ++cp;
-        switch (*cp) {
-          case '%':
-            --len;
-            break;
-          case 's':
-            len += file_len - 2;
-            break;
-          case 'I':
-            len += ident_len - 2;
-            break;
-          default:
-            skAbortBadCase((int)(*cp));
-        }
-        ++cp;
-    }
-    expanded_cmd = (char*)malloc(len + 1);
-    if (expanded_cmd == NULL) {
+    /* order of arguments is file, ident */
+    assert('s' == post_command_conversions[0]
+           && 'I' == post_command_conversions[1]);
+
+    expanded_cmd = (skSubcommandStringFill(
+                        post_command, post_command_conversions, file, ident));
+    if (NULL == expanded_cmd) {
         WARNINGMSG("Unable to allocate memory to create command string");
         return;
     }
 
-    /* Parent (original process) forks to create Child 1 */
-    pid = fork();
-    if (-1 == pid) {
-        ERRMSG("Could not fork to run command: %s", strerror(errno));
-        free(expanded_cmd);
-        return;
+    DEBUGMSG("Invoking %s: %s",
+             appOptions[OPT_POST_COMMAND].name, expanded_cmd);
+    rv = skSubcommandExecuteShell(expanded_cmd);
+    switch (rv) {
+      case -1:
+        ERRMSG("Unable to fork to run command: %s", strerror(errno));
+        break;
+      case -2:
+        NOTICEMSG("Error waiting for child: %s", strerror(errno));
+        break;
+      default:
+        assert(rv > 0);
+        break;
     }
-
-    /* Parent reaps Child 1 and returns */
-    if (0 != pid) {
-        free(expanded_cmd);
-        /* Wait for Child 1 to exit. */
-        while (waitpid(pid, NULL, 0) == -1) {
-            if (EINTR != errno) {
-                NOTICEMSG("Error waiting for child %ld: %s",
-                          (long)pid, strerror(errno));
-                break;
-            }
-        }
-        return;
-    }
-
-    /* Disable/Ignore locking of the log file; disable log rotation */
-    sklogSetLocking(NULL, NULL, NULL, NULL);
-    sklogDisableRotation();
-
-    /* Child 1 forks to create Child 2 */
-    pid = fork();
-    if (pid == -1) {
-        ERRMSG("Child could not fork for to run command: %s", strerror(errno));
-        _exit(EXIT_FAILURE);
-    }
-
-    /* Child 1 immediately exits, so Parent can stop waiting */
-    if (pid != 0) {
-        _exit(EXIT_SUCCESS);
-    }
-
-    /* Only Child 2 makes it here */
-
-    /* Unmask signals */
-    sigemptyset(&sigs);
-    sigprocmask(SIG_SETMASK, &sigs, NULL);
-
-    /* Copy command into buffer, handling %-expansions */
-    cp = command;
-    exp_cp = expanded_cmd;
-    while (NULL != (sp = strchr(cp, (int)'%'))) {
-        /* copy text we just jumped over */
-        strncpy(exp_cp, cp, sp - cp);
-        exp_cp += (sp - cp);
-        /* handle conversion */
-        switch (*(sp + 1)) {
-          case '%':
-            *exp_cp = '%';
-            ++exp_cp;
-            break;
-          case 's':
-            strcpy(exp_cp, file);
-            exp_cp += file_len;
-            break;
-          case 'I':
-            strcpy(exp_cp, ident);
-            exp_cp += ident_len;
-            break;
-          default:
-            skAbortBadCase((int)(*(sp+1)));
-        }
-        cp = sp + 2;
-        assert(len >= (size_t)(exp_cp - expanded_cmd));
-    }
-    strcpy(exp_cp, cp);
-    expanded_cmd[len] = '\0';
-
-    /* Execute the command */
-    DEBUGMSG("Invoking /bin/sh -c %s", expanded_cmd);
-    if (execl("/bin/sh", "sh", "-c", expanded_cmd, (char*)NULL)
-        == -1)
-    {
-        ERRMSG(("Error invoking /bin/sh: %s"),
-               strerror(errno));
-        _exit(EXIT_FAILURE);
-    }
-
-    /* Should never get here. */
-    skAbort();
+    free(expanded_cmd);
 }
 
 
@@ -1174,7 +1055,7 @@ transferFiles(
             if (proto_err == 0) {
                 /* Run the post command on the file */
                 if (post_command) {
-                    runPostCommand(post_command, destpath, sndr->ident);
+                    runPostCommand(destpath, sndr->ident);
                 }
                 destpath[0] = '\0';
                 INFOMSG("Finished receiving from %s: '%s'", sndr->ident, name);

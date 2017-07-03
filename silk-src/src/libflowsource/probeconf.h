@@ -22,7 +22,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_PROBECONF_H, "$SiLK: probeconf.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_PROBECONF_H, "$SiLK: probeconf.h aef7638398d6 2017-05-05 20:24:11Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -681,12 +681,14 @@ skpcNetworkLookupByID(
 
 
 /**
- *    Create a new probe and fill in 'probe' with the address of
- *    the newly allocated probe.
+ *    Create a new probe of type 'probe_type' and set the referent of
+ *    'probe' to the newly allocated probe.  Return 0 on success.
+ *    Return -1 if 'probe_type' is unknown or if the allocation fails.
  */
 int
 skpcProbeCreate(
-    skpc_probe_t      **probe);
+    skpc_probe_t      **probe,
+    skpc_probetype_t    probe_type);
 
 
 /**
@@ -735,14 +737,6 @@ skpc_probetype_t
 skpcProbeGetType(
     const skpc_probe_t *probe);
 #endif  /* skpcProbeGetType */
-
-/**
- *    Set the probe's type.
- */
-int
-skpcProbeSetType(
-    skpc_probe_t       *probe,
-    skpc_probetype_t    probe_type);
 
 
 /**
@@ -1052,6 +1046,16 @@ int
 skpcProbeVerify(
     skpc_probe_t       *probe,
     int                 is_ephemeral);
+
+
+/**
+ *    Print a one line summary of 'probe' using the print function
+ *    'printer'.
+ */
+void
+skpcProbePrint(
+    const skpc_probe_t *probe,
+    sk_msg_fn_t         printer);
 
 
 

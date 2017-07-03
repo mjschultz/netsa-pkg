@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwstatssetup.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
+RCSIDENT("$SiLK: rwstatssetup.c e1c14c597311 2017-06-05 21:20:23Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skcountry.h>
@@ -918,6 +918,12 @@ topnSetup(
             skAppPrintErr("Unable to set fields");
             appExit(EXIT_FAILURE);
         }
+        if (limit.distinct) {
+            if (skPresortedUniqueEnableTotalDistinct(ps_uniq)) {
+                skAppPrintErr("Unable to set fields");
+                appExit(EXIT_FAILURE);
+            }
+        }
 
         while ((rv = skOptionsCtxNextArgument(optctx, &path)) == 0) {
             skPresortedUniqueAddInputFile(ps_uniq, path);
@@ -936,9 +942,14 @@ topnSetup(
 
         skUniqueSetTempDirectory(uniq, temp_directory);
 
-        if (skUniqueSetFields(uniq, key_fields, distinct_fields, value_fields)
-            || skUniquePrepareForInput(uniq))
-        {
+        rv = skUniqueSetFields(uniq, key_fields, distinct_fields, value_fields);
+        if (0 == rv && limit.distinct) {
+            rv = skUniqueEnableTotalDistinct(uniq);
+        }
+        if (0 == rv) {
+            rv = skUniquePrepareForInput(uniq);
+        }
+        if (rv) {
             skAppPrintErr("Unable to set fields");
             appExit(EXIT_FAILURE);
         }
@@ -1038,14 +1049,6 @@ value_to_ascii(
         skFieldListExtractFromBuffer(value_fields, HEAP_PTR_VALUE(v_heap_ptr),
                                      fl_entry, (uint8_t*)&val32);
         snprintf(text_buf, text_buf_size, ("%" PRIu32), val32);
-        break;
-
-      case SK_FIELD_MIN_STARTTIME:
-      case SK_FIELD_MAX_ENDTIME:
-        skFieldListExtractFromBuffer(value_fields, HEAP_PTR_VALUE(v_heap_ptr),
-                                     fl_entry, (uint8_t*)&val32);
-        assert(text_buf_size > SKTIMESTAMP_STRLEN);
-        sktimestamp_r(text_buf, sktimeCreate(val32, 0), timestamp_format);
         break;
 
       case SK_FIELD_CALLER:
@@ -2060,20 +2063,10 @@ parseValueFields(
         assert(FIELD_TYPE_KEY != field_type);
         /* first value determines order of output rows */
         if (NULL == limit.fl_entry) {
-            if (FIELD_TYPE_DISTINCT == field_type
-                && RWSTATS_PERCENTAGE == limit.type)
-            {
-                skAppPrintErr(("The --%s limit is not supported when the"
-                               " primary values field is a distinct count"),
-                              appOptions[OPT_PERCENTAGE].name);
-                goto END;
-            }
-
             limit.fl_entry = fl_entry;
             limit.fl_id = (sk_fieldid_t)skFieldListEntryGetId(fl_entry);
             limit.bf_value = bf;
             limit.distinct = (FIELD_TYPE_DISTINCT == field_type);
-
             if (limit.distinct) {
                 builtin_distinct_get_title(limit.title, sizeof(limit.title),
                                            fl_entry);
@@ -2133,24 +2126,15 @@ appAddPlugin(
 
     /* if this is the first value/distinct field, ensure that the limit-type
      * is valid. */
-    if (NULL == limit.fl_entry) {
-        if ((FIELD_TYPE_VALUE == field_type)
-            && (RWSTATS_PERCENTAGE == limit.type
-                || RWSTATS_THRESHOLD == limit.type))
-        {
-            skAppPrintErr(("Only the --%s limit is supported when the"
-                           " primary values field is from a plug-in"),
-                          appOptions[OPT_COUNT].name);
-            return -1;
-        }
-        if ((FIELD_TYPE_DISTINCT == field_type)
-            && (RWSTATS_PERCENTAGE == limit.type))
-        {
-            skAppPrintErr(("The --%s limit is not supported when the"
-                           " primary values field is a distinct count"),
-                          appOptions[OPT_PERCENTAGE].name);
-            return -1;
-        }
+    if ((NULL == limit.fl_entry)
+        && (FIELD_TYPE_VALUE == field_type)
+        && (RWSTATS_PERCENTAGE == limit.type
+            || RWSTATS_THRESHOLD == limit.type))
+    {
+        skAppPrintErr(("Only the --%s limit is supported when the"
+                       " primary values field is from a plug-in"),
+                      appOptions[OPT_COUNT].name);
+        return -1;
     }
 
     /* set the regdata for the sk_fieldlist_t */

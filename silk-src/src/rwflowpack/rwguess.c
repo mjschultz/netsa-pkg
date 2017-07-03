@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwguess.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwguess.c de8fdd9e63cf 2017-04-27 19:11:35Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/rwrec.h>
@@ -295,11 +295,10 @@ analyze(
     if (skpcSetup()) {
         return -1;
     }
-    if (skpcProbeCreate(&probe)) {
+    if (skpcProbeCreate(&probe, PROBE_ENUM_NETFLOW_V5)) {
         return -1;
     }
     skpcProbeSetName(probe, "rwguess");
-    skpcProbeSetType(probe, PROBE_ENUM_NETFLOW_V5);
     skpcProbeSetFileSource(probe, file_name);
     skpcProbeClearLogFlags(probe);
     if (skpcProbeVerify(probe, 0)) {

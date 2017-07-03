@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sklog.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: sklog.c 4ba08a73ecbf 2017-05-05 22:05:45Z mthomas $");
 
 #include <silk/sklog.h>
 #include <silk/skstringmap.h>
@@ -44,10 +44,6 @@ RCSIDENT("$SiLK: sklog.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 /* when using log rotation, the suffix to add to file names */
 #define SKLOG_SUFFIX ".log"
-
-/* the program to use to compress the logs after rotating, or
- * undefined to not compress the older log files */
-#define SKLOG_COMPRESSOR "gzip"
 
 /* default log level */
 #define SKLOG_DEFAULT_LEVEL    LOG_INFO
@@ -136,7 +132,7 @@ typedef struct sklog_rotated_st {
     /* time of next scheduled log rotation */
     time_t          rolltime;
     /* user command to run on the closed log file; if NULL, compress
-     * the file using SKLOG_COMPRESSOR */
+     * the file using SK_LOG_COMPRESSOR */
     const char     *post_rotate;
     /* the directory in which to write all log files */
     char            dir[PATH_MAX];
@@ -393,91 +389,10 @@ DEBUGMSG(
 #endif
 
 
-int
-EMERGMSG_v(
-    const char         *fmt,
-    va_list             args)
-{
-    SKLOG_CALL_LOGGER(LOG_EMERG, fmt, args);
-    return 0;
-}
-
-
-int
-ALERTMSG_v(
-    const char         *fmt,
-    va_list             args)
-{
-    SKLOG_CALL_LOGGER(LOG_ALERT, fmt, args);
-    return 0;
-}
-
-
-int
-CRITMSG_v(
-    const char         *fmt,
-    va_list             args)
-{
-    SKLOG_CALL_LOGGER(LOG_CRIT, fmt, args);
-    return 0;
-}
-
-
-int
-ERRMSG_v(
-    const char         *fmt,
-    va_list             args)
-{
-    SKLOG_CALL_LOGGER(LOG_ERR, fmt, args);
-    return 0;
-}
-
-
-int
-WARNINGMSG_v(
-    const char         *fmt,
-    va_list             args)
-{
-    SKLOG_CALL_LOGGER(LOG_WARNING, fmt, args);
-    return 0;
-}
-
-
-int
-NOTICEMSG_v(
-    const char         *fmt,
-    va_list             args)
-{
-    SKLOG_CALL_LOGGER(LOG_NOTICE, fmt, args);
-    return 0;
-}
-
-
-int
-INFOMSG_v(
-    const char         *fmt,
-    va_list             args)
-{
-    SKLOG_CALL_LOGGER(LOG_INFO, fmt, args);
-    return 0;
-}
-
-
-int
-DEBUGMSG_v(
-    const char         *fmt,
-    va_list             args)
-{
-    SKLOG_CALL_LOGGER(LOG_DEBUG, fmt, args);
-    return 0;
-}
-
-
-
 /*
  *  logCompress(file);
  *
- *    Run the user's post-rotate command or the SKLOG_COMPRESSOR
+ *    Run the user's post-rotate command or the SK_LOG_COMPRESSOR
  *    command to compress the log file 'file'.  Will call free() on
  *    the 'file' parameter.
  */
@@ -485,157 +400,59 @@ static void
 logCompress(
     char               *file)
 {
-    pid_t pid;
-    char *expanded_cmd = NULL;
+    long pid;
 
     if (file == NULL) {
         INFOMSG("logCompress passed NULL pointer");
         return;
     }
 
-    if (NULL != logctx->l_rot.post_rotate) {
-        size_t len;
-        size_t file_len;
-        const char *cp;
-        const char *sp;
-        char *exp_cp;
+    if (NULL == logctx->l_rot.post_rotate) {
+#ifndef SK_LOG_COMPRESSOR
+        free(file);
+        return;
+#else
+        char *command[4];
+        command[0] = (char *)SK_LOG_COMPRESSOR;
+        command[1] = (char *)"-f";
+        command[2] = file;
+        command[3] = (char *)NULL;
+        pid = skSubcommandExecute(command);
+        free(file);
+#endif  /* SK_LOG_COMPRESSOR */
 
-        /* do nothing if post-rotate command is empty string */
-        if ('\0' == logctx->l_rot.post_rotate[0]) {
-            free(file);
-            return;
-        }
+    } else if ('\0' == logctx->l_rot.post_rotate) {
+        /* do nothing when post-rotate command is empty string */
+        free(file);
+        return;
 
-        /* Determine length of buffer needed to hold the expanded
-         * command string and allocate it. */
-        cp = logctx->l_rot.post_rotate;
-        len = strlen(cp);
-        file_len = strlen(file);
-        while (NULL != (cp = strchr(cp, '%'))) {
-            ++cp;
-            switch (*cp) {
-              case '%':
-                --len;
-                break;
-              case 's':
-                len += file_len - 2;
-                break;
-              default:
-                skAbortBadCase((int)(*cp));
-            }
-            ++cp;
-        }
-        expanded_cmd = (char*)malloc(len + 1);
-        if (expanded_cmd == NULL) {
+    } else {
+        char *expanded_cmd;
+
+        expanded_cmd = skSubcommandStringFill(logctx->l_rot.post_rotate,
+                                              "s", file);
+        free(file);
+        if (NULL == expanded_cmd) {
             WARNINGMSG("Unable to allocate memory to create command string");
-            free(file);
             return;
         }
-
-        /* Copy command into buffer, handling %-expansions */
-        cp = logctx->l_rot.post_rotate;
-        exp_cp = expanded_cmd;
-        while (NULL != (sp = strchr(cp, '%'))) {
-            /* copy text we just jumped over */
-            strncpy(exp_cp, cp, sp - cp);
-            exp_cp += (sp - cp);
-            /* handle conversion */
-            switch (*(sp+1)) {
-              case '%':
-                *exp_cp = '%';
-                ++exp_cp;
-                break;
-              case 's':
-                strcpy(exp_cp, file);
-                exp_cp += file_len;
-                break;
-              default:
-                skAbortBadCase((int)(*(sp+1)));
-            }
-            cp = sp + 2;
-            assert(len >= (size_t)(exp_cp - expanded_cmd));
-        }
-        strcpy(exp_cp, cp);
-        expanded_cmd[len] = '\0';
-    }
-#ifndef SKLOG_COMPRESSOR
-    else {
-        free(file);
-        return;
-    }
-#endif
-
-    /* Fork */
-    pid = fork();
-    if (pid == -1) {
-        ERRMSG("Could not fork for %s command: %s",
-               logOptions[OPT_LOG_POST_ROTATE].name, strerror(errno));
+        DEBUGMSG("Running %s: %s",
+                 logOptions[OPT_LOG_POST_ROTATE].name,  expanded_cmd);
+        pid = skSubcommandExecuteShell(expanded_cmd);
         free(expanded_cmd);
-        free(file);
-        return;
     }
 
-    /* Parent (original process) reaps Child 1 and returns */
-    if (pid != 0) {
-        free(expanded_cmd);
-        free(file);
-        /* Wait for Child 1 to exit. */
-        while (waitpid(pid, NULL, 0) == -1) {
-            if (EINTR != errno) {
-                NOTICEMSG("Error waiting for child %ld: %s",
-                          (long)pid, strerror(errno));
-                break;
-            }
-        }
-        return;
+    switch (pid) {
+      case -1:
+        ERRMSG("Unable to fork to run command: %s", strerror(errno));
+        break;
+      case -2:
+        NOTICEMSG("Error waiting for child: %s", strerror(errno));
+        break;
+      default:
+        assert(pid > 0);
+        break;
     }
-
-    /* Change our process group, so a server program using this
-     * library that is waiting for any of its children (by process
-     * group) won't wait for this child. */
-    setpgid(0, 0);
-
-    /* Disable/Ignore locking of the log file; disable log rotation */
-    sklogSetLocking(NULL, NULL, NULL, NULL);
-    sklogDisableRotation();
-
-    /* Child 1 forks to create Child 2 */
-    pid = fork();
-    if (pid == -1) {
-        ERRMSG("Child could not fork for %s command: %s",
-               logOptions[OPT_LOG_POST_ROTATE].name, strerror(errno));
-        _exit(EXIT_FAILURE);
-    }
-
-    /* Child 1 immediately exits, so Parent can stop waiting */
-    if (pid != 0) {
-        _exit(EXIT_SUCCESS);
-    }
-
-    /* Child 2 executes the compression or log-post-rotate command */
-    if (NULL != logctx->l_rot.post_rotate) {
-        DEBUGMSG("Invoking command: %s", expanded_cmd);
-
-        /* Execute the command */
-        if (execl("/bin/sh", "sh", "-c", expanded_cmd, (char*)NULL)
-            == -1)
-        {
-            ERRMSG("Error invoking /bin/sh: %s", strerror(errno));
-            _exit(EXIT_FAILURE);
-        }
-    }
-#ifdef SKLOG_COMPRESSOR
-    else if (execlp(SKLOG_COMPRESSOR, SKLOG_COMPRESSOR, "-f", file,(char*)NULL)
-             == -1)
-    {
-        ERRMSG("Error invoking '%s': %s",
-               SKLOG_COMPRESSOR, strerror(errno));
-        _exit(EXIT_FAILURE);
-    }
-#endif /* SKLOG_COMPRESSOR */
-
-    /* Should never get here. */
-    skAbort();
 }
 
 
@@ -733,6 +550,11 @@ logOptionsSetup(
 
 /*
  *  logRotatedLog(priority, fmt, args);
+ *
+ *    Write a log message to a file that may need to be rotated.
+ *
+ *    The logctx->l_func is set to this function when log rotation is
+ *    enabled.
  *
  *    Lock the mutex for the log.  If the rollover-time for the log
  *    has passed call logRotatedOpen() to open a new log file.  Use
@@ -911,6 +733,12 @@ logSimpleClose(
 /*
  *  logSimpleLog(priority, fmt, args);
  *
+ *    Write a log message to a file that does not get rotated.
+ *
+ *    The logctx->l_func is set to this function when log messages are
+ *    written to a single file, to standard output, or to standard
+ *    error.
+ *
  *    Lock the mutex for the log and call logSimpleVPrintf() to print
  *    a message to the log.
  */
@@ -1070,6 +898,11 @@ logStringifyCommand(
 SK_DIAGNOSTIC_FORMAT_NONLITERAL_PUSH
 /*
  *  logVSyslog(priority, fmt, args);
+ *
+ *    Write a log message to syslog.
+ *
+ *    The logctx->l_func is set to this function when writing to
+ *    syslog and the OS does not provide vsyslog().
  *
  *    Create a message using the format 'fmt' and variable list
  *    'args', then write that message to syslog() with the specified
@@ -1393,10 +1226,10 @@ void
 sklogOptionsUsage(
     FILE               *fp)
 {
-#ifdef SKLOG_COMPRESSOR
-    const char *post_rotate = SKLOG_COMPRESSOR " -f %s";
+#ifdef SK_LOG_COMPRESSOR
+    const char *post_rotate = SK_LOG_COMPRESSOR " -f %s";
 #else
-    const char *post_rotate = "\"\"";
+    const char *post_rotate = "";
 #endif
     int i, j;
     int features = INT32_MAX;
@@ -1429,11 +1262,12 @@ sklogOptionsUsage(
 
           case OPT_LOG_POST_ROTATE:
             fprintf(fp,
-                    ("Run this command on the previous day's log file after\n"
-                     "\tlog rotatation. Def. '%s'. Each \"%%s\" in the"
-                     " command is replaced\n"
-                     "\tby the file's complete path."
-                     " Empty string denotes no action"),
+                    ("Run this command on the previous day's log file\n"
+                     "\tafter log rotatation."
+                     " Each \"%%s\" in the command is replaced by the\n"
+                     "\tfile's complete path."
+                     " When set to the empty string, no action is\n"
+                     "\ttaken. Def. '%s'"),
                     post_rotate);
             break;
 
@@ -2057,7 +1891,7 @@ int
 sklogSetPostRotateCommand(
     const char         *command)
 {
-    const char *cp;
+    size_t rv;
 
     if (!logctx) {
         skAppPrintErr("Must setup the log before setting post-rotate command");
@@ -2077,14 +1911,9 @@ sklogSetPostRotateCommand(
         return 0;
     }
 
-    cp = command;
-    while (NULL != (cp = strchr(cp, '%'))) {
-        ++cp;
-        switch (*cp) {
-          case '%':
-          case 's':
-            ++cp;
-            break;
+    rv = skSubcommandStringCheck(command, "s");
+    if (rv) {
+        switch (command[rv]) {
           case '\0':
             skAppPrintErr(("Invalid %s command '%s':"
                            " '%%' appears at end of string"),
@@ -2093,7 +1922,8 @@ sklogSetPostRotateCommand(
           default:
             skAppPrintErr(("Invalid %s command '%s':"
                            " Unknown conversion '%%%c'"),
-                          logOptions[OPT_LOG_POST_ROTATE].name, command, *cp);
+                          logOptions[OPT_LOG_POST_ROTATE].name, command,
+                          command[rv]);
             return -1;
         }
     }
@@ -2181,6 +2011,86 @@ sklogTeardown(
     }
     memset(logctx, 0, sizeof(sklog_context_t));
     logctx = NULL;
+}
+
+
+int
+EMERGMSG_v(
+    const char         *fmt,
+    va_list             args)
+{
+    SKLOG_CALL_LOGGER(LOG_EMERG, fmt, args);
+    return 0;
+}
+
+
+int
+ALERTMSG_v(
+    const char         *fmt,
+    va_list             args)
+{
+    SKLOG_CALL_LOGGER(LOG_ALERT, fmt, args);
+    return 0;
+}
+
+
+int
+CRITMSG_v(
+    const char         *fmt,
+    va_list             args)
+{
+    SKLOG_CALL_LOGGER(LOG_CRIT, fmt, args);
+    return 0;
+}
+
+
+int
+ERRMSG_v(
+    const char         *fmt,
+    va_list             args)
+{
+    SKLOG_CALL_LOGGER(LOG_ERR, fmt, args);
+    return 0;
+}
+
+
+int
+WARNINGMSG_v(
+    const char         *fmt,
+    va_list             args)
+{
+    SKLOG_CALL_LOGGER(LOG_WARNING, fmt, args);
+    return 0;
+}
+
+
+int
+NOTICEMSG_v(
+    const char         *fmt,
+    va_list             args)
+{
+    SKLOG_CALL_LOGGER(LOG_NOTICE, fmt, args);
+    return 0;
+}
+
+
+int
+INFOMSG_v(
+    const char         *fmt,
+    va_list             args)
+{
+    SKLOG_CALL_LOGGER(LOG_INFO, fmt, args);
+    return 0;
+}
+
+
+int
+DEBUGMSG_v(
+    const char         *fmt,
+    va_list             args)
+{
+    SKLOG_CALL_LOGGER(LOG_DEBUG, fmt, args);
+    return 0;
 }
 
 

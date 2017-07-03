@@ -281,17 +281,17 @@ for my $pt (@probe_types) {
     elsif ($pt eq 'ipfix') {
         $md5_sums{$sensor_conf} = (($SiLKTests::SK_ENABLE_IPFIX)
                                    ? $md5_no_output
-                                   : "ec632316a009ee464c6c494f0bc2f660");
+                                   : "e9febfa0917a41d03d0e11a906466209");
     }
     elsif ($pt eq 'netflow-v9') {
         $md5_sums{$sensor_conf} = (($SiLKTests::SK_ENABLE_IPFIX)
                                    ? "6491c4f7bcbe5e28920b4afa636285d2"
-                                   : "ae585a80f52ddeeced8a9799f7e270d3");
+                                   : "3d2c3d0797739474cccbf590d324c3b0");
     }
     elsif ($pt eq 'sflow') {
         $md5_sums{$sensor_conf} = (($SiLKTests::SK_ENABLE_IPFIX)
                                    ? "fb56bd4d7f417e6854afde7087fa653a"
-                                   : "4fc5994d24440cf8a6ad5d08a68237d3");
+                                   : "c999322f7bb9d221acc56157ca8d3b0b");
     }
     else {
         die "$NAME: Unexpected probe_type '$pt'";
@@ -339,7 +339,7 @@ close_sensorconf($sensor_conf, *SENSOR);
 $sensor_conf = open_sensorconf("badsource-ipfix", *SENSOR);
 $md5_sums{$sensor_conf} = (($SiLKTests::SK_ENABLE_IPFIX)
                            ? "e287169ca89490e576ed079ff5054847"
-                           : "e5f6a44381f6adf06f375a4a2a7e5405");
+                           : "47be355aa649b553470bc2a47721b057");
 for my $lines (@sources_bad_ipfix) {
     my $name = sprintf("PROBE-%04d", ++$probe);
 
@@ -433,7 +433,7 @@ close_sensorconf($sensor_conf, *SENSOR);
 $sensor_conf = open_sensorconf("ipfix-iface-values", *SENSOR);
 $md5_sums{$sensor_conf} = (($SiLKTests::SK_ENABLE_IPFIX)
                            ? "37875a828df890726def606fea8ec26a"
-                           : "e6ab6b818065a152f6ca5427a827e759");
+                           : "cd13db37bfa9e11b1e4601d15f7cec66");
 $port = 9900;
 for my $lines (@probe_interface_values) {
     my $name = sprintf("PROBE-%04d", ++$probe);

@@ -239,7 +239,7 @@ environment variable.  See the L</FILES> section for details.
 
 =item RWFILTER
 
-Complete path to the B<rwfilter> program.  If not set, B<rwscanquery>
+Complete path to the B<rwfilter> program.  If not set, B<rwidsquery>
 attempts to find B<rwfilter> on your PATH.
 
 =back
@@ -269,11 +269,11 @@ types that use B<rwfilter>.
 
 =head1 SEE ALSO
 
-B<rwfilter(1)>, B<silk.conf(5)>, B<silk(7)>, B<snort(8)>
+B<rwfilter(1)>, B<silk(7)>, B<snort(8)>
 
 =cut
 
-$SiLK: rwidsquery.pod cd09f0a5fcc6 2014-06-14 15:43:33Z mthomas $
+$SiLK: rwidsquery.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
 
 Local Variables:
 mode:text

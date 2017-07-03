@@ -138,7 +138,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwstats.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwstats.c e1c14c597311 2017-06-05 21:20:23Z mthomas $");
 
 #include <silk/skheap.h>
 #include "rwstats.h"
@@ -692,7 +692,8 @@ rwstatsPrintHeap(
         while (skHeapIteratorNext(itheap, &heap_ptr) == SKHEAP_OK) {
             writeAsciiRecord(heap_ptr);
         }
-    } else {
+    } else if (limit.distinct == 0) {
+        /* records uses 32-bit counter; others use 64-bit counter */
         switch (limit.fl_id) {
           case SK_FIELD_RECORDS:
             while (skHeapIteratorNext(itheap, &heap_ptr) == SKHEAP_OK) {
@@ -731,7 +732,83 @@ rwstatsPrintHeap(
                         width[WIDTH_PCT], '?', final_delim);
             }
         }
-    }
+    } else {
+        union count_un {
+            uint8_t   ar[HASHLIB_MAX_VALUE_WIDTH];
+            uint64_t  u64;
+            uint32_t  u32;
+            uint16_t  u16;
+            uint8_t   u8;
+        } count;
+        size_t len;
+
+        len = skFieldListEntryGetBinOctets(limit.fl_entry);
+        while (skHeapIteratorNext(itheap, &heap_ptr) == SKHEAP_OK) {
+            switch (len) {
+              case 1:
+                skFieldListExtractFromBuffer(distinct_fields,
+                                             HEAP_PTR_DISTINCT(heap_ptr),
+                                             limit.fl_entry, &count.u8);
+                percent = 100.0 * (double)count.u8 / value_total;
+                break;
+
+              case 2:
+                skFieldListExtractFromBuffer(distinct_fields,
+                                             HEAP_PTR_DISTINCT(heap_ptr),
+                                             limit.fl_entry,
+                                             (uint8_t*)&count.u16);
+                percent = 100.0 * (double)count.u16 / value_total;
+                break;
+
+              case 4:
+                skFieldListExtractFromBuffer(distinct_fields,
+                                             HEAP_PTR_DISTINCT(heap_ptr),
+                                             limit.fl_entry,
+                                             (uint8_t*)&count.u32);
+                percent = 100.0 * (double)count.u32 / value_total;
+                break;
+
+              case 8:
+                skFieldListExtractFromBuffer(distinct_fields,
+                                             HEAP_PTR_DISTINCT(heap_ptr),
+                                             limit.fl_entry,
+                                             (uint8_t*)&count.u64);
+                percent = 100.0 * (double)count.u64 / value_total;
+                break;
+
+              case 3:
+              case 5:
+              case 6:
+              case 7:
+                count.u64 = 0;
+#if SK_BIG_ENDIAN
+                skFieldListExtractFromBuffer(distinct_fields,
+                                             HEAP_PTR_DISTINCT(heap_ptr),
+                                             limit.fl_entry,
+                                             &count.ar[8 - len]);
+#else
+                skFieldListExtractFromBuffer(distinct_fields,
+                                             HEAP_PTR_DISTINCT(heap_ptr),
+                                             limit.fl_entry, &count.ar[0]);
+#endif  /* SK_BIG_ENDIAN */
+                percent = 100.0 * (double)count.u64 / value_total;
+                break;
+
+              default:
+                skFieldListExtractFromBuffer(distinct_fields,
+                                             HEAP_PTR_DISTINCT(heap_ptr),
+                                             limit.fl_entry, count.ar);
+                percent = 100.0 * (double)count.u64 / value_total;
+                break;
+            }
+
+            cumul_pct += percent;
+            writeAsciiRecord(heap_ptr);
+            fprintf(output.of_fp, ("%c%*.6f%c%*.4f%s\n"),
+                    delimiter, width[WIDTH_PCT], percent, delimiter,
+                    width[WIDTH_PCT], cumul_pct, final_delim);
+        }
+     }
 
     skHeapIteratorFree(itheap);
 }
@@ -1004,6 +1081,10 @@ statsRandom(
 
     /* no more input; prepare for output */
     skUniquePrepareForOutput(uniq);
+
+    if (limit.distinct) {
+        value_total = skUniqueGetTotalDistinctCount(uniq);
+    }
 
     if (RWSTATS_PERCENTAGE == limit.type) {
         /* the limit is a percentage of the sum of bytes, of packets,
@@ -1490,6 +1571,10 @@ statsPresorted(
         skAppPrintErr("Unique processing failed");
         return -1;
     }
+    if (limit.distinct) {
+        value_total = skPresortedUniqueGetTotalDistinctCount(ps_uniq);
+    }
+
     return 0;
 }
 

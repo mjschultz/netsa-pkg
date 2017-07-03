@@ -7,7 +7,7 @@
 # @OPENSOURCE_LICENSE_END@
 #
 #######################################################################
-# $SiLK: rwscanquery.in 275df62a2e41 2017-01-05 17:30:40Z mthomas $
+# $SiLK: rwscanquery.in 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
 #######################################################################
 # rwscanquery
 #
@@ -1727,8 +1727,7 @@ types that use B<rwfilter>.
 =head1 SEE ALSO
 
 B<rwscan(1)>, B<rwfilter(1)>, B<rwset(1)>, B<rwsetbuild(1)>,
-B<rwsetcat(1)>, B<rwuniq(1)>, B<silk.conf(5)>, B<silk(7)>,
-B<environ(7)>
+B<rwsetcat(1)>, B<rwuniq(1)>, B<silk(7)>, B<environ(7)>
 
 =cut
 

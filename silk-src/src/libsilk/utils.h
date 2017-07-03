@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
+RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h 6d21d1f3d455 2017-06-28 16:32:15Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -54,14 +54,14 @@ RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h 6ed7bbd25102 2017-03-21 20:57:52Z mth
 #define SK_TEMPDIR_DEFAULT "/tmp"
 
 /**
- *    Name of primary envionment variable that holds name of temp
+ *    Name of primary environment variable that holds name of temp
  *    directory.  This is consulted when the --temp-dir switch is not
  *    given.
  */
 #define SK_TEMPDIR_ENVAR1 "SILK_TMPDIR"
 
 /**
- *    Name of alternate envionment variable that holds name of temp
+ *    Name of alternate environment variable that holds name of temp
  *    directory.  Used when the --temp-dir switch is not given and the
  *    variable named by SK_TMPDIR_ENVAR1 is not set.
  */
@@ -955,7 +955,7 @@ skTraceMsg(
  */
 int
 skAppSetSignalHandler(
-    void (*sig_handler)(int signal));
+    void              (*sig_handler)(int signal));
 
 
 /**
@@ -1349,14 +1349,14 @@ skOptionsIPFormatUsage(
  *    skOptionsIPFormatRegister() that indicates an --integer-ips
  *    switch should be included.  Since SiLK 3.15.0.
  */
-#define SK_OPTION_IP_FORMAT_INTEGER_IPS     (1 << 0)
+#define SK_OPTION_IP_FORMAT_INTEGER_IPS     (1u << 0)
 
 /**
  *    A bit to include in the 'settings' argument to
  *    skOptionsIPFormatRegister() that indicates an --zero-pad-ips
  *    switch should be included.  Since SiLK 3.15.0.
  */
-#define SK_OPTION_IP_FORMAT_ZERO_PAD_IPS    (1 << 1)
+#define SK_OPTION_IP_FORMAT_ZERO_PAD_IPS    (1u << 1)
 
 
 /**
@@ -1423,7 +1423,7 @@ skOptionsTimestampFormatUsage(
  *    SKTIMESTAMP_NOMSEC flag is always set on the result, and
  *    "no-msec" is not allowed in --timestamp-format.
  */
-#define SK_OPTION_TIMESTAMP_NEVER_MSEC          (1 << 0)
+#define SK_OPTION_TIMESTAMP_NEVER_MSEC          (1u << 0)
 
 /**
  *    A bit to include in the 'settings' argument to
@@ -1431,14 +1431,14 @@ skOptionsTimestampFormatUsage(
  *    application only supports fractional seconds.  The "no-msec"
  *    is not allowed in --timestamp-format.
  */
-#define SK_OPTION_TIMESTAMP_ALWAYS_MSEC         (1 << 1)
+#define SK_OPTION_TIMESTAMP_ALWAYS_MSEC         (1u << 1)
 
 /**
  *    A bit to include in the 'settings' argument to
  *    skOptionsTimestampFormatRegister() that indicates an
  *    --epoch-time switch should be included.
  */
-#define SK_OPTION_TIMESTAMP_OPTION_EPOCH        (1 << 2)
+#define SK_OPTION_TIMESTAMP_OPTION_EPOCH        (1u << 2)
 
 /**
  *    Similar to SK_OPTION_TIMESTAMP_OPTION_EPOCH except this
@@ -1446,14 +1446,14 @@ skOptionsTimestampFormatUsage(
  *    var-args values.  This takes precedence when
  *    SK_OPTION_TIMESTAMP_OPTION_EPOCH is also specified.
  */
-#define SK_OPTION_TIMESTAMP_OPTION_EPOCH_NAME   (1 << 3)
+#define SK_OPTION_TIMESTAMP_OPTION_EPOCH_NAME   (1u << 3)
 
 /**
  *    A bit to include in the 'settings' argument to
  *    skOptionsTimestampFormatRegister() that indicates a
  *    --legacy-timestamps switch should be included.
  */
-#define SK_OPTION_TIMESTAMP_OPTION_LEGACY       (1 << 4)
+#define SK_OPTION_TIMESTAMP_OPTION_LEGACY       (1u << 4)
 
 
 
@@ -2261,7 +2261,9 @@ skFileptrOpenPager(
 
 
 /**
- *    DEPRECATED.  Use skFileptrOpen() instead.
+ *    DEPRECATED.  Replaced by skFileptrOpen().
+ *
+ *    Removed in SiLK 4.0.0.
  *
  *    Open 'file' as a pipe or as a regular file depending on whether
  *    it is a gzipped file or not.  A file is considered gzipped if
@@ -2283,7 +2285,8 @@ skOpenFile(
     const char         *FName,
     int                 mode,
     FILE              **fp,
-    int                *isPipe);
+    int                *isPipe)
+    SK_GCC_DEPRECATED;
 
 
 /**
@@ -2344,7 +2347,9 @@ skTempDir(
 
 
 /**
- *    DEPRECATED.  Use skFileptrOpenPager() instead.
+ *    DEPRECATED.  Replaced by skFileptrOpenPager().
+ *
+ *    Removed in SiLK 4.0.0.
  *
  *    Attempts to redirect the '*output_stream' to the paging program
  *    '*pager.'
@@ -2378,11 +2383,14 @@ skTempDir(
 int
 skOpenPagerWhenStdoutTty(
     FILE              **output_stream,
-    char              **pager);
+    char              **pager)
+    SK_GCC_DEPRECATED;
 
 
 /**
- *    DEPRECATED
+ *    DEPRECATED.
+ *
+ *    Removed in SiLK 4.0.0.
  *
  *    If skOpenPagerWhenStdoutTty() returns a positive value, use this
  *    function to close the pager stream.  Prints an error if the
@@ -2391,7 +2399,8 @@ skOpenPagerWhenStdoutTty(
 void
 skClosePager(
     FILE               *output_stream,
-    const char         *pager);
+    const char         *pager)
+    SK_GCC_DEPRECATED;
 
 
 /**
@@ -2444,6 +2453,90 @@ skwriten(
     int                 fd,
     const void         *buf,
     size_t              count);
+
+
+/**
+ *    Verify that the command string specified in 'cmd_string'
+ *    contains only the conversions specified in 'conversion_chars'.
+ *
+ *    Specifically, search 'cmd_string' for the character '%', and
+ *    verify that the character that follows '%' is either another '%'
+ *    or one of the characters specified in 'conversion_chars'.  In
+ *    addition, verify that the command does not contain a single '%'
+ *    at the end of the string.
+ *
+ *    If 'cmd_string' is the empty string or does not contain any
+ *    invalid conversions, return 0.
+ *
+ *    If 'cmd_string' is not valid, return the offset into
+ *    'cmd_string' of the invalid character that followed '%'.
+ */
+size_t
+skSubcommandStringCheck(
+    const char         *cmd_string,
+    const char         *conversion_chars);
+
+/**
+ *    Allocate and return a new string that contains 'cmd_string' with
+ *    any %-conversions expanded.
+ *
+ *    Specifically, create a new string and copy 'cmd_string' into it,
+ *    where the string "%%" is replaced with a single '%' and where
+ *    any other occurence of '%' and a character by is replaced by
+ *    finding the offset of that character in 'conversion_chars' and
+ *    using that offset as the index into the variable argument list
+ *    to get the string to use in place of that conversion.  If the
+ *    conversion character is not present in 'conversion_chars' or is
+ *    the '\0' character, return NULL.
+ *
+ *    Return the new string.  Return NULL on an allocation error or an
+ *    invalid conversion.  The caller is responsible for freeing the
+ *    returned string.
+ */
+char *
+skSubcommandStringFill(
+    const char         *cmd_string,
+    const char         *conversion_chars,
+    ...);
+
+/**
+ *    Execute 'cmd_array[0]' in a subprocess with the remaining
+ *    members of 'cmd_array[]' as the arguments to the program.  The
+ *    final member of cmd_array[] must be NULL.  The value in
+ *    'cmd_array[0]' should be the full path to the program since this
+ *    function does not search for the command in PATH.
+ *
+ *    See also skSubcommandExecuteShell().
+ *
+ *    This function calls fork() twice to ensure that the parent
+ *    process does not wait for the subprocess to terminate.
+ *
+ *    Return the process id of the first child if the parent
+ *    successfully forks and waits for that child.
+ *
+ *    Return -1 if there is an allocate error or if the parent is
+ *    unable to fork().  Return -2 if the wait() call fails.  In all
+ *    cases, errno is set.
+ *
+ *    The child and grandchild only call a non-reentrant function on
+ *    error: when either the child process is unable to fork() or
+ *    grandchild process encounters an error in the execve() call.  In
+ *    these cases, an error is reported by calling skAppPrintErr().
+ */
+long int
+skSubcommandExecute(
+    char * const        cmd_array[]);
+
+/**
+ *    Execute 'cmd_string' in a subprocess.
+ *
+ *    This is identical to skSubcommandExecute() execept the command
+ *    'cmd_string' is invoked as the argument to "/bin/sh -c" in the
+ *    grandchild process.
+ */
+long int
+skSubcommandExecuteShell(
+    const char         *cmd_string);
 
 
 
@@ -2837,7 +2930,7 @@ num2dot0_r(
     char               *outbuf);
 
 
-#define SK_PADDED_FLAGS (1 << 0)
+#define SK_PADDED_FLAGS (1u << 0)
 
 
 #define SK_TCPFLAGS_STRLEN 9
@@ -2877,26 +2970,34 @@ skTCPStateString(
 
 
 /**
+ *    DEPRECATED.  Replaced by skTCPFlagsString().
+ *
+ *    Removed in SiLK 4.0.0.
+ *
  *    Return an 8 character string denoting which TCP flags are set.
  *    If all flags are on, FSRPAUEC is returned.  For any flag that is
  *    off, a space (' ') appears in place of the character.  Returns a
  *    pointer to a static buffer.
- *
- *    Deprecated.  Please use skTCPFlagsString instead.
  */
 char *
 tcpflags_string(
-    uint8_t             flags);
+    uint8_t             flags)
+    SK_GCC_DEPRECATED;
 
 
 /**
+ *    DEPRECATED.  Replaced by skTCPFlagsString().
+ *
+ *    Removed in SiLK 4.0.0.
+ *
  *    Thread-safe version of tcpflags_string().  The 'outbuf' should
  *    be at least SK_TCPFLAGS_STRLEN characters long.
- *
- *    Deprecated.  Please use skTCPFlagsString instead.
  */
-#define tcpflags_string_r(flags, outbuf)                        \
-    skTCPFlagsString(flags, outbuf, SK_PADDED_FLAGS)
+char *
+tcpflags_string_r(
+    uint8_t             flags,
+    char               *outbuf)
+    SK_GCC_DEPRECATED;
 
 
 /**
@@ -2929,6 +3030,8 @@ skToUpper(
 /**
  *    Return a string describing the last error that occurred when
  *    invoking the skStringParse* functions.
+ *
+ *    The 'errcode' value is expected to be an silk_utils_errcode_t.
  */
 const char *
 skStringParseStrerror(
@@ -3103,6 +3206,13 @@ skStringParseCIDR(
 /* typedef union sk_sockaddr_un sk_sockaddr_t;              // silk_types.h */
 /* typedef struct sk_sockaddr_array_st sk_sockaddr_array_t; // silk_types.h */
 
+/**
+ *    Constant returned by skSockaddrArrayGetHostname() when the
+ *    string that created the sk_sockaddr_array_t---that is, the
+ *    string passed to skStringParseHostPortPair()---did not contain a
+ *    hostname or host address.
+ */
+extern const char *sk_sockaddr_array_anyhostname;
 
 /* It seems that solaris does not define SUN_LEN (yet) */
 #ifndef SUN_LEN
@@ -3117,38 +3227,62 @@ skStringParseCIDR(
 #endif
 
 /**
- *    Returns the size of sk_sockaddr_t object, suitable for passing
+ *    Return the size of sk_sockaddr_t object, suitable for passing
  *    as the addrlen in functions such as connect(2) and bind(2).
+ *
+ *    Prior to SiLK 3.16.0, this was called skSockaddrLen().
  */
 #if 0
 size_t
-skSockaddrLen(
+skSockaddrGetLen(
     const sk_sockaddr_t    *s);
 #endif  /* 0 */
-#define skSockaddrLen(s)                                                \
+#define skSockaddrGetLen(s)                                             \
     (((s)->sa.sa_family == AF_INET) ? sizeof((s)->v4) :                 \
      (((s)->sa.sa_family == AF_INET6) ? sizeof((s)->v6) :               \
       (((s)->sa.sa_family == AF_UNIX) ? SUN_LEN(&(s)->un) : 0)))
 
+/**
+ *    DEPRECATED.  Replaced by skSockaddrGetLen().
+ *
+ *    Removed in SiLK 4.0.0.
+ */
+size_t
+skSockaddrLen(
+    const sk_sockaddr_t    *s)
+    SK_GCC_DEPRECATED;
+
 
 /**
- *    Returns the port portion of a sk_sockaddr_t object, as an
- *    integer in host-byte-order.  Returns -1 for sockaddr types
- *    without ports.
+ *    Return the port portion of a sk_sockaddr_t object, as an integer
+ *    in host-byte-order.  Return -1 for sockaddr types without
+ *    ports.
+ *
+ *    Prior to SiLK 3.16.0, this was called skSockaddrPort().
  */
 #if 0
 int
-skSockaddrPort(
+skSockaddrGetPort(
     const sk_sockaddr_t    *s);
 #endif  /* 0 */
-#define skSockaddrPort(s)                                               \
+#define skSockaddrGetPort(s)                                            \
     (((s)->sa.sa_family == AF_INET) ? ntohs((s)->v4.sin_port) :         \
      (((s)->sa.sa_family == AF_INET6) ? ntohs((s)->v6.sin6_port) : -1))
 
+/**
+ *    DEPRECATED.  Replaced by skSockaddrGetPort().
+ *
+ *    Removed in SiLK 4.0.0.
+ */
+int
+skSockaddrPort(
+    const sk_sockaddr_t    *s)
+    SK_GCC_DEPRECATED;
+
 
 /**
- *    Destroys a sk_sockaddr_array_t structure allocated by
- *    skStringParseHostPortPair().  Does nothing if the parameter is
+ *    Destroy a sk_sockaddr_array_t structure previously created by
+ *    skStringParseHostPortPair().  Do nothing if the argument is
  *    NULL.
  */
 #if 0
@@ -3159,59 +3293,116 @@ skSockaddrArrayDestroy(
 #define skSockaddrArrayDestroy(s)               \
     do {                                        \
         if (s) {                                \
-            if ((s)->name) {                    \
-                free((s)->name);                \
-            }                                   \
-            if ((s)->addrs) {                   \
-                free((s)->addrs);               \
-            }                                   \
+            free((s)->name);                    \
+            free((s)->host_port_pair);          \
+            free((s)->addrs);                   \
             free(s);                            \
         }                                       \
     } while (0)
 
+
 /**
+ *    Return the hostname or host address portion of a
+ *    sk_sockaddr_array_t structure as a C character array.  That is,
+ *    return the host or IP address portion of the 'host_port'
+ *    parameter of skStringParseHostPortPair().
+ *
+ *    If no hostname was specified when the sk_sockaddr_array_t was
+ *    created, return the string specified by the global
+ *    sk_sockaddr_array_anyhostname constant---the string "*".
+ *
+ *    To determine whether a hostname was provided to
+ *    skStringParseHostPortPair(), the caller may compare the result
+ *    of this macro with the sk_sockaddr_array_anyhostname constant.
+ *
+ *    Prior to SiLK 3.16.0, this was called skSockaddrArrayNameSafe().
+ */
+#if 0
+const char *
+skSockaddrArrayGetHostname(
+    const sk_sockaddr_array_t  *s);
+#endif  /* 0 */
+#define skSockaddrArrayGetHostname(s)                           \
+    ((s)->name ? (s)->name : sk_sockaddr_array_anyhostname)
+
+/*
+ *    DEPRECATED.  Replaced by skSockaddrArrayGetHostname().
+ *
+ *    Removed in SiLK 4.0.0.
+ */
+const char *
+skSockaddrArrayNameSafe(
+    const sk_sockaddr_array_t  *s)
+    SK_GCC_DEPRECATED;
+
+
+/**
+ *    DEPRECATED.  Replaced by skSockaddrArrayGetHostname().  If need
+ *    to know whether value is NULL, compare result of
+ *    skSockaddrArrayGetHostname() to sk_sockaddr_array_anyhostname.
+ *
+ *    Removed in SiLK 4.0.0.
+ *
  *    Returns the name of a sk_sockaddr_array_t structure.
  *    Specifically, returns the host or IP address portion of the
  *    'host_port' parameter of skStringParseHostPortPair().  May
  *    return NULL.  See also skSockaddrArrayNameSafe() and
  *    skSockaddrString().
  */
-#if 0
 const char *
 skSockaddrArrayName(
-    const sk_sockaddr_array_t  *s);
-#endif  /* 0 */
-#define skSockaddrArrayName(s)     ((s)->name)
+    const sk_sockaddr_array_t  *s)
+    SK_GCC_DEPRECATED;
+
 
 /**
- *    Returns the name of a sk_sockaddr_array_t structure.  Does not
- *    return NULL.  See also skSockaddrArrayName() and
- *    skSockaddrString().
+ *    Return the host-port pair string that created the
+ *    sk_sockaddr_array_t structure.  The return value is nearly the
+ *    string that was passed to skStringParseHostPortPair() except the
+ *    string uses a "*" or "[*]" to represent the host when no
+ *    host-name/-address was provided to skStringParseHostPortPair()
+ *    and the HOST_PROHIBITED flag was not set.
+ *
+ *    Since SiLK 4.0.0.
  */
 #if 0
 const char *
-skSockaddrArrayNameSafe(
+skSockaddrArrayGetHostPortPair(
     const sk_sockaddr_array_t  *s);
 #endif  /* 0 */
-#define skSockaddrArrayNameSafe(s) ((s)->name ? (s)->name : "*")
+#define skSockaddrArrayGetHostPortPair(s)   ((s)->host_port_pair)
+
 
 /**
- *    Returns the number of addresses in a sk_sockaddr_array_t
+ *    Return the number of addresses in a sk_sockaddr_array_t
  *    structure.
+ *
+ *    Prior to SiLK 3.16.0, this was called skSockaddrArraySize().
  */
 #if 0
 uint32_t
-skSockaddrArraySize(
+skSockaddrArrayGetSize(
     const sk_sockaddr_array_t  *s);
 #endif  /* 0 */
-#define skSockaddrArraySize(s)     ((s)->num_addrs)
+#define skSockaddrArrayGetSize(s)           ((s)->num_addrs)
+
+/*
+ *    DEPRECATED.  Replaced by skSockaddrArrayGetSize().
+ *
+ *    Removed in SiLK 4.0.0.
+ */
+uint32_t
+skSockaddrArraySize(
+    const sk_sockaddr_array_t  *s)
+    SK_GCC_DEPRECATED;
 
 
 /**
- *    Returns the address (sk_sockaddr_t *) at position 'n' in the
- *    sk_sockaddr_array_t structure 's'.  The first address is at position
- *    0.  The value 'n' must be less than skSockaddrArraySize(s),
- *    otherwise the return value is indeterminate.
+ *    Return the address (sk_sockaddr_t *) at position 'n' in the
+ *    sk_sockaddr_array_t structure 's'.  The first address is at
+ *    position 0.  The value 'n' must be less than
+ *    skSockaddrArrayGetSize(s), otherwise the return value is
+ *    indeterminate.
  */
 #if 0
 const sk_sockaddr_t *
@@ -3219,7 +3410,7 @@ skSockaddrArrayGet(
     const sk_sockaddr_array_t  *s,
     uint32_t                    n);
 #endif  /* 0 */
-#define skSockaddrArrayGet(s, n)   (&((s)->addrs[n]))
+#define skSockaddrArrayGet(s, n)            (&((s)->addrs[n]))
 
 
 /**
@@ -3243,9 +3434,9 @@ skSockaddrArrayGet(
 
 
 /**
- *    Fill 'outbuf' with a string representing the address in 'addr'
- *    and any non-zero port number.  The address and port are
- *    separated by a colon, ':'.  If the address in 'addr' is
+ *    Fill 'outbuf' with a string representing the IP address in
+ *    'addr' and any non-zero port number.  The IP address and port
+ *    are separated by a colon, ':'.  If the address in 'addr' is
  *    INADDR_ANY, the address is represented by an asterisk '*'.  When
  *    the address is IPv6 and the port is non-zero, the address is
  *    enclosed in square brackets, '[',']'.  When 'addr' contains a
@@ -3259,17 +3450,17 @@ skSockaddrArrayGet(
  *    would have written if 'outbuf' had been large enough to hold the
  *    entire string, not including the terminating NUL.
  */
-int
+ssize_t
 skSockaddrString(
     char                   *outbuf,
-    int                     size,
+    size_t                  size,
     const sk_sockaddr_t    *addr);
 
 /**
- *    Compares two sk_sockaddr_t objects.
+ *    Compare two sk_sockaddr_t objects.
  *
- *    Returns -1 if 'a' is "less than" 'b', 1 if 'a' is "greater than"
- *    'b', and 0 if the two are equal.
+ *    Return -1 if a is "less than" b, 1 if a is "greater than" b,
+ *    and 0 if the two are equal.
  *
  *    The 'flags' parameter may contain any of the following bits:
  *
@@ -3290,8 +3481,8 @@ skSockaddrCompare(
     unsigned int            flags);
 
 /**
- *    Determines whether 'array' contains 'addr', according to
- *    'flags'.  Returns 1 if true, 0 if false.
+ *    Determine whether 'array' contains 'addr', according to
+ *    'flags'.  Return 1 if true, 0 if false.
  *
  *    Addresses are compared using the skSockaddrCompare() function.
  *    The 'flags' argument will be passed to that function.
@@ -3305,7 +3496,7 @@ skSockaddrArrayContains(
     unsigned int                flags);
 
 /**
- *    Determines whether two sk_sockaddr_array_t objects are
+ *    Determine whether two sk_sockaddr_array_t objects are
  *    identical, according to 'flags'.
  *
  *    Two sk_sockaddr_array_t objects are considered equal if they
@@ -3323,7 +3514,7 @@ skSockaddrArrayEqual(
 
 
 /**
- *    Decides whether two sk_sockaddr_array_t objects match.  Returns
+ *    Decide whether two sk_sockaddr_array_t objects match.  Return
  *    1 if they match, 0 otherwise.
  *
  *    Two sk_sockaddr_array_t objects are considered to match if any
@@ -3341,12 +3532,12 @@ skSockaddrArrayMatches(
 
 
 /* Flags which can be passed to skStringParseHostPortPair() */
-#define PORT_REQUIRED    1
-#define PORT_PROHIBITED  (1 << 1)
-#define HOST_REQUIRED    (1 << 2)
-#define HOST_PROHIBITED  (1 << 3)
-#define IPV6_REQUIRED    (1 << 4)
-#define IPV6_PROHIBITED  (1 << 5)
+#define PORT_REQUIRED    (1u << 0)
+#define PORT_PROHIBITED  (1u << 1)
+#define HOST_REQUIRED    (1u << 2)
+#define HOST_PROHIBITED  (1u << 3)
+#define IPV6_REQUIRED    (1u << 4)
+#define IPV6_PROHIBITED  (1u << 5)
 
 
 /**
@@ -3709,21 +3900,41 @@ skStringParseHumanUint64(
     unsigned int        parse_flags);
 
 
-/* Following are used by skStringParseRange32() */
+/* Following are used by skStringParseRange64() and
+ * skStringParseRange32() */
 
-/** Allow single values '3' and open-ended ranges '3-' */
+/**
+ *    Allow a fully specified range "3-5", a single value "3"
+ *    (range_upper is set to range_lower), or an open-ended range "3-"
+ *    (range_upper is set to max_val).
+ */
 #define SKUTILS_RANGE_SINGLE_OPEN   0
 
-/** Force the value to be a range, but allow open-ended ranges */
+/**
+ *    Allow a fully specified range "3-5" or an open-ended range "3-";
+ *    i.e., the argument must contain a hyphen.  A single value is not
+ *    allowed.
+ */
 #define SKUTILS_RANGE_NO_SINGLE     (1u << 0)
 
-/** Allow single values '3' or complete ranges '3-5'; i.e., force an
- * upper bound on any range */
+/**
+ *    Allow a fully specified range "3-5" or a single value "3"
+ *    (range_upper is set to range_lower).
+ */
 #define SKUTILS_RANGE_NO_OPEN       (1u << 1)
 
-/** Only support ranges, and force the range to have both bounds */
+/**
+ *    Only support a fully specified range "3-5"; i.e., the range must
+ *    have both bounds.
+ */
 #define SKUTILS_RANGE_ONLY_RANGE    (SKUTILS_RANGE_NO_SINGLE \
                                      | SKUTILS_RANGE_NO_OPEN)
+
+/**
+ *    When a single value "3" is parsed, set range_upper to max_val as
+ *    if an open-ended range had been specified.
+ */
+#define SKUTILS_RANGE_MAX_SINGLE    (1u << 2)
 
 /**
  *    Attempts to parse the C-string 'range_string' as a range of two
@@ -3751,6 +3962,10 @@ skStringParseHumanUint64(
  *    UINT32_MAX if 'max_val' is 0.  SKUTILS_ERR_SHORT is returned
  *    when an open-ended range is given and SKUTILS_RANGE_NO_OPEN is
  *    specified.
+ *
+ *    If flags contains 'SKUTILS_RANGE_MAX_SINGLE', the function sets
+ *    range_upper to 'max_val' (or to UINT32_MAX if 'max_val' is 0)
+ *    when a single value is parsed (as for an open-ended range).
  *
  *    Whitespace around the range will be ignored.  Whitespace within
  *    the range will result in SKUTILS_ERR_BAD_CHAR being returned.
@@ -3912,14 +4127,14 @@ skStringParseTCPFlagsHighMask(
 /*
  * flag definitions.
  */
-#define CWR_FLAG (1 << 7)         /* 128 */
-#define ECE_FLAG (1 << 6)         /*  64 */
-#define URG_FLAG (1 << 5)         /*  32 */
-#define ACK_FLAG (1 << 4)         /*  16 */
-#define PSH_FLAG (1 << 3)         /*   8 */
-#define RST_FLAG (1 << 2)         /*   4 */
-#define SYN_FLAG (1 << 1)         /*   2 */
-#define FIN_FLAG (1)              /*   1 */
+#define CWR_FLAG (1u << 7)      /* 128 */
+#define ECE_FLAG (1u << 6)      /*  64 */
+#define URG_FLAG (1u << 5)      /*  32 */
+#define ACK_FLAG (1u << 4)      /*  16 */
+#define PSH_FLAG (1u << 3)      /*   8 */
+#define RST_FLAG (1u << 2)      /*   4 */
+#define SYN_FLAG (1u << 1)      /*   2 */
+#define FIN_FLAG (1u << 0)      /*   1 */
 
 
 /**

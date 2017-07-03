@@ -1,16 +1,19 @@
-# RCSIDENT("$SiLK: Makefile.am d82586e0bb8f 2016-12-13 22:17:26Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 0a5374cd2f26 2017-05-09 17:11:42Z mthomas $");
 
 # Installed Targets
 
-pkglib_LTLIBRARIES = app-mismatch.la conficker-c.la cutmatch.la \
-	 flowkey.la flowrate.la int-ext-fields.la uniq-distproto.la
+pkglib_LTLIBRARIES = app-mismatch.la conficker-c.la cutmatch.la flowkey.la \
+	 flowrate.la int-ext-fields.la
 
-EXTRA_DIST = flowkey.pod flowrate.pod int-ext-fields.pod silk-plugin.pod
+EXTRA_DIST = app-mismatch.pod conficker-c.pod cutmatch.pod flowkey.pod \
+	 flowrate.pod int-ext-fields.pod silk-plugin.pod
 if HAVE_POD2MAN
-man3_MANS = flowkey.3 flowrate.3 int-ext-fields.3 silk-plugin.3
+man3_MANS = app-mismatch.3 conficker-c.3 cutmatch.3 flowkey.3 \
+	 flowrate.3 int-ext-fields.3 silk-plugin.3
 endif
 
-noinst_LTLIBRARIES = skplugin-test.la rwslammer.la rwsynackfin.la
+noinst_LTLIBRARIES = skplugin-test.la rwslammer.la rwsynackfin.la \
+	 uniq-distproto.la
 
 check_PROGRAMS =
 

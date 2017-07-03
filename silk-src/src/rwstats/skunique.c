@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skunique.c 9d04be8e27ff 2017-01-05 19:09:17Z mthomas $");
+RCSIDENT("$SiLK: skunique.c 7ef130398e4c 2017-06-20 14:58:08Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/rwascii.h>
@@ -76,13 +76,13 @@ RCSIDENT("$SiLK: skunique.c 9d04be8e27ff 2017-01-05 19:09:17Z mthomas $");
  *    Return the name of the current temporary file used for output on
  *    the sk_unique_t object 'm_uniq'.
  */
-#define UNIQUE_TMPNAME_OUT(m_uniq)                               \
-    skTempFileGetName((m_uniq)->tmpctx, (m_uniq)->temp_idx)
+#define UNIQUE_TMPNAME_OUT(m_uniq)                                      \
+    uniqBasename(skTempFileGetName((m_uniq)->tmpctx, (m_uniq)->temp_idx))
 
 /*
  *    Given the number 'm_idx' which is an index into the fps[] array
- *    on the structure 'sk_sort_unique_t', 'uniqiter_tempfiles_t', or
- *    'uniqiter_temp_nodist_t' pointed to by 'm_uniq', return the
+ *    on the structure 'sk_sort_unique_t', 'uniqiter_temp_dist_t', or
+ *    'uniqiter_temp_values_t' pointed to by 'm_uniq', return the
  *    absolute number identifier for that temporary file.
  */
 #define UNIQUE_TMPNUM_READ(m_uniq, m_idx)       \
@@ -298,8 +298,6 @@ skFieldMergeUint64(
     MERGE_INT_PTRS(UINT64_MAX, uint64_t, a, b);
 }
 
-
-
 /*  create a new field list */
 int
 skFieldListCreate(
@@ -315,7 +313,6 @@ skFieldListCreate(
     *field_list = fl;
     return 0;
 }
-
 
 /*  destroy a field list */
 void
@@ -1165,7 +1162,6 @@ skFieldListExtractFromBuffer(
 
 /* **************************************************************** */
 
-
 /* LOCAL DEFINES AND TYPEDEFS */
 
 typedef struct HashSet_st {
@@ -1531,7 +1527,7 @@ typedef struct sk_short_list_st {
  *    list object will use 'cmp_func' to compare keys.  Return 0 on
  *    success, or -1 on failure.
  */
-int
+static int
 skShortListCreate(
     sk_short_list_t   **list,
     size_t              element_size,
@@ -1544,7 +1540,7 @@ skShortListCreate(
  *    Destroy the short-list object at 'list'.  Does nothing if 'list'
  *    or the object that 'list' refers to is NULL.
  */
-void
+static void
 skShortListDestroy(
     sk_short_list_t   **list);
 
@@ -1553,7 +1549,7 @@ skShortListDestroy(
  *
  *    Count the number of entries in list.
  */
-uint32_t
+static uint32_t
 skShortListCountEntries(
     const sk_short_list_t  *list);
 
@@ -1564,7 +1560,7 @@ skShortListCountEntries(
  *    no object at 'position'.  The caller must treat the returned
  *    value as immutable.
  */
-const void *
+static const void *
 skShortListGetElement(
     const sk_short_list_t  *list,
     uint32_t                position);
@@ -1574,7 +1570,7 @@ skShortListGetElement(
  *
  *    Remove all the entries in 'list'.
  */
-void
+static void
 skShortListRemoveAll(
     sk_short_list_t    *list);
 
@@ -1587,14 +1583,14 @@ skShortListRemoveAll(
  *    'list'.  Return SK_SHORT_LIST_ERR_FULL if there is no room in
  *    'list' for the entry.
  */
-int
+static int
 skShortListInsert(
     sk_short_list_t    *list,
     const void         *element);
 
 
 /*  create a short-list */
-int
+static int
 skShortListCreate(
     sk_short_list_t   **list,
     size_t              element_size,
@@ -1621,7 +1617,7 @@ skShortListCreate(
 
 
 /*  destroy a short-list */
-void
+static void
 skShortListDestroy(
     sk_short_list_t   **list)
 {
@@ -1633,7 +1629,7 @@ skShortListDestroy(
 
 
 /*  count number of entries in the short-list */
-uint32_t
+static uint32_t
 skShortListCountEntries(
     const sk_short_list_t  *list)
 {
@@ -1642,7 +1638,7 @@ skShortListCountEntries(
 
 
 /*  get object at 'position' in 'list' */
-const void *
+static const void *
 skShortListGetElement(
     const sk_short_list_t  *list,
     uint32_t                position)
@@ -1656,7 +1652,7 @@ skShortListGetElement(
 
 
 /*  remove all the entries in 'list' */
-void
+static void
 skShortListRemoveAll(
     sk_short_list_t    *list)
 {
@@ -1666,7 +1662,7 @@ skShortListRemoveAll(
 
 
 /*  add 'element' to 'list' */
-int
+static int
 skShortListInsert(
     sk_short_list_t    *list,
     const void         *element)
@@ -1727,7 +1723,6 @@ typedef struct sk_uniq_field_info_st {
     uint8_t                 value_num_fields;
     uint8_t                 value_octets;
 
-    /* number of distinct fields */
     uint8_t                 distinct_num_fields;
     uint8_t                 distinct_octets;
 } sk_uniq_field_info_t;
@@ -1981,6 +1976,7 @@ typedef enum {
 } distinct_type_t;
 
 
+/*    The data structure holding the distinct values */
 typedef union distinct_tracker_un {
     sk_short_list_t    *dv_shortlist;
     HashSet            *dv_hashset;
@@ -1988,10 +1984,16 @@ typedef union distinct_tracker_un {
 } distinct_tracker_t;
 
 typedef struct distinct_value_st {
+    /*    count of distinct elements */
     uint64_t            dv_count;
+    /*    data structure holding the distinct elements */
     distinct_tracker_t  dv_v;
+    /*    the type of data structure in 'dv_v' */
     distinct_type_t     dv_type;
+    /*    the octet length of an element */
     uint8_t             dv_octets;
+    /*    the offset of this field in the buffer that is filled for a
+     *    single record or for a single bin's results */
     uint8_t             dv_offset;
 } distinct_value_t;
 
@@ -2035,10 +2037,8 @@ uniqDistinctFree(
             skShortListDestroy(&dist->dv_v.dv_shortlist);
             break;
           case DISTINCT_HASHSET:
-            if (dist->dv_v.dv_hashset) {
-                hashset_free_table(dist->dv_v.dv_hashset);
-                dist->dv_v.dv_hashset = NULL;
-            }
+            hashset_free_table(dist->dv_v.dv_hashset);
+            dist->dv_v.dv_hashset = NULL;
             break;
         }
     }
@@ -2407,8 +2407,9 @@ uniqDistinctSetOutputBuf(
 /*
  *  status = uniqDistinctReset(uniq_fields, distincts);
  *
- *    Reset the distinct counters.  Return 0 on success, or -1 on
- *    memory allocation error.
+ *    Reset the distinct counters and clear all entries from the data
+ *    structure (this recreates the hashset data structure).  Return 0
+ *    on success, or -1 on memory allocation error.
  */
 static int
 uniqDistinctReset(
@@ -2428,9 +2429,7 @@ uniqDistinctReset(
             skShortListRemoveAll(dist->dv_v.dv_shortlist);
             break;
           case DISTINCT_HASHSET:
-            if (dist->dv_v.dv_hashset) {
-                hashset_free_table(dist->dv_v.dv_hashset);
-            }
+            hashset_free_table(dist->dv_v.dv_hashset);
             dist->dv_v.dv_hashset = hashset_create_set(dist->dv_octets, 256,
                                                        DEFAULT_LOAD_FACTOR);
             if (NULL == dist->dv_v.dv_hashset) {
@@ -2446,11 +2445,44 @@ uniqDistinctReset(
 }
 
 
+
 /* **************************************************************** */
 
 /*    SKUNIQUE INTERNAL WRAPPERS FOR OPEN, READ AND WRITE OF TEMP FILES */
 
 /* **************************************************************** */
+
+/*
+ *    Return a pointer into the string 'name' that either points at
+ *    the first character after the final '/' or to the first
+ *    character of 'name'.
+ */
+static const char *
+uniqBasename(
+    const char         *name)
+{
+    const char *base;
+
+    if (name) {
+        base = strrchr(name, '/');
+        if (base) {
+            return base + 1;
+        }
+    }
+    return name;
+}
+
+
+/*
+ *    Return the basename of the path to specified in 'stream'.
+ */
+static const char *
+uniqTempName(
+    const skstream_t   *stream)
+{
+    return uniqBasename(skStreamGetPathname(stream));
+}
+
 
 /*
  *    Create and return a new temporary file, putting the index of the
@@ -2497,7 +2529,7 @@ uniqTempReopen(
 
 /*
  *    Close a temporary file.  Exit the application if stream was open
- *    for write and closing fails.
+ *    for write and closing fails.  Do nothing if stream is NULL.
  */
 static void
 uniqTempClose(
@@ -2553,11 +2585,11 @@ uniqTempReadHelper(
 #else
     if (rv == 0) {
         TRACEMSG(("%s:%d: Failed to read %" SK_PRIuZ " bytes: EOF on '%s'",
-                  file_name, file_line, size, skStreamGetPathname(stream)));
+                  file_name, file_line, size, uniqTempName(stream)));
     } else if (rv > 0) {
         TRACEMSG(("%s:%d: Failed to read %" SK_PRIuZ " bytes:"
                   " Short read of %" SK_PRIdZ " on '%s'",
-                  file_name, file_line, size, rv, skStreamGetPathname(stream)));
+                  file_name, file_line, size, rv, uniqTempName(stream)));
     } else {
         char errbuf[2 * PATH_MAX];
 
@@ -2565,7 +2597,7 @@ uniqTempReadHelper(
         TRACEMSG(("%s:%d: Failed to read %" SK_PRIuZ " bytes: %s",
                   file_name, file_line, size, errbuf));
     }
-#endif
+#endif  /* #else of #if TRACEMSG_LEVEL == 0 */
     return 0;
 }
 
@@ -2602,17 +2634,17 @@ uniqTempWriteHelper(
     if (rv >= 0) {
         TRACEMSG(("%s:%d: Failed to write %" SK_PRIuZ " bytes:"
                   " Short write of %" SK_PRIdZ " on '%s'",
-                  file_name, file_line, size, rv, skStreamGetPathname(stream)));
+                  file_name, file_line, size, rv, uniqTempName(stream)));
     } else {
         TRACEMSG(("%s:%d: Failed to write %" SK_PRIuZ " bytes: %s",
                   file_name, file_line, size, errbuf));
     }
-#endif
+#endif  /* #else of #if TRACEMSG_LEVEL == 0 */
 
     if (rv >= 0) {
         snprintf(errbuf, sizeof(errbuf),
                  "Short write of %" SK_PRIdZ " bytes to '%s'",
-                 rv, skStreamGetPathname(stream));
+                 rv, uniqTempName(stream));
     }
     skAppPrintErr("Cannot write to temporary file: %s", errbuf);
     exit(EXIT_FAILURE);
@@ -2622,26 +2654,817 @@ uniqTempWriteHelper(
 
 /* **************************************************************** */
 
-/*    SKUNIQUE INTERNAL SUPPORT USING TEMPORARY FILES */
+/*    SKUNIQUE INTERNAL SUPPORT FOR MERGING DISTINCT FILES   */
 
 /* **************************************************************** */
 
 /*
- *  status = uniqTempWriteTriple(field_info, fp, key_buf, value_buf, distincts);
+ *    The following data structure and functions allow merging of
+ *    distinct values that have been written to temporary files.  This
+ *    code may be used by either unsorted input data, presorted input
+ *    data, or when computing the number of distinct values across all
+ *    bins.
+ */
+
+/*
+ *    distinct_merge_data_t is used when merging distinct values that
+ *    have been written to temporary files.  It contains the current
+ *    distinct value that was read from every open file.
+ */
+struct distinct_merge_data_st {
+    uint8_t      value[MAX_MERGE_FILES][HASHLIB_MAX_KEY_WIDTH];
+    uint8_t      octets;
+};
+typedef struct distinct_merge_data_st distinct_merge_data_t;
+
+/*
+ *    distinct_merge_t is used to process distinct values that have
+ *    been written to temporary files.
+ */
+struct distinct_merge_st {
+    uint64_t                num_distinct[MAX_MERGE_FILES];
+    skstream_t             *fps[MAX_MERGE_FILES];
+    skstream_t             *dist_fp;
+    distinct_merge_data_t  *merge_data;
+    skheap_t               *heap;
+    uint16_t                active[MAX_MERGE_FILES];
+    /* index of first temp file opened for this round of merging;
+     * used when reporting temp file indexes */
+    int                     temp_idx_base;
+    uint16_t                max_fps;
+    uint16_t                num_active;
+    uint8_t                 octet_len;
+    uint8_t                 read_to_end_of_file;
+    uint8_t                 write_to_temp;
+    uint8_t                 print_debug;
+};
+typedef struct distinct_merge_st distinct_merge_t;
+
+
+#if TRACEMSG_LEVEL == 0
+
+/*
+ *    Function that is used to output log messages enabled by the
+ *    SILK_UNIQUE_DEBUG environment variable.
  *
- *    Write the values from 'key_buffer', 'value_buffer', and any
- *    distinct fields (located on the 'uniq' object) to the file
- *    handle 'fp'.  Return 0 on success, or -1 on failure.
+ *    If SKUNIQUE_TRACE_LEVEL or TRACEMSG_LEVEL is non-zero, a
+ *    different definition of this funciton is used, which is defined
+ *    below.
+ */
+static void
+uniqDistmergeDebug(
+    const distinct_merge_t *merge,
+    const char             *fmt,
+    ...)
+    SK_CHECK_PRINTF(2, 3);
+
+static void
+uniqDistmergeDebug(
+    const distinct_merge_t *merge,
+    const char             *fmt,
+    ...)
+{
+    va_list args;
+
+    va_start(args, fmt);
+    if (merge && merge->print_debug) {
+        fprintf(stderr, "%s: " SKUNIQUE_DEBUG_ENVAR ": ", skAppName());
+        vfprintf(stderr, fmt, args);
+        fprintf(stderr, "\n");
+    }
+    va_end(args);
+}
+
+#else  /* TRACEMSG_LEVEL > 0 */
+
+/*
+ *    When SKUNIQUE_TRACE_LEVEL or TRACEMSG_LEVEL is non-zero, the
+ *    code behaves as though SILK_UNIQUE_DEBUG is enabled and this
+ *    function is used to to trace the code.
+ */
+#define uniqDistmergeDebug(...)                         \
+    uniqDistmergeDebugHelper(__LINE__, __VA_ARGS__)
+
+static void
+uniqDistmergeDebugHelper(
+    int                     lineno,
+    const distinct_merge_t *merge,
+    const char             *fmt,
+    ...)
+    SK_CHECK_PRINTF(3, 4);
+
+static void
+uniqDistmergeDebugHelper(
+    int                     lineno,
+    const distinct_merge_t *merge,
+    const char             *fmt,
+    ...)
+{
+    va_list args;
+
+    SK_UNUSED_PARAM(merge);
+
+    va_start(args, fmt);
+    fprintf(stderr, __FILE__ ":%d: ", lineno);
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "\n");
+    va_end(args);
+}
+#endif  /* #else of TRACEMSG_LEVEL == 0 */
+
+
+/*
+ *    Comparison function used by the heap on the distinct_merge_t
+ *    data structure.
  *
- *    Data is written as follows:
+ *    The values in 'b' and 'a' (note the order) are integer indexes
+ *    into an array of distinct values.
+ *
+ *    The context value in 'v_dist_merge' is a distinct_merge_t object
+ *    that holds a pointer to a distinct_merge_data_t object that
+ *    holds the values.
+ */
+static int
+uniqDistmergeCmp(
+    const skheapnode_t  b,
+    const skheapnode_t  a,
+    void               *v_dist_merge)
+{
+    distinct_merge_data_t *merge_data;
+    const uint8_t *dist_a;
+    const uint8_t *dist_b;
+
+    assert(v_dist_merge);
+    assert(((distinct_merge_t *)v_dist_merge)->merge_data);
+
+    merge_data = ((distinct_merge_t *)v_dist_merge)->merge_data;
+
+    dist_a = merge_data->value[*(uint16_t*)a];
+    dist_b = merge_data->value[*(uint16_t*)b];
+
+    return memcmp(dist_a, dist_b, merge_data->octets);
+}
+
+
+/*
+ *    Merge a single distinct field and return the number of distinct
+ *    values seen for that field, or UINT64_MAX on error.
+ *
+ *    The fps[] array of the 'merge' object must contain open file
+ *    handles to the files containing the distinct values; the
+ *    active[] array must specify which indexes from 'fps' are to be
+ *    used; the num_active member must specify the number of entries
+ *    in 'active'; the num_distinct[] array must specify the number of
+ *    distinct values to read from each file or the
+ *    'read_to_end_of_file' value may be specified to indicate that
+ *    the function should only stop reading once the end of the files
+ *    has been reached; the 'octet_len' member must specify the octet
+ *    length of this distinct field; the 'write_to_temp' member
+ *    specifies that the distinct values should be written to the
+ *    'dist_fp' member.
+ */
+static uint64_t
+uniqDistmergeMergeOne(
+    distinct_merge_t   *merge)
+{
+    uint8_t lowest_distinct[HASHLIB_MAX_KEY_WIDTH];
+    uint64_t distinct_count;
+    uint32_t heap_count;
+    uint16_t *top_heap;
+    uint16_t lowest;
+    ssize_t last_errno;
+    distinct_merge_data_t merge_data;
+    uint16_t i;
+
+    assert(merge);
+    assert(merge->heap);
+    assert(0 == skHeapGetNumberEntries(merge->heap));
+
+    /* Should only be called when distinct fields are present */
+    assert(!merge->write_to_temp || merge->dist_fp);
+
+    merge_data.octets = merge->octet_len;
+    merge->merge_data = &merge_data;
+
+    if (merge->read_to_end_of_file) {
+        /* set all num_distinct counts to the maximum */
+        memset(merge->num_distinct, 0xff, sizeof(merge->num_distinct));
+    }
+
+    /* holds the number of distinct values found for this distinct
+     * field across all open files */
+    distinct_count = 0;
+
+    /* for each file: read the first distinct value and store the
+     * index in dist_heap */
+    for (i = 0; i < merge->num_active; ++i) {
+        lowest = merge->active[i];
+        if (0 == merge->num_distinct[lowest]) {
+            /* do nothing */
+        } else if (uniqTempRead(merge->fps[lowest],
+                                merge_data.value[lowest], merge_data.octets))
+        {
+            skHeapInsert(merge->heap, &lowest);
+            --merge->num_distinct[lowest];
+        } else {
+            last_errno = skStreamGetLastErrno(merge->fps[lowest]);
+            if (last_errno != 0 || !merge->read_to_end_of_file) {
+                goto READ_ERROR;
+            }
+            uniqDistmergeDebug(merge, "Ignoring empty temporary file #%u '%s'",
+                               UNIQUE_TMPNUM_READ(merge, i),
+                               uniqTempName(merge->fps[lowest]));
+        }
+    }
+
+    /* get the file index that has the lowest distinct value */
+    if (skHeapPeekTop(merge->heap, (skheapnode_t*)&top_heap)
+        == SKHEAP_ERR_EMPTY)
+    {
+        /* strange, but okay? */
+        return distinct_count;
+    }
+    lowest = *top_heap;
+
+    heap_count = skHeapGetNumberEntries(merge->heap);
+    assert(heap_count > 0);
+
+    /* process all the distinct values */
+    while (heap_count > 1) {
+        if (merge->write_to_temp) {
+            uniqTempWrite(merge->dist_fp,
+                          &merge_data.value[lowest], merge_data.octets);
+        }
+        ++distinct_count;
+
+        memcpy(lowest_distinct, merge_data.value[lowest], merge_data.octets);
+
+        do {
+            /* replace the distinct_value we just read */
+            if (0 == merge->num_distinct[lowest]) {
+                /* no more distinct values from this file */
+                skHeapExtractTop(merge->heap, NULL);
+                --heap_count;
+                if (0 == heap_count) {
+                    break;
+                }
+            } else if (uniqTempRead(merge->fps[lowest],
+                                    merge_data.value[lowest],
+                                    merge_data.octets))
+            {
+                --merge->num_distinct[lowest];
+                skHeapReplaceTop(merge->heap, &lowest, NULL);
+                /* distinct values in each file must be sorted and
+                 * unique */
+                assert(memcmp(lowest_distinct, merge_data.value[lowest],
+                              merge->octet_len) < 0);
+            } else {
+                last_errno = skStreamGetLastErrno(merge->fps[lowest]);
+                if (last_errno != 0 || !merge->read_to_end_of_file) {
+                    goto READ_ERROR;
+                }
+                /* done with this file */
+                skHeapExtractTop(merge->heap, NULL);
+                --heap_count;
+                uniqDistmergeDebug(
+                    merge, "Finished reading file #%u, %u files remain",
+                    UNIQUE_TMPNUM_READ(merge, lowest), heap_count);
+                if (0 == heap_count) {
+                    break;
+                }
+            }
+
+            /* get the new value at the top of the heap */
+            skHeapPeekTop(merge->heap, (skheapnode_t*)&top_heap);
+            lowest = *top_heap;
+            /* ignore value if it matches the lowest_distinct */
+        } while (memcmp(lowest_distinct, merge_data.value[lowest],
+                        merge_data.octets) == 0);
+    }
+
+    if (skHeapExtractTop(merge->heap, (skheapnode_t)&lowest)
+        == SKHEAP_ERR_EMPTY)
+    {
+        return distinct_count;
+    }
+    assert(skHeapGetNumberEntries(merge->heap) == 0);
+
+    /* process the remaining values in this single file */
+    for (;;) {
+        if (merge->write_to_temp) {
+            uniqTempWrite(merge->dist_fp,
+                          &merge_data.value[lowest], merge->octet_len);
+        }
+        ++distinct_count;
+
+        if (0 == merge->num_distinct[lowest]) {
+            /* no more distinct values */
+            break;
+        } else if (uniqTempRead(merge->fps[lowest], merge_data.value[lowest],
+                                merge_data.octets))
+        {
+            --merge->num_distinct[lowest];
+        } else {
+            last_errno = skStreamGetLastErrno(merge->fps[lowest]);
+            if (last_errno != 0 || !merge->read_to_end_of_file) {
+                goto READ_ERROR;
+            }
+            uniqDistmergeDebug(merge,
+                               "Finished reading file #%u, 0 files remain",
+                               UNIQUE_TMPNUM_READ(merge, lowest));
+            break;
+        }
+    }
+
+    return distinct_count;
+
+  READ_ERROR:
+    uniqDistmergeDebug(merge, "Cannot read from temporary file #%u",
+                       UNIQUE_TMPNUM_READ(merge, lowest));
+    skAppPrintErr("Cannot read distinct values from temporary file: %s",
+                  (last_errno ? strerror(last_errno) : "EOF"));
+    return UINT64_MAX;
+}
+
+
+
+/* **************************************************************** */
+
+/*    SKUNIQUE INTERNAL SUPPORT FOR DISTINCT COUNT ACROSS ALL BINS   */
+
+/* **************************************************************** */
+
+/*
+ *    total_dist_t is used to count the number of distinct values for
+ *    one field across all bins.  It is used by rwstats when the
+ *    primary value field is a distinct count.
+ *
+ *    FIXME: It would be nice if we could use a bitmap for 2-byte
+ *    values instead of the short-list/hashset hybrid, but that means
+ *    changing some of the the uniqDistinct* calls to special-case the
+ *    total-distinct case.
+ */
+struct total_distinct_st {
+    /*      information about this single field */
+    sk_uniq_field_info_t    td_fi;
+    /*      the count of distinct items */
+    uint64_t                td_count;
+    /*      data structure holding the distinct values */
+    distinct_value_t       *td_distincts;
+    /*      the temp file context to use if all distinct values cannot
+     *      be stored in memory */
+    sk_tempfilectx_t       *td_tmpctx;
+    /*      the open temporary file */
+    skstream_t             *td_tmp_fp;
+    /*      index of the temp file */
+    int                     td_tmp_idx;
+    /*      octet length of this distinct field */
+    uint8_t                 td_octets;
+    /*      whether any temp files have been written to */
+    uint8_t                 td_uses_temp;
+    /*      whether the count has already been computed */
+    uint8_t                 td_have_count;
+};
+typedef struct total_distinct_st total_distinct_t;
+
+
+/*
+ *    Write the current distinct values to the tempoary file, close
+ *    the temporary file, and empty the distinct data structure.  For
+ *    the hashset, recreates the hash.
+ */
+static int
+uniqTotalDistinctToTemp(
+    total_distinct_t   *totdis)
+{
+    distinct_value_t *dist;
+    hashset_iter h_iter;
+    uint8_t *hash_key;
+    uint16_t j;
+
+    assert(totdis);
+    assert(totdis->td_tmp_fp);
+
+    dist = totdis->td_distincts;
+
+    TRACEMSG(("%s:%d: Writing %" PRIu64 " total distinct values to TD#%d...",
+              __FILE__, __LINE__, totdis->td_distincts->dv_count,
+              totdis->td_tmp_idx));
+
+    /* write each value into the distinct file */
+    switch (dist->dv_type) {
+      case DISTINCT_BITMAP:
+        skAppPrintErr("Should never need to write total dist bitmap to file");
+        skAbort();
+
+      case DISTINCT_SHORTLIST:
+        assert(skShortListCountEntries(dist->dv_v.dv_shortlist)
+               == dist->dv_count);
+        for (j = 0; j < dist->dv_count; ++j) {
+            uniqTempWrite(totdis->td_tmp_fp,
+                          skShortListGetElement(dist->dv_v.dv_shortlist, j),
+                          dist->dv_octets);
+        }
+        skShortListRemoveAll(dist->dv_v.dv_shortlist);
+        break;
+
+      case DISTINCT_HASHSET:
+        assert(hashset_count_entries(dist->dv_v.dv_hashset) == dist->dv_count);
+        hashset_sort_entries(dist->dv_v.dv_hashset);
+        h_iter = hashset_create_iterator(dist->dv_v.dv_hashset);
+        while (OK == hashset_iterate(dist->dv_v.dv_hashset, &h_iter,&hash_key))
+        {
+            uniqTempWrite(totdis->td_tmp_fp, hash_key, dist->dv_octets);
+        }
+        hashset_free_table(dist->dv_v.dv_hashset);
+        dist->dv_v.dv_hashset = hashset_create_set(dist->dv_octets, 256,
+                                                   DEFAULT_LOAD_FACTOR);
+        if (NULL == dist->dv_v.dv_hashset) {
+            TRACEMSG(("%s:%d: Error allocating hashset",
+                      __FILE__, __LINE__));
+            return -1;
+        }
+        break;
+    }
+
+    /* close the temporary file */
+    TRACEMSG((("%s:%d: Finished writing TD#%d '%s'"),
+              __FILE__, __LINE__, totdis->td_tmp_idx,
+              uniqBasename(skStreamGetPathname(totdis->td_tmp_fp))));
+    uniqTempClose(totdis->td_tmp_fp);
+    totdis->td_tmp_fp = NULL;
+    totdis->td_uses_temp = 1;
+
+    /* reset count */
+    dist->dv_count = 0;
+
+    return 0;
+}
+
+
+/*
+ *    Return the number of distinct values seen.
+ *
+ *    The uniqTotalDistinctPrepareOutput() function must be called
+ *    before calling this function.
+ *
+ *    If temporary files are in use, this function reads the distinct
+ *    values from the files to compute the number of distinct values.
+ */
+static uint64_t
+uniqTotalDistinctGetCount(
+    total_distinct_t   *totdis)
+{
+    distinct_merge_t dist_merge;
+
+    /* indexes at which to start and stop the merge */
+    int tmp_idx_a;
+    int tmp_idx_b;
+
+    /* number of distinct values */
+    uint64_t distinct_count;
+
+    uint16_t i;
+    int j;
+
+    if (totdis->td_have_count) {
+        return totdis->td_count;
+    }
+    if (!totdis->td_uses_temp) {
+        skAppPrintErr("uniqTotalDistinctPrepareOutput was not called");
+        skAbort();
+    }
+
+    assert(totdis->td_tmp_idx > 0);
+
+    memset(&dist_merge, 0, sizeof(dist_merge));
+    dist_merge.read_to_end_of_file = 1;
+    dist_merge.octet_len = totdis->td_octets;
+    dist_merge.write_to_temp = 1;
+
+    /* create a heap to manage merging of the distinct values */
+    dist_merge.heap = skHeapCreate2(uniqDistmergeCmp, MAX_MERGE_FILES,
+                                    sizeof(uint16_t), NULL, &dist_merge);
+    if (NULL == dist_merge.heap) {
+        skAppPrintOutOfMemory("heap");
+        goto ERROR;
+    }
+
+    tmp_idx_a = 0;
+
+    /* This loop repeats until we have processed all of the temp files
+     * that hold the total distinct values. */
+    do {
+        dist_merge.temp_idx_base = tmp_idx_a;
+        dist_merge.num_active = 0;
+        distinct_count = 0;
+
+        /* may not process more than MAX_MERGE_FILES files */
+        tmp_idx_b = tmp_idx_a + MAX_MERGE_FILES - 1;
+        if (totdis->td_tmp_idx < tmp_idx_b) {
+            /* number of temp files is less than MAX_MERGE_FILES */
+            tmp_idx_b = totdis->td_tmp_idx;
+        }
+        TRACEMSG((("%s:%d: Attempting to open total distinct temporary"
+                   " files TD#%d through TD#%d"),
+                  __FILE__, __LINE__, tmp_idx_a, tmp_idx_b));
+
+        /* open an intermediate temp file.  The processing writes
+         * distinct values here if all existing temporary files cannot
+         * be processed at once. */
+        totdis->td_tmp_fp = uniqTempCreate(totdis->td_tmpctx,
+                                           &totdis->td_tmp_idx);
+
+        /* Open each total distinct temp file */
+        for (j = tmp_idx_a, i = 0; j <= tmp_idx_b; ++j, ++i) {
+            dist_merge.fps[i] = uniqTempReopen(totdis->td_tmpctx, j);
+            if (NULL == dist_merge.fps[i]) {
+                if (i < 2) {
+                    skAppPrintErr("Unable to open multiple temporary files");
+                    return -1;
+                }
+                /* We cannot open any more temp files; we'll need
+                 * to catch file 'j' the next time around. */
+                tmp_idx_b = j - 1;
+                TRACEMSG((("%s:%d: File limit hit [%s]---merging"
+                           " TD#%d through TD#%d into TD#%d..."),
+                          __FILE__, __LINE__, strerror(errno),
+                          tmp_idx_a, tmp_idx_b, totdis->td_tmp_idx));
+                break;
+            }
+            dist_merge.active[dist_merge.num_active++] = i;
+        }
+
+        TRACEMSG(("%s:%d: Opened %d total distinct temporary files",
+                 __FILE__, __LINE__, i));
+
+        /* We may close the intermediate temp file if we have opened
+         * all existing temporary files. */
+        if (tmp_idx_b == totdis->td_tmp_idx - 1) {
+            TRACEMSG(("%s:%d: Successfully opened all%s"
+                      " total distinct temporary files",
+                      __FILE__, __LINE__,
+                      ((tmp_idx_a > 0) ? " remaining" : "")));
+            uniqTempClose(totdis->td_tmp_fp);
+            totdis->td_tmp_fp = NULL;
+            dist_merge.write_to_temp = 0;
+        }
+
+        dist_merge.dist_fp = totdis->td_tmp_fp;
+
+        /* process the files */
+        distinct_count = uniqDistmergeMergeOne(&dist_merge);
+
+        /* Close and destroy all the temp files that we processed this
+         * time. */
+        for (j = tmp_idx_a, i = 0; j <= tmp_idx_b; ++j, ++i) {
+            uniqTempClose(dist_merge.fps[i]);
+            skTempFileRemove(totdis->td_tmpctx, j);
+        }
+        memset(dist_merge.fps, 0, sizeof(dist_merge.fps));
+
+        /* return if there was an error */
+        if (UINT64_MAX == distinct_count) {
+            goto ERROR;
+        }
+
+        /* Close the intermediate temp file(s). */
+        if (totdis->td_tmp_fp) {
+            TRACEMSG(("%s:%d: Finished writing TD#%d '%s'",
+                      __FILE__, __LINE__, totdis->td_tmp_idx,
+                      uniqBasename(skStreamGetPathname(totdis->td_tmp_fp))));
+            uniqTempClose(totdis->td_tmp_fp);
+            totdis->td_tmp_fp = NULL;
+        }
+
+        /* start the next merge with the next temp file */
+        tmp_idx_a = tmp_idx_b + 1;
+    } while (dist_merge.write_to_temp);
+
+    skHeapFree(dist_merge.heap);
+
+    totdis->td_count = distinct_count;
+
+    totdis->td_have_count = 1;
+    return totdis->td_count;
+
+  ERROR:
+    skHeapFree(dist_merge.heap);
+    return SIZE_MAX;
+}
+
+
+/*
+ *    Insert the value of the distinct field on 'rwrec' into the
+ *    distinct data structure.  If memory is exhausted, write the
+ *    values in the data structure to disk and create an empty data
+ *    structure.
+ */
+static int
+uniqTotalDistinctIncrement(
+    total_distinct_t   *totdis,
+    const rwRec        *rwrec)
+{
+    uint8_t field_buf[HASHLIB_MAX_KEY_WIDTH];
+
+    assert(rwrec);
+    assert(totdis);
+    assert(0 == totdis->td_have_count);
+
+    if (0 == totdis->td_fi.distinct_num_fields) {
+        /* nothing to do */
+        return 0;
+    }
+    skFieldListRecToBinary(totdis->td_fi.distinct_fields, rwrec, field_buf);
+    if (uniqDistinctIncrement(&totdis->td_fi, totdis->td_distincts, field_buf)
+        == 0)
+    {
+        /* success */
+        return 0;
+    }
+
+    if (uniqTotalDistinctToTemp(totdis)) {
+        return -1;
+    }
+
+    /* open a new file */
+    totdis->td_tmp_fp = uniqTempCreate(totdis->td_tmpctx, &totdis->td_tmp_idx);
+
+    /* insert the value */
+    if (uniqDistinctIncrement(&totdis->td_fi, totdis->td_distincts, field_buf)
+        != 0)
+    {
+        skAppPrintSyserror("Unable to increment into empty data structure");
+        return -1;
+    }
+
+    return 0;
+}
+
+
+/*
+ *    Initialize the 'totdis' data strucure to process the first
+ *    distinct field specified in the field info structure
+ *    'field_info'.  Create a temporary file to hold the distinct
+ *    values if the data structure overflows.  Return an error if no
+ *    distinct fields have been specified in 'field_info' or if there
+ *    is an allocation error.
+ */
+static int
+uniqTotalDistinctPrepareInput(
+    total_distinct_t           *totdis,
+    const sk_uniq_field_info_t *field_info,
+    const char                 *temp_dir)
+{
+    sk_fieldlist_t *dist_list = NULL;
+    sk_tempfilectx_t *tmpctx = NULL;
+
+    if (NULL == field_info->distinct_fields
+        || 0 == field_info->distinct_num_fields)
+    {
+        skAppPrintErr("No distinct fields have been specified");
+        return -1;
+    }
+
+    memset(totdis, 0, sizeof(*totdis));
+    if (skFieldListCreate(&dist_list)) {
+        return -1;
+    }
+
+    memcpy(&dist_list->fields[0], &field_info->distinct_fields->fields[0],
+           sizeof(sk_fieldentry_t));
+    dist_list->fields[0].parent_list = dist_list;
+    dist_list->fields[0].offset = 0;
+    dist_list->num_fields = 1;
+    dist_list->total_octets = dist_list->fields[0].octets;
+
+    if (dist_list->total_octets > 1) {
+        /* initialize a separate temp file context */
+        if (skTempFileInitialize(&tmpctx, temp_dir, NULL, &skAppPrintErr)) {
+            skFieldListDestroy(&dist_list);
+            return -1;
+        }
+        /* open a temp file */
+        totdis->td_tmp_fp = uniqTempCreate(tmpctx, &totdis->td_tmp_idx);
+    }
+
+    totdis->td_fi.distinct_num_fields = 1;
+    totdis->td_fi.distinct_octets = dist_list->total_octets;
+    totdis->td_fi.distinct_fields = dist_list;
+
+    totdis->td_octets = dist_list->total_octets;
+    totdis->td_tmpctx = tmpctx;
+
+    return uniqDistinctAlloc(&totdis->td_fi, &totdis->td_distincts);
+}
+
+
+/*
+ *    Tell 'totdis' that there is no more input data.  If temporary
+ *    files have been used, this function writes the current in-memory
+ *    values to a temporary file.  If no temporary files have been
+ *    written to, this function simply counts the number of unique
+ *    values specified in the data structure.
+ */
+static int
+uniqTotalDistinctPrepareOutput(
+    total_distinct_t   *totdis)
+{
+    if (NULL == totdis || 0 == totdis->td_fi.distinct_num_fields) {
+        /* not being used */
+        return 0;
+    }
+
+    if (!totdis->td_uses_temp) {
+        assert(0 == totdis->td_tmp_idx);
+        totdis->td_have_count = 1;
+        totdis->td_count = totdis->td_distincts->dv_count;
+
+        /* close the temporary file */
+        uniqTempClose(totdis->td_tmp_fp);
+        totdis->td_tmp_fp = NULL;
+    } else {
+        assert(totdis->td_tmp_idx > 0);
+        assert(totdis->td_tmp_fp);
+
+        /* write the current contents of the data structure */
+        if (uniqTotalDistinctToTemp(totdis)) {
+            return -1;
+        }
+    }
+
+    /* done with the data structure */
+    uniqDistinctFree(&totdis->td_fi, totdis->td_distincts);
+    totdis->td_distincts = NULL;
+
+    return 0;
+}
+
+
+/*
+ *    Free any memory associated with the total distinct data
+ *    structure 'totdis'.  This function does not free 'totdis'
+ *    itself.
+ */
+static void
+uniqTotalDistinctDestroy(
+    total_distinct_t   *totdis)
+{
+    sk_fieldlist_t *fl;
+
+    if (NULL == totdis) {
+        return;
+    }
+    uniqDistinctFree(&totdis->td_fi, totdis->td_distincts);
+    fl = (sk_fieldlist_t *)totdis->td_fi.distinct_fields;
+    totdis->td_fi.distinct_fields = NULL;
+    uniqTempClose(totdis->td_tmp_fp);
+    skTempFileTeardown(&totdis->td_tmpctx);
+    skFieldListDestroy(&fl);
+}
+
+
+
+/* **************************************************************** */
+
+/*    SKUNIQUE INTERNAL SUPPORT WRITING KEY,VALUE TO TEMPORARY FILE */
+
+/* **************************************************************** */
+
+/*
+ *  uniqTempWriteTriple(field_info, fp, dist_fp,key_buf, value_buf, distincts);
+ *
+ *    Write the values from 'key_buffer', 'value_buffer', and the
+ *    distinct fields in 'distincts' (if any) to the file handles 'fp'
+ *    and 'dist_fp'.  Return on success; exit on failure.
+ *
+ *    When there are no distinct fields, data is written to 'fp' only,
+ *    and it is written as follows:
  *
  *      the key_buffer
  *      the value_buffer
- *      for each distinct field:
+ *
+ *    When there are distinct fields but 'distincts' is NULL, data is
+ *    written to 'fp' only, and it is written as follows:
+ *
+ *      the key_buffer
+ *      the value_buffer
+ *      a 0 (in 8 bytes) for each distinct field
+ *
+ *    When there are distinct fields and 'distincts' is not NULL, data
+ *    is written to 'fp' as follows:
+ *
+ *      the key_buffer
+ *      the value_buffer
+ *      for each distinct field
  *          number of distinct values
+ *
+ *    And data is written to 'dist_fp' as follows:
+ *
+ *      for each distinct field
  *          distinct value 1, distinct value 2, ...
  */
-static int
+static void
 uniqTempWriteTriple(
     const sk_uniq_field_info_t *field_info,
     skstream_t                 *fp,
@@ -2665,15 +3488,16 @@ uniqTempWriteTriple(
     }
 
     if (0 == field_info->distinct_num_fields) {
-        return 0;
+        return;
     }
     if (NULL == dist) {
-        /* write a count of 0 for each distinct value */
+        /* write a count of 0 for each distinct value into the main
+         * file */
         uint64_t count = 0;
         for (i = 0; i < field_info->distinct_num_fields; ++i) {
             uniqTempWrite(fp, &count, sizeof(uint64_t));
         }
-        return 0;
+        return;
     }
 
     /* handle all the distinct fields */
@@ -2716,8 +3540,6 @@ uniqTempWriteTriple(
             break;
         }
     }
-
-    return 0;
 }
 
 
@@ -2749,14 +3571,23 @@ struct sk_unique_st {
 
     /* when distinct fields are being computed, temporary files always
      * appear in pairs, and this is the pointer to an intermediate
-     * temp file used to hold distinct values */
+     * temp file used to hold distinct values; its index is given by
+     * the 'max_temp_idx' member */
     skstream_t             *dist_fp;
 
-    /* index of the intermediate temp file member 'temp_fp'. this is
-     * one more than the temp file currently in use. */
+    /* when computing the number of distinct values for one field
+     * across all bins */
+    total_distinct_t        total_dist;
+
+    /* index of the intermediate temp file member 'temp_fp'. if temp
+     * files have been written, its value is one more than the temp
+     * file most recently written. */
     int                     temp_idx;
 
-    /* index of highest used temporary file */
+    /* index of highest used temporary file; this is the same as
+     * 'temp_idx' when distinct files are not in use; when distinct
+     * files are in use, this is one more than 'temp_idx' and the
+     * index of 'dist_fp'. */
     int                     max_temp_idx;
 
     uint32_t                hash_value_octets;
@@ -2770,7 +3601,81 @@ struct sk_unique_st {
 
     /* whether to print debugging information */
     unsigned                print_debug:1;
+
+    /* whether the total_dist object is to be used */
+    unsigned                use_total_distinct:1;
 };
+
+
+#if TRACEMSG_LEVEL == 0
+
+/*
+ *    Function that is used to output log messages enabled by the
+ *    SILK_UNIQUE_DEBUG environment variable.
+ *
+ *    If SKUNIQUE_TRACE_LEVEL or TRACEMSG_LEVEL is non-zero, a
+ *    different definition of this funciton is used, which is defined
+ *    below.
+ */
+static void
+uniqDebug(
+    const sk_unique_t  *uniq,
+    const char         *fmt,
+    ...)
+    SK_CHECK_PRINTF(2, 3);
+
+static void
+uniqDebug(
+    const sk_unique_t  *uniq,
+    const char         *fmt,
+    ...)
+{
+    va_list args;
+
+    va_start(args, fmt);
+    if (uniq && uniq->print_debug) {
+        fprintf(stderr, "%s: " SKUNIQUE_DEBUG_ENVAR ": ", skAppName());
+        vfprintf(stderr, fmt, args);
+        fprintf(stderr, "\n");
+    }
+    va_end(args);
+}
+
+#else  /* TRACEMSG_LEVEL > 0 */
+
+/*
+ *    When SKUNIQUE_TRACE_LEVEL or TRACEMSG_LEVEL is non-zero, the
+ *    code behaves as though SILK_UNIQUE_DEBUG is enabled and this
+ *    function is used to to trace the code.
+ */
+#define uniqDebug(...)  uniqDebugHelper(__LINE__, __VA_ARGS__)
+
+static void
+uniqDebugHelper(
+    int                 lineno,
+    const sk_unique_t  *uniq,
+    const char         *fmt,
+    ...)
+    SK_CHECK_PRINTF(3, 4);
+
+static void
+uniqDebugHelper(
+    int                 lineno,
+    const sk_unique_t  *uniq,
+    const char         *fmt,
+    ...)
+{
+    va_list args;
+
+    SK_UNUSED_PARAM(uniq);
+
+    va_start(args, fmt);
+    fprintf(stderr, __FILE__ ":%d: ", lineno);
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "\n");
+    va_end(args);
+}
+#endif  /* #else of TRACEMSG_LEVEL == 0 */
 
 
 /*
@@ -2796,7 +3701,7 @@ uniqueCreateHashTable(
                                     HASH_INITIAL_SIZE,
                                     DEFAULT_LOAD_FACTOR);
     if (NULL == uniq->ht) {
-        skAppPrintErr("Error allocating hash table");
+        skAppPrintOutOfMemory("hash table");
         return -1;
     }
     return 0;
@@ -2845,15 +3750,15 @@ uniqueDestroyHashTable(
 
 
 /*
- *  status = uniqueDumpHashToTemp(uniq);
+ *  uniqueDumpHashToTemp(uniq);
  *
  *    Write the entries in the current hash table to the current
  *    temporary file on 'uniq, destroy the hash table, and open a new
  *    temporary file.  The entries are written in sorted order, where
  *    the sort algorithm will depend on whether the user requested
- *    sorted output.  Return 0 on success, or -1 on failure.
+ *    sorted output.  Return 0 on success, exit on failure.
  */
-static int
+static void
 uniqueDumpHashToTemp(
     sk_unique_t        *uniq)
 {
@@ -2876,82 +3781,54 @@ uniqueDumpHashToTemp(
     /* create an iterator for the hash table */
     ithash = hashlib_create_iterator(uniq->ht);
 
-    /* iterate over the hash entries */
     if (0 == uniq->fi.distinct_num_fields) {
-        UNIQUE_DEBUG(uniq,
-                     ((SKUNIQUE_DEBUG_ENVAR ": Writing %" PRIu64 " %s to '%s'"),
-                      hashlib_count_entries(uniq->ht), "key/value pairs",
-                      UNIQUE_TMPNAME_OUT(uniq)));
+        uniqDebug(uniq, "Writing %" PRIu64 " key/value paris to #%d...",
+                  hashlib_count_entries(uniq->ht), uniq->temp_idx);
 
+        /* iterate over the hash entries */
         while (hashlib_iterate(uniq->ht, &ithash, &hash_key, &hash_val)
                != ERR_NOMOREENTRIES)
         {
-            if (uniqTempWriteTriple(&uniq->fi, uniq->temp_fp, NULL,
-                                    hash_key, hash_val, NULL))
-            {
-                /* error writing, errno may or may not be set */
-                skAppPrintSyserror(
-                    "Error writing key/value pair to temporary file '%s'",
-                    UNIQUE_TMPNAME_OUT(uniq));
-                return -1;
-            }
+            uniqTempWriteTriple(&uniq->fi, uniq->temp_fp, NULL,
+                                hash_key, hash_val, NULL);
         }
+        /* destroy the hash table */
+        uniqueDestroyHashTable(uniq);
+
+        /* close the temp file and open a new file */
+        uniqDebug(uniq, "Finished writing #%d '%s'",
+                  uniq->temp_idx, UNIQUE_TMPNAME_OUT(uniq));
+        uniqTempClose(uniq->temp_fp);
+        uniq->temp_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
+        uniq->temp_idx = uniq->max_temp_idx;
 
     } else {
-        UNIQUE_DEBUG(uniq,
-                     ((SKUNIQUE_DEBUG_ENVAR ": Writing %" PRIu64 " %s to '%s'"),
-                      hashlib_count_entries(uniq->ht),
-                      "key/value/distinct triples", UNIQUE_TMPNAME_OUT(uniq)));
+        uniqDebug(uniq, ("Writing %" PRIu64
+                         " key/value/distinct triples to #%d, #%d..."),
+                  hashlib_count_entries(uniq->ht), uniq->temp_idx,
+                  uniq->max_temp_idx);
 
         while (hashlib_iterate(uniq->ht, &ithash, &hash_key, &hash_val)
                != ERR_NOMOREENTRIES)
         {
             memcpy(&distincts, hash_val + uniq->fi.value_octets, sizeof(void*));
-            if (uniqTempWriteTriple(&uniq->fi, uniq->temp_fp, uniq->dist_fp,
-                                    hash_key, hash_val, distincts))
-            {
-                /* error writing, errno may or may not be set */
-                skAppPrintSyserror(("Error writing key/value/distinct triple"
-                                    " to temporary file '%s'"),
-                                   UNIQUE_TMPNAME_OUT(uniq));
-                return -1;
-            }
+            uniqTempWriteTriple(&uniq->fi, uniq->temp_fp, uniq->dist_fp,
+                                hash_key, hash_val, distincts);
         }
-    }
+        uniqueDestroyHashTable(uniq);
 
-    /* close the temporary file(s) */
-    uniqTempClose(uniq->temp_fp);
-    uniq->temp_fp = NULL;
-    if (uniq->dist_fp) {
+        /* close the temp files and open a new files */
+        uniqDebug(uniq, "Finished writing #%d '%s', #%d '%s'",
+                  uniq->temp_idx, UNIQUE_TMPNAME_OUT(uniq), uniq->max_temp_idx,
+                  uniqBasename(skStreamGetPathname(uniq->dist_fp)));
+        uniqTempClose(uniq->temp_fp);
+        uniq->temp_fp = NULL;
         uniqTempClose(uniq->dist_fp);
         uniq->dist_fp = NULL;
-    }
-
-    /* success so far */
-    UNIQUE_DEBUG(uniq, (SKUNIQUE_DEBUG_ENVAR ": Successfully wrote %s",
-                        ((uniq->fi.distinct_num_fields > 0)
-                         ? "key/value/distinct triples"
-                         : "key/value pairs")));
-
-    /* destroy the hash table */
-    uniqueDestroyHashTable(uniq);
-
-    /* open a new temporary file */
-    uniq->temp_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
-    if (NULL == uniq->temp_fp) {
-        skAppPrintSyserror("Error creating temporary file");
-        return -1;
-    }
-    uniq->temp_idx = uniq->max_temp_idx;
-    if (uniq->fi.distinct_num_fields) {
+        uniq->temp_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
+        uniq->temp_idx = uniq->max_temp_idx;
         uniq->dist_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
-        if (NULL == uniq->dist_fp) {
-            skAppPrintSyserror("Error creating temporary file");
-            return -1;
-        }
     }
-
-    return 0;
 }
 
 
@@ -3005,14 +3882,11 @@ skUniqueDestroy(
         uniqTempClose(u->dist_fp);
         u->dist_fp = NULL;
     }
+    uniqTotalDistinctDestroy(&u->total_dist);
     skTempFileTeardown(&u->tmpctx);
     u->temp_idx = -1;
-    if (u->ht) {
-        uniqueDestroyHashTable(u);
-    }
-    if (u->temp_dir) {
-        free(u->temp_dir);
-    }
+    uniqueDestroyHashTable(u);
+    free(u->temp_dir);
 
     free(u);
 }
@@ -3084,6 +3958,38 @@ skUniqueSetFields(
 }
 
 
+/*  count distincts across all bins for first distinct field */
+int
+skUniqueEnableTotalDistinct(
+    sk_unique_t        *uniq)
+{
+    assert(uniq);
+
+    if (uniq->ready_for_input) {
+        skAppPrintErr("May not call skUniqueEnableTotalDistinct"
+                      " after calling skUniquePrepareForInput");
+        return -1;
+    }
+    uniq->use_total_distinct = 1;
+    return 0;
+}
+
+
+/*  return the number of distincts for first distinct field across all
+ *  bins */
+uint64_t
+skUniqueGetTotalDistinctCount(
+    sk_unique_t        *uniq)
+{
+    if (!uniq->ready_for_output) {
+        skAppPrintErr("May not call skUniqueGetTotalDistinctCount"
+                      " before calling skUniquePrepareForOutput");
+        return UINT64_MAX;
+    }
+    return uniqTotalDistinctGetCount(&uniq->total_dist);
+}
+
+
 /*  tell the unique object that initialization is complete.  return an
  *  error if the object is not completely specified. */
 int
@@ -3098,6 +4004,15 @@ skUniquePrepareForInput(
 
     if (uniqCheckFields(&uniq->fi)) {
         return -1;
+    }
+
+    /* initialize the total distinct object */
+    if (uniq->use_total_distinct) {
+        if (uniqTotalDistinctPrepareInput(
+                &uniq->total_dist, &uniq->fi, uniq->temp_dir))
+        {
+            return -1;
+        }
     }
 
     /* set sizes for the hash table */
@@ -3119,17 +4034,9 @@ skUniquePrepareForInput(
 
     /* open an intermediate file */
     uniq->temp_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
-    if (NULL == uniq->temp_fp) {
-        skAppPrintSyserror("Error creating intermediate temporary file");
-        return -1;
-    }
     uniq->temp_idx = uniq->max_temp_idx;
     if (uniq->fi.distinct_num_fields) {
         uniq->dist_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
-        if (NULL == uniq->dist_fp) {
-            skAppPrintSyserror("Error creating temporary file");
-            return -1;
-        }
     }
 
     uniq->ready_for_input = 1;
@@ -3152,10 +4059,9 @@ skUniqueAddRecord(
     assert(uniq);
     assert(uniq->ht);
     assert(rwrec);
+    assert(uniq->ready_for_input);
 
-    if (!uniq->ready_for_input) {
-        skAppPrintErr("May not call skUniqueAddRecord"
-                      " before calling skUniquePrepareForInput");
+    if (uniqTotalDistinctIncrement(&uniq->total_dist, rwrec)) {
         return -1;
     }
 
@@ -3244,9 +4150,8 @@ skUniqueAddRecord(
          */
 
         /* out of memory */
-        if (uniqueDumpHashToTemp(uniq)) {
-            return -1;
-        }
+        uniqueDumpHashToTemp(uniq);
+
         /* re-create the hash table */
         if (uniqueCreateHashTable(uniq)) {
             return -1;
@@ -3273,15 +4178,19 @@ skUniquePrepareForOutput(
 
     if (uniq->temp_idx > 0) {
         /* dump the current/final hash entries to a file */
-        if (uniqueDumpHashToTemp(uniq)) {
-            return -1;
-        }
+        uniqueDumpHashToTemp(uniq);
     } else if (uniq->sort_output) {
         /* need to sort using the skFieldListCompareBuffers function */
         hashlib_sort_entries_usercmp(uniq->ht,
                                      COMP_FUNC_CAST(skFieldListCompareBuffers),
                                      (void*)uniq->fi.key_fields);
     }
+
+    if (uniqTotalDistinctPrepareOutput(&uniq->total_dist)) {
+        return -1;
+    }
+
+    uniqDebug(uniq, "Preparing for output");
 
     uniq->ready_for_output = 1;
     return 0;
@@ -3292,34 +4201,16 @@ skUniquePrepareForOutput(
  * Iterator for handling one hash table, no distinct counts
  ***************************************************************/
 
+/*
+ *    A simple iterator over the items in the hash table.
+ */
+
 typedef struct uniqiter_simple_st {
-    sk_uniqiter_reset_fn_t  reset_fn;
     sk_uniqiter_next_fn_t   next_fn;
     sk_uniqiter_free_fn_t   free_fn;
     sk_unique_t            *uniq;
     HASH_ITER               ithash;
 } uniqiter_simple_t;
-
-
-/*
- *  status = uniqIterSimpleReset(iter);
- *
- *    Implementation for skUniqueIteratorReset().
- */
-static int
-uniqIterSimpleReset(
-    sk_unique_iterator_t   *v_iter)
-{
-    uniqiter_simple_t *iter = (uniqiter_simple_t*)v_iter;
-
-    UNIQUE_DEBUG(iter->uniq, ((SKUNIQUE_DEBUG_ENVAR ": Resetting simple"
-                               " iterator; num entries = %" PRIu64),
-                              hashlib_count_entries(iter->uniq->ht)));
-
-    /* create the iterator */
-    iter->ithash = hashlib_create_iterator(iter->uniq->ht);
-    return 0;
-}
 
 
 /*
@@ -3380,19 +4271,17 @@ uniqIterSimpleCreate(
 
     iter = (uniqiter_simple_t*)calloc(1, sizeof(uniqiter_simple_t));
     if (NULL == iter) {
-        skAppPrintErr("Error allocating unique iterator");
+        skAppPrintOutOfMemory("unique iterator");
         return -1;
     }
 
     iter->uniq = uniq;
-    iter->reset_fn = uniqIterSimpleReset;
     iter->next_fn = uniqIterSimpleNext;
     iter->free_fn = uniqIterSimpleDestroy;
+    iter->ithash = hashlib_create_iterator(iter->uniq->ht);
 
-    if (uniqIterSimpleReset((sk_unique_iterator_t*)iter)) {
-        uniqIterSimpleDestroy((sk_unique_iterator_t**)&iter);
-        return -1;
-    }
+    uniqDebug(iter->uniq, "Created simple iterator; num entries = %" PRIu64,
+              hashlib_count_entries(iter->uniq->ht));
 
     *new_iter = (sk_unique_iterator_t*)iter;
     return 0;
@@ -3404,35 +4293,18 @@ uniqIterSimpleCreate(
  * Iterator for handling distinct values in one hash table
  ***************************************************************/
 
+/*
+ *    An iterator over the items in the hash table that calls a
+ *    function to get the distinct count for every distinct field.
+ */
+
 typedef struct uniqiter_distinct_st {
-    sk_uniqiter_reset_fn_t  reset_fn;
     sk_uniqiter_next_fn_t   next_fn;
     sk_uniqiter_free_fn_t   free_fn;
     sk_unique_t            *uniq;
     HASH_ITER               ithash;
     uint8_t                 returned_buf[HASH_MAX_NODE_BYTES];
 } uniqiter_distinct_t;
-
-
-/*
- *  status = uniqIterDistinctReset();
- *
- *    Implementation for skUniqueIteratorReset(iter).
- */
-static int
-uniqIterDistinctReset(
-    sk_unique_iterator_t   *v_iter)
-{
-    uniqiter_distinct_t *iter = (uniqiter_distinct_t*)v_iter;
-
-    UNIQUE_DEBUG(iter->uniq, ((SKUNIQUE_DEBUG_ENVAR ": Resetting distinct"
-                               " iterator; num entries = %" PRIu64),
-                              hashlib_count_entries(iter->uniq->ht)));
-
-    /* create the iterator */
-    iter->ithash = hashlib_create_iterator(iter->uniq->ht);
-    return 0;
-}
 
 
 /*
@@ -3502,19 +4374,18 @@ uniqIterDistinctCreate(
 
     iter = (uniqiter_distinct_t*)calloc(1, sizeof(uniqiter_distinct_t));
     if (NULL == iter) {
-        skAppPrintErr("Error allocating unique iterator");
+        skAppPrintOutOfMemory("unique iterator");
         return -1;
     }
 
     iter->uniq = uniq;
-    iter->reset_fn = uniqIterDistinctReset;
     iter->next_fn = uniqIterDistinctNext;
     iter->free_fn = uniqIterDistinctDestroy;
+    iter->ithash = hashlib_create_iterator(iter->uniq->ht);
 
-    if (uniqIterDistinctReset((sk_unique_iterator_t*)iter)) {
-        uniqIterDistinctDestroy((sk_unique_iterator_t**)iter);
-        return -1;
-    }
+    uniqDebug(iter->uniq,
+              "Created simple-distinct iterator; num entries = %" PRIu64,
+              hashlib_count_entries(iter->uniq->ht));
 
     *new_iter = (sk_unique_iterator_t*)iter;
     return 0;
@@ -3522,366 +4393,125 @@ uniqIterDistinctCreate(
 
 
 /****************************************************************
- * Iterator for handling temporary files
+ * Iterator for handling temporary files without distinct values
  ***************************************************************/
 
 /*
- *    There are two structures used when handling temporary files
- *    depending on whether there are distinct fields to handle.  the
- *    two structures have the same initial members can be cast to one
- *    another.
+ *    The iterator merge-sorts the keys in the temporary files and
+ *    merges the values when keys are identical.
  *
- *    The callback function that implements skUniqueIteratorNext() is
- *    different depending on whether distinct fields are present.
+ *    The first call to the iterator opens all temporary files.  If
+ *    there are more temporary files than file handles, the files are
+ *    merged until the iterator is able to have an open file handle to
+ *    every temporary file.
  */
 
-/* has support for distinct fields */
-typedef struct uniqiter_tempfiles_st {
-    /* function pointer used by skUniqueIteratorReset() */
-    sk_uniqiter_reset_fn_t  reset_fn;
-
-    /* function pointer used by skUniqueIteratorNext() */
-    sk_uniqiter_next_fn_t   next_fn;
-
-    /* function pointer used by skUniqueIteratorDestroy() */
-    sk_uniqiter_free_fn_t   free_fn;
-
-    /* the object to iterate over */
-    sk_unique_t        *uniq;
-
-    /* heap the stores the indexes used by the 'fps' and 'key'
-     * members. comparison function uses the 'key' member of this
-     * structure and returns the keys in ascending order */
-    skheap_t           *heap;
-
-    /* temporary files that are currently open; number of valid files
-     * specified by the 'open_count' member */
-    skstream_t         *fps[MAX_MERGE_FILES];
-
-    /* for each file in 'fps', the file's current key */
-    uint8_t             key[MAX_MERGE_FILES][HASHLIB_MAX_KEY_WIDTH];
-
-    /* buffer used to hold the values the are returned to the caller
-     * by skUniqueIteratorNext(). */
-    uint8_t             returned_buf[HASH_MAX_NODE_BYTES];
-
-    /* index of first temp file opened for this round of merging; used
-     * when reporting temp file indexes */
-    int                 temp_idx_base;
-
-    /* number of open files: number of valid entries in fps[] */
-    uint16_t            open_count;
-
-    /* ENSURE EVERYTHING ABOVE HERE MATCHES uniqiter_temp_nodist_t */
-
-    /* current distinct field; used by comparison function for the
-     * 'dist_heap' member */
-    const distinct_value_t *cur_dist;
-
-    /* lengths and offsets of each distinct field */
-    distinct_value_t   *distincts;
-
-    /* heap that stores the indexes used by the 'distinct_value'
-     * members.  comparison function uses the 'distinct_value' and
-     * 'cur_dist' members and returns the distinct values in ascending
-     * order. */
-    skheap_t           *dist_heap;
-
-    /* holds the current distinct value for files that share the same
-     * key */
-    uint8_t             distinct_value[MAX_MERGE_FILES][HASHLIB_MAX_KEY_WIDTH];
-
-} uniqiter_tempfiles_t;
-
-/* no support for distinct fields */
-typedef struct uniqiter_temp_nodist_st {
-    sk_uniqiter_reset_fn_t  reset_fn;
+typedef struct uniqiter_temp_values_st {
     sk_uniqiter_next_fn_t   next_fn;
     sk_uniqiter_free_fn_t   free_fn;
     sk_unique_t            *uniq;
     skheap_t               *heap;
-    skstream_t             *fps[MAX_MERGE_FILES];
     uint8_t                 key[MAX_MERGE_FILES][HASHLIB_MAX_KEY_WIDTH];
+    skstream_t             *fps[MAX_MERGE_FILES];
     uint8_t                 returned_buf[HASH_MAX_NODE_BYTES];
     int                     temp_idx_base;
-    uint16_t                open_count;
-    /* ENSURE EVERYTHING ABOVE HERE MATCHES uniqiter_tempfiles_t */
-} uniqiter_temp_nodist_t;
+    uint16_t                max_fps;
+    /* ENSURE EVERYTHING ABOVE HERE MATCHES uniqiter_temp_dist_t */
+} uniqiter_temp_values_t;
+
 
 static int
-uniqIterTempfilesHeapKeysCmp(
+uniqIterTempValuesKeyCmp(
     const skheapnode_t  b,
     const skheapnode_t  a,
     void               *v_iter);
 
 static int
-uniqIterTempfilesHeapDistCmp(
-    const skheapnode_t  b,
-    const skheapnode_t  a,
-    void               *v_iter);
+uniqIterTempValuesMergeValues(
+    uniqiter_temp_values_t *iter,
+    uint16_t                lowest,
+    uint8_t                *cached_key,
+    uint8_t                *merged_values);
 
 static int
-uniqIterTempfilesMergeOne(
-    uniqiter_tempfiles_t   *iter,
-    uint16_t                fps_index,
-    unsigned int            write_to_temp,
-    uint8_t                 merged_values[]);
-
-static int
-uniqIterTempfilesMergeValuesDist(
-    uniqiter_tempfiles_t   *iter,
-    const uint16_t          file_ids[],
-    uint16_t                file_ids_len,
-    unsigned int            write_to_temp,
-    uint8_t                 merged_values[]);
-
-static int
-uniqIterTempfilesOpenAll(
-    uniqiter_tempfiles_t   *iter);
-
-/* Implements iter->next_fn when no distinct fields.*/
-static int
-uniqIterTempfilesNodistNext(
-    sk_unique_iterator_t   *v_iter,
-    uint8_t               **key_fields_buffer,
-    uint8_t               **distinct_fields_buffer,
-    uint8_t               **value_fields_buffer);
+uniqIterTempValuesOpenAll(
+    uniqiter_temp_values_t *iter);
 
 
 /*
- *  status = uniqIterTempfilesReset(iter);
- *
- *    Implementation for skUniqueIteratorReset().
- */
-static int
-uniqIterTempfilesReset(
-    sk_unique_iterator_t   *v_iter)
-{
-    uniqiter_tempfiles_t *iter = (uniqiter_tempfiles_t*)v_iter;
-    uint16_t step;
-    uint16_t j;
-
-    /* NOTE: the idea of resetting this iterator is completely broken
-     * since uniqIterTempfilesOpenAll() assumes the first temporary
-     * file to process is #0, which will not be true if it has already
-     * been called. */
-
-    UNIQUE_DEBUG(iter->uniq, ((SKUNIQUE_DEBUG_ENVAR ": Resetting tempfiles"
-                               " iterator; num files = %d"),
-                              iter->open_count));
-
-    /* if files are already open (e.g., caller has reset an active
-     * iterator), we need to close them first */
-    for (j = 0; j < iter->open_count; ++j) {
-        if (iter->fps[j]) {
-            uniqTempClose(iter->fps[j]);
-            iter->fps[j] = NULL;
-        }
-    }
-
-    /* open all temp files---this also merges temp files if there
-     * are not enough file handles to open all temp files */
-    iter->open_count = uniqIterTempfilesOpenAll(iter);
-    if (iter->open_count == (uint16_t)-1) {
-        return -1;
-    }
-
-    step = 1 + (iter->uniq->fi.distinct_num_fields > 0);
-
-    /* Read the first key from each temp file into the 'key[]' array
-     * on the iterator; add the file's index to the heap */
-    for (j = 0; j < iter->open_count; j += step) {
-        if (uniqTempRead(iter->fps[j], iter->key[j], iter->uniq->fi.key_octets))
-        {
-            skHeapInsert(iter->heap, &j);
-        } else if (skStreamGetLastErrno(iter->fps[j])) {
-            skAppPrintErr("Cannot read first key from temporary file: %s",
-                          strerror(skStreamGetLastErrno(iter->fps[j])));
-            return -1;
-        } else {
-            UNIQUE_DEBUG(iter->uniq, (SKUNIQUE_DEBUG_ENVAR
-                                      ": Ignoring empty temporary file #%u",
-                                      j));
-        }
-    }
-
-    if (skHeapGetNumberEntries(iter->heap) == 0) {
-        skAppPrintErr("Could not read records from any temporary files");
-        return -1;
-    }
-
-    UNIQUE_DEBUG(iter->uniq,
-                 ((SKUNIQUE_DEBUG_ENVAR
-                   ": Iterator using %" PRIu32 " of %" PRIu32
-                   " open temporary files"),
-                  skHeapGetNumberEntries(iter->heap), iter->open_count));
-
-    return 0;
-}
-
-
-/*
- *  status = uniqIterTempfilesNext(iter, &key, &distinct, &value);
+ *  status = uniqIterTempValuesNext(iter, &key, &distinct, &value);
  *
  *    Implementation for skUniqueIteratorNext() when using temporary
- *    files that do have distinct values.
- *
- *    See also uniqIterTempfilesNodistNext().
+ *    files that do not have distinct values.
  */
 static int
-uniqIterTempfilesNext(
+uniqIterTempValuesNext(
     sk_unique_iterator_t   *v_iter,
     uint8_t               **key_fields_buffer,
     uint8_t               **distinct_fields_buffer,
     uint8_t               **value_fields_buffer)
 {
-    uniqiter_tempfiles_t *iter = (uniqiter_tempfiles_t*)v_iter;
+    uniqiter_temp_values_t *iter = (uniqiter_temp_values_t*)v_iter;
     uint16_t lowest;
     uint16_t *top_heap;
     uint8_t cached_key[HASHLIB_MAX_KEY_WIDTH];
     uint8_t merged_values[HASHLIB_MAX_VALUE_WIDTH];
-    uint16_t merge_nodes[MAX_MERGE_FILES];
-    uint16_t merge_nodes_len;
-    uint16_t i;
-    int rv;
+
+    SK_UNUSED_PARAM(distinct_fields_buffer);
 
     assert(iter);
 
-    /* should only be called when distinct fields are present */
-    assert(iter->uniq->fi.distinct_num_fields > 0);
+    /* should only be called with value fields and no distinct fields */
+    assert(0 == iter->uniq->fi.distinct_num_fields);
+    assert(iter->uniq->fi.value_octets > 0);
 
     /* get the index of the file with the lowest key; which is at
-     * the top of the heap; cache this low key */
+     * the top of the heap */
     if (SKHEAP_OK != skHeapPeekTop(iter->heap, (skheapnode_t*)&top_heap)) {
         return SK_ITERATOR_NO_MORE_ENTRIES;
     }
     lowest = *top_heap;
-    memcpy(cached_key, iter->key[lowest], iter->uniq->fi.key_octets);
 
-    /* short-cut the code when only one file remains */
-    if (skHeapGetNumberEntries(iter->heap) == 1) {
-        if (uniqIterTempfilesMergeOne(iter, lowest, 0, merged_values)) {
-            skHeapEmpty(iter->heap);
-            return SK_ITERATOR_NO_MORE_ENTRIES;
-        }
-
-        /* replace the key for the record we just processed */
-        if (!uniqTempRead(iter->fps[lowest], iter->key[lowest],
-                          iter->uniq->fi.key_octets))
-        {
-            /* read failed and no more data for this file; remove it
-             * from the heap */
-            UNIQUE_DEBUG(iter->uniq,
-                         ((SKUNIQUE_DEBUG_ENVAR
-                           ": Finished reading files #%u, #%u; 0 files remain"),
-                          UNIQUE_TMPNUM_READ(iter, lowest),
-                          UNIQUE_TMPNUM_READ(iter, lowest + 1)));
-            skHeapExtractTop(iter->heap, NULL);
-        }
-        goto END;
-    }
-
-    /* store the id of each file whose current key matches the
-     * cached_key into the merge_nodes[] array; remove the items
-     * from heap as they are added to merge_nodes[] */
-    merge_nodes[0] = lowest;
-    merge_nodes_len = 1;
-    skHeapExtractTop(iter->heap, NULL);
-
-    while (skHeapPeekTop(iter->heap, (skheapnode_t*)&top_heap) == SKHEAP_OK
-           && 0 == (skFieldListCompareBuffers(
-                        cached_key, iter->key[*top_heap],
-                        iter->uniq->fi.key_fields)))
+    if (uniqIterTempValuesMergeValues(iter, lowest, cached_key, merged_values))
     {
-        merge_nodes[merge_nodes_len++] = *top_heap;
-        skHeapExtractTop(iter->heap, NULL);
-    }
-
-    if (1 == merge_nodes_len) {
-        /* nothing to merge when the key occurs in one file */
-        rv = uniqIterTempfilesMergeOne(iter, lowest, 0, merged_values);
-    } else {
-        rv = uniqIterTempfilesMergeValuesDist(
-            iter, merge_nodes, merge_nodes_len, 0, merged_values);
-    }
-    if (rv) {
+        /* error reading from files */
         skHeapEmpty(iter->heap);
         return SK_ITERATOR_NO_MORE_ENTRIES;
     }
 
-    /* for each element in merge_nodes[], read its next key and insert
-     * it into the heap containing the keys */
-    for (i = 0; i < merge_nodes_len; ++i) {
-        if (uniqTempRead(iter->fps[merge_nodes[i]], iter->key[merge_nodes[i]],
-                         iter->uniq->fi.key_octets))
-        {
-            /* read succeeded. insert the new entry into the heap */
-            skHeapInsert(iter->heap, &merge_nodes[i]);
-            /* keys within a file should always be sorted; duplicate
-             * keys may appear if the distinct data structure ran out
-             * of memory */
-            assert(skFieldListCompareBuffers(cached_key, iter->key[lowest],
-                                             iter->uniq->fi.key_fields) <= 0);
-        } else {
-            /* read failed and no more data for this file */
-            UNIQUE_DEBUG(iter->uniq,
-                         ((SKUNIQUE_DEBUG_ENVAR
-                           ": Finished reading files #%u, #%u;"
-                           " %d files remain"),
-                          UNIQUE_TMPNUM_READ(iter, merge_nodes[i]),
-                          UNIQUE_TMPNUM_READ(iter, merge_nodes[i] + 1),
-                          (2 * (skHeapGetNumberEntries(iter->heap)
-                                + merge_nodes_len - i - 1))));
-        }
-    }
-
-  END:
     /* set user's pointers to the buffers on the iterator, and write
      * the key, values, and distincts into those buffers */
     *key_fields_buffer = iter->returned_buf;
     memcpy(*key_fields_buffer, cached_key, iter->uniq->fi.key_octets);
 
     *value_fields_buffer = iter->returned_buf + iter->uniq->fi.key_octets;
-    memcpy(*value_fields_buffer, merged_values, iter->uniq->fi.value_octets);
-
-    *distinct_fields_buffer = (iter->returned_buf + iter->uniq->fi.key_octets
-                               + iter->uniq->fi.value_octets);
-    uniqDistinctSetOutputBuf(&iter->uniq->fi, iter->distincts,
-                             *distinct_fields_buffer);
+    memcpy(*value_fields_buffer,merged_values,iter->uniq->fi.value_octets);
 
     return SK_ITERATOR_OK;
 }
 
 
 /*
- *  uniqIterTempfilesDestroy(iter);
+ *  uniqIterTempValuesDestroy(iter);
  *
  *    Implementation for skUniqueIteratorDestroy().
  */
 static void
-uniqIterTempfilesDestroy(
+uniqIterTempValuesDestroy(
     sk_unique_iterator_t  **v_iter)
 {
-    uniqiter_tempfiles_t *iter;
+    uniqiter_temp_values_t *iter;
     size_t i;
 
     if (v_iter && *v_iter) {
-        iter = *(uniqiter_tempfiles_t**)v_iter;
+        iter = *(uniqiter_temp_values_t**)v_iter;
 
-        for (i = 0; i < iter->open_count; ++i) {
-            if (iter->fps[i]) {
-                uniqTempClose(iter->fps[i]);
-                iter->fps[i] = NULL;
-            }
+        for (i = 0; i < iter->max_fps; ++i) {
+            uniqTempClose(iter->fps[i]);
         }
-
-        if (iter->uniq->fi.distinct_num_fields) {
-            uniqDistinctFree(&iter->uniq->fi, iter->distincts);
-            skHeapFree(iter->dist_heap);
-        }
+        memset(iter->fps, 0, sizeof(iter->fps));
 
         skHeapFree(iter->heap);
-
         free(iter);
         *v_iter = NULL;
     }
@@ -3889,73 +4519,60 @@ uniqIterTempfilesDestroy(
 
 
 /*
- *  status = uniqIterTempfilesCreate(uniq, &iter);
+ *  status = uniqIterTempValuesCreate(uniq, &iter);
  *
  *    Helper function for skUniqueIteratorCreate().
  */
 static int
-uniqIterTempfilesCreate(
+uniqIterTempValuesCreate(
     sk_unique_t            *uniq,
     sk_unique_iterator_t  **new_iter)
 {
-    uniqiter_tempfiles_t *iter;
+    uniqiter_temp_values_t *iter;
 
     assert(uniq);
+    assert(new_iter);
 
-    if (0 == uniq->fi.distinct_num_fields) {
-        /* NOTE: Allocating smaller sized object and casting it to the
-         * larger object. */
-        iter = (uniqiter_tempfiles_t*)calloc(1,sizeof(uniqiter_temp_nodist_t));
-    } else {
-        iter = (uniqiter_tempfiles_t*)calloc(1, sizeof(uniqiter_tempfiles_t));
-    }
+    /* should only be called with value fields and no distinct fields */
+    assert(0 == uniq->fi.distinct_num_fields);
+    assert(uniq->fi.value_octets > 0);
+
+    iter = (uniqiter_temp_values_t *)calloc(1,sizeof(uniqiter_temp_values_t));
     if (NULL == iter) {
+        skAppPrintOutOfMemory("unique iterator");
         goto ERROR;
     }
 
-    iter->heap = skHeapCreate2(uniqIterTempfilesHeapKeysCmp, MAX_MERGE_FILES,
+    iter->heap = skHeapCreate2(uniqIterTempValuesKeyCmp, MAX_MERGE_FILES,
                                sizeof(uint16_t), NULL, iter);
     if (NULL == iter->heap) {
+        skAppPrintOutOfMemory("unique iterator");
         goto ERROR;
     }
 
     iter->uniq = uniq;
-    iter->reset_fn = uniqIterTempfilesReset;
-    iter->free_fn = uniqIterTempfilesDestroy;
+    iter->next_fn = uniqIterTempValuesNext;
+    iter->free_fn = uniqIterTempValuesDestroy;
 
-    /* set up the handling of distinct field(s) */
-    if (0 == uniq->fi.distinct_num_fields) {
-        iter->next_fn = uniqIterTempfilesNodistNext;
-    } else {
-        iter->next_fn = uniqIterTempfilesNext;
-
-        /* create the heap that operates over the distinct fields */
-        iter->dist_heap = skHeapCreate2(uniqIterTempfilesHeapDistCmp,
-                                        MAX_MERGE_FILES, sizeof(uint16_t),
-                                        NULL, iter);
-        if (NULL == iter->dist_heap) {
-            goto ERROR;
-        }
-        if (uniqDistinctAllocMerging(&uniq->fi, &iter->distincts)) {
-            goto ERROR;
-        }
+    /* open all temp files---this also merges temp files if there
+     * are not enough file handles to open all temp files */
+    if (uniqIterTempValuesOpenAll(iter)) {
+        goto ERROR;
+    }
+    if (skHeapGetNumberEntries(iter->heap) == 0) {
+        skAppPrintErr("Could not read records from any temporary files");
+        goto ERROR;
     }
 
-    if (uniqIterTempfilesReset((sk_unique_iterator_t*)iter)) {
-        uniqIterTempfilesDestroy((sk_unique_iterator_t**)&iter);
-        return -1;
-    }
+    uniqDebug(iter->uniq, "Created tempfile iterator; open files = %" PRIu32,
+              skHeapGetNumberEntries(iter->heap));
 
     *new_iter = (sk_unique_iterator_t*)iter;
     return 0;
 
   ERROR:
-    if (iter) {
-        skHeapFree(iter->dist_heap);
-        skHeapFree(iter->heap);
-        free(iter);
-    }
-    skAppPrintErr("Error allocating unique iterator");
+    uniqIterTempValuesDestroy((sk_unique_iterator_t**)&iter);
+    skAppPrintErr("Error creating unique iterator");
     return -1;
 }
 
@@ -3980,8 +4597,8 @@ uniqIterTempfilesCreate(
  *    Return 0 on success or -1 on read failure.
  */
 static int
-uniqIterTempfilesNodistMergeValues(
-    uniqiter_temp_nodist_t *iter,
+uniqIterTempValuesMergeValues(
+    uniqiter_temp_values_t *iter,
     uint16_t                lowest,
     uint8_t                *cached_key,
     uint8_t                *merged_values)
@@ -4012,10 +4629,8 @@ uniqIterTempfilesNodistMergeValues(
         if (!uniqTempRead(iter->fps[lowest], buf, iter->uniq->fi.value_octets))
         {
             last_errno = skStreamGetLastErrno(iter->fps[lowest]);
-            UNIQUE_DEBUG(iter->uniq,
-                         ((SKUNIQUE_DEBUG_ENVAR
-                           ": Cannot read from temporary file #%u"),
-                          UNIQUE_TMPNUM_READ(iter, lowest)));
+            uniqDebug(iter->uniq, "Cannot read from temporary file #%u",
+                      UNIQUE_TMPNUM_READ(iter, lowest));
             skAppPrintErr(
                 "Cannot read value field from temporary file: %s",
                 (last_errno ? strerror(last_errno) : "EOF"));
@@ -4038,11 +4653,9 @@ uniqIterTempfilesNodistMergeValues(
         } else {
             /* read failed or no more data for this file; remove it
              * from the heap */
-            UNIQUE_DEBUG(iter->uniq,
-                         ((SKUNIQUE_DEBUG_ENVAR
-                           ": Finished reading file #%u, %u files remain"),
-                          UNIQUE_TMPNUM_READ(iter, lowest),
-                          skHeapGetNumberEntries(iter->heap) - 1));
+            uniqDebug(iter->uniq, "Finished reading file #%u, %u files remain",
+                      UNIQUE_TMPNUM_READ(iter, lowest),
+                      skHeapGetNumberEntries(iter->heap) - 1);
             skHeapExtractTop(iter->heap, NULL);
             --heap_count;
             if (0 == heap_count) {
@@ -4063,61 +4676,7 @@ uniqIterTempfilesNodistMergeValues(
 
 
 /*
- *  status = uniqIterTempfilesNodistNext(iter, &key, &distinct, &value);
- *
- *    Implementation for skUniqueIteratorNext() when using temporary
- *    files that do not have distinct values.
- *
- *    See also uniqIterTempfilesNext().
- */
-static int
-uniqIterTempfilesNodistNext(
-    sk_unique_iterator_t   *v_iter,
-    uint8_t               **key_fields_buffer,
-    uint8_t        UNUSED(**distinct_fields_buffer),
-    uint8_t               **value_fields_buffer)
-{
-    uniqiter_temp_nodist_t *iter = (uniqiter_temp_nodist_t*)v_iter;
-    uint16_t lowest;
-    uint16_t *top_heap;
-    uint8_t cached_key[HASHLIB_MAX_KEY_WIDTH];
-    uint8_t merged_values[HASHLIB_MAX_VALUE_WIDTH];
-
-    assert(iter);
-
-    /* should only be called with value fields and no distinct fields */
-    assert(0 == iter->uniq->fi.distinct_num_fields);
-    assert(iter->uniq->fi.value_octets > 0);
-
-    /* get the index of the file with the lowest key; which is at
-     * the top of the heap */
-    if (SKHEAP_OK != skHeapPeekTop(iter->heap, (skheapnode_t*)&top_heap)) {
-        return SK_ITERATOR_NO_MORE_ENTRIES;
-    }
-    lowest = *top_heap;
-
-    if (uniqIterTempfilesNodistMergeValues(
-            iter, lowest, cached_key, merged_values))
-    {
-        /* error reading from files */
-        skHeapEmpty(iter->heap);
-        return SK_ITERATOR_NO_MORE_ENTRIES;
-    }
-
-    /* set user's pointers to the buffers on the iterator, and write
-     * the key, values, and distincts into those buffers */
-    *key_fields_buffer = iter->returned_buf;
-    memcpy(*key_fields_buffer, cached_key, iter->uniq->fi.key_octets);
-
-    *value_fields_buffer = iter->returned_buf + iter->uniq->fi.key_octets;
-    memcpy(*value_fields_buffer,merged_values,iter->uniq->fi.value_octets);
-
-    return SK_ITERATOR_OK;
-}
-
-
-/*
- *  status = uniqIterTempfilesHeapKeysCmp(b, a, v_iter);
+ *  status = uniqIterTempValuesKeyCmp(b, a, v_iter);
  *
  *    Comparison callback function used by the heap.
  *
@@ -4125,140 +4684,577 @@ uniqIterTempfilesNodistNext(
  *    keys.  The function calls the field comparison function to
  *    compare the keys and returns the result.
  *
- *    The context value in 'v_iter' is the uniqiter_tempfiles_t object
- *    that holds the keys and the fields describing the sort order.
+ *    The context value in 'v_iter' is the uniqiter_temp_values_t or
+ *    uniqiter_temp_dist_t object that holds the keys and the fields
+ *    describing the sort order.
  *
  *    Note the order of arguments is 'b', 'a'.
  */
 static int
-uniqIterTempfilesHeapKeysCmp(
+uniqIterTempValuesKeyCmp(
     const skheapnode_t  b,
     const skheapnode_t  a,
     void               *v_iter)
 {
-    uniqiter_tempfiles_t *iter = (uniqiter_tempfiles_t*)v_iter;
+    uniqiter_temp_values_t *iter = (uniqiter_temp_values_t *)v_iter;
 
     return skFieldListCompareBuffers(iter->key[*(uint16_t*)a],
                                      iter->key[*(uint16_t*)b],
                                      iter->uniq->fi.key_fields);
 }
 
-/*
- *    Comparison function used by the heap for distinct values.
- *
- *    Similar to uniqIterTempfilesHeapKeysCmp(), except the indexes
- *    are into a different array on the iterator.
- */
-static int
-uniqIterTempfilesHeapDistCmp(
-    const skheapnode_t  b,
-    const skheapnode_t  a,
-    void               *v_iter)
-{
-    uniqiter_tempfiles_t *iter = (uniqiter_tempfiles_t*)v_iter;
-    const uint8_t *dist_a;
-    const uint8_t *dist_b;
-
-    assert(iter);
-    assert(iter->cur_dist);
-
-    dist_a = iter->distinct_value[*(uint16_t*)a] + iter->cur_dist->dv_offset;
-    dist_b = iter->distinct_value[*(uint16_t*)b] + iter->cur_dist->dv_offset;
-
-    return memcmp(dist_a, dist_b, iter->cur_dist->dv_octets);
-}
-
 
 /*
- *    Helper function to merge temporary files into a new temporary
- *    file.  May only be used when there are no distinct fields; when
- *    distinct fields are present, use uniqIterTempfilesMergeFiles().
+ *  count = uniqIterTempValuesOpenAll(iter);
  *
- *    Read the values from the 'open_count' temporary files stored on
- *    'iter', merge the values when the keys are identical, and store
- *    the result in the file whose index is 'temp_idx_offset'.
+ *    Open all temporary files created while reading records, put the
+ *    file handles in the 'fp' member of 'iter', read the first key
+ *    from each file into the 'key' member of 'iter', insert the keys
+ *    into the heap on 'iter', and return the number of files opened.
  *
- *    Return 0 on success or -1 on failure.
+ *    If it is impossible to open all files due to a lack of file
+ *    handles, the existing temporary files will be merged into new
+ *    temporary files, and then another attempt will be made to open
+ *    all files.
+ *
+ *    This function will only return when it is possible to return a
+ *    file handle to every existing temporary file.  If it is unable
+ *    to create a new temporary file, it returns -1.
  */
 static int
-uniqIterTempfilesNodistMergeFiles(
-    uniqiter_temp_nodist_t *iter)
+uniqIterTempValuesOpenAll(
+    uniqiter_temp_values_t *iter)
 {
+    uint16_t i;
+    int j;
+    int tmp_idx_a;
+    int tmp_idx_b;
     uint16_t *top_heap;
     uint16_t lowest;
     uint8_t cached_key[HASHLIB_MAX_KEY_WIDTH];
     uint8_t merged_values[HASHLIB_MAX_VALUE_WIDTH];
+    ssize_t rv;
+
+    /* recall that uniq->temp_idx is the intermediate temp file; which
+     * is open but unused when this function is called.  for this
+     * function to be called, temp files #0 and #1 must be in use */
+    assert(iter->uniq->temp_idx >= 2);
+    assert(iter->uniq->temp_fp);
 
     /* should only be called with value fields and no distinct fields */
     assert(0 == iter->uniq->fi.distinct_num_fields);
     assert(0 < iter->uniq->fi.value_octets);
 
-    /* exit this while() loop once all records for all opened files
-     * have been read or until there is only one file remaining */
-    while (skHeapGetNumberEntries(iter->heap) > 1) {
-        /* get the index of the file with the lowest key; which is at
-         * the top of the heap */
-        skHeapPeekTop(iter->heap, (skheapnode_t*)&top_heap);
-        lowest = *top_heap;
+    /* index at which to start the merge */
+    tmp_idx_a = 0;
 
-        /* for all files that match the lowest key key, merge their
-         * values into 'merged_values' */
-        if (uniqIterTempfilesNodistMergeValues(
-                iter, lowest, cached_key, merged_values))
+    /* This loop repeats as long as we haven't opened all of the temp
+     * files generated while reading the flows. */
+    for (;;) {
+        assert(skHeapGetNumberEntries(iter->heap) == 0);
+
+        /* the index of the first temporary file being processed */
+        iter->temp_idx_base = tmp_idx_a;
+
+        /* determine the index at which to stop the merge */
+        tmp_idx_b = tmp_idx_a + MAX_MERGE_FILES - 1;
+        if (iter->uniq->temp_idx <= tmp_idx_b) {
+            /* fewer than MAX_MERGE_FILES files */
+            tmp_idx_b = iter->uniq->temp_idx - 1;
+        }
+
+        uniqDebug(iter->uniq,
+                  "Attempting to open temporary files #%d through #%d",
+                  tmp_idx_a, tmp_idx_b);
+
+        /* Open up to MAX_MERGE files */
+        for (j = tmp_idx_a, i = 0; j <= tmp_idx_b; ++j, ++i) {
+            iter->fps[i] = uniqTempReopen(iter->uniq->tmpctx, j);
+            if (NULL == iter->fps[i]) {
+                if (skHeapGetNumberEntries(iter->heap) < 2) {
+                    skAppPrintErr("Unable to open multiple temporary files");
+                    return -1;
+                }
+                /* We cannot open any more temp files; we'll need to
+                 * catch file 'j' the next time around. */
+                tmp_idx_b = j - 1;
+                uniqDebug(iter->uniq,
+                          ("File limit hit [%s]---merging"
+                           " #%d through #%d into #%d..."),
+                          strerror(errno), tmp_idx_a, tmp_idx_b,
+                          iter->uniq->temp_idx);
+                break;
+            }
+
+            /* Read the first key from the file and add the file's
+             * index to the heap */
+            if (uniqTempRead(iter->fps[i], iter->key[i],
+                             iter->uniq->fi.key_octets))
+            {
+                skHeapInsert(iter->heap, &i);
+            } else if (0 == skStreamGetLastErrno(iter->fps[i])) {
+                uniqDebug(iter->uniq,
+                          "Ignoring empty temporary file #%u '%s'",
+                          j, skTempFileGetName(iter->uniq->tmpctx, j));
+                uniqTempClose(iter->fps[i]);
+                iter->fps[i] = NULL;
+            } else {
+                skAppPrintErr(
+                    "Cannot read first key from temporary file '%s': %s",
+                    skTempFileGetName(iter->uniq->tmpctx, j),
+                    strerror(skStreamGetLastErrno(iter->fps[i])));
+                return -1;
+            }
+        }
+
+        uniqDebug(iter->uniq, "Opened %" PRIu32 " temporary files",
+                  skHeapGetNumberEntries(iter->heap));
+
+        /* Check to see if we've opened all temp files.  If so,
+         * return */
+        if (tmp_idx_b == iter->uniq->temp_idx - 1) {
+            uniqDebug(iter->uniq,
+                      "Successfully opened all%s temporary files",
+                      ((tmp_idx_a > 0) ? " remaining" : ""));
+            iter->max_fps = i;
+            return 0;
+        }
+        /* Else, we could not open all temp files, so merge all opened
+         * temp files into the intermediate file */
+
+        /* exit this while() loop once all records for all opened
+         * files have been read or until there is only one file
+         * remaining */
+        while (skHeapGetNumberEntries(iter->heap) > 1) {
+            /* get the index of the file with the lowest key */
+            skHeapPeekTop(iter->heap, (skheapnode_t*)&top_heap);
+            lowest = *top_heap;
+
+            /* for all files that match the lowest key key, merge
+             * their values into 'merged_values' */
+            if (uniqIterTempValuesMergeValues(
+                    iter, lowest, cached_key, merged_values))
+            {
+                return -1;
+            }
+
+            /* write the lowest key/value pair to the intermediate
+             * temp file */
+            uniqTempWrite(iter->uniq->temp_fp, cached_key,
+                          iter->uniq->fi.key_octets);
+            uniqTempWrite(iter->uniq->temp_fp, merged_values,
+                          iter->uniq->fi.value_octets);
+        }
+
+        /* copy the data from the remaining file as blocks */
+        if (skHeapExtractTop(iter->heap, (skheapnode_t)&lowest) == SKHEAP_OK) {
+            uint8_t buf[4096];
+
+            assert(skHeapGetNumberEntries(iter->heap) == 0);
+
+            /* write the key that's in memory */
+            uniqTempWrite(iter->uniq->temp_fp, iter->key[lowest],
+                          iter->uniq->fi.key_octets);
+
+            /* inline the body of uniqTempRead() since that function
+             * does not support partial reads */
+            while ((rv =skStreamRead(iter->fps[lowest], buf, sizeof(buf))) > 0)
+            {
+                uniqTempWrite(iter->uniq->temp_fp, buf, rv);
+            }
+            if (-1 == rv) {
+                char errbuf[2 * PATH_MAX];
+
+                skStreamLastErrMessage(
+                    iter->fps[lowest], rv, errbuf, sizeof(errbuf));
+                TRACEMSG(("%s:%d: Failed to read %" SK_PRIuZ " bytes: %s",
+                          __FILE__, __LINE__, sizeof(buf), errbuf));
+                skAppPrintErr("Cannot read from temporary file: %s", errbuf);
+                return -1;
+            }
+            uniqDebug(iter->uniq, "Finished reading file #%u, 0 files remain",
+                      UNIQUE_TMPNUM_READ(iter, lowest));
+        }
+        assert(skHeapGetNumberEntries(iter->heap) == 0);
+
+        /* Close and remove all the temp files that we processed this
+         * time. */
+        for (j = tmp_idx_a, i = 0; j <= tmp_idx_b; ++j, ++i) {
+            uniqTempClose(iter->fps[i]);
+            skTempFileRemove(iter->uniq->tmpctx, j);
+        }
+        memset(iter->fps, 0, sizeof(iter->fps));
+
+        /* Close the intermediate temp file and open a new one. */
+        uniqDebug(iter->uniq, "Finished writing #%d '%s'",
+                  iter->uniq->temp_idx, UNIQUE_TMPNAME_OUT(iter->uniq));
+        uniqTempClose(iter->uniq->temp_fp);
+        iter->uniq->temp_fp = uniqTempCreate(iter->uniq->tmpctx,
+                                             &iter->uniq->max_temp_idx);
+        iter->uniq->temp_idx = iter->uniq->max_temp_idx;
+
+        /* Start the next merge with the next input temp file */
+        tmp_idx_a = tmp_idx_b + 1;
+    }
+
+    return -1;    /* NOTREACHED */
+}
+
+
+/****************************************************************
+ * Iterator for handling temporary files with distinct values
+ ***************************************************************/
+
+/*
+ *    There are two structures used when handling temporary files
+ *    depending on whether there are distinct fields to handle.  the
+ *    two structures have the same initial members can be cast to one
+ *    another.
+ *
+ *    The callback function that implements skUniqueIteratorNext() is
+ *    different depending on whether distinct fields are present.
+ */
+
+/* has support for distinct fields */
+typedef struct uniqiter_temp_dist_st {
+    /* function pointer used by skUniqueIteratorNext() */
+    sk_uniqiter_next_fn_t   next_fn;
+
+    /* function pointer used by skUniqueIteratorDestroy() */
+    sk_uniqiter_free_fn_t   free_fn;
+
+    /* the object to iterate over */
+    sk_unique_t        *uniq;
+
+    /* heap the stores the indexes used by the 'fps' and 'key'
+     * members. comparison function uses the 'key' member of this
+     * structure and returns the keys in ascending order */
+    skheap_t           *heap;
+
+    /* for each file in 'fps', the file's current key */
+    uint8_t             key[MAX_MERGE_FILES >> 1][HASHLIB_MAX_KEY_WIDTH];
+
+    /* temporary key/value files that are currently open; number of
+     * valid files specified by the 'open_count' member */
+    skstream_t         *fps[MAX_MERGE_FILES >> 1];
+
+    /* buffer used to hold the values the are returned to the caller
+     * by skUniqueIteratorNext(). */
+    uint8_t             returned_buf[HASH_MAX_NODE_BYTES];
+
+    /* */
+    distinct_merge_t    dist_merge;
+
+    /* index of first temp file opened for this round of merging; used
+     * when reporting temp file indexes */
+    int                 temp_idx_base;
+
+    /* number of open files: number of valid entries in fps[] */
+    uint16_t            max_fps;
+
+    /* lengths and offsets of each distinct field */
+    distinct_value_t   *distincts;
+
+} uniqiter_temp_dist_t;
+
+
+static int
+uniqIterTempDistMergeOne(
+    uniqiter_temp_dist_t   *iter,
+    uint8_t                 merged_values[]);
+
+static int
+uniqIterTempDistMergeValuesDist(
+    uniqiter_temp_dist_t   *iter,
+    uint8_t                 merged_values[]);
+
+static int
+uniqIterTempDistOpenAll(
+    uniqiter_temp_dist_t   *iter);
+
+static int
+uniqIterTempDistKeyCmp(
+    const skheapnode_t  b,
+    const skheapnode_t  a,
+    void               *v_iter);
+
+
+/*
+ *  status = uniqIterTempDistNext(iter, &key, &distinct, &value);
+ *
+ *    Implementation for skUniqueIteratorNext() when using temporary
+ *    files that do have distinct values.
+ */
+static int
+uniqIterTempDistNext(
+    sk_unique_iterator_t   *v_iter,
+    uint8_t               **key_fields_buffer,
+    uint8_t               **distinct_fields_buffer,
+    uint8_t               **value_fields_buffer)
+{
+    uniqiter_temp_dist_t *iter = (uniqiter_temp_dist_t*)v_iter;
+    uint16_t lowest;
+    uint16_t *top_heap;
+    uint8_t cached_key[HASHLIB_MAX_KEY_WIDTH];
+    uint8_t merged_values[HASHLIB_MAX_VALUE_WIDTH];
+    uint16_t i;
+    int rv;
+
+    assert(iter);
+
+    /* should only be called when distinct fields are present */
+    assert(iter->uniq->fi.distinct_num_fields > 0);
+
+    /* should not be writing to tempoary files */
+    assert(0 == iter->dist_merge.write_to_temp);
+
+    /* get the index of the file with the lowest key; which is at
+     * the top of the heap; cache this low key */
+    if (SKHEAP_OK != skHeapPeekTop(iter->heap, (skheapnode_t*)&top_heap)) {
+        return SK_ITERATOR_NO_MORE_ENTRIES;
+    }
+    lowest = *top_heap;
+    memcpy(cached_key, iter->key[lowest], iter->uniq->fi.key_octets);
+
+    /* store the id of each file whose current key matches the
+     * cached_key into the active[] array on iter->dist_merge and
+     * remove the items from heap as they are added to active[] */
+    iter->dist_merge.active[0] = lowest;
+    iter->dist_merge.num_active = 1;
+
+    /* avoid a needless pop/push on the heap when only one file
+     * remains */
+    if (skHeapGetNumberEntries(iter->heap) == 1) {
+        if (uniqIterTempDistMergeOne(iter, merged_values)) {
+            skHeapEmpty(iter->heap);
+            return SK_ITERATOR_NO_MORE_ENTRIES;
+        }
+
+        /* replace the key for the record we just processed */
+        if (!uniqTempRead(iter->fps[lowest], iter->key[lowest],
+                          iter->uniq->fi.key_octets))
         {
-            return -1;
+            /* read failed and no more data for this file; remove it
+             * from the heap */
+            uniqDebug(iter->uniq,
+                      "Finished reading files #%u, #%u; 0 files remain",
+                      UNIQUE_TMPNUM_READ(iter, lowest),
+                      UNIQUE_TMPNUM_READ(iter, lowest + 1));
+            skHeapExtractTop(iter->heap, NULL);
         }
-
-        /* write the lowest key/value pair to the intermediate
-         * temp file */
-        uniqTempWrite(iter->uniq->temp_fp, cached_key,
-                      iter->uniq->fi.key_octets);
-        uniqTempWrite(iter->uniq->temp_fp, merged_values,
-                      iter->uniq->fi.value_octets);
+        goto END;
     }
 
-    /* copy the data from the remaining file as blocks */
-    if (skHeapExtractTop(iter->heap, (skheapnode_t*)&top_heap) == SKHEAP_OK) {
-        uint8_t buf[4096];
-        ssize_t rv;
-
-        if (skHeapGetNumberEntries(iter->heap) != 0) {
-            skAbort();
-        }
-        lowest = *top_heap;
-
-        /* write the key that's in memory */
-        uniqTempWrite(
-            iter->uniq->temp_fp, iter->key[lowest], iter->uniq->fi.key_octets);
-
-        /* inline the body of uniqTempRead() since that function does
-         * not support partial reads */
-
-        while ((rv = skStreamRead(iter->fps[lowest], buf, sizeof(buf))) > 0) {
-            uniqTempWrite(iter->uniq->temp_fp, buf, rv);
-        }
-        if (-1 == rv) {
-            char errbuf[2 * PATH_MAX];
-
-            skStreamLastErrMessage(
-                iter->fps[lowest], rv, errbuf, sizeof(errbuf));
-            TRACEMSG(("%s:%d: Failed to read %" SK_PRIuZ " bytes: %s",
-                      __FILE__, __LINE__, sizeof(buf), errbuf));
-            skAppPrintErr("Cannot read from temporary file: %s", errbuf);
-            return -1;
-        }
-        UNIQUE_DEBUG(iter->uniq,
-                     ((SKUNIQUE_DEBUG_ENVAR
-                       ": Finished reading file #%u, 0 files remain"),
-                      UNIQUE_TMPNUM_READ(iter, lowest)));
+    skHeapExtractTop(iter->heap, NULL);
+    while (skHeapPeekTop(iter->heap, (skheapnode_t*)&top_heap) == SKHEAP_OK
+           && 0 == (skFieldListCompareBuffers(
+                        cached_key, iter->key[*top_heap],
+                        iter->uniq->fi.key_fields)))
+    {
+        iter->dist_merge.active[iter->dist_merge.num_active++] = *top_heap;
+        skHeapExtractTop(iter->heap, NULL);
     }
 
-    return 0;
+    if (1 == iter->dist_merge.num_active) {
+        /* nothing to merge when the key occurs in one file */
+        rv = uniqIterTempDistMergeOne(iter, merged_values);
+    } else {
+        rv = uniqIterTempDistMergeValuesDist(iter, merged_values);
+    }
+    if (rv) {
+        skHeapEmpty(iter->heap);
+        return SK_ITERATOR_NO_MORE_ENTRIES;
+    }
+
+    /* for each element in iter->dist_merge.active[], read its next key and
+     * insert it into the heap containing the keys */
+    for (i = 0; i < iter->dist_merge.num_active; ++i) {
+        lowest = iter->dist_merge.active[i];
+        if (uniqTempRead(iter->fps[lowest], iter->key[lowest],
+                         iter->uniq->fi.key_octets))
+        {
+            /* read succeeded. insert the new entry into the heap */
+            skHeapInsert(iter->heap, &lowest);
+            /* keys within a file should always be sorted; duplicate
+             * keys may appear if the distinct data structure ran out
+             * of memory */
+            assert(skFieldListCompareBuffers(cached_key, iter->key[lowest],
+                                             iter->uniq->fi.key_fields) <= 0);
+        } else {
+            /* read failed and no more data for this file */
+            uniqDebug(iter->uniq,
+                      "Finished reading files #%u, #%u; %d files remain",
+                      UNIQUE_TMPNUM_READ(iter, iter->dist_merge.active[i]),
+                      UNIQUE_TMPNUM_READ(iter, iter->dist_merge.active[i] + 1),
+                      (2 * (skHeapGetNumberEntries(iter->heap)
+                            + iter->dist_merge.num_active - i - 1)));
+        }
+    }
+
+  END:
+    /* set user's pointers to the buffers on the iterator, and write
+     * the key, values, and distincts into those buffers */
+    *key_fields_buffer = iter->returned_buf;
+    memcpy(*key_fields_buffer, cached_key, iter->uniq->fi.key_octets);
+
+    *value_fields_buffer = iter->returned_buf + iter->uniq->fi.key_octets;
+    memcpy(*value_fields_buffer, merged_values, iter->uniq->fi.value_octets);
+
+    *distinct_fields_buffer = (iter->returned_buf + iter->uniq->fi.key_octets
+                               + iter->uniq->fi.value_octets);
+    uniqDistinctSetOutputBuf(&iter->uniq->fi, iter->distincts,
+                             *distinct_fields_buffer);
+
+    return SK_ITERATOR_OK;
 }
 
 
 /*
- *  status = uniqIterTempfilesMergeOne(iter, fps_index, write_to_temp, merged_values);
+ *  uniqIterTempDistDestroy(iter);
+ *
+ *    Implementation for skUniqueIteratorDestroy().
+ */
+static void
+uniqIterTempDistDestroy(
+    sk_unique_iterator_t  **v_iter)
+{
+    uniqiter_temp_dist_t *iter;
+    size_t i;
+
+    if (v_iter && *v_iter) {
+        iter = *(uniqiter_temp_dist_t**)v_iter;
+
+        for (i = 0; i < iter->max_fps; ++i) {
+            uniqTempClose(iter->fps[i]);
+        }
+        memset(iter->fps, 0, sizeof(iter->fps));
+
+        for (i = 0; i < iter->dist_merge.max_fps; ++i) {
+            uniqTempClose(iter->dist_merge.fps[i]);
+        }
+        memset(iter->dist_merge.fps, 0, sizeof(iter->dist_merge.fps));
+
+        uniqDistinctFree(&iter->uniq->fi, iter->distincts);
+        skHeapFree(iter->dist_merge.heap);
+        skHeapFree(iter->heap);
+
+        free(iter);
+        *v_iter = NULL;
+    }
+}
+
+
+/*
+ *  status = uniqIterTempDistCreate(uniq, &iter);
+ *
+ *    Helper function for skUniqueIteratorCreate().
+ */
+static int
+uniqIterTempDistCreate(
+    sk_unique_t            *uniq,
+    sk_unique_iterator_t  **new_iter)
+{
+    uniqiter_temp_dist_t *iter;
+
+    assert(uniq);
+    assert(new_iter);
+
+    /* should only be called when distinct fields are present */
+    assert(uniq->fi.distinct_num_fields > 0);
+
+    iter = (uniqiter_temp_dist_t*)calloc(1, sizeof(uniqiter_temp_dist_t));
+    if (NULL == iter) {
+        goto ERROR;
+    }
+
+    iter->heap = skHeapCreate2(uniqIterTempDistKeyCmp, MAX_MERGE_FILES,
+                               sizeof(uint16_t), NULL, iter);
+    if (NULL == iter->heap) {
+        goto ERROR;
+    }
+
+    iter->uniq = uniq;
+    iter->next_fn = uniqIterTempDistNext;
+    iter->free_fn = uniqIterTempDistDestroy;
+
+    /* create the heap that operates over the distinct fields */
+    iter->dist_merge.heap = skHeapCreate2(uniqDistmergeCmp,
+                                          MAX_MERGE_FILES >> 1,
+                                          sizeof(uint16_t),
+                                          NULL, &iter->dist_merge);
+    if (NULL == iter->dist_merge.heap) {
+        goto ERROR;
+    }
+    if (uniqDistinctAllocMerging(&uniq->fi, &iter->distincts)) {
+        goto ERROR;
+    }
+
+    iter->dist_merge.print_debug = uniq->print_debug;
+    iter->dist_merge.write_to_temp = 0;
+
+    /* open all temp files---this also merges temp files if there
+     * are not enough file handles to open all temp files */
+    if (uniqIterTempDistOpenAll(iter)) {
+        goto ERROR;
+    }
+
+    if (skHeapGetNumberEntries(iter->heap) == 0) {
+        skAppPrintErr("Could not read records from any temporary files");
+        goto ERROR;
+    }
+
+    iter->dist_merge.write_to_temp = 0;
+
+    uniqDebug(iter->uniq, ("Created tempfile-distinct iterator;"
+                           " processing %" PRIu32 " temporary file pairs"),
+              skHeapGetNumberEntries(iter->heap));
+
+    *new_iter = (sk_unique_iterator_t*)iter;
+    return 0;
+
+  ERROR:
+    uniqIterTempDistDestroy((sk_unique_iterator_t**)&iter);
+    if (iter) {
+        skHeapFree(iter->dist_merge.heap);
+        skHeapFree(iter->heap);
+        free(iter);
+    }
+    skAppPrintErr("Error allocating unique iterator");
+    return -1;
+}
+
+
+/*
+ *  status = uniqIterTempDistKeyCmp(b, a, v_iter);
+ *
+ *    Comparison callback function used by the heap.
+ *
+ *    The values in 'b' and 'a' are integer indexes into an array of
+ *    keys.  The function calls the field comparison function to
+ *    compare the keys and returns the result.
+ *
+ *    The context value in 'v_iter' is the uniqiter_temp_values_t or
+ *    uniqiter_temp_dist_t object that holds the keys and the fields
+ *    describing the sort order.
+ *
+ *    Note the order of arguments is 'b', 'a'.
+ */
+static int
+uniqIterTempDistKeyCmp(
+    const skheapnode_t  b,
+    const skheapnode_t  a,
+    void               *v_iter)
+{
+    uniqiter_temp_dist_t *iter = (uniqiter_temp_dist_t *)v_iter;
+
+    return skFieldListCompareBuffers(iter->key[*(uint16_t*)a],
+                                     iter->key[*(uint16_t*)b],
+                                     iter->uniq->fi.key_fields);
+}
+
+
+/*
+ *  status = uniqIterTempDistMergeOne(iter, merged_values);
  *
  *    Read the values and distincts from the file in the iter->fps[]
  *    array at position 'fps_index'.
@@ -4271,23 +5267,27 @@ uniqIterTempfilesNodistMergeFiles(
  *    Return 0 on success, or -1 on read or write error.
  */
 static int
-uniqIterTempfilesMergeOne(
-    uniqiter_tempfiles_t   *iter,
-    uint16_t                fps_index,
-    unsigned int            write_to_temp,
+uniqIterTempDistMergeOne(
+    uniqiter_temp_dist_t   *iter,
     uint8_t                 merged_values[])
 {
     distinct_value_t *dist;
     uint8_t buf[4096];
     size_t to_read;
     size_t exp_len;
+    uint16_t fps_index;
     uint64_t dist_count;
     uint16_t i;
     int last_errno;
 
     /* Should only be called when distinct fields are present */
     assert(0 != iter->uniq->fi.distinct_num_fields);
-    assert(!write_to_temp || (iter->uniq->temp_fp && iter->uniq->dist_fp));
+
+    assert(1 == iter->dist_merge.num_active);
+    assert(0 == iter->dist_merge.write_to_temp
+           || (iter->uniq->temp_fp && iter->uniq->dist_fp));
+
+    fps_index = iter->dist_merge.active[0];
 
     if (iter->uniq->fi.value_octets) {
         /* read the value */
@@ -4300,7 +5300,7 @@ uniqIterTempfilesMergeOne(
                 (last_errno ? strerror(last_errno) : "EOF"));
             return -1;
         }
-        if (!write_to_temp) {
+        if (!iter->dist_merge.write_to_temp) {
             /* store value in the 'merged_values[]' buffer */
             skFieldListInitializeBuffer(
                 iter->uniq->fi.value_fields, merged_values);
@@ -4325,30 +5325,33 @@ uniqIterTempfilesMergeOne(
             return -1;
         }
 
-        if (write_to_temp) {
-            uniqTempWrite(iter->uniq->temp_fp, &dist_count, sizeof(uint64_t));
-        }
-
         /* determine the number of bytes to read */
         assert(dist->dv_octets > 0);
         to_read = dist->dv_octets * dist_count;
 
-        if (!write_to_temp) {
+        if (!iter->dist_merge.write_to_temp) {
             /* no need to read the data, just skip over it by using
              * 'NULL' as the buffer */
-            if (!uniqTempRead(iter->fps[fps_index + 1], NULL, to_read)) {
-                last_errno = skStreamGetLastErrno(iter->fps[fps_index + 1]);
+            if (!uniqTempRead(iter->dist_merge.fps[fps_index], NULL, to_read)){
+                last_errno = (skStreamGetLastErrno(
+                                  iter->dist_merge.fps[fps_index]));
                 skAppPrintErr(
                     "Cannot read distinct values from temporary file: %s",
                     (last_errno ? strerror(last_errno) : "EOF"));
                 return -1;
             }
         } else {
+            /* write the number of distinct values */
+            uniqTempWrite(iter->uniq->temp_fp, &dist_count, sizeof(uint64_t));
+
             /* read and write the bytes */
             while (to_read) {
                 exp_len = ((to_read < sizeof(buf)) ? to_read : sizeof(buf));
-                if (!uniqTempRead(iter->fps[fps_index + 1], buf, exp_len)) {
-                    last_errno = skStreamGetLastErrno(iter->fps[fps_index + 1]);
+                if (!uniqTempRead(
+                        iter->dist_merge.fps[fps_index], buf, exp_len))
+                {
+                    last_errno
+                        = skStreamGetLastErrno(iter->dist_merge.fps[fps_index]);
                     skAppPrintErr(
                         "Cannot read distinct values from temporary file: %s",
                         (last_errno ? strerror(last_errno) : "EOF"));
@@ -4368,29 +5371,21 @@ uniqIterTempfilesMergeOne(
 /*
  *    Helper function used when merging files.
  *
- *    Process the set of file ids specified in 'file_ids', an array
- *    containing 'file_ids_len' entries.  These files are known to have the
- *    same key, and their read position is just after the key.
+ *    Process the set of file ids specified in the 'active' array on
+ *    the 'dist_merge' member of the iterator 'iter'.  These files
+ *    are known to have the same key, and the read position in each
+ *    file is just after the key.
  *
  *    Read and merge the values and distinct fields from the files for
- *    this single key and write the result to the new temporary file.
+ *    this single key.  Update the 'disticts' value with the count of
+ *    items and perhaps write the result to the new temporary file.
  */
 static int
-uniqIterTempfilesMergeValuesDist(
-    uniqiter_tempfiles_t   *iter,
-    const uint16_t          file_ids[],
-    uint16_t                file_ids_len,
-    unsigned int            write_to_temp,
+uniqIterTempDistMergeValuesDist(
+    uniqiter_temp_dist_t   *iter,
     uint8_t                 merged_values[])
 {
     uint8_t buf[4096];
-    uint8_t lowest_distinct[HASHLIB_MAX_KEY_WIDTH];
-    uint64_t num_distinct[MAX_MERGE_FILES];
-    uint64_t distinct_count;
-    uint32_t heap_count;
-    distinct_value_t *dist;
-    uint16_t *top_heap;
-    uint16_t lowest;
     uint16_t fps_index;
     uint16_t i;
     uint16_t j;
@@ -4398,26 +5393,27 @@ uniqIterTempfilesMergeValuesDist(
 
     /* Should only be called when distinct fields are present */
     assert(0 != iter->uniq->fi.distinct_num_fields);
-    assert(!write_to_temp || (iter->uniq->temp_fp && iter->uniq->dist_fp));
+
+    assert(iter->dist_merge.num_active > 1);
+    assert(0 == iter->dist_merge.write_to_temp
+           || (iter->uniq->temp_fp && iter->uniq->dist_fp));
+    assert(0 == iter->dist_merge.write_to_temp
+           || (iter->uniq->dist_fp == iter->dist_merge.dist_fp));
 
     if (iter->uniq->fi.value_octets) {
         /* initialize the merged_values buffer.  for each file, read
          * the value and add it to the merged_values buffer. */
 
-        /* initialize buffer */
         skFieldListInitializeBuffer(iter->uniq->fi.value_fields,merged_values);
 
-        /* read and merge all values */
-        for (j = 0; j < file_ids_len; ++j) {
-            fps_index = file_ids[j];
+        for (j = 0; j < iter->dist_merge.num_active; ++j) {
+            fps_index = iter->dist_merge.active[j];
             if (!uniqTempRead(iter->fps[fps_index], buf,
                               iter->uniq->fi.value_octets))
             {
                 last_errno = skStreamGetLastErrno(iter->fps[fps_index]);
-                UNIQUE_DEBUG(iter->uniq,
-                             ((SKUNIQUE_DEBUG_ENVAR
-                               ": Cannot read from temporary file #%u"),
-                              UNIQUE_TMPNUM_READ(iter, fps_index)));
+                uniqDebug(iter->uniq, "Cannot read from temporary file #%u",
+                          UNIQUE_TMPNUM_READ(iter, fps_index));
                 skAppPrintErr(
                     "Cannot read value field from temporary file: %s",
                     (last_errno ? strerror(last_errno) : "EOF"));
@@ -4427,7 +5423,7 @@ uniqIterTempfilesMergeValuesDist(
                 iter->uniq->fi.value_fields, merged_values, buf);
         }
 
-        if (write_to_temp) {
+        if (iter->dist_merge.write_to_temp) {
             /* write the merged value to the temporary file */
             uniqTempWrite(iter->uniq->temp_fp, merged_values,
                           iter->uniq->fi.value_octets);
@@ -4436,127 +5432,35 @@ uniqIterTempfilesMergeValuesDist(
 
     /* process each distinct field */
     for (i = 0; i < iter->uniq->fi.distinct_num_fields; ++i) {
-        dist = &iter->distincts[i];
-        iter->cur_dist = dist;
+        assert(0 == skHeapGetNumberEntries(iter->dist_merge.heap));
 
-        /* holds the number of distinct values found for this distinct
-         * field across all open files */
-        distinct_count = 0;
+        iter->dist_merge.octet_len = iter->distincts[i].dv_octets;
 
-        /* for each file: read the number of distinct entries, read
-         * the first distinct value, and store the index in
-         * the dist_heap using a comparitor over the distinct value */
-        for (j = 0; j < file_ids_len; ++j) {
-            fps_index = file_ids[j];
-            if (!uniqTempRead(iter->fps[fps_index], &num_distinct[fps_index],
+        /* for each file: read the number of distinct entries */
+        for (j = 0; j < iter->dist_merge.num_active; ++j) {
+            fps_index = iter->dist_merge.active[j];
+            if (!uniqTempRead(iter->fps[fps_index],
+                              &iter->dist_merge.num_distinct[fps_index],
                               sizeof(uint64_t)))
             {
                 last_errno = skStreamGetLastErrno(iter->fps[fps_index]);
-                UNIQUE_DEBUG(iter->uniq,
-                             ((SKUNIQUE_DEBUG_ENVAR
-                               ": Cannot read from temporary file #%u"),
-                              UNIQUE_TMPNUM_READ(iter, fps_index)));
+                uniqDebug(iter->uniq, "Cannot read from temporary file #%u",
+                          UNIQUE_TMPNUM_READ(iter, fps_index));
                 skAppPrintErr(
                     "Cannot read distinct count from temporary file: %s",
                     (last_errno ? strerror(last_errno) : "EOF"));
                 return -1;
             }
-
-            if (num_distinct[fps_index]) {
-                if (!uniqTempRead(iter->fps[fps_index + 1],
-                                  iter->distinct_value[fps_index],
-                                  dist->dv_octets))
-                {
-                    last_errno = skStreamGetLastErrno(iter->fps[fps_index + 1]);
-                    UNIQUE_DEBUG(iter->uniq,
-                                 ((SKUNIQUE_DEBUG_ENVAR
-                                   ": Cannot read from temporary file #%u"),
-                                  UNIQUE_TMPNUM_READ(iter, fps_index + 1)));
-                    skAppPrintErr(
-                        "Cannot read distinct values from temporary file: %s",
-                        (last_errno ? strerror(last_errno) : "EOF"));
-                    return -1;
-                }
-                skHeapInsert(iter->dist_heap, &fps_index);
-                --num_distinct[fps_index];
-            }
         }
 
-        heap_count = skHeapGetNumberEntries(iter->dist_heap);
-        if (0 == heap_count) {
-            /* strange, but okay? */
-            dist->dv_count = distinct_count;
-            continue;
-        }
-
-        /* get the file index that has the lowest distinct value */
-        skHeapPeekTop(iter->dist_heap, (skheapnode_t*)&top_heap);
-        lowest = *top_heap;
-
-        /* process all the distinct values */
-        do {
-            /* FIXME: shortcut this while() when only a single file
-             * remains */
-            memcpy(lowest_distinct, iter->distinct_value[lowest],
-                   dist->dv_octets);
-            ++distinct_count;
-
-            if (write_to_temp) {
-                /* write the distinct value */
-                uniqTempWrite(iter->uniq->dist_fp, &lowest_distinct,
-                              dist->dv_octets);
-            }
-
-            /* ignore lowest_distinct in all other files */
-            do {
-                /* replace the distinct_value we just read */
-                if (0 == num_distinct[lowest]) {
-                    /* no more distinct values from this file; remove
-                     * it from the heap */
-                    skHeapExtractTop(iter->dist_heap, NULL);
-                    --heap_count;
-                    if (0 == heap_count) {
-                        break;
-                    }
-                } else if (!uniqTempRead(iter->fps[lowest + 1],
-                                         iter->distinct_value[lowest],
-                                         dist->dv_octets))
-                {
-                    last_errno = skStreamGetLastErrno(iter->fps[lowest + 1]);
-                    UNIQUE_DEBUG(iter->uniq,
-                                 ((SKUNIQUE_DEBUG_ENVAR
-                                   ": Cannot read from temporary file #%u"),
-                                  UNIQUE_TMPNUM_READ(iter, lowest)));
-                    skAppPrintErr(
-                        "Cannot read distinct values from temporary file: %s",
-                        (last_errno ? strerror(last_errno) : "EOF"));
-                    return -1;
-                } else {
-                    skHeapReplaceTop(iter->dist_heap, &lowest, NULL);
-                    --num_distinct[lowest];
-                    /* distinct values in each file must be sorted and
-                     * unique */
-                    assert(memcmp(lowest_distinct,iter->distinct_value[lowest],
-                                  dist->dv_octets) < 0);
-                }
-
-                /* get the new value at the top of the heap and see if
-                 * it matches the lowest_distinct */
-                skHeapPeekTop(iter->dist_heap, (skheapnode_t*)&top_heap);
-                lowest = *top_heap;
-            } while (memcmp(lowest_distinct, iter->distinct_value[lowest],
-                            dist->dv_octets) == 0);
-        } while (heap_count > 0);
-
-        dist->dv_count = distinct_count;
+        iter->distincts[i].dv_count = uniqDistmergeMergeOne(&iter->dist_merge);
     }
 
-    if (write_to_temp) {
+    if (iter->dist_merge.write_to_temp) {
         /* write the distinct count to the main temporary file */
         for (i = 0; i < iter->uniq->fi.distinct_num_fields; ++i) {
-            dist = &iter->distincts[i];
-            uniqTempWrite(iter->uniq->temp_fp, &dist->dv_count,
-                          sizeof(dist->dv_count));
+            uniqTempWrite(iter->uniq->temp_fp, &iter->distincts[i].dv_count,
+                          sizeof(iter->distincts[i].dv_count));
         }
     }
 
@@ -4565,134 +5469,7 @@ uniqIterTempfilesMergeValuesDist(
 
 
 /*
- *    Helper function to merge temporary files into a new temporary
- *    file.  May only be used when there are distinct fields; when
- *    distinct fields not are present, use
- *    uniqIterTempfilesNodistMergeFiles().
- *
- *    Read the values (if any) and distinct fields from the
- *    'open_count' temporary files stored on 'iter', merge the values
- *    and the distinct fields when the keys are identical, and store
- *    the result in the file whose index is 'temp_idx_offset'.
- *
- *    Return 0 on success or -1 on failure.
- */
-static int
-uniqIterTempfilesMergeFiles(
-    uniqiter_tempfiles_t   *iter)
-{
-    uint16_t *top_heap;
-    uint16_t lowest;
-    uint8_t cached_key[HASHLIB_MAX_KEY_WIDTH];
-    uint8_t merged_values[HASHLIB_MAX_VALUE_WIDTH];
-    uint16_t merge_nodes[MAX_MERGE_FILES];
-    uint16_t merge_nodes_len;
-    uint16_t i;
-    int rv;
-
-    /* Should only be called when distinct fields are present */
-    assert(0 != iter->uniq->fi.distinct_num_fields);
-    assert(iter->uniq->temp_fp && iter->uniq->dist_fp);
-
-    /* exit this while() loop once all data for all opened files have
-     * been read or until there is only one file remaining */
-    while (skHeapGetNumberEntries(iter->heap) > 1) {
-        /* get the index of the file with the lowest key; which is at
-         * the top of the heap */
-        skHeapPeekTop(iter->heap, (skheapnode_t*)&top_heap);
-        lowest = *top_heap;
-
-        /* cache this low key and write it to the output file */
-        memcpy(cached_key, iter->key[lowest], iter->uniq->fi.key_octets);
-        uniqTempWrite(iter->uniq->temp_fp, cached_key,
-                      iter->uniq->fi.key_octets);
-
-        /* store the id of each file whose current key matches the
-         * cached_key into the merge_nodes[] array; remove the items
-         * from heap as they are added to merge_nodes[] */
-        merge_nodes[0] = lowest;
-        merge_nodes_len = 1;
-        skHeapExtractTop(iter->heap, NULL);
-
-        while (skHeapPeekTop(iter->heap, (skheapnode_t*)&top_heap) == SKHEAP_OK
-               && 0 == (skFieldListCompareBuffers(
-                            cached_key, iter->key[*top_heap],
-                            iter->uniq->fi.key_fields)))
-        {
-            merge_nodes[merge_nodes_len++] = *top_heap;
-            skHeapExtractTop(iter->heap, NULL);
-        }
-
-        if (1 == merge_nodes_len) {
-            /* if the cached_key only appears in one file, there no need
-             * to merge, just copy the bytes from source to the dest */
-            rv = uniqIterTempfilesMergeOne(iter, lowest, 1, merged_values);
-        } else {
-            rv = uniqIterTempfilesMergeValuesDist(
-                iter, merge_nodes, merge_nodes_len, 1, merged_values);
-        }
-        if (rv) {
-            return -1;
-        }
-
-        /* for each element in merge_nodes[], read its next key and
-         * insert it into the heap */
-        for (i = 0; i < merge_nodes_len; ++i) {
-            if (uniqTempRead(iter->fps[merge_nodes[i]],
-                             iter->key[merge_nodes[i]],
-                             iter->uniq->fi.key_octets))
-            {
-                /* read succeeded. insert the new entry into the
-                 * heap. */
-                skHeapInsert(iter->heap, &merge_nodes[i]);
-                /* keys within a file should always be sorted;
-                 * duplicate keys may appear if the distinct data
-                 * structure ran out of memory */
-                assert(skFieldListCompareBuffers(cached_key, iter->key[lowest],
-                                                 iter->uniq->fi.key_fields)<=0);
-            } else {
-                UNIQUE_DEBUG(iter->uniq,
-                             ((SKUNIQUE_DEBUG_ENVAR
-                               ": Finished reading files #%u, #%u;"
-                               " %d files remain"),
-                              UNIQUE_TMPNUM_READ(iter, merge_nodes[i]),
-                              UNIQUE_TMPNUM_READ(iter, merge_nodes[i] + 1),
-                              (2 * (skHeapGetNumberEntries(iter->heap)
-                                    + merge_nodes_len - i - 1))));
-            }
-        }
-    }
-
-    if (skHeapExtractTop(iter->heap, (skheapnode_t*)&top_heap) == SKHEAP_OK) {
-        lowest = *top_heap;
-
-        assert(0 == skHeapGetNumberEntries(iter->heap));
-
-        do {
-            /* write the key to the output file */
-            uniqTempWrite(iter->uniq->temp_fp, iter->key[lowest],
-                          iter->uniq->fi.key_octets);
-            /* handle the values and distincts */
-            if (uniqIterTempfilesMergeOne(iter, lowest, 1, merged_values)) {
-                return -1;
-            }
-            /* read the next key */
-        } while (uniqTempRead(iter->fps[lowest], iter->key[lowest],
-                              iter->uniq->fi.key_octets));
-        /* read failed and no more data for this file */
-        UNIQUE_DEBUG(iter->uniq,
-                     ((SKUNIQUE_DEBUG_ENVAR
-                       ": Finished reading files #%u, #%u; 0 files remain"),
-                      UNIQUE_TMPNUM_READ(iter, lowest),
-                      UNIQUE_TMPNUM_READ(iter, lowest + 1)));
-    }
-
-    return 0;
-}
-
-
-/*
- *  count = uniqIterTempfilesOpenAll(iter);
+ *  count = uniqIterTempDistOpenAll(iter);
  *
  *    Open all temporary files created while reading records,
  *    put the file handles in the 'fp' member of 'iter', and return
@@ -4708,24 +5485,31 @@ uniqIterTempfilesMergeFiles(
  *    to create a new temporary file, it returns -1.
  */
 static int
-uniqIterTempfilesOpenAll(
-    uniqiter_tempfiles_t   *iter)
+uniqIterTempDistOpenAll(
+    uniqiter_temp_dist_t   *iter)
 {
+#ifndef NDEBUG
+    uint8_t cached_key[HASHLIB_MAX_KEY_WIDTH];
+#endif
     uint16_t i;
-    uint16_t step;
     int j;
     int tmp_idx_a;
     int tmp_idx_b;
-    int open_count;
     int last_errno;
-    int rv;
+    uint16_t *top_heap;
+    uint16_t lowest;
+    uint8_t merged_values[HASHLIB_MAX_VALUE_WIDTH];
+    ssize_t rv;
 
     /* recall that uniq->temp_idx is the intermediate temp file; which
      * is open but unused when this function is called.  for this
      * function to be called, temp files #0 and #1 must be in use */
     assert(iter->uniq->temp_idx >= 2);
     assert(iter->uniq->temp_fp);
-    assert(0 == iter->uniq->fi.distinct_num_fields || iter->uniq->dist_fp);
+
+    /* should only be called when distinct fields are present */
+    assert(iter->uniq->fi.distinct_num_fields > 0);
+    assert(iter->uniq->temp_fp && iter->uniq->dist_fp);
 
     /* index at which to start the merge */
     tmp_idx_a = 0;
@@ -4735,162 +5519,223 @@ uniqIterTempfilesOpenAll(
     for (;;) {
         assert(skHeapGetNumberEntries(iter->heap) == 0);
 
-        /* store the index of the first temporary file being processed
-         * this time on the iterator */
+        iter->dist_merge.dist_fp = iter->uniq->dist_fp;
+
+        /* the index of the first temporary file being processed */
         iter->temp_idx_base = tmp_idx_a;
 
         /* determine the index at which to stop the merge */
-        if (iter->uniq->temp_idx - tmp_idx_a < MAX_MERGE_FILES) {
+        tmp_idx_b = tmp_idx_a + MAX_MERGE_FILES - 1;
+        if (iter->uniq->temp_idx <= tmp_idx_b) {
             /* fewer than MAX_MERGE_FILES files */
             tmp_idx_b = iter->uniq->temp_idx - 1;
-        } else {
-            tmp_idx_b = tmp_idx_a + MAX_MERGE_FILES - 1;
         }
+        assert((tmp_idx_a & 0x1) == 0);
+        assert((tmp_idx_b & 0x1) == 1);
 
-        /* when using distinct fields, files must we opened in
-         * pairs */
-        if (iter->uniq->fi.distinct_num_fields) {
-            assert((tmp_idx_a & 0x1) == 0);
-            if (((tmp_idx_b & 0x1) == 0) && (tmp_idx_b > tmp_idx_a)) {
-                --tmp_idx_b;
-            }
-        }
+        uniqDebug(iter->uniq,
+                  "Attempting to open temporary files #%d through #%d",
+                  tmp_idx_a, tmp_idx_b);
 
-        UNIQUE_DEBUG(iter->uniq,
-                     ((SKUNIQUE_DEBUG_ENVAR
-                       ": Attempting to open temporary files #%d through #%d"),
-                      tmp_idx_a, tmp_idx_b));
-
-        /* number of files successfully opened */
-        open_count = 0;
-
-        /* Attempt to open up to MAX_MERGE_FILES, though an open may
-         * due to lack of resources (EMFILE or ENOMEM) */
-        for (j = tmp_idx_a; j <= tmp_idx_b; ++j) {
-            iter->fps[open_count] = uniqTempReopen(iter->uniq->tmpctx, j);
-            if (iter->fps[open_count] == NULL) {
-                if ((open_count > 0)
-                    && ((errno == EMFILE) || (errno == ENOMEM)))
-                {
-                    /* We cannot open any more temp files; we'll need
-                     * to catch file 'j' the next time around. */
-                    tmp_idx_b = j - 1;
-                    UNIQUE_DEBUG(iter->uniq,
-                                 ((SKUNIQUE_DEBUG_ENVAR ": EMFILE limit hit"
-                                   "---merging #%d through #%d into #%d: %s"),
-                                  tmp_idx_a, tmp_idx_b, iter->uniq->temp_idx,
-                                 strerror(errno)));
-                    break;
-                } else {
-                    skAppPrintSyserror(
-                        "Error opening existing temporary file '%s'",
-                        skTempFileGetName(iter->uniq->tmpctx, j));
+        /* Open up to MAX_MERGE files; the files are opened in pairs
+         * where the second file of the pair contains the distinct
+         * counts */
+        for (j = tmp_idx_a, i = 0; j <= tmp_idx_b; j += 2, ++i) {
+            iter->fps[i] = uniqTempReopen(iter->uniq->tmpctx, j);
+            if (NULL == iter->fps[i]) {
+                if (skHeapGetNumberEntries(iter->heap) < 2) {
+                    skAppPrintErr("Unable to open multiple temporary files");
                     return -1;
                 }
+                /* We cannot open any more temp files; we'll need to
+                 * catch file 'j' the next time around. */
+                tmp_idx_b = j - 1;
+                uniqDebug(iter->uniq,
+                          ("File limit hit [%s]---merging"
+                           " #%d through #%d into #%d, #%d..."),
+                          strerror(errno), tmp_idx_a, tmp_idx_b,
+                          iter->uniq->temp_idx, iter->uniq->max_temp_idx);
+                break;
             }
-            ++open_count;
+
+            /* Read the first key from the file */
+            if (!uniqTempRead(iter->fps[i], iter->key[i],
+                              iter->uniq->fi.key_octets))
+            {
+                last_errno = skStreamGetLastErrno(iter->fps[i]);
+                if (0 != last_errno) {
+                    skAppPrintErr(
+                        "Cannot read first key from temporary file '%s': %s",
+                        skTempFileGetName(iter->uniq->tmpctx, j),
+                        strerror(last_errno));
+                    return -1;
+                }
+                uniqDebug(iter->uniq,
+                          "Ignoring empty temporary file #%u '%s'",
+                          j, skTempFileGetName(iter->uniq->tmpctx, j));
+                uniqTempClose(iter->fps[i]);
+                iter->fps[i] = NULL;
+                continue;
+            }
+
+            /* open the corresponding distinct file */
+            iter->dist_merge.fps[i] = uniqTempReopen(iter->uniq->tmpctx, j+ 1);
+            if (NULL == iter->dist_merge.fps[i]) {
+                if (skHeapGetNumberEntries(iter->heap) < 2) {
+                    skAppPrintErr("Unable to open multiple temporary files");
+                    return -1;
+                }
+                tmp_idx_b = j - 1;
+                uniqDebug(iter->uniq,
+                          ("File limit hit [%s]---merging"
+                           " #%d through #%d into #%d, #%d..."),
+                          strerror(errno), tmp_idx_a, tmp_idx_b,
+                          iter->uniq->temp_idx, iter->uniq->max_temp_idx);
+                uniqTempClose(iter->fps[i]);
+                iter->fps[i] = NULL;
+                break;
+            }
+
+            skHeapInsert(iter->heap, &i);
         }
 
-        if (iter->uniq->fi.distinct_num_fields) {
-            if ((open_count & 0x1) == 1) {
-                /* number of opened files must be even */
-                --tmp_idx_b;
-                --open_count;
-                uniqTempClose(iter->fps[open_count]);
-            }
-        }
-
-        UNIQUE_DEBUG(iter->uniq,
-                     ((SKUNIQUE_DEBUG_ENVAR ": Opened %d temporary files"),
-                      open_count));
+        uniqDebug(iter->uniq, "Opened %" PRIu32 " temporary file pairs",
+                  skHeapGetNumberEntries(iter->heap));
 
         /* Check to see if we've opened all temp files.  If so,
          * return */
         if (tmp_idx_b == iter->uniq->temp_idx - 1) {
-            UNIQUE_DEBUG(iter->uniq,
-                         (SKUNIQUE_DEBUG_ENVAR
-                          ": Successfully opened all%s temporary files",
-                          ((tmp_idx_a > 0) ? " remaining" : "")));
-            return open_count;
+            uniqDebug(iter->uniq,
+                      "Successfully opened all%s temporary files",
+                      ((tmp_idx_a > 0) ? " remaining" : ""));
+            iter->dist_merge.max_fps = iter->max_fps = i;
+            return 0;
         }
         /* Else, we could not open all temp files, so merge all opened
          * temp files into the intermediate file */
 
-        step = 1 + (iter->uniq->fi.distinct_num_fields > 0);
+        iter->dist_merge.write_to_temp = 1;
 
-        /* Read the first key from each temp file into the 'key[]'
-         * array on the iterator; add file's index to the heap */
-        for (i = 0; i < open_count; i += step) {
-            if (uniqTempRead(
-                    iter->fps[i], iter->key[i], iter->uniq->fi.key_octets))
+        /* exit this while() loop once all data for all opened files
+         * have been read or until there is only one file remaining */
+        while (skHeapGetNumberEntries(iter->heap) > 1) {
+            /* get the index of the file with the lowest key */
+            skHeapExtractTop(iter->heap, (skheapnode_t)&lowest);
+
+            /* write the key to the temp file */
+            uniqTempWrite(iter->uniq->temp_fp, iter->key[lowest],
+                          iter->uniq->fi.key_octets);
+#ifndef NDEBUG
+            /* cache the key */
+            memcpy(cached_key, iter->key[lowest], iter->uniq->fi.key_octets);
+#endif
+
+            /* pop items from the heap that match the lowest key and
+             * store the ids in the active[] array */
+            iter->dist_merge.active[0] = lowest;
+            iter->dist_merge.num_active = 1;
+            while (skHeapPeekTop(iter->heap, (skheapnode_t*)&top_heap)
+                   == SKHEAP_OK
+                   && (skFieldListCompareBuffers(
+                           iter->key[lowest], iter->key[*top_heap],
+                           iter->uniq->fi.key_fields) == 0))
             {
-                skHeapInsert(iter->heap, &i);
-            } else {
-                last_errno = skStreamGetLastErrno(iter->fps[i]);
-                if (last_errno) {
-                    skAppPrintErr(
-                        "Cannot read first key from temporary file '%s': %s",
-                        skTempFileGetName(iter->uniq->tmpctx, tmp_idx_a + i),
-                        strerror(last_errno));
-                    return -1;
-                }
-                UNIQUE_DEBUG(iter->uniq,
-                             ((SKUNIQUE_DEBUG_ENVAR
-                               ": Ignoring empty temporary file '%s'"),
-                              skTempFileGetName(iter->uniq->tmpctx,
-                                                tmp_idx_a + i)));
+                iter->dist_merge.active[iter->dist_merge.num_active++]
+                    = *top_heap;
+                skHeapExtractTop(iter->heap, NULL);
             }
-        }
 
-        UNIQUE_DEBUG(iter->uniq,
-                     ((SKUNIQUE_DEBUG_ENVAR
-                       ": Processing %" PRIu32 " of %" PRIu32
-                       " open temporary files"),
-                      skHeapGetNumberEntries(iter->heap), open_count));
-
-        if (0 == iter->uniq->fi.distinct_num_fields) {
-            rv = (uniqIterTempfilesNodistMergeFiles(
-                      (uniqiter_temp_nodist_t*)iter));
-        } else {
-            rv = uniqIterTempfilesMergeFiles(iter);
-        }
-        if (rv) {
-            return -1;
-        }
-
-        assert(skHeapGetNumberEntries(iter->heap) == 0);
-
-        /* Close all the temp files that we processed this time. */
-        for (i = 0; i < open_count; ++i) {
-            uniqTempClose(iter->fps[i]);
-        }
-        /* Delete all the temp files that we opened */
-        for (j = tmp_idx_a; j <= tmp_idx_b; ++j) {
-            skTempFileRemove(iter->uniq->tmpctx, j);
-        }
-
-        /* Close the intermediate temp file. */
-        UNIQUE_DEBUG(iter->uniq,
-                     ((SKUNIQUE_DEBUG_ENVAR ": Finished writing '%s'"),
-                      UNIQUE_TMPNAME_OUT(iter->uniq)));
-        uniqTempClose(iter->uniq->temp_fp);
-
-        /* Open a new intermediate temp file. */
-        iter->uniq->temp_fp = uniqTempCreate(iter->uniq->tmpctx,
-                                             &iter->uniq->max_temp_idx);
-        if (iter->uniq->temp_fp == NULL) {
-            skAppPrintSyserror("Error creating intermediate temporary file");
-            return -1;
-        }
-        iter->uniq->temp_idx = iter->uniq->max_temp_idx;
-        if (iter->uniq->fi.distinct_num_fields) {
-            iter->uniq->dist_fp = uniqTempCreate(iter->uniq->tmpctx,
-                                                 &iter->uniq->max_temp_idx);
-            if (NULL == iter->uniq->dist_fp) {
-                skAppPrintSyserror("Error creating temporary file");
+            if (1 == iter->dist_merge.num_active) {
+                /* if the lowest key only appears in one file, there
+                 * no need to merge, just copy the bytes from source
+                 * to the dest */
+                rv = uniqIterTempDistMergeOne(iter, merged_values);
+            } else {
+                rv = uniqIterTempDistMergeValuesDist(iter, merged_values);
+            }
+            if (rv) {
                 return -1;
             }
+
+            /* for each element in dist_merge.active[], read its next
+             * key and insert it into the heap */
+            for (i = 0; i < iter->dist_merge.num_active; ++i) {
+                if (uniqTempRead(iter->fps[iter->dist_merge.active[i]],
+                                 iter->key[iter->dist_merge.active[i]],
+                                 iter->uniq->fi.key_octets))
+                {
+                    /* read succeeded. insert the new entry into the
+                     * heap. */
+                    skHeapInsert(iter->heap, &iter->dist_merge.active[i]);
+                    /* keys within a file should always be sorted;
+                     * duplicate keys may appear if the distinct data
+                     * structure ran out of memory */
+                    assert(skFieldListCompareBuffers(
+                               cached_key, iter->key[lowest],
+                               iter->uniq->fi.key_fields) <= 0);
+                } else {
+                    uniqDebug(
+                        iter->uniq,
+                        "Finished reading files #%u, #%u; %d files remain",
+                        UNIQUE_TMPNUM_READ(iter, iter->dist_merge.active[i]),
+                        UNIQUE_TMPNUM_READ(iter, iter->dist_merge.active[i]+1),
+                        (2 * (skHeapGetNumberEntries(iter->heap)
+                              + iter->dist_merge.num_active - i - 1)));
+                }
+            }
         }
+
+        /* handle the final file */
+        if (skHeapExtractTop(iter->heap, (skheapnode_t)&lowest) == SKHEAP_OK) {
+            assert(skHeapGetNumberEntries(iter->heap) == 0);
+
+            iter->dist_merge.active[0] = lowest;
+            iter->dist_merge.num_active = 1;
+            do {
+                /* write the key to the output file */
+                uniqTempWrite(iter->uniq->temp_fp, iter->key[lowest],
+                              iter->uniq->fi.key_octets);
+                /* handle the values and distincts */
+                if (uniqIterTempDistMergeOne(iter, merged_values)) {
+                    return -1;
+                }
+                /* read the next key */
+            } while (uniqTempRead(iter->fps[lowest], iter->key[lowest],
+                                  iter->uniq->fi.key_octets));
+            /* read failed and no more data for this file */
+            uniqDebug(iter->uniq,
+                      "Finished reading files #%u, #%u; 0 files remain",
+                      UNIQUE_TMPNUM_READ(iter, lowest),
+                      UNIQUE_TMPNUM_READ(iter, lowest + 1));
+        }
+        assert(skHeapGetNumberEntries(iter->heap) == 0);
+
+        /* Close and remove all the temp files that we processed this
+         * time. */
+        for (j = tmp_idx_a, i = 0; j <= tmp_idx_b; j += 2, ++i) {
+            uniqTempClose(iter->fps[i]);
+            uniqTempClose(iter->dist_merge.fps[i]);
+            skTempFileRemove(iter->uniq->tmpctx, j);
+            skTempFileRemove(iter->uniq->tmpctx, j + 1);
+        }
+        memset(iter->fps, 0, sizeof(iter->fps));
+        memset(iter->dist_merge.fps, 0, sizeof(iter->dist_merge.fps));
+
+        /* Close the intermediate temp file and open a new one. */
+        uniqDebug(iter->uniq, "Finished writing #%d '%s', #%d '%s'",
+                  iter->uniq->temp_idx, UNIQUE_TMPNAME_OUT(iter->uniq),
+                  iter->uniq->max_temp_idx,
+                  uniqBasename(skTempFileGetName(iter->uniq->tmpctx,
+                                                 iter->uniq->max_temp_idx)));
+        uniqTempClose(iter->uniq->temp_fp);
+        iter->uniq->temp_fp = uniqTempCreate(iter->uniq->tmpctx,
+                                             &iter->uniq->max_temp_idx);
+        iter->uniq->temp_idx = iter->uniq->max_temp_idx;
+
+        /* Close and open the temp file for distinct counts */
+        uniqTempClose(iter->uniq->dist_fp);
+        iter->uniq->dist_fp = uniqTempCreate(iter->uniq->tmpctx,
+                                             &iter->uniq->max_temp_idx);
 
         /* Start the next merge with the next input temp file */
         tmp_idx_a = tmp_idx_b + 1;
@@ -4898,6 +5743,7 @@ uniqIterTempfilesOpenAll(
 
     return -1;    /* NOTREACHED */
 }
+
 
 
 /****************************************************************
@@ -4911,7 +5757,7 @@ skUniqueIteratorCreate(
     sk_unique_t            *uniq,
     sk_unique_iterator_t  **new_iter)
 {
-    UNIQUE_DEBUG(uniq, ((SKUNIQUE_DEBUG_ENVAR ": Initializing iterator")));
+    uniqDebug(uniq, "Initializing iterator");
 
     if (!uniq->ready_for_output) {
         skAppPrintErr("May not call skUniqueIteratorCreate"
@@ -4919,7 +5765,10 @@ skUniqueIteratorCreate(
         return -1;
     }
     if (uniq->temp_idx > 0) {
-        return uniqIterTempfilesCreate(uniq, new_iter);
+        if (uniq->fi.distinct_num_fields) {
+            return uniqIterTempDistCreate(uniq, new_iter);
+        }
+        return uniqIterTempValuesCreate(uniq, new_iter);
     }
 
     if (uniq->fi.distinct_num_fields) {
@@ -4974,7 +5823,6 @@ skUniqueIteratorReset(
 
 /* **************************************************************** */
 
-
 /* structure for binning records */
 /* typedef struct sk_sort_unique_st sk_sort_unique_t; */
 struct sk_sort_unique_st {
@@ -5014,20 +5862,29 @@ struct sk_sort_unique_st {
     /* the temp file context */
     sk_tempfilectx_t       *tmpctx;
 
-    /* pointer to the current intermediate temp file; it's index is
+    /* pointer to the current intermediate temp file; its index is
      * given by the 'temp_idx' member */
     skstream_t             *temp_fp;
 
     /* when distinct fields are being computed, temporary files always
      * appear in pairs, and this is the pointer to an intermediate
-     * temp file used to hold distinct values */
+     * temp file used to hold distinct values; its index is given by
+     * the 'max_temp_idx' member */
     skstream_t             *dist_fp;
 
-    /* index of the intermediate temp file member 'temp_fp'. this is
-     * one more than the temp file currently in use. */
+    /* when computing the number of distinct values for one field
+     * across all bins */
+    total_distinct_t        total_dist;
+
+    /* index of the intermediate temp file member 'temp_fp'. if temp
+     * files have been written, its value is one more than the temp
+     * file most recently written. */
     int                     temp_idx;
 
-    /* index of highest used temporary file */
+    /* index of highest used temporary file; this is the same as
+     * 'temp_idx' when distinct files are not in use; when distinct
+     * files are in use, this is one more than 'temp_idx' and the
+     * index of 'dist_fp'. */
     int                     max_temp_idx;
 
     /* when merging temporary files, the index of the first temporary
@@ -5037,26 +5894,86 @@ struct sk_sort_unique_st {
     /* current position in the 'files' vector */
     int                     files_position;
 
-    /* current distinct field; used by comparison function for the
-     * 'dist_heap' member */
-    const distinct_value_t *cur_dist;
-
-    /* heap that stores the indexes used by the 'distinct_value'
-     * members.  comparison function uses the 'distinct_value' and
-     * 'cur_dist' members and returns the distinct values in ascending
-     * order. */
-    skheap_t           *dist_heap;
-
-    /* holds the current distinct value for files that share the same
-     * key */
-    uint8_t             distinct_value[MAX_MERGE_FILES][HASHLIB_MAX_KEY_WIDTH];
-
     /* flag to detect recursive calls to skPresortedUniqueProcess() */
     unsigned                processing : 1;
 
     /* whether to print debugging information */
     unsigned                print_debug:1;
+
+    /* whether the total_dist object is to be used */
+    unsigned                use_total_distinct:1;
 };
+
+
+#if TRACEMSG_LEVEL == 0
+
+/*
+ *    Function that is used to output log messages enabled by the
+ *    SILK_UNIQUE_DEBUG environment variable.
+ *
+ *    If SKUNIQUE_TRACE_LEVEL or TRACEMSG_LEVEL is non-zero, a
+ *    different definition of this funciton is used, which is defined
+ *    below.
+ */
+static void
+sortuniqDebug(
+    const sk_sort_unique_t *uniq,
+    const char             *fmt,
+    ...)
+    SK_CHECK_PRINTF(2, 3);
+
+static void
+sortuniqDebug(
+    const sk_sort_unique_t *uniq,
+    const char             *fmt,
+    ...)
+{
+    va_list args;
+
+    va_start(args, fmt);
+    if (uniq && uniq->print_debug) {
+        fprintf(stderr, "%s: " SKUNIQUE_DEBUG_ENVAR ": ", skAppName());
+        vfprintf(stderr, fmt, args);
+        fprintf(stderr, "\n");
+    }
+    va_end(args);
+}
+
+#else  /* TRACEMSG_LEVEL > 0 */
+
+/*
+ *    When SKUNIQUE_TRACE_LEVEL or TRACEMSG_LEVEL is non-zero, the
+ *    code behaves as though SILK_UNIQUE_DEBUG is enabled and this
+ *    function is used to to trace the code.
+ */
+#define sortuniqDebug(...)  sortuniqDebugHelper(__LINE__, __VA_ARGS__)
+
+static void
+sortuniqDebugHelper(
+    int                     lineno,
+    const sk_sort_unique_t *uniq,
+    const char             *fmt,
+    ...)
+    SK_CHECK_PRINTF(3, 4);
+
+static void
+sortuniqDebugHelper(
+    int                     lineno,
+    const sk_sort_unique_t *uniq,
+    const char             *fmt,
+    ...)
+{
+    va_list args;
+
+    SK_UNUSED_PARAM(uniq);
+
+    va_start(args, fmt);
+    fprintf(stderr, __FILE__ ":%d: ", lineno);
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "\n");
+    va_end(args);
+}
+#endif  /* #else of TRACEMSG_LEVEL == 0 */
 
 
 /*
@@ -5094,9 +6011,8 @@ sortuniqOpenNextInput(
                 rv = -2;
                 /* decrement counter to try this file next time */
                 --uniq->files_position;
-                UNIQUE_DEBUG(uniq,
-                             (SKUNIQUE_DEBUG_ENVAR ": Unable to open '%s': %s",
-                              filename, strerror(errno)));
+                sortuniqDebug(uniq, "Unable to open '%s': %s",
+                              filename, strerror(errno));
             } else {
                 skStreamPrintLastErr(stream, rv, skAppPrintErr);
                 rv = -1;
@@ -5109,16 +6025,12 @@ sortuniqOpenNextInput(
         if (uniq->post_open_fn) {
             rv = uniq->post_open_fn(stream);
             if (rv == 1 || rv == -1) {
-                UNIQUE_DEBUG(uniq,
-                             ((SKUNIQUE_DEBUG_ENVAR
-                               ": Caller's post_open_fn returned %d"), rv));
+                sortuniqDebug(uniq, "Caller's post_open_fn returned %d", rv);
                 skStreamDestroy(&stream);
                 return rv;
             }
             if (rv != 0) {
-                UNIQUE_DEBUG(uniq,
-                             ((SKUNIQUE_DEBUG_ENVAR
-                               ": Caller's post_open_fn returned %d"), rv));
+                sortuniqDebug(uniq, "Caller's post_open_fn returned %d", rv);
                 skStreamDestroy(&stream);
             }
         }
@@ -5155,6 +6067,11 @@ sortuniqFillRecordAndKey(
 
     skFieldListRecToBinary(uniq->fi.key_fields, &uniq->rec[idx],
                            uniq->key[idx]);
+
+    if (uniqTotalDistinctIncrement(&uniq->total_dist, &uniq->rec[idx])) {
+        return 0;
+    }
+
     return 1;
 }
 
@@ -5187,31 +6104,6 @@ sortuniqHeapKeysCmp(
                                      uniq->fi.key_fields);
 }
 
-/*
- *    Comparison function used by the heap for distinct values.
- *
- *    Similar to sortuniqHeapKeysCmp(), except the indexes are into a
- *    different array on the sk_sort_unique_t object.
- */
-static int
-sortuniqHeapDistCmp(
-    const skheapnode_t  b,
-    const skheapnode_t  a,
-    void               *v_uniq)
-{
-    sk_sort_unique_t *uniq = (sk_sort_unique_t*)v_uniq;
-    const uint8_t *dist_a;
-    const uint8_t *dist_b;
-
-    assert(uniq);
-    assert(uniq->cur_dist);
-
-    dist_a = uniq->distinct_value[*(uint16_t*)a] + uniq->cur_dist->dv_offset;
-    dist_b = uniq->distinct_value[*(uint16_t*)b] + uniq->cur_dist->dv_offset;
-
-    return memcmp(dist_a, dist_b, uniq->cur_dist->dv_octets);
-}
-
 
 /*
  *    Helper function for skPresortedUniqueProcess() that process SiLK
@@ -5227,8 +6119,6 @@ sortuniqHeapDistCmp(
  *
  *    This function returns once all the data in the open files has
  *    been read.
- *
- *    See also sortuniqReadSilkTotemp().
  */
 static int
 sortuniqReadSilkNodist(
@@ -5273,36 +6163,23 @@ sortuniqReadSilkNodist(
                 uniq->fi.value_fields, &uniq->rec[lowest], merged_values);
 
             /* replace the record we just processed */
-            if (!sortuniqFillRecordAndKey(uniq, lowest)) {
+            if (sortuniqFillRecordAndKey(uniq, lowest)) {
+                /* read succeeded. insert it into the heap */
+                skHeapReplaceTop(uniq->heap, &lowest, NULL);
+            } else {
                 /* read failed and no more data for this file; remove
                  * the file's index from the heap; exit the loop if
                  * the heap is empty */
-                UNIQUE_DEBUG(uniq,
-                             ((SKUNIQUE_DEBUG_ENVAR
-                               ": Finished reading records from file #%u,"
-                               " %u files remain"),
-                              lowest, skHeapGetNumberEntries(uniq->heap) - 1));
-                skHeapExtractTop(uniq->heap, NULL);
                 --heap_count;
+                sortuniqDebug(uniq,
+                              ("Finished reading records from file #%u,"
+                               " %u files remain"),
+                              lowest, heap_count);
+                skHeapExtractTop(uniq->heap, NULL);
+                assert(skHeapGetNumberEntries(uniq->heap) == heap_count);
                 if (0 == heap_count) {
                     break;
                 }
-            } else if (skFieldListCompareBuffers(
-                           cached_key, uniq->key[lowest], uniq->fi.key_fields)
-                       == 0)
-            {
-                /* FIXME: This comparison reduces work when the keys
-                 * are the same, but it adds another comparison when
-                 * the keys are different; is this an overall win or
-                 * lose? */
-                /* read succeeded and keys are the same.  no need to
-                 * insert it into heap, just add this record's value
-                 * to our total */
-                continue;
-            } else {
-                /* read succeeded and keys differ. insert the new
-                 * entry into the heap */
-                skHeapReplaceTop(uniq->heap, &lowest, NULL);
             }
 
             /* get the new value at the top of the heap and see if it
@@ -5318,19 +6195,12 @@ sortuniqReadSilkNodist(
             rv = output_fn(cached_key, distinct_buffer, merged_values,
                            callback_data);
             if (rv != 0) {
-                UNIQUE_DEBUG(uniq, ((SKUNIQUE_DEBUG_ENVAR
-                                     ": output_fn returned non-zero %d"),
-                                    rv));
+                sortuniqDebug(uniq, "output_fn returned non-zero %d", rv);
                 return -1;
             }
-        } else if (uniqTempWriteTriple(
-                       &uniq->fi, uniq->temp_fp, NULL,
-                       cached_key, merged_values, uniq->distincts))
-        {
-            skAppPrintSyserror(
-                "Error writing merged keys/values to temporary file '%s'",
-                UNIQUE_TMPNAME_OUT(uniq));
-            return -1;
+        } else {
+            uniqTempWriteTriple(&uniq->fi, uniq->temp_fp, NULL,
+                                cached_key, merged_values, uniq->distincts);
         }
     } while (heap_count > 0);
 
@@ -5351,11 +6221,9 @@ sortuniqReadSilkNodist(
  *
  *    This function returns once all the data in the open files has
  *    been read.
- *
- *    See also sortuniqReadSilkNodist().
  */
 static int
-sortuniqReadSilkTotemp(
+sortuniqReadSilkDist(
     sk_sort_unique_t       *uniq)
 {
     uint16_t *top_heap;
@@ -5389,7 +6257,7 @@ sortuniqReadSilkTotemp(
         /* reset the values and distincts */
         skFieldListInitializeBuffer(uniq->fi.value_fields, merged_values);
         if (uniqDistinctReset(&uniq->fi, uniq->distincts)) {
-            skAppPrintErr("Error allocating table for distinct values");
+            skAppPrintOutOfMemory("table for distinct values");
             return -1;
         }
 
@@ -5402,22 +6270,37 @@ sortuniqReadSilkTotemp(
             if (uniqDistinctIncrement(
                     &uniq->fi, uniq->distincts, distinct_buffer))
             {
-                /* increment failed; write the current values to disk
-                 * and then reset the values and distincts */
-                if (uniqTempWriteTriple(
-                        &uniq->fi, uniq->temp_fp, uniq->dist_fp,
-                        cached_key, merged_values, uniq->distincts))
-                {
-                    skAppPrintSyserror(
-                        ("Error writing merged keys/values/distincts"
-                         " to temporary file '%s'"),
-                        UNIQUE_TMPNAME_OUT(uniq));
-                    return -1;
-                }
+                /* increment of the distinct values failed; write the
+                 * current values to disk */
+                sortuniqDebug(uniq, ("Writing 1 key/value/distinct triple"
+                                     " to #%d, #%d..."),
+                              uniq->temp_idx, uniq->max_temp_idx);
+                uniqTempWriteTriple(
+                    &uniq->fi, uniq->temp_fp, uniq->dist_fp,
+                    cached_key, merged_values, uniq->distincts);
+
+                /* close and create new temporary files.  the merging
+                 * code assumes keys are not duplicated within a
+                 * single temporary file */
+                sortuniqDebug(uniq, "Finished writing #%d '%s', #%d '%s'",
+                              uniq->temp_idx, UNIQUE_TMPNAME_OUT(uniq),
+                              uniq->max_temp_idx,
+                              uniqBasename(skStreamGetPathname(uniq->dist_fp)));
+
+                uniqTempClose(uniq->temp_fp);
+                uniq->temp_fp = uniqTempCreate(uniq->tmpctx,
+                                               &uniq->max_temp_idx);
+                uniq->temp_idx = uniq->max_temp_idx;
+
+                uniqTempClose(uniq->dist_fp);
+                uniq->dist_fp = uniqTempCreate(uniq->tmpctx,
+                                               &uniq->max_temp_idx);
+
+                /* reset the values and distincts */
                 skFieldListInitializeBuffer(
                     uniq->fi.value_fields, merged_values);
                 if (uniqDistinctReset(&uniq->fi, uniq->distincts)) {
-                    skAppPrintErr("Error allocating table for distinct values");
+                    skAppPrintOutOfMemory("table for distinct values");
                     return -1;
                 }
             }
@@ -5427,36 +6310,22 @@ sortuniqReadSilkTotemp(
                 uniq->fi.value_fields, &uniq->rec[lowest], merged_values);
 
             /* replace the record we just processed */
-            if (!sortuniqFillRecordAndKey(uniq, lowest)) {
+            if (sortuniqFillRecordAndKey(uniq, lowest)) {
+                /* read succeeded. insert it into the heap */
+                skHeapReplaceTop(uniq->heap, &lowest, NULL);
+            } else {
                 /* read failed and no more data for this file;
                  * remove it from the heap */
-                UNIQUE_DEBUG(uniq,
-                             ((SKUNIQUE_DEBUG_ENVAR
-                               ": Finished reading records from file #%u,"
-                               " %" PRIu32 " files remain"),
-                              lowest, heap_count - 1));
-                skHeapExtractTop(uniq->heap, NULL);
                 --heap_count;
+                sortuniqDebug(uniq,
+                              ("Finished reading records from file #%u,"
+                               " %" PRIu32 " files remain"),
+                              lowest, heap_count);
+                skHeapExtractTop(uniq->heap, NULL);
+                assert(skHeapGetNumberEntries(uniq->heap) == heap_count);
                 if (0 == heap_count) {
                     break;
                 }
-            } else if (skFieldListCompareBuffers(
-                           cached_key, uniq->key[lowest], uniq->fi.key_fields)
-                       == 0)
-            {
-                /* FIXME: This comparison reduces work when the keys
-                 * are the same, but it adds another comparison when
-                 * the keys are different; is this an overall win or
-                 * lose? */
-                /* read succeeded and keys are the same.  no need
-                 * to insert it into heap, just add this record's
-                 * value to our total */
-                continue;
-            } else {
-                /* read succeeded and keys differ. insert the new
-                 * entry into the heap and get the new value at
-                 * the top of the heap */
-                skHeapReplaceTop(uniq->heap, &lowest, NULL);
             }
 
             /* get the new index at top of heap and see if the file's
@@ -5468,15 +6337,8 @@ sortuniqReadSilkTotemp(
                  == 0);
 
         /* write the current values to the disk. */
-        if (uniqTempWriteTriple(
-                &uniq->fi, uniq->temp_fp, uniq->dist_fp,
-                cached_key, merged_values, uniq->distincts))
-        {
-            skAppPrintSyserror(("Error writing merged  keys/values/distincts"
-                                " to temporary file '%s'"),
-                               UNIQUE_TMPNAME_OUT(uniq));
-            return -1;
-        }
+        uniqTempWriteTriple(&uniq->fi, uniq->temp_fp, uniq->dist_fp,
+                            cached_key, merged_values, uniq->distincts);
     } while (heap_count > 0);
 
     return 0;
@@ -5505,13 +6367,14 @@ static int
 sortuniqMergeSingleFile(
     sk_sort_unique_t       *uniq,
     const uint8_t           cached_key[],
-    uint16_t                fps_index,
+    distinct_merge_t       *dist_merge,
     sk_unique_output_fn_t   output_fn,
     void                   *callback_data)
 {
     distinct_value_t *dist;
     uint8_t distinct_buffer[HASHLIB_MAX_KEY_WIDTH];
     uint8_t merged_values[HASHLIB_MAX_VALUE_WIDTH];
+    uint16_t fps_index;
     uint8_t buf[4096];
     size_t to_read;
     size_t exp_len;
@@ -5523,6 +6386,11 @@ sortuniqMergeSingleFile(
     /* Should only be called when distinct fields are present */
     assert(0 != uniq->fi.distinct_num_fields);
     assert(output_fn || (uniq->temp_fp && uniq->dist_fp));
+    assert((1 == dist_merge->write_to_temp && (uniq->temp_fp && uniq->dist_fp))
+           || (0 == dist_merge->write_to_temp && output_fn));
+    assert(1 == dist_merge->num_active);
+
+    fps_index = dist_merge->active[0];
 
     /* handle the values field */
     if (uniq->fi.value_octets) {
@@ -5543,7 +6411,7 @@ sortuniqMergeSingleFile(
     /* handle the distinct fields */
     for (i = 0; i < uniq->fi.distinct_num_fields; ++i) {
         dist = &uniq->distincts[i];
-        /* handle the count of distinct entries */
+        /* read the number of distinct values */
         if (!uniqTempRead(uniq->fps[fps_index], &dist_count, sizeof(uint64_t)))
         {
             last_errno = skStreamGetLastErrno(uniq->fps[fps_index]);
@@ -5551,32 +6419,33 @@ sortuniqMergeSingleFile(
                           (last_errno ? strerror(last_errno) : "EOF"));
             return -1;
         }
-        if (output_fn) {
-            dist->dv_count = dist_count;
-        } else {
-            uniqTempWrite(uniq->temp_fp, &dist_count, sizeof(uint64_t));
-        }
 
         /* determine the number of bytes to read */
         assert(dist->dv_octets > 0);
         to_read = dist->dv_octets * dist_count;
 
         if (output_fn) {
+            dist->dv_count = dist_count;
+
             /* no need to read the data, just skip over it by using
              * 'NULL' as the buffer */
-            if (!uniqTempRead(uniq->fps[fps_index + 1], NULL, to_read)) {
-                last_errno = skStreamGetLastErrno(uniq->fps[fps_index + 1]);
+            if (!uniqTempRead(dist_merge->fps[fps_index], NULL, to_read)) {
+                last_errno = skStreamGetLastErrno(dist_merge->fps[fps_index]);
                 skAppPrintErr(
                     "Cannot read distinct values from temporary file: %s",
                     (last_errno ? strerror(last_errno) : "EOF"));
                 return -1;
             }
         } else {
+            /* write the number of distinct values */
+            uniqTempWrite(uniq->temp_fp, &dist_count, sizeof(uint64_t));
+
             /* read and write the bytes */
             while (to_read) {
                 exp_len = ((to_read < sizeof(buf)) ? to_read : sizeof(buf));
-                if (!uniqTempRead(uniq->fps[fps_index + 1], buf, exp_len)) {
-                    last_errno = skStreamGetLastErrno(uniq->fps[fps_index + 1]);
+                if (!uniqTempRead(dist_merge->fps[fps_index], buf, exp_len)) {
+                    last_errno
+                        = skStreamGetLastErrno(dist_merge->fps[fps_index]);
                     skAppPrintErr(
                         "Cannot read distinct values from temporary file: %s",
                         (last_errno ? strerror(last_errno) : "EOF"));
@@ -5593,9 +6462,7 @@ sortuniqMergeSingleFile(
         rv = output_fn(cached_key, distinct_buffer, merged_values,
                        callback_data);
         if (rv != 0) {
-            UNIQUE_DEBUG(uniq, ((SKUNIQUE_DEBUG_ENVAR
-                                 ": output_fn returned non-zero %" SK_PRIdZ),
-                                rv));
+            sortuniqDebug(uniq, "output_fn returned non-zero %" SK_PRIdZ, rv);
             return -1;
         }
     }
@@ -5628,21 +6495,13 @@ static int
 sortuniqMergeValuesDist(
     sk_sort_unique_t       *uniq,
     const uint8_t           cached_key[],
-    const uint16_t          file_ids[],
-    uint16_t                file_ids_len,
+    distinct_merge_t       *dist_merge,
     sk_unique_output_fn_t   output_fn,
     void                   *callback_data)
 {
     uint8_t buf[4096];
     uint8_t distinct_buffer[HASHLIB_MAX_KEY_WIDTH];
     uint8_t merged_values[HASHLIB_MAX_VALUE_WIDTH];
-    uint8_t lowest_distinct[HASHLIB_MAX_KEY_WIDTH];
-    uint64_t num_distinct[MAX_MERGE_FILES];
-    uint64_t distinct_count;
-    uint32_t heap_count;
-    distinct_value_t *dist;
-    uint16_t *top_heap;
-    uint16_t lowest;
     uint16_t fps_index;
     uint16_t i;
     uint16_t j;
@@ -5652,6 +6511,8 @@ sortuniqMergeValuesDist(
     /* Should only be called when distinct fields are present */
     assert(0 != uniq->fi.distinct_num_fields);
     assert(output_fn || (uniq->temp_fp && uniq->dist_fp));
+    assert((1 == dist_merge->write_to_temp && (uniq->temp_fp && uniq->dist_fp))
+           || (0 == dist_merge->write_to_temp && output_fn));
 
     if (uniq->fi.value_octets) {
         /* initialize the merged_values buffer.  for each file, read
@@ -5661,15 +6522,13 @@ sortuniqMergeValuesDist(
         skFieldListInitializeBuffer(uniq->fi.value_fields, merged_values);
 
         /* read and merge all values */
-        for (j = 0; j < file_ids_len; ++j) {
-            fps_index = file_ids[j];
+        for (j = 0; j < dist_merge->num_active; ++j) {
+            fps_index = dist_merge->active[j];
             if (!uniqTempRead(uniq->fps[fps_index], buf, uniq->fi.value_octets))
             {
                 last_errno = skStreamGetLastErrno(uniq->fps[fps_index]);
-                UNIQUE_DEBUG(uniq,
-                             ((SKUNIQUE_DEBUG_ENVAR
-                               ": Cannot read from temporary file #%u"),
-                              UNIQUE_TMPNUM_READ(uniq, fps_index)));
+                sortuniqDebug(uniq, "Cannot read from temporary file #%u",
+                              UNIQUE_TMPNUM_READ(uniq, fps_index));
                 skAppPrintErr(
                     "Cannot read values field from temporary file: %s",
                     (last_errno ? strerror(last_errno) : "EOF"));
@@ -5687,135 +6546,40 @@ sortuniqMergeValuesDist(
 
     /* process each distinct field */
     for (i = 0; i < uniq->fi.distinct_num_fields; ++i) {
-        dist = &uniq->distincts[i];
-        uniq->cur_dist = dist;
+        dist_merge->octet_len = uniq->distincts[i].dv_octets;
 
-        /* holds the number of distinct values found for this distinct
-         * field across all open files */
-        distinct_count = 0;
-
-        /* for each file: read the number of distinct entries, read
-         * the first distinct value, and store the index in
-         * the dist_heap using a comparitor over the distinct value */
-        for (j = 0; j < file_ids_len; ++j) {
-            fps_index = file_ids[j];
-            if (!uniqTempRead(uniq->fps[fps_index], &num_distinct[fps_index],
+        /* for each file: read the number of distinct entries */
+        for (j = 0; j < dist_merge->num_active; ++j) {
+            fps_index = dist_merge->active[j];
+            if (!uniqTempRead(uniq->fps[fps_index],
+                              &dist_merge->num_distinct[fps_index],
                               sizeof(uint64_t)))
             {
                 last_errno = skStreamGetLastErrno(uniq->fps[fps_index]);
-                UNIQUE_DEBUG(uniq,
-                             ((SKUNIQUE_DEBUG_ENVAR
-                               ": Cannot read from temporary file #%u"),
-                              UNIQUE_TMPNUM_READ(uniq, fps_index)));
+                sortuniqDebug(uniq, "Cannot read from temporary file #%u",
+                              UNIQUE_TMPNUM_READ(uniq, fps_index));
                 skAppPrintErr(
                     "Cannot read distinct count from temporary file: %s",
                     (last_errno ? strerror(last_errno) : "EOF"));
                 return -1;
             }
-
-            if (num_distinct[fps_index]) {
-                if (!uniqTempRead(uniq->fps[fps_index + 1],
-                                  uniq->distinct_value[fps_index],
-                                  dist->dv_octets))
-                {
-                    last_errno = skStreamGetLastErrno(uniq->fps[fps_index + 1]);
-                    UNIQUE_DEBUG(uniq,
-                                 ((SKUNIQUE_DEBUG_ENVAR
-                                   ": Cannot read from temporary file #%u"),
-                                  UNIQUE_TMPNUM_READ(uniq, fps_index + 1)));
-                    skAppPrintErr(
-                        "Cannot read distinct values from temporary file: %s",
-                        (last_errno ? strerror(last_errno) : "EOF"));
-                    return -1;
-                }
-                skHeapInsert(uniq->dist_heap, &fps_index);
-                --num_distinct[fps_index];
-            }
         }
 
-        heap_count = skHeapGetNumberEntries(uniq->dist_heap);
-        if (0 == heap_count) {
-            /* strange, but okay? */
-            dist->dv_count = distinct_count;
-            continue;
-        }
-
-        /* get the file index that has the lowest distinct value */
-        skHeapPeekTop(uniq->dist_heap, (skheapnode_t*)&top_heap);
-        lowest = *top_heap;
-
-        /* process all the distinct values */
-        do {
-            /* FIXME: shortcut this while() when only a single file
-             * remains */
-            memcpy(lowest_distinct, uniq->distinct_value[lowest],
-                   dist->dv_octets);
-            ++distinct_count;
-
-            if (!output_fn) {
-                /* write the distinct value */
-                uniqTempWrite(uniq->dist_fp, &lowest_distinct, dist->dv_octets);
-            }
-
-            /* ignore this lowest_distinct value in all other files */
-            do {
-                /* replace the distinct_value we just read */
-                if (0 == num_distinct[lowest]) {
-                    /* no more distinct values from this file; remove
-                     * it from the heap */
-                    skHeapExtractTop(uniq->dist_heap, NULL);
-                    --heap_count;
-                    if (0 == heap_count) {
-                        break;
-                    }
-                } else if (!uniqTempRead(uniq->fps[lowest + 1],
-                                         uniq->distinct_value[lowest],
-                                         dist->dv_octets))
-                {
-                    last_errno = skStreamGetLastErrno(uniq->fps[lowest + 1]);
-                    UNIQUE_DEBUG(uniq,
-                                 ((SKUNIQUE_DEBUG_ENVAR
-                                   ": Cannot read from temporary file #%u"),
-                                  UNIQUE_TMPNUM_READ(uniq, lowest + 1)));
-                    skAppPrintErr(
-                        "Cannot read distinct count from temporary file: %s",
-                        (last_errno ? strerror(last_errno) : "EOF"));
-                    return -1;
-                } else {
-                    skHeapReplaceTop(uniq->dist_heap, &lowest, NULL);
-                    --num_distinct[lowest];
-                    /* distinct values in each file must be sorted and
-                     * unique */
-                    assert(memcmp(lowest_distinct, uniq->distinct_value[lowest],
-                                  dist->dv_octets) < 0);
-                }
-
-                /* get the new value at the top of the heap and see if
-                 * it matches the lowest_distinct */
-                skHeapPeekTop(uniq->dist_heap, (skheapnode_t*)&top_heap);
-                lowest = *top_heap;
-            } while (memcmp(lowest_distinct, uniq->distinct_value[lowest],
-                            dist->dv_octets) == 0);
-        } while (heap_count > 0);
-
-        dist->dv_count = distinct_count;
+        uniq->distincts[i].dv_count = uniqDistmergeMergeOne(dist_merge);
     }
 
     if (!output_fn) {
         /* write the distinct count to the main temporary file */
         for (i = 0; i < uniq->fi.distinct_num_fields; ++i) {
-            dist = &uniq->distincts[i];
-            uniqTempWrite(uniq->temp_fp, &dist->dv_count,
-                          sizeof(dist->dv_count));
+            uniqTempWrite(uniq->temp_fp, &uniq->distincts[i].dv_count,
+                          sizeof(uniq->distincts[i].dv_count));
         }
     } else {
         uniqDistinctSetOutputBuf(&uniq->fi, uniq->distincts, distinct_buffer);
         rv = output_fn(cached_key, distinct_buffer, merged_values,
                        callback_data);
         if (rv != 0) {
-            UNIQUE_DEBUG(uniq, ((SKUNIQUE_DEBUG_ENVAR
-                                 ": output_fn returned non-zero %d"),
-                                rv));
+            sortuniqDebug(uniq, "output_fn returned non-zero %d", rv);
             return -1;
         }
     }
@@ -5838,92 +6602,303 @@ sortuniqMergeValuesDist(
  *
  *    This function returns once all the data in the open files has
  *    been read.
- *
- *    See also sortuniqMergeFilesNodist().
  */
 static int
 sortuniqMergeFilesDist(
     sk_sort_unique_t       *uniq,
+    distinct_merge_t       *dist_merge,
     sk_unique_output_fn_t   output_fn,
     void                   *callback_data)
 {
     uint16_t *top_heap;
     uint16_t lowest;
-    uint8_t cached_key[HASHLIB_MAX_KEY_WIDTH];
-    uint16_t merge_nodes[MAX_MERGE_FILES];
-    uint16_t merge_nodes_len;
     uint16_t i;
     int rv = -1;
 
     /* Should only be called when distinct fields are present */
     assert(0 != uniq->fi.distinct_num_fields);
     assert(output_fn || (uniq->temp_fp && uniq->dist_fp));
+    assert((1 == dist_merge->write_to_temp && (uniq->temp_fp && uniq->dist_fp))
+           || (0 == dist_merge->write_to_temp && output_fn));
 
-    /* exit this do...while() once all records for all opened
-     * files have been read */
-    while (skHeapPeekTop(uniq->heap, (skheapnode_t*)&top_heap) == SKHEAP_OK) {
-        /* cache this low key */
-        lowest = *top_heap;
-        memcpy(cached_key, uniq->key[lowest], uniq->fi.key_octets);
+    /* check for the same key in multiple input files */
+    while (skHeapGetNumberEntries(uniq->heap) > 1) {
+        /* get the file with the lowest key */
+        skHeapExtractTop(uniq->heap, (skheapnode_t)&lowest);
 
         /* store the id of each file whose current key matches the
-         * cached_key into the merge_nodes[] array; remove the items
-         * from heap as they are added to merge_nodes[] */
-        merge_nodes[0] = lowest;
-        merge_nodes_len = 1;
-        skHeapExtractTop(uniq->heap, NULL);
+         * lowest key into the dist_merge->active[] array; remove the
+         * items from heap as they are added to active[] */
+        dist_merge->active[0] = lowest;
+        dist_merge->num_active = 1;
 
         while (skHeapPeekTop(uniq->heap, (skheapnode_t*)&top_heap)
                == SKHEAP_OK
                && 0 == (skFieldListCompareBuffers(
-                            cached_key, uniq->key[*top_heap],
+                            uniq->key[lowest], uniq->key[*top_heap],
                             uniq->fi.key_fields)))
         {
-            merge_nodes[merge_nodes_len++] = *top_heap;
+            dist_merge->active[dist_merge->num_active++] = *top_heap;
             skHeapExtractTop(uniq->heap, NULL);
         }
-
-        if (!output_fn) {
+        if (dist_merge->write_to_temp) {
             /* write the key to the temporary file */
-            uniqTempWrite(uniq->temp_fp, cached_key, uniq->fi.key_octets);
+            uniqTempWrite(
+                uniq->temp_fp, uniq->key[lowest], uniq->fi.key_octets);
         }
 
-        if (1 == merge_nodes_len) {
-            /* if the cached_key only appears in one file, there no need
-             * to merge, just copy the bytes from source to the dest */
-            rv = sortuniqMergeSingleFile(uniq, cached_key, lowest,
+        if (1 == dist_merge->num_active) {
+            /* if the lowest key only appears in one file, there no
+             * need to merge, just copy the bytes from source to the
+             * dest */
+            rv = sortuniqMergeSingleFile(uniq, uniq->key[lowest], dist_merge,
                                          output_fn, callback_data);
         } else {
-            rv = sortuniqMergeValuesDist(uniq, cached_key,
-                                         merge_nodes, merge_nodes_len,
+            rv = sortuniqMergeValuesDist(uniq, uniq->key[lowest], dist_merge,
                                          output_fn, callback_data);
         }
         if (rv) {
             return -1;
         }
 
-        /* for each element in merge_nodes[], read its next key and
+        /* for each element in dist_merge->active[], read its next key and
          * insert it into the heap */
-        for (i = 0; i < merge_nodes_len; ++i) {
-            if (uniqTempRead(uniq->fps[merge_nodes[i]],
-                             uniq->key[merge_nodes[i]], uniq->fi.key_octets))
+        for (i = 0; i < dist_merge->num_active; ++i) {
+            if (uniqTempRead(uniq->fps[dist_merge->active[i]],
+                             uniq->key[dist_merge->active[i]],
+                             uniq->fi.key_octets))
             {
                 /* read succeeded. insert the new entry into the heap */
-                skHeapInsert(uniq->heap, &merge_nodes[i]);
+                skHeapInsert(uniq->heap, &dist_merge->active[i]);
             } else {
                 /* read failed and no more data for this file */
-                UNIQUE_DEBUG(uniq,
-                             ((SKUNIQUE_DEBUG_ENVAR
-                               ": Finished reading files #%u, #%u;"
-                               " %d files remain"),
-                              UNIQUE_TMPNUM_READ(uniq, merge_nodes[i]),
-                              UNIQUE_TMPNUM_READ(uniq, merge_nodes[i] + 1),
-                              (2 * (skHeapGetNumberEntries(uniq->heap)
-                                    + merge_nodes_len - i - 1))));
+                sortuniqDebug(
+                    uniq, "Finished reading files #%u, #%u; %d files remain",
+                    UNIQUE_TMPNUM_READ(uniq, dist_merge->active[i]),
+                    UNIQUE_TMPNUM_READ(uniq, dist_merge->active[i] + 1),
+                    (2 * (skHeapGetNumberEntries(uniq->heap)
+                          + dist_merge->num_active - i - 1)));
             }
         }
     }
 
+    /* handle the final file */
+    if (skHeapExtractTop(uniq->heap, (skheapnode_t)&lowest) == SKHEAP_OK) {
+        assert(skHeapGetNumberEntries(uniq->heap) == 0);
+
+        dist_merge->active[0] = lowest;
+        dist_merge->num_active = 1;
+
+        do {
+            if (dist_merge->write_to_temp) {
+                uniqTempWrite(
+                    uniq->temp_fp, uniq->key[lowest], uniq->fi.key_octets);
+            }
+            if (sortuniqMergeSingleFile(uniq, uniq->key[lowest], dist_merge,
+                                        output_fn, callback_data))
+            {
+                return -1;
+            }
+        } while (uniqTempRead(uniq->fps[lowest], uniq->key[lowest],
+                              uniq->fi.key_octets));
+        /* read failed and no more data for this file */
+        sortuniqDebug(
+            uniq, "Finished reading files #%u, #%u; 0 files remain",
+            UNIQUE_TMPNUM_READ(uniq, lowest),
+            UNIQUE_TMPNUM_READ(uniq, lowest + 1));
+    }
+    assert(skHeapGetNumberEntries(uniq->heap) == 0);
+
+    return 0;
+}
+
+
+/*
+ *    The output function for presorted input when temporary files
+ *    have been written and distinct files are being used.
+ */
+static int
+sortuniqHandleTempDist(
+    sk_sort_unique_t       *uniq,
+    sk_unique_output_fn_t   output_fn,
+    void                   *callback_data)
+{
+    int tmp_idx_a;
+    int tmp_idx_b;
+    uint16_t i;
+    int j;
+    distinct_merge_t dist_merge;
+    int rv = -1;
+
+    /* Should only be called when distinct fields are present */
+    assert(0 != uniq->fi.distinct_num_fields);
+    assert(output_fn);
+
+    memset(&dist_merge, 0, sizeof(dist_merge));
+    dist_merge.write_to_temp = 1;
+
+    /* create the heap that operates over the distinct fields */
+    dist_merge.heap = skHeapCreate2(uniqDistmergeCmp, MAX_MERGE_FILES,
+                                    sizeof(uint16_t), NULL, &dist_merge);
+    if (NULL == dist_merge.heap) {
+        skAppPrintOutOfMemory("distinct heap");
+        return -1;
+    }
+
+    /* index at which to start the merge */
+    tmp_idx_a = 0;
+
+    /* This loop repeats as long as we haven't opened all of the temp
+     * files generated while reading the flows. */
+    do {
+        assert(skHeapGetNumberEntries(uniq->heap) == 0);
+
+        /* the index of the first temporary file being processed */
+        uniq->temp_idx_base = tmp_idx_a;
+
+        /* determine the index at which to stop the merge */
+        tmp_idx_b = tmp_idx_a + MAX_MERGE_FILES - 1;
+        if (uniq->max_temp_idx < tmp_idx_b) {
+            /* number of temp files is less than MAX_MERGE */
+            tmp_idx_b = uniq->max_temp_idx;
+        }
+        assert((tmp_idx_a & 0x1) == 0);
+        assert((tmp_idx_b & 0x1) == 1);
+
+        sortuniqDebug(uniq,
+                      "Attempting to open temporary files #%d through #%d",
+                      tmp_idx_a, tmp_idx_b);
+
+        /* open intermediate temp files */
+        uniq->temp_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
+        uniq->temp_idx = uniq->max_temp_idx;
+
+        uniq->dist_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
+        dist_merge.dist_fp = uniq->dist_fp;
+
+        /* Open up to MAX_MERGE files; the files are opened in pairs
+         * where the second file of the pair contains the distinct
+         * counts */
+        for (j = tmp_idx_a, i = 0; j <= tmp_idx_b; j += 2, ++i) {
+            uniq->fps[i] = uniqTempReopen(uniq->tmpctx, j);
+            if (uniq->fps[i] == NULL) {
+                if (skHeapGetNumberEntries(uniq->heap) < 2) {
+                    skAppPrintErr("Unable to open multiple temporary files");
+                    return -1;
+                }
+                /* We cannot open any more temp files; we'll need to
+                 * catch file 'j' the next time around. */
+                tmp_idx_b = j - 1;
+                sortuniqDebug(uniq,
+                              ("File limit hit [%s]---merging"
+                               " #%d through #%d into #%d, #%d..."),
+                              strerror(errno), tmp_idx_a, tmp_idx_b,
+                              uniq->temp_idx, uniq->max_temp_idx);
+                break;
+            }
+
+            /* Read the first key from the file */
+            if (!uniqTempRead(uniq->fps[i], uniq->key[i],
+                              uniq->fi.key_octets))
+            {
+                if (0 != skStreamGetLastErrno(uniq->fps[i])) {
+                    skAppPrintErr(
+                        "Cannot read first key from temporary file '%s'; %s",
+                        skTempFileGetName(uniq->tmpctx, j),
+                        strerror(skStreamGetLastErrno(uniq->fps[i])));
+                    return -1;
+                }
+                sortuniqDebug(uniq, "Ignoring empty temporary file '%s'",
+                              skTempFileGetName(uniq->tmpctx, j));
+                uniqTempClose(uniq->fps[i]);
+                uniq->fps[i] = NULL;
+                continue;
+            }
+
+            /* open the corresponding distinct file */
+            dist_merge.fps[i] = uniqTempReopen(uniq->tmpctx, j + 1);
+            if (NULL == dist_merge.fps[i]) {
+                if (skHeapGetNumberEntries(uniq->heap) < 2) {
+                    skAppPrintErr("Unable to open multiple temporary files");
+                    return -1;
+                }
+                /* We cannot open any more temp files; we'll need to
+                 * catch file 'j' the next time around. */
+                tmp_idx_b = j - 1;
+                sortuniqDebug(uniq,
+                              ("File limit hit [%s]---merging"
+                               " #%d through #%d into #%d, #%d..."),
+                              strerror(errno), tmp_idx_a, tmp_idx_b,
+                              uniq->temp_idx, uniq->max_temp_idx);
+                uniqTempClose(uniq->fps[i]);
+                uniq->fps[i] = NULL;
+                break;
+            }
+
+            skHeapInsert(uniq->heap, &i);
+        }
+
+        sortuniqDebug(uniq, "Opened %" PRIu32 " temporary file pairs",
+                      skHeapGetNumberEntries(uniq->heap));
+
+        /* Check to see if we've opened all temp files.  If so, close
+         * the intermediate file. */
+        if (tmp_idx_b == uniq->temp_idx - 1) {
+            /* no longer need the intermediate temp file */
+            sortuniqDebug(uniq, "Successfully opened all%s temporary files",
+                          ((tmp_idx_a > 0) ? " remaining" : ""));
+
+            uniqTempClose(uniq->temp_fp);
+            uniqTempClose(uniq->dist_fp);
+            uniq->temp_fp = NULL;
+            uniq->dist_fp = NULL;
+
+            dist_merge.write_to_temp = 0;
+        }
+
+        /* process this set of files */
+        if (uniq->temp_fp) {
+            rv = sortuniqMergeFilesDist(uniq, &dist_merge, NULL, NULL);
+        } else {
+            rv = sortuniqMergeFilesDist(uniq, &dist_merge,
+                                        output_fn, callback_data);
+        }
+        /* return on error below after closing files */
+
+        /* Close and remove all the temp files that we processed this
+         * time. */
+        for (j = tmp_idx_a, i = 0; j <= tmp_idx_b; j += 2, ++i) {
+            uniqTempClose(uniq->fps[i]);
+            uniqTempClose(dist_merge.fps[i]);
+            skTempFileRemove(uniq->tmpctx, j);
+            skTempFileRemove(uniq->tmpctx, j + 1);
+        }
+        memset(uniq->fps, 0, sizeof(uniq->fps));
+        memset(dist_merge.fps, 0, sizeof(dist_merge.fps));
+
+        if (rv) {
+            skHeapFree(dist_merge.heap);
+            return rv;
+        }
+
+        if (uniq->temp_fp) {
+            /* Close the intermediate temp files. */
+            sortuniqDebug(uniq, "Finished writing #%d '%s', #%d '%s'",
+                          uniq->temp_idx, UNIQUE_TMPNAME_OUT(uniq),
+                          uniq->max_temp_idx,
+                          uniqBasename(skStreamGetPathname(uniq->dist_fp)));
+
+            uniqTempClose(uniq->temp_fp);
+            uniq->temp_fp = NULL;
+            uniqTempClose(uniq->dist_fp);
+            uniq->dist_fp = NULL;
+        }
+
+        /* start the next merge with the next temp file */
+        tmp_idx_a = tmp_idx_b + 1;
+    } while (dist_merge.write_to_temp);
+
+    skHeapFree(dist_merge.heap);
     return 0;
 }
 
@@ -5941,8 +6916,6 @@ sortuniqMergeFilesDist(
  *
  *    This function returns once all the data in the open files has
  *    been read.
- *
- *    See also sortuniqMergeFilesDist().
  */
 static int
 sortuniqMergeFilesNodist(
@@ -5963,6 +6936,8 @@ sortuniqMergeFilesNodist(
     /* should only be called with value fields and no distinct fields */
     assert(0 == uniq->fi.distinct_num_fields);
     assert(0 < uniq->fi.value_octets);
+
+    /* either writing to the temp file or to the output function */
     assert(output_fn || uniq->temp_fp);
 
     heap_count = skHeapGetNumberEntries(uniq->heap);
@@ -5988,9 +6963,8 @@ sortuniqMergeFilesNodist(
             /* read the value from the file and merge it */
             if (!uniqTempRead(uniq->fps[lowest], buf, uniq->fi.value_octets)) {
                 last_errno = skStreamGetLastErrno(uniq->fps[lowest]);
-                UNIQUE_DEBUG(uniq, ((SKUNIQUE_DEBUG_ENVAR
-                                     ": Cannot read from temporary file #%u"),
-                                    UNIQUE_TMPNUM_READ(uniq, lowest)));
+                sortuniqDebug(uniq, "Cannot read from temporary file #%u",
+                              UNIQUE_TMPNUM_READ(uniq, lowest));
                 skAppPrintErr(
                     "Cannot read value field from temporary file: %s",
                     (last_errno ? strerror(last_errno) : "EOF"));
@@ -6010,13 +6984,13 @@ sortuniqMergeFilesNodist(
                 /* read failed.  there is no more data for this file;
                  * remove it from the heap; get the new top of the
                  * heap, or end the while if no more files */
-                UNIQUE_DEBUG(uniq,
-                             ((SKUNIQUE_DEBUG_ENVAR
-                               ": Finished reading records from file #%u,"
-                               " %" PRIu32 " files remain"),
-                              UNIQUE_TMPNUM_READ(uniq, lowest), heap_count-1));
-                skHeapExtractTop(uniq->heap, NULL);
                 --heap_count;
+                sortuniqDebug(uniq,
+                              ("Finished reading records from file #%u,"
+                               " %" PRIu32 " files remain"),
+                              UNIQUE_TMPNUM_READ(uniq, lowest), heap_count);
+                skHeapExtractTop(uniq->heap, NULL);
+                assert(skHeapGetNumberEntries(uniq->heap) == heap_count);
                 if (0 == heap_count) {
                     break;
                 }
@@ -6033,21 +7007,160 @@ sortuniqMergeFilesNodist(
             rv = output_fn(cached_key, distinct_buffer, merged_values,
                            callback_data);
             if (rv != 0) {
-                UNIQUE_DEBUG(uniq, ((SKUNIQUE_DEBUG_ENVAR
-                                     ": output_fn returned non-zero %d"),
-                                    rv));
+                sortuniqDebug(uniq, "output_fn returned non-zero %d", rv);
                 return -1;
             }
-        } else if (uniqTempWriteTriple(
-                       &uniq->fi, uniq->temp_fp, NULL,
-                       cached_key, merged_values, uniq->distincts))
-        {
-            skAppPrintSyserror(
-                "Error writing merged key/values to temporary file '%s'",
-                UNIQUE_TMPNAME_OUT(uniq));
-            return -1;
+        } else {
+            uniqTempWriteTriple(&uniq->fi, uniq->temp_fp, NULL,
+                                cached_key, merged_values, uniq->distincts);
         }
     } while (heap_count > 0);
+
+    return 0;
+}
+
+
+/*
+ *    The output function for presorted input when temporary files
+ *    have been written and distinct files are not in use.
+ */
+static int
+sortuniqHandleTempNodist(
+    sk_sort_unique_t       *uniq,
+    sk_unique_output_fn_t   output_fn,
+    void                   *callback_data)
+{
+    int tmp_idx_a;
+    int tmp_idx_b;
+    uint16_t i;
+    int j;
+    int opened_all_temps;
+    int rv = -1;
+
+    assert(uniq);
+    assert(output_fn);
+
+    /* should only be called with value fields and no distinct fields */
+    assert(0 == uniq->fi.distinct_num_fields);
+    assert(0 < uniq->fi.value_octets);
+    assert(output_fn);
+
+    /* for this function to be called, temp files #0 and #1 must be in
+     * use */
+    assert(uniq->temp_idx >= 1);
+
+    /* index at which to start the merge */
+    tmp_idx_a = 0;
+
+    opened_all_temps = 0;
+
+    /* This loop repeats as long as we haven't opened all of the temp
+     * files generated while reading the flows. */
+    do {
+        assert(skHeapGetNumberEntries(uniq->heap) == 0);
+
+        /* the index of the first temporary file being processed */
+        uniq->temp_idx_base = tmp_idx_a;
+
+        /* determine the index at which to stop the merge */
+        tmp_idx_b = tmp_idx_a + MAX_MERGE_FILES - 1;
+        if (uniq->max_temp_idx < tmp_idx_b) {
+            /* number of temp files is less than MAX_MERGE */
+            tmp_idx_b = uniq->max_temp_idx;
+        }
+
+        sortuniqDebug(uniq,
+                      "Attempting to open temporary files #%d through #%d",
+                      tmp_idx_a, tmp_idx_b);
+
+        /* open an intermediate temp file.  The merge-sort will have
+         * to write nodes here if there are not enough file handles
+         * available to open all the temporary files we wrote while
+         * reading the data. */
+        uniq->temp_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
+        uniq->temp_idx = uniq->max_temp_idx;
+
+        /* Open up to MAX_MERGE files */
+        for (j = tmp_idx_a, i = 0; j <= tmp_idx_b; ++j, ++i) {
+            uniq->fps[i] = uniqTempReopen(uniq->tmpctx, j);
+            if (NULL == uniq->fps[i]) {
+                if (skHeapGetNumberEntries(uniq->heap) < 2) {
+                    skAppPrintErr("Unable to open multiple temporary files");
+                    return -1;
+                }
+                /* We cannot open any more temp files; we'll need to
+                 * catch file 'j' the next time around. */
+                tmp_idx_b = j - 1;
+                sortuniqDebug(uniq,
+                              ("File limit hit [%s]---merging"
+                               " #%d through #%d into #%d..."),
+                              strerror(errno), tmp_idx_a, tmp_idx_b,
+                              uniq->temp_idx);
+                break;
+            }
+
+            /* Read the first key from the file and add the file's
+             * index to the heap */
+            if (uniqTempRead(uniq->fps[i], uniq->key[i], uniq->fi.key_octets)){
+                skHeapInsert(uniq->heap, &i);
+            } else if (0 == skStreamGetLastErrno(uniq->fps[i])) {
+                sortuniqDebug(uniq, "Ignoring empty temporary file #%u '%s'",
+                              j, skTempFileGetName(uniq->tmpctx, j));
+                uniqTempClose(uniq->fps[i]);
+                uniq->fps[i] = NULL;
+            } else {
+                skAppPrintErr(
+                    "Cannot read first key from temporary file '%s': %s",
+                    skTempFileGetName(uniq->tmpctx, j),
+                    strerror(skStreamGetLastErrno(uniq->fps[i])));
+                return -1;
+            }
+        }
+
+        sortuniqDebug(uniq, "Opened %" PRIu32 " temporary files",
+                      skHeapGetNumberEntries(uniq->heap));
+
+        /* Check to see if we've opened all temp files.  If so, close
+         * the intermediate file. */
+        if (tmp_idx_b == uniq->temp_idx - 1) {
+            /* no longer need the intermediate temp file */
+            sortuniqDebug(uniq, "Successfully opened all%s temporary files",
+                          ((tmp_idx_a > 0) ? " remaining" : ""));
+            uniqTempClose(uniq->temp_fp);
+            uniq->temp_fp = NULL;
+            opened_all_temps = 1;
+        }
+
+        if (uniq->temp_fp) {
+            rv = sortuniqMergeFilesNodist(uniq, NULL, NULL);
+        } else {
+            rv = sortuniqMergeFilesNodist(uniq, output_fn, callback_data);
+        }
+        /* return on error after closing temporary files */
+
+        /* Close and remove all the temp files that we processed this
+         * time. */
+        for (j = tmp_idx_a, i = 0; j <= tmp_idx_b; ++j, ++i) {
+            uniqTempClose(uniq->fps[i]);
+            skTempFileRemove(uniq->tmpctx, j);
+        }
+        memset(uniq->fps, 0, sizeof(uniq->fps));
+
+        if (rv) {
+            return rv;
+        }
+
+        /* Close the intermediate temp file if using it */
+        if (uniq->temp_fp) {
+            sortuniqDebug(uniq, "Finished writing #%d '%s'",
+                          uniq->temp_idx, UNIQUE_TMPNAME_OUT(uniq));
+            uniqTempClose(uniq->temp_fp);
+            uniq->temp_fp = NULL;
+        }
+
+        /* start the next merge with the next temp file */
+        tmp_idx_a = tmp_idx_b + 1;
+    } while (!opened_all_temps);
 
     return 0;
 }
@@ -6116,9 +7229,8 @@ skPresortedUniqueDestroy(
         u->dist_fp = NULL;
     }
     skTempFileTeardown(&u->tmpctx);
-    if (u->temp_dir) {
-        free(u->temp_dir);
-    }
+    free(u->temp_dir);
+
     if (u->files) {
         for (i = 0; 0 == skVectorGetValue(&filename, u->files, i); ++i) {
             free(filename);
@@ -6126,24 +7238,12 @@ skPresortedUniqueDestroy(
         skVectorDestroy(u->files);
     }
 
-    if (u->rec) {
-        free(u->rec);
-    }
-    if (u->key) {
-        free(u->key);
-    }
-    if (u->key_data) {
-        free(u->key_data);
-    }
-    if (u->heap) {
-        skHeapFree(u->heap);
-    }
-    if (u->dist_heap) {
-        skHeapFree(u->dist_heap);
-    }
-    if (u->distincts) {
-        uniqDistinctFree(&u->fi, u->distincts);
-    }
+    free(u->rec);
+    free(u->key);
+    free(u->key_data);
+    skHeapFree(u->heap);
+    uniqTotalDistinctDestroy(&u->total_dist);
+    uniqDistinctFree(&u->fi, u->distincts);
 
     free(u);
 }
@@ -6255,6 +7355,33 @@ skPresortedUniqueSetFields(
 }
 
 
+/*  count distincts across all bins for first distinct field */
+int
+skPresortedUniqueEnableTotalDistinct(
+    sk_sort_unique_t   *uniq)
+{
+    assert(uniq);
+
+    if (uniq->processing) {
+        skAppPrintErr("May not call skPresortedUniqueEnableTotalDistinct"
+                      " after calling skPresortedUniqueProcess");
+        return -1;
+    }
+    uniq->use_total_distinct = 1;
+    return 0;
+}
+
+
+/*  return the number of distincts for first distinct field across all
+ *  bins */
+uint64_t
+skPresortedUniqueGetTotalDistinctCount(
+    sk_sort_unique_t   *uniq)
+{
+    return uniqTotalDistinctGetCount(&uniq->total_dist);
+}
+
+
 /*  set callback function that 'uniq' will call once it determines
  *  that a bin is complete */
 int
@@ -6263,14 +7390,9 @@ skPresortedUniqueProcess(
     sk_unique_output_fn_t   output_fn,
     void                   *callback_data)
 {
-    uint16_t tmp_idx_a;
-    uint16_t tmp_idx_b;
     uint16_t open_count;
     uint16_t i;
-    uint16_t step;
     int no_more_inputs = 0;
-    int opened_all_temps;
-    int last_errno;
     int rv = -1;
 
     assert(uniq);
@@ -6286,6 +7408,15 @@ skPresortedUniqueProcess(
         return -1;
     }
 
+    /* initialize the total distinct object */
+    if (uniq->use_total_distinct) {
+        if (uniqTotalDistinctPrepareInput(
+                &uniq->total_dist, &uniq->fi, uniq->temp_dir))
+        {
+            return -1;
+        }
+    }
+
     if (skTempFileInitialize(&uniq->tmpctx, uniq->temp_dir,
                              NULL, skAppPrintErr))
     {
@@ -6295,16 +7426,7 @@ skPresortedUniqueProcess(
     /* set up distinct fields */
     if (uniq->fi.distinct_num_fields) {
         if (uniqDistinctAlloc(&uniq->fi, &uniq->distincts)) {
-            skAppPrintErr("Error allocating space for distinct counts");
-            return -1;
-        }
-
-        /* create the heap that operates over the distinct fields */
-        uniq->dist_heap = skHeapCreate2(sortuniqHeapDistCmp,
-                                        MAX_MERGE_FILES, sizeof(uint16_t),
-                                        NULL, uniq);
-        if (NULL == uniq->dist_heap) {
-            skAppPrintErr("Error allocating distinct heap");
+            skAppPrintOutOfMemory("distinct counts");
             return -1;
         }
     }
@@ -6317,18 +7439,9 @@ skPresortedUniqueProcess(
          * are not enough file handles available to open all the input
          * files. */
         uniq->temp_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
-        if (uniq->temp_fp == NULL) {
-            skAppPrintSyserror("Error creating intermediate temporary file:");
-            return -1;
-        }
         uniq->temp_idx = uniq->max_temp_idx;
         if (uniq->fi.distinct_num_fields) {
             uniq->dist_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
-            if (uniq->dist_fp == NULL) {
-                skAppPrintSyserror(
-                    "Error creating intermediate temporary file");
-                return -1;
-            }
         }
 
         /* Attempt to open up to MAX_MERGE_FILES SILK input files,
@@ -6343,9 +7456,8 @@ skPresortedUniqueProcess(
         switch (rv) {
           case 1:
             /* successfully opened all (remaining) input files */
-            UNIQUE_DEBUG(uniq, (SKUNIQUE_DEBUG_ENVAR
-                                ": Opened all%s input files",
-                                (uniq->rec ? " remaining" : "")));
+            sortuniqDebug(uniq, "Opened all%s input files",
+                          (uniq->rec ? " remaining" : ""));
             no_more_inputs = 1;
             break;
           case -1:
@@ -6353,28 +7465,25 @@ skPresortedUniqueProcess(
             return -1;
           case -2:
             /* ran out of memory or file descriptors */
-            UNIQUE_DEBUG(uniq, (SKUNIQUE_DEBUG_ENVAR ": Unable to open all"
-                                " inputs---out of memory or file handles"));
+            sortuniqDebug(uniq, ("Unable to open all inputs"
+                                 "---out of memory or file handles"));
             break;
           case 0:
             if (open_count != MAX_MERGE_FILES) {
                 /* no other way that rv == 0 */
-                UNIQUE_DEBUG(uniq,
-                             ((SKUNIQUE_DEBUG_ENVAR ": rv == 0 but"
-                               " open_count == %d; max_merge == %d. Abort"),
-                              open_count, MAX_MERGE_FILES));
+                sortuniqDebug(uniq, ("rv == 0 but open_count == %d;"
+                                     " max_merge == %d. Abort"),
+                              open_count, MAX_MERGE_FILES);
                 skAbort();
             }
             /* ran out of pointers for this run */
-            UNIQUE_DEBUG(uniq,
-                         ((SKUNIQUE_DEBUG_ENVAR ": Unable to open all inputs"
-                           "---max_merge (%d) limit reached"),
-                          MAX_MERGE_FILES));
+            sortuniqDebug(uniq, ("Unable to open all inputs"
+                                 "---max_merge (%d) limit reached"),
+                          MAX_MERGE_FILES);
             break;
           default:
             /* unexpected error */
-            UNIQUE_DEBUG(uniq, ((SKUNIQUE_DEBUG_ENVAR
-                                 ": Got unexpected rv value = %d"), rv));
+            sortuniqDebug(uniq, "Got unexpected rv value = %d", rv);
             skAbortBadCase(rv);
         }
 
@@ -6425,23 +7534,27 @@ skPresortedUniqueProcess(
             }
         }
 
-        UNIQUE_DEBUG(uniq, ((SKUNIQUE_DEBUG_ENVAR
-                             ": Processing %" PRIu32
-                             " of %" PRIu32 " open input files"),
-                            skHeapGetNumberEntries(uniq->heap), open_count));
-
         /* process this set of files */
         if (uniq->fi.distinct_num_fields) {
-            rv = sortuniqReadSilkTotemp(uniq);
+            sortuniqDebug(uniq, ("Merging %" PRIu32 " presorted input files"
+                                 " into temporary files #%d, #%d..."),
+                          skHeapGetNumberEntries(uniq->heap),
+                          uniq->temp_idx, uniq->max_temp_idx);
+            rv = sortuniqReadSilkDist(uniq);
         } else if (no_more_inputs && uniq->temp_idx == 0) {
             /* opened everything in one pass; no longer need the
              * intermediate temp file */
+            sortuniqDebug(uniq, "Merging %" PRIu32 " presorted input files",
+                          skHeapGetNumberEntries(uniq->heap));
             uniqTempClose(uniq->temp_fp);
             uniq->temp_fp = NULL;
             uniq->temp_idx = -1;
             uniq->max_temp_idx = -1;
             rv = sortuniqReadSilkNodist(uniq, output_fn, callback_data);
         } else {
+            sortuniqDebug(uniq, ("Merging %" PRIu32 " presorted input files"
+                                 " into temporary file #%d..."),
+                          skHeapGetNumberEntries(uniq->heap), uniq->temp_idx);
             rv = sortuniqReadSilkNodist(uniq, NULL, NULL);
         }
         if (rv) {
@@ -6453,17 +7566,21 @@ skPresortedUniqueProcess(
             skStreamDestroy(&uniq->fps[i]);
         }
 
-        /* Close the intermediate temp file. */
-        if (uniq->temp_fp) {
-            UNIQUE_DEBUG(uniq,
-                         ((SKUNIQUE_DEBUG_ENVAR ": Finished writing '%s'"),
-                          UNIQUE_TMPNAME_OUT(uniq)));
+        /* Close the intermediate temp file(s) if using them. */
+        if (uniq->dist_fp) {
+            sortuniqDebug(uniq, "Finished writing #%d '%s', #%d '%s'",
+                          uniq->temp_idx, UNIQUE_TMPNAME_OUT(uniq),
+                          uniq->max_temp_idx,
+                          uniqBasename(skStreamGetPathname(uniq->dist_fp)));
             uniqTempClose(uniq->temp_fp);
             uniq->temp_fp = NULL;
-        }
-        if (uniq->dist_fp) {
             uniqTempClose(uniq->dist_fp);
             uniq->dist_fp = NULL;
+        } else if (uniq->temp_fp) {
+            sortuniqDebug(uniq, "Finished writing #%d '%s'",
+                          uniq->temp_idx, UNIQUE_TMPNAME_OUT(uniq));
+            uniqTempClose(uniq->temp_fp);
+            uniq->temp_fp = NULL;
         }
 
     } while (!no_more_inputs);
@@ -6471,6 +7588,11 @@ skPresortedUniqueProcess(
     /* we are finished processing records; free the 'rec' array */
     free(uniq->rec);
     uniq->rec = NULL;
+
+    /* close the total distinct file and data structure */
+    if (uniqTotalDistinctPrepareOutput(&uniq->total_dist)) {
+        return -1;
+    }
 
     /* If any temporary files were written, we now have to merge them.
      * Otherwise, we didn't write any temporary files, and we are
@@ -6480,191 +7602,15 @@ skPresortedUniqueProcess(
         return 0;
     }
 
-    UNIQUE_DEBUG(uniq, ("Finished reading SiLK Flow records"));
+    sortuniqDebug(uniq, "Finished reading SiLK Flow records");
 
-    /* index at which to start the merge */
-    tmp_idx_a = 0;
+    if (uniq->fi.distinct_num_fields) {
+        rv = sortuniqHandleTempDist(uniq, output_fn, callback_data);
+    } else {
+        rv = sortuniqHandleTempNodist(uniq, output_fn, callback_data);
+    }
 
-    opened_all_temps = 0;
-
-    /* This loop repeats as long as we haven't opened all of the temp
-     * files generated while reading the flows. */
-    do {
-        /* index at which to stop the merge */
-        if (uniq->max_temp_idx - tmp_idx_a < MAX_MERGE_FILES - 1) {
-            /* number of temp files is less than max_merge files */
-            tmp_idx_b = uniq->max_temp_idx;
-        } else {
-            /* must stop at max_merge */
-            tmp_idx_b = tmp_idx_a + MAX_MERGE_FILES - 1;
-        }
-
-        /* when using distinct fields, files must we opened in
-         * pairs */
-        if (uniq->fi.distinct_num_fields) {
-            assert((tmp_idx_a & 0x1) == 0);
-            if (((tmp_idx_b & 0x1) == 0) && (tmp_idx_b > tmp_idx_a)) {
-                --tmp_idx_b;
-            }
-        }
-
-        UNIQUE_DEBUG(uniq,
-                     ((SKUNIQUE_DEBUG_ENVAR
-                       ": Attempting to open temporary files #%d through #%d"),
-                      tmp_idx_a, tmp_idx_b));
-
-        uniq->temp_idx_base = tmp_idx_a;
-
-        /* open an intermediate temp file.  The merge-sort will have
-         * to write nodes here if there are not enough file handles
-         * available to open all the temporary files we wrote while
-         * reading the data. */
-        uniq->temp_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
-        if (uniq->temp_fp == NULL) {
-            skAppPrintSyserror(
-                "Error creating intermediate temporary file");
-            return -1;
-        }
-        uniq->temp_idx = uniq->max_temp_idx;
-        if (uniq->fi.distinct_num_fields) {
-            uniq->dist_fp = uniqTempCreate(uniq->tmpctx, &uniq->max_temp_idx);
-            if (uniq->dist_fp == NULL) {
-                skAppPrintSyserror(
-                    "Error creating intermediate temporary file");
-                return -1;
-            }
-        }
-
-        /* number of files successfully opened */
-        open_count = 0;
-
-        /* Attempt to open up to MAX_MERGE_FILES, though an open may
-         * fail due to lack of resources (EMFILE or ENOMEM) */
-        for (i = tmp_idx_a; i <= tmp_idx_b; ++i) {
-            uniq->fps[open_count] = uniqTempReopen(uniq->tmpctx, i);
-            if (uniq->fps[open_count] == NULL) {
-                if ((open_count > 0)
-                    && ((errno == EMFILE) || (errno == ENOMEM)))
-                {
-                    /* We cannot open any more temp files; we'll need
-                     * to catch file 'i' the next time around. */
-                    tmp_idx_b = i - 1;
-                    UNIQUE_DEBUG(uniq,
-                                 ((SKUNIQUE_DEBUG_ENVAR ": EMFILE limit hit"
-                                   "---merging #%d through #%d to #%d: %s"),
-                                  tmp_idx_a, tmp_idx_b, uniq->temp_idx,
-                                  strerror(errno)));
-                    break;
-                } else {
-                    skAppPrintSyserror(
-                        "Error opening existing temporary file '%s'",
-                        skTempFileGetName(uniq->tmpctx, i));
-                    return -1;
-                }
-            }
-            ++open_count;
-        }
-
-        if (uniq->fi.distinct_num_fields) {
-            if ((open_count & 0x1) == 1) {
-                /* number of opened files must be even */
-                --tmp_idx_b;
-                --open_count;
-                uniqTempClose(uniq->fps[open_count]);
-            }
-        }
-
-        UNIQUE_DEBUG(uniq,
-                     ((SKUNIQUE_DEBUG_ENVAR ": Opened %d temporary files"),
-                      open_count));
-
-        /* Check to see if we've opened all temp files.  If so, close
-         * the intermediate file. */
-        if (tmp_idx_b == uniq->temp_idx - 1) {
-            /* no longer need the intermediate temp file */
-            UNIQUE_DEBUG(uniq,
-                         (SKUNIQUE_DEBUG_ENVAR
-                          ": Successfully opened all%s temporary files",
-                          ((tmp_idx_a > 0) ? " remaining" : "")));
-            uniqTempClose(uniq->temp_fp);
-            uniq->temp_fp = NULL;
-            opened_all_temps = 1;
-            if (uniq->dist_fp) {
-                uniqTempClose(uniq->dist_fp);
-                uniq->dist_fp = NULL;
-            }
-        }
-
-        step = 1 + (uniq->fi.distinct_num_fields > 0);
-
-        /* Read the first key from each temp file into the 'key[]'
-         * array on the uniq object; add file's index to the heap */
-        for (i = 0; i < open_count; i += step) {
-            if (uniqTempRead(uniq->fps[i], uniq->key[i], uniq->fi.key_octets)){
-                skHeapInsert(uniq->heap, &i);
-            } else {
-                last_errno = skStreamGetLastErrno(uniq->fps[i]);
-                if (last_errno) {
-                    skAppPrintErr(
-                        "Cannot read first key from temporary file '%s'; %s",
-                        skTempFileGetName(uniq->tmpctx, tmp_idx_a + i),
-                        strerror(last_errno));
-                    return -1;
-                }
-                UNIQUE_DEBUG(uniq,
-                             ((SKUNIQUE_DEBUG_ENVAR
-                               ": Ignoring empty temporary file '%s'"),
-                              skTempFileGetName(uniq->tmpctx, tmp_idx_a + i)));
-            }
-        }
-
-        UNIQUE_DEBUG(uniq, ((SKUNIQUE_DEBUG_ENVAR
-                             ": Processing %" PRIu32
-                             " of %" PRIu32 " open temporary files"),
-                            skHeapGetNumberEntries(uniq->heap), open_count));
-
-        /* process this set of files */
-        if (uniq->temp_fp) {
-            if (uniq->fi.distinct_num_fields) {
-                rv = sortuniqMergeFilesDist(uniq, NULL, NULL);
-            } else {
-                rv = sortuniqMergeFilesNodist(uniq, NULL, NULL);
-            }
-        } else {
-            if (uniq->fi.distinct_num_fields) {
-                rv = sortuniqMergeFilesDist(uniq, output_fn, callback_data);
-            } else {
-                rv = sortuniqMergeFilesNodist(uniq, output_fn, callback_data);
-            }
-        }
-        if (rv) {
-            return rv;
-        }
-
-        /* Close all the temp files that we processed this time. */
-        for (i = 0; i < open_count; ++i) {
-            uniqTempClose(uniq->fps[i]);
-        }
-        /* Delete all the temp files that we opened */
-        for (i = tmp_idx_a; i <= tmp_idx_b; ++i) {
-            skTempFileRemove(uniq->tmpctx, i);
-        }
-
-        /* Close the intermediate temp file(s). */
-        if (uniq->temp_fp) {
-            uniqTempClose(uniq->temp_fp);
-            uniq->temp_fp = NULL;
-        }
-        if (uniq->dist_fp) {
-            uniqTempClose(uniq->dist_fp);
-            uniq->dist_fp = NULL;
-        }
-
-        /* start the next merge with the next temp file */
-        tmp_idx_a = tmp_idx_b + 1;
-    } while (!opened_all_temps);
-
-    return 0;
+    return rv;
 }
 
 

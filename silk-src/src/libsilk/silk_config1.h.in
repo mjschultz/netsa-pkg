@@ -108,6 +108,10 @@
 /* Define to 1 if you have the <ctype.h> header file. */
 #undef HAVE_CTYPE_H
 
+/* Define to 1 if you have the declaration of `environ', and to 0 if you
+   don't. */
+#undef HAVE_DECL_ENVIRON
+
 /* Define to 1 if you have the declaration of `FB_ENABLE_SCTP', and to 0 if
    you don't. */
 #undef HAVE_DECL_FB_ENABLE_SCTP
@@ -123,6 +127,10 @@
 /* Define to 1 if you have the declaration of `HAVE_SPREAD', and to 0 if you
    don't. */
 #undef HAVE_DECL_HAVE_SPREAD
+
+/* Define to 1 if you have the declaration of `_NSGetEnviron', and to 0 if you
+   don't. */
+#undef HAVE_DECL__NSGETENVIRON
 
 /* Define to 1 if you have the <dirent.h> header file, and it defines `DIR'.
    */
@@ -338,6 +346,9 @@
    first (like Intel, unlike Motorola and SPARC). Define to 0 otherwise. See
    also SK_BIG_ENDIAN. */
 #undef LITTLE_ENDIAN
+
+/* The full path to the program to use to compress log files */
+#undef LOG_COMPRESSOR
 
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR

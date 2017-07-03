@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skmsg.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skmsg.c b1f14bba708e 2017-06-28 15:29:44Z mthomas $");
 
 #include "intdict.h"
 #include "multiqueue.h"
@@ -3730,17 +3730,17 @@ skMsgQueueBind(
 
     assert(q);
     assert(listen_addrs);
-    assert(skSockaddrArraySize(listen_addrs) > 0);
+    assert(skSockaddrArrayGetSize(listen_addrs) > 0);
 
-    pfd = (struct pollfd*)calloc(skSockaddrArraySize(listen_addrs),
+    pfd = (struct pollfd*)calloc(skSockaddrArrayGetSize(listen_addrs),
                                  sizeof(struct pollfd));
     MEM_ASSERT(pfd);
 
     n = 0;
     DEBUGMSG(("Attempting to bind %" PRIu32 " addresses for %s"),
-             skSockaddrArraySize(listen_addrs),
-             skSockaddrArrayNameSafe(listen_addrs));
-    for (i = 0; i < skSockaddrArraySize(listen_addrs); i++) {
+             skSockaddrArrayGetSize(listen_addrs),
+             skSockaddrArrayGetHostPortPair(listen_addrs));
+    for (i = 0; i < skSockaddrArrayGetSize(listen_addrs); i++) {
         char addr_string[PATH_MAX];
         int sock;
         sk_sockaddr_t *addr = skSockaddrArrayGet(listen_addrs, i);
@@ -3758,7 +3758,7 @@ skMsgQueueBind(
         rv = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
                         &on, sizeof(on));
         XASSERT(rv != -1);
-        rv = bind(sock, &addr->sa, skSockaddrLen(addr));
+        rv = bind(sock, &addr->sa, skSockaddrGetLen(addr));
         if (rv == 0) {
             DEBUGMSG("Succeeded binding to %s", addr_string);
             rv = listen(sock, LISTENQ);
@@ -3776,20 +3776,20 @@ skMsgQueueBind(
     }
     if (n == 0) {
         ERRMSG("Failed to bind any addresses for %s",
-               skSockaddrArrayNameSafe(listen_addrs));
+               skSockaddrArrayGetHostPortPair(listen_addrs));
         free(pfd);
         RETURN(-1);
     }
 
     DEBUGMSG(("Bound %" PRIu32 "/%" PRIu32 " addresses for %s"),
-             (uint32_t)n, skSockaddrArraySize(listen_addrs),
-             skSockaddrArrayNameSafe(listen_addrs));
+             (uint32_t)n, skSockaddrArrayGetSize(listen_addrs),
+             skSockaddrArrayGetHostPortPair(listen_addrs));
 
     QUEUE_LOCK(q);
 
     if (q->root->listener_state != SKM_THREAD_BEFORE) {
         QUEUE_UNLOCK(q);
-        for (i = 0; i < skSockaddrArraySize(listen_addrs); i++) {
+        for (i = 0; i < skSockaddrArrayGetSize(listen_addrs); i++) {
             if (pfd[i].fd >= 0) {
                 close(pfd[i].fd);
             }
@@ -3801,7 +3801,7 @@ skMsgQueueBind(
     /* Set the listen sock for the queue. */
     assert(q->root->pfd == NULL);
     q->root->pfd = pfd;
-    q->root->pfd_len = skSockaddrArraySize(listen_addrs);
+    q->root->pfd_len = skSockaddrArrayGetSize(listen_addrs);
 
 #if SK_ENABLE_GNUTLS
     q->root->bind_tls = (conn_type == CONN_TLS);
@@ -4622,7 +4622,7 @@ skMsgGetLocalPort(
         goto END;
     }
 
-    *port = skSockaddrPort(&addr);
+    *port = skSockaddrGetPort(&addr);
     rv = 0;
 
   END:

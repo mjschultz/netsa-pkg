@@ -74,12 +74,12 @@ prompt.  The text after the dollar sign represents the command line.
 Lines have been wrapped for improved readability, and the back slash
 (C<\>) is used to indicate a wrapped line.
 
-Given the B<pcap> capture file F<data.pcap>, convert it to a SiLK flow
-file:
+Given the B<pcap> capture file F<data.pcap>, use B<rwptoflow(1)> to
+convert it to a SiLK flow file:
 
  $ rwptoflow data.pcap --packet-pass=good.pcap --flow-out=data.rw
 
-Filter the SiLK flows---passing those records whose source IPs are
+With B<rwfilter(1)>, select the SiLK Flow records whose source IPs are
 found in the IPset file F<sip.set>:
 
  $ rwfilter --sipset=sip.set --pass=filtered.rw  data.rw
@@ -123,7 +123,7 @@ B<rwptoflow(1)>, B<rwfilter(1)>, B<silk(7)>, B<tcpdump(1)>, B<pcap(3)>
 
 =cut
 
-$SiLK: rwpmatch.pod cd09f0a5fcc6 2014-06-14 15:43:33Z mthomas $
+$SiLK: rwpmatch.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
 
 Local Variables:
 mode:text
