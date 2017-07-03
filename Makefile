@@ -85,9 +85,17 @@ rpm:
 		--after-remove packaging/scripts/postrm.sh \
 		packaging/root/=/
 
-build_deb: libfixbuf yaf silk deb
+build_deb:
+	make libfixbuf
+	make yaf silk
+	make silk
+	make deb
 
-build_rpm: libfixbuf yaf silk rpm
+build_rpm:
+	make libfixbuf
+	make yaf silk
+	make silk
+	make rpm
 
 build_ubuntu:
 	$(eval IMAGE_ID = $(shell docker build --force-rm -q -f "packaging/scripts/buildimage_ubuntu-12.04/Dockerfile" .))
