@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: flowcap.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: flowcap.c 4696f07c97e3 2017-05-05 20:27:39Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/rwrec.h>
@@ -987,6 +987,11 @@ startReaders(
         return 1;
     }
 #endif  /* SK_ENABLE_IPFIX */
+
+    DEBUGMSG("Configuration file contains these probes:");
+    for (i = 0, reader = fc_readers; i < num_fc_readers; ++i, ++reader) {
+        skpcProbePrint(reader->probe, &DEBUGMSG);
+    }
 
     NOTICEMSG("Starting all reader threads...");
     reading = 1;

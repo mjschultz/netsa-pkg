@@ -87,7 +87,7 @@ Store the result file in F<out.tcp>.
 
 =head1 SEE ALSO
 
-B<mergecap(1)>, B<tcpdump(1)>, B<pcap(3)>
+B<silk(7)>, B<mergecap(1)>, B<tcpdump(1)>, B<pcap(3)>
 
 =head1 NOTES
 
@@ -96,7 +96,7 @@ without eliminating duplicate packets.
 
 =cut
 
-$SiLK: rwpdedupe.pod f1a2c940be02 2016-06-10 18:28:08Z mthomas $
+$SiLK: rwpdedupe.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
 
 Local Variables:
 mode:text

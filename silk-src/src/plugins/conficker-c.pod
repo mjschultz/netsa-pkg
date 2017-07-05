@@ -1,0 +1,256 @@
+=pod
+
+=head1 NAME
+
+B<conficker-c> - SiLK plug-in to detect traffic matching the Conficker C worm
+
+=head1 SYNOPSIS
+
+  rwfilter --plugin=conficker-c.so [--conficker-seed=SEED]
+        [--s-conficker] [--d-conficker] [--a-conficker] ...
+
+  rwcut --plugin=conficker-c.so [--conficker-seed=SEED]
+        [--fields=...,sconficker,dconficker,...] ...
+
+  rwgroup --plugin=conficker-c.so [--conficker-seed=SEED]
+        [--fields=...,sconficker,dconficker,...] ...
+
+  rwsort --plugin=conficker-c.so [--conficker-seed=SEED]
+        [--fields=...,sconficker,dconficker,...] ...
+
+  rwstats --plugin=conficker-c.so [--conficker-seed=SEED]
+        [--fields=...,sconficker,dconficker,...] ...
+
+  rwuniq --plugin=conficker-c.so [--conficker-seed=SEED]
+        [--fields=...,sconficker,dconficker,...] ...
+
+=head1 DESCRIPTION
+
+The B<conficker-c> plug-in was written in March 2009 to detect traffic
+that matches the signature of the .C variant of the Conficker worm.
+
+The .C variant of the Conficker worm
+(L<https://www.us-cert.gov/ncas/alerts/TA09-088A>) contains a
+peer-to-peer scanning thread which generates a large amount of UDP
+high-port to high-port packets.  SRI International provides a detailed
+analysis report on the worm's behavior which describes features of the
+peer-to-peer network traffic.
+(L<http://www.csl.sri.com/users/vinod/papers/Conficker/addendumC/index.html>)
+This report hints at "...a unique mapping from IP address to the two
+TCP and UDP listen ports in each host."
+
+This type of behavior is also ideally suited for flow analysis, and
+the B<conficker-c> plug-in emulates the same functionality.  When
+loaded into either B<rwfilter(1)> or B<rwcut(1)> using the B<--plugin>
+switch, the plug-in adds fields for detecting and filtering
+Conficker.C traffic with a limited number of false positives.
+
+The B<conficker-c> plug-in identifies the I<targets> of Conficker.C
+scanning.  When a Conficker.C infected machine starts scanning for
+other peers, it targets a somewhat random port on the destination host
+according to a function B<f()> where
+
+ dPort = f (dIP, seed)
+ sPort = f (sIP, seed)
+
+and the seed is computed from the function B<g()>:
+
+ seed = g (start_time)
+
+The plug-in implements that function and can check whether the
+computed source or destination port matches the observed value of the
+port.  If the source or destination matches, that indicates that the
+destination or source, respectively, may be infected.
+
+To compute the C<seed> argument to the function, the plug-in computes
+the number of weeks between 1970-Jan-05 and the flow record's start
+time.  When the flow's start time is within a few minutes of the week
+boundary, the plug-in computes ports using both possible values for
+the seed.  The plug-in provides the B<--conficker-seed> command line
+switch to allow selection of a different seed.
+
+The plug-in ignores any non-UDP/non-TCP traffic.
+
+=head1 OPTIONS
+
+Option names may be abbreviated if the abbreviation is unique or is an
+exact match for an option.  A parameter to an option may be specified
+as B<--arg>=I<param> or B<--arg> I<param>, though the first form is
+required for options that take optional parameters.
+
+The B<conficker-c> plug-in provides the following options to the
+indicated applications.
+
+=head2 B<rwfilter> Switches
+
+The B<conficker-c> plug-in adds the following switches to
+B<rwfilter(1)>.  You may check for Conficker.C traffic on a particular
+side of the flow, or for both sides:
+
+=over 4
+
+=item B<--s-conficker>
+
+Pass the flow record if the source IP and port match those targeted by
+Conficker.C (indicating that the destination IP may be infected).
+
+=item B<--d-conficker>
+
+Pass the flow record if the destination IP and port match those
+targeted by Conficker.C (indicating that the source IP may be
+infected).
+
+=item B<--a-conficker>
+
+Pass the flow record if either the source IP and port or the
+destination IP and port match those targeted by Conficker.C.
+
+=item B<--conficker-seed>=I<SEED>
+
+Use the value I<SEED> to seed Conficker.C checker.  Typically the
+flow's start time is used as the basis for the seed.
+
+=back
+
+=head2 B<rwcut>, B<rwgroup>, B<rwsort>, B<rwstats>, and B<rwuniq> Switches
+
+The B<conficker-c> plug-in augments the switches of B<rwcut(1)>,
+B<rwgroup(1)>, B<rwsort(1)>, B<rwstats(1)>, and B<rwuniq(1)> as
+follows:
+
+=over 4
+
+=item B<--fields>=I<FIELDS>
+
+I<FIELDS> refers to a list of fields to use for the operation.  The
+B<conficker-c> plug-in adds the following fields:
+
+=over 4
+
+=item sconficker
+
+Show whether the source IP and source port combination match the
+values targeted by Conficker.C, which indicate that the destination IP
+may be infected.  This field contains a C<1> when values match and a
+C<0> when they do not.
+
+=item dconficker
+
+Show whether the destination IP and destination port combination match
+the values targeted by Conficker.C, which indicate that the source IP
+may be infected.  This field contains a C<1> when values match and a
+C<0> when they do not.
+
+=back
+
+=item B<--conficker-seed>=I<SEED>
+
+Use the value I<SEED> to seed Conficker.C checker.  Typically the
+flow's start time is used as the basis for the seed.
+
+=back
+
+=head1 EXAMPLES
+
+In the following examples, the dollar sign (C<$>) represents the shell
+prompt.  The text after the dollar sign represents the command line.
+Lines have been wrapped for improved readability, and the back slash
+(C<\>) is used to indicate a wrapped line.
+
+This example uses contrived data to test that the plug-in works.
+Values that are known to match the worm are piped into B<rwtuc(1)> to
+create a SiLK Flow record.  That record is piped into B<rwfilter>,
+which matches the record.  That result is piped into B<rwcut> to
+display the result:
+
+ $ echo '17|10.10.10.10|23332|192.168.192.168|16514|'        \
+   | rwtuc --fields=protocol,sip,sport,dip,dport             \
+   | rwfilter --plugin=conficker.so --conficker-seed=8888    \
+        --s-conficker --protocol=17 --print-volume           \
+        --pass=stdout stdin                                  \
+   | rwcut --plugin=conficker.so --conficker-seed=8888       \
+        --fields=sip,sport,sconficker,dip,dport,dconficker   \
+        --ipv6-policy=ignore
+      | Recs  | Packets | Bytes | Files |
+ Total|      1|        1|      1|      1|
+ Pass |      1|        1|      1|       |
+ Fail |      0|        0|      0|       |
+         sIP|sPort|scon|            dIP|dPort|dcon|
+ 10.10.10.10|23332|   1|192.168.192.168|16514|   1|
+
+To find infected hosts on your network, you typically want to look at
+outgoing traffic and find instances where source hosts are targeting
+conficker I<destination> IP and port pairs, so you would use the
+B<--d-conficker> switch on B<rwfilter>.
+
+To further refine the query and eliminate most false positives, it is
+useful to eliminate common service ports (the packets from a scanner
+have sport=ephemeral, dport=conficker-chosen):
+
+ $ rwfilter --plugin=conficker-c.so --d-conficker                 \
+        --sport=1024- --dport=1024-                               \
+        --start-date=2009/05/01 --end-date=2009/05/31 --type=out  \
+        --pass=stdout                                             \
+   | rwuniq --fields=sip --flows=10 --sort-output
+
+There may be false positives from VPN traffic.  Depending on your
+network, you might want to filter traffic on UDP 500 or 10000.
+
+=head1 ENVIRONMENT
+
+=over 4
+
+=item SILK_PATH
+
+This environment variable gives the root of the install tree.  When
+searching for plug-ins, a SiLK application may use this environment
+variable.  See the L</FILES> section for details.
+
+=item SILK_PLUGIN_DEBUG
+
+When set to 1, the SiLK applications print status messages to the
+standard error as they attempt to find and open the F<conficker-c.so>
+plug-in.  A typical invocation using this variable is:
+
+ env SILK_PLUGIN_DEBUG=1 rwcut --plugin=conficker-c.so --version
+
+=back
+
+=head1 FILES
+
+=over 4
+
+=item F<${SILK_PATH}/lib64/silk/conficker-c.so>
+
+=item F<${SILK_PATH}/lib64/conficker-c.so>
+
+=item F<${SILK_PATH}/lib/silk/conficker-c.so>
+
+=item F<${SILK_PATH}/lib/conficker-c.so>
+
+=item F<@prefix@/lib64/silk/conficker-c.so>
+
+=item F<@prefix@/lib64/conficker-c.so>
+
+=item F<@prefix@/lib/silk/conficker-c.so>
+
+=item F<@prefix@/lib/conficker-c.so>
+
+Possible locations for the plug-in.
+
+=back
+
+=head1 SEE ALSO
+
+B<rwfilter(1)>, B<rwcut(1)>, B<rwgroup(1)>, B<rwsort(1)>, B<rwstats(1)>,
+B<rwuniq(1)>, B<rwtuc(1)>, B<silk(7)>
+
+
+=cut
+
+$SiLK: conficker-c.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
+
+Local Variables:
+mode:text
+indent-tabs-mode:nil
+End:

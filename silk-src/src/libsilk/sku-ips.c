@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-ips.c d84fde825740 2017-02-14 14:49:23Z mthomas $");
+RCSIDENT("$SiLK: sku-ips.c b1f14bba708e 2017-06-28 15:29:44Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/utils.h>
@@ -31,6 +31,10 @@ const uint8_t sk_ipv6_zero[SK_IPV6_ZERO_LEN] =
     {0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0};
 const uint8_t sk_ipv6_v4inv6[SK_IPV6_V4INV6_LEN] =
     {0,0,0,0, 0,0,0,0, 0,0,0xFF,0xFF};
+
+/* Constant returned by skSockaddrArrayGetHostname() when no
+ * host-name/-address was specified to skStringParseHostPortPair(). */
+const char *sk_sockaddr_array_anyhostname = "*";
 
 
 /* LOCAL VARIABLES */
@@ -1764,17 +1768,17 @@ skSockaddrCompare(
     }
 }
 
-int
+ssize_t
 skSockaddrString(
     char                   *buffer,
-    int                     size,
+    size_t                  size,
     const sk_sockaddr_t    *addr)
 {
     /* Must be large enough to hold UNIX domain socket path. */
     char sabuf[PATH_MAX];
     skipaddr_t ipaddr;
     uint16_t port;
-    int rv;
+    ssize_t rv;
 
     switch (addr->sa.sa_family) {
       case AF_INET6:
@@ -1840,7 +1844,7 @@ skSockaddrArrayContains(
     if (array == NULL || addr == NULL) {
         return 0;
     }
-    for (i = 0; i < skSockaddrArraySize(array); i++) {
+    for (i = 0; i < skSockaddrArrayGetSize(array); i++) {
         if (skSockaddrCompare(skSockaddrArrayGet(array, i),
                               addr, flags) == 0)
         {
@@ -1865,10 +1869,10 @@ skSockaddrArrayEqual(
     if (b == NULL) {
         return 0;
     }
-    if (skSockaddrArraySize(a) != skSockaddrArraySize(b)) {
+    if (skSockaddrArrayGetSize(a) != skSockaddrArrayGetSize(b)) {
         return 0;
     }
-    for (i = 0; i < skSockaddrArraySize(a); i++) {
+    for (i = 0; i < skSockaddrArrayGetSize(a); i++) {
         if (!skSockaddrArrayContains(b, skSockaddrArrayGet(a, i), flags)) {
             return 0;
         }
@@ -1890,8 +1894,8 @@ skSockaddrArrayMatches(
     if (b == NULL) {
         return 0;
     }
-    for (i = 0; i < skSockaddrArraySize(a); ++i) {
-        for (j = 0; j < skSockaddrArraySize(b); ++j) {
+    for (i = 0; i < skSockaddrArrayGetSize(a); ++i) {
+        for (j = 0; j < skSockaddrArrayGetSize(b); ++j) {
             if (skSockaddrCompare(skSockaddrArrayGet(a, i),
                                   skSockaddrArrayGet(b, j),
                                   flags) == 0)
@@ -1901,6 +1905,47 @@ skSockaddrArrayMatches(
         }
     }
     return 0;
+}
+
+
+/* Deprecated */
+size_t
+skSockaddrLen(
+    const sk_sockaddr_t    *s)
+{
+    return skSockaddrGetLen(s);
+}
+
+/* Deprecated */
+int
+skSockaddrPort(
+    const sk_sockaddr_t    *s)
+{
+    return skSockaddrGetPort(s);
+}
+
+/* Deprecated */
+const char *
+skSockaddrArrayNameSafe(
+    const sk_sockaddr_array_t  *s)
+{
+    return skSockaddrArrayGetHostname(s);
+}
+
+/* Deprecated */
+const char *
+skSockaddrArrayName(
+    const sk_sockaddr_array_t  *s)
+{
+    return s->name;
+}
+
+/* Deprecated */
+uint32_t
+skSockaddrArraySize(
+    const sk_sockaddr_array_t  *s)
+{
+    return skSockaddrArrayGetSize(s);
 }
 
 

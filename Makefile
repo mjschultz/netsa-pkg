@@ -1,5 +1,5 @@
 MAINTAINER = "Bo Bayles <bbayles+netsa@gmail.com>"
-VERSION = 20170325
+VERSION = 20170629
 PROC_ARC ?= amd64
 TARGET_ROOT = $(shell pwd)/packaging/root
 OUTPUT_DIR = $(shell pwd)/packaging/output

@@ -366,26 +366,29 @@ B<a1> anonymous proxy; B<a2> satellite provider; B<o1> other
 
 as B<scc> for the destination IP
 
-=item src-I<MAPNAME>
+=item src-I<map-name>
 
-label determined by passing the source IP or the protocol/source-port
-to the user-defined mapping defined in the prefix map associated with
-I<MAPNAME>.  See the description of the B<--pmap-file> switch below
-and the B<pmapfilter(3)> manual page.
+label contained in the prefix map file associated with I<map-name>.
+If the prefix map is for IP addresses, the label is that associated
+with the source IP address.  If the prefix map is for protocol/port
+pairs, the label is that associated with the protocol and source port.
+See also the description of the B<--pmap-file> switch below and the
+B<pmapfilter(3)> manual page.
 
-=item dst-I<MAPNAME>
+=item dst-I<map-name>
 
-as B<src-I<MAPNAME>> for the destination IP or
-protocol/destination-port.
+as B<src-I<map-name>> for the destination IP address or the protocol
+and destination port.
 
 =item sval
 
+as B<src-I<map-name>> when no map-name is associated with the prefix
+map file
+
 =item dval
 
-These are deprecated field names created by B<pmapfilter> that
-correspond to B<src-I<MAPNAME>> and B<dst-I<MAPNAME>>, respectively.
-These fields are available when a prefix map is used that is
-not associated with a I<MAPNAME>.
+as B<dst-I<map-name>> when no map-name is associated with the prefix
+map file
 
 =back
 
@@ -867,20 +870,19 @@ allow the output to include descriptions of those fields.
 Print the version number and information about how SiLK was
 configured, then exit the application.
 
-=item B<--pmap-file>=I<MAPNAME>:I<PATH>
-
 =item B<--pmap-file>=I<PATH>
 
-Instruct B<rwuniq> to load the mapping file located at I<PATH> and
-create the src-I<MAPNAME> and dst-I<MAPNAME> fields.  When I<MAPNAME>
-is provided explicitly, it will be used to refer to the fields
-specific to that prefix map.  If I<MAPNAME> is not provided, B<rwuniq>
-will check the prefix map file to see if a map-name was specified when
-the file was created.  If no map-name is available, B<rwuniq> creates
-the fields sval and dval.  Multiple B<--pmap-file> switches are
-supported as long as each uses a unique value for map-name.  The
-B<--pmap-file> switch(es) must precede the B<--fields> switch.  For
-more information, see B<pmapfilter(3)>.
+=item B<--pmap-file>=I<MAPNAME>:I<PATH>
+
+Load the prefix map file located at I<PATH> and create fields named
+src-I<map-name> and dst-I<map-name> where I<map-name> is either the
+I<MAPNAME> part of the argument or the map-name specified when the
+file was created (see B<rwpmapbuild(1)>).  If no map-name is
+available, B<rwuniq> names the fields C<sval> and C<dval>.  Specify
+I<PATH> as C<-> or C<stdin> to read from the standard input.  The
+switch may be repeated to load multiple prefix map files, but each
+prefix map must use a unique map-name.  The B<--pmap-file> switch(es)
+must precede the B<--fields> switch.  See also B<pmapfilter(3)>.
 
 =item B<--pmap-column-width>=I<NUM>
 
@@ -1216,15 +1218,19 @@ B<rwuniq> functionally replaces the combination of
 
 To get a list of unique IP addresses in a data set without the
 counting or threshold abilities of B<rwuniq>, consider using the IPset
-tools for improved performance:
+tools B<rwset(1)> and B<rwsetcat(1)> for improved performance:
 
  rwset --sip-set=stdout | rwsetcat --print-ips
 
 For situations where the key and value are each a single field, the
-Bag tools usually provide better performance, especially when the key
-is one or two bytes:
+Bag tools (B<rwbag(1)>, B<rwbagcat(1)>) often provide better
+performance, especially when the key length is one or two bytes:
 
  rwbag --bag-file=sport,bytes,stdout | rwbagcat
+
+To create a binary file that contains B<rwuniq>-like output, use
+B<rwaggbag(1)> or B<rwaggbagbuild(1)>.  The content of these files may
+be printed with B<rwaggbagcat(1)>.
 
 B<rwgroup(1)> works similarly to B<rwuniq>, except the data remains in
 the form of SiLK Flow records, and the next-hop-IP field is modified
@@ -1289,16 +1295,18 @@ B<rwtotal(1)> or B<rwbag(1)>.
 
 =head1 SEE ALSO
 
-B<rwfilter(1)>, B<rwbag(1)>, B<rwcut(1)>, B<rwset(1)>, B<rwsetcat(1)>,
-B<rwaddrcount(1)>, B<rwgroup(1)>, B<rwstats(1)>, B<rwnetmask(1)>,
-B<rwsort(1)>, B<rwtotal(1)>, B<rwcount(1)>, B<addrtype(3)>,
-B<ccfilter(3)>, B<pmapfilter(3)>, B<pysilk(3)>, B<silkpython(3)>,
-B<silk-plugin(3)>, B<sensor.conf(5)>, B<rwflowpack(8)>, B<silk(7)>,
-B<yaf(1)>, B<dlopen(3)>, B<tzset(3)>, B<environ(7)>
+B<rwfilter(1)>, B<rwbag(1)>, B<rwbagcat(1)>, B<rwaggbag(1)>,
+B<rwaggbagbuild(1)>, B<rwaggbagcat(1)>, B<rwcut(1)>, B<rwset(1)>,
+B<rwsetcat(1)>, B<rwaddrcount(1)>, B<rwgroup(1)>, B<rwstats(1)>,
+B<rwnetmask(1)>, B<rwsort(1)>, B<rwtotal(1)>, B<rwcount(1)>,
+B<rwpmapbuild(1)>, B<addrtype(3)>, B<ccfilter(3)>, B<pmapfilter(3)>,
+B<pysilk(3)>, B<silkpython(3)>, B<silk-plugin(3)>, B<sensor.conf(5)>,
+B<rwflowpack(8)>, B<silk(7)>, B<yaf(1)>, B<dlopen(3)>, B<tzset(3)>,
+B<environ(7)>
 
 =cut
 
-$SiLK: rwuniq.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwuniq.pod 118af073bc56 2017-06-05 18:13:10Z mthomas $
 
 Local Variables:
 mode:text

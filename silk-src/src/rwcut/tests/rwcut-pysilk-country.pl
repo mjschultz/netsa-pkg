@@ -14,8 +14,7 @@ $ENV{PYTHONPATH} = $SiLKTests::testsdir.((defined $ENV{PYTHONPATH}) ? ":$ENV{PYT
 $ENV{SILK_COUNTRY_CODES} = "$SiLKTests::PWD/$file{fake_cc}";
 add_plugin_dirs('/src/pysilk');
 
-skip_test('Cannot use --python-file') 
-    unless check_exit_status(qq|$rwcut --python-file=$file{pysilk_plugin} --help|);
+check_python_plugin($rwcut);
 my $cmd = "$rwcut --python-file=$file{pysilk_plugin} --fields=scc,py-scc,dcc,py-dcc --num-recs=10000 $file{data}";
 my $md5 = "2ea0d70400291589bd4f299379550397";
 

@@ -22,7 +22,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKIPSET_H, "$SiLK: skipset.h ef5b2378ee80 2017-02-27 21:48:55Z mthomas $");
+RCSIDENTVAR(rcsID_SKIPSET_H, "$SiLK: skipset.h fe84612b8116 2017-06-01 21:05:03Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/skheader.h>
@@ -763,7 +763,7 @@ typedef struct skipset_procstream_parm_st skipset_procstream_parm_t;
  *    processing of the IPset stops.
  *
  *    The 'fake_ipset' argument is an empty IPset that must be
- *    considered read-only. The caller can determine whether the
+ *    considered read-only. The caller may determine whether the
  *    stream is capable of containing IPv6 addresses by calling
  *    skIPSetIsV6().  Note: It is possible for an IPv6 IPset to only
  *    contain IPv4 addresses.
@@ -794,7 +794,7 @@ typedef int
  *    specified by skipset_walk_fn_t.  The callback is given an IP,
  *    its netblock prefix, and a caller-provided context pointer.  The
  *    callback and its context are specified with the 'cb_entry_func'
- *    and ;cb_entry_func_ctx' members of the 'proc_stream_settings'
+ *    and 'cb_entry_func_ctx' members of the 'proc_stream_settings'
  *    parameter, respectively.  Processing of entries continues until
  *    the stream is exhausted or until 'cb_entry_func' returns a value
  *    other than 'SKIPSET_OK'.

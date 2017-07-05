@@ -8,8 +8,8 @@ use SiLKTests;
 my $rwstats = check_silk_app('rwstats');
 my %file;
 $file{v6data} = get_data_or_exit77('v6data');
-$ENV{OUTGOING_FLOWTYPES} = 'all/out,all/outweb';
 $ENV{INCOMING_FLOWTYPES} = 'all/in,all/inweb';
+$ENV{OUTGOING_FLOWTYPES} = 'all/out,all/outweb';
 add_plugin_dirs('/src/plugins');
 check_features(qw(ipv6));
 

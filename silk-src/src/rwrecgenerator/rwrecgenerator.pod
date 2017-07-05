@@ -663,16 +663,9 @@ find the flowtype "all/outweb" in the F<silk.conf> file.
 =item B<--site-config-file>=I<FILENAME>
 
 Read the SiLK site configuration from the named file I<FILENAME>.
-When this switch is not provided, the location specified by the
-SILK_CONFIG_FILE environment variable is used if that variable is not
-empty.  The value of SILK_CONFIG_FILE should include the name of the
-file.  Otherwise, the application looks for a file named F<silk.conf>
-in the following directories: the directory specified in the
-SILK_DATA_ROOTDIR environment variable; the data root directory that
-is compiled into SiLK (use the B<--version> switch to view this
-value); the directories F<$SILK_PATH/share/silk/> and
-F<$SILK_PATH/share/>; and the F<share/silk/> and F<share/> directories
-parallel to the application's directory.
+When this switch is not provided, B<rwrecgenerator> searches for the
+site configuration file in the locations specified in the L</FILES>
+section.
 
 =back
 
@@ -764,7 +757,7 @@ B<syslog(3)>, B<zlib(3)>, B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwrecgenerator.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwrecgenerator.pod 6d21d1f3d455 2017-06-28 16:32:15Z mthomas $
 
 Local Variables:
 mode:text

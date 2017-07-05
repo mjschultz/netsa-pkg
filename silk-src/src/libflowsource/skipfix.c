@@ -22,7 +22,7 @@
 #define SKIPFIX_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipfix.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skipfix.c 97a30a8874f3 2017-05-02 16:49:05Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/skipaddr.h>
@@ -40,7 +40,7 @@ RCSIDENT("$SiLK: skipfix.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 /*
  *    A context is added to incoming templates to assist when decoding
  *    records.  The context is a 32-bit bitmap, and the following
- *    determines whether to allocate the bitmap or to use a pointer
+ *    determines whether to allocate the bitmap or to use the pointer
  *    itself and cast the pointer to a uintptr_t.
  */
 #ifndef SKIPFIX_ALLOCATE_BITMAP
@@ -53,7 +53,7 @@ RCSIDENT("$SiLK: skipfix.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 
 #if SKIPFIX_ALLOCATE_BITMAP
 #  define BMAP_TYPE  uint32_t
-#  define BMAP_PRI   "0x%08" PRIx32
+#  define BMAP_PRI   "%#010" PRIx32
 #  define BMAP_TMPL_CTX_GET(m_template)                 \
     ((fbTemplateGetContext(m_template) != NULL)         \
      ? *((BMAP_TYPE *)fbTemplateGetContext(m_template)) \
@@ -70,11 +70,11 @@ RCSIDENT("$SiLK: skipfix.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 #else
 #  define BMAP_TYPE  uintptr_t
 #  ifdef PRIxPTR
-#    define BMAP_PRI "0x%08" PRIxPTR
+#    define BMAP_PRI "%#010" PRIxPTR
 #  elif SK_SIZEOF_UINTPTR_T > 4
-#    define BMAP_PRI "0x%08" PRIx64
+#    define BMAP_PRI "%#010" PRIx64
 #  else
-#    define BMAP_PRI "0x%08" PRIx32
+#    define BMAP_PRI "%#010" PRIx32
 #  endif
 #  define BMAP_TMPL_CTX_GET(m_template)         \
     (BMAP_TYPE)fbTemplateGetContext(m_template)
@@ -151,7 +151,7 @@ RCSIDENT("$SiLK: skipfix.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
  *
  *    xx1. If the least significant bit is high, the general purpose
  *    ski_fixrec_next() function is used to read the data, and the
- *    other 31 bits determine what the template contains.
+ *    other 31 bits are an indication what the template contains.
  *
  *    x10. If the two LSB are 10, the data looks like NetFlow v9 and
  *    the ski_nf9rec_next() function is used to read the data.  See
@@ -253,6 +253,10 @@ RCSIDENT("$SiLK: skipfix.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 #define TMPL_BIT_initialTCPFlags                (UINT64_C(1) << 37)
 #define TMPL_BIT_reverseFlowDeltaMilliseconds   (UINT64_C(1) << 38)
 #define TMPL_BIT_subTemplateMultiList           (UINT64_C(1) << 39)
+/*  either postOctetDeltaCount or postPacketDeltaCount */
+#define TMPL_BIT_postOctetDeltaCount            (UINT64_C(1) << 40)
+/*  either postOctetTotalCount or postPacketTotalCount */
+#define TMPL_BIT_postOctetTotalCount            (UINT64_C(1) << 41)
 
 /* The following are only seen in options templates, so the bit
  * position here can repeat those above */
@@ -304,7 +308,9 @@ RCSIDENT("$SiLK: skipfix.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
     (TMPL_BIT_octetDeltaCount |                 \
      TMPL_BIT_octetTotalCount |                 \
      TMPL_BIT_initiatorOctets |                 \
-     TMPL_BIT_responderOctets)
+     TMPL_BIT_responderOctets |                 \
+     TMPL_BIT_postOctetDeltaCount |             \
+     TMPL_BIT_postOctetTotalCount)
 
 #define TMPL_MASK_TIME_SYSUP                    \
     (TMPL_BIT_systemInitTimeMilliseconds |      \
@@ -350,10 +356,12 @@ RCSIDENT("$SiLK: skipfix.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 /*
  *  **********  "Give Me Everything" Template for Import  **********
  *
- *    This is the template used for reading generic flow records.
+ *    This is the template and a matching struct used for reading
+ *    generic flow records.  The template and struct are used by
+ *    ski_fixrec_next() when reading data.
  *
- *    It containas all the IPFIX fields that SiLK supports when
- *    importing data.
+ *    The template contains all the IPFIX fields that SiLK supports
+ *    when importing data.
  */
 
 #define SKI_FIXREC_TID          0xAFEB
@@ -440,6 +448,11 @@ static fbInfoElementSpec_t ski_fixrec_spec[] = {
     { (char*)"sourceIPv6Address",                 16, 0 },
     { (char*)"destinationIPv6Address",            16, 0 },
     { (char*)"ipNextHopIPv6Address",              16, 0 },
+    /* Volumes as flow leaves the router or middlebox */
+    { (char*)"postPacketDeltaCount",               8, 0 },
+    { (char*)"postOctetDeltaCount",                8, 0 },
+    { (char*)"postPacketTotalCount",               8, 0 },
+    { (char*)"postOctetTotalCount",                8, 0 },
     /* End reason */
     { (char*)"flowEndReason",                      1, 0 },
     /* TCP Flags (reverse) */
@@ -569,32 +582,38 @@ typedef struct ski_fixrec_st {
     uint8_t         destinationIPv6Address[16];     /* 256-271 */
     uint8_t         ipNextHopIPv6Address[16];       /* 272-287 */
 
-    uint8_t         flowEndReason;                  /* 288     */
+    /* egress volume; used when ingress volume is 0 */
+    uint64_t        postPacketDeltaCount;           /* 288-295 */
+    uint64_t        postOctetDeltaCount;            /* 296-303 */
+    uint64_t        postPacketTotalCount;           /* 304-311 */
+    uint64_t        postOctetTotalCount;            /* 312-319 */
+
+    uint8_t         flowEndReason;                  /* 320     */
 
     /* Flags for the reverse flow: */
-    uint8_t         reverseTcpControlBits;          /* 289     */
-    uint8_t         reverseInitialTCPFlags;         /* 290     */
-    uint8_t         reverseUnionTCPFlags;           /* 291     */
+    uint8_t         reverseTcpControlBits;          /* 321     */
+    uint8_t         reverseInitialTCPFlags;         /* 322     */
+    uint8_t         reverseUnionTCPFlags;           /* 323     */
 
     /* start time of reverse flow, as millisec offset from start time
      * of forward flow */
-    uint32_t        reverseFlowDeltaMilliseconds;   /* 292-295 */
+    uint32_t        reverseFlowDeltaMilliseconds;   /* 324-327 */
 
-    uint64_t        reversePacketDeltaCount;        /* 296-303 */
-    uint64_t        reverseOctetDeltaCount;         /* 304-311 */
-    uint64_t        reversePacketTotalCount;        /* 312-319 */
-    uint64_t        reverseOctetTotalCount;         /* 320-327 */
+    uint64_t        reversePacketDeltaCount;        /* 328-335 */
+    uint64_t        reverseOctetDeltaCount;         /* 336-343 */
+    uint64_t        reversePacketTotalCount;        /* 344-351 */
+    uint64_t        reverseOctetTotalCount;         /* 352-359 */
 
     /* vlan IDs (reverse) */
-    uint16_t        reverseVlanId;                  /* 328-329 */
-    uint16_t        reversePostVlanId;              /* 330-331 */
+    uint16_t        reverseVlanId;                  /* 360-361 */
+    uint16_t        reversePostVlanId;              /* 362-363 */
 
     /* Flow attribute flags (reverse) */
-    uint16_t        reverseFlowAttributes;          /* 332-333 */
+    uint16_t        reverseFlowAttributes;          /* 364-365 */
 
     /* padding */
 #if SKI_FIXREC_PADDING != 0
-    uint8_t         paddingOctets[SKI_FIXREC_PADDING];/* 334-335 */
+    uint8_t         paddingOctets[SKI_FIXREC_PADDING];/* 366-367 */
 #endif
 
     /* TCP flags from yaf (when it is run without --silk) */
@@ -606,7 +625,8 @@ typedef struct ski_fixrec_st {
  *  **********  YAF/SiLK Template for Import  **********
  *
  *    These are templates used for reading records we know are coming
- *    from SiLK or YAF.
+ *    from SiLK or YAF.  The templates and struct are used
+ *    by ski_yafrec_next() when reading data.
  */
 
 /*
@@ -615,6 +635,8 @@ typedef struct ski_fixrec_st {
  *    ski_yafrec_spec[] are used.  For the template that uses the
  *    elements, the correspong bits are set to high in the
  *    SKI_YAFREC_TID below.
+ *
+ *    On SKI_YAFREC_TID, high bits are 2, 12, 13, 14
  */
 #define YAFREC_UNI          (1 <<  3)
 #define YAFREC_BI           (1 <<  4)
@@ -839,10 +861,33 @@ typedef struct ski_tcp_stml_st {
 
 
 /*
+ *  **********  YAF Statistics Options Template  **********
+ *
+ *    Information for statistics information exported by YAF.  The
+ *    template and structure are based on the yaf 2.3.0 manual page.
+ *    The templates and struct are used by ski_yafstats_next() when
+ *    reading data.
+ *
+ *    These types are defined in ipfixsource.h so they may be shared
+ *    with ipfixsource.c and that the source structure may contain
+ *    them.
+ *
+ *    #define SKI_YAFSTATS_TID        0xD000
+ *
+ *    static fbInfoElementSpec_t ski_yafstats_spec[] = {...};
+ *
+ *    typedef struct ski_yafstats_st { ... } ski_yafstats_t;
+ *
+ */
+
+
+
+/*
  *  **********  NetFlowV9 Data Template  **********
  *
  *    Define the list of information elements and the corresponding
- *    struct for reading common NetFlowV9 records.
+ *    struct for reading common NetFlowV9 records.  The templates and
+ *    struct are used by ski_nf9rec_next() when reading data.
  */
 
 /*
@@ -850,6 +895,8 @@ typedef struct ski_tcp_stml_st {
  *    determine which elements in the ski_nf9rec_spec[] are used.  For
  *    the template that uses the elements, the correspong bits are set
  *    to high in the SKI_NF9REC_TID below.
+ *
+ *    On SKI_NF9REC_TID, high bits are 1, 13, 14.
  */
 #define NF9REC_DELTA        (1 <<  2)
 #define NF9REC_TOTAL        (1 <<  3)
@@ -886,10 +933,12 @@ static fbInfoElementSpec_t ski_nf9rec_spec[] = {
      * Delta elements */
     { (char*)"packetDeltaCount",                   8, NF9REC_DELTA },
     { (char*)"octetDeltaCount",                    8, NF9REC_DELTA },
-    { (char*)"paddingOctets",                     16, NF9REC_DELTA },
+    { (char*)"postPacketDeltaCount",               8, NF9REC_DELTA },
+    { (char*)"postOctetDeltaCount",                8, NF9REC_DELTA },
     { (char*)"packetTotalCount",                   8, NF9REC_TOTAL },
     { (char*)"octetTotalCount",                    8, NF9REC_TOTAL },
-    { (char*)"paddingOctets",                     16, NF9REC_TOTAL },
+    { (char*)"postPacketTotalCount",               8, NF9REC_TOTAL },
+    { (char*)"postOctetTotalCount",                8, NF9REC_TOTAL },
     { (char*)"initiatorPackets",                   8, NF9REC_INITIATOR},
     { (char*)"initiatorOctets",                    8, NF9REC_INITIATOR },
     { (char*)"responderPackets",                   8, NF9REC_INITIATOR},
@@ -949,10 +998,12 @@ typedef struct ski_nf9rec_st {
     uint64_t        packetDeltaCount;               /*  16- 23 */
     uint64_t        octetDeltaCount;                /*  24- 31 */
 
-    /* actually holds responderPackets and responderOctets, but only
-     * when NF9REC_INITIATOR bit is set. */
-    uint64_t        reversePacketDeltaCount;        /*  32- 39 */
-    uint64_t        reverseOctetDeltaCount;         /*  40- 47 */
+    /* postPacketDeltaCount and postOctetDeltaCount; or
+     * postPacketTotalCount and postPacketTotalCount; or
+     * responderPackets and responderOctets when the NF9REC_INITIATOR
+     * bit is set */
+    uint64_t        postPacketDeltaCount;           /*  32- 39 */
+    uint64_t        postOctetDeltaCount;            /*  40- 47 */
 
     union nf9rec_time_un {
         /* Traditional NetFlow time uses SysUptime */
@@ -1004,7 +1055,8 @@ typedef struct ski_nf9rec_st {
  *
  *    Define the list of information elements and the corresponding
  *    struct for reading NetFlowV9 Options Template records that
- *    contains sampling information.
+ *    contains sampling information.  The template and struct are used
+ *    by ski_nf9sampling_next() when reading data.
  */
 
 #define SKI_NF9SAMPLING_TID     0xAFED
@@ -1046,7 +1098,9 @@ typedef struct ski_nf9sampling_st {
 /*
  *  **********  Simple Template for Ignoring Data  **********
  *
- *    Simple template for reading data that is thrown away.
+ *    Simple template for reading data that is thrown away.  The
+ *    template and struct are used by ski_ignore_next() when reading
+ *    data.
  */
 
 #define SKI_IGNORE_TID          0x4444
@@ -1067,24 +1121,24 @@ typedef struct ski_ignore_st {
 
 /* Types of IPFIX records.  Returned by ski_rectype_next(). */
 typedef enum ski_rectype_en {
+    SKI_RECTYPE_ERROR,
     SKI_RECTYPE_FIXREC,
     SKI_RECTYPE_YAFREC,
     SKI_RECTYPE_NF9REC,
     SKI_RECTYPE_YAFSTATS,
     SKI_RECTYPE_NF9SAMPLING,
-    SKI_RECTYPE_IGNORE,
-    SKI_RECTYPE_ERROR
+    SKI_RECTYPE_IGNORE
 } ski_rectype_t;
 
 #if TRACEMSG_LEVEL >= 2
 static const char *ski_rectype_name[] = {
+    "SKI_RECTYPE_ERROR",
     "SKI_RECTYPE_FIXREC",
     "SKI_RECTYPE_YAFREC",
     "SKI_RECTYPE_NF9REC",
     "SKI_RECTYPE_YAFSTATS",
     "SKI_RECTYPE_NF9SAMPLING",
-    "SKI_RECTYPE_IGNORE",
-    "SKI_RECTYPE_ERROR"
+    "SKI_RECTYPE_IGNORE"
 };
 #endif
 
@@ -1171,14 +1225,17 @@ skiTemplateCallbackCtx(
     if (print_templates)
 #endif
     {
-        snprintf(prefix, sizeof(prefix), "Domain 0x%04X, TemplateID 0x%04X",
+        snprintf(prefix, sizeof(prefix), "Domain %#06X, TemplateID %#06X",
                  domain, tid);
     }
 
     TRACEMSG(2, ("%s [%p] skiTemplateCallback()", prefix, tmpl));
 
     if (SKI_YAF_TCP_FLOW_TID == (tid & ~SKI_YAF_REVERSE_BIT)) {
+        /* the template ID matches the ID for the YAF template that
+         * contains TCP flags */
         fbSessionAddTemplatePair(session, tid, SKI_TCP_STML_TID);
+        TRACEMSG(3, ("%s, Added template pair for YAF TCP flags", prefix));
 
     } else if (fbTemplateGetOptionsScope(tmpl)) {
         /* do not define any template pairs for this template */
@@ -1223,7 +1280,7 @@ skiTemplateCallbackCtx(
                 }
             }
             TRACEMSG(
-                3, ("%s, bmap 0x%08" PRIx64 ", IE %s (%u/%u)",
+                3, ("%s, bmap %#010" PRIx64 ", IE %s (%u/%u)",
                     prefix, bmap, ie->ref.canon->ref.name, ie->ent, ie->num));
         }
         if (bmap) {
@@ -1233,15 +1290,15 @@ skiTemplateCallbackCtx(
         if (bmap & (TMPL_BIT_flowTableFlushEventCount
                     | TMPL_BIT_flowTablePeakCount))
         {
-            DEBUGMSG(("Will process options template 0x%04x with the"
+            DEBUGMSG(("Will process options template %#06x with the"
                       " YAFstats template"),
                      tid);
         } else if (bmap & (TMPL_BIT_samplingAlgorithm | TMPL_BIT_samplerMode)){
-            DEBUGMSG(("Will process options template 0x%04x with the"
+            DEBUGMSG(("Will process options template %#06x with the"
                       " sampling template"),
                      tid);
         } else {
-            DEBUGMSG(("Will process options template 0x%04x with the"
+            DEBUGMSG(("Will process options template %#06x with the"
                       " ignore template"),
                      tid);
         }
@@ -1250,6 +1307,7 @@ skiTemplateCallbackCtx(
         /* do not define any template pairs for this template */
         fbSessionAddTemplatePair(session, tid, 0);
 
+        /* populate the bitmap */
         for (i = 0; i < count && (ie = fbTemplateGetIndexedIE(tmpl, i)); ++i) {
             if (ie->ent == 0) {
                 /* STANDARD ELEMENT */
@@ -1273,6 +1331,16 @@ skiTemplateCallbackCtx(
                   case 86:
                     /* octetTotalCount and/or packetTotalCount */
                     bmap |= TMPL_BIT_octetTotalCount;
+                    break;
+                  case 23:
+                  case 24:
+                    /* postOctetDeltaCount and/or postPacketDeltaCount */
+                    bmap |= TMPL_BIT_postOctetDeltaCount;
+                    break;
+                  case 171:
+                  case 172:
+                    /* postOctetTotalCount and/or postPacketTotalCount */
+                    bmap |= TMPL_BIT_postOctetTotalCount;
                     break;
                   case 32:
                   case 139:
@@ -1401,7 +1469,10 @@ skiTemplateCallbackCtx(
                 switch (ie->num) {
                   case 1:
                   case 2:
-                    /* reverseOctetDeltaCount and/or reversePacketDeltaCount */
+                    /* reverseOctetDeltaCount and/or
+                     * reversePacketDeltaCount; for NetFlow v9 records
+                     * they may hold post{Octet,Packet}DeltaCount when
+                     * using libfixbuf prior to 1.8.0 */
                     bmap |= TMPL_BIT_reverseOctetDeltaCount;
                     break;
                   case 6:
@@ -1431,65 +1502,66 @@ skiTemplateCallbackCtx(
                 }
             }
             TRACEMSG(
-                3, ("%s, bmap 0x%010" PRIx64 ", IE %s (%u/%u)",
+                3, ("%s, bmap %#012" PRIx64 ", IE %s (%u/%u)",
                     prefix, bmap, ie->ref.canon->ref.name, ie->ent, ie->num));
         }
 
-        if ((0 == (bmap & ~TMPL_MASK_YAFREC))
-            && (bmap & TMPL_MASK_IPADDRESS))
+        /* now that the bitmap is populated, see if it matches some
+         * expected patterns */
+
+        /* check whether the template may be processed by the YAF
+         * template by: not using any IEs outside of those defined the
+         * YAF template, by having IP addresses, and by having
+         * consistent IEs for volume */
+        if (0 == (bmap & ~TMPL_MASK_YAFREC)
+            && (bmap & TMPL_MASK_IPADDRESS)
+            && ((bmap & TMPL_MASK_VOLUME_YAF) == TMPL_BIT_octetDeltaCount
+                || (bmap & TMPL_MASK_VOLUME_YAF) == TMPL_BIT_octetTotalCount))
         {
-            /* this do{}while is not a loop, it is just something that
-             * "break;" works with */
-            do {
-                /* Which volume element is present? */
-                if ((bmap & TMPL_MASK_VOLUME_YAF) == TMPL_BIT_octetDeltaCount){
-                    out |= YAFREC_DELTA;
-                } else if ((bmap & TMPL_MASK_VOLUME_YAF)
-                           == TMPL_BIT_octetTotalCount)
-                {
-                    out |= YAFREC_TOTAL;
-                } else {
-                    /* cannot use the yafrec template */
-                    out = 0;
-                    break;
-                }
-                /* Which IP addresses are present? */
-                if ((bmap & TMPL_MASK_IPADDRESS) == TMPL_MASK_IPADDRESS) {
-                    /* Both are */
-                    out |= YAFREC_IP_BOTH;
-                } else if (bmap & TMPL_BIT_sourceIPv6Address) {
-                    out |= YAFREC_ONLY_IP6;
-                } else {
-                    assert(bmap & TMPL_BIT_sourceIPv4Address);
-                    out |= YAFREC_ONLY_IP4;
-                }
+            /* Which volume element is present? */
+            if ((bmap & TMPL_MASK_VOLUME_YAF) == TMPL_BIT_octetDeltaCount) {
+                out |= YAFREC_DELTA;
+            } else {
+                assert((bmap & TMPL_MASK_VOLUME_YAF)
+                       == TMPL_BIT_octetTotalCount);
+                out |= YAFREC_TOTAL;
+            }
+            /* Which IP addresses are present? */
+            if ((bmap & TMPL_MASK_IPADDRESS) == TMPL_MASK_IPADDRESS) {
+                /* Both are */
+                out |= YAFREC_IP_BOTH;
+            } else if (bmap & TMPL_BIT_sourceIPv6Address) {
+                out |= YAFREC_ONLY_IP6;
+            } else {
+                assert(bmap & TMPL_BIT_sourceIPv4Address);
+                out |= YAFREC_ONLY_IP4;
+            }
 
-                /* Are TCP flags available without visiting the STML? */
-                if ((0 == (bmap & TMPL_BIT_initialTCPFlags))
-                    && (bmap & TMPL_BIT_subTemplateMultiList))
-                {
-                    out |= YAFREC_STML;
-                }
-                /* Is it a uniflow or a bi flow? */
-                if (bmap & TMPL_BIT_reverseFlowDeltaMilliseconds) {
-                    out |= YAFREC_BI;
-                } else {
-                    out |= YAFREC_UNI;
-                }
-                out |= (SKI_YAFREC_TID
-                        | (bmap & (TMPL_BIT_reverseVlanId |
-                                   TMPL_BIT_reverseTcpControlBits |
-                                   TMPL_BIT_reverseInitialTCPFlags |
-                                   TMPL_BIT_icmpTypeCodeIPv4)));
-                BMAP_TMPL_CTX_SET(ctx, ctx_free_fn, out);
-                DEBUGMSG("Will process template 0x%04x with the YAF template",
-                         tid);
-            } while (0);
-        }
+            /* Are TCP flags available without visiting the STML? */
+            if ((0 == (bmap & TMPL_BIT_initialTCPFlags))
+                && (bmap & TMPL_BIT_subTemplateMultiList))
+            {
+                out |= YAFREC_STML;
+            }
+            /* Is it a uniflow or a bi flow? */
+            if (bmap & TMPL_BIT_reverseFlowDeltaMilliseconds) {
+                out |= YAFREC_BI;
+            } else {
+                out |= YAFREC_UNI;
+            }
+            out |= (SKI_YAFREC_TID
+                    | (bmap & (TMPL_BIT_reverseVlanId |
+                               TMPL_BIT_reverseTcpControlBits |
+                               TMPL_BIT_reverseInitialTCPFlags |
+                               TMPL_BIT_icmpTypeCodeIPv4)));
+            BMAP_TMPL_CTX_SET(ctx, ctx_free_fn, out);
+            DEBUGMSG("Will process template %#06x with the YAF template",
+                     tid);
 
-        if (NULL == *ctx
-            && (0 == (bmap & ~TMPL_MASK_NF9REC))
-            && (bmap & TMPL_MASK_IPADDRESS))
+        /* check whether the template may be processed by the NetFlow
+         * v9 template by not having any IEs outside of that set */
+        } else if ((0 == (bmap & ~TMPL_MASK_NF9REC))
+                   && (bmap & TMPL_MASK_IPADDRESS))
         {
             /* this do{}while is not a loop, it is just something that
              * "break;" works with */
@@ -1524,15 +1596,17 @@ skiTemplateCallbackCtx(
 
                 /* Which volume is present */
                 if ((bmap & TMPL_MASK_VOLUME_NF9)
-                    == (TMPL_BIT_initiatorOctets | TMPL_BIT_responderOctets))
+                    & (TMPL_BIT_initiatorOctets | TMPL_BIT_responderOctets))
                 {
                     out |= NF9REC_INITIATOR;
                 } else if ((bmap & TMPL_MASK_VOLUME_NF9)
-                           == TMPL_BIT_octetDeltaCount)
+                           & (TMPL_BIT_octetDeltaCount
+                              | TMPL_BIT_postOctetDeltaCount))
                 {
                     out |= NF9REC_DELTA;
                 } else if ((bmap & TMPL_MASK_VOLUME_NF9)
-                           == TMPL_BIT_octetTotalCount)
+                           & (TMPL_BIT_octetTotalCount
+                              | TMPL_BIT_postOctetTotalCount))
                 {
                     out |= NF9REC_TOTAL;
                 } else if (((bmap & TMPL_MASK_VOLUME_NF9) == 0)
@@ -1553,7 +1627,7 @@ skiTemplateCallbackCtx(
                                    TMPL_BIT_NF_F_FW_EVENT |
                                    TMPL_BIT_NF_F_FW_EXT_EVENT)));
                 BMAP_TMPL_CTX_SET(ctx, ctx_free_fn, out);
-                DEBUGMSG("Will process template 0x%04x with the NFv9 template",
+                DEBUGMSG("Will process template %#06x with the NFv9 template",
                          tid);
             } while (0);
         }
@@ -1561,7 +1635,7 @@ skiTemplateCallbackCtx(
         if (*ctx == NULL && bmap) {
             out = 1 | (BMAP_TYPE)bmap;
             BMAP_TMPL_CTX_SET(ctx, ctx_free_fn, out);
-            DEBUGMSG("Will process template 0x%04x with the generic template",
+            DEBUGMSG("Will process template %#06x with the generic template",
                      tid);
         }
     }
@@ -1597,6 +1671,10 @@ skiTemplateCallbackCtx(
 /*
  *    Initialize an fbSession object that reads from either the
  *    network or from a file.
+ *
+ *    This function updates the fbSession object with (1) the
+ *    received-new-template callback function and (2) all the
+ *    templates used when transcoding the incoming data.
  */
 int
 skiSessionInitReader(
@@ -1656,6 +1734,7 @@ skiSessionInitReader(
     uint16_t tid;
 
 
+    /* assert that we are not replacing an existing template */
 #ifdef  NDEBUG
 #define ASSERT_NO_TMPL(m_session, m_tid, m_err)
 #else
@@ -1675,7 +1754,7 @@ skiSessionInitReader(
     if (!fbTemplateAppendSpecArray(tmpl, ski_fixrec_spec, sampler_flags, err)){
         goto ERROR;
     }
-    ASSERT_NO_TMPL(session, SKI_YAFREC_TID, err);
+    ASSERT_NO_TMPL(session, SKI_FIXREC_TID, err);
     if (!fbSessionAddTemplate(session, TRUE, SKI_FIXREC_TID, tmpl, err)) {
         goto ERROR;
     }
@@ -1700,7 +1779,7 @@ skiSessionInitReader(
         goto ERROR;
     }
 
-    /* Add the netflow v9 sampling template  */
+    /* Add the netflow v9 sampling options template  */
     tmpl = fbTemplateAlloc(model);
     if (!fbTemplateAppendSpecArray(
             tmpl, ski_nf9sampling_spec, sampler_flags, err))
@@ -1712,7 +1791,7 @@ skiSessionInitReader(
         goto ERROR;
     }
 
-    /* Add the options template  */
+    /* Add the "do nothing/ignore record" template  */
     tmpl = fbTemplateAlloc(model);
     if (!fbTemplateAppendSpecArray(tmpl, ski_ignore_spec, 0, err)) {
         goto ERROR;
@@ -1768,8 +1847,13 @@ skiSessionInitReader(
  */
 
 /**
- *    Fill the referent of 'tmpl' with the template for the next
- *    record and return the type of the next record.
+ *    Use the external template of the next record to determine its
+ *    type.
+ *
+ *    Fill the 'tmpl' member of 'record' with the incoming template
+ *    for the next record, fill the 'bmap' member of 'record' with the
+ *    bitmap settings for that template, fill the 'rectype' member of
+ *    'record' with the next record's type, and return that type.
  */
 static ski_rectype_t
 ski_rectype_next(
@@ -1828,7 +1912,7 @@ ski_yafstats_next(
 {
     size_t len;
 
-    TRACEMSG(2, (("Domain 0x%04X, TemplateID 0x%04X [%p], bmap " BMAP_PRI
+    TRACEMSG(2, (("Domain %#06X, TemplateID %#06X [%p], bmap " BMAP_PRI
                   ", read by ski_yafstats_next()"),
                  fbSessionGetDomain(fBufGetSession(fbuf)), record->tid,
                  (void *)record->tmpl, record->bmap));
@@ -1956,7 +2040,7 @@ ski_nf9sampling_next(
 {
     size_t len;
 
-    TRACEMSG(2, (("Domain 0x%04X, TemplateID 0x%04X [%p], bmap " BMAP_PRI
+    TRACEMSG(2, (("Domain %#06X, TemplateID %#06X [%p], bmap " BMAP_PRI
                   ", read by ski_nf9sampling_next()"),
                  fbSessionGetDomain(fBufGetSession(fbuf)), record->tid,
                  (void *)record->tmpl, record->bmap));
@@ -2006,7 +2090,7 @@ ski_ignore_next(
 {
     size_t len;
 
-    TRACEMSG(2, (("Domain 0x%04X, TemplateID 0x%04X [%p], bmap " BMAP_PRI
+    TRACEMSG(2, (("Domain %#06X, TemplateID %#06X [%p], bmap " BMAP_PRI
                   ", read by ski_ignore_next()"),
                  fbSessionGetDomain(fBufGetSession(fbuf)), record->tid,
                  (void *)record->tmpl, record->bmap));
@@ -2674,29 +2758,24 @@ ski_fixrec_ignore(
 
 
 /**
- * Read the next IPFIX record from a buffer and convert it to SiLK
- * Flow record(s) 'rec' and 'revRec'.  Overwrites the rwRec buffer
- * pointed to by rec with the converted record. If the next IPFIX
- * record is a biflow record and revRec is not NULL, overwrites the
- * rwRec buffer pointed to by revRec with the reverse direction
- * record; if revRec is NULL, the reverse direction is discarded
- * silently.  If the next IPFIX record is a uniflow record and revRec
- * is not NULL, the the rwRec buffer pointed to by revRec is cleared
- * with RWREC_CLEAR().
+ *    Call fBufNext() and transcode the data into the ski_fixrec_spec
+ *    template, then convert the structure into 0, 1, or 2 SiLK Flow
+ *    records and fill the record pointers on the 'record' structure.
+ *    The return value indicates the number of records converted.
+ *    Return -1 on failure.
  *
- * Returns 1 if the IPFIX record contained a uni-flow record, or
- * returns 2 if the IPFIX record contained a bi-flow record.  Both rec
- * and revRec (if provided) will have been modified.
+ *    The reverse record is cleared via RWREC_CLEAR() when the return
+ *    value is 1.
  *
- * Returns 0 if the IPFIX record should be ignored.  The forward rec
- * will have been cleared; the reverse record is untouched.  A record
- * can be ignored when (1)the record is IPv6 and SiLK is compiled
- * without IPv6 support, (2)the record has a packet and/or byte count
- * of 0, or (3)the record is explicitly marked as an "intermediate"
- * record by yaf.
+ *    Return 0 if the IPFIX record should be ignored.  The forward rec
+ *    will have been cleared; the reverse record is untouched.  A
+ *    record can be ignored when (1)the record is IPv6 and SiLK is
+ *    compiled without IPv6 support, (2)the record has a packet and/or
+ *    byte count of 0, or (3)the record is explicitly marked as an
+ *    "intermediate" record by yaf.
  *
- * Returns -1 on failure.  The forward rec will have been cleared; the
- * reverse record is untouched.
+ *    Return -1 on failure.  The forward rec will have been cleared;
+ *    the reverse record is untouched.
  */
 static int
 ski_fixrec_next(
@@ -2715,7 +2794,7 @@ ski_fixrec_next(
     int have_tcp_stml = 0;
     rwRec *fwd_rec;
 
-    TRACEMSG(2, (("Domain 0x%04X, TemplateID 0x%04X [%p], bmap " BMAP_PRI
+    TRACEMSG(2, (("Domain %#06X, TemplateID %#06X [%p], bmap " BMAP_PRI
                   ", read by ski_fixrec_next()"),
                  fbSessionGetDomain(fBufGetSession(fbuf)), record->tid,
                  (void *)record->tmpl, record->bmap));
@@ -2764,13 +2843,23 @@ ski_fixrec_next(
             ? fixrec->packetDeltaCount
             : ((fixrec->packetTotalCount)
                ? fixrec->packetTotalCount
-               : fixrec->initiatorPackets));
+               : ((fixrec->initiatorPackets)
+                  ? fixrec->initiatorPackets
+                  : ((fixrec->postPacketDeltaCount)
+                     ? fixrec->postPacketDeltaCount
+                     : fixrec->postPacketTotalCount))));
     bytes = ((fixrec->octetDeltaCount)
              ? fixrec->octetDeltaCount
              : ((fixrec->octetTotalCount)
                 ? fixrec->octetTotalCount
-                : fixrec->initiatorOctets));
+                : ((fixrec->initiatorOctets)
+                   ? fixrec->initiatorOctets
+                   : ((fixrec->postOctetDeltaCount)
+                      ? fixrec->postOctetDeltaCount
+                      : fixrec->postOctetTotalCount))));
 
+    /* I suppose we could add checks for
+     * reversePost{Packet,Octet}{Delta,Total}Count here as well. */
     rev_pkts = ((fixrec->reversePacketDeltaCount)
                 ? fixrec->reversePacketDeltaCount
                 : ((fixrec->reversePacketTotalCount)
@@ -3494,7 +3583,7 @@ ski_yafrec_next(
     rwRec *fwd_rec;
     rwRec *rev_rec;
 
-    TRACEMSG(2, (("Domain 0x%04X, TemplateID 0x%04X [%p], bmap " BMAP_PRI
+    TRACEMSG(2, (("Domain %#06X, TemplateID %#06X [%p], bmap " BMAP_PRI
                   ", read by ski_yafrec_next()"),
                  fbSessionGetDomain(fBufGetSession(fbuf)), record->tid,
                  (void *)record->tmpl, record->bmap));
@@ -3508,13 +3597,13 @@ ski_yafrec_next(
      * use to read the record. */
     int_tid = record->bmap & UINT16_MAX;
     if ((int_tid & SKI_YAFREC_TID) != SKI_YAFREC_TID) {
-        TRACEMSG(1, ("ski_yafrec_next() called but TID 0x%04x does not match",
+        TRACEMSG(1, ("ski_yafrec_next() called but TID %#06x does not match",
                      int_tid));
         return ski_ignore_next(fbuf, record, probe, err);
     }
     if (!fBufSetInternalTemplate(fbuf, int_tid, err)) {
         TRACEMSG(1, (("ski_yafrec_next() called but setting Template"
-                      " TID 0x%04x failed: %s"), int_tid, (*err)->message));
+                      " TID %#06x failed: %s"), int_tid, (*err)->message));
         g_clear_error(err);
         return ski_ignore_next(fbuf, record, probe, err);
     }
@@ -3954,7 +4043,7 @@ ski_nf9rec_next(
     rwRec *fwd_rec;
     rwRec *rev_rec;
 
-    TRACEMSG(2, (("Domain 0x%04X, TemplateID 0x%04X [%p], bmap " BMAP_PRI
+    TRACEMSG(2, (("Domain %#06X, TemplateID %#06X [%p], bmap " BMAP_PRI
                   ", read by ski_nf9rec_next()"),
                  fbSessionGetDomain(fBufGetSession(fbuf)), record->tid,
                  (void *)record->tmpl, record->bmap));
@@ -3969,13 +4058,13 @@ ski_nf9rec_next(
      * use to read the record. */
     int_tid = record->bmap & UINT16_MAX;
     if ((int_tid & SKI_NF9REC_TID) != SKI_NF9REC_TID) {
-        TRACEMSG(1, ("ski_nf9rec_next() called but TID 0x%04x does not match",
+        TRACEMSG(1, ("ski_nf9rec_next() called but TID %#06x does not match",
                      int_tid));
         return ski_ignore_next(fbuf, record, probe, err);
     }
     if (!fBufSetInternalTemplate(fbuf, int_tid, err)) {
         TRACEMSG(1, (("ski_nf9rec_next() called but setting Template"
-                      " TID 0x%04x failed: %s"), int_tid, (*err)->message));
+                      " TID %#06x failed: %s"), int_tid, (*err)->message));
         g_clear_error(err);
         return ski_ignore_next(fbuf, record, probe, err);
     }
@@ -3995,8 +4084,8 @@ ski_nf9rec_next(
     }
 #endif  /* SK_ENABLE_IPV6 */
 
-    /* Check for reverse (responder) volume and handle the firewall
-     * settings.  See big comment in ski_fixrec_next() for all the
+    /* Handle the firewall settings and check for reverse (responder)
+     * volume.  See the big comment in ski_fixrec_next() for all the
      * gory details on firewall rules. */
     if (record->bmap & (TMPL_BIT_firewallEvent | TMPL_BIT_NF_F_FW_EVENT
                         | TMPL_BIT_NF_F_FW_EXT_EVENT))
@@ -4006,7 +4095,7 @@ ski_nf9rec_next(
         uint8_t event = (nf9rec->firewallEvent
                          ? nf9rec->firewallEvent : nf9rec->NF_F_FW_EVENT);
         if (SKIPFIX_FW_EVENT_DENIED == event) {
-            /* flow denied; there is no reverse record */
+            /* flow denied; there should be no reverse record */
             TRACEMSG(1, (("Processing flow denied event as actual flow record;"
                           " firewallEvent=%u, NF_F_FW_EVENT=%u,"
                           " NF_F_FW_EXT_EVENT=%u"),
@@ -4028,6 +4117,21 @@ ski_nf9rec_next(
                 } else {
                     TRACEMSG(1, ("Setting forward packets to 1"
                                  " for denied firewall event"));
+                    rwRecSetPkts(fwd_rec, 1);
+                }
+            } else if (nf9rec->postOctetDeltaCount
+                       && !(record->bmap & NF9REC_INITIATOR))
+            {
+                /* postOctet value is non-zero and it is not
+                 * responderOctets; use in place of standard value */
+                rwRecSetBytes(fwd_rec,
+                              CLAMP_VAL32(nf9rec->postOctetDeltaCount));
+                if (nf9rec->postPacketDeltaCount) {
+                    rwRecSetPkts(fwd_rec,
+                                 CLAMP_VAL32(nf9rec->postPacketDeltaCount));
+                } else {
+                    TRACEMSG(1, ("Setting forward packets to 1 for denied"
+                                 " firewall event (postOctets non-zero)"));
                     rwRecSetPkts(fwd_rec, 1);
                 }
             } else if (nf9rec->packetDeltaCount) {
@@ -4069,6 +4173,21 @@ ski_nf9rec_next(
                                  " for deleted firewall event"));
                     rwRecSetPkts(fwd_rec, 1);
                 }
+            } else if (nf9rec->postOctetDeltaCount
+                       && !(record->bmap & NF9REC_INITIATOR))
+            {
+                /* postOctet value is non-zero and it is not
+                 * responderOctets; use in place of standard value */
+                rwRecSetBytes(fwd_rec,
+                              CLAMP_VAL32(nf9rec->postOctetDeltaCount));
+                if (nf9rec->postPacketDeltaCount) {
+                    rwRecSetPkts(fwd_rec,
+                                 CLAMP_VAL32(nf9rec->postPacketDeltaCount));
+                } else {
+                    TRACEMSG(1, ("Setting forward packets to 1 for deleted"
+                                 " firewall event (postOctets non-zero)"));
+                    rwRecSetPkts(fwd_rec, 1);
+                }
             } else if (nf9rec->packetDeltaCount) {
                 TRACEMSG(1, ("Setting forward bytes equal to packets value"
                              " for deleted firewall event"));
@@ -4084,54 +4203,76 @@ ski_nf9rec_next(
             /* handle reverse record */
             if (!(record->bmap & NF9REC_INITIATOR)) {
                 /* There is no reverse data */
-            } else if (nf9rec->reverseOctetDeltaCount) {
-                /* there is a reverse byte count */
+            } else if (nf9rec->postOctetDeltaCount) {
+                /* there is a reverse byte count: postOctet and
+                 * postPacket members hold responder values */
                 RWREC_CLEAR(record->rev_rec);
                 rev_rec = record->rev_rec;
                 rwRecSetBytes(
-                    rev_rec, CLAMP_VAL32(nf9rec->reverseOctetDeltaCount));
-                if (nf9rec->reversePacketDeltaCount) {
+                    rev_rec, CLAMP_VAL32(nf9rec->postOctetDeltaCount));
+                if (nf9rec->postPacketDeltaCount) {
                     rwRecSetPkts(
-                        rev_rec, CLAMP_VAL32(nf9rec->reversePacketDeltaCount));
+                        rev_rec, CLAMP_VAL32(nf9rec->postPacketDeltaCount));
                 } else {
                     TRACEMSG(1, ("Setting reverse packets to 1"
                                  " for deleted firewall event"));
                     rwRecSetPkts(rev_rec, 1);
                 }
-            } else if (nf9rec->reversePacketDeltaCount) {
+            } else if (nf9rec->postPacketDeltaCount) {
                 /* there is a reverse packet count */
                 RWREC_CLEAR(record->rev_rec);
                 rev_rec = record->rev_rec;
                 TRACEMSG(1, ("Setting reverse bytes equal to packets value"
                              " for deleted firewall event"));
                 rwRecSetBytes(
-                    rev_rec, CLAMP_VAL32(nf9rec->reversePacketDeltaCount));
+                    rev_rec, CLAMP_VAL32(nf9rec->postPacketDeltaCount));
                 rwRecSetPkts(
-                    rev_rec, CLAMP_VAL32(nf9rec->reversePacketDeltaCount));
+                    rev_rec, CLAMP_VAL32(nf9rec->postPacketDeltaCount));
             }
             /* else no reverse record */
         }
     } else if (!(record->bmap & NF9REC_INITIATOR)) {
-        /* There is no firewall event data and no reverse data; set
+        /* there is no firewall event data and no reverse data; set
          * forward data */
-        if (0 == nf9rec->octetDeltaCount) {
+        if (nf9rec->octetDeltaCount) {
+            /* use the forward octet count which is non-zero */
+            if (nf9rec->packetDeltaCount) {
+                rwRecSetBytes(fwd_rec, CLAMP_VAL32(nf9rec->octetDeltaCount));
+                rwRecSetPkts(fwd_rec, CLAMP_VAL32(nf9rec->packetDeltaCount));
+            } else if (skpcProbeGetQuirks(probe) & SKPC_QUIRK_ZERO_PACKETS) {
+                TRACEMSG(1, ("Setting forward packets to 1"
+                             " outside of firewall event handler"));
+                rwRecSetBytes(fwd_rec, CLAMP_VAL32(nf9rec->octetDeltaCount));
+                rwRecSetPkts(fwd_rec, 1);
+            } else {
+                ski_nf9rec_ignore(record, "No forward packets");
+                return 0;
+            }
+        } else if (nf9rec->postOctetDeltaCount) {
+            /* postOctet value is non-zero and it is not
+             * responderOctets; use in place of standard value */
+            if (nf9rec->postPacketDeltaCount) {
+                rwRecSetBytes(fwd_rec,
+                              CLAMP_VAL32(nf9rec->postOctetDeltaCount));
+                rwRecSetPkts(fwd_rec,
+                             CLAMP_VAL32(nf9rec->postPacketDeltaCount));
+            } else if (skpcProbeGetQuirks(probe) & SKPC_QUIRK_ZERO_PACKETS) {
+                TRACEMSG(1, ("Setting forward packets to 1"
+                             " outside of firewall event handler"));
+                rwRecSetBytes(fwd_rec,
+                              CLAMP_VAL32(nf9rec->postOctetDeltaCount));
+                rwRecSetPkts(fwd_rec, 1);
+            } else {
+                ski_nf9rec_ignore(record, "No forward packets");
+                return 0;
+            }
+        } else {
             ski_nf9rec_ignore(record, "No forward octets");
             return 0;
         }
-        if (nf9rec->packetDeltaCount) {
-            rwRecSetBytes(fwd_rec, CLAMP_VAL32(nf9rec->octetDeltaCount));
-            rwRecSetPkts(fwd_rec, CLAMP_VAL32(nf9rec->packetDeltaCount));
-        } else if (skpcProbeGetQuirks(probe) & SKPC_QUIRK_ZERO_PACKETS) {
-            TRACEMSG(1, ("Setting forward packets to 1"
-                         " outside of firewall event handler"));
-            rwRecSetBytes(fwd_rec, CLAMP_VAL32(nf9rec->octetDeltaCount));
-            rwRecSetPkts(fwd_rec, 1);
-        } else {
-            ski_nf9rec_ignore(record, "No forward packets");
-            return 0;
-        }
     } else if (nf9rec->octetDeltaCount) {
-        /* There is forward volume */
+        /* the template included initiatorOctets & responderOctets and
+         * there is forward volume */
         if (nf9rec->packetDeltaCount) {
             rwRecSetBytes(fwd_rec, CLAMP_VAL32(nf9rec->octetDeltaCount));
             rwRecSetPkts(fwd_rec, CLAMP_VAL32(nf9rec->packetDeltaCount));
@@ -4144,29 +4285,29 @@ ski_nf9rec_next(
             ski_nf9rec_ignore(record, "No forward packets");
             return 0;
         }
-        if (nf9rec->reverseOctetDeltaCount) {
-            /* there is a reverse byte count */
-            if (nf9rec->reversePacketDeltaCount) {
+        if (nf9rec->postOctetDeltaCount) {
+            /* there is a reverse byte count (responderOctets) */
+            if (nf9rec->postPacketDeltaCount) {
                 RWREC_CLEAR(record->rev_rec);
                 rev_rec = record->rev_rec;
                 rwRecSetBytes(
-                    rev_rec, CLAMP_VAL32(nf9rec->reverseOctetDeltaCount));
+                    rev_rec, CLAMP_VAL32(nf9rec->postOctetDeltaCount));
                 rwRecSetPkts(
-                    rev_rec, CLAMP_VAL32(nf9rec->reversePacketDeltaCount));
+                    rev_rec, CLAMP_VAL32(nf9rec->postPacketDeltaCount));
             } else if (skpcProbeGetQuirks(probe) & SKPC_QUIRK_ZERO_PACKETS) {
                 RWREC_CLEAR(record->rev_rec);
                 rev_rec = record->rev_rec;
                 TRACEMSG(1, ("Setting reverse packets to 1"
                              " outside of firewall event handler"));
                 rwRecSetBytes(
-                    rev_rec, CLAMP_VAL32(nf9rec->reverseOctetDeltaCount));
+                    rev_rec, CLAMP_VAL32(nf9rec->postOctetDeltaCount));
                 rwRecSetPkts(rev_rec, 1);
             } else {
                 TRACEMSG(
                     1, ("Ignoring reverse bytes since no reverse packets"));
             }
         }
-    } else if (nf9rec->reverseOctetDeltaCount) {
+    } else if (nf9rec->postOctetDeltaCount) {
         /* reverse only record */
         ski_nf9rec_ignore(record,
                           "No forward octets (reverse octets are non-zero)");

@@ -21,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: ipfixsource.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: ipfixsource.c b1f14bba708e 2017-06-28 15:29:44Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/redblack.h>
@@ -562,7 +562,7 @@ fixbufConnect(
         && fbListenerGetCollector(listener, &collector, NULL))
     {
         conn->ob_domain = fbCollectorGetObservationDomain(collector);
-        INFOMSG("'%s': accepted connection from %s, domain 0x%04x",
+        INFOMSG("'%s': accepted connection from %s, domain %#06x",
                 source->name, addr_buf, conn->ob_domain);
     } else {
         INFOMSG("'%s': accepted connection from %s",
@@ -615,7 +615,7 @@ fixbufDisconnect(
 
         skSockaddrString(addr_buf, sizeof(addr_buf), &conn->peer_addr);
         if (conn->ob_domain) {
-            INFOMSG("'%s': noticed disconnect by %s, domain 0x%04x",
+            INFOMSG("'%s': noticed disconnect by %s, domain %#06x",
                     conn->source->name, addr_buf, conn->ob_domain);
         } else {
             INFOMSG("'%s': noticed disconnect by %s",
@@ -963,7 +963,7 @@ ipfixSourceBaseAddIPFIXSource(
         /* Add a mapping on the base for each accept-from-host address
          * on this source. */
         for (j = 0; j < accept_from_count; ++j) {
-            for (i = 0; i < skSockaddrArraySize(accept_from[j]); ++i) {
+            for (i = 0; i < skSockaddrArrayGetSize(accept_from[j]); ++i) {
                 peeraddr = ((peeraddr_source_t*)
                             calloc(1, sizeof(peeraddr_source_t)));
                 if (peeraddr == NULL) {
@@ -1112,16 +1112,16 @@ ipfixSourceCreateFromSockaddr(
         int *s;
         uint16_t port = 0;
 
-        s = sock_array = (int *)calloc(skSockaddrArraySize(listen_address),
+        s = sock_array = (int *)calloc(skSockaddrArrayGetSize(listen_address),
                                        sizeof(int));
         if (sock_array == NULL) {
             goto ERROR;
         }
 
         DEBUGMSG(("Attempting to bind %" PRIu32 " addresses for %s"),
-                 skSockaddrArraySize(listen_address),
-                 skSockaddrArrayNameSafe(listen_address));
-        for (i = 0; i < skSockaddrArraySize(listen_address); ++i) {
+                 skSockaddrArrayGetSize(listen_address),
+                 skSockaddrArrayGetHostPortPair(listen_address));
+        for (i = 0; i < skSockaddrArrayGetSize(listen_address); ++i) {
             addr = skSockaddrArrayGet(listen_address, i);
             skSockaddrString(addr_name, sizeof(addr_name), addr);
 
@@ -1144,19 +1144,20 @@ ipfixSourceCreateFromSockaddr(
             ++s;
 
             if (0 == port) {
-                port = skSockaddrPort(addr);
+                port = skSockaddrGetPort(addr);
             }
-            assert(port == skSockaddrPort(addr));
+            assert(port == skSockaddrGetPort(addr));
         }
         if (s == sock_array) {
             ERRMSG("Failed to bind any addresses for %s",
-                   skSockaddrArrayNameSafe(listen_address));
+                   skSockaddrArrayGetHostPortPair(listen_address));
             free(sock_array);
             goto ERROR;
         }
         DEBUGMSG(("Bound %" PRIu32 "/%" PRIu32 " addresses for %s"),
-                 (uint32_t)(s-sock_array), skSockaddrArraySize(listen_address),
-                 skSockaddrArrayNameSafe(listen_address));
+                 (uint32_t)(s-sock_array),
+                 skSockaddrArrayGetSize(listen_address),
+                 skSockaddrArrayGetHostPortPair(listen_address));
         while (s != sock_array) {
             --s;
             close(*s);
@@ -1181,7 +1182,7 @@ ipfixSourceCreateFromSockaddr(
 
         /* Ensure the accept-from addresses are unique. */
         for (j = 0; j < accept_from_count; ++j) {
-            for (i = 0; i < skSockaddrArraySize(accept_from[j]); ++i) {
+            for (i = 0; i < skSockaddrArrayGetSize(accept_from[j]); ++i) {
                 target.addr = skSockaddrArrayGet(accept_from[j], i);
                 found = ((const peeraddr_source_t*)
                          rbfind(&target, base->addr_to_source));
@@ -1249,14 +1250,17 @@ ipfixSourceCreateFromSockaddr(
         if (base->connspec == NULL) {
             goto ERROR;
         }
-        if (skSockaddrArrayName(listen_address)) {
-            base->connspec->host = strdup(skSockaddrArrayName(listen_address));
+        if (skSockaddrArrayGetHostname(listen_address)
+            != sk_sockaddr_array_anyhostname)
+        {
+            base->connspec->host
+                = strdup(skSockaddrArrayGetHostname(listen_address));
             if (base->connspec->host == NULL) {
                 goto ERROR;
             }
         }
         rv = snprintf(port_string, sizeof(port_string), "%i",
-                      skSockaddrPort(skSockaddrArrayGet(listen_address, 0)));
+                      skSockaddrGetPort(skSockaddrArrayGet(listen_address, 0)));
         assert((size_t)rv < sizeof(port_string));
         base->connspec->svc = strdup(port_string);
         if (base->connspec->svc == NULL) {
@@ -1340,12 +1344,13 @@ ipfixSourceCreateFromSockaddr(
 
         /* Start the listener thread */
         pthread_mutex_lock(&base->mutex);
-        rv = skthread_create(skSockaddrArrayNameSafe(listen_address),
+        rv = skthread_create(skSockaddrArrayGetHostPortPair(listen_address),
                              &base->thread, ipfix_reader, (void*)base);
         if (rv != 0) {
             pthread_mutex_unlock(&base->mutex);
             WARNINGMSG("Unable to spawn new thread for '%s': %s",
-                       skSockaddrArrayNameSafe(listen_address), strerror(rv));
+                       skSockaddrArrayGetHostPortPair(listen_address),
+                       strerror(rv));
             goto ERROR;
         }
 
@@ -1640,7 +1645,7 @@ skIPFIXSourceDestroy(
         /* Remove the source's accept-from-host addresses from
          * base->addr_to_source */
         for (j = 0; j < accept_from_count; ++j) {
-            for (i = 0; i < skSockaddrArraySize(accept_from[j]); ++i) {
+            for (i = 0; i < skSockaddrArrayGetSize(accept_from[j]); ++i) {
                 target.addr = skSockaddrArrayGet(accept_from[j], i);
                 found = ((const peeraddr_source_t*)
                          rbdelete(&target, base->addr_to_source));

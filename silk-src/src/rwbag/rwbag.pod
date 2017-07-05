@@ -710,8 +710,8 @@ B<rwbag> and B<rwbagbuild(1)> can use a prefix map file as the key in
 a Bag file as of SiLK 3.12.0.  For example, to lookup each source
 address in the prefix map file F<ip-map.pmap> that maps from address
 to "type of service", use the B<--pmap-file> switch to specify the
-prefix map file, and specify the Bag's key as C<sip-pmap:>I<MAPNAME>,
-where I<MAPNAME> is either the map-name stored in the prefix map file
+prefix map file, and specify the Bag's key as C<sip-pmap:>I<map-name>,
+where I<map-name> is either the map-name stored in the prefix map file
 or a name that is provided as part of the B<--pmap-file> argument.  (A
 prefix map's map-name is available via the B<rwfileinfo(1)> command.)
 
@@ -839,13 +839,14 @@ C<sip-country> and C<dip-country> keys.
 
 =head1 SEE ALSO
 
-B<rwbagbuild(1)>, B<rwbagcat(1)>, B<rwbagtool(1)>, B<rwfileinfo(1)>,
-B<rwfilter(1)>, B<rwnetmask(1)>, B<rwpmapbuild(1)>, B<rwuniq(1)>,
-B<ccfilter(3)>, B<sensor.conf(5)>, B<silk(7)>, B<zlib(3)>
+B<rwbagbuild(1)>, B<rwbagcat(1)>, B<rwbagtool(1)>, B<rwaggbag(1)>,
+B<rwfileinfo(1)>, B<rwfilter(1)>, B<rwnetmask(1)>, B<rwpmapbuild(1)>,
+B<rwuniq(1)>, B<ccfilter(3)>, B<sensor.conf(5)>, B<silk(7)>,
+B<zlib(3)>
 
 =cut
 
-$SiLK: rwbag.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwbag.pod 118af073bc56 2017-06-05 18:13:10Z mthomas $
 
 Local Variables:
 mode:text

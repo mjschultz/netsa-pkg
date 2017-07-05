@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: ipfixreader.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: ipfixreader.c b1f14bba708e 2017-06-28 15:29:44Z mthomas $");
 
 #include "rwflowpack_priv.h"
 
@@ -122,10 +122,9 @@ readerStart(
      * connection, get it for logging */
     skpcProbeGetListenOnSockaddr(fproc->probe, &bind_addr);
 
-    INFOMSG("Creating %s Reader for probe '%s' on %s:%d",
+    INFOMSG("Creating %s Reader for probe '%s' on %s",
             reader_type, skpcProbeGetName(fproc->probe),
-            skSockaddrArrayNameSafe(bind_addr),
-            skSockaddrPort(skSockaddrArrayGet(bind_addr, 0)));
+            skSockaddrArrayGetHostPortPair(bind_addr));
 
     /* create the source */
     params.max_pkts = BUF_REC_COUNT;
@@ -137,10 +136,9 @@ readerStart(
     }
 
     /* failed.  print error */
-    ERRMSG("Could not create %s Reader for '%s' on %s:%d",
+    ERRMSG("Could not create %s Reader for '%s' on %s",
            reader_type, skpcProbeGetName(fproc->probe),
-           skSockaddrArrayNameSafe(bind_addr),
-           skSockaddrPort(skSockaddrArrayGet(bind_addr, 0)));
+           skSockaddrArrayGetHostPortPair(bind_addr));
 
     return -1;
 }

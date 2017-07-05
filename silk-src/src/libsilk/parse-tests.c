@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: parse-tests.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: parse-tests.c b1f14bba708e 2017-06-28 15:29:44Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/utils.h>
@@ -889,6 +889,199 @@ uint32_parser(
             P_ERR(rv);
         }
 
+        P_END;
+    }
+
+    return 0;
+}
+
+
+
+/* Tests for skStringParseRange64() */
+
+static int
+range_uint64_parser(
+    void)
+{
+    uint32_t i;
+    int rv;
+    uint64_t result_lo;
+    uint64_t result_hi;
+    int failed, print_results;
+
+    static struct {
+        int             exp_retval;
+        uint64_t        min;
+        uint64_t        max;
+        unsigned int    flags;
+        uint64_t        exp_result_lo;
+        uint64_t        exp_result_hi;
+        const char     *str;
+    } input[] = {
+        {SKUTILS_OK,            0, 0,
+         SKUTILS_RANGE_ONLY_RANGE,      4,          14,
+         "4-14"},
+        {SKUTILS_OK,            0, UINT32_MAX,
+         SKUTILS_RANGE_ONLY_RANGE,      4,          14,
+         "    4-14"},
+        {SKUTILS_OK,            0, 0,
+         SKUTILS_RANGE_ONLY_RANGE,      4,          14,
+         "4-14    "},
+        {SKUTILS_OK,            4, 14,
+         SKUTILS_RANGE_ONLY_RANGE,      4,          14,
+         "    4-14    "},
+
+        {SKUTILS_ERR_MINIMUM,   5, 14,
+         SKUTILS_RANGE_ONLY_RANGE,      4,           0,
+         "    4-14    "},
+        {SKUTILS_ERR_MINIMUM,  15, 20,
+         SKUTILS_RANGE_ONLY_RANGE,      4,           0,
+         "    4-14    "},
+        {SKUTILS_ERR_MAXIMUM,   0,  3,
+         SKUTILS_RANGE_ONLY_RANGE,      4,           0,
+         "    4-14    "},
+        {SKUTILS_ERR_MAXIMUM,   0, 12,
+         SKUTILS_RANGE_ONLY_RANGE,      4,          14,
+         "    4-14    "},
+        {SKUTILS_ERR_BAD_RANGE, 0,  0,
+         SKUTILS_RANGE_ONLY_RANGE,     14,           4,
+         "    14-4    "},
+        {SKUTILS_ERR_OVERFLOW,  0,  0,
+         SKUTILS_RANGE_ONLY_RANGE,      4,           0,
+         "4-18446744073709551622"},
+
+        {SKUTILS_ERR_BAD_CHAR,  0, 0,
+         SKUTILS_RANGE_ONLY_RANGE,      4,           0,
+         "4- 14"},
+        {SKUTILS_ERR_BAD_CHAR,  0, 0,
+         SKUTILS_RANGE_ONLY_RANGE,      4,          14,
+         "4-14x"},
+        {SKUTILS_ERR_BAD_CHAR,  0, 0,
+         SKUTILS_RANGE_ONLY_RANGE,      4,           0,
+         "4=14"},
+        {SKUTILS_ERR_BAD_CHAR,  0, 0,
+         SKUTILS_RANGE_ONLY_RANGE,      4,           0,
+         "4 14"},
+        {SKUTILS_ERR_BAD_CHAR,  0, 0,
+         SKUTILS_RANGE_ONLY_RANGE,      4,           0,
+         "4--14"},
+        {SKUTILS_ERR_BAD_CHAR,  0, 0,
+         SKUTILS_RANGE_ONLY_RANGE,      0,           0,
+         "-4-14"},
+
+        {SKUTILS_ERR_SHORT,     0, 0,
+         SKUTILS_RANGE_ONLY_RANGE,      4,           0,
+         " 4"},
+        {SKUTILS_ERR_SHORT,     0, 0,
+         SKUTILS_RANGE_ONLY_RANGE,      4,           0,
+         " 4-"},
+
+        {SKUTILS_OK,            2, 22,
+         SKUTILS_RANGE_SINGLE_OPEN,     4,          14,
+         " 4-14 "},
+        {SKUTILS_OK,            2, 22,
+         SKUTILS_RANGE_SINGLE_OPEN,     4,          22,
+         "4-"},
+        {SKUTILS_OK,            2, 22,
+         SKUTILS_RANGE_SINGLE_OPEN,     4,           4,
+         "4"},
+        {SKUTILS_OK,            2, 22,
+         SKUTILS_RANGE_SINGLE_OPEN,     4,           4,
+         "4-4"},
+        {SKUTILS_OK,            2, 22,
+         SKUTILS_RANGE_SINGLE_OPEN | SKUTILS_RANGE_MAX_SINGLE,  4, 22,
+         "4"},
+        {SKUTILS_OK,            2, 22,
+         SKUTILS_RANGE_SINGLE_OPEN | SKUTILS_RANGE_MAX_SINGLE,  4,  4,
+         "4-4"},
+
+        {SKUTILS_ERR_BAD_CHAR,  2, 22,
+         SKUTILS_RANGE_SINGLE_OPEN,     4,           0,
+         "4- 14"},
+
+        {SKUTILS_OK,            2, 22,
+         SKUTILS_RANGE_NO_SINGLE,     4,          14,
+         " 4-14 "},
+        {SKUTILS_OK,            0,  0,
+         SKUTILS_RANGE_NO_SINGLE,     4,   UINT64_MAX,
+         "4-"},
+        {SKUTILS_ERR_SHORT,     2, 22,
+         SKUTILS_RANGE_NO_SINGLE,     4,           0,
+         "4"},
+        {SKUTILS_ERR_SHORT,            2, 22,
+         SKUTILS_RANGE_NO_SINGLE | SKUTILS_RANGE_MAX_SINGLE,  4, 0,
+         "4"},
+
+        {SKUTILS_OK,            2, 22,
+         SKUTILS_RANGE_NO_OPEN,       4,          14,
+         " 4-14 "},
+        {SKUTILS_ERR_SHORT,     0,  0,
+         SKUTILS_RANGE_NO_OPEN,       4,           0,
+         "4-"},
+        {SKUTILS_OK,            2, 22,
+         SKUTILS_RANGE_NO_OPEN,       4,           4,
+         "4"},
+        {SKUTILS_OK,            2, 22,
+         SKUTILS_RANGE_NO_OPEN | SKUTILS_RANGE_MAX_SINGLE,  4, 22,
+         "4"},
+
+        {0, 0, 0, 0, 0, 0, SENTINEL}
+    };
+
+
+    P_HEADER("skStringParseRange64()");
+
+    for (i = 0; !IS_SENTINEL(input[i].str); ++i) {
+
+        P_BEGIN;
+        printf("flags=%3u,  str=",
+               input[i].flags);
+        P_NULL(input[i].str);
+        P_NL;
+
+        result_lo = 0;
+        result_hi = 0;
+        failed = 0;
+        print_results = 1;
+
+        rv = skStringParseRange64(&result_lo, &result_hi, input[i].str,
+                                  input[i].min, input[i].max, input[i].flags);
+
+        if (rv != input[i].exp_retval) {
+            failed = 1;
+        } else if (rv < 0) {
+            print_results = 1;
+        } else if (result_lo != input[i].exp_result_lo
+                   || result_hi != input[i].exp_result_hi)
+        {
+            failed = 1;
+        }
+
+        P_STATUS(failed);
+
+        if (failed || print_results) {
+            printf((GOT_STR "ret=%3d;"
+                    " result_lo=%" PRIu64 "; result_hi=%" PRIu64),
+                   rv, result_lo, result_hi);
+        }
+        P_NL;
+
+        if (failed) {
+            printf((EXP_STR "ret=%3d,"
+                    " result_lo=%" PRIu64 "; result_hi=%" PRIu64 "\n"),
+                   input[i].exp_retval,
+                   input[i].exp_result_lo, input[i].exp_result_hi);
+        }
+
+        if ( failed || print_results) {
+            P_ERR(rv);
+        }
+
+        if (result_lo != input[i].exp_result_lo
+            || result_hi != input[i].exp_result_hi)
+        {
+            printf("**");
+        }
         P_END;
     }
 
@@ -1869,7 +2062,7 @@ host_port_parser(
 
                 if (rv == SKUTILS_OK
                     && (num_addrs == 0
-                        || num_addrs != skSockaddrArraySize(addrs)))
+                        || num_addrs != skSockaddrArrayGetSize(addrs)))
                 {
                     failed = 1;
                 } else if (rv < 0 && num_addrs > 0) {
@@ -1892,7 +2085,7 @@ host_port_parser(
                 goto next;
             }
 
-            for (j = 0; j < skSockaddrArraySize(addrs); j++) {
+            for (j = 0; j < skSockaddrArrayGetSize(addrs); j++) {
                 uint16_t port;
                 sk_sockaddr_t *addr = skSockaddrArrayGet(addrs, j);
                 switch (addr->sa.sa_family) {
@@ -2033,6 +2226,7 @@ appOptionsHandler(
     switch (opt_index) {
       case OPT_NUMBERS:
         uint32_parser();
+        range_uint64_parser();
         human_uint64_parser();
         break;
 

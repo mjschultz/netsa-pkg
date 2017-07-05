@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcompare.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwcompare.c 354c76bbe5c0 2017-06-01 21:04:04Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -83,7 +83,8 @@ appUsageLong(
      "\tCompare the SiLK Flow records in FILE1 and FILE2.  Print nothing\n"   \
      "\tand exit with status 0 if the SiLK Flow records in the two files\n"   \
      "\tare identical.  Else, print the record where files differ and exit\n" \
-     "\twith status 1.\n")
+     "\twith status 1.  Use 'stdin' or '-' for either FILE1 or FILE2 to\n"    \
+     "\tread from the standard input.\n")
 
     FILE *fh = USAGE_FH;
 

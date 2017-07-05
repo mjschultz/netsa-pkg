@@ -9,7 +9,8 @@ B<rwrandomizeip> - Randomize the IP addresses in a SiLK Flow file
   rwrandomizeip [--seed=NUMBER] [--only-change-set=CHANGE_IPSET]
         [--dont-change-set=KEEP_IPSET]
         [--consistent] [--save-table=FILE] [--load-table=FILE]
-        [--site-config-file=FILENAME] INPUT_FILE OUTPUT_FILE
+        [--site-config-file=FILENAME]
+        [INPUT_FILE [OUTPUT_FILE]]
 
   rwrandomizeip --help
 
@@ -17,40 +18,63 @@ B<rwrandomizeip> - Randomize the IP addresses in a SiLK Flow file
 
 =head1 DESCRIPTION
 
-Substitute a pseudo-random IP address for the source and destination
-IP addresses of I<INPUT_FILE> and write the result to I<OUTPUT_FILE>.
-You may use C<stdin> for I<INPUT_FILE> to have B<rwrandomizeip> to
-read from the standard input; the I<OUTPUT_FILE> value of C<stdout>
-will cause B<rwrandomizeip> to write to the standard output unless it
-is connected to a terminal.  B<rwrandomizeip> knows how to read and
-write compressed (B<gzip>pid) files.
+Read SiLK Flow records from I<INPUT_FILE>, substitute a pseudo-random
+IP address for the source and destination IP addresses, and write the
+result to I<OUTPUT_FILE>.  
+
+B<rwrandomizeip> reads its input from the standard input either when
+no non-switch arguments are given or when I<INPUT_FILE> is the string
+C<stdin> or C<->.  B<rwrandomizeip> writes its output to the standard
+output either when the number of non-switch arguments is less than two
+or when I<OUTPUT_FILE> is the string C<stdout> or C<->.  Since
+B<rwrandomizeip> processes binary data, it exits with an error if
+either I<INPUT_FILE> or I<OUTPUT_FILE> refer to a terminal.
+B<rwrandomizeip> is able to read and write files that have been
+compressed with B<gzip(1)> when the file name ends with C<.gz>.
 
 To only change a subset of the IP addresses, the optional switches
-B<--only-change-set> or B<--dont-change-set> can be used; each switch
+B<--only-change-set> or B<--dont-change-set> may be used; each switch
 takes an IPset file as its required argument.  When the
 B<--only-change-set>=I<CHANGE_IPSET> switch is given, B<rwrandomizeip>
-only modifies the IP addresses listed in the I<CHANGE_IPSET> file.  To
+modifies only the IP addresses listed in the I<CHANGE_IPSET> file.  To
 change all addresses I<except> a specified set, use B<rwsetbuild(1)>
 to create an IPset file containing those IPs and pass the name of the
 file to the B<--dont-change-set> switch.  An address listed in both
-the B<only-change-set> and the B<dont-change-set> will not be
-modified.
+the B<only-change-set> and the B<dont-change-set> is not modified.
+When the same IPset is passed to the B<--only-change-set> and
+B<--dont-change-set> switches, the output is identical to the input
+for all records.
 
-The B<--seed> switch can be used to initialize the pseudo-random
+The B<--seed> switch may be used to initialize the pseudo-random
 number generator to a known state.
 
-When the B<--consistent>, B<--load-table>, and B<--save-table>
-switches are I<not> provided, B<rwrandomizeip> uses a pseudo-random,
-non-routable IP address for each source and destination IP address it
-sees; an IP address that appears multiple times in the input will be
-mapped to different output address each time, and no structural
-information in the input will be maintained.
+Use of the B<--consistent>, B<--load-table>, or B<--save-table>
+switches causes B<rwrandomizeip> to operate in consistent mode.  When
+none of the switches are specified, it operates in inconsistent mode.
 
-The B<--consistent>, B<--load-table>, or B<--save-table> switches
-enable consistent IP mapping, so that an input IP is consistently
-mapped to the same output IP.  In addition, the structural information
-of the input IPs is maintained.  Unfortunately, this comes at a cost
-of less randomness in the output.
+=head2 Consistent Mode
+
+In consistent mode, the octets of an IPv4 address are modified such
+that structural information of the data is maintained, and multiple
+instances of an input IP address are mapped to the same randomized
+output address.  Unfortunately, this comes at a cost of less
+randomness in the output.  Specifically, B<rwrandomizeip> creates four
+internal tables with each table having 256 entries containing the
+values 0--255 that have been randomly shuffled.  When an IP address is
+read, each table is used to map the values for a specific octet of
+that IP address.  For example, when modifying the IP address
+10.10.10.10, the value at position 10 from each table is substituted
+into the IP.
+
+=head2 Inconsistent Mode
+
+In this mode, B<rwrandomizeip> uses a pseudo-random address for each
+source and destination IP address it processes.  Each record is
+handled individually, and an IP address that appears multiple times in
+the input file is mapped to a different output address each time.
+Thus, no structural information in the input is maintained.
+B<rwrandomizeip> changes each IP address to a non-routable address
+from the CIDR blocks 10.0.0.0/8, 172.16.0.0/12, or 192.168.0.0/16.
 
 =head1 OPTIONS
 
@@ -63,23 +87,23 @@ required for options that take optional parameters.
 
 =item B<--seed>=I<NUMBER>
 
-Use I<NUMBER> to seed the pseudo-random number generator.  This can be
+Use I<NUMBER> to seed the pseudo-random number generator.  This may be
 used to put the random number generator into a known state, which is
 useful for testing.
 
 =item B<--only-change-set>=I<CHANGE_IPSET>
 
 Only modify the source or destination IP address if it appears in the
-given IPset file I<CHANGE_IPSET>.  The B<rwsetbuild> command can be
+given IPset file I<CHANGE_IPSET>.  The B<rwsetbuild> command may be
 used to create an IPset file.  When the
 B<--dont-change-set>=I<KEEP_IPSET> switch is also given, the IPs it
-contains will override those in the I<CHANGE_IPSET> file.
+contains override those in the I<CHANGE_IPSET> file.
 
 =item B<--dont-change-set>=I<KEEP_IPSET>
 
 Do not modify the source or destination IP address if the address
 appears in the given IPset file I<KEEP_IPSET>.  The B<rwsetbuild>
-command can be used to create an IPset file.  The interaction of this
+command may be used to create an IPset file.  The interaction of this
 switch with the B<--only-change-set> switch is described immediately
 above.
 
@@ -106,16 +130,9 @@ B<--save-table> switch.
 =item B<--site-config-file>=I<FILENAME>
 
 Read the SiLK site configuration from the named file I<FILENAME>.
-When this switch is not provided, the location specified by the
-SILK_CONFIG_FILE environment variable is used if that variable is not
-empty.  The value of SILK_CONFIG_FILE should include the name of the
-file.  Otherwise, the application looks for a file named F<silk.conf>
-in the following directories: the directory specified in the
-SILK_DATA_ROOTDIR environment variable; the data root directory that
-is compiled into SiLK (@SILK_DATA_ROOTDIR@); the directories
-F<$SILK_PATH/share/silk/> and F<$SILK_PATH/share/>; and the
-F<share/silk/> and F<share/> directories parallel to the application's
-directory.
+When this switch is not provided, B<rwrandomizeip> searches for the
+site configuration file in the locations specified in the L</FILES>
+section.
 
 =item B<--help>
 
@@ -132,6 +149,11 @@ configured, then exit the application.
 
 =over 4
 
+=item SILK_CLOBBER
+
+The SiLK tools normally refuse to overwrite existing files.  Setting
+SILK_CLOBBER to a non-empty value removes this restriction.
+
 =item SILK_CONFIG_FILE
 
 This environment variable is used as the value for the
@@ -139,22 +161,40 @@ B<--site-config-file> when that switch is not provided.
 
 =item SILK_DATA_ROOTDIR
 
-When the B<--site-config-file> switch is not provided and the
-SILK_CONFIG_FILE environment variable is not set, B<rwrandomizeip>
-looks for the site configuration file in
-F<$SILK_DATA_ROOTDIR/silk.conf>.
-
-=item SILK_CLOBBER
-
-The SiLK tools normally refuse to overwrite existing files.  Setting
-SILK_CLOBBER to a non-empty value removes this restriction.
+This variable gives the root of the directory tree where the data
+store of SiLK Flow files is maintained, overriding the location that
+is compiled into the tools (@SILK_DATA_ROOTDIR@).  B<rwswapbytes> may
+search for the site configuration file, F<silk.conf>, in this
+directory.  See the L</FILES> section for details.
 
 =item SILK_PATH
 
-This environment variable gives the root of the install tree.  As part
-of its search for the SiLK site configuration file, B<rwrandomizeip>
-checks for a file named F<silk.conf> in the directories
-F<$SILK_PATH/share/silk> and F<$SILK_PATH/share>.
+This environment variable gives the root of the directory tree where
+the tools are installed.  As part of its search for the site
+configuration file, B<rwrandomizeip> may use this variable.  See the
+L</FILES> section for details.
+
+=back
+
+=head1 FILES
+
+=over 4
+
+=item F<${SILK_CONFIG_FILE}>
+
+=item F<${SILK_DATA_ROOTDIR}/silk.conf>
+
+=item F<@SILK_DATA_ROOTDIR@/silk.conf>
+
+=item F<${SILK_PATH}/share/silk/silk.conf>
+
+=item F<${SILK_PATH}/share/silk.conf>
+
+=item F<@prefix@/share/silk/silk.conf>
+
+=item F<@prefix@/share/silk.conf>
+
+Possible locations for the SiLK site configuration file.
 
 =back
 
@@ -173,20 +213,12 @@ addresses outside of that prefix.
 Only the source and destination IP fields are modified; additional
 fields in the SiLK Flow records may leak sensitive information.
 
-The B<--consistent> switch uses a method of randomization that is
-fairly easy to decipher.  Specifically, 4 tables are created with each
-having 256 entries containing the values 0-255 that have been randomly
-shuffled.  Each table is used to map the values for a specific octet
-in an IP address.  For example, when modifying the IP address
-C<10.10.10.10>, the value at position C<10> from each table will be
-substituted into the IP.
-
-When the same IPset is passed to the B<--only-change-set> and
-B<--dont-change-set> switches, the output is identical to the input.
+Prior to SiLK 3.16.0, B<rwrandomizeip> required explicit arguments for
+the input file and the output file.
 
 =cut
 
-$SiLK: rwrandomizeip.pod 9e71f5672f24 2013-03-05 23:37:50Z mthomas $
+$SiLK: rwrandomizeip.pod 89b3ca5a7207 2017-06-01 19:19:24Z mthomas $
 
 Local Variables:
 mode:text

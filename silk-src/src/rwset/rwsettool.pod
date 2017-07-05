@@ -88,6 +88,11 @@ standard output.  B<rwsettool> exits with an error if an attempt
 is made to read an IPset from the terminal or write an IPset to the
 terminal.
 
+To create an IPset file from SiLK Flow records, use B<rwset(1)>, and
+to create one from text, use B<rwsetbuild(1)>.  B<rwsetcat(1)> prints
+an IPset file as text.  To determine whether an IPset file contains an
+IP address, use B<rwsetmember(1)>.
+
 =head1 OPTIONS
 
 Option names may be abbreviated if the abbreviation is unique or is an
@@ -225,23 +230,23 @@ Use the default version for an IPv4 IPset and an IPv6 IPset, currently
 
 =item S< 2 >
 
-Create a file that may hold only IPv4 adresses and is readable by all
+Create a file that may hold only IPv4 addresses and is readable by all
 versions of SiLK.
 
 =item S< 3 >
 
-Create a file that may hold IPv4 or IPv6 adresses and is readable by
+Create a file that may hold IPv4 or IPv6 addresses and is readable by
 S<SiLK 3.0> and later.
 
 =item S< 4 >
 
-Create a file that may hold IPv4 or IPv6 adresses and is readable by
+Create a file that may hold IPv4 or IPv6 addresses and is readable by
 S<SiLK 3.7> and later.  These files are more compact that version 3
 and often more compact than version 2.
 
 =item S< 5 >
 
-Create a file that may hold only IPv6 adresses and is readable by
+Create a file that may hold only IPv6 addresses and is readable by
 S<SiLK 3.14> and later.  When this version is specified, IPsets
 containing only IPv4 addresses are written in version 4.  These files
 are usually more compact that version 4.
@@ -632,6 +637,40 @@ write create the F<all-v4.set> IPset file.
  $ echo '::ffff:0:0/96'   \
    | rwsettool --difference mixed.set - > subset-v6.set
 
+=head2 Comparing Two IPsets Example
+
+To determine if two IPset files contain the same set of IP addresses,
+use the B<--symmetric-difference> switch and then count the number of
+IP addresses of the result with B<rwsetcat>.  If the count is 0, the
+files contain the same IP addresses.
+
+ $ cp A.set A2.set
+ $ rwsettool --symmetric-difference A.set A2.set  \
+   | rwsetcat --count
+ 0
+
+=head2 Changing a File's Format
+
+To share an IPset file with a user who has an older version of SiLK
+that includes different compression libraries, it may be necessary to
+change the the record-version or the compression-method of an IPset
+file.
+
+It is not possible to change those aspects of the file directly.  A
+new file must be created first, and then you may then replace the old
+file with the new file.
+
+To create a new file that uses a different record-version or
+compression-method of the IPset file F<A.set>, use B<rwsettool> with
+the B<--union> switch and specify the desired arguments:
+
+ $ rwsettool --union --record-version=5 --output-path=A2.set A.set
+
+ $ rwsettool --union --compression=none --output-path=A3.set A.set
+
+ $ rwsettool --union --record-version=2 --compression=best \
+        --output-path=A4.set A.set
+
 =head1 ENVIRONMENT
 
 =over 4
@@ -657,8 +696,9 @@ SiLK 3.13.0.>
 
 =head1 SEE ALSO
 
-B<rwset(1)>, B<rwsetbuild(1)>, B<rwsetcat(1)>, B<rwbagbuild(1)>,
-B<rwbagtool(1)>, B<rwfileinfo(1)>, B<silk(7)>, B<zlib(3)>
+B<rwset(1)>, B<rwsetbuild(1)>, B<rwsetcat(1)>, B<rwsetmember(1)>,
+B<rwbagbuild(1)>, B<rwbagtool(1)>, B<rwfileinfo(1)>, B<silk(7)>,
+B<zlib(3)>
 
 =head1 NOTES
 
@@ -671,7 +711,7 @@ environment variable.  Version 5 was added in S<SiLK 3.14>.
 
 =cut
 
-$SiLK: rwsettool.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwsettool.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
 
 Local Variables:
 mode:text

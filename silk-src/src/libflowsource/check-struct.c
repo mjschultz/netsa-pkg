@@ -21,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcs_CHECK_STRUCT_C, "$SiLK: check-struct.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcs_CHECK_STRUCT_C, "$SiLK: check-struct.c 97a30a8874f3 2017-05-02 16:49:05Z mthomas $");
 
 
 /*
@@ -221,6 +221,10 @@ skiCheckDataStructure(
     PRINT_OFFSET(pos, ski_fixrec_t, sourceIPv6Address);
     PRINT_OFFSET(pos, ski_fixrec_t, destinationIPv6Address);
     PRINT_OFFSET(pos, ski_fixrec_t, ipNextHopIPv6Address);
+    PRINT_OFFSET(pos, ski_fixrec_t, postPacketDeltaCount);
+    PRINT_OFFSET(pos, ski_fixrec_t, postOctetDeltaCount);
+    PRINT_OFFSET(pos, ski_fixrec_t, postPacketTotalCount);
+    PRINT_OFFSET(pos, ski_fixrec_t, postOctetTotalCount);
     PRINT_OFFSET(pos, ski_fixrec_t, flowEndReason);
     PRINT_OFFSET(pos, ski_fixrec_t, reverseTcpControlBits);
     PRINT_OFFSET(pos, ski_fixrec_t, reverseInitialTCPFlags);
@@ -344,8 +348,8 @@ skiCheckDataStructure(
     PRINT_OFFSET(pos, ski_nf9rec_t, egressInterface);
     PRINT_OFFSET(pos, ski_nf9rec_t, packetDeltaCount);
     PRINT_OFFSET(pos, ski_nf9rec_t, octetDeltaCount);
-    PRINT_OFFSET(pos, ski_nf9rec_t, reversePacketDeltaCount);
-    PRINT_OFFSET(pos, ski_nf9rec_t, reverseOctetDeltaCount);
+    PRINT_OFFSET(pos, ski_nf9rec_t, postPacketDeltaCount);
+    PRINT_OFFSET(pos, ski_nf9rec_t, postOctetDeltaCount);
     PRINT_OFFSET(pos, ski_nf9rec_t, t.sysup.systemInitTimeMilliseconds);
     PRINT_OFFSET(pos, ski_nf9rec_t, t.sysup.flowStartSysUpTime);
     PRINT_OFFSET(pos, ski_nf9rec_t, t.sysup.flowEndSysUpTime);

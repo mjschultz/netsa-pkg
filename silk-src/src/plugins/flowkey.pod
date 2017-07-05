@@ -132,7 +132,7 @@ The file B<vlan.pcap> is a packet capture file created by
 B<tcpdump(1)>.  The packets in the file include vlan identifiers.
 
 In the following command, B<yaf(1)> creates IPFIX flow records from
-the PCAP file, B<rwipfix2silk(1>) converts the IPFIX records to SiLK
+the PCAP file, B<rwipfix2silk(1)>) converts the IPFIX records to SiLK
 Flow records, and B<rwcut(1)> prints the SiLK records as text.  Note
 the use of the B<--interface-values=vlan> switch on B<rwipfix2silk>,
 and see how the B<--plugin> switch is used on B<rwcut>.  The
@@ -318,7 +318,7 @@ Possible locations for the plug-in.
 B<rwcut(1)>, B<rwfilter(1)>, B<rwgroup(1)>, B<rwsort(1)>,
 B<rwstats(1)>, B<rwuniq(1)>, B<rwipfix2silk(1)>, B<rwflowpack(8)>,
 B<flowcap(8)>, B<sensor.conf(5)>, B<silk(7)>, B<yaf(1)>,
-B<getFlowKeyHash(1)>
+B<getFlowKeyHash(1)>, B<tcpdump(1)>
 
 =head1 NOTES
 
@@ -326,7 +326,7 @@ The B<flowkey> plug-in was added in SiLK 3.15.0.
 
 =cut
 
-$SiLK: flowkey.pod 044818761a01 2017-03-24 21:50:21Z mthomas $
+$SiLK: flowkey.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
 
 Local Variables:
 mode:text

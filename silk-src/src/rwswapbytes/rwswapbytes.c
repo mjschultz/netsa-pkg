@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwswapbytes.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwswapbytes.c 89b3ca5a7207 2017-06-01 19:19:24Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -30,7 +30,8 @@ RCSIDENT("$SiLK: rwswapbytes.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 #define USAGE_FH stdout
 
 typedef enum rwswapOptions {
-    RWSW_BIG = 128, RWSW_LITTLE, RWSW_NATIVE, RWSW_SWAP
+    RWSW_BIG = 128, RWSW_LITTLE, RWSW_NATIVE, RWSW_SWAP,
+    RWSW_UNSET = 1
 } rwswapOptions_t;
 
 #if SK_LITTLE_ENDIAN
@@ -42,23 +43,26 @@ typedef enum rwswapOptions {
 
 /* LOCAL VARIABLES */
 
-static rwswapOptions_t out_endian;
+static rwswapOptions_t out_endian = RWSW_UNSET;
 static const char *in_path;
 static const char *out_path;
 
 
 /* OPTIONS */
 
+typedef enum {
+    OPT_BIG_ENDIAN, OPT_LITTLE_ENDIAN, OPT_NATIVE_ENDIAN, OPT_SWAP_ENDIAN
+} appOptionsEnum;
+
 static struct option appOptions[] = {
-    {"big-endian",       NO_ARG,       0, RWSW_BIG},
-    {"little-endian",    NO_ARG,       0, RWSW_LITTLE},
-    {"native-endian",    NO_ARG,       0, RWSW_NATIVE},
-    {"swap-endian",      NO_ARG,       0, RWSW_SWAP},
+    {"big-endian",       NO_ARG,       0, OPT_BIG_ENDIAN},
+    {"little-endian",    NO_ARG,       0, OPT_LITTLE_ENDIAN},
+    {"native-endian",    NO_ARG,       0, OPT_NATIVE_ENDIAN},
+    {"swap-endian",      NO_ARG,       0, OPT_SWAP_ENDIAN},
     {0,0,0,0}            /* sentinel entry */
 };
 
 static const char *appHelp[] = {
-    /* add help strings here for the applications options */
     "Write output in big-endian format (network byte-order)",
     "Write output in little-endian format",
     ("Write output in this machine's native format [" RWSW_NATIVE_FORMAT "]"),
@@ -86,12 +90,13 @@ static void
 appUsageLong(
     void)
 {
-#define USAGE_MSG                                                       \
-    ("[SWITCHES] <ENDIAN_SWITCH> <INPUT_FILE> <OUTPUT_FILE>\n"          \
-     "\tChange the byte-order of <INPUT_FILE> as specified by "         \
-     "<ENDIAN_SWITCH>\n"                                                \
-     "\tand write result to <OUTPUT_FILE>.  You may use \"stdin\" for\n" \
-     "\t<INPUT_FILE> and \"stdout\" for <OUTPUT_FILE>.\n")
+#define USAGE_MSG                                                             \
+    ("ENDIAN_SWITCH [SWITCHES] [INPUT_FILE [OUTPUT_FILE]]\n"                  \
+     "\tChange the byte-order of the SiLK Flow records in INPUT_FILE as\n"    \
+     "\tspecified by ENDIAN_SWITCH and write the result to OUTPUT_FILE.\n"    \
+     "\tUse 'stdin' or '-' for INPUT_FILE to read from the standard input;\n" \
+     "\tuse 'stdout' or '-' for OUTPUT_FILE to write to the standard\n"       \
+     "\toutput. INPUT_FILE and OUTPUT_FILE default to 'stdin' and 'stdout'.\n")
 
     FILE *fh = USAGE_FH;
     unsigned int i;
@@ -185,31 +190,30 @@ appSetup(
     sksiteConfigure(0);
 
     /* Check that a swapping option was given */
-    if (0 == out_endian) {
+    if (RWSW_UNSET == out_endian) {
         skAppPrintErr("You must specify the output byte order.");
         skAppUsage();
     }
 
-    /* Check that we have input */
-    if (arg_index >= argc) {
-        skAppPrintErr("Expecting input file name");
-        skAppUsage();           /* never returns */
-    }
-    in_path = argv[arg_index];
-    ++arg_index;
+    /* default is to read from stdin and write to stdout */
+    in_path = "-";
+    out_path = "-";
 
-    /* check that we have an output location */
-    if (arg_index >= argc) {
-        skAppPrintErr("Expecting output file name");
-        skAppUsage();           /* never returns */
-    }
-    out_path = argv[arg_index];
-    ++arg_index;
-
-    /* check for extra options */
-    if (argc != arg_index) {
-        skAppPrintErr("Got extra options");
-        skAppUsage();           /* never returns */
+    /* process files named on the command line */
+    switch (argc - arg_index) {
+      case 2:
+        in_path = argv[arg_index++];
+        out_path = argv[arg_index++];
+        break;
+      case 1:
+        in_path = argv[arg_index++];
+        break;
+      case 0:
+        break;
+      default:
+        skAppPrintErr("Too many arguments;"
+                      " a maximum of two files may be specified");
+        skAppUsage();
     }
 
     return;                     /* OK */
@@ -235,43 +239,30 @@ appSetup(
  */
 static int
 appOptionsHandler(
-    clientData   UNUSED(cData),
+    clientData          cData,
     int                 opt_index,
-    char        UNUSED(*opt_arg))
+    char               *opt_arg)
 {
-    switch (opt_index) {
-#if !SK_LITTLE_ENDIAN
-      case RWSW_NATIVE:
-#endif
-      case RWSW_BIG:
-        if ((0 != out_endian) && (RWSW_BIG != out_endian)) {
-            skAppPrintErr("Conflicting endian options given");
+    rwswapOptions_t e;
+
+    SK_UNUSED_PARAM(cData);
+    SK_UNUSED_PARAM(opt_arg);
+
+    switch ((appOptionsEnum)opt_index) {
+      case OPT_BIG_ENDIAN:
+      case OPT_LITTLE_ENDIAN:
+      case OPT_NATIVE_ENDIAN:
+      case OPT_SWAP_ENDIAN:
+        e = (rwswapOptions_t)(RWSW_BIG + (opt_index - OPT_BIG_ENDIAN));
+        if (RWSW_UNSET == out_endian) {
+            out_endian = e;
+        } else if (e != out_endian) {
+            skAppPrintErr("Invalid %s: The --%s switch was already specified",
+                          appOptions[opt_index].name,
+                          appOptions[out_endian - RWSW_BIG].name);
             return 1;
         }
-        out_endian = RWSW_BIG;
         break;
-
-#if SK_LITTLE_ENDIAN
-      case RWSW_NATIVE:
-#endif
-      case RWSW_LITTLE:
-        if ((0 != out_endian) && (RWSW_LITTLE != out_endian)) {
-            skAppPrintErr("Conflicting endian options given");
-            return 1;
-        }
-        out_endian = RWSW_LITTLE;
-        break;
-
-      case RWSW_SWAP:
-        if ((0 != out_endian) && (RWSW_SWAP != out_endian)) {
-            skAppPrintErr("Conflicting endian options given");
-            return 1;
-        }
-        out_endian = RWSW_SWAP;
-        break;
-
-      default:
-        skAbortBadCase(opt_index);
     }
 
     return 0;                   /* OK */
@@ -300,11 +291,22 @@ rwswap_file(
     int in_rv = SKSTREAM_OK;
     int rv = 0;
 
+    assert(RWSW_UNSET != endian);
+
+    /* Create and bind the output file */
+    if ((rv = skStreamCreate(&out_stream, SK_IO_WRITE, SK_CONTENT_SILK_FLOW))
+        || (rv = skStreamBind(out_stream, out_file)))
+    {
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+        return 1;
+    }
+
     /* Open input file */
     in_rv = skStreamOpenSilkFlow(&in_stream, in_file, SK_IO_READ);
     if (in_rv) {
         skStreamPrintLastErr(in_stream, in_rv, &skAppPrintErr);
         skStreamDestroy(&in_stream);
+        skStreamDestroy(&out_stream);
         return 1;
     }
 
@@ -336,30 +338,17 @@ rwswap_file(
         skAbortBadCase(endian);
     }
 
-    /* Open the output file and copy the headers from the source file,
-     * but modify the byte order */
-    rv = skStreamCreate(&out_stream, SK_IO_WRITE, SK_CONTENT_SILK_FLOW);
-    if (rv == SKSTREAM_OK) {
-        rv = skStreamBind(out_stream, out_file);
-        out_hdr = skStreamGetSilkHeader(out_stream);
-    }
-    if (rv == SKSTREAM_OK) {
-        rv = skHeaderCopy(out_hdr, in_hdr,
-                          (SKHDR_CP_ALL & ~SKHDR_CP_ENDIAN));
-    }
-    if (rv == SKSTREAM_OK) {
-        rv = skHeaderSetByteOrder(out_hdr, byte_order);
-    }
-    if (rv == SKSTREAM_OK) {
-        rv = skOptionsNotesAddToStream(out_stream);
-    }
-    if (rv == SKSTREAM_OK) {
-        rv = skStreamOpen(out_stream);
-    }
-    if (rv == SKSTREAM_OK) {
-        rv = skStreamWriteSilkHeader(out_stream);
-    }
-    if (rv != SKSTREAM_OK) {
+    /* Copy the headers from the source file to the output file
+     * modifying the byte order, output the output stream, and write
+     * its header */
+    out_hdr = skStreamGetSilkHeader(out_stream);
+    if ((rv = skHeaderCopy(out_hdr, in_hdr,
+                           (SKHDR_CP_ALL & ~SKHDR_CP_ENDIAN)))
+        || (rv = skHeaderSetByteOrder(out_hdr, byte_order))
+        || (rv = skOptionsNotesAddToStream(out_stream))
+        || (rv = skStreamOpen(out_stream))
+        || (rv = skStreamWriteSilkHeader(out_stream)))
+    {
         goto END;
     }
 
@@ -384,12 +373,8 @@ rwswap_file(
     if (rv) {
         skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
     }
-    if (out_stream) {
-        skStreamDestroy(&out_stream);
-    }
-    if (in_stream) {
-        skStreamDestroy(&in_stream);
-    }
+    skStreamDestroy(&out_stream);
+    skStreamDestroy(&in_stream);
 
     return rv;
 }
@@ -404,7 +389,7 @@ int main(int argc, char **argv)
     rv = rwswap_file(in_path, out_path, out_endian);
 
     /* done */
-    return rv;
+    return ((0 == rv) ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 

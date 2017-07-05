@@ -1,0 +1,157 @@
+=pod
+
+=head1 NAME
+
+B<cutmatch> - Display value in next-hop field written by rwmatch
+
+=head1 SYNOPSIS
+
+  rwcut --plugin=cutmatch.so --fields=...,match,...  ...
+
+=head1 DESCRIPTION
+
+The B<cutmatch> plug-in creates a field in B<rwcut(1)> that provides a
+more user-friendly representation of the match parameter value that
+B<rwmatch(1)> writes into a SiLK Flow record's next hop IP field.
+
+The B<cutmatch> plug-in defines a C<match> field that displays the
+direction of the flow (C<-E<gt>> represents a query and C<E<lt>-> a
+response) and the numeric match ID.
+
+=head1 OPTIONS
+
+The B<cutmatch> plug-in modifies the following switch of B<rwcut(1)>:
+
+=over 4
+
+=item B<--fields>=I<FIELDS>
+
+I<FIELDS> refers to a list of fields to print.  The B<cutmatch>
+plug-in adds the following field:
+
+=over 4
+
+=item match
+
+Print the direction of the flow (C<-E<gt>> represents a query and
+C<E<lt>-> a response) and the numeric match ID
+
+=back
+
+=back
+
+=head1 EXAMPLES
+
+In the following examples, the dollar sign (C<$>) represents the shell
+prompt.  The text after the dollar sign represents the command line.
+Lines have been wrapped for improved readability, and the back slash
+(C<\>) is used to indicate a wrapped line.
+
+Given two files containing unidirectional flow records, use
+B<rwsort(1)> and B<rwmatch(1)> to create the file F<matched.rw> where
+a query and its response have been labeled with a unique value in the
+next-hop IP field.  See the B<rwmatch> manual page for more
+information.
+
+ $ rwsort --fields=1,4,2,3,5,stime incoming.rw > incoming-query.rw
+ $ rwsort --fields=2,3,1,4,5,stime outgoing.rw > outgoing-response.rw
+ $ rwmatch --relate=1,2 --relate=4,3 --relate=2,1 --relate=3,4 \
+        --relate=5,5 incoming-query.rw outgoing-response.rw matched.rw
+
+To use the plug-in, you must explicitly load it into B<rwcut(1)> by
+specifying the B<--plugin> switch.  You can then include C<match> in
+the list of B<--fields> to print:
+
+ $ rwcut --plugin=cutmatch.so --num-rec=8  \
+        --fields=sIP,sPort,match,dIP,dPort,type matched.rw
+             sIP|sPort| <->Match#|            dIP|dPort|   type|
+     10.4.52.235|29631|->       1|192.168.233.171|   80|  inweb|
+ 192.168.233.171|   80|<-       1|    10.4.52.235|29631| outweb|
+     10.9.77.117|29906|->       2| 192.168.184.65|   80|  inweb|
+  192.168.184.65|   80|<-       2|    10.9.77.117|29906| outweb|
+   10.14.110.214|29989|->       3| 192.168.249.96|   80|  inweb|
+  192.168.249.96|   80|<-       3|  10.14.110.214|29989| outweb|
+     10.18.66.79|29660|->       4| 192.168.254.69|   80|  inweb|
+  192.168.254.69|   80|<-       4|    10.18.66.79|29660| outweb|
+
+This shows external hosts querying the web server (the Match column
+contains C<-E<gt>>) and the web server's responses (C<E<lt>->).
+
+Using the C<sIP> and C<dIP> fields may be confusing when the file you
+are examining contains both incoming and outgoing flow records.  To
+make the output from B<rwmatch> more clear, consider using the
+B<int-ext-fields(3)> plug-in as well.  That plug-in allows you to
+display the external IPs in one column and the internal IPs in a
+another column.  See its manual page for additional information.
+
+ $ export INCOMING_FLOWTYPES=all/in,all/inweb
+ $ export OUTGOING_FLOWTYPES=all/out,all/outweb
+ $ rwcut --plugin=cutmatch.so --plugin=int-ext-fields.so --num-rec=8 \
+      --fields=ext-ip,ext-port,match,int-ip,int-port,proto matched.rw
+         ext-ip|ext-p| <->Match#|         int-ip|int-p|   type|
+    10.4.52.235|29631|->       1|192.168.233.171|   80|  inweb|
+    10.4.52.235|29631|<-       1|192.168.233.171|   80| outweb|
+    10.9.77.117|29906|->       2| 192.168.184.65|   80|  inweb|
+    10.9.77.117|29906|<-       2| 192.168.184.65|   80| outweb|
+  10.14.110.214|29989|->       3| 192.168.249.96|   80|  inweb|
+  10.14.110.214|29989|<-       3| 192.168.249.96|   80| outweb|
+    10.18.66.79|29660|->       4| 192.168.254.69|   80|  inweb|
+    10.18.66.79|29660|<-       4| 192.168.254.69|   80| outweb|
+
+=head1 ENVIRONMENT
+
+=over 4
+
+=item SILK_PATH
+
+This environment variable gives the root of the install tree.  When
+searching for plug-ins, a SiLK application may use this environment
+variable.  See the L</FILES> section for details.
+
+=item SILK_PLUGIN_DEBUG
+
+When set to 1, the SiLK applications print status messages to the
+standard error as they attempt to find and open the F<cutmatch.so>
+plug-in.  A typical invocation using this variable is:
+
+ env SILK_PLUGIN_DEBUG=1 rwcut --plugin=cutmatch.so --version
+
+=back
+
+=head1 FILES
+
+=over 4
+
+=item F<${SILK_PATH}/lib64/silk/cutmatch.so>
+
+=item F<${SILK_PATH}/lib64/cutmatch.so>
+
+=item F<${SILK_PATH}/lib/silk/cutmatch.so>
+
+=item F<${SILK_PATH}/lib/cutmatch.so>
+
+=item F<@prefix@/lib64/silk/cutmatch.so>
+
+=item F<@prefix@/lib64/cutmatch.so>
+
+=item F<@prefix@/lib/silk/cutmatch.so>
+
+=item F<@prefix@/lib/cutmatch.so>
+
+Possible locations for the plug-in.
+
+=back
+
+=head1 SEE ALSO
+
+B<rwcut(1)>, B<rwmatch(1)>, B<rwsort(1)>, B<int-ext-fields(3)>,
+B<silk(7)>
+
+=cut
+
+$SiLK: cutmatch.pod 0a5374cd2f26 2017-05-09 17:11:42Z mthomas $
+
+Local Variables:
+mode:text
+indent-tabs-mode:nil
+End:

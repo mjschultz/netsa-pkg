@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconfparse.y 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: probeconfparse.y de8fdd9e63cf 2017-04-27 19:11:35Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/probeconf.h>
@@ -863,7 +863,7 @@ probe_begin(
     char               *probe_name,
     char               *probe_type)
 {
-    const char *dummy_name = "<ERROR>";
+    const char *dummy_name = "<NONAME>";
     skpc_probetype_t t;
 
     if (probe) {
@@ -873,15 +873,32 @@ probe_begin(
     }
     defn_errors = 0;
 
-    if (skpcProbeCreate(&probe)) {
+    /* probe_name will only be NULL on bad input from user */
+    if (NULL == probe_name) {
+        skpcParseErr("%s requires a name and a type", pcscan_clause);
+        ++defn_errors;
+        t = PROBE_ENUM_NETFLOW_V5;
+    } else {
+        if (skpcProbeLookupByName(probe_name)) {
+            skpcParseErr("A probe named '%s' already exists", probe_name);
+            ++defn_errors;
+        }
+
+        t = skpcProbetypeNameToEnum(probe_type);
+        if (t == PROBE_ENUM_INVALID) {
+            skpcParseErr("Do not recognize probe type '%s'", probe_type);
+            ++defn_errors;
+            t = PROBE_ENUM_NETFLOW_V5;
+        }
+    }
+
+    if (skpcProbeCreate(&probe, t)) {
         skpcParseErr("Fatal: Unable to create probe");
         exit(EXIT_FAILURE);
     }
 
     /* probe_name will only be NULL on bad input from user */
     if (probe_name == NULL) {
-        skpcParseErr("%s requires a name and a type", pcscan_clause);
-        ++defn_errors;
         if (probe_type == NULL) {
             skpcProbeSetName(probe, dummy_name);
         } else if (skpcProbeSetName(probe, probe_type)) {
@@ -891,25 +908,11 @@ probe_begin(
         goto END;
     }
 
-    if (skpcProbeLookupByName(probe_name)) {
-        skpcParseErr("A probe named '%s' already exists", probe_name);
-        ++defn_errors;
-    }
-
     if (skpcProbeSetName(probe, probe_name)) {
         skpcParseErr("Error setting probe name to %s", probe_name);
         ++defn_errors;
     }
     free(probe_name);
-
-    t = skpcProbetypeNameToEnum(probe_type);
-    if (t == PROBE_ENUM_INVALID) {
-        skpcParseErr("Do not recognize probe type '%s'", probe_type);
-        ++defn_errors;
-    } else if (skpcProbeSetType(probe, t)) {
-        skpcParseErr("Error setting probe type to %s", probe_type);
-        ++defn_errors;
-    }
 
     if (listen_as_address != NULL) {
         free(listen_as_address);
@@ -1887,18 +1890,12 @@ sensor_probes(
         } else {
             /* Create a new probe with the specified name and type */
             skpc_probe_t *new_probe;
-            if (skpcProbeCreate(&new_probe)) {
+            if (skpcProbeCreate(&new_probe, t)) {
                 skpcParseErr("Fatal: Unable to create ephemeral probe");
                 exit(EXIT_FAILURE);
             }
             if (skpcProbeSetName(new_probe, *s)) {
                 skpcParseErr("Error setting ephemeral probe name to %s", *s);
-                ++defn_errors;
-                goto END;
-            }
-            if (skpcProbeSetType(new_probe, t)) {
-                skpcParseErr("Error setting ephemeral probe type to %s",
-                             probe_type);
                 ++defn_errors;
                 goto END;
             }

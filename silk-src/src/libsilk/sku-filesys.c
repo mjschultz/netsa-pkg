@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-filesys.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: sku-filesys.c 4ba08a73ecbf 2017-05-05 22:05:45Z mthomas $");
 
 #include <silk/utils.h>
 
@@ -1128,7 +1128,7 @@ skMoveFile(
 }
 
 
-/* return the tempory directory. */
+/* return the temporary directory. */
 const char *
 skTempDir(
     const char         *user_temp_dir,
@@ -1437,6 +1437,293 @@ skGetLine(
 
     out_buffer[0] = '\0';
     return 0;
+}
+
+
+/* check that char after % in command is in conversion_chars */
+size_t
+skSubcommandStringCheck(
+    const char         *command,
+    const char         *conversion_chars)
+{
+    const char *cp;
+
+    assert(command);
+    assert(conversion_chars);
+
+    cp = command;
+    while (NULL != (cp = strchr(cp, (int)'%'))) {
+        ++cp;
+        switch (*cp) {
+          case '%':
+            break;
+          case '\0':
+            return cp - command;
+          default:
+            if (NULL == strchr(conversion_chars, (int)*cp)) {
+                return cp - command;
+            }
+            break;
+        }
+        ++cp;
+    }
+    return 0;
+}
+
+
+/* return a new string that is command with conversions expanded */
+char *
+skSubcommandStringFill(
+    const char         *command,
+    const char         *conversion_chars,
+    ...)
+{
+    char *expanded_cmd;
+    char *expansion;
+    const char *cp;
+    const char *sp;
+    char *exp_cp;
+    va_list args;
+    size_t len;
+
+    /* Determine length of buffer needed for the expanded command
+     * string and allocate it.  */
+    cp = command;
+    len = 0;
+    while (NULL != (sp = strchr(cp, (int)'%'))) {
+        len += sp - cp;
+        cp = sp + 1;
+        if ('%' == *cp) {
+            ++len;
+        } else {
+            sp = strchr(conversion_chars, (int)*cp);
+            if (NULL == sp || '\0' == *sp) {
+                return NULL;
+            }
+            va_start(args, conversion_chars);
+            do {
+                expansion = va_arg(args, char *);
+                --sp;
+            } while (sp >= conversion_chars);
+            len += strlen(expansion);
+            va_end(args);
+        }
+        ++cp;
+    }
+    len += strlen(cp);
+    expanded_cmd = (char*)malloc(len + 1);
+    if (NULL == expanded_cmd) {
+        return NULL;
+    }
+
+    /* Copy command into buffer, handling %-expansions */
+    cp = command;
+    exp_cp = expanded_cmd;
+    while (NULL != (sp = strchr(cp, (int)'%'))) {
+        /* copy text we just jumped over */
+        strncpy(exp_cp, cp, sp - cp);
+        exp_cp += sp - cp;
+        cp = sp + 1;
+        /* handle conversion */
+        if ('%' == *cp) {
+            *exp_cp = '%';
+            ++exp_cp;
+        } else {
+            sp = strchr(conversion_chars, (int)*cp);
+            assert(sp && *sp);
+            va_start(args, conversion_chars);
+            do {
+                expansion = va_arg(args, char *);
+                --sp;
+            } while (sp >= conversion_chars);
+            strcpy(exp_cp, expansion);
+            exp_cp = strchr(exp_cp, (int)'\0');
+            va_end(args);
+        }
+        ++cp;
+        assert(len >= (size_t)(exp_cp - expanded_cmd));
+    }
+    strcpy(exp_cp, cp);
+    expanded_cmd[len] = '\0';
+
+    return expanded_cmd;
+}
+
+
+/*
+ *    Use the global 'environ' variable to get the environment table.
+ *    On macOS, we must use _NSGetEnviron() to get the environment.
+ */
+#if defined(SK_HAVE_DECL__NSGETENVIRON) && SK_HAVE_DECL__NSGETENVIRON
+#include <crt_externs.h>
+#define SK_ENVIRON_TABLE *_NSGetEnviron()
+#define SK_COPY_ENVIRONMENT 1
+#elif defined(SK_HAVE_DECL_ENVIRON) && SK_HAVE_DECL_ENVIRON
+#define SK_ENVIRON_TABLE environ
+#define SK_COPY_ENVIRONMENT 1
+#endif
+#ifndef SK_COPY_ENVIRONMENT
+#define SK_COPY_ENVIRONMENT 0
+#endif
+
+
+#if SK_COPY_ENVIRONMENT
+/**
+ *    Free the copy of the environment that was allocated by
+ *    skSubcommandCopyEnvironment().
+ */
+static void
+skSubcommandFreeEnvironment(
+    char              **env_copy)
+{
+    size_t i;
+
+    if (env_copy) {
+        for (i = 0; env_copy[i]; ++i) {
+            free(env_copy[i]);
+        }
+        free(env_copy);
+    }
+}
+
+/**
+ *    Make and return a copy of the current environment.
+ */
+static char **
+skSubcommandCopyEnvironment(
+    void)
+{
+    char **env = SK_ENVIRON_TABLE;
+    char **env_copy = NULL;
+    const size_t step = 100;
+    size_t sz = 0;
+    size_t i;
+
+    /* Add 1 for the terminating NULL */
+    for (i = 0; env[i]; ++i) {
+        if (i == sz) {
+            char **old = env_copy;
+            env_copy = (char **)realloc(old, (sz + step + 1) * sizeof(char *));
+            if (NULL == env_copy) {
+                old[i] = (char *)NULL;
+                skSubcommandFreeEnvironment(old);
+                return NULL;
+            }
+            sz += step;
+        }
+        env_copy[i] = strdup(env[i]);
+        if (NULL == env_copy[i]) {
+            skSubcommandFreeEnvironment(env_copy);
+            return NULL;
+        }
+    }
+    if (env_copy) {
+        env_copy[i] = (char *)NULL;
+    } else {
+        env_copy = (char **)calloc(1, sizeof(char *));
+    }
+    return env_copy;
+}
+#endif  /* SK_COPY_ENVIRONMENT */
+
+
+/* run the command */
+static long int
+skSubcommandExecuteHelper(
+    const char         *cmd_string,
+    char * const        cmd_array[])
+{
+    sigset_t sigs;
+    pid_t pid;
+
+#if SK_COPY_ENVIRONMENT
+    char **env_copy = skSubcommandCopyEnvironment();
+    if (NULL == env_copy) {
+        return -1;
+    }
+#endif  /* SK_COPY_ENVIRONMENT */
+
+    /* Parent (original process) forks to create Child 1 */
+    pid = fork();
+    if (-1 == pid) {
+        return -1;
+    }
+
+    /* Parent reaps Child 1 and returns */
+    if (0 != pid) {
+#if SK_COPY_ENVIRONMENT
+        skSubcommandFreeEnvironment(env_copy);
+#endif
+        /* Wait for Child 1 to exit. */
+        while (waitpid(pid, NULL, 0) == -1) {
+            if (EINTR != errno) {
+                return -2;
+            }
+        }
+        return (long)pid;
+    }
+
+    /* Change our process group, so a server program using this
+     * library that is waiting for any of its children (by process
+     * group) won't wait for this child. */
+    setpgid(0, 0);
+
+    /* Child 1 forks to create Child 2 */
+    pid = fork();
+    if (pid == -1) {
+        skAppPrintSyserror("Child could not fork for to run command");
+        _exit(EXIT_FAILURE);
+    }
+
+    /* Child 1 immediately exits, so Parent can stop waiting */
+    if (pid != 0) {
+        _exit(EXIT_SUCCESS);
+    }
+
+    /* Only Child 2 makes it here */
+
+    /* Unmask signals */
+    sigemptyset(&sigs);
+    sigprocmask(SIG_SETMASK, &sigs, NULL);
+
+    /* Execute the command */
+#if SK_COPY_ENVIRONMENT
+    if (cmd_string) {
+        execle("/bin/sh", "sh", "-c", cmd_string, (char*)NULL, env_copy);
+    } else {
+        execve(cmd_array[0], cmd_array, env_copy);
+    }
+#else  /* SK_COPY_ENVIRONMENT */
+    if (cmd_string) {
+        execl("/bin/sh", "sh", "-c", cmd_string, (char*)NULL);
+    } else {
+        execv(cmd_array[0], cmd_array);
+    }
+#endif  /* SK_COPY_ENVIRONMENT */
+
+    /* only get here when an error occurs */
+    if (cmd_string)  {
+        skAppPrintSyserror("Error invoking /bin/sh");
+    } else {
+        skAppPrintSyserror("Error invoking %s", cmd_array[0]);
+    }
+    _exit(EXIT_FAILURE);
+}
+
+
+long int
+skSubcommandExecute(
+    char * const        cmd_array[])
+{
+    return skSubcommandExecuteHelper(NULL, cmd_array);
+}
+
+
+long int
+skSubcommandExecuteShell(
+    const char         *cmd_string)
+{
+    return skSubcommandExecuteHelper(cmd_string, NULL);
 }
 
 

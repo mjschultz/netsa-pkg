@@ -1,3 +1,51 @@
+SiLK-3.16.0 Release, 2017-Jun-29
+
+* rwstats
+  -- When the primary value is a distinct count, compute the number of
+     distinct items across all bins and print each bin's percentage of
+     the total distinct count.
+  -- Fix bugs that may occur when computing distinct counts and not
+     all distinct counts fit into memory.
+* rwuniq
+  -- Fix bugs that may occur when computing distinct counts and not
+     all distinct counts fit into memory.
+* flowrate plug-in
+  -- Change how the flowrate plug-in handles flow records whose
+     duration is zero in order to fix bizarre looking output in
+     rwstats.  The plug-in now assumes each of these flow records has
+     a duration of 400 microseconds (0.4 milliseconds).
+  -- Add the --flowrate-zero-duration switch which allows the user to
+     set the duration that the plug-in uses for flow records whose
+     given duration is zero.
+* rwrandomizeip
+  -- Read flow records from the standard input if the number of
+     non-switch arguments is zero.
+  -- Write the flow records to the standard output if the number of
+     non-switch arguments is zero or one.
+* rwswapbytes
+  -- Read flow records from the standard input if the number of
+     non-switch arguments is zero.
+  -- Write the flow records to the standard output if the number of
+     non-switch arguments is zero or one.
+* rwflowpack, flowcap
+  -- Change processing of NetFlow v9 records so that, when SiLK is
+     compiled against libfixbuf 1.8.0, the OUT_BYTES and OUT_PKTS
+     values are used when the IN_BYTES and IN_PKTS values are 0.
+* flowcap
+  -- Print the probe definitions to the log file when the log-level is
+     set to debug.
+* rwflowpack, rwflowappend, flowcap, rwsender, rwreceiver, rwpollexec
+  -- Change how daemons invoke subprocesses in order to avoid creating
+     subprocesses that deadlock and never complete.
+  -- Modify start-up scripts to be more in line with the rules in the
+     Linux Standard Base.
+* Plug-ins
+  -- Add manual pages for the cutmatch, conficker-c, and app-mismatch
+     plug-ins.
+  -- No longer install the uniq-distproto plug-in since its
+     functionality is available as --values=distinct:protocol.
+
+
 SiLK-3.15.0 Release, 2017-Mar-24
 
 * rwaggbag

@@ -10,7 +10,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: hashlib.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: hashlib.c b0731eaff96d 2017-06-20 14:47:48Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/utils.h>
@@ -22,8 +22,8 @@ RCSIDENT("$SiLK: hashlib.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
 #include <silk/sktracemsg.h>
 
 #if TRACEMSG_LEVEL > 0
-#define TRC_FMT  "hashlib.c:%d "
-#define TRC_ARG  __LINE__
+#define TRC_FMT         "hashlib.c:%d [%p] "
+#define TRC_ARG(v_v)    __LINE__, (void *)(v_v)
 #endif
 
 
@@ -34,6 +34,17 @@ RCSIDENT("$SiLK: hashlib.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
  *    hash block.
  */
 #define HASH_MAX_MEMORY_BLOCK   ((uint64_t)(SIZE_MAX >> 3))
+
+/*
+ *    The maximum size (in terms of number of bytes) for the entire
+ *    hash table.  May be modified by the environment variable named
+ *    by HASHLIB_ENV_MAXMEM.
+ *
+ *    The default value is the maximum size of any block multiplied by
+ *    three, where the three comes from assuming that the
+ *    SECONDARY_BLOCK_FRACTION is set to -3, which is its default.
+ */
+#define HASH_MAX_MEMORY_TOTAL   (HASH_MAX_MEMORY_BLOCK * 3)
 
 /*
  *    Maximum number of blocks ever allocated, used for sizing the
@@ -99,6 +110,12 @@ int32_t SECONDARY_BLOCK_FRACTION = -3;
 #error "The MIN_BLOCK_ENTRIES must be greater than 256"
 #endif
 
+/*
+ *    Environment variable to choose the maximum size of an individual
+ *    hash table.
+ */
+#define HASHLIB_ENV_MAXMEM      "SILK_HASH_MAXMEM"
+
 /* Distinguished values for block index in the iterator */
 #define HASH_ITER_BEGIN -1
 #define HASH_ITER_END -2
@@ -141,6 +158,8 @@ struct HashTable_st {
     uint8_t             is_sorted;
     /**  Non-zero if we can memset new memory to a value */
     uint8_t             can_memset_val;
+    /**  Maximum number of entries the initial block may store */
+    uint64_t            max_init_entry;
     /**  Size of key; used as cmp_userdata by hashlib_sort_entries() */
     size_t              keylen_cmp_userdata;
     /**  Pointer to representation of an empty value */
@@ -246,16 +265,19 @@ hashlib_iterate_sorted(
     HASH_ITER          *iter_ptr,
     uint8_t           **key_pptr,
     uint8_t           **val_pptr);
+static void
+hashlib_compute_max_initial_entries(
+    HashTable          *table_ptr);
 
 
 /* FUNCTION-LIKE MACROS */
 
 /*
- *    Compute the maximum number of entries on the largest block in
+ *    Return the maximum number of entries on the largest block in
  *    the table 'tbl_ptr'.
  */
-#define HASH_GET_MAX_BLOCK_ENTRIES(tbl_ptr)                     \
-    ((uint64_t)(HASH_MAX_MEMORY_BLOCK/HASH_GET_ENTRY_LEN(tbl_ptr)))
+#define HASH_GET_MAX_BLOCK_ENTRIES(tbl_ptr)                             \
+    ((tbl_ptr)->max_init_entry)
 
 /*
  *    Return true if the HashBlock 'blk_ptr' is full; that is, whether
@@ -266,63 +288,64 @@ hashlib_iterate_sorted(
 
 /*
  *    Get number of bytes of storage required to hold a key in
- *    'tbl_ptr', which may be a HashTable or a HashBlock.
+ *    'tbl_blk_ptr', which may be a HashTable or a HashBlock.
  */
-#define HASH_GET_KEY_LEN(tbl_ptr)               \
-    ((tbl_ptr)->table->key_len)
+#define HASH_GET_KEY_LEN(tbl_blk_ptr)           \
+    ((tbl_blk_ptr)->table->key_len)
 
 /*
  *    Get number of bytes of storage required to hold a value in
- *    'tbl_ptr', which may be a HashTable or a HashBlock.
+ *    'tbl_blk_ptr', which may be a HashTable or a HashBlock.
  */
-#define HASH_GET_VALUE_LEN(tbl_ptr)             \
-    ((tbl_ptr)->table->value_len)
+#define HASH_GET_VALUE_LEN(tbl_blk_ptr)         \
+    ((tbl_blk_ptr)->table->value_len)
 
 /*
  *    Get number of bytes of storage required to hold an entry in
- *    'tbl_ptr', which may be a HashTable or a HashBlock.
+ *    'tbl_blk_ptr', which may be a HashTable or a HashBlock.
  */
-#define HASH_GET_ENTRY_LEN(tbl_ptr)                             \
-    ((tbl_ptr)->table->key_len + (tbl_ptr)->table->value_len)
+#define HASH_GET_ENTRY_LEN(tbl_blk_ptr)                                 \
+    ((tbl_blk_ptr)->table->key_len + (tbl_blk_ptr)->table->value_len)
 
 /*
  *    Get a pointer to the storage key part of 'entry_ptr' in
- *    'tbl_ptr' which may be a HashTable or HashBlock.
+ *    'tbl_blk_ptr' which may be a HashTable or HashBlock.
  */
-#define HASHENTRY_GET_KEY(tbl_ptr, entry_ptr)   \
+#define HASHENTRY_GET_KEY(tbl_blk_ptr, entry_ptr)       \
     (entry_ptr)
 
 /*
- *    Get a pointer to the value part of 'entry_ptr' in 'tbl_ptr'
+ *    Get a pointer to the value part of 'entry_ptr' in 'tbl_blk_ptr'
  *    which may be a HashTable or HashBlock.
  */
-#define HASHENTRY_GET_VALUE(tbl_ptr, entry_ptr) \
-    ((entry_ptr) + HASH_GET_KEY_LEN(tbl_ptr))
+#define HASHENTRY_GET_VALUE(tbl_blk_ptr, entry_ptr)     \
+    ((entry_ptr) + HASH_GET_KEY_LEN(tbl_blk_ptr))
 
 /*
- *    Set the storage key part of 'entry_ptr' in 'tbl_ptr' to contain
- *    the bytes in 'key_bytes'.  'tbl_ptr' may be a HashTable or
- *    HashBlock.
+ *    Set the storage key part of 'entry_ptr' in 'tbl_blk_ptr' to
+ *    contain the bytes in 'key_bytes'.  'tbl_blk_ptr' may be a
+ *    HashTable or HashBlock.
  */
-#define HASHENTRY_SET_KEY(tbl_ptr, entry_ptr, key_bytes)        \
-    memcpy(HASHENTRY_GET_KEY(tbl_ptr, entry_ptr), (key_bytes),  \
-           HASH_GET_KEY_LEN(tbl_ptr))
+#define HASHENTRY_SET_KEY(tbl_blk_ptr, entry_ptr, key_bytes)            \
+    memcpy(HASHENTRY_GET_KEY(tbl_blk_ptr, entry_ptr), (key_bytes),      \
+           HASH_GET_KEY_LEN(tbl_blk_ptr))
 
 /*
  *    Return 1 if the bytes in 'value_ptr' match the empty value,
- *    otherwise 0.  'tbl_ptr' may be a table or block.
+ *    otherwise 0.  'tbl_blk_ptr' may be a HashTable or HashBlock.
  */
-#define HASH_VALUE_ISEMPTY(tbl_ptr, value_ptr)                  \
-    (0 == memcmp((value_ptr), (tbl_ptr)->table->no_value_ptr,   \
-                 HASH_GET_VALUE_LEN(tbl_ptr)))
+#define HASH_VALUE_ISEMPTY(tbl_blk_ptr, value_ptr)                      \
+    (0 == memcmp((value_ptr), (tbl_blk_ptr)->table->no_value_ptr,       \
+                 HASH_GET_VALUE_LEN(tbl_blk_ptr)))
 
 /*
  *    Return 1 if the value part of the entry at 'entry_ptr' matches
- *    the empty value, otherwise 0.  'tbl_ptr' may be a HashTable or a
- *    HashBlock.
+ *    the empty value, otherwise 0.  'tbl_blk_ptr' may be a HashTable
+ *    or a HashBlock.
  */
-#define HASHENTRY_ISEMPTY(tbl_ptr, entry_ptr)                           \
-    HASH_VALUE_ISEMPTY(tbl_ptr, HASHENTRY_GET_VALUE((tbl_ptr), (entry_ptr)))
+#define HASHENTRY_ISEMPTY(tbl_blk_ptr, entry_ptr)                       \
+    HASH_VALUE_ISEMPTY(tbl_blk_ptr,                                     \
+                       HASHENTRY_GET_VALUE((tbl_blk_ptr), (entry_ptr)))
 
 /*
  *    Get a pointer to the entry at index 'hash_index' in 'blk_ptr',
@@ -347,14 +370,14 @@ hashlib_iterate_sorted(
 
 /*
  *    Increment the value of 'member' in the hashlib_stats structure
- *    for 'tbl_ptr', which may be a HashTable or a HashBlock.
+ *    for 'tbl_blk_ptr', which may be a HashTable or a HashBlock.
  */
 #ifndef HASHLIB_RECORD_STATS
-#define HASH_STAT_INCR(tbl_ptr, member)
+#define HASH_STAT_INCR(tbl_blk_ptr, member)
 #else
 /* need to cast away the "const" */
-#define HASH_STAT_INCR(tbl_ptr, member)                         \
-    ++(((HashTable *)(tbl_ptr)->table)->ht_stats. member )
+#define HASH_STAT_INCR(tbl_blk_ptr, member)                     \
+    ++(((HashTable *)(tbl_blk_ptr)->table)->ht_stats. member )
 #endif
 
 
@@ -390,7 +413,7 @@ hashlib_create_table(
     /* Validate arguments */
     if (0 == key_len || 0 == value_len) {
         TRACEMSG(1,(TRC_FMT "create table: invalid width key %u, value %u",
-                    TRC_ARG, key_len, value_len));
+                    TRC_ARG(table_ptr), key_len, value_len));
         assert(0);
         return NULL;
     }
@@ -398,7 +421,8 @@ hashlib_create_table(
     /* Allocate memory for the table and initialize attributes.  */
     table_ptr = (HashTable*)calloc(1, sizeof(HashTable));
     if (table_ptr == NULL) {
-        TRACEMSG(1,(TRC_FMT "Failed to allocate new HashTable.", TRC_ARG));
+        TRACEMSG(1,(TRC_FMT "Failed to allocate new HashTable.",
+                    TRC_ARG(table_ptr)));
         return NULL;
     }
 
@@ -410,19 +434,20 @@ hashlib_create_table(
 
     TRACEMSG(3,
              (TRC_FMT "key_len %u, value_len %u, entry_len %u, load_factor %u",
-              TRC_ARG, key_len, value_len, key_len + value_len, load_factor));
+              TRC_ARG(table_ptr), key_len, value_len,
+              key_len + value_len, load_factor));
 
     /* Application data */
-    (void)value_type;
-    (void)appdata_ptr;
-    (void)appdata_size;
+    SK_UNUSED_PARAM(value_type);
+    SK_UNUSED_PARAM(appdata_ptr);
+    SK_UNUSED_PARAM(appdata_size);
 
     /* Initialize value_ptr to string of zero-valued bytes if NULL */
     table_ptr->no_value_ptr = (uint8_t*)calloc(value_len, sizeof(uint8_t));
     if (table_ptr->no_value_ptr == NULL) {
-        free(table_ptr);
         TRACEMSG(1,((TRC_FMT "Failed to allocate new no_value_ptr"
-                     " for new HashTable."), TRC_ARG));
+                     " for new HashTable."), TRC_ARG(table_ptr)));
+        free(table_ptr);
         return NULL;
     }
     if (no_value_ptr == NULL) {
@@ -446,10 +471,12 @@ hashlib_create_table(
         }
     }
 
+    /* Compute the maximum number of entries for the initial block */
+    hashlib_compute_max_initial_entries(table_ptr);
+
     /*
      * Calculate the number of entres in the initial block.  This is a
      * power of 2 with at least MIN_BLOCK_ENTRIES entries that
-     * accomodates the data at a load less than the given load factor.
      */
     /* account for the load factor */
     initial_entries = (estimated_count << 8) / table_ptr->load_factor;
@@ -459,30 +486,30 @@ hashlib_create_table(
     TRACEMSG(2,((TRC_FMT "estimated_count %" PRIu64 ", initial_entries %"
                  PRIu64 " (calculated %" PRIu64 "), min_entries %" PRIu64
                  ", max_entries %" PRIu64),
-                TRC_ARG, estimated_count, initial_entries,
+                TRC_ARG(table_ptr), estimated_count, initial_entries,
                 ((estimated_count << 8) / table_ptr->load_factor),
                 MIN_BLOCK_ENTRIES, HASH_GET_MAX_BLOCK_ENTRIES(table_ptr)));
 
     if (initial_entries <= MIN_BLOCK_ENTRIES) {
         initial_entries = MIN_BLOCK_ENTRIES;
         TRACEMSG(2,(TRC_FMT "adjusted initial_entries to %" PRIu64,
-                    TRC_ARG, initial_entries));
+                    TRC_ARG(table_ptr), initial_entries));
     } else {
-        while (initial_entries > HASH_GET_MAX_BLOCK_ENTRIES(table_ptr)) {
-            initial_entries >>= 1;
+        if (initial_entries > HASH_GET_MAX_BLOCK_ENTRIES(table_ptr)) {
+            initial_entries = HASH_GET_MAX_BLOCK_ENTRIES(table_ptr);
         }
         TRACEMSG(2,(TRC_FMT "adjusted initial_entries to %" PRIu64,
-                    TRC_ARG, initial_entries));
+                    TRC_ARG(table_ptr), initial_entries));
         assert(initial_entries >= MIN_BLOCK_ENTRIES);
     }
 
-    TRACEMSG(1,(TRC_FMT "Adding block #0...", TRC_ARG));
+    TRACEMSG(1,(TRC_FMT "Adding block #0...", TRC_ARG(table_ptr)));
 
     /* Start with one block */
     table_ptr->num_blocks = 1;
     block_ptr = hashlib_create_block(table_ptr, initial_entries);
     if (block_ptr == NULL) {
-        TRACEMSG(1,(TRC_FMT "Adding block #0 failed.", TRC_ARG));
+        TRACEMSG(1,(TRC_FMT "Adding block #0 failed.", TRC_ARG(table_ptr)));
         table_ptr->num_blocks = 0;
         hashlib_free_table(table_ptr);
         return NULL;
@@ -490,7 +517,7 @@ hashlib_create_table(
     table_ptr->block_ptrs[0] = block_ptr;
 
     TRACEMSG(1,(TRC_FMT "Added block #%u.",
-                TRC_ARG, table_ptr->num_blocks - 1));
+                TRC_ARG(table_ptr), table_ptr->num_blocks - 1));
 
     return table_ptr;
 }
@@ -506,10 +533,10 @@ hashlib_free_table(
         return;
     }
 
-    TRACEMSG(1,(TRC_FMT "Freeing HashTable...", TRC_ARG));
+    TRACEMSG(1,(TRC_FMT "Freeing HashTable...", TRC_ARG(table_ptr)));
     /* Free all the blocks in the table */
     for (k = 0; k < table_ptr->num_blocks; ++k) {
-        TRACEMSG(2,(TRC_FMT "Freeing block #%u", TRC_ARG, k));
+        TRACEMSG(2,(TRC_FMT "Freeing block #%u", TRC_ARG(table_ptr), k));
         hashlib_free_block(table_ptr->block_ptrs[k]);
     }
 
@@ -518,7 +545,7 @@ hashlib_free_table(
 
     /* Free the table structure itself */
     free(table_ptr);
-    TRACEMSG(1,(TRC_FMT "Freed HashTable.", TRC_ARG));
+    TRACEMSG(1,(TRC_FMT "Freed HashTable.", TRC_ARG(table_ptr)));
 }
 
 
@@ -542,14 +569,14 @@ hashlib_create_block(
 
     TRACEMSG(1,((TRC_FMT "Creating block; requesting %#" PRIx64
                  " %" PRIu32 "-byte entries (%" PRIu64 " bytes)..."),
-                TRC_ARG, block_entries, HASH_GET_ENTRY_LEN(table_ptr),
-                block_bytes));
+                TRC_ARG(table_ptr), block_entries,
+                HASH_GET_ENTRY_LEN(table_ptr), block_bytes));
 
 #if SIZE_MAX < UINT64_MAX
     /* verify we do not overflow the size of a size_t */
     if (block_bytes > SIZE_MAX) {
         TRACEMSG(1,(TRC_FMT "Cannot create block; size exceeds SIZE_MAX.",
-                    TRC_ARG));
+                    TRC_ARG(table_ptr)));
         return NULL;
     }
 #endif
@@ -557,13 +584,15 @@ hashlib_create_block(
     /* Allocate memory for the block and initialize attributes.  */
     block_ptr = (HashBlock*)malloc(sizeof(HashBlock));
     if (block_ptr == NULL) {
-        TRACEMSG(1,(TRC_FMT "Failed to allocate new HashBlock.", TRC_ARG));
+        TRACEMSG(1,(TRC_FMT "Failed to allocate new HashBlock.",
+                    TRC_ARG(table_ptr)));
         return NULL;
     }
     block_ptr->data_ptr = (uint8_t*)malloc(block_bytes);
     if (block_ptr->data_ptr == NULL) {
         free(block_ptr);
-        TRACEMSG(1,(TRC_FMT "Failed to allocate new data block.", TRC_ARG));
+        TRACEMSG(1,(TRC_FMT "Failed to allocate new data block.",
+                    TRC_ARG(table_ptr)));
         return NULL;
     }
 
@@ -632,7 +661,7 @@ hashlib_rehash(
 
     if (table_ptr->is_sorted) {
         TRACEMSG(1,(TRC_FMT "ERROR: Attempt to rehash a sorted HashTable",
-                    TRC_ARG));
+                    TRC_ARG(table_ptr)));
         assert(0 == table_ptr->is_sorted);
         return ERR_SORTTABLE;
     }
@@ -655,12 +684,13 @@ hashlib_rehash(
 
     TRACEMSG(1,((TRC_FMT "Rehashing table having %" PRIu64
                  " %" PRIu32 "-byte entries..."),
-                TRC_ARG, num_entries, HASH_GET_ENTRY_LEN(table_ptr)));
+                TRC_ARG(table_ptr), num_entries,
+                HASH_GET_ENTRY_LEN(table_ptr)));
 
     if (num_entries >= max_entries) {
         TRACEMSG(1,((TRC_FMT "Too many entries for rehash; "
                      " num_entries=%" PRIu64 " >= max_entries=%" PRIu64 "."),
-                    TRC_ARG, num_entries, max_entries));
+                    TRC_ARG(table_ptr), num_entries, max_entries));
         return ERR_OUTOFMEMORY;
     }
 
@@ -680,27 +710,28 @@ hashlib_rehash(
     if (initial_entries > max_entries) {
         TRACEMSG(1,((TRC_FMT "Will not rehash table; new initial_entries=%"
                      PRIu64 " > max_entries=%" PRIu64 "."),
-                    TRC_ARG, initial_entries, max_entries));
+                    TRC_ARG(table_ptr), initial_entries, max_entries));
         return ERR_OUTOFMEMORY;
     }
 
-    TRACEMSG(1,(TRC_FMT "Allocating new rehash block...", TRC_ARG));
+    TRACEMSG(1,(TRC_FMT "Allocating new rehash block...", TRC_ARG(table_ptr)));
 
     /* Create the new block */
     new_block_ptr = hashlib_create_block(table_ptr, initial_entries);
     if (new_block_ptr == NULL) {
         TRACEMSG(1,((TRC_FMT "Allocating rehash block failed for %#" PRIx64
-                     " entries."), TRC_ARG, initial_entries));
+                     " entries."), TRC_ARG(table_ptr), initial_entries));
         return ERR_OUTOFMEMORY;
     }
-    TRACEMSG(1,(TRC_FMT "Allocated rehash block.", TRC_ARG));
+    TRACEMSG(1,(TRC_FMT "Allocated rehash block.", TRC_ARG(table_ptr)));
 
     /* Walk through each block in the table looking for non-empty
      * entries and insert them into the new block. */
     for (k = table_ptr->num_blocks; k > 0; ) {
         --k;
         block_ptr = table_ptr->block_ptrs[k];
-        TRACEMSG(2,(TRC_FMT "Rehashing entries from block #%u", TRC_ARG, k));
+        TRACEMSG(2,(TRC_FMT "Rehashing entries from block #%u",
+                    TRC_ARG(table_ptr), k));
 
         for (i = 0, entry_ptr = HASH_ENTRY_AT(block_ptr, 0);
              i < block_ptr->max_entries;
@@ -722,7 +753,7 @@ hashlib_rehash(
                      * the next line will call abort(). */
                     TRACEMSG(1,((TRC_FMT "During the rehash, unexpectedly"
                                  " found an existing key in the new block"),
-                                TRC_ARG));
+                                TRC_ARG(table_ptr)));
                     assert(rv == ERR_NOTFOUND);
                     free(new_block_ptr);
                     table_ptr->num_blocks = 1 + k;
@@ -746,7 +777,7 @@ hashlib_rehash(
     table_ptr->num_blocks = 1;
     table_ptr->block_ptrs[0] = new_block_ptr;
 
-    TRACEMSG(1,(TRC_FMT "Rehashed table.", TRC_ARG));
+    TRACEMSG(1,(TRC_FMT "Rehashed table.", TRC_ARG(table_ptr)));
 
     return OK;
 }
@@ -766,16 +797,17 @@ hashlib_add_block(
     if (table_ptr->num_blocks >= HASH_MAX_BLOCKS) {
         TRACEMSG(1,((TRC_FMT "Cannot allocate another block:"
                      " num_blocks=%" PRIu32 " >= HASH_MAX_BLOCKS=%u."),
-                    TRC_ARG, table_ptr->num_blocks, HASH_MAX_BLOCKS));
+                    TRC_ARG(table_ptr), table_ptr->num_blocks,
+                    HASH_MAX_BLOCKS));
         return ERR_NOMOREBLOCKS;
     }
     /* Create the new block */
     TRACEMSG(1,((TRC_FMT "Adding block #%u..."),
-                TRC_ARG, table_ptr->num_blocks));
+                TRC_ARG(table_ptr), table_ptr->num_blocks));
     block_ptr = hashlib_create_block(table_ptr, new_block_entries);
     if (block_ptr == NULL) {
         TRACEMSG(1,(TRC_FMT "Adding block #%u failed.",
-                    TRC_ARG, table_ptr->num_blocks));
+                    TRC_ARG(table_ptr), table_ptr->num_blocks));
         return ERR_OUTOFMEMORY;
     }
 
@@ -783,14 +815,160 @@ hashlib_add_block(
     table_ptr->block_ptrs[table_ptr->num_blocks] = block_ptr;
     ++table_ptr->num_blocks;
     TRACEMSG(1,(TRC_FMT "Added block #%u.",
-                TRC_ARG, table_ptr->num_blocks - 1));
+                TRC_ARG(table_ptr), table_ptr->num_blocks - 1));
 
     return OK;
 }
 
 
 /*
- *    See what size the next hash block should be.
+ *    Using the maximum memory_size for the entire hash table (either
+ *    from the environment or the HASH_MAX_MEMORY_TOTAL default),
+ *    compute the maximum number of entries that the initial block is
+ *    allowed to contain and update the hash table with that value.
+ */
+static void
+hashlib_compute_max_initial_entries(
+    HashTable          *table_ptr)
+{
+    /* true if env contains an invalid value */
+    static int bad_env = 0;
+
+    /* assume the initial block has this size */
+    const uint64_t init_basis = (1 << 16);
+
+    /* based on the initial block having a size of 'init_basis',
+     * compute the total size of the hash table using the
+     * SECONDARY_BLOCK_FRACTION and the number of hash blocks */
+    uint64_t total_basis;
+
+    /* max number of entries in initial block */
+    uint64_t max_init_entry;
+
+    uint64_t max_memory = HASH_MAX_MEMORY_TOTAL;
+    const char *env;
+
+    /* Determine maximum memory footprint of the entire hash table */
+    env = getenv(HASHLIB_ENV_MAXMEM);
+    if (bad_env) {
+        /* do nothing */
+    } else if (env && *env) {
+        int rv = skStringParseHumanUint64(&max_memory, env, SK_HUMAN_NORMAL);
+        if (rv) {
+            bad_env = 1;
+            skAppPrintErr("Ignoring Invalid %s '%s': %s",
+                          HASHLIB_ENV_MAXMEM, env, skStringParseStrerror(rv));
+            max_memory = HASH_MAX_MEMORY_TOTAL;
+        }
+    }
+
+    assert(HASH_MAX_BLOCKS > 2);
+    assert(REHASH_BLOCK_COUNT >= 2);
+    assert(REHASH_BLOCK_COUNT < HASH_MAX_BLOCKS);
+
+    /*
+     *    When you continually take half of an initial value and add
+     *    it to the initial value, the sum approaches 2.  If you only
+     *    take half N times, the sum is:
+     *
+     *    init_value * 2 - (init_value >> (N - 1))
+     */
+
+    switch (SECONDARY_BLOCK_FRACTION) {
+      case -1:
+        /* Keep halving blocks until REHASH_BLOCK_COUNT blocks have
+         * been created, then size is constant */
+        total_basis = (init_basis * 2
+                       + ((init_basis >> (REHASH_BLOCK_COUNT - 1))
+                          * (HASH_MAX_BLOCKS - REHASH_BLOCK_COUNT - 1)));
+        break;
+      case -2:
+        /* First secondary block is 1/4 size of main block; other
+         * blocks are halved until REHASH_BLOCK_COUNT is reached */
+        total_basis = (init_basis + (init_basis >> 1)
+                       - ((init_basis >> 2) >> (REHASH_BLOCK_COUNT - 2))
+                       + ((init_basis >> REHASH_BLOCK_COUNT)
+                          >> (HASH_MAX_BLOCKS - REHASH_BLOCK_COUNT)));
+        break;
+      case -3:
+        /* First secondary block is 1/2 size of main block; all others
+         * are 1/4 of main block */
+        total_basis = (init_basis + (init_basis >> 1)
+                       + (init_basis >> 2) * (HASH_MAX_BLOCKS - 2));
+        break;
+      case -4:
+        /* First secondary block is 1/4 size of main block; all others
+         * are 1/8 of main block */
+        total_basis = (init_basis + (init_basis >> 2)
+                       + (init_basis >> 3) * (HASH_MAX_BLOCKS - 2));
+        break;
+      case 0:
+        /* All blocks are the same size (shift size by 0) */
+        total_basis = init_basis * HASH_MAX_BLOCKS;
+        break;
+      default:
+        /* All secondary blocks shifted by SECONDARY_BLOCK_FRACTION
+         * from the main block */
+        if (SECONDARY_BLOCK_FRACTION < 0) {
+            skAbort();
+        }
+        total_basis = (init_basis + ((init_basis >> SECONDARY_BLOCK_FRACTION)
+                                     * (HASH_MAX_BLOCKS - 1)));
+        break;
+    }
+
+    /*
+     *    this is the formula that would compute the total maximum
+     *    size of the hash table
+     *
+     * total_size = initial_bins * record_size * total_basis / init_basis;
+     *
+     *    using that formula, solve for initial_bins:
+     */
+    max_init_entry = ((double)max_memory / (double)total_basis
+                      * (double)init_basis
+                      / (double)HASH_GET_ENTRY_LEN(table_ptr));
+
+    /*
+     *    Get the largest power of two less than max_init_entry.
+     */
+    table_ptr->max_init_entry = UINT64_C(1) << skIntegerLog2(max_init_entry);
+    if (table_ptr->max_init_entry < MIN_BLOCK_ENTRIES) {
+        table_ptr->max_init_entry = MIN_BLOCK_ENTRIES;
+    }
+
+#if TRACEMSG_LEVEL >= 2
+    {
+        uint64_t total_size;
+
+        total_size = ((double)table_ptr->max_init_entry / (double)init_basis
+                      * (double)HASH_GET_ENTRY_LEN(table_ptr)
+                      * (double)total_basis);
+
+        TRACEMSG(2,((TRC_FMT "desired max mem = %" PRIu64
+                     "; entry size = %" PRIu32
+                     "; max total entry = %" PRIu64
+                     "; total size / init block size = %.4f"
+                     "; max initial entry = %" PRIu64
+                     "; log2 initial entry = %" PRIu64
+                     "; actual max memory = %" PRIu64
+                     "; actual max/desired max = %.4f"),
+                    TRC_ARG(table_ptr), max_memory,
+                    HASH_GET_ENTRY_LEN(table_ptr),
+                    max_memory / HASH_GET_ENTRY_LEN(table_ptr),
+                    (double)total_basis/(double)init_basis,
+                    max_init_entry, table_ptr->max_init_entry, total_size,
+                    ((0 == max_memory)
+                     ? DBL_MAX
+                     : (double)total_size/max_memory)));
+    }
+#endif  /* TRACEMSG_LEVEL >= 2 */
+}
+
+
+
+/*
+ *    Compute the size the next hash block.
  */
 static uint64_t
 hashlib_compute_next_block_entries(
@@ -804,24 +982,23 @@ hashlib_compute_next_block_entries(
         return table_ptr->block_ptrs[table_ptr->num_blocks-1]->max_entries;
     }
     /* Otherwise, it depends on current parameters */
-    if (SECONDARY_BLOCK_FRACTION >= 0) {
-        block_entries =
-            (table_ptr->block_ptrs[0]->max_entries >> SECONDARY_BLOCK_FRACTION);
-    } else if (SECONDARY_BLOCK_FRACTION == -1) {
+    switch (SECONDARY_BLOCK_FRACTION) {
+      case -1:
         /* Keep halving blocks */
         block_entries =
             (table_ptr->block_ptrs[table_ptr->num_blocks-1]->max_entries >> 1);
-    } else if (SECONDARY_BLOCK_FRACTION == -2) {
+        break;
+      case -2:
         if (table_ptr->num_blocks == 1) {
             /* First secondary block is 1/4 size of main block */
-            block_entries =
-                table_ptr->block_ptrs[table_ptr->num_blocks-1]->max_entries >>2;
+            block_entries = table_ptr->block_ptrs[0]->max_entries >>2;
         } else {
             /* Other secondary blocks are halved */
             block_entries =
                 table_ptr->block_ptrs[table_ptr->num_blocks-1]->max_entries >>1;
         }
-    } else if (SECONDARY_BLOCK_FRACTION == -3) {
+        break;
+      case -3:
         if (table_ptr->num_blocks == 1) {
             /* First secondary block is 1/2 size of main block */
             block_entries = table_ptr->block_ptrs[0]->max_entries >> 1;
@@ -829,7 +1006,8 @@ hashlib_compute_next_block_entries(
             /* All others are 1/4 size of main block */
             block_entries = table_ptr->block_ptrs[0]->max_entries >> 2;
         }
-    } else if (SECONDARY_BLOCK_FRACTION == -4) {
+        break;
+      case -4:
         if (table_ptr->num_blocks == 1) {
             /* First secondary block is 1/4 size of main block */
             block_entries = table_ptr->block_ptrs[0]->max_entries >> 2;
@@ -837,10 +1015,24 @@ hashlib_compute_next_block_entries(
             /* All others are 1/8 size of main block */
             block_entries = table_ptr->block_ptrs[0]->max_entries >> 3;
         }
-    } else {
-        skAbort();
+        break;
+      case 0:
+        /* All blocks are the same size */
+        block_entries = table_ptr->block_ptrs[0]->max_entries;
+        break;
+      default:
+        if (SECONDARY_BLOCK_FRACTION < 0) {
+            skAppPrintErr("Invalid block fraction %d",
+                          SECONDARY_BLOCK_FRACTION);
+            skAbort();
+        }
+        block_entries =
+            (table_ptr->block_ptrs[0]->max_entries >> SECONDARY_BLOCK_FRACTION);
+        break;
     }
-
+    if (block_entries < MIN_BLOCK_ENTRIES) {
+        block_entries = MIN_BLOCK_ENTRIES;
+    }
     return block_entries;
 }
 
@@ -862,7 +1054,7 @@ hashlib_resize_table(
     uint64_t new_block_entries;
     int rv;
 
-    TRACEMSG(1,(TRC_FMT "Resizing the table...", TRC_ARG));
+    TRACEMSG(1,(TRC_FMT "Resizing the table...", TRC_ARG(table_ptr)));
 
     /* Compute the (potential) size of the new block */
     new_block_entries = hashlib_compute_next_block_entries(table_ptr);
@@ -875,7 +1067,7 @@ hashlib_resize_table(
         TRACEMSG(1,((TRC_FMT "Unable to resize table: no more blocks;"
                      " table contains %" PRIu64 " %" PRIu32 "-byte entries"
                      " in %" PRIu64 " buckets across %u blocks"),
-                    TRC_ARG, hashlib_count_entries(table_ptr),
+                    TRC_ARG(table_ptr), hashlib_count_entries(table_ptr),
                     HASH_GET_ENTRY_LEN(table_ptr),
                     hashlib_count_buckets(table_ptr), table_ptr->num_blocks));
         return ERR_NOMOREBLOCKS;
@@ -899,7 +1091,7 @@ hashlib_resize_table(
         TRACEMSG(1,((TRC_FMT "Resize table forcing rehash;"
                      " new_block_entries = %#" PRIx64
                      "; num_blocks = %u; REHASH_BLOCK_COUNT = %" PRIu32 "."),
-                    TRC_ARG, new_block_entries,
+                    TRC_ARG(table_ptr), new_block_entries,
                     table_ptr->num_blocks, REHASH_BLOCK_COUNT));
         rv = hashlib_rehash(table_ptr);
         if (rv != ERR_OUTOFMEMORY) {
@@ -911,7 +1103,7 @@ hashlib_resize_table(
             new_block_entries = MIN_BLOCK_ENTRIES;
         }
         TRACEMSG(1,(TRC_FMT "Rehash failed; creating new block instead...",
-                    TRC_ARG));
+                    TRC_ARG(table_ptr)));
     }
     /* Assert several global invariants */
     assert(new_block_entries >= MIN_BLOCK_ENTRIES);
@@ -962,7 +1154,7 @@ hashlib_insert(
 
     if (table_ptr->is_sorted) {
         TRACEMSG(1,(TRC_FMT "Attempted an insert into a sorted HashTable",
-                    TRC_ARG));
+                    TRC_ARG(table_ptr)));
         assert(0 == table_ptr->is_sorted);
         return ERR_SORTTABLE;
     }
@@ -1031,7 +1223,7 @@ hashlib_lookup(
 
     if (table_ptr->is_sorted) {
         TRACEMSG(1,(TRC_FMT "Attempt to lookup in a sorted HashTable",
-                    TRC_ARG));
+                    TRC_ARG(table_ptr)));
         assert(0 == table_ptr->is_sorted);
         return ERR_SORTTABLE;
     }
@@ -1200,7 +1392,7 @@ hashlib_iterate(
     uint8_t           **key_pptr,
     uint8_t           **val_pptr)
 {
-#ifdef TRACEMSG_LEVEL
+#if TRACEMSG_LEVEL >= 2
     static uint64_t so_far = 0;
 #endif
     HashBlock *block_ptr;
@@ -1220,9 +1412,9 @@ hashlib_iterate(
     if (iter_ptr->block == HASH_ITER_BEGIN) {
         /* Initialize the iterator. */
         memset(iter_ptr, 0, sizeof(HASH_ITER));
-#ifdef TRACEMSG_LEVEL
+#if TRACEMSG_LEVEL >= 2
         TRACEMSG(2,(TRC_FMT "Iterate. Starting to iterate over HashTable...",
-                    TRC_ARG));
+                    TRC_ARG(table_ptr)));
         so_far = 0;
 #endif
     } else {
@@ -1247,7 +1439,7 @@ hashlib_iterate(
                 /* We found an entry, return it */
                 *key_pptr = HASHENTRY_GET_KEY(block_ptr, entry_ptr);
                 *val_pptr = HASHENTRY_GET_VALUE(block_ptr, entry_ptr);
-#ifdef TRACEMSG_LEVEL
+#if TRACEMSG_LEVEL >= 2
                 ++so_far;
 #endif
                 return OK;
@@ -1257,7 +1449,8 @@ hashlib_iterate(
         /* At the end of the block. */
         TRACEMSG(2,((TRC_FMT "Iterate. Finished block #%u containing %" PRIu64
                      " entries. Total visted %" PRIu64),
-                    TRC_ARG, iter_ptr->block, block_ptr->num_entries,so_far));
+                    TRC_ARG(table_ptr), iter_ptr->block,
+                    block_ptr->num_entries, so_far));
 
         /* try the next block */
         ++iter_ptr->block;
@@ -1269,7 +1462,7 @@ hashlib_iterate(
     *val_pptr = NULL;
     iter_ptr->block = HASH_ITER_END;
     TRACEMSG(2,(TRC_FMT "Iterate. No more entries. Total visited %"
-                PRIu64, TRC_ARG, so_far));
+                PRIu64, TRC_ARG(table_ptr), so_far));
 
     return ERR_NOMOREENTRIES;
 }
@@ -1293,7 +1486,7 @@ hashlib_iterate_sorted(
         /* Initialize the iterator. */
         memset(iter_ptr, 0, sizeof(HASH_ITER));
         TRACEMSG(2,((TRC_FMT "Iterate. Starting to iterate"
-                     " over sorted HashTable..."), TRC_ARG));
+                     " over sorted HashTable..."), TRC_ARG(table_ptr)));
     } else {
         /* Increment the pointer in the block from which we took the
          * entry last time. */
@@ -1316,7 +1509,7 @@ hashlib_iterate_sorted(
         *key_pptr = NULL;
         *val_pptr = NULL;
         iter_ptr->block = HASH_ITER_END;
-        TRACEMSG(2,(TRC_FMT "Iterate. No more entries.", TRC_ARG));
+        TRACEMSG(2,(TRC_FMT "Iterate. No more entries.", TRC_ARG(table_ptr)));
         return ERR_NOMOREENTRIES;
     }
 
@@ -1366,8 +1559,9 @@ hashlib_count_entries(
 
     for (k = 0; k < table_ptr->num_blocks; ++k) {
         total += table_ptr->block_ptrs[k]->num_entries;
-        TRACEMSG(2,((TRC_FMT "entry count for block #%u is %" PRIu64 "."),
-                    TRC_ARG, k, table_ptr->block_ptrs[k]->num_entries));
+        TRACEMSG(3,((TRC_FMT "entry count for block #%u is %" PRIu64 "."),
+                    TRC_ARG(table_ptr), k,
+                    table_ptr->block_ptrs[k]->num_entries));
     }
     return total;
 }
@@ -1398,7 +1592,7 @@ hashlib_count_nonempties(
         }
         total += count;
         TRACEMSG(2,((TRC_FMT "nonempty count for block #%u is %" PRIu64 "."),
-                    TRC_ARG, k, count));
+                    TRC_ARG(table_ptr), k, count));
     }
     return total;
 }
@@ -1436,10 +1630,12 @@ hashlib_make_contiguous(
     const uint32_t entry_len = HASH_GET_ENTRY_LEN(table_ptr);
     const uint32_t value_len = HASH_GET_VALUE_LEN(table_ptr);
 
-    TRACEMSG(1,(TRC_FMT "Making the HashTable contiguous...", TRC_ARG));
+    TRACEMSG(1,(TRC_FMT "Making the HashTable contiguous...",
+                TRC_ARG(table_ptr)));
 
     for (k = 0; k < table_ptr->num_blocks; ++k) {
-        TRACEMSG(2,(TRC_FMT "Making block #%u contiguous", TRC_ARG, k));
+        TRACEMSG(2,(TRC_FMT "Making block #%u contiguous",
+                    TRC_ARG(table_ptr), k));
         block_ptr = table_ptr->block_ptrs[k];
         if (0 == block_ptr->num_entries) {
             continue;
@@ -1481,7 +1677,7 @@ hashlib_make_contiguous(
         }
         assert(j <= block_ptr->num_entries);
     }
-    TRACEMSG(1,(TRC_FMT "Made the HashTable contiguous.", TRC_ARG));
+    TRACEMSG(1,(TRC_FMT "Made the HashTable contiguous.", TRC_ARG(table_ptr)));
 }
 
 
@@ -1495,7 +1691,7 @@ hashlib_sort_entries_usercmp(
     const size_t entry_len = HASH_GET_ENTRY_LEN(table_ptr);
     unsigned int k;
 
-    TRACEMSG(1,(TRC_FMT "Sorting the HashTable...", TRC_ARG));
+    TRACEMSG(1,(TRC_FMT "Sorting the HashTable...", TRC_ARG(table_ptr)));
 
     if (NULL == cmp_fn) {
         return ERR_BADARGUMENT;
@@ -1511,14 +1707,14 @@ hashlib_sort_entries_usercmp(
     /* we use qsort to sort each block individually; when iterating,
      * return the lowest value among all sorted blocks. */
     for (k = 0; k < table_ptr->num_blocks; ++k) {
-        TRACEMSG(2,(TRC_FMT "Sorting block #%u...", TRC_ARG, k));
+        TRACEMSG(2,(TRC_FMT "Sorting block #%u...", TRC_ARG(table_ptr), k));
         block_ptr = table_ptr->block_ptrs[k];
         /* sort the block's entries */
         skQSort_r(block_ptr->data_ptr, block_ptr->num_entries,
                   entry_len, table_ptr->cmp_fn, table_ptr->cmp_userdata);
     }
 
-    TRACEMSG(1,(TRC_FMT "Sorted the HashTable.", TRC_ARG));
+    TRACEMSG(1,(TRC_FMT "Sorted the HashTable.", TRC_ARG(table_ptr)));
 
     table_ptr->is_sorted = 1;
     return 0;

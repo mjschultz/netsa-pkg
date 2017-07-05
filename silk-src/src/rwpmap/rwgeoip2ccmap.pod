@@ -94,6 +94,9 @@ bin by the country codes in B<rwstats(1)>, B<rwuniq(1)>, and B<rwgroup(1)>.
 The B<rwpmaplookup(1)> command can use the country code mapping file
 to display the country code for textual IP addresses.
 
+To create a general prefix map file from textual input, use
+B<rwpmapbuild(1)>.
+
 =head1 OPTIONS
 
 Option names may be abbreviated if the abbreviation is unique or is an
@@ -279,7 +282,8 @@ subshell to avoid having to store the uncompressed data:
 
 B<ccfilter(3)>, B<rwpmaplookup(1)>, B<rwfilter(1)>, B<rwcut(1)>,
 B<rwsort(1)>, B<rwstats(1)>, B<rwuniq(1)>, B<rwgroup(1)>,
-B<rwpmapbuild(1)>, B<silk(7)>, B<gzip(1)>, B<zip(1)>, B<unzip(1)>,
+B<rwpmapbuild(1)>, B<rwfileinfo(1)>, B<silk(7)>, B<gzip(1)>,
+B<zip(1)>, B<unzip(1)>,
 L<http://dev.maxmind.com/geoip/legacy/geolite/>
 
 =head1 NOTES
@@ -289,7 +293,7 @@ SiLK 3.12.0 and restored in SiLK 3.12.2.
 
 =cut
 
-$SiLK: rwgeoip2ccmap.pod a67233a9fda8 2016-06-13 19:04:29Z mthomas $
+$SiLK: rwgeoip2ccmap.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
 
 Local Variables:
 mode:text

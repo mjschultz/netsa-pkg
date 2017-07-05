@@ -182,11 +182,11 @@ B<rwuniq> twice (as with B<rwstats> in the previous example).
 =head1 SEE ALSO
 
 B<rwpdu2silk(1)>, B<rwstats(1)>, B<rwuniq(1)>, B<rwflowpack(8)>,
-B<sensor.conf(5)>, B<silk(7)>
+B<silk.conf(5)>, B<silk(7)>
 
 =cut
 
-$SiLK: rwguess.pod 72c1364e7399 2014-06-19 14:34:57Z mthomas $
+$SiLK: rwguess.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
 
 Local Variables:
 mode:text

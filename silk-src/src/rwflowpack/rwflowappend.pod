@@ -37,10 +37,22 @@ stored in the SiLK data repository whose directory tree root is
 specified by the B<--root-directory> switch.
 
 The directory that B<rwflowappend> watches for incremental files is
-specified by B<--incoming-directory>.  Once B<rwflowappend> processes
-an incremental file, the file is deleted unless the
-B<--archive-directory> switch is specified, in which case the
-incremental file is moved to that directory.
+specified by B<--incoming-directory>.  As B<rwflowappend> scans this
+directory, it ignores a file if its size is 0 bytes or if its name
+begins with a dot (C<.>).  On each scan, if B<rwflowappend> detects a
+file name that was not present in the previous scan, it records the
+name and size of the file.  If the file has a different size on the
+next scan, the new size is recorded.  Once the file has the same size
+on two consecutive scans, B<rwflowappend> appends the file to the
+appropriate hourly file.
+
+After B<rwflowappend> processes an incremental file, the file is
+deleted unless the B<--archive-directory> switch is specified, in
+which case the incremental file is moved to that directory or to a
+subdirectory of that directory depending on whether B<--flat-archive>
+was specified.  The B<--post-command> switch allows a command to be
+executed on the incremental file after it has been moved to the
+archive directory.
 
 If a fatal write error occurs (for example, the disk containing the
 data repository becomes full), B<rwflowappend> exits.  Before exiting,
@@ -76,22 +88,27 @@ The following switches are required:
 
 =item B<--incoming-directory>=I<DIR_PATH>
 
-Watch this directory for new incremental files to append to the hourly
-files.  B<rwflowappend> ignores any files in this directory that are
-empty or whose names begin with a dot (C<.>).  In addition, new files
-are only considered when their size is constant for one
-polling-interval after they are first noticed.
+Periodically scan the directory I<DIR_PATH> for incremental files to
+append to the hourly files.  As B<rwflowappend> scans I<DIR_PATH>, it
+ignores a file if its name begins with a dot (C<.>) or if its size is
+0 bytes.  When a file is first detected, its size is recorded, and the
+file must have the same size for two consecutive scans before
+B<rwflowappend> will append it to the appropriate hourly file.  The
+interval between scans is set by B<--polling-interval>.  I<DIR_PATH>
+must be a complete directory path.
 
 =item B<--root-directory>=I<DIR_PATH>
 
 Append to existing hourly files and create new hourly files in the
 directory tree rooted at this location.  The directory tree has the
 same subdirectory structure as that created by B<rwflowpack>.
+I<DIR_PATH> must be a complete directory path.
 
 =item B<--error-directory>=I<DIR_PATH>
 
 Store in this directory incremental files that were NOT successfully
-appended to an hourly file.
+appended to an hourly file.  I<DIR_PATH> must be a complete directory
+path.
 
 =back
 
@@ -120,7 +137,7 @@ is present.
 When archiving incremental files via B<--archive-directory>, move the
 files into the top of the archive-directory, not into subdirectories
 of it.  This switch has no effect if B<--archive-directory> is not
-also specified.  This switch can be used to allow another process to
+also specified.  This switch may be used to allow another process to
 watch for new files appearing in the archive-directory.
 
 =item B<--post-command>=I<COMMAND>
@@ -132,14 +149,16 @@ is replaced with the full path to the incremental file in the
 archive-directory, and each occurrence of C<%%> is replaced with C<%>.
 If any other character follows C<%>, B<rwflowappend> exits with an
 error.  When using this feature, the B<--archive-directory> must be
-specified.  See also the B<rwpollexec(8)> daemon.
+specified.  The exit status of I<COMMAND> is ignored.  See also the
+B<rwpollexec(8)> daemon.
 
 =item B<--hour-file-command>=I<COMMAND>
 
 Run I<COMMAND> upon creation of a new hourly file.  The string C<%s>
 in I<COMMAND> is replaced with the full path to the hourly file, and
 the string C<%%> is replaced with C<%>.  If any other character
-follows C<%>, B<rwflowappend> exits with an error.
+follows C<%>, B<rwflowappend> exits with an error.  The exit status of
+I<COMMAND> is ignored.
 
 =item B<--threads>=I<N>
 
@@ -334,9 +353,9 @@ The following set of switches is optional:
 
 =item B<--log-level>=I<LEVEL>
 
-Set the severity of messages that will be logged.  The levels from
-most severe to least are: C<emerg>, C<alert>, C<crit>, C<err>,
-C<warning>, C<notice>, C<info>, C<debug>.  The default is C<info>.
+Set the severity of messages that are logged.  The levels from most
+severe to least are: C<emerg>, C<alert>, C<crit>, C<err>, C<warning>,
+C<notice>, C<info>, C<debug>.  The default is C<info>.
 
 =item B<--log-sysfacility>=I<NUMBER>
 
@@ -359,11 +378,11 @@ Run I<COMMAND> on the previous day's log file after log rotation.
 When this switch is not specified, the previous day's log file is
 compressed with B<gzip(1)>.  When the switch is specified and
 I<COMMAND> is the empty string, no action is taken on the log file.
-Each occurrence of the string C<%s> in I<COMMAND> will be replaced
-with the full path to the log file, and each occurrence of C<%%> will
-be replaced with C<%>.  If any other character follows C<%>,
-B<rwflowappend> exits with an error.  Specifying this switch without
-also using B<--log-directory> is an error.
+Each occurrence of the string C<%s> in I<COMMAND> is replaced with the
+full path to the log file, and each occurrence of C<%%> is replaced
+with C<%>.  If any other character follows C<%>, B<rwflowappend> exits
+with an error.  Specifying this switch without also using
+B<--log-directory> is an error.
 
 =item B<--pidfile>=I<FILE_PATH>
 
@@ -475,7 +494,7 @@ simultaneously.
 
 =cut
 
-$SiLK: rwflowappend.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
+$SiLK: rwflowappend.pod 38c3071a03ba 2017-04-26 20:55:19Z mthomas $
 
 Local Variables:
 mode:text

@@ -30,6 +30,10 @@ When B<rwsetmember> encounters an I<INPUT_SET> file that it cannot
 read as an IPset, it prints an error message and moves to the next
 I<INPUT_SET> file.
 
+To create an IPset file from SiLK Flow records, use B<rwset(1)>, and
+to create one from text, use B<rwsetbuild(1)>.  B<rwsetcat(1)> prints
+an IPset file as text.
+
 =head1 OPTIONS
 
 Option names may be abbreviated if the abbreviation is unique or is an
@@ -107,7 +111,7 @@ B<rwset(1)>, B<rwsetbuild(1)>, B<rwsetcat(1)>, B<silk(7)>
 
 =cut
 
-$SiLK: rwsetmember.pod 555c76ddb38c 2014-06-22 12:17:13Z mthomas $
+$SiLK: rwsetmember.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
 
 Local Variables:
 mode:text

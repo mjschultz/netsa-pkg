@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwtransfer.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwtransfer.c b1f14bba708e 2017-06-28 15:29:44Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sklog.h>
@@ -1425,7 +1425,7 @@ startClientConnection(
                 item->ident, connection_type);
 
         for (rv = -1, i = 0;
-             rv != 0 && i < skSockaddrArraySize(item->addr); i++)
+             rv != 0 && i < skSockaddrArrayGetSize(item->addr); i++)
         {
             sk_sockaddr_t *addr = skSockaddrArrayGet(item->addr, i);
             switch (addr->sa.sa_family) {

@@ -23,7 +23,12 @@ B<rwaggbagtool> - Manipulate binary Aggregate Bag files
 =head1 DESCRIPTION
 
 B<rwaggbagtool> performs operations on one or more Aggregate Bag files
-and creates a new Aggregate Bag file.
+and creates a new Aggregate Bag file.  An I<Aggregate Bag> is a binary
+file that maps a key to a counter, where the key and the counter are
+both composed of one or more fields.  B<rwaggbag(1)> and
+B<rwaggbagbuild(1)> are the primary tools used to create an Aggregate
+Bag file.  B<rwaggbagcat(1)> prints a binary Aggregate Bag file as
+text.
 
 B<rwaggbagtool> processes the Aggregate Bag files listed on the
 command line.  When no file names are specified, B<rwaggbagtool>
@@ -148,23 +153,23 @@ Use the default version for an IPv4 IPset and an IPv6 IPset, currently
 
 =item S< 2 >
 
-Create a file that may hold only IPv4 adresses and is readable by all
+Create a file that may hold only IPv4 addresses and is readable by all
 versions of SiLK.
 
 =item S< 3 >
 
-Create a file that may hold IPv4 or IPv6 adresses and is readable by
+Create a file that may hold IPv4 or IPv6 addresses and is readable by
 S<SiLK 3.0> and later.
 
 =item S< 4 >
 
-Create a file that may hold IPv4 or IPv6 adresses and is readable by
+Create a file that may hold IPv4 or IPv6 addresses and is readable by
 S<SiLK 3.7> and later.  These files are more compact that version 3
 and often more compact than version 2.
 
 =item S< 5 >
 
-Create a file that may hold only IPv6 adresses and is readable by
+Create a file that may hold only IPv6 addresses and is readable by
 S<SiLK 3.14> and later.  When this version is specified, IPsets
 containing only IPv4 addresses are written in version 4.  These files
 are usually more compact that version 4.
@@ -415,7 +420,7 @@ B<rwfilter(1)>, B<rwfileinfo(1)>, B<silk(7)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwaggbagtool.pod 19097c33c9cb 2017-03-24 19:36:51Z mthomas $
+$SiLK: rwaggbagtool.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
 
 Local Variables:
 mode:text

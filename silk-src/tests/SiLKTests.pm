@@ -11,7 +11,7 @@
 #  March 2009
 #
 #######################################################################
-#  RCSIDENT("$SiLK: SiLKTests.pm 22c7d008aa07 2017-01-26 23:10:13Z mthomas $")
+#  RCSIDENT("$SiLK: SiLKTests.pm 9a4f4ca2d067 2017-06-21 17:41:59Z mthomas $")
 #######################################################################
 #
 #    Perl module used by the scripts that "make check" runs.
@@ -239,7 +239,8 @@ BEGIN {
                       &check_daemon_init_program_name
                       &check_exit_status &check_features
                       &check_md5_file &check_md5_output
-                      &check_python_bin &check_silk_app &compute_md5
+                      &check_python_bin &check_python_plugin
+                      &check_silk_app &compute_md5
                       &get_data_or_exit77 &get_datafile
                       &get_ephemeral_port &make_config_file
                       &make_packer_sensor_conf
@@ -364,6 +365,7 @@ my %test_files = (
     data            => "$testsdir/data.rwf",
     v6data          => "$testsdir/data-v6.rwf",
     scandata        => "$testsdir/scandata.rwf",
+    sips004         => "$testsdir/sips-004-008.rw",
 
     v4set1          => "$testsdir/set1-v4.set",
     v4set2          => "$testsdir/set2-v4.set",
@@ -983,6 +985,9 @@ sub check_exit_status
 #    exit 77.  Otherwise, prefix any existing PYTHONPATH with the
 #    proper directories and return 1.
 #
+#    This check used by the code that tests daemons since the daemon
+#    testing code requires a python interpreter.
+#
 sub check_python_bin
 {
     if ($SiLKTests::PYTHON eq "no"
@@ -996,6 +1001,25 @@ sub check_python_bin
                                   $SiLKTests::top_srcdir.'/tests',
                                   ($ENV{PYTHONPATH} ? $ENV{PYTHONPATH} : ()));
     return 1;
+}
+
+
+#  check_python_plugin($app)
+#
+#    Check whether the --python-file switch works for the application
+#    $app.  The argument to --python-file is the pysilk_plugin defined
+#    in the %test_files hash.  If the switch does not work, exit 77.
+#
+sub check_python_plugin
+{
+    my ($app) = @_;
+
+    my $file = get_data_or_exit77('pysilk_plugin');
+    if (check_exit_status(qq|$app --python-file=$file --help|)) {
+        return;
+    }
+    check_exit_status(qq|$app --python-file=$file --help|, 'no_redirect');
+    skip_test('Cannot use --python-file');
 }
 
 
@@ -1617,7 +1641,8 @@ EOF
 
         # Set any environment variables
         if ($env_hash) {
-            while (my ($var, $val) = each %$env_hash) {
+            for my $var (sort keys %$env_hash) {
+                my $val = $env_hash->{$var};
                 $test_body .= "\$ENV{$var} = $val;\n";
                 $run_body .= "\$ENV{$var} = $val;\n";
             }

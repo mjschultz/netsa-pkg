@@ -1,5 +1,5 @@
 #! /usr/bin/perl -w
-# MD5: b9b28de94acf988b2ae5dc4a7c10467b
+# MD5: 44acd5910a25f168eba9ab8825f55809
 # TEST: ./rwcut --plugin=flowrate.so --fields=bytes,packets,dur,pckts/sec,bytes/sec,bytes/packet,payload-bytes,payload-rate ../../tests/data.rwf
 
 use strict;
@@ -13,6 +13,6 @@ add_plugin_dirs('/src/plugins');
 skip_test('Cannot load flowrate plugin')
     unless check_app_switch($rwcut.' --plugin=flowrate.so', 'fields', qr/payload-rate/);
 my $cmd = "$rwcut --plugin=flowrate.so --fields=bytes,packets,dur,pckts/sec,bytes/sec,bytes/packet,payload-bytes,payload-rate $file{data}";
-my $md5 = "b9b28de94acf988b2ae5dc4a7c10467b";
+my $md5 = "44acd5910a25f168eba9ab8825f55809";
 
 check_md5_output($md5, $cmd);

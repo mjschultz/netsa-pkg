@@ -438,8 +438,9 @@ prompt.  The text after the dollar sign represents the command line.
 Lines have been wrapped for improved readability, and the back slash
 (C<\>) is used to indicate a wrapped line.
 
-The output from B<rwcut(1)> shows the flow exporter split this
-long-lived B<ssh> session into multiple flow records:
+Use B<rwfilter(1)> to find B<ssh> flow records that involve the host
+192.168.126.252.  The output from B<rwcut(1)> shows the flow exporter
+split this long-lived B<ssh> session into multiple flow records:
 
  $ rwfilter --saddr=192.168.126.252 --dport=22 --pass=- data.rw \
    | rwcut --fields=flags,attributes,stime,etime 
@@ -597,7 +598,7 @@ The first release of B<rwcombine> occurred in SiLK 3.9.0.
 
 =cut
 
-$SiLK: rwcombine.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwcombine.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
 
 Local Variables:
 mode:text

@@ -209,7 +209,9 @@ bins.
 =back
 
 The B<--bin-ips> switch may not be combined with the
-B<--network-structure> or B<--sort-counters> switches.
+B<--network-structure> or B<--sort-counters> switches.  See also the
+B<--invert> switch on B<rwbagtool(1)> which inverts a bag using a
+linear scale and creates a new binary bag file.
 
 =item B<--sort-counters>
 
@@ -617,9 +619,59 @@ including summary information:
      192.168.20.0/24   |             11| 3 hosts in 1 /27
  192.0.0.0/8           |             28| 6 hosts in 1 /16, 2 /24s, and 3 /27s
 
+=head2 Overriding the key type
+
+Suppose a key-type of a bag file is C<duration>:
+
+ $ rwfileinfo --field=bag Bag2.bag
+ Bag2.bag:
+   bag          key: duration @ 4 octets; counter: custom @ 8 octets
+
+B<rwbagcat> complains when the B<--key-format> switch lists a format
+that it thinks is "nonsensical" for that type of key.
+
+ $ rwbagcat --key-format=utc Bag2.bag
+ rwbagcat: Invalid key-format 'utc':
+        Nonsensical for Bag containing duration keys
+
+ $ rwbagcat --key-format=canonical Bag2.bag
+ rwbagcat: Invalid key-format 'canonical':
+        Nonsensical for Bag containing duration keys
+
+To use the B<--key-format> one time and leave the key-type in the Bag
+file unchanged, you may merge the bag with an empty bag file: Use
+B<rwbagbuild(1)> to create an empty bag that uses the C<custom> key
+type, add the empty bag to F<Bag2.bag> using B<rwbagtool(1)>, then
+display the result:
+
+ $ rwbagbuild --bag-input=/dev/null   \
+   | rwbagtool --add Bag2.bag stdin   \
+   | rwbagcat --key-format=utc
+ 1970/01/01T00:00:01|                   1|
+ 1970/01/01T00:00:04|                   2|
+ 1970/01/01T00:00:07|                  32|
+ 1970/01/01T00:00:08|                   2|
+
+ $ rwbagbuild --bag-input=/dev/null   \
+   | rwbagtool --add Bag2.bag -       \
+   | rwbagcat --key-format=canonical
+         0.0.0.1|                   1|
+         0.0.0.4|                   2|
+         0.0.0.7|                  32|
+         0.0.0.8|                   2|
+
+To rewrite the bag file with a different key type, print the bag file
+as text and use B<rwbagbuild> to build a new bag file:
+
+ $ rwbagcat Bag2.bag    \
+   | rwbagbuild --bag-input=- --key-type=sipv4
+
 =head2 Inverting a bag
 
-To bin by number of unique IP addresses by volume:
+Inverting a bag means counting the number of times each counter
+appears in the bag.
+
+To bin the number of IP addresses that had each flow count:
 
  $ rwbagcat --bin-ips mybag.bag
                1|              3|
@@ -629,9 +681,9 @@ To bin by number of unique IP addresses by volume:
               19|              1|
              231|              1|
 
-This means there were 3 source hosts in the bag that had a
-single flow; 3 hosts that had 5 flows; and one host each that
-had 9, 15, 19, and 231 flows.
+The output shows that the bag contains 3 source hosts that had a
+single flow, 3 hosts that had 5 flows, and four hosts that each had a
+unique flow count (9, 15, 19, and 231).
 
 For a log2 breakdown of the counts:
 
@@ -645,9 +697,9 @@ For a log2 breakdown of the counts:
 =head2 Sorting the bag by counter value
 
 B<rwbagcat> normally presents the data in order of increasing key
-value.  To sorted based on the counter value, specify the
-B<--sort-counter> switch.  The default sort order is from maximum
-counter to minimum counter.
+value.  To sort based on the counter value, specify the
+B<--sort-counter> switch.  When sorting by the counter value, the
+default order is from maximum counter to minimum counter.
 
  $ rwbagcat --sort-counter mybag.bag
       172.23.1.2|                 231|
@@ -676,8 +728,9 @@ B<--sort-counter> switch:
       172.23.1.4|                  19|
       172.23.1.2|                 231|
 
-The order of the keys is consistent for keys have the same counter
-value.  The following output is limited to those keys whose value is
+For keys have the same counter value, the order of the keys is
+consistent (always from low to high) regardless how the counters are
+sorted.  The following output is limited to those keys whose value is
 5.  The output is first shown without the B<--sort-counter> switch,
 then with the data sorted by increasing and decreasing counter value.
 
@@ -701,8 +754,8 @@ then with the data sorted by increasing and decreasing counter value.
 B<rwbag(1)> and B<rwbagbuild(1)> can use a prefix map file as the key
 in a bag file as of SiLK 3.12.0.  When attempting to display these Bag
 files, you must specify the B<--pmap-file> switch on the B<rwbagcat>
-command line can map the prefix map values to the labels.  If the
-B<--pmap-file> is not given, B<rwbagcat> displays an error.
+command line for it to map each prefix map value to its label.  If
+the B<--pmap-file> is not given, B<rwbagcat> displays an error.
 
  $ rwbagcat service.bag
  rwbagcat: The --pmap-file switch is required for \
@@ -727,10 +780,11 @@ type of key in a bag may be determined by B<rwfileinfo(1)>.
   TCP/SMTP|                 800|
   TCP/HTTP|                5642|
 
-The only check is whether the prefix map file is the correct type.  A
-different prefix map file could be used.  If a value in the bag file
-does not have an index in the prefix map file, the numeric index of
-the label is displayed.
+The only check B<rwbagcat> makes is whether the prefix map file is the
+correct type.  A different prefix map file may be used.  If a value in
+the bag file does not have an index in the prefix map file, the
+numeric index of the label is displayed as shown in the following
+example which creates a prefix map with a single label.
 
  $ echo 'label 1 none'                                      \
    | rwpmapbuild --mode=proto-port --input-file=-           \
@@ -839,11 +893,12 @@ checked when the B<--site-config-file> switch is not provided.
 =head1 SEE ALSO
 
 B<rwbag(1)>, B<rwbagbuild(1)>, B<rwbagtool(1)>, B<rwpmapbuild(1)>,
-B<rwfileinfo(1)>, B<rwset(1)>, B<rwsetbuild(1)>, B<silk(7)>
+B<rwfileinfo(1)>, B<rwset(1)>, B<rwsetbuild(1)>, B<silk(7)>,
+B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwbagcat.pod 66e65613d494 2017-03-21 19:29:56Z mthomas $
+$SiLK: rwbagcat.pod 2c01a5f676fc 2017-05-23 18:38:42Z mthomas $
 
 Local Variables:
 mode:text

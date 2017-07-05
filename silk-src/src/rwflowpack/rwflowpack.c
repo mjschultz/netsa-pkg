@@ -81,7 +81,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwflowpack.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwflowpack.c 4ba08a73ecbf 2017-05-05 22:05:45Z mthomas $");
 
 #include <dlfcn.h>
 
@@ -1135,7 +1135,7 @@ appOptionsProcessOpt(
         if (verifyCommandString(opt_arg, appOptions[opt_index].name)) {
             return 1;
         }
-        archiveDirectorySetPostCommand(opt_arg);
+        archiveDirectorySetPostCommand(opt_arg, appOptions[opt_index].name);
         break;
 
       case OPT_FLAT_ARCHIVE:
@@ -2153,11 +2153,10 @@ createFlowProcessorsRespool(
     imt = &input_mode_types[INPUT_MODE_TYPE_RESPOOL];
 
     /* create a dummy probe that is used when reporting errors */
-    if (skpcProbeCreate(&probe)) {
+    if (skpcProbeCreate(&probe, PROBE_ENUM_SILK)) {
         exit(EXIT_FAILURE);
     }
     skpcProbeSetName(probe, "RESPOOL");
-    skpcProbeSetType(probe, PROBE_ENUM_SILK);
     skpcProbeSetPollDirectory(probe, reader_opts.respool.incoming_directory);
     if (skpcProbeVerify(probe, 0)) {
         exit(EXIT_FAILURE);
