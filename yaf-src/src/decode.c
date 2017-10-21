@@ -1562,7 +1562,7 @@ static const uint8_t *yfDecodeIP(
 
 #if YAF_NONIP
     if (type == 0) {
-        key->version = 6;
+        key->version = 4;
         key->sp = 0;
         key->dp = 0;
         /* not really - but best we can do */
@@ -1886,10 +1886,6 @@ void yfDecodeDumpStats(
     fail_l3total = ctx->stats.fail_l3type + ctx->stats.fail_arptype +
                    ctx->stats.fail_8023type + ctx->stats.fail_lldptype;
 
-    /* fail_total isn't counted in packetTotal(flowtab) - so add
-       packetTotal & fail_total to get TOTAL packets processed by YAF. */
-    packetTotal += fail_total;
-
     if (fail_total) {
         g_debug("Rejected %u packets during decode: (%3.2f%%)",
                 fail_total,
@@ -1944,56 +1940,56 @@ void yfDecodeDumpStats(
                 fail_suptotal,
                 ((double)(fail_suptotal)/(double)(packetTotal) * 100) );
             if (ctx->stats.fail_l2type) {
-                g_debug("    %u unsupported/rejected Layer 2 headers. "
+                g_debug("      %u unsupported/rejected Layer 2 headers. "
                         "(%3.2f%%)",
                         ctx->stats.fail_l2type,
                         ((double)(ctx->stats.fail_l2type)/(double)(packetTotal) * 100) );
             }
             if (ctx->stats.fail_l3type) {
-                g_debug("    %u unsupported/rejected Layer 3 headers. "
+                g_debug("      %u unsupported/rejected Layer 3 headers. "
                         "(%3.2f%%)",
-                        fail_l3total,
-                        ((double)(fail_l3total)/
+                        ctx->stats.fail_l3type,
+                        ((double)(ctx->stats.fail_l3type)/
                          (double)(packetTotal) * 100) );
             }
             if (ctx->stats.fail_arptype) {
-                g_debug("    %u ARP packets. (%3.2f%%)",
+                g_debug("      %u ARP packets. (%3.2f%%)",
                         ctx->stats.fail_arptype,
                         ((double)(ctx->stats.fail_arptype)/(double)(packetTotal) * 100));
             }
             if (ctx->stats.fail_lldptype) {
-                g_debug("    %u LLDP packets. (%3.2f%%)",
+                g_debug("      %u LLDP packets. (%3.2f%%)",
                         ctx->stats.fail_lldptype,
                         ((double)(ctx->stats.fail_lldptype)/(double)(packetTotal) * 100));
 
             }
             if (ctx->stats.fail_8023type) {
-                g_debug("    %u 802.3 packets. (%3.2f%%)",
+                g_debug("      %u 802.3 packets. (%3.2f%%)",
                         ctx->stats.fail_8023type,
                         ((double)(ctx->stats.fail_8023type)/(double)(packetTotal) * 100));
             }
             if (ctx->stats.fail_ip4frag) {
-                g_debug("    %u IPv4 fragments. (%3.2f%%)",
+                g_debug("      %u IPv4 fragments. (%3.2f%%)",
                     ctx->stats.fail_ip4frag,
                     ((double)(ctx->stats.fail_ip4frag)/(double)(packetTotal) * 100) );
             }
             if (ctx->stats.fail_ip6frag) {
-                g_debug("    %u IPv6 fragments. (%3.2f%%)",
+                g_debug("      %u IPv6 fragments. (%3.2f%%)",
                     ctx->stats.fail_ip6frag,
                     ((double)(ctx->stats.fail_ip6frag)/(double)(packetTotal) * 100) );
             }
             if (ctx->stats.fail_l2loop) {
-                g_debug("    %u unsupported loopback packet families. (%3.2f%%)",
+                g_debug("      %u unsupported loopback packet families. (%3.2f%%)",
                     ctx->stats.fail_l2loop,
                     ((double)(ctx->stats.fail_l2loop)/(double)(packetTotal) * 100) );
             }
             if (ctx->stats.fail_grevers) {
-                g_debug("    %u unsupported GRE version headers. (%3.2f%%)",
+                g_debug("      %u unsupported GRE version headers. (%3.2f%%)",
                         ctx->stats.fail_grevers,
                         ((double)(ctx->stats.fail_grevers)/(double)(packetTotal) * 100) );
             }
             if (ctx->stats.fail_erspan) {
-                g_debug("    %u unsupported ERSPAN headers. (%3.2f%%)",
+                g_debug("      %u unsupported ERSPAN headers. (%3.2f%%)",
                         ctx->stats.fail_erspan,
                         ((double)(ctx->stats.fail_erspan)/(double)(packetTotal) * 100) );
             }

@@ -220,10 +220,10 @@ typedef struct yfDPIContext_st {
  */
 
 typedef struct yfDPIData_st {
+    /* offset in the payload to the good stuff */
+    int dpacketCapt;
     /* id of the field we found */
     uint16_t dpacketID;
-    /* offset in the payload to the good stuff */
-    uint16_t dpacketCapt;
     /* length of good stuff */
     uint16_t dpacketCaptLen;
 } yfDPIData_t;
@@ -917,6 +917,8 @@ fbTemplate_t * ypInitTemplate(
     fbSession_t            *session,
     fbInfoElementSpec_t    *spec,
     uint16_t               tid,
+    const gchar            *name,
+    const gchar            *description,
     uint32_t               flags,
     GError                 **err);
 

@@ -211,6 +211,7 @@ static void idTemplateCallback(
     uint16_t len = 0;
     tmplContext_t *myctx = malloc(sizeof(tmplContext_t));
     uint32_t obdomain;
+    uint16_t ntid = 0;
     /* get infomodel from session -
        give it to idPrintTmpl to add up length
        (should use type instead of length?) */
@@ -229,15 +230,17 @@ static void idTemplateCallback(
 
     len = idPrintTemplate(outfile, tmpl, ctx, tid, dump_data);
 
-    fbSessionAddTemplate(session, TRUE, tid, tmpl, &err);
+    ntid = fbSessionAddTemplate(session, TRUE, tid, tmpl, &err);
 
-    if (tid == 0) {
+    if (ntid == 0) {
         fprintf(stderr, "Error adding template to session: %s\n",
                 err->message);
     }
 
     /* mark every tmpl we have received */
-    id_tmpl_stats[tid] = 1;
+    if (id_tmpl_stats[tid] == 0) {
+        id_tmpl_stats[tid] = 1;
+    }
     if (tid > max_tmpl_id) {
         max_tmpl_id = tid;
     }

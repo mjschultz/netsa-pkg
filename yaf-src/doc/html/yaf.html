@@ -46,6 +46,7 @@
             [--idle-timeout IDLE_TIMEOUT]
             [--active-timeout ACTIVE_TIMEOUT]
             [--udp-temp-timeout TEMPLATE_TIMEOUT]
+            [--no-vlan-in-key]
             [--force-read-all]
             [--flow-stats] [--delta]
             [--ingress INGRESS_INT] [--egress EGRESS_INT]
@@ -56,6 +57,7 @@
             [--uniflow] [--mac] [--force-ip6-export]
             [--observation-domain DOMAIN_ID] [--entropy]
             [--applabel] [--applabel-rules RULES_FILE]
+            [--ndpi] [--ndpi-protocol-file FILE]
             [--ipfix-port PORT] [--tls] [--tls-ca CA_PEM_FILE]
             [--tls-cert CERT_PEM_FILE] [--tls-key KEY_PEM_FILE]
             [--become-user UNPRIVILEGED_USER]
@@ -343,6 +345,12 @@
 <p>If present, <b>yaf</b> will process out-of-sequence packets. However, it will still reject out-of-sequence fragments.</p>
 
 </dd>
+<dt id="no-vlan-in-key"><b>--no-vlan-in-key</b></dt>
+<dd>
+
+<p>If present, <b>yaf</b> will NOT use the VLAN ID in the flow key hash calculation for flows. This means that packets within the active/idle timeouts that have the same 5-tuple (sIP, dIP, sport, dport, protocol) but different VLAN IDs will be aggregated into 1 flow and the VLAN ID of the first packet in each direction will be exported in the vlanId and reverseVlanId fields.</p>
+
+</dd>
 </dl>
 
 <h2 id="Export-Options">Export Options</h2>
@@ -441,6 +449,30 @@
 <dd>
 
 <p>Read application labeler rules from <i>RULES_FILE</i>. If not present, rules are read by default from <i>/usr/local/etc/yafApplabelRules.conf</i>.</p>
+
+</dd>
+</dl>
+
+<h2 id="nDPI-Options">nDPI Options</h2>
+
+<p>nDPI is a version of OpenDPI as maintained by ntop. You can read more about nDPI and the applications supported at: http://www.ntop.org/products/deep-packet-inspection/ndpi/</p>
+
+<p>If <b>yaf</b> is built with nDPI support enabled (using the <b>--enable-ndpi</b> option to <b>./configure</b> when <b>yaf</b> is built), then <b>yaf</b> can examine packet payloads and determine the application protocol in use within a flow, and export the applicaiton protocol and sub-protocol with each flow.</p>
+
+<p>nDPI requires payload capture to be enabled with the <b>--max-payload</b> option. A minimum payload capture length of 384 octets is recommended for best results.</p>
+
+<dl>
+
+<dt id="ndpi"><b>--ndpi</b></dt>
+<dd>
+
+<p>If present, export nDPI data. Requires <b>--max-payload</b> to enable payload capture.</p>
+
+</dd>
+<dt id="ndpi-protocol-file-FILE"><b>--ndpi-protocol-file</b> <i>FILE</i></dt>
+<dd>
+
+<p>Specify protocol file for sub-protocol and port-based protocol detection</p>
 
 </dd>
 </dl>
@@ -576,33 +608,23 @@
 
 <p>for each flow in the pcap. If a flow exists across 3 pcap files, there will be 3 lines in <i>META_FILENAME</i> for that flow (each line having a different filename). The pcap-meta-file will rotate approximately every 4,500,000 lines (or approx 2G). A new file will be created in the form <i>META_FILENAME</i>[datetime]_serialno.meta. This file can be uploaded to a database for flow correlation and flow-to-pcap analysis.</p>
 
-<p>If <b>--pcap-meta-file</b> is present and --pcap is not present, <b>yaf</b> will export information about the pcap file(s) it is presently reading, as opposed to the pcap files <b>yaf</b> is writing. For each packet in the pcap file, <b>yaf</b> will write a line in the form:</p>
-
-<dl>
-
-<dt id="flow_key_hash-flowStartMilliseconds-file_num-offset-length"><i>flow_key_hash | flowStartMilliseconds | file_num | offset | length</i></dt>
-<dd>
-
-</dd>
-</dl>
-
-<p><code>file_num</code> is the sequential file number that <b>yaf</b> has processed. If <b>yaf</b> was given a single pcap file, this number will always be 0. <code>offset</code> is the offset into the pcap file of the beginning of the packet, at the start of the pcap packet header. <code>length</code> is the length of the packet including the pcap packet header. Using this offset, a separate program, such as <b>yafMeta2Pcap</b>, will be able to quickly extract packets for a flow. This file only rotates if <i>META_FILE</i> reaches max size.</p>
+<p>If <b>--pcap-meta-file</b> is present and --pcap is not present, <b>yaf</b> will export information about the pcap file(s) it is presently reading, as opposed to the pcap files <b>yaf</b> is writing.</p>
 
 </dd>
 <dt id="index-pcap"><b>--index-pcap</b></dt>
 <dd>
 
-<p>If present and <b>--pcap</b> and <b>--pcap-meta-file</b> are also present, export offset and length information about the packets <b>yaf</b> is writing to the rolling pcap files. Adding this option will force <b>yaf</b> to write one line per packet to the <b>pcap-meta-file</b> in the form:</p>
+<p>If present and <b>--pcap</b> and <b>--pcap-meta-file</b> are also present, export offset and length information about the packets <b>yaf</b> is writing to the rolling pcap files. This option can also be used when &lt;B--pcap&gt; is not present, in which case it will write information about the file it is reading. Adding this option will force <b>yaf</b> to write one line per packet to the <b>pcap-meta-file</b> in the form:</p>
 
 <dl>
 
-<dt id="flow_key_hash-flowStartMilliseconds-pcap_file_name-offset-length"><i>flow_key_hash | flowStartMilliseconds | pcap_file_name | offset | length</i></dt>
+<dt id="flow_key_hash-flowStartMilliseconds-pcap_file_name-file_num-offset-length"><i>flow_key_hash | flowStartMilliseconds | pcap_file_name/file_num | offset | length</i></dt>
 <dd>
 
 </dd>
 </dl>
 
-<p>This option is ignored if <b>--pcap</b> is not present.</p>
+<p>If <b>--pcap</b> is present, the <code>pcap_file_name</code> is the name of the PCAP file <b>yaf</b> is writing. Otherwise, <code>file_num</code> will represent the sequential file number that <b>yaf</b> has processed. If <b>yaf</b> was given a single pcap file, this number will always be 0. <code>offset</code> is the offset into the pcap file of the beginning of the packet, at the start of the pcap packet header. <code>length</code> is the length of the packet including the pcap packet header. Using this offset, a separate program, such as <b>yafMeta2Pcap</b>, will be able to quickly extract packets for a flow. This file only rotates if <i>META_FILE</i> reaches max size.</p>
 
 </dd>
 <dt id="hash-FLOW_KEY_HASH"><b>--hash</b> <i>FLOW_KEY_HASH</i></dt>
@@ -1501,7 +1523,7 @@
 
 <h1 id="AUTHORS">AUTHORS</h1>
 
-<p>Brian Trammell, Chris Inacio, Michael Duggan, Emily Sarneso, Dan Ruef, and the CERT Network Situational Awareness Group Engineering Team, &lt;http://www.cert.org/netsa&gt;.</p>
+<p>Brian Trammell, Chris Inacio, Michael Duggan, Emily Sarneso, Dan Ruef, Matt Coates, and the CERT Network Situational Awareness Group Engineering Team, &lt;http://www.cert.org/netsa&gt;.</p>
 
 <h1 id="SEE-ALSO">SEE ALSO</h1>
 

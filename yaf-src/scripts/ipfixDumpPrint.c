@@ -479,7 +479,7 @@ void idPrintDataRecord(
     uint16_t buf_walk = 0;
     char ip_buf[40];
     uint8_t thing48[6];
-    uint32_t mpls;
+    uint32_t mpls = 0;
     uint64_t thing = 0;
     int i, loop;
     char str_prefix2[DT_MAX];

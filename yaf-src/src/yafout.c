@@ -74,12 +74,15 @@ fBuf_t *yfOutputOpen(
     /* Short-circuit IPFIX output over the wire.
        Get a writer for the given connection specifier. */
     if (cfg->ipfixNetTrans) {
-        #ifdef HAVE_SPREAD
+#ifdef HAVE_SPREAD
         if (cfg->ipfixSpreadTrans){
-            return yfWriterForSpread( &(cfg->spreadparams), cfg->odid, cfg->spreadGroupIndex, err );
+            return yfWriterForSpread( &(cfg->spreadparams), cfg->odid,
+                                      cfg->spreadGroupIndex,
+                                      cfg->tmpl_metadata, err);
         }
-        #endif
-        return yfWriterForSpec(&(cfg->connspec), cfg->odid, err);
+#endif
+        return yfWriterForSpec(&(cfg->connspec), cfg->odid, cfg->tmpl_metadata,
+                               err);
     }
 
     /* create a buffer for the output filename */
@@ -108,7 +111,7 @@ fBuf_t *yfOutputOpen(
     }
     /* start a writer on the file */
 
-    if (!(fbuf = yfWriterForFile(namebuf->str, cfg->odid, err))) {
+    if (!(fbuf = yfWriterForFile(namebuf->str, cfg->odid, cfg->tmpl_metadata, err))) {
         goto err;
     }
 

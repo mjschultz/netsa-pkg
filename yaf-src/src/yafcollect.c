@@ -209,7 +209,7 @@ static gboolean ycOpenFileSink(
     ycContext_t              *yx = (ycContext_t *)vctx;
 
     /* start a new FixWriter */
-    yx->obuf = yfWriterForFP(mio_fp(sink), 0, err);
+    yx->obuf = yfWriterForFP(mio_fp(sink), 0, FALSE, err);
 
     /* check for failure */
     if (yx->obuf) {

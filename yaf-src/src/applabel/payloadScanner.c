@@ -230,19 +230,22 @@ ycInitializeScanRules (
                      lt_dlerror ());
         return FALSE;
     }
-
     /* if LTDL_LIBRARY_PATH is set - add this one first */
     ltdl_lib_path = getenv("LTDL_LIBRARY_PATH");
     if (ltdl_lib_path) {
         lt_dladdsearchdir(ltdl_lib_path);
     }
 
+#ifdef YAF_APPLABEL_PATH
+    /* add the applabel path based on libdir at build time */
+    lt_dladdsearchdir(YAF_APPLABEL_PATH);
+#else
     /* add /usr/local/lib/yaf to path since libtool can never find it */
 
     lt_dladdsearchdir(YAF_SEARCH_PATH);
     lt_dladdsearchdir(ALT_SEARCH_PATH);
     lt_dladdsearchdir(ALT_SEARCH_PATH64);
-
+#endif
     /* create the hash table for library modules to library handle names */
     if (!hcreate ((MAX_PAYLOAD_RULES * 20) / 100)) {
         *err = g_error_new (YAF_ERROR_DOMAIN, YAF_ERROR_IMPL,

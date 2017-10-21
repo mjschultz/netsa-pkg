@@ -14,7 +14,7 @@
 
 AM_CFLAGS = -Wall
 
-pkglib_LTLIBRARIES = nullplugin.la dnsplugin.la tlsplugin.la slpplugin.la dumpplugin.la ircplugin.la pptpplugin.la nntpplugin.la tftpplugin.la mysqlplugin.la pop3plugin.la teredoplugin.la snmpplugin.la aolplugin.la socksplugin.la bgpplugin.la dhcpplugin.la piplugin.la rtpplugin.la palplugin.la proxyplugin.la dnp3plugin.la modbusplugin.la ethipplugin.la ldpplugin.la ldapplugin.la gh0stplugin.la netdgmplugin.la
+pkglib_LTLIBRARIES = nullplugin.la dnsplugin.la tlsplugin.la slpplugin.la dumpplugin.la ircplugin.la pptpplugin.la nntpplugin.la tftpplugin.la mysqlplugin.la pop3plugin.la teredoplugin.la snmpplugin.la aolplugin.la socksplugin.la bgpplugin.la dhcpplugin.la piplugin.la rtpplugin.la palplugin.la proxyplugin.la dnp3plugin.la modbusplugin.la ethipplugin.la ldpplugin.la ldapplugin.la gh0stplugin.la netdgmplugin.la ntpplugin.la
 
 nullplugin_la_SOURCES = nullplugin.c
 nullplugin_la_LDFLAGS = -version-info @version_info@ -module
@@ -127,3 +127,7 @@ gh0stplugin_la_CFLAGS = -I${top_srcdir}/include @GLIB_CFLAGS@ @libfixbuf_CFLAGS@
 netdgmplugin_la_SOURCES = netdgmplugin.c
 netdgmplugin_la_LDFLAGS = -version-info @version_info@ -module
 netdgmplugin_la_CFLAGS = -I${top_srcdir}/include @GLIB_CFLAGS@ @libfixbuf_CFLAGS@
+
+ntpplugin_la_SOURCES = ntpplugin.c
+ntpplugin_la_LDFLAGS = -version-info @version_info@ -module
+ntpplugin_la_CFLAGS = -I${top_srcdir}/include @GLIB_CFLAGS@ @libfixbuf_CFLAGS@ 

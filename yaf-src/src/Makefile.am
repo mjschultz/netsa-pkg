@@ -65,8 +65,8 @@ libyaf_la_SOURCES += yafcygwin.c
 endif
 
 libyaf_la_LIBADD = @GLIB_LDADD@ 
-libyaf_la_LDFLAGS = @GLIB_LIBS@ @libfixbuf_LIBS@ @libp0f_LIBS@ @SPREAD_LDFLAGS@ @SPREAD_LIBS@ -version-info @LIBCOMPAT@ -release ${VERSION}
-libyaf_la_CFLAGS = @GLIB_CFLAGS@ @libfixbuf_CFLAGS@ @libp0f_CFLAGS@ @SPREAD_CFLAGS@ -DYAF_CONF_DIR='"$(sysconfdir)"'
+libyaf_la_LDFLAGS = @GLIB_LIBS@ @libfixbuf_LIBS@ @libp0f_LIBS@ @SPREAD_LDFLAGS@ @SPREAD_LIBS@ -version-info @LIBCOMPAT@ -release ${VERSION} @libndpi_LIBS@
+libyaf_la_CFLAGS = @GLIB_CFLAGS@ @libfixbuf_CFLAGS@ @libp0f_CFLAGS@ @SPREAD_CFLAGS@ -DYAF_CONF_DIR='"$(sysconfdir)"' @libndpi_CFLAGS@ -DYAF_APPLABEL_PATH=\"${libdir}/yaf\"
 
 yaf_SOURCES = yaf.c yafstat.c yafdag.c yafcap.c yafout.c yaflush.c yafpcapx.c yafnfe.c yafpfring.c
 yaf_LDADD   =  libyaf.la @GLIB_LDADD@ ../lua/src/liblua.la

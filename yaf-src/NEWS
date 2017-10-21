@@ -1,3 +1,17 @@
+Version 2.9.0: 2017-10-19
+==========================
+
+nDPI library suppport added
+
+Added NTP applabel
+
+Added RFC5610 template metadata (name and description) record output.
+
+Add option --no-vlan-in-key to drop VLAN ID from hash calculation
+
+Minor Bug Fixes
+
+
 Version 2.8.4: 2016-04-14
 =========================
 

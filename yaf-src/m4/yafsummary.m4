@@ -141,6 +141,15 @@ AC_DEFUN([YAF_AC_WRITE_SUMMARY],[
     * Application Labeling:         NO"
     fi
 
+    if test "x$ndpi" = xtrue
+    then
+       YF_BUILD_CONF="$YF_BUILD_CONF
+    * nDPI Support:                 YES"
+    else
+       YF_BUILD_CONF="$YF_BUILD_CONF
+    * nDPI Support:                 NO"
+    fi
+
     if test "x$exportDNSAuth" = xtrue
     then
       YF_BUILD_CONF="$YF_BUILD_CONF
@@ -228,6 +237,15 @@ AC_DEFUN([YAF_AC_WRITE_SUMMARY],[
     * Spread Support:               YES"
     fi
 
+    if test "x$type_export" = xtrue
+    then
+      YF_BUILD_CONF="$YF_BUILD_CONF
+    * Type export Support:              YES"
+    else
+      YF_BUILD_CONF="$YF_BUILD_CONF
+    * Type export Support:              NO"
+    fi
+
     if test "x$gcc_atomic" = xtrue
     then
       YF_BUILD_CONF="$YF_BUILD_CONF
@@ -241,6 +259,12 @@ AC_DEFUN([YAF_AC_WRITE_SUMMARY],[
     then
       YF_BUILD_CONF="$YF_BUILD_CONF
     * Multi-threading available:    NO (reconfigure with --without-pic)"
+    fi
+
+    if test "x$type_export" = xtrue
+    then
+      YF_BUILD_CONF="$YF_BUILD_CONF
+    * IE metadata export available:    YES"
     fi
 
     # Remove leading whitespace

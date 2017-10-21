@@ -300,6 +300,8 @@ typedef struct yfFlowVal_st {
     uint8_t     uflags;
     /** packets with payload - don't care if this wraps. */
     uint8_t     appkt;
+    /** VLAN TAG (also in key, but want to record both sides) */
+    uint16_t    vlan;
 #   if YAF_ENABLE_SEPARATE_INTERFACES
     uint8_t     netIf;
 #   endif
@@ -387,6 +389,10 @@ typedef struct yfFlow_st {
     /** Application label for this flow */
     uint16_t        appLabel;
 #endif
+#if YAF_ENABLE_NDPI
+    uint16_t        ndpi_master;
+    uint16_t        ndpi_sub;
+#endif
     /** Flow termination reason (YAF_END_ macros, per IPFIX standard) */
     uint8_t         reason;
     /** Keep track of number of pcap files for this flow */
@@ -455,6 +461,7 @@ void yfFlowCleanup(
  *
  * @param path      Name of the file to write to, or - for stdout.
  * @param domain    observation domain
+ * @param export_meta Export Template/IE Metadata
  * @param err       an error description, set on failure.
  * @return fBuf_t   a new writer, or a reused writer, for writing on the
  *                  given open file. NULL on failure.
@@ -463,6 +470,7 @@ void yfFlowCleanup(
 fBuf_t *yfWriterForFile(
     const char              *path,
     uint32_t                domain,
+    gboolean                export_meta,
     GError                  **err);
 
 /**
@@ -473,6 +481,7 @@ fBuf_t *yfWriterForFile(
  *
  * @param fp    File pointer to open file to write to.
  * @param domain observation domain
+ * @param export_meta Export Template/IE Metadata
  * @param err an error description, set on failure.
  * @return fBuf_t   a new writer, or a reused writer, for writing on the
  *                  given open file. NULL on failure.
@@ -481,6 +490,7 @@ fBuf_t *yfWriterForFile(
 fBuf_t *yfWriterForFP(
     FILE                    *fp,
     uint32_t                domain,
+    gboolean                export_meta,
     GError                  **err);
 
 /**
@@ -488,6 +498,7 @@ fBuf_t *yfWriterForFP(
  *
  * @param spec  fixbuf connection specifier for remote end of socket.
  * @param domain observation domain
+ * @param export_meta Export Template/IE Metadata
  * @param err an error description, set on failure.
  * @return a new writer for export to the given address.
  */
@@ -495,6 +506,7 @@ fBuf_t *yfWriterForFP(
 fBuf_t *yfWriterForSpec(
     fbConnSpec_t            *spec,
     uint32_t                domain,
+    gboolean                export_meta,
     GError                  **err);
 
 
@@ -507,6 +519,7 @@ fBuf_t *yfWriterForSpec(
  * @param params fixbuf Spread parameters
  * @param domain observation domain
  * @param spreadGroupIndex an array of groups matched to IE values
+ * @param export_meta Export Template/IE Metadata
  * @param err an error description, set on failure.
  * @return a new writer for export to the given address
  */
@@ -515,6 +528,7 @@ fBuf_t *yfWriterForSpread(
     fbSpreadParams_t       *params,
     uint32_t               domain,
     uint16_t               *spreadGroupIndex,
+    gboolean               export_meta,
     GError                 **err);
 
 #endif /* HAVE_SPREAD */

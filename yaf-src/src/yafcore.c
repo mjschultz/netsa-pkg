@@ -87,6 +87,12 @@
 
 #define YAF_OPTIONS_TID     0xD000
 
+#define YAF_FLOW_BASE_NAME "yaf_flow_base"
+#define YAF_FLOW_FULL_NAME "yaf_flow_full"
+#define YAF_FLOW_EXT_NAME  "yaf_flow_ext"
+
+#define YAF_OPTIONS_NAME  "yaf_process_stats"
+
 /* 49154 - 49160 */
 #define YAF_APP_FLOW_TID       0xC001 /* not used */
 #define YAF_ENTROPY_FLOW_TID   0xC002
@@ -97,6 +103,23 @@
 #define YAF_FPEXPORT_FLOW_TID  0xC007
 #define YAF_PAYLOAD_FLOW_TID   0xC008
 #define YAF_MPTCP_FLOW_TID     0xC009
+
+#define YAF_APP_FLOW_NAME           "UNUSED" /* not used */
+#define YAF_ENTROPY_FLOW_NAME       "yaf_entropy"
+#define YAF_ENTROPY_FLOW_REV_NAME   "yaf_entropy_rev"
+#define YAF_TCP_FLOW_NAME           "yaf_tcp"
+#define YAF_TCP_FLOW_REV_NAME       "yaf_tcp_rev"
+#define YAF_MAC_FLOW_NAME           "yaf_mac"
+#define YAF_STATS_FLOW_NAME         "yaf_flow_stats"
+#define YAF_STATS_FLOW_REV_NAME     "yaf_flow_stats_rev"
+#define YAF_P0F_FLOW_NAME           "yaf_p0f"
+#define YAF_P0F_FLOW_REV_NAME       "yaf_p0f_rev"
+#define YAF_FPEXPORT_FLOW_NAME      "yaf_fpexport"
+#define YAF_FPEXPORT_FLOW_REV_NAME  "yaf_fpexport_rev"
+#define YAF_PAYLOAD_FLOW_NAME       "yaf_payload"
+#define YAF_PAYLOAD_FLOW_REV_NAME   "yaf_payload_rev"
+#define YAF_MPTCP_FLOW_NAME         "yaf_mptcp"
+#define YAF_MPTCP_FLOW_REV_NAME     "yaf_mptcp_rev"
 
 /** The dimensions are flags which determine which sets of fields will
     be exported out to an IPFIX record.  They are entries in a bitmap
@@ -120,6 +143,20 @@
 #define YTF_INTERNAL    0x0800
 #define YTF_ALL         0x0EFF /* this has to be everything _except_ RLE enabled */
 #define YTF_REV         0xFF0F
+
+#define YTF_BIF_NAME         "bif"
+#define YTF_TOTAL_NAME       "total"
+#define YTF_DELTA_NAME       "delta"
+#define YTF_MPLS_NAME        "mpls"
+#define YTF_SILK_NAME        "silk"
+#define YTF_DAGIF_NAME       "dagif"
+#define YTF_FLE_NAME         "fle"
+#define YTF_RLE_NAME         "rle"
+#define YTF_IP4_NAME         "ip4"
+#define YTF_IP6_NAME         "ip6"
+#define YTF_INTERNAL_NAME    "internal"
+#define YTF_ALL_NAME         "all"
+#define YTF_REV_NAME         "rev"
 
 /** If any of the FLE/RLE values are larger than this constant
     then we have to use FLE, otherwise, we choose RLE to
@@ -190,7 +227,13 @@ static fbInfoElementSpec_t yaf_flow_spec[] = {
     { "mplsTopLabelStackSection",           3, YTF_MPLS },
     { "mplsLabelStackSection2",             3, YTF_MPLS },
     { "mplsLabelStackSection3",             3, YTF_MPLS },
+#if defined(YAF_ENABLE_NDPI)
+    { "paddingOctets",                      1, YTF_INTERNAL },
+    { "nDPIL7Protocol",                     0, 0 },
+    { "nDPIL7SubProtocol",                  0, 0 },
+#else
     { "paddingOctets",                      5, YTF_INTERNAL },
+#endif
     { "subTemplateMultiList",               0, 0 },
     FB_IESPEC_NULL
 };
@@ -326,6 +369,7 @@ static fbInfoElementSpec_t yaf_flow_stats_spec[] = {
     FB_IESPEC_NULL
 };
 
+
 typedef struct yfFlowStatsRecord_st {
     uint64_t dataByteCount;
     uint64_t averageInterarrivalTime;
@@ -431,7 +475,13 @@ typedef struct yfIpfixFlow_st {
     uint8_t     mpls_label1[3];
     uint8_t     mpls_label2[3];
     uint8_t     mpls_label3[3];
+#if YAF_ENABLE_NDPI
+    uint8_t     paddingOctets2[1];
+    uint16_t    ndpi_master;
+    uint16_t    ndpi_sub;
+#else
     uint8_t     paddingOctets3[5];
+#endif
     fbSubTemplateMultiList_t subTemplateMultiList;
 } yfIpfixFlow_t;
 
@@ -606,8 +656,13 @@ void yfAlignmentCheck()
     RUN_CHECKS(yfIpfixFlow_t,mpls_label1,1);
     RUN_CHECKS(yfIpfixFlow_t,mpls_label2,1);
     RUN_CHECKS(yfIpfixFlow_t,mpls_label3,1);
+#if YAF_ENABLE_NDPI
+    RUN_CHECKS(yfIpfixFlow_t,paddingOctets2,0);
+    RUN_CHECKS(yfIpfixFlow_t,ndpi_master,1);
+    RUN_CHECKS(yfIpfixFlow_t,ndpi_sub,1);
+#else
     RUN_CHECKS(yfIpfixFlow_t,paddingOctets3,0);
-
+#endif
     RUN_CHECKS(yfIpfixFlow_t,subTemplateMultiList,0);
     prevOffset = 0;
     prevSize = 0;
@@ -808,36 +863,42 @@ static fbTemplate_t *yfAddTemplate(
     fbSession_t           *session,
     fbInfoElementSpec_t   *spec,
     uint16_t              tid,
+    const gchar           *name,
+    const gchar           *description,
     gboolean              reverse,
     GError                **err)
 {
     fbInfoModel_t   *model = yfInfoModel();
     fbTemplate_t    *tmpl = fbTemplateAlloc(model);
+    uint32_t        flags = 0;
+    uint16_t        rtid = tid;
 
     if (reverse) {
-        if (!fbTemplateAppendSpecArray(tmpl, spec, 0xffffffff, err))
-        {
-            return NULL;
-        }
+        flags = 0xffffffff;
+        rtid = tid | YTF_BIF;
+    }
 
-        if (!fbSessionAddTemplate(session, FALSE, tid | YTF_BIF, tmpl, err))
-        {
-            return NULL;
-        }
+    g_debug("yaf: %x (%s), %d (%x)", tid, name, reverse, tid | (reverse ? YTF_BIF : 0));
 
+    if (!fbTemplateAppendSpecArray(tmpl, spec, flags, err)) {
+        return NULL;
+    }
+
+#if YAF_ENABLE_METADATA_EXPORT
+    if (!fbSessionAddTemplateWithMetadata(session, FALSE, rtid,
+                                          tmpl, name, description, err))
+    {
+        return NULL;
+    }
+#else
+    if (!fbSessionAddTemplate(session, FALSE, rtid, tmpl, err))
+    {
+        return NULL;
+    }
+#endif
+
+    if (reverse) {
         if (!fbSessionAddTemplate(session, TRUE, tid, tmpl, err))
-        {
-            return NULL;
-        }
-
-    } else {
-
-        if (!fbTemplateAppendSpecArray(tmpl, spec, 0, err))
-        {
-            return NULL;
-        }
-
-        if (!fbSessionAddTemplate(session, FALSE, tid, tmpl, err))
         {
             return NULL;
         }
@@ -853,6 +914,7 @@ static fbTemplate_t *yfAddTemplate(
  */
 static fbSession_t *yfInitExporterSession(
     uint32_t        domain,
+    gboolean        export_meta,
     GError          **err)
 {
     fbInfoModel_t   *model = yfInfoModel();
@@ -867,16 +929,39 @@ static fbSession_t *yfInitExporterSession(
 
    /* Create the full record template */
     tmpl = fbTemplateAlloc(model);
-    if (!fbTemplateAppendSpecArray(tmpl, yaf_flow_spec, YTF_ALL, err))
-        return NULL;
-
-    /* Add the full record template to the session */
-    if (!fbSessionAddTemplate(session, TRUE, YAF_FLOW_FULL_TID, tmpl, err)) {
+    if (!fbTemplateAppendSpecArray(tmpl, yaf_flow_spec, YTF_ALL, err)) {
         return NULL;
     }
+
+    if (export_meta) {
+#if YAF_ENABLE_METADATA_EXPORT
+        if (!fbSessionEnableTypeMetadata(session, TRUE, err)) {
+            return NULL;
+        }
+
+        if (!fbSessionEnableTemplateMetadata(session, TRUE, err)) {
+            return NULL;
+        }
+#endif
+    }
+
+#if YAF_ENABLE_METADATA_EXPORT
+    if (!fbSessionAddTemplateWithMetadata(session, FALSE, YAF_FLOW_FULL_TID,
+                                          tmpl, YAF_FLOW_FULL_NAME, NULL, err))
+    {
+        return NULL;
+    }
+#else
+    /* Add the full record template to the session */
     if (!fbSessionAddTemplate(session, FALSE, YAF_FLOW_FULL_TID, tmpl, err)) {
         return NULL;
     }
+
+#endif
+    if (!fbSessionAddTemplate(session, TRUE, YAF_FLOW_FULL_TID, tmpl, err)) {
+        return NULL;
+    }
+
 
     /* Create the Options Template */
     yaf_tmpl.ipfixStatsTemplate = fbTemplateAlloc(model);
@@ -888,89 +973,111 @@ static fbSession_t *yfInitExporterSession(
 
     /* Scope fields are exporterIPv4Address and exportingProcessID */
     fbTemplateSetOptionsScope(yaf_tmpl.ipfixStatsTemplate, 2);
+#if YAF_ENABLE_METADATA_EXPORT
+    if (!fbSessionAddTemplateWithMetadata(session, FALSE, YAF_OPTIONS_TID,
+                                          yaf_tmpl.ipfixStatsTemplate,
+                                          YAF_OPTIONS_NAME, NULL, err))
+    {
+        return NULL;
+    }
+#else
+    if (!fbSessionAddTemplate(session, FALSE, YAF_OPTIONS_TID,
+                              yaf_tmpl.ipfixStatsTemplate, err))
+    {
+        return NULL;
+    }
+#endif
     if (!fbSessionAddTemplate(session, TRUE, YAF_OPTIONS_TID,
                               yaf_tmpl.ipfixStatsTemplate, err))
     {
         return NULL;
     }
 
-    if (!fbSessionAddTemplate(session, FALSE, YAF_OPTIONS_TID,
-                              yaf_tmpl.ipfixStatsTemplate, err))
-    {
-        return NULL;
-    }
 
     /* Flow Stats Template */
     yaf_tmpl.fstatsTemplate = yfAddTemplate(session, yaf_flow_stats_spec,
-                                            YAF_STATS_FLOW_TID, FALSE, err);
+                                            YAF_STATS_FLOW_TID,
+                                            YAF_STATS_FLOW_NAME, NULL,
+                                            FALSE, err);
     if (!yaf_tmpl.fstatsTemplate) {
         return NULL;
     }
 
     yaf_tmpl.revfstatsTemplate = yfAddTemplate(session, yaf_flow_stats_spec,
-                                               YAF_STATS_FLOW_TID, TRUE, err);
+                                               YAF_STATS_FLOW_TID,
+                                               YAF_STATS_FLOW_REV_NAME, NULL,
+                                               TRUE, err);
     if (!yaf_tmpl.revfstatsTemplate) {
         return NULL;
     }
 
 #if YAF_ENABLE_ENTROPY
     yaf_tmpl.entropyTemplate = yfAddTemplate(session, yaf_entropy_spec,
-                                             YAF_ENTROPY_FLOW_TID, FALSE, err);
+                                             YAF_ENTROPY_FLOW_TID,
+                                             YAF_ENTROPY_FLOW_NAME, NULL,
+                                             FALSE, err);
+
     if (!yaf_tmpl.entropyTemplate) {
         return NULL;
     }
 
     yaf_tmpl.revEntropyTemplate = yfAddTemplate(session, yaf_entropy_spec,
-                                             YAF_ENTROPY_FLOW_TID, TRUE, err);
+                                                YAF_ENTROPY_FLOW_TID,
+                                                YAF_ENTROPY_FLOW_REV_NAME,
+                                                NULL, TRUE, err);
     if (!yaf_tmpl.revEntropyTemplate) {
         return NULL;
     }
+
 #endif
 
     yaf_tmpl.tcpTemplate = yfAddTemplate(session, yaf_tcp_spec,
-                                             YAF_TCP_FLOW_TID, FALSE, err);
+                                         YAF_TCP_FLOW_TID, YAF_TCP_FLOW_NAME,
+                                         NULL, FALSE, err);
+
     if (!yaf_tmpl.tcpTemplate) {
         return NULL;
     }
 
     yaf_tmpl.revTcpTemplate = yfAddTemplate(session, yaf_tcp_spec,
-                                                YAF_TCP_FLOW_TID, TRUE, err);
+                                            YAF_TCP_FLOW_TID,
+                                            YAF_TCP_FLOW_REV_NAME, NULL,
+                                            TRUE, err);
+
     if (!yaf_tmpl.revTcpTemplate) {
         return NULL;
     }
 
     yaf_tmpl.macTemplate = yfAddTemplate(session, yaf_mac_spec,
-                                         YAF_MAC_FLOW_TID, FALSE, err);
+                                         YAF_MAC_FLOW_TID, YAF_MAC_FLOW_NAME,
+                                         NULL, FALSE, err);
+
     if (!yaf_tmpl.macTemplate) {
-        return NULL;
-    }
-    if (!fbSessionAddTemplate(session, TRUE, YAF_MAC_FLOW_TID,
-                              yaf_tmpl.macTemplate, err))
-    {
         return NULL;
     }
 
     yaf_tmpl.mptcpTemplate = yfAddTemplate(session, yaf_mptcp_spec,
-                                           YAF_MPTCP_FLOW_TID, FALSE, err);
+                                           YAF_MPTCP_FLOW_TID,
+                                           YAF_MPTCP_FLOW_NAME, NULL,
+                                           FALSE, err);
     if (!yaf_tmpl.mptcpTemplate) {
         return NULL;
     }
-    if (!fbSessionAddTemplate(session, TRUE, YAF_MPTCP_FLOW_TID,
-                              yaf_tmpl.mptcpTemplate, err))
-    {
-        return NULL;
-    }
-
 
 #if YAF_ENABLE_P0F
     yaf_tmpl.p0fTemplate = yfAddTemplate(session, yaf_p0f_spec,
-                                         YAF_P0F_FLOW_TID, FALSE, err);
+                                         YAF_P0F_FLOW_TID, YAF_P0F_FLOW_NAME,
+                                         NULL, FALSE, err);
+
     if (!yaf_tmpl.p0fTemplate) {
         return NULL;
     }
 
     yaf_tmpl.revP0fTemplate = yfAddTemplate(session, yaf_p0f_spec,
-                                            YAF_P0F_FLOW_TID, TRUE, err);
+                                            YAF_P0F_FLOW_TID,
+                                            YAF_P0F_FLOW_REV_NAME,
+                                            NULL, TRUE, err);
+
     if (!yaf_tmpl.revP0fTemplate) {
         return NULL;
     }
@@ -978,13 +1085,18 @@ static fbSession_t *yfInitExporterSession(
 
 #if YAF_ENABLE_FPEXPORT
     yaf_tmpl.fpexportTemplate = yfAddTemplate(session, yaf_fpexport_spec,
-                                         YAF_FPEXPORT_FLOW_TID, FALSE, err);
+                                              YAF_FPEXPORT_FLOW_TID,
+                                              YAF_FPEXPORT_FLOW_NAME, NULL,
+                                              FALSE, err);
+
     if (!yaf_tmpl.fpexportTemplate) {
         return NULL;
     }
 
     yaf_tmpl.revFpexportTemplate = yfAddTemplate(session, yaf_fpexport_spec,
-                                            YAF_FPEXPORT_FLOW_TID, TRUE, err);
+                                                 YAF_FPEXPORT_FLOW_TID,
+                                                 YAF_FPEXPORT_FLOW_REV_NAME,
+                                                 NULL, TRUE, err);
     if (!yaf_tmpl.revFpexportTemplate) {
         return NULL;
     }
@@ -992,13 +1104,19 @@ static fbSession_t *yfInitExporterSession(
 
 #if YAF_ENABLE_PAYLOAD
     yaf_tmpl.payloadTemplate = yfAddTemplate(session, yaf_payload_spec,
-                                         YAF_PAYLOAD_FLOW_TID, FALSE, err);
+                                             YAF_PAYLOAD_FLOW_TID,
+                                             YAF_PAYLOAD_FLOW_NAME, NULL,
+                                             FALSE, err);
+
     if (!yaf_tmpl.payloadTemplate) {
         return NULL;
     }
 
     yaf_tmpl.revPayloadTemplate = yfAddTemplate(session, yaf_payload_spec,
-                                            YAF_PAYLOAD_FLOW_TID, TRUE, err);
+                                                YAF_PAYLOAD_FLOW_TID,
+                                                YAF_PAYLOAD_FLOW_REV_NAME,
+                                                NULL, TRUE, err);
+
     if (!yaf_tmpl.revPayloadTemplate) {
         return NULL;
     }
@@ -1017,121 +1135,68 @@ static fbSession_t *yfInitExporterSession(
     return session;
 }
 
-/**
- *yfWriterForFile
- *
- *
- */
-fBuf_t *yfWriterForFile(
-    const char              *path,
-    uint32_t                domain,
-    GError                  **err)
-{
-    fBuf_t                  *fbuf = NULL;
-    fbExporter_t            *exporter;
-    fbSession_t             *session;
-
-    /* Allocate an exporter for the file */
-    exporter = fbExporterAllocFile(path);
-
-    /* Create a new buffer */
-    if (!(session = yfInitExporterSession(domain, err))) goto err;
-
-    fbuf = fBufAllocForExport(session, exporter);
-
-    /* write YAF flow templates */
-    if (!fbSessionExportTemplates(session, err)) goto err;
-
-    /* set internal template */
-    if (!fBufSetInternalTemplate(fbuf, YAF_FLOW_FULL_TID, err)) goto err;
-    /* all done */
-    return fbuf;
-
-  err:
-    /* free buffer if necessary */
-    if (fbuf) fBufFree(fbuf);
-    return NULL;
-}
-
-/**
- *yfWriterForFP
- *
- *
- *
- */
-fBuf_t *yfWriterForFP(
-    FILE                    *fp,
-    uint32_t                domain,
-    GError                  **err)
-{
-    fBuf_t                  *fbuf = NULL;
-    fbExporter_t            *exporter;
-    fbSession_t             *session;
-
-    /* Allocate an exporter for the file */
-    exporter = fbExporterAllocFP(fp);
-    /* Create a new buffer */
-    if (!(session = yfInitExporterSession(domain, err))) goto err;
-
-    fbuf = fBufAllocForExport(session, exporter);
-
-    /* write YAF flow templates */
-
-    if (!fbSessionExportTemplates(session, err)) goto err;
-
-    /* set internal template */
-    if (!fBufSetInternalTemplate(fbuf, YAF_FLOW_FULL_TID, err)) goto err;
-
-    /* all done */
-    return fbuf;
-
-  err:
-    /* free buffer if necessary */
-    if (fbuf) fBufFree(fbuf);
-    return NULL;
-}
-
-/**
- *yfWriterForSpec
- *
- *
- *
- */
-fBuf_t *yfWriterForSpec(
-    fbConnSpec_t            *spec,
-    uint32_t                domain,
-    GError                  **err)
-{
-    fBuf_t                  *fbuf = NULL;
-    fbSession_t             *session;
-    fbExporter_t            *exporter;
-
-    /* initialize session and exporter */
-    if (!(session = yfInitExporterSession(domain, err))) goto err;
-
-    exporter = fbExporterAllocNet(spec);
-    fbuf = fBufAllocForExport(session, exporter);
-
-    /* set observation domain */
-    fbSessionSetDomain(session, domain);
-
-    /* write YAF flow templates */
-    if (!fbSessionExportTemplates(session, err)) goto err;
-
-    /* set internal template */
-    if (!fBufSetInternalTemplate(fbuf, YAF_FLOW_FULL_TID, err)) goto err;
-
-    /* all done */
-    return fbuf;
-
-  err:
-    /* free buffer if necessary */
-    if (fbuf) fBufFree(fbuf);
-    return NULL;
-}
-
 
 #ifdef HAVE_SPREAD
+/**
+ * yfAddTemplateSpread
+ *
+ *
+ */
+static fbTemplate_t *yfAddTemplateSpread(
+    fbSession_t           *session,
+    fbInfoElementSpec_t   *spec,
+    char                  **groups,
+    uint16_t              tid,
+    const gchar           *name,
+    const gchar           *description,
+    gboolean              reverse,
+    GError                **err)
+{
+    fbInfoModel_t   *model = yfInfoModel();
+    fbTemplate_t    *tmpl = fbTemplateAlloc(model);
+    uint32_t        flags = 0;
+    uint16_t        rtid = tid;
+
+    if (reverse) {
+        flags = 0xffffffff;
+        rtid = tid | YTF_BIF;
+    }
+
+    g_debug("yaf spread: %x (%s), %d (%x)", tid, name, reverse, tid | (reverse ? YTF_BIF : 0));
+    if (!fbTemplateAppendSpecArray(tmpl, spec, flags, err))
+    {
+        return NULL;
+    }
+
+#if YAF_ENABLE_METADATA_EXPORT
+    if (!fbSessionAddTemplatesMulticastWithMetadata(session, groups, FALSE, rtid,
+                                                    tmpl, name, description, err))
+    {
+        return NULL;
+    }
+#else
+    if (!fbSessionAddTemplatesMulticast(session, groups, FALSE,
+                                        rtid, tmpl, err))
+    {
+        return NULL;
+    }
+#endif
+
+    if (reverse) {
+
+        if (!fbSessionAddTemplate(session, TRUE, tid, tmpl, err))
+        {
+            return NULL;
+        }
+
+    }
+
+    return tmpl;
+}
+
+
+
+
 /**
  * yfInitExporterSpreadSession
  *
@@ -1143,6 +1208,7 @@ static fbSession_t *yfInitExporterSpreadSession(
     fbSpreadParams_t *spread,
     uint32_t domain,
     uint16_t *spreadIndex,
+    gboolean export_meta,
     GError **err)
 {
 
@@ -1151,6 +1217,18 @@ static fbSession_t *yfInitExporterSpreadSession(
 #if YAF_ENABLE_HOOKS
     int             n = 0;
 #endif
+
+    if (export_meta) {
+#if YAF_ENABLE_METADATA_EXPORT
+        if (!fbSessionSpreadEnableTypeMetadata(session, spread->groups, TRUE, err)) {
+            return NULL;
+        }
+
+        if (!fbSessionSpreadEnableTemplateMetadata(session, spread->groups, TRUE, err)) {
+            return NULL;
+        }
+#endif
+    }
 
     /*Create the full record template */
     tmpl = fbTemplateAlloc(model);
@@ -1161,11 +1239,20 @@ static fbSession_t *yfInitExporterSpreadSession(
     if (!fbSessionAddTemplate(session, TRUE, YAF_FLOW_FULL_TID, tmpl, err)) {
         return NULL;
     }
+#if YAF_ENABLE_METADATA_EXPORT
+    if (!fbSessionAddTemplatesMulticastWithMetadata(session, spread->groups, FALSE,
+                                                    YAF_FLOW_FULL_TID, tmpl,
+                                                    YAF_FLOW_FULL_NAME, NULL, err))
+    {
+        return NULL;
+    }
+#else
     if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
                                         YAF_FLOW_FULL_TID, tmpl, err))
     {
         return NULL;
     }
+#endif
 
     /* Create the Options Template */
     yaf_tmpl.ipfixStatsTemplate = fbTemplateAlloc(model);
@@ -1183,259 +1270,164 @@ static fbSession_t *yfInitExporterSpreadSession(
         return NULL;
     }
 
+#if YAF_ENABLE_METADATA_EXPORT
+    if (!fbSessionAddTemplatesMulticastWithMetadata(session, spread->groups, FALSE,
+                                        YAF_OPTIONS_TID,
+                                        yaf_tmpl.ipfixStatsTemplate,
+                                        YAF_OPTIONS_NAME, NULL, err))
+    {
+        return NULL;
+    }
+#else
     if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
                                         YAF_OPTIONS_TID,
                                         yaf_tmpl.ipfixStatsTemplate, err))
     {
         return NULL;
     }
+#endif
 
     /* Flow Stats Template */
-    yaf_tmpl.fstatsTemplate = fbTemplateAlloc(model);
-    if (!fbTemplateAppendSpecArray(yaf_tmpl.fstatsTemplate,
-                                   yaf_flow_stats_spec, 0, err))
-    {
-        return NULL;
-    }
-    if (!fbSessionAddTemplatesMulticast(session, spread->groups,  FALSE,
-                                       YAF_STATS_FLOW_TID,
-                                       yaf_tmpl.fstatsTemplate, err))
-    {
+    yaf_tmpl.fstatsTemplate = yfAddTemplateSpread(session, yaf_flow_stats_spec,
+                                                  spread->groups,
+                                                  YAF_STATS_FLOW_TID,
+                                                  YAF_STATS_FLOW_NAME, NULL,
+                                                  FALSE, err);
+    if (!yaf_tmpl.fstatsTemplate) {
         return NULL;
     }
 
-    yaf_tmpl.revfstatsTemplate = fbTemplateAlloc(model);
-
-    if (!fbTemplateAppendSpecArray(yaf_tmpl.revfstatsTemplate,
-                                   yaf_flow_stats_spec, 0xffffffff, err))
-    {
-        return NULL;
-    }
-    if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
-                                        YAF_STATS_FLOW_TID | YTF_BIF,
-                                        yaf_tmpl.revfstatsTemplate, err))
-    {
-        return NULL;
-    }
-    if (!fbSessionAddTemplate(session, TRUE, YAF_STATS_FLOW_TID,
-                              yaf_tmpl.revfstatsTemplate, err))
-    {
-        return NULL;
-    }
-
-
-#if YAF_ENABLE_ENTROPY
-    yaf_tmpl.entropyTemplate = fbTemplateAlloc(model);
-    if (!fbTemplateAppendSpecArray(yaf_tmpl.entropyTemplate, yaf_entropy_spec,
-                                   0, err))
-    {
-        return NULL;
-    }
-    if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
-                                        YAF_ENTROPY_FLOW_TID,
-                                        yaf_tmpl.entropyTemplate, err))
-    {
+    yaf_tmpl.revfstatsTemplate = yfAddTemplateSpread(session, yaf_flow_stats_spec,
+                                                     spread->groups,
+                                                     YAF_STATS_FLOW_TID,
+                                                     YAF_STATS_FLOW_REV_NAME, NULL,
+                                                     TRUE, err);
+    if (!yaf_tmpl.revfstatsTemplate) {
         return NULL;
     }
 
-    yaf_tmpl.revEntropyTemplate = fbTemplateAlloc(model);
-    if (!fbTemplateAppendSpecArray(yaf_tmpl.revEntropyTemplate,
-                                   yaf_entropy_spec, 0xffffffff, err))
-    {
+#if YAF_ENABLE_ENTROPY
+    yaf_tmpl.entropyTemplate = yfAddTemplateSpread(session, yaf_entropy_spec,
+                                                   spread->groups,
+                                                   YAF_ENTROPY_FLOW_TID,
+                                                   YAF_ENTROPY_FLOW_NAME, NULL,
+                                                   FALSE, err);
+
+    if (!yaf_tmpl.entropyTemplate) {
         return NULL;
     }
 
-    if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
-                                        YAF_ENTROPY_FLOW_TID|YTF_BIF,
-                                        yaf_tmpl.revEntropyTemplate, err))
-    {
-        return NULL;
-    }
-    if (!fbSessionAddTemplate(session, TRUE, YAF_ENTROPY_FLOW_TID,
-                              yaf_tmpl.revEntropyTemplate, err))
-    {
+    yaf_tmpl.revEntropyTemplate = yfAddTemplateSpread(session, yaf_entropy_spec,
+                                                      spread->groups,
+                                                      YAF_ENTROPY_FLOW_TID,
+                                                      YAF_ENTROPY_FLOW_REV_NAME,
+                                                      NULL, TRUE, err);
+    if (!yaf_tmpl.revEntropyTemplate) {
         return NULL;
     }
 
 #endif
-    yaf_tmpl.tcpTemplate = fbTemplateAlloc(model);
-    if (!fbTemplateAppendSpecArray(yaf_tmpl.tcpTemplate, yaf_tcp_spec, 0, err))
-    {
+
+    yaf_tmpl.tcpTemplate = yfAddTemplateSpread(session, yaf_tcp_spec,
+                                               spread->groups,
+                                               YAF_TCP_FLOW_TID, YAF_TCP_FLOW_NAME,
+                                               NULL, FALSE, err);
+
+    if (!yaf_tmpl.tcpTemplate) {
         return NULL;
     }
 
-    if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
-                                        YAF_TCP_FLOW_TID, yaf_tmpl.tcpTemplate,
-                                        err))
-    {
+    yaf_tmpl.revTcpTemplate = yfAddTemplateSpread(session, yaf_tcp_spec,
+                                                  spread->groups,
+                                                  YAF_TCP_FLOW_TID,
+                                                  YAF_TCP_FLOW_REV_NAME, NULL,
+                                                  TRUE, err);
+
+    if (!yaf_tmpl.revTcpTemplate) {
         return NULL;
     }
 
-    yaf_tmpl.revTcpTemplate = fbTemplateAlloc(model);
-    if (!fbTemplateAppendSpecArray( yaf_tmpl.revTcpTemplate, yaf_tcp_spec,
-                                    0xffffffff, err))
-    {
+    yaf_tmpl.macTemplate = yfAddTemplateSpread(session, yaf_mac_spec,
+                                               spread->groups,
+                                               YAF_MAC_FLOW_TID, YAF_MAC_FLOW_NAME,
+                                               NULL, FALSE, err);
+
+    if (!yaf_tmpl.macTemplate) {
         return NULL;
     }
 
-    if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
-                                        YAF_TCP_FLOW_TID | YTF_BIF,
-                                        yaf_tmpl.revTcpTemplate, err))
-    {
-        return NULL;
-    }
-
-    if (!fbSessionAddTemplate(session, TRUE, YAF_TCP_FLOW_TID,
-                              yaf_tmpl.revTcpTemplate, err))
-    {
-        return NULL;
-    }
-
-
-    yaf_tmpl.mptcpTemplate = fbTemplateAlloc(model);
-    if (!fbTemplateAppendSpecArray(yaf_tmpl.mptcpTemplate, yaf_mptcp_spec,
-                                   0xffffffff, err))
-    {
-        return NULL;
-    }
-    if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
-                                        YAF_MPTCP_FLOW_TID,
-                                        yaf_tmpl.mptcpTemplate, err))
-    {
-        return NULL;
-    }
-
-    if (!fbSessionAddTemplate(session, TRUE, YAF_MPTCP_FLOW_TID,
-                              yaf_tmpl.mptcpTemplate, err))
-    {
-        return NULL;
-    }
-
-
-    yaf_tmpl.macTemplate = fbTemplateAlloc(model);
-    if (!fbTemplateAppendSpecArray(yaf_tmpl.macTemplate, yaf_mac_spec,
-                                   0xffffffff, err))
-    {
-        return NULL;
-    }
-
-    if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
-                                        YAF_MAC_FLOW_TID,
-                                        yaf_tmpl.macTemplate, err))
-    {
-        return NULL;
-    }
-
-    if (!fbSessionAddTemplate(session, TRUE, YAF_MAC_FLOW_TID,
-                              yaf_tmpl.macTemplate, err))
-    {
+    yaf_tmpl.mptcpTemplate = yfAddTemplateSpread(session, yaf_mptcp_spec,
+                                                 spread->groups,
+                                                 YAF_MPTCP_FLOW_TID,
+                                                 YAF_MPTCP_FLOW_NAME, NULL,
+                                                 FALSE, err);
+    if (!yaf_tmpl.mptcpTemplate) {
         return NULL;
     }
 
 #if YAF_ENABLE_P0F
-    yaf_tmpl.p0fTemplate = fbTemplateAlloc(model);
-    if (!fbTemplateAppendSpecArray(yaf_tmpl.p0fTemplate, yaf_p0f_spec, 0, err))
-    {
+    yaf_tmpl.p0fTemplate = yfAddTemplateSpread(session, yaf_p0f_spec,
+                                               spread->groups,
+                                               YAF_P0F_FLOW_TID, YAF_P0F_FLOW_NAME,
+                                               NULL, FALSE, err);
+
+    if (!yaf_tmpl.p0fTemplate) {
         return NULL;
     }
 
-    if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
-                                        YAF_P0F_FLOW_TID, yaf_tmpl.p0fTemplate,
-                                        err))
-    {
-        return NULL;
-    }
+    yaf_tmpl.revP0fTemplate = yfAddTemplateSpread(session, yaf_p0f_spec,
+                                                  spread->groups,
+                                                  YAF_P0F_FLOW_TID,
+                                                  YAF_P0F_FLOW_REV_NAME,
+                                                  NULL, TRUE, err);
 
-    yaf_tmpl.revP0fTemplate = fbTemplateAlloc(model);
-    if (!fbTemplateAppendSpecArray(yaf_tmpl.revP0fTemplate, yaf_p0f_spec,
-                                   0xffffffff, err))
-    {
-        return NULL;
-    }
-
-    if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
-                                        YAF_P0F_FLOW_TID | YTF_BIF,
-                                        yaf_tmpl.revP0fTemplate, err))
-    {
-        return NULL;
-    }
-    if (!fbSessionAddTemplate(session, TRUE, YAF_P0F_FLOW_TID,
-                              yaf_tmpl.revP0fTemplate, err))
-    {
+    if (!yaf_tmpl.revP0fTemplate) {
         return NULL;
     }
 #endif
 
 #if YAF_ENABLE_FPEXPORT
-    yaf_tmpl.fpexportTemplate = fbTemplateAlloc(model);
-    if (!fbTemplateAppendSpecArray(yaf_tmpl.fpexportTemplate,
-                                   yaf_fpexport_spec, 0, err))
-    {
+    yaf_tmpl.fpexportTemplate = yfAddTemplateSpread(session, yaf_fpexport_spec,
+                                                    spread->groups,
+                                                    YAF_FPEXPORT_FLOW_TID,
+                                                    YAF_FPEXPORT_FLOW_NAME, NULL,
+                                                    FALSE, err);
+
+    if (!yaf_tmpl.fpexportTemplate) {
         return NULL;
     }
 
-    if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
-                                        YAF_FPEXPORT_FLOW_TID,
-                                        yaf_tmpl.fpexportTemplate, err))
-    {
-        return NULL;
-    }
-
-    yaf_tmpl.revFpexportTemplate = fbTemplateAlloc(model);
-    if (!fbTemplateAppendSpecArray(yaf_tmpl.revFpexportTemplate,
-                                   yaf_fpexport_spec, 0xffffffff, err))
-    {
-        return NULL;
-    }
-
-    if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
-                                        (YAF_FPEXPORT_FLOW_TID|YTF_BIF),
-                                        yaf_tmpl.revFpexportTemplate, err))
-    {
-        return NULL;
-    }
-    if (!fbSessionAddTemplate(session, TRUE, YAF_FPEXPORT_FLOW_TID,
-                              yaf_tmpl.revFpexportTemplate, err))
-    {
+    yaf_tmpl.revFpexportTemplate = yfAddTemplateSpread(session, yaf_fpexport_spec,
+                                                       spread->groups,
+                                                       YAF_FPEXPORT_FLOW_TID,
+                                                       YAF_FPEXPORT_FLOW_REV_NAME,
+                                                       NULL, TRUE, err);
+    if (!yaf_tmpl.revFpexportTemplate) {
         return NULL;
     }
 #endif
 
 #if YAF_ENABLE_PAYLOAD
-    yaf_tmpl.payloadTemplate = fbTemplateAlloc(model);
-    if(!fbTemplateAppendSpecArray(yaf_tmpl.payloadTemplate, yaf_payload_spec,
-                                  0, err))
-    {
+    yaf_tmpl.payloadTemplate = yfAddTemplateSpread(session, yaf_payload_spec,
+                                                   spread->groups,
+                                                   YAF_PAYLOAD_FLOW_TID,
+                                                   YAF_PAYLOAD_FLOW_NAME, NULL,
+                                                   FALSE, err);
+
+    if (!yaf_tmpl.payloadTemplate) {
         return NULL;
     }
 
-    if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
-                                        YAF_PAYLOAD_FLOW_TID,
-                                        yaf_tmpl.payloadTemplate, err))
-    {
-        return NULL;
-    }
+    yaf_tmpl.revPayloadTemplate = yfAddTemplateSpread(session, yaf_payload_spec,
+                                                      spread->groups,
+                                                      YAF_PAYLOAD_FLOW_TID,
+                                                      YAF_PAYLOAD_FLOW_REV_NAME,
+                                                      NULL, TRUE, err);
 
-    yaf_tmpl.revPayloadTemplate = fbTemplateAlloc(model);
-    if (!fbTemplateAppendSpecArray(yaf_tmpl.revPayloadTemplate,
-                                   yaf_payload_spec, 0xffffffff, err)) {
+    if (!yaf_tmpl.revPayloadTemplate) {
         return NULL;
     }
-
-    if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
-                                        YAF_PAYLOAD_FLOW_TID|YTF_BIF,
-                                        yaf_tmpl.revPayloadTemplate, err))
-    {
-        return NULL;
-    }
-    if (!fbSessionAddTemplate(session, TRUE, YAF_PAYLOAD_FLOW_TID,
-                              yaf_tmpl.revPayloadTemplate, err))
-    {
-        return NULL;
-    }
-
 #endif
-
 
 #if YAF_ENABLE_HOOKS
     /*  Add the hook template fields if available  */
@@ -1492,6 +1484,7 @@ fBuf_t *yfWriterForSpread(
      fbSpreadParams_t *spread,
      uint32_t domain,
      uint16_t *spreadGroupIndex,
+     gboolean export_metadata,
      GError **err)
 {
      fBuf_t            *fbuf = NULL;
@@ -1510,17 +1503,20 @@ fBuf_t *yfWriterForSpread(
      fbuf = fBufAllocForExport(session, exporter);
 
      /* If we are using spread group by - we need to multicast templates */
-
      if (spreadGroupIndex) {
          if (!(session = yfInitExporterSpreadSession(fbuf, session, spread,
                                                      domain, spreadGroupIndex,
+                                                     export_metadata,
                                                      err)))
          {
              goto err;
          }
      } else {
          /* initialize session and exporter */
-         if (!(session = yfInitExporterSession(domain, err))) goto err;
+         if (!(session = yfInitExporterSession(domain, export_metadata, err)))
+         {
+             goto err;
+         }
      }
 
      /* set observation domain */
@@ -1606,6 +1602,9 @@ static gboolean yfSetSpreadExportTemplate(
  *
  *
  */
+
+#define TEMPLATE_NAME_INIT_LEN 32
+
 static gboolean yfSetExportTemplate(
     fBuf_t              *fbuf,
     uint16_t            tid,
@@ -1614,6 +1613,7 @@ static gboolean yfSetExportTemplate(
     fbSession_t         *session = NULL;
     fbTemplate_t        *tmpl = NULL;
 
+    GString             *template_name = NULL;
 
     /* Try to set export template */
     if (fBufSetExportTemplate(fbuf, tid, err)) {
@@ -1627,21 +1627,195 @@ static gboolean yfSetExportTemplate(
 
     /* Okay. We have a missing template. Clear the error and try to load it. */
     g_clear_error(err);
+
+    template_name = g_string_sized_new(TEMPLATE_NAME_INIT_LEN);
+
     session = fBufGetSession(fbuf);
     tmpl = fbTemplateAlloc(yfInfoModel());
+
+
+    if ( (tid & YAF_FLOW_BASE_TID) == YAF_FLOW_BASE_TID )
+    {
+        g_string_append_printf(template_name, "yaf_flow");
+
+        if ( tid & YTF_DELTA ) {
+            g_string_append_printf(template_name, "_%s", YTF_DELTA_NAME);
+        } else {
+            g_string_append_printf(template_name, "_%s", YTF_TOTAL_NAME);
+        }
+
+        if (tid & YTF_BIF) {
+            g_string_append_printf(template_name, "_%s", YTF_BIF_NAME);
+        }
+
+        if (tid & YTF_SILK) {
+            g_string_append_printf(template_name, "_%s", YTF_SILK_NAME);
+        }
+
+        if (tid & YTF_MPLS) {
+            g_string_append_printf(template_name, "_%s", YTF_MPLS_NAME);
+        }
+
+        if (tid & YTF_RLE) {
+            g_string_append_printf(template_name, "_%s", YTF_RLE_NAME);
+        } else {
+            g_string_append_printf(template_name, "_%s", YTF_FLE_NAME);
+        }
+
+        if (tid & YTF_IP6) {
+            g_string_append_printf(template_name, "_%s", YTF_IP6_NAME);
+        } else {
+            g_string_append_printf(template_name, "_%s", YTF_IP4_NAME);
+        }
+
+        if (tid & YTF_DAGIF) {
+            g_string_append_printf(template_name, "_%s", YTF_DAGIF_NAME);
+        }
+
+    }
 
     if (!fbTemplateAppendSpecArray(tmpl, yaf_flow_spec,
                                    (tid & (~YAF_FLOW_BASE_TID)), err))    {
         return FALSE;
     }
 
+     printf("yfSetExportTemplate: %x, %s\n", tid, template_name->str);
+#if YAF_ENABLE_METADATA_EXPORT
+    if (!fbSessionAddTemplateWithMetadata(session, FALSE, tid, tmpl,
+                                          template_name->str, NULL, err))
+    {
+        printf("error setting template metadata\n");
+        return FALSE;
+    }
+#else
     if (!fbSessionAddTemplate(session, FALSE, tid, tmpl, err)) {
         return FALSE;
     }
-
+#endif
+    g_debug("adding new template?!?!!? %02x", tid);
     /* Template should be loaded. Try setting the template again. */
     return fBufSetExportTemplate(fbuf, tid, err);
 }
+
+/**
+ *yfWriterForFile
+ *
+ *
+ */
+fBuf_t *yfWriterForFile(
+    const char              *path,
+    uint32_t                domain,
+    gboolean                export_meta,
+    GError                  **err)
+{
+    fBuf_t                  *fbuf = NULL;
+    fbExporter_t            *exporter;
+    fbSession_t             *session;
+
+    /* Allocate an exporter for the file */
+    exporter = fbExporterAllocFile(path);
+
+    /* Create a new buffer */
+    if (!(session = yfInitExporterSession(domain, export_meta, err))) goto err;
+
+    fbuf = fBufAllocForExport(session, exporter);
+
+    /* write YAF flow templates */
+    if (!fbSessionExportTemplates(session, err)) goto err;
+
+    /* set internal template */
+    if (!fBufSetInternalTemplate(fbuf, YAF_FLOW_FULL_TID, err)) goto err;
+
+    /* all done */
+    return fbuf;
+
+  err:
+    /* free buffer if necessary */
+    if (fbuf) fBufFree(fbuf);
+    return NULL;
+}
+
+
+/**
+ *yfWriterForFP
+ *
+ *
+ *
+ */
+fBuf_t *yfWriterForFP(
+    FILE                    *fp,
+    uint32_t                domain,
+    gboolean                export_meta,
+    GError                  **err)
+{
+    fBuf_t                  *fbuf = NULL;
+    fbExporter_t            *exporter;
+    fbSession_t             *session;
+
+    /* Allocate an exporter for the file */
+    exporter = fbExporterAllocFP(fp);
+    /* Create a new buffer */
+    if (!(session = yfInitExporterSession(domain, export_meta, err))) goto err;
+
+    fbuf = fBufAllocForExport(session, exporter);
+
+    /* write YAF flow templates */
+
+    if (!fbSessionExportTemplates(session, err)) goto err;
+
+    /* set internal template */
+    if (!fBufSetInternalTemplate(fbuf, YAF_FLOW_FULL_TID, err)) goto err;
+
+    /* all done */
+    return fbuf;
+
+  err:
+    /* free buffer if necessary */
+    if (fbuf) fBufFree(fbuf);
+    return NULL;
+}
+
+
+/**
+ *yfWriterForSpec
+ *
+ *
+ *
+ */
+fBuf_t *yfWriterForSpec(
+    fbConnSpec_t            *spec,
+    uint32_t                domain,
+    gboolean                export_meta,
+    GError                  **err)
+{
+    fBuf_t                  *fbuf = NULL;
+    fbSession_t             *session;
+    fbExporter_t            *exporter;
+
+    /* initialize session and exporter */
+    if (!(session = yfInitExporterSession(domain, export_meta, err))) goto err;
+
+    exporter = fbExporterAllocNet(spec);
+    fbuf = fBufAllocForExport(session, exporter);
+
+    /* set observation domain */
+    fbSessionSetDomain(session, domain);
+
+    /* write YAF flow templates */
+    if (!fbSessionExportTemplates(session, err)) goto err;
+
+    /* set internal template */
+    if (!fBufSetInternalTemplate(fbuf, YAF_FLOW_FULL_TID, err)) goto err;
+
+    /* all done */
+    return fbuf;
+
+  err:
+    /* free buffer if necessary */
+    if (fbuf) fBufFree(fbuf);
+    return NULL;
+}
+
 
 /**
  *yfWriteStatsFlow
@@ -1825,10 +1999,9 @@ gboolean yfWriteFlow(
 
     /* choose options for basic template */
     wtid = YAF_FLOW_BASE_TID;
-
-    rec.vlanId = flow->key.vlanId;
+    rec.vlanId = flow->val.vlan;
     /* right? */
-    rec.reverseVlanId = flow->key.vlanId;
+    rec.reverseVlanId = flow->rval.vlan;
 
     /* copy key and counters */
     rec.sourceTransportPort = flow->key.sp;
@@ -1887,6 +2060,11 @@ gboolean yfWriteFlow(
                                 rec.destinationTransportPort,
                                 rec.protocolIdentifier, flow->key.version);
 #endif
+#endif
+
+#if YAF_ENABLE_NDPI
+    rec.ndpi_master = flow->ndpi_master;
+    rec.ndpi_sub = flow->ndpi_sub;
 #endif
 
 #if YAF_MPLS
@@ -1980,6 +2158,7 @@ gboolean yfWriteFlow(
         }
     }
 #else
+
     if (!yfSetExportTemplate(fbuf, wtid, err)) {
         return FALSE;
     }
@@ -2040,8 +2219,7 @@ gboolean yfWriteFlow(
 #endif
 
     /* Initialize SubTemplateMultiList with number of templates we are to add*/
-    fbSubTemplateMultiListInit(&(rec.subTemplateMultiList), 0, tmplcount);
-    fbSubTemplateMultiListSetSemantic(&(rec.subTemplateMultiList), 3);
+    fbSubTemplateMultiListInit(&(rec.subTemplateMultiList), 3, tmplcount);
 
     /* Add TCP Template - IF TCP Flow and SiLK Mode is OFF */
     if (flow->key.proto == YF_PROTO_TCP && !ctx->cfg->silkmode) {
@@ -2632,17 +2810,12 @@ gboolean yfReadFlow(
         flow->key.version = 4;
         flow->key.addr.v4.sip = rec.sourceIPv4Address;
         flow->key.addr.v4.dip = rec.destinationIPv4Address;
-    } else if (rec.sourceIPv6Address || rec.destinationIPv6Address) {
+    } else {
         flow->key.version = 6;
         memcpy(flow->key.addr.v6.sip, rec.sourceIPv6Address,
                sizeof(flow->key.addr.v6.sip));
         memcpy(flow->key.addr.v6.dip, rec.destinationIPv6Address,
                sizeof(flow->key.addr.v6.dip));
-    } else {
-        /* Hmm. Default to v4 null addressing for now. */
-        flow->key.version = 4;
-        flow->key.addr.v4.sip = 0;
-        flow->key.addr.v4.dip = 0;
     }
 
     /* copy key and counters */
@@ -2656,6 +2829,8 @@ gboolean yfReadFlow(
         flow->val.pkt = rec.packetDeltaCount;
     }
     flow->key.vlanId = rec.vlanId;
+    flow->val.vlan = rec.vlanId;
+    flow->rval.vlan = rec.reverseVlanId;
     flow->rval.oct = rec.reverseOctetTotalCount;
     flow->rval.pkt = rec.reversePacketTotalCount;
     flow->reason = rec.flowEndReason;
@@ -2857,17 +3032,12 @@ gboolean yfReadFlowExtended(
         flow->key.version = 4;
         flow->key.addr.v4.sip = rec.f.sourceIPv4Address;
         flow->key.addr.v4.dip = rec.f.destinationIPv4Address;
-    } else if (rec.f.sourceIPv6Address || rec.f.destinationIPv6Address) {
+    } else {
         flow->key.version = 6;
         memcpy(flow->key.addr.v6.sip, rec.f.sourceIPv6Address,
                sizeof(flow->key.addr.v6.sip));
         memcpy(flow->key.addr.v6.dip, rec.f.destinationIPv6Address,
                sizeof(flow->key.addr.v6.dip));
-    } else {
-        /* Hmm. Default to v4 null addressing for now. */
-        flow->key.version = 4;
-        flow->key.addr.v4.sip = 0;
-        flow->key.addr.v4.dip = 0;
     }
 
     /* copy key and counters */
@@ -2879,6 +3049,8 @@ gboolean yfReadFlowExtended(
     flow->rval.oct = rec.f.reverseOctetTotalCount;
     flow->rval.pkt = rec.f.reversePacketTotalCount;
     flow->key.vlanId = rec.f.vlanId;
+    flow->val.vlan = rec.f.vlanId;
+    flow->rval.vlan = rec.f.reverseVlanId;
     flow->reason = rec.f.flowEndReason;
     /* Handle delta counters */
     if (!(flow->val.oct)) {
@@ -2893,6 +3065,11 @@ gboolean yfReadFlowExtended(
 #if YAF_ENABLE_APPLABEL
     flow->appLabel = rec.f.silkAppLabel;
 #endif
+#if YAF_ENABLE_NDPI
+    flow->ndpi_master = rec.f.ndpi_master;
+    flow->ndpi_sub = rec.f.ndpi_sub;
+#endif
+
 #if YAF_ENABLE_ENTROPY
     flow->val.entropy = 0;
     flow->rval.entropy = 0;
@@ -3059,10 +3236,10 @@ void yfPrintString(
     if (flow->key.vlanId) {
         if (flow->rval.oct) {
             g_string_append_printf(rstr, " vlan %03hx:%03hx",
-                flow->key.vlanId, flow->key.vlanId);
+                flow->val.vlan, flow->rval.vlan);
         } else {
             g_string_append_printf(rstr, " vlan %03hx",
-                flow->key.vlanId);
+                flow->val.vlan);
         }
     }
 
@@ -3096,6 +3273,15 @@ void yfPrintString(
 #   ifdef YAF_ENABLE_APPLABEL
     if (0 != flow->appLabel) {
         g_string_append_printf(rstr, " applabel: %u", flow->appLabel);
+    }
+#   endif
+#   ifdef YAF_ENABLE_NDPI
+    if (0 != flow->ndpi_master) {
+        if (flow->ndpi_sub) {
+            g_string_append_printf(rstr, " ndpi: %u[%u]", flow->ndpi_master, flow->ndpi_sub);
+        } else {
+            g_string_append_printf(rstr, " ndpi: %u", flow->ndpi_master);
+        }
     }
 #   endif
 
@@ -3217,8 +3403,8 @@ void yfPrintDelimitedString(
 
     /* print vlan tags */
     if (flow->rval.oct) {
-        g_string_append_printf(rstr, "%03hx%s%03hx%s", flow->key.vlanId,
-                               YF_PRINT_DELIM, flow->key.vlanId,
+        g_string_append_printf(rstr, "%03hx%s%03hx%s", flow->val.vlan,
+                               YF_PRINT_DELIM, flow->rval.vlan,
                                YF_PRINT_DELIM);
     } else {
         g_string_append_printf(rstr, "%03hx%s%03hx%s", flow->key.vlanId,

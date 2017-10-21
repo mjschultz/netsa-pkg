@@ -148,7 +148,7 @@ To configure **yaf**, edit the configuration file ``/usr/local/etc/yaf.conf``:
     YAF_CAP_IF=eth0
     YAF_IPFIX_PROTO=tcp
     YAF_IPFIX_HOST=localhost
-    YAF_IPFIX_PORT=18000
+    YAF_IPFIX_PORT=18001
     YAF_STATEDIR=/var/log/yaf
     YAF_EXTRAFLAGS="--silk --applabel --max-payload=2048 --plugin-name=/usr/local/lib/yaf/dpacketplugin.la"
 

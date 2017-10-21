@@ -126,9 +126,12 @@ static int          yaf_opt_payload_export = 0;
 static gboolean     yaf_opt_payload_export_on = FALSE;
 static gboolean     yaf_opt_applabel_mode = FALSE;
 static gboolean     yaf_opt_force_read_all = FALSE;
+
 #if YAF_ENABLE_APPLABEL
 static char       *yaf_opt_applabel_rules = NULL;
 #endif
+static gboolean     yaf_opt_ndpi = FALSE;
+static char         *yaf_ndpi_proto_file = NULL;
 static gboolean     yaf_opt_entropy_mode = FALSE;
 static gboolean     yaf_opt_uniflow_mode = FALSE;
 static uint16_t     yaf_opt_udp_uniflow_port = 0;
@@ -146,7 +149,7 @@ static char         *yaf_hash_search = NULL;
 static char         *yaf_stime_search = NULL;
 static int          yaf_opt_ingress_int = 0;
 static int          yaf_opt_egress_int = 0;
-
+static gboolean     yaf_novlan_in_key;
 /* GOption managed fragment table options */
 static int          yaf_opt_max_frags = 0;
 static gboolean     yaf_opt_nofrag = FALSE;
@@ -299,6 +302,9 @@ AirOptionEntry yaf_optent_flow[] = {
     AF_OPTION( "force-read-all", (char)0, 0, AF_OPT_TYPE_NONE,
                &yaf_opt_force_read_all, THE_LAME_80COL_FORMATTER_STRING"Force "
                "read of any out of sequence packets", NULL),
+    AF_OPTION( "no-vlan-in-key", (char)0, 0, AF_OPT_TYPE_NONE,
+               &yaf_novlan_in_key, THE_LAME_80COL_FORMATTER_STRING"Do not use "
+               "the VLAN in the flow key hash calculation", NULL),
     AF_OPTION_END
 };
 
@@ -349,6 +355,12 @@ AirOptionEntry yaf_optent_exp[] = {
     AF_OPTION( "egress", (char)0, 0, AF_OPT_TYPE_INT, &yaf_opt_egress_int,
                THE_LAME_80COL_FORMATTER_STRING"Set egressInterface field in "
                "flow template", NULL),
+#if YAF_ENABLE_METADATA_EXPORT
+    AF_OPTION( "template-info", (char)0, 0, AF_OPT_TYPE_NONE,
+               &yaf_config.tmpl_metadata,
+               THE_LAME_80COL_FORMATTER_STRING"Export template and information"
+               " element metadata before data", NULL),
+#endif
 #if YAF_ENABLE_DAG_SEPARATE_INTERFACES || YAF_ENABLE_SEPARATE_INTERFACES
     AF_OPTION( "export-interface", (char)0, 0, AF_OPT_TYPE_NONE,
                &yaf_config.exportInterface, THE_LAME_80COL_FORMATTER_STRING
@@ -446,6 +458,15 @@ AirOptionEntry yaf_optent_payload[] = {
               THE_LAME_80COL_FORMATTER_STRING"enable the packet inspection "
               "protocol"THE_LAME_80COL_FORMATTER_STRING"application labeler "
               "engine", NULL ),
+#endif
+#if YAF_ENABLE_NDPI
+    AF_OPTION( "ndpi", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_ndpi,
+               THE_LAME_80COL_FORMATTER_STRING"enable nDPI application "
+               "labeling.", NULL),
+    AF_OPTION( "ndpi-protocol-file", 0, 0, AF_OPT_TYPE_STRING,
+               &yaf_ndpi_proto_file, THE_LAME_80COL_FORMATTER_STRING"Specify"
+               " protocol file for sub-protocol"THE_LAME_80COL_FORMATTER_STRING
+               "and port-based protocol detection", "file"),
 #endif
 #if YAF_ENABLE_P0F
     AF_OPTION( "p0f-fingerprints", 0, 0, AF_OPT_TYPE_STRING,
@@ -643,6 +664,23 @@ static GString *yfVersionString(
                            "NO"
 #endif
                            );
+    g_string_append_printf(resultString,"    * %-32s  %s\n",
+                           "nDPI Support:",
+#if YAF_ENABLE_NDPI
+                           "YES"
+#else
+                           "NO"
+#endif
+                           );
+
+    g_string_append_printf(resultString,"    * %-32s  %s\n",
+                           "IE Metadata Export:",
+#if YAF_ENABLE_METADATA_EXPORT
+                           "YES"
+#else
+                           "NO"
+#endif
+                           );
 
     return resultString;
 };
@@ -665,6 +703,7 @@ static void groups_from_list( char *list, char ***groups,
     *groups = g_new0( char *, n+1 );
 
     *spreadIndex = g_new0(uint16_t, n);
+
     if (n > 255) {
         g_debug("Spread Max Groups is 255: "
                 "List will be contained to 255 Groups");
@@ -1045,6 +1084,11 @@ static void yfLuaLoadConfig(
     yf_lua_getstr("applabel_rules", yaf_opt_applabel_rules);
 #endif
 
+#if YAF_ENABLE_NDPI
+    yf_lua_getbool("ndpi", yaf_opt_ndpi);
+    yf_lua_getstr("ndpi_proto_file", yaf_ndpi_proto_file);
+#endif
+
     /* p0f options */
 #if YAF_ENABLE_P0F
     yf_lua_getbool("p0fprint", yaf_opt_p0fprint_mode);
@@ -1207,6 +1251,20 @@ static void yfParseOptions(
         }
     }
 #endif
+#if YAF_ENABLE_NDPI
+    if (yaf_ndpi_proto_file && (FALSE == yaf_opt_ndpi)) {
+        g_warning("--ndpi-proto-file requires --ndpi.");
+        g_warning("NDPI labeling will not operate");
+    }
+    if (TRUE == yaf_opt_ndpi) {
+        if (yaf_opt_max_payload == 0) {
+            g_warning("--ndpi requires --max-payload.");
+            g_warning("NDPI labeling will not operate");
+            yaf_opt_ndpi = FALSE;
+        }
+    }
+#endif
+
 #if YAF_ENABLE_P0F
     if (yaf_opt_p0f_fingerprints && (FALSE == yaf_opt_p0fprint_mode)) {
         g_warning("--p0f-fingerprints requires --p0fprint.");
@@ -1901,6 +1959,9 @@ int main (
                                  yaf_opt_force_read_all,
                                  yaf_opt_extra_stats_mode,
                                  yaf_index_pcap,
+                                 yaf_novlan_in_key,
+                                 yaf_opt_ndpi,
+                                 yaf_ndpi_proto_file,
                                  yaf_hash_search,
                                  yaf_stime_search,
                                  yfctx);

@@ -181,7 +181,7 @@ Use **super_table_creator** to create all the tables in your database:
       	--pass=<SuperSecretPassword> --database=smediator
     $ /usr/local/bin/super_table_creator --name mediator \
       	--pass=<SuperSecretPassword> \
-	--database=smediator --dedup
+	--database=smediator --dns-dedup
 
 Create your super_mediator.conf file.  One is installed by default into /usr/local/etc.  The following one will get you started:
     

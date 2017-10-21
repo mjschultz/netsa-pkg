@@ -119,7 +119,7 @@ gboolean logc_add_option_group(
 
 
 static void logc_print_version() {
-    fprintf(stderr,"%s version %s (c) 2000-2015 Carnegie Mellon University.\n",
+    fprintf(stderr,"%s version %s (c) 2000-2017 Carnegie Mellon University.\n",
             logc.appname,logc.version);
     fprintf(stderr,"GNU General Public License (GPL) Rights "
                    "pursuant to Version 2, June 1991\n");
