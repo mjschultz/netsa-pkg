@@ -58,7 +58,7 @@ ipfixDump_LDFLAGS = @GLIB_LIBS@ @libfixbuf_LIBS@
 ipfixDump_CFLAGS = @GLIB_CFLAGS@ @libfixbuf_CFLAGS@
 
 yafzcbalance_SOURCES = yafzcbalance.c
-yafzcbalance_LDFLAGS = @GLIB_LIBS@ -lpthread -lairframe
+yafzcbalance_LDFLAGS = -L../airframe/src -lairframe @GLIB_LIBS@ -lpthread
 yafzcbalance_CFLAGS = @GLIB_CFLAGS@
 
 noinst_HEADERS = ipfixDumpPrint.h

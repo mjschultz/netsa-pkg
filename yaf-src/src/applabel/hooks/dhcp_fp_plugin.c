@@ -791,7 +791,7 @@ gboolean ypFlowWrite(
         dhcp_op = (yfDHCP_OP_Flow_t *)fbSubTemplateMultiListEntryInit(stml,
                                                                       (YAF_DHCP_OP_TID | flags),
                                                                       otmpl, 1);
-        options = (uint8_t *)fbBasicListInit(&(dhcp_op->options), 0,
+        options = (uint8_t *)fbBasicListInit(&(dhcp_op->options), 3,
                                              fbInfoModelGetElementByName(model,
                                                                          "dhcpOption"),
                                              flowContext->val.count);
@@ -812,7 +812,7 @@ gboolean ypFlowWrite(
                    sizeof(ypDHCPFlowValCtx_t));
             memset(&(flowContext->rval), 0, sizeof(ypDHCPFlowValCtx_t));
         } else if (flags) {
-            options = (uint8_t *)fbBasicListInit(&(dhcp_op->revOptions), 0,
+            options = (uint8_t *)fbBasicListInit(&(dhcp_op->revOptions), 3,
                                                  fbInfoModelGetElementByName(model,
                                                                              "dhcpOption"),
                                                  flowContext->rval.count);
@@ -917,6 +917,15 @@ gboolean ypGetTemplate(
                 return FALSE;
             }
 
+#if YAF_ENABLE_METADATA_EXPORT
+            if (!fbSessionAddTemplateWithMetadata(session, FALSE,
+                              YAF_DHCP_OP_TID|flags,
+                              revDhcpOpTemplate,
+                              "yaf_dhcp_op_rev", NULL, &err))
+            {
+                return FALSE;
+            }
+#else
             if (!fbSessionAddTemplate(session, FALSE, YAF_DHCP_OP_TID | flags,
                                       revDhcpOpTemplate, &err))
             {
@@ -924,6 +933,9 @@ gboolean ypGetTemplate(
                           err->message);
                 return FALSE;
             }
+
+#endif
+
         }
 
         dhcpOpTemplate = fbTemplateAlloc(model);
@@ -934,6 +946,15 @@ gboolean ypGetTemplate(
             return FALSE;
         }
 
+#if YAF_ENABLE_METADATA_EXPORT
+        if (!fbSessionAddTemplateWithMetadata(session, FALSE,
+                                              YAF_DHCP_OP_TID,
+                                              dhcpOpTemplate,
+                                              "yaf_dhcp_op", NULL, &err))
+        {
+            return FALSE;
+        }
+#else
         if (!fbSessionAddTemplate(session, FALSE, YAF_DHCP_OP_TID,
                                   dhcpOpTemplate, &err))
         {
@@ -941,7 +962,7 @@ gboolean ypGetTemplate(
                       err->message);
             return FALSE;
         }
-
+#endif
     } else {
 
         if (!dhcp_uniflow_gl) {
@@ -956,10 +977,19 @@ gboolean ypGetTemplate(
             if (!fbSessionAddTemplate(session, FALSE, YAF_DHCP_FLOW_TID | flags,
                                       revDhcpTemplate, &err))
             {
-                g_warning("Error adding template %02x: %s", YAF_DHCP_FLOW_TID,
+                g_warning("Error adding template %02x: %s", YAF_DHCP_FLOW_TID | flags,
                           err->message);
                 return FALSE;
             }
+#if YAF_ENABLE_METADATA_EXPORT
+            if (!fbSessionSetTemplateMetadata(
+                    session, YAF_DHCP_FLOW_TID|flags,
+                    "yaf_dhcp_rev", NULL, &err))
+            {
+                return FALSE;
+            }
+#endif
+
         }
 
         dhcpTemplate = fbTemplateAlloc(model);
@@ -976,8 +1006,14 @@ gboolean ypGetTemplate(
                       err->message);
             return FALSE;
         }
-
-
+#if YAF_ENABLE_METADATA_EXPORT
+        if (!fbSessionSetTemplateMetadata(
+                session, YAF_DHCP_FLOW_TID,
+                "yaf_dhcp", NULL, &err))
+        {
+            return FALSE;
+        }
+#endif
     }
 
     return TRUE;

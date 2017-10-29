@@ -214,9 +214,11 @@ If present, B<getFlowKeyHash> will ignore the value in ingressInterface
 field.  SiLK encodes either the VLAN ID or the SNMP interface in
 the ingressInterface IPFIX field.  If SiLK was configured to pack the
 SNMP interface, this value will interfere with the correct calculation
-of the B<getFlowKeyHash>.  Alternatively, you may set the environment
-variable YAF_IGNORE_SNMP to 1 to always ignore this value in flow
-key hash calculations.
+of the B<getFlowKeyHash>. You also may want to ignore this field if B<yaf>
+is run with the B<--no-vlan-in-key> option which forces B<yaf> to not use
+the VLAN in the flow key hash calculation. Alternatively, you may set 
+the environment variable YAF_IGNORE_SNMP to 1 to always ignore 
+this value in flow key hash calculations.
 
 =back
 

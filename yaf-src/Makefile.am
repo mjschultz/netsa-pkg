@@ -67,5 +67,6 @@ EXTRA_DIST = \
     doc/howto/yaf_super_silk.md \
     doc/howto/yaf_silk.md \
     doc/howto/yaf_orcus.md \
+    doc/howto/yaf_super_pipeline.md \
     doc/LICENSE.txt
 

@@ -95,6 +95,7 @@ am__aclocal_m4_deps =  \
 	$(top_srcdir)/m4/ax_check_aligned_access_required.m4 \
 	$(top_srcdir)/m4/ax_check_libz.m4 \
 	$(top_srcdir)/m4/ax_check_ltdl.m4 \
+	$(top_srcdir)/m4/ax_compare_version.m4 \
 	$(top_srcdir)/m4/ax_prog_doxygen.m4 \
 	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltdl.m4 \
 	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
@@ -237,6 +238,12 @@ nntpplugin_la_OBJECTS = $(am_nntpplugin_la_OBJECTS)
 nntpplugin_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(nntpplugin_la_CFLAGS) \
 	$(CFLAGS) $(nntpplugin_la_LDFLAGS) $(LDFLAGS) -o $@
+ntpplugin_la_LIBADD =
+am_ntpplugin_la_OBJECTS = ntpplugin_la-ntpplugin.lo
+ntpplugin_la_OBJECTS = $(am_ntpplugin_la_OBJECTS)
+ntpplugin_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(ntpplugin_la_CFLAGS) \
+	$(CFLAGS) $(ntpplugin_la_LDFLAGS) $(LDFLAGS) -o $@
 nullplugin_la_LIBADD =
 am_nullplugin_la_OBJECTS = nullplugin_la-nullplugin.lo
 nullplugin_la_OBJECTS = $(am_nullplugin_la_OBJECTS)
@@ -359,13 +366,14 @@ SOURCES = $(aolplugin_la_SOURCES) $(bgpplugin_la_SOURCES) \
 	$(ircplugin_la_SOURCES) $(ldapplugin_la_SOURCES) \
 	$(ldpplugin_la_SOURCES) $(modbusplugin_la_SOURCES) \
 	$(mysqlplugin_la_SOURCES) $(netdgmplugin_la_SOURCES) \
-	$(nntpplugin_la_SOURCES) $(nullplugin_la_SOURCES) \
-	$(palplugin_la_SOURCES) $(piplugin_la_SOURCES) \
-	$(pop3plugin_la_SOURCES) $(pptpplugin_la_SOURCES) \
-	$(proxyplugin_la_SOURCES) $(rtpplugin_la_SOURCES) \
-	$(slpplugin_la_SOURCES) $(snmpplugin_la_SOURCES) \
-	$(socksplugin_la_SOURCES) $(teredoplugin_la_SOURCES) \
-	$(tftpplugin_la_SOURCES) $(tlsplugin_la_SOURCES)
+	$(nntpplugin_la_SOURCES) $(ntpplugin_la_SOURCES) \
+	$(nullplugin_la_SOURCES) $(palplugin_la_SOURCES) \
+	$(piplugin_la_SOURCES) $(pop3plugin_la_SOURCES) \
+	$(pptpplugin_la_SOURCES) $(proxyplugin_la_SOURCES) \
+	$(rtpplugin_la_SOURCES) $(slpplugin_la_SOURCES) \
+	$(snmpplugin_la_SOURCES) $(socksplugin_la_SOURCES) \
+	$(teredoplugin_la_SOURCES) $(tftpplugin_la_SOURCES) \
+	$(tlsplugin_la_SOURCES)
 DIST_SOURCES = $(aolplugin_la_SOURCES) $(bgpplugin_la_SOURCES) \
 	$(dhcpplugin_la_SOURCES) $(dnp3plugin_la_SOURCES) \
 	$(dnsplugin_la_SOURCES) $(dumpplugin_la_SOURCES) \
@@ -373,13 +381,14 @@ DIST_SOURCES = $(aolplugin_la_SOURCES) $(bgpplugin_la_SOURCES) \
 	$(ircplugin_la_SOURCES) $(ldapplugin_la_SOURCES) \
 	$(ldpplugin_la_SOURCES) $(modbusplugin_la_SOURCES) \
 	$(mysqlplugin_la_SOURCES) $(netdgmplugin_la_SOURCES) \
-	$(nntpplugin_la_SOURCES) $(nullplugin_la_SOURCES) \
-	$(palplugin_la_SOURCES) $(piplugin_la_SOURCES) \
-	$(pop3plugin_la_SOURCES) $(pptpplugin_la_SOURCES) \
-	$(proxyplugin_la_SOURCES) $(rtpplugin_la_SOURCES) \
-	$(slpplugin_la_SOURCES) $(snmpplugin_la_SOURCES) \
-	$(socksplugin_la_SOURCES) $(teredoplugin_la_SOURCES) \
-	$(tftpplugin_la_SOURCES) $(tlsplugin_la_SOURCES)
+	$(nntpplugin_la_SOURCES) $(ntpplugin_la_SOURCES) \
+	$(nullplugin_la_SOURCES) $(palplugin_la_SOURCES) \
+	$(piplugin_la_SOURCES) $(pop3plugin_la_SOURCES) \
+	$(pptpplugin_la_SOURCES) $(proxyplugin_la_SOURCES) \
+	$(rtpplugin_la_SOURCES) $(slpplugin_la_SOURCES) \
+	$(snmpplugin_la_SOURCES) $(socksplugin_la_SOURCES) \
+	$(teredoplugin_la_SOURCES) $(tftpplugin_la_SOURCES) \
+	$(tlsplugin_la_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -571,6 +580,8 @@ libdir = @libdir@
 libexecdir = @libexecdir@
 libfixbuf_CFLAGS = @libfixbuf_CFLAGS@
 libfixbuf_LIBS = @libfixbuf_LIBS@
+libndpi_CFLAGS = @libndpi_CFLAGS@
+libndpi_LIBS = @libndpi_LIBS@
 libp0f_CFLAGS = @libp0f_CFLAGS@
 libp0f_LIBS = @libp0f_LIBS@
 localedir = @localedir@
@@ -584,6 +595,7 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -599,7 +611,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 version_info = @version_info@
 AM_CFLAGS = -Wall
-pkglib_LTLIBRARIES = nullplugin.la dnsplugin.la tlsplugin.la slpplugin.la dumpplugin.la ircplugin.la pptpplugin.la nntpplugin.la tftpplugin.la mysqlplugin.la pop3plugin.la teredoplugin.la snmpplugin.la aolplugin.la socksplugin.la bgpplugin.la dhcpplugin.la piplugin.la rtpplugin.la palplugin.la proxyplugin.la dnp3plugin.la modbusplugin.la ethipplugin.la ldpplugin.la ldapplugin.la gh0stplugin.la netdgmplugin.la
+pkglib_LTLIBRARIES = nullplugin.la dnsplugin.la tlsplugin.la slpplugin.la dumpplugin.la ircplugin.la pptpplugin.la nntpplugin.la tftpplugin.la mysqlplugin.la pop3plugin.la teredoplugin.la snmpplugin.la aolplugin.la socksplugin.la bgpplugin.la dhcpplugin.la piplugin.la rtpplugin.la palplugin.la proxyplugin.la dnp3plugin.la modbusplugin.la ethipplugin.la ldpplugin.la ldapplugin.la gh0stplugin.la netdgmplugin.la ntpplugin.la
 nullplugin_la_SOURCES = nullplugin.c
 nullplugin_la_LDFLAGS = -version-info @version_info@ -module
 nullplugin_la_CFLAGS = -I${top_srcdir}/include @GLIB_CFLAGS@ @libfixbuf_CFLAGS@ 
@@ -684,6 +696,9 @@ gh0stplugin_la_CFLAGS = -I${top_srcdir}/include @GLIB_CFLAGS@ @libfixbuf_CFLAGS@
 netdgmplugin_la_SOURCES = netdgmplugin.c
 netdgmplugin_la_LDFLAGS = -version-info @version_info@ -module
 netdgmplugin_la_CFLAGS = -I${top_srcdir}/include @GLIB_CFLAGS@ @libfixbuf_CFLAGS@
+ntpplugin_la_SOURCES = ntpplugin.c
+ntpplugin_la_LDFLAGS = -version-info @version_info@ -module
+ntpplugin_la_CFLAGS = -I${top_srcdir}/include @GLIB_CFLAGS@ @libfixbuf_CFLAGS@ 
 all: all-am
 
 .SUFFIXES:
@@ -798,6 +813,9 @@ netdgmplugin.la: $(netdgmplugin_la_OBJECTS) $(netdgmplugin_la_DEPENDENCIES) $(EX
 nntpplugin.la: $(nntpplugin_la_OBJECTS) $(nntpplugin_la_DEPENDENCIES) $(EXTRA_nntpplugin_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(nntpplugin_la_LINK) -rpath $(pkglibdir) $(nntpplugin_la_OBJECTS) $(nntpplugin_la_LIBADD) $(LIBS)
 
+ntpplugin.la: $(ntpplugin_la_OBJECTS) $(ntpplugin_la_DEPENDENCIES) $(EXTRA_ntpplugin_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(ntpplugin_la_LINK) -rpath $(pkglibdir) $(ntpplugin_la_OBJECTS) $(ntpplugin_la_LIBADD) $(LIBS)
+
 nullplugin.la: $(nullplugin_la_OBJECTS) $(nullplugin_la_DEPENDENCIES) $(EXTRA_nullplugin_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(nullplugin_la_LINK) -rpath $(pkglibdir) $(nullplugin_la_OBJECTS) $(nullplugin_la_LIBADD) $(LIBS)
 
@@ -858,6 +876,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mysqlplugin_la-mysqlplugin.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netdgmplugin_la-netdgmplugin.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nntpplugin_la-nntpplugin.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ntpplugin_la-ntpplugin.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nullplugin_la-nullplugin.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/palplugin_la-palplugin.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/piplugin_la-piplugin.Plo@am__quote@
@@ -1000,6 +1019,13 @@ nntpplugin_la-nntpplugin.lo: nntpplugin.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='nntpplugin.c' object='nntpplugin_la-nntpplugin.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(nntpplugin_la_CFLAGS) $(CFLAGS) -c -o nntpplugin_la-nntpplugin.lo `test -f 'nntpplugin.c' || echo '$(srcdir)/'`nntpplugin.c
+
+ntpplugin_la-ntpplugin.lo: ntpplugin.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ntpplugin_la_CFLAGS) $(CFLAGS) -MT ntpplugin_la-ntpplugin.lo -MD -MP -MF $(DEPDIR)/ntpplugin_la-ntpplugin.Tpo -c -o ntpplugin_la-ntpplugin.lo `test -f 'ntpplugin.c' || echo '$(srcdir)/'`ntpplugin.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/ntpplugin_la-ntpplugin.Tpo $(DEPDIR)/ntpplugin_la-ntpplugin.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ntpplugin.c' object='ntpplugin_la-ntpplugin.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ntpplugin_la_CFLAGS) $(CFLAGS) -c -o ntpplugin_la-ntpplugin.lo `test -f 'ntpplugin.c' || echo '$(srcdir)/'`ntpplugin.c
 
 nullplugin_la-nullplugin.lo: nullplugin.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(nullplugin_la_CFLAGS) $(CFLAGS) -MT nullplugin_la-nullplugin.lo -MD -MP -MF $(DEPDIR)/nullplugin_la-nullplugin.Tpo -c -o nullplugin_la-nullplugin.lo `test -f 'nullplugin.c' || echo '$(srcdir)/'`nullplugin.c

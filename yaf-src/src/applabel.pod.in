@@ -297,6 +297,10 @@ and set <N> to the port on which the proxy is listening for connections.  This w
 <td>Gh0st RAT</td>
 <td>9997</td>
 </tr>
+<tr>
+<td>NTP</td>
+<td>123</td>
+</tr>
 </table>
 
 =end html

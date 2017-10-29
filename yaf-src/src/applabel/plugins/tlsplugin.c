@@ -411,7 +411,7 @@ gboolean decodeTLSv1(
         offsetptr += 2 + ext_len;
 #if YAF_ENABLE_HOOKS
         /* only want Client Hello's server name */
-        if (type == 1 && (offsetptr < payloadSize)) {
+        if (type == 1) {
             while (ext_ptr < payloadSize && (tot_ext < ext_len)) {
                 sub_ext_type = ntohs(*(uint16_t *)(payload + ext_ptr));
                 ext_ptr += 2;

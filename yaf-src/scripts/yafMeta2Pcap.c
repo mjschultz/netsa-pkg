@@ -80,6 +80,7 @@
 
 #define MAX_LINE 4096
 #define MAX_PATH 100
+#define MAX_WINDOW 30
 
 /* Possible Environment Variables */
 #define YAF_PCAP_META_FILE "YAF_PCAP_META_FILE"
@@ -103,6 +104,7 @@ static gboolean ipfix = FALSE;
 static int meta_files_num = 0;
 static int pcap_files_num = 0;
 static char *yaf_prog_path = NULL;
+static int timewindow = 0;
 
 static GOptionEntry md_core_option[] = {
     {"pcap-meta-file", 'f', 0, G_OPTION_ARG_STRING, &meta_file,
@@ -124,6 +126,9 @@ static GOptionEntry md_core_option[] = {
      "Time in milliseconds. Suggested, \n\t\t\t\tbut not required.", "ms" },
     {"etime", 'e', 0, G_OPTION_ARG_STRING, &flowendtime,
      "End time in milliseconds. Suggested, \n\t\t\t\tbut not required.","ms" },
+    {"window", 'w', 0, G_OPTION_ARG_INT, &timewindow,
+     "Number of milliseconds past the start \n\t\t\t\ttime to search "
+     "for flow key hash. Search time window, not exact time.", "ms"},
     {"packets", 'n', 0, G_OPTION_ARG_INT, &num_packets,
      "Use to limit number of packets searched \n\t\t\t\tfor/found [all]",
      "num"},
@@ -339,12 +344,15 @@ static void yfMetaParseOptions(
             if (env2) {
                 metalist = g_strdup(env2);
             } else {
-                meta_array = (char **)calloc(1, sizeof(char *));
+                meta_file = g_strdup(env);
+                /*                meta_array = (char **)calloc(1, sizeof(char *));
                 meta_array[0] = g_strdup(env);
-                meta_files_num = 1;
+                meta_files_num = 1;*/
             }
         }
-    } else if (metalist) {
+    }
+
+    if (metalist) {
         /* read list of meta files */
         fp = fopen(metalist, "r");
         if (fp == NULL) {
@@ -359,7 +367,7 @@ static void yfMetaParseOptions(
         }
         fclose(fp);
         fp = NULL;
-    } else {
+    } else if (meta_file) {
         glob_t gbuf;
         int grc;
 
@@ -427,17 +435,16 @@ static FILE *yfMetaMakeTemp(
     char    *tmpname,
     size_t   tmpsize)
 {
-    size_t sz;
     int fd;
     FILE *temp;
     const char *env = getenv("TMPDIR");
 
     if (env) {
-        sz = (size_t)snprintf(tmpname, tmpsize,
-                              "%s/yaf_m2p_temp%s", env, temp_suffix);
+        snprintf(tmpname, tmpsize,
+                 "%s/yaf_m2p_temp%s", env, temp_suffix);
     } else {
-        sz = (size_t)snprintf(tmpname, tmpsize,
-                              "/tmp/yaf_m2p_temp%s", temp_suffix);
+        snprintf(tmpname, tmpsize,
+                 "/tmp/yaf_m2p_temp%s", temp_suffix);
     }
 
     fd = mkstemp(tmpname);
@@ -503,6 +510,34 @@ static pcap_dumper_t *yfMetaOpenPcapOut(
 }
 
 
+static void yfCreatePcap(
+    FILE *capfile,
+    char *filename,
+    uint32_t hash,
+    uint64_t time)
+{
+
+    char param[MAX_LINE];
+
+    if (yaf_prog_path) {
+        snprintf(param, MAX_LINE, "%s --in %s --no-output --caplist"
+                         " --noerror --max-payload=4000 --pcap=%s --hash=%u "
+                 "--stime=%"PRIu64, yaf_prog_path, filename, out_file,
+                 hash, time);
+    } else {
+        snprintf(param, MAX_LINE, "yaf --in %s --no-output --caplist"
+                         " --noerror --max-payload=4000 --pcap=%s --hash=%u"
+                 " --stime=%"PRIu64, filename, out_file, hash, time);
+
+    }
+
+    fseek(capfile, 0, SEEK_SET);
+    system(param);
+
+}
+
+
+
 /**
  * main
  *
@@ -515,8 +550,11 @@ main (int argc, char *argv[]) {
     uint64_t start, end;
     uint32_t key_hash = 0;
     uint32_t rev_key_hash = 0;
+    uint64_t windowstarts[MAX_WINDOW];
+    int numstarts = 0;
     FILE *fp = NULL;
     FILE *temp = NULL;
+    char *last_file = NULL;
     char tmpname[MAX_PATH];
     char line[MAX_LINE];
     char old_file_path[MAX_LINE];
@@ -526,6 +564,8 @@ main (int argc, char *argv[]) {
     gboolean do_once = TRUE;
     gboolean list = FALSE;
     gboolean new_file;
+    gboolean key_hash_matched = FALSE;
+    gboolean rev_key_hash_matched = FALSE;
     int pfile, i, n, rv;
     int counter = 0;
     int file = 0;
@@ -545,6 +585,12 @@ main (int argc, char *argv[]) {
     }
 
     yfMetaParseOptions();
+
+    if (timewindow) {
+        for (i = 0; i < MAX_WINDOW; i++) {
+            windowstarts[i] = 0;
+        }
+    }
 
     memset(tmpname, 0, MAX_PATH);
 
@@ -664,14 +710,38 @@ main (int argc, char *argv[]) {
             rstart = strtoull(tok[1], NULL, 10);
 
             if (rhash != key_hash) {
-                if (rhash != rev_key_hash) continue;
+                if (rhash != rev_key_hash) {
+                    continue;
+                } else {
+                    rev_key_hash_matched = TRUE;
+                }
+            } else {
+                key_hash_matched = TRUE;
             }
 
             if (start) {
-                if (start != rstart) continue;
+                if (timewindow) {
+                    /* if we are looking for the reverse flow, the start time of the
+                       forward flow occurred before the reverse flow */
+                    if (start < rstart) continue;
+                    if (rstart < (start - timewindow)) continue;
+                    if (start != rstart) {
+                        if (numstarts < MAX_WINDOW) {
+                            windowstarts[numstarts] = rstart;
+                            numstarts++;
+                        }
+                    }
+                } else if (start != rstart) continue;
             }
-
             if (list) {
+                if (last_file) {
+                    if (strcmp(last_file, tok[2]) == 0) {
+                        /* file already in list */
+                        continue;
+                    }
+                    g_free(last_file);
+                }
+                last_file = g_strdup(tok[2]);
                 if (temp) {
                     fprintf(temp, "%s", tok[2]);
                 } else {
@@ -778,8 +848,32 @@ main (int argc, char *argv[]) {
 
     if (list) {
         if (temp && counter) {
-            char param[MAX_LINE];
 
+            if (key_hash_matched) {
+                if (numstarts) {
+                    i = 0;
+                    while ( i < numstarts ) {
+                        yfCreatePcap(temp, tmpname, key_hash, windowstarts[i]);
+                        i++;
+                    }
+                } else {
+                    yfCreatePcap(temp, tmpname, key_hash, start);
+                }
+            }
+            if (access(out_file, F_OK)) {
+                if (rev_key_hash && rev_key_hash_matched) {
+                    if (numstarts) {
+                        i =0;
+                        while ( i < numstarts ) {
+                            yfCreatePcap(temp, tmpname, rev_key_hash, windowstarts[i]);
+                            i++;
+                        }
+                    } else {
+                        yfCreatePcap(temp, tmpname, rev_key_hash, start);
+                    }
+                }
+            }
+            /*
             if (yaf_prog_path) {
                 snprintf(param, MAX_LINE, "%s --in %s --no-output --caplist"
                          " --noerror --max-payload=4000 --pcap=%s --hash=%u "
@@ -789,6 +883,7 @@ main (int argc, char *argv[]) {
                 snprintf(param, MAX_LINE, "yaf --in %s --no-output --caplist"
                          " --noerror --max-payload=4000 --pcap=%s --hash=%u"
                          " --stime=%"PRIu64, tmpname, out_file, key_hash, start);
+
             }
 
             fseek(temp, 0, SEEK_SET);
@@ -813,7 +908,7 @@ main (int argc, char *argv[]) {
                     system(param);
                 }
             }
-
+            */
 
         }
     }
@@ -846,6 +941,10 @@ main (int argc, char *argv[]) {
         if (temp) {
             unlink(tmpname);
         }
+    }
+
+    if (last_file) {
+        g_free(last_file);
     }
 
     if (pcap_files_num) {

@@ -67,7 +67,9 @@
 #include <airframe/airlock.h>
 #include <airframe/airutil.h>
 #include <pcap.h>
+#if YAF_ENABLE_ZLIB
 #include <zlib.h>
+#endif
 
 #ifdef YAF_ENABLE_BIVIO
 #include <pcap-zcopy.h>
@@ -88,6 +90,7 @@ struct yfCapSource_st {
     FILE            *lfp;
     FILE            *pcapng;
     char            *tmp;
+    char            *last_filename;
     gboolean        swap;
     gboolean        is_live;
     int             datalink;
@@ -433,6 +436,7 @@ yfCapSource_t *yfCapOpenFile(
     cs->lfp = NULL;
     cs->datalink = *datalink;
     cs->tmp = tmp_file;
+    cs->last_filename = g_strdup(path);
 
     if (!cs->pcap) {
         g_free(cs);
@@ -497,6 +501,11 @@ static gboolean yfCapFileListNext(
         }
 
         yfCapPcapNGCheck(cs, cappath);
+
+        if (cs->last_filename) {
+            g_free(cs->last_filename);
+        }
+        cs->last_filename = g_strdup(cappath);
 
         /* make sure the datalink matches all the others */
         if (cs->datalink == -1) {
@@ -702,7 +711,7 @@ static pcap_dumper_t *yfCapPcapRotate(
 
     air_lock_acquire(lock, namebuf->str, &err);
 
-    yfUpdateRollingPcapFile(ctx->flowtab, namebuf);
+    yfUpdateRollingPcapFile(ctx->flowtab, namebuf->str);
 
     pcap_ret = pcap_dump_open(yaf_pcap, namebuf->str);
 
@@ -835,6 +844,10 @@ gboolean yfCapMain(
         ctx->pcap_offset = sizeof(struct pcap_file_header);
     }
 
+    if (!cs->is_live) {
+        yfUpdateRollingPcapFile(ctx->flowtab, cs->last_filename);
+    }
+
     if (!ctx->cfg->nostats) {
         stimer = g_timer_new();
     }
@@ -895,6 +908,7 @@ gboolean yfCapMain(
                     yfSetPcapFilter(cs->pcap, bp_filter, &(ctx->err));
                 }
                 yfDecodeResetOffset(ctx->dectx);
+                yfUpdateRollingPcapFile(ctx->flowtab, cs->last_filename);
                 if (!ctx->pcap) {
                     if (cs->pcapng) {
                         ctx->pcap_offset = ftell(cs->pcapng);
@@ -934,6 +948,7 @@ gboolean yfCapMain(
                     yfSetPcapFilter(cs->pcap, bp_filter, &(ctx->err));
                 }
                 yfDecodeResetOffset(ctx->dectx);
+                yfUpdateRollingPcapFile(ctx->flowtab, cs->last_filename);
                 if (!ctx->pcap){
                     if (cs->pcapng) {
                         ctx->pcap_offset = ftell(cs->pcapng);

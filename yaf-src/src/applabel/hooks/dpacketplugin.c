@@ -1422,7 +1422,7 @@ void ypInitializeBLs(
     int              rc, loop;
 
     for (loop = 0; loop < ctx->ruleSet[app_pos].numRules; loop++) {
-        fbBasicListInit(temp, 0, ctx->ruleSet[app_pos].regexFields[loop].elem, 0);
+        fbBasicListInit(temp, 3, ctx->ruleSet[app_pos].regexFields[loop].elem, 0);
         temp++;
     }
 
@@ -1434,7 +1434,7 @@ void ypInitializeBLs(
 
     /* add some dummy elements to fill to proto_standard */
     for (loop = 0; loop < rc; loop++) {
-        fbBasicListInit(temp, 0, ctx->ruleSet[app_pos].regexFields[0].elem, 0);
+        fbBasicListInit(temp, 3, ctx->ruleSet[app_pos].regexFields[0].elem, 0);
         temp++;
     }
 }
@@ -1659,295 +1659,334 @@ gboolean ypGetTemplate(
     GError               *err = NULL;
 
     if (ypSearchPlugOpts(global_active_protos, 194)) {
-        if (!(ircTemplate = ypInitTemplate(session, yaf_singleBL_spec,
-                                           YAF_IRC_FLOW_TID, 0xffffffff,
-                                           &err)))
+        if (!(ircTemplate = ypInitTemplate(
+                  session, yaf_singleBL_spec,
+                  YAF_IRC_FLOW_TID, "yaf_irc", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
 
     if (ypSearchPlugOpts(global_active_protos, 110)) {
-        if (!(pop3Template = ypInitTemplate(session, yaf_singleBL_spec,
-                                            YAF_POP3_FLOW_TID, 0xffffffff,
-                                            &err)))
+        if (!(pop3Template = ypInitTemplate(
+                  session, yaf_singleBL_spec,
+                  YAF_POP3_FLOW_TID, "yaf_pop3", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
 
     if (ypSearchPlugOpts(global_active_protos, 69)) {
-        if (!(tftpTemplate = ypInitTemplate(session, yaf_tftp_spec,
-                                            YAF_TFTP_FLOW_TID, 0xffffffff,
-                                            &err)))
+        if (!(tftpTemplate = ypInitTemplate(
+                  session, yaf_tftp_spec,
+                  YAF_TFTP_FLOW_TID, "yaf_tftp", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
 
     if (ypSearchPlugOpts(global_active_protos, 427)) {
-        if (!(slpTemplate = ypInitTemplate(session, yaf_slp_spec,
-                                           YAF_SLP_FLOW_TID, 0xffffffff,
-                                           &err)))
+        if (!(slpTemplate = ypInitTemplate(
+                  session, yaf_slp_spec,
+                  YAF_SLP_FLOW_TID, "yaf_slp", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
 
     if (ypSearchPlugOpts(global_active_protos, 80)) {
-        if (!(httpTemplate = ypInitTemplate(session, yaf_http_spec,
-                                            YAF_HTTP_FLOW_TID, 0xffffffff,
-                                            &err)))
+        if (!(httpTemplate = ypInitTemplate(
+                  session, yaf_http_spec,
+                  YAF_HTTP_FLOW_TID, "yaf_http", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
 
     if (ypSearchPlugOpts(global_active_protos, 21)) {
-        if (!(ftpTemplate = ypInitTemplate(session, yaf_ftp_spec,
-                                           YAF_FTP_FLOW_TID, 0xffffffff,
-                                           &err)))
+        if (!(ftpTemplate = ypInitTemplate(
+                  session, yaf_ftp_spec,
+                  YAF_FTP_FLOW_TID, "yaf_ftp", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
 
     if (ypSearchPlugOpts(global_active_protos, 143)) {
-        if (!(imapTemplate = ypInitTemplate(session, yaf_imap_spec,
-                                            YAF_IMAP_FLOW_TID, 0xffffffff,
-                                            &err)))
+        if (!(imapTemplate = ypInitTemplate(
+                  session, yaf_imap_spec,
+                  YAF_IMAP_FLOW_TID, "yaf_imap", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
 
     if (ypSearchPlugOpts(global_active_protos, 554)) {
-        if (!(rtspTemplate = ypInitTemplate(session, yaf_rtsp_spec,
-                                            YAF_RTSP_FLOW_TID, 0xffffffff,
-                                            &err)))
+        if (!(rtspTemplate = ypInitTemplate(
+                  session, yaf_rtsp_spec,
+                  YAF_RTSP_FLOW_TID, "yaf_rtsp", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
 
     if (ypSearchPlugOpts(global_active_protos, 5060)) {
-        if (!(sipTemplate = ypInitTemplate(session, yaf_sip_spec,
-                                           YAF_SIP_FLOW_TID, 0xffffffff,
-                                           &err)))
+        if (!(sipTemplate = ypInitTemplate(
+                  session, yaf_sip_spec,
+                  YAF_SIP_FLOW_TID, "yaf_sip", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
 
     if (ypSearchPlugOpts(global_active_protos, 25)) {
-        if (!(smtpTemplate = ypInitTemplate(session, yaf_smtp_spec,
-                                            YAF_SMTP_FLOW_TID, 0xffffffff,
-                                            &err)))
+        if (!(smtpTemplate = ypInitTemplate(
+                  session, yaf_smtp_spec,
+                  YAF_SMTP_FLOW_TID, "yaf_smtp", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
 
     if (ypSearchPlugOpts(global_active_protos, 22)) {
-        if (!(sshTemplate = ypInitTemplate(session, yaf_singleBL_spec,
-                                           YAF_SSH_FLOW_TID, 0xffffffff,
-                                           &err)))
+        if (!(sshTemplate = ypInitTemplate(
+                  session, yaf_singleBL_spec,
+                  YAF_SSH_FLOW_TID, "yaf_ssh", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
 
     if (ypSearchPlugOpts(global_active_protos, 119)) {
-        if (!(nntpTemplate = ypInitTemplate(session, yaf_nntp_spec,
-                                            YAF_NNTP_FLOW_TID, 0xffffffff,
-                                            &err)))
+        if (!(nntpTemplate = ypInitTemplate(
+                  session, yaf_nntp_spec,
+                  YAF_NNTP_FLOW_TID, "yaf_nntp", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
 
     if (ypSearchPlugOpts(global_active_protos, 53)) {
-        if (!(dnsTemplate = ypInitTemplate(session, yaf_dns_spec,
-                                           YAF_DNS_FLOW_TID, 0xffffffff,
-                                           &err)))
+        if (!(dnsTemplate = ypInitTemplate(
+                  session, yaf_dns_spec,
+                  YAF_DNS_FLOW_TID, "yaf_dns", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
-        if (!(dnsQRTemplate = ypInitTemplate(session, yaf_dnsQR_spec,
-                                             YAF_DNSQR_FLOW_TID, 0xffffffff,
-                                             &err)))
+        if (!(dnsQRTemplate = ypInitTemplate(
+                  session, yaf_dnsQR_spec,
+                  YAF_DNSQR_FLOW_TID, "yaf_dns_qr", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
-        if (!(dnsATemplate = ypInitTemplate(session, yaf_dnsA_spec,
-                                            YAF_DNSA_FLOW_TID, 0xffffffff,
-                                            &err)))
+        if (!(dnsATemplate = ypInitTemplate(
+                  session, yaf_dnsA_spec,
+                  YAF_DNSA_FLOW_TID, "yaf_dns_a", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
-        if (!(dnsAAAATemplate = ypInitTemplate(session, yaf_dnsAAAA_spec,
-                                               YAF_DNSAAAA_FLOW_TID,
-                                               0xffffffff, &err)))
+        if (!(dnsAAAATemplate = ypInitTemplate(
+                  session, yaf_dnsAAAA_spec,
+                  YAF_DNSAAAA_FLOW_TID, "yaf_dns_aaaa", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
-        if (!(dnsCNTemplate = ypInitTemplate(session, yaf_dnsCNAME_spec,
-                                             YAF_DNSCN_FLOW_TID, 0xffffffff,
-                                             &err)))
+        if (!(dnsCNTemplate = ypInitTemplate(
+                  session, yaf_dnsCNAME_spec,
+                  YAF_DNSCN_FLOW_TID, "yaf_dns_cname", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
-        if (!(dnsMXTemplate = ypInitTemplate(session, yaf_dnsMX_spec,
-                                             YAF_DNSMX_FLOW_TID, 0xffffffff,
-                                             &err)))
+        if (!(dnsMXTemplate = ypInitTemplate(
+                  session, yaf_dnsMX_spec,
+                  YAF_DNSMX_FLOW_TID, "yaf_dns_mx", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
-        if (!(dnsNSTemplate = ypInitTemplate(session, yaf_dnsNS_spec,
-                                             YAF_DNSNS_FLOW_TID, 0xffffffff,
-                                             &err)))
+        if (!(dnsNSTemplate = ypInitTemplate(
+                  session, yaf_dnsNS_spec,
+                  YAF_DNSNS_FLOW_TID, "yaf_dns_ns", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
-        if (!(dnsPTRTemplate = ypInitTemplate(session, yaf_dnsPTR_spec,
-                                              YAF_DNSPTR_FLOW_TID, 0xffffffff,
-                                              &err)))
+        if (!(dnsPTRTemplate = ypInitTemplate(
+                  session, yaf_dnsPTR_spec,
+                  YAF_DNSPTR_FLOW_TID, "yaf_dns_ptr", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
-        if (!(dnsTXTTemplate = ypInitTemplate(session, yaf_dnsTXT_spec,
-                                              YAF_DNSTXT_FLOW_TID, 0xffffffff,
-                                              &err)))
+        if (!(dnsTXTTemplate = ypInitTemplate(
+                  session, yaf_dnsTXT_spec,
+                  YAF_DNSTXT_FLOW_TID, "yaf_dns_txt", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
-        if (!(dnsSOATemplate = ypInitTemplate(session, yaf_dnsSOA_spec,
-                                              YAF_DNSSOA_FLOW_TID, 0xffffffff,
-                                              &err)))
+        if (!(dnsSOATemplate = ypInitTemplate(
+                  session, yaf_dnsSOA_spec,
+                  YAF_DNSSOA_FLOW_TID, "yaf_dns_soa", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
-        if (!(dnsSRVTemplate = ypInitTemplate(session, yaf_dnsSRV_spec,
-                                              YAF_DNSSRV_FLOW_TID, 0xffffffff,
-                                              &err)))
+        if (!(dnsSRVTemplate = ypInitTemplate(
+                  session, yaf_dnsSRV_spec,
+                  YAF_DNSSRV_FLOW_TID, "yaf_dns_srv", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
         if (dnssec_global) {
-            if (!(dnsDSTemplate = ypInitTemplate(session, yaf_dnsDS_spec,
-                                                 YAF_DNSDS_FLOW_TID,
-                                                 0xffffffff,
-                                                 &err)))
+            if (!(dnsDSTemplate = ypInitTemplate(
+                      session, yaf_dnsDS_spec,
+                      YAF_DNSDS_FLOW_TID, "yaf_dns_ds", NULL,
+                      0xffffffff, &err)))
             {
                 return FALSE;
             }
-            if (!(dnsRRSigTemplate = ypInitTemplate(session, yaf_dnsSig_spec,
-                                                    YAF_DNSRRSIG_FLOW_TID,
-                                                    0xffffffff, &err)))
+            if (!(dnsRRSigTemplate = ypInitTemplate(
+                      session, yaf_dnsSig_spec,
+                      YAF_DNSRRSIG_FLOW_TID, "yaf_dns_sig", NULL,
+                      0xffffffff, &err)))
             {
                 return FALSE;
             }
-            if (!(dnsNSECTemplate = ypInitTemplate(session, yaf_dnsNSEC_spec,
-                                                   YAF_DNSNSEC_FLOW_TID,
-                                                   0xffffffff, &err)))
+            if (!(dnsNSECTemplate = ypInitTemplate(
+                      session, yaf_dnsNSEC_spec,
+                      YAF_DNSNSEC_FLOW_TID, "yaf_dns_nsec", NULL,
+                      0xffffffff, &err)))
             {
                 return FALSE;
             }
-            if (!(dnsKeyTemplate = ypInitTemplate(session, yaf_dnsKey_spec,
-                                                  YAF_DNSKEY_FLOW_TID,
-                                                  0xffffffff, &err)))
+            if (!(dnsNSEC3Template = ypInitTemplate(
+                      session, yaf_dnsNSEC3_spec,
+                      YAF_DNSNSEC3_FLOW_TID, "yaf_dns_nsec3", NULL,
+                      0xffffffff, &err)))
             {
                 return FALSE;
             }
-            if (!(dnsNSEC3Template = ypInitTemplate(session, yaf_dnsNSEC3_spec,
-                                                    YAF_DNSNSEC3_FLOW_TID,
-                                                    0xffffffff, &err)))
+            if (!(dnsKeyTemplate = ypInitTemplate(
+                      session, yaf_dnsKey_spec,
+                      YAF_DNSKEY_FLOW_TID, "yaf_dns_key", NULL,
+                      0xffffffff, &err)))
             {
                 return FALSE;
             }
         }
     }
     if (ypSearchPlugOpts(global_active_protos, 443) || certhash_global) {
-        if (!(sslTemplate = ypInitTemplate(session, yaf_ssl_spec,
-                                           YAF_SSL_FLOW_TID, 0xffffffff,
-                                           &err)))
+        if (!(sslTemplate = ypInitTemplate(
+                  session, yaf_ssl_spec,
+                  YAF_SSL_FLOW_TID, "yaf_ssl", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
-        if (!(sslCertTemplate = ypInitTemplate(session, yaf_cert_spec,
-                                               YAF_SSL_CERT_FLOW_TID,
-                                               0xffffffff, &err)))
+        if (!(sslCertTemplate = ypInitTemplate(
+                  session, yaf_cert_spec,
+                  YAF_SSL_CERT_FLOW_TID, "yaf_ssl_cert", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
-        if (!(sslSubTemplate = ypInitTemplate(session, yaf_subssl_spec,
-                                               YAF_SSL_SUBCERT_FLOW_TID,
-                                               0xffffffff, &err)))
+        if (!(sslSubTemplate = ypInitTemplate(
+                  session, yaf_subssl_spec,
+                  YAF_SSL_SUBCERT_FLOW_TID, "yaf_ssl_subcert", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
 
     }
     if (ypSearchPlugOpts(global_active_protos, 3306)) {
-        if (!(mysqlTemplate = ypInitTemplate(session, yaf_mysql_spec,
-                                             YAF_MYSQL_FLOW_TID, 0xffffffff,
-                                             &err)))
+        if (!(mysqlTemplate = ypInitTemplate(
+                  session, yaf_mysql_spec,
+                  YAF_MYSQL_FLOW_TID, "yaf_mysql", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
-        if (!(mysqlTxtTemplate = ypInitTemplate(session, yaf_mysql_txt_spec,
-                                                YAF_MYSQLTXT_FLOW_TID,
-                                                0xffffffff, &err)))
+        if (!(mysqlTxtTemplate = ypInitTemplate(
+                  session, yaf_mysql_txt_spec,
+                  YAF_MYSQLTXT_FLOW_TID, "yaf_mysql_txt", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
     /* DNP 3.0 */
     if (ypSearchPlugOpts(global_active_protos, 20000)) {
-        if (!(dnp3Template = ypInitTemplate(session, yaf_dnp_spec,
-                                            YAF_DNP3_FLOW_TID, 0, &err)))
+        if (!(dnp3Template = ypInitTemplate(
+                  session, yaf_dnp_spec,
+                  YAF_DNP3_FLOW_TID, "yaf_dnp", NULL,
+                  0, &err)))
         {
             return FALSE;
         }
-        if (!(dnp3RecTemplate = ypInitTemplate(session, yaf_dnp_rec_spec,
-                                               YAF_DNP3_REC_FLOW_TID,
-                                               0xffffffff, &err)))
+        if (!(dnp3RecTemplate = ypInitTemplate(
+                  session, yaf_dnp_rec_spec,
+                  YAF_DNP3_REC_FLOW_TID, "yaf_dnp_rec", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
 
     if (ypSearchPlugOpts(global_active_protos, 502)) {
-        if (!(modbusTemplate = ypInitTemplate(session, yaf_singleBL_spec,
-                                              YAF_MODBUS_FLOW_TID,
-                                              0xffffffff, &err)))
+        if (!(modbusTemplate = ypInitTemplate(
+                  session, yaf_singleBL_spec,
+                  YAF_MODBUS_FLOW_TID, "yaf_modbus", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
 
     if (ypSearchPlugOpts(global_active_protos, 44818)) {
-        if (!(enipTemplate = ypInitTemplate(session, yaf_singleBL_spec,
-                                            YAF_ENIP_FLOW_TID,
-                                            0xffffffff, &err)))
+        if (!(enipTemplate = ypInitTemplate(
+                  session, yaf_singleBL_spec,
+                  YAF_ENIP_FLOW_TID, "yaf_enip", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
 
     if (ypSearchPlugOpts(global_active_protos, 5004)) {
-        if (!(rtpTemplate = ypInitTemplate(session, yaf_rtp_spec,
-                                           YAF_RTP_FLOW_TID, 0xffffffff,
-                                           &err)))
+        if (!(rtpTemplate = ypInitTemplate(
+                  session, yaf_rtp_spec,
+                  YAF_RTP_FLOW_TID, "yaf_rtp", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
     }
 
     if (fullcert_global) {
-        if (!(sslFullCertTemplate = ypInitTemplate(session, yaf_singleBL_spec,
-                                                   YAF_FULL_CERT_TID,
-                                                   0xffffffff, &err)))
+        if (!(sslFullCertTemplate = ypInitTemplate(
+                  session, yaf_singleBL_spec,
+                  YAF_FULL_CERT_TID, "yaf_ssl_cert_full", NULL,
+                  0xffffffff, &err)))
         {
             return FALSE;
         }
@@ -2604,7 +2643,7 @@ ypDPIScanner (
     int                rc = 0;
     int                loop;
     int                subVects[NUM_SUBSTRING_VECTS];
-    uint16_t           offsetptr;
+    int                offsetptr;
     uint8_t            captCount = flowContext->dpinum;
     uint8_t            newCapture = flowContext->dpinum;
     uint8_t            captDirection = 0;
@@ -2679,6 +2718,8 @@ fbTemplate_t * ypInitTemplate(
     fbSession_t *session,
     fbInfoElementSpec_t *spec,
     uint16_t tid,
+    const gchar *name,
+    const gchar *description,
     uint32_t flags,
     GError **err)
 {
@@ -2737,10 +2778,18 @@ fbTemplate_t * ypInitTemplate(
         return NULL;
     }
 
+#if YAF_ENABLE_METADATA_EXPORT
+    if (!fbSessionAddTemplateWithMetadata(session, FALSE, tid,
+                                          tmpl, name, description, &error))
+    {
+        return NULL;
+    }
+#else
     if (!fbSessionAddTemplate(session, FALSE, tid, tmpl, &error)) {
         g_debug("Error adding template %02x: %s", tid, error->message);
         return NULL;
     }
+#endif
 
     return tmpl;
 }
@@ -2763,7 +2812,7 @@ void *ypProcessIRC(
     rec =(yfIRCFlow_t *)fbSubTemplateMultiListEntryInit(stml, YAF_IRC_FLOW_TID,
                                                         ircTemplate, 1);
 
-    ircVarfield = (fbVarfield_t *)fbBasicListInit(&(rec->ircMsg), 0,
+    ircVarfield = (fbVarfield_t *)fbBasicListInit(&(rec->ircMsg), 3,
                   fbInfoModelGetElementByName(model, "ircTextMessage"),
                                                   totalcap);
 
@@ -2803,7 +2852,7 @@ void *ypProcessPOP3(
     rec = (yfPOP3Flow_t *)fbSubTemplateMultiListEntryInit(stml,
                                                           YAF_POP3_FLOW_TID,
                                                           pop3Template, 1);
-    popvar = (fbVarfield_t *)fbBasicListInit(&(rec->pop3msg), 0,
+    popvar = (fbVarfield_t *)fbBasicListInit(&(rec->pop3msg), 3,
                      fbInfoModelGetElementByName(model, "pop3TextMessage"),
                                              totalcap);
 
@@ -2893,7 +2942,7 @@ void *ypProcessSLP(
             total++;
         }
     }
-    slpVar = (fbVarfield_t *)fbBasicListInit(&(rec->slpString), 0,
+    slpVar = (fbVarfield_t *)fbBasicListInit(&(rec->slpString), 3,
                        fbInfoModelGetElementByName(model, "slpString"), total);
 
     while (count < fwdcap) {
@@ -2973,7 +3022,7 @@ void *ypProcessHTTP(
             if (val) {
                 char *sc = (char *)rec;
                 blist = (fbBasicList_t *)(sc + val->BLoffset);
-                httpVar = (fbVarfield_t *)fbBasicListInit(blist, 0,
+                httpVar = (fbVarfield_t *)fbBasicListInit(blist, 3,
                                                           val->infoElement,
                                                           total);
                 ypFillBasicList(flow, dpi, total, fwdcap,&httpVar, totalIndex);
@@ -3029,7 +3078,7 @@ void *ypProcessFTP(
             if (val) {
                 char *sc = (char *)rec;
                 blist = (fbBasicList_t *)(sc + val->BLoffset);
-                ftpVar = (fbVarfield_t *)fbBasicListInit(blist, 0,
+                ftpVar = (fbVarfield_t *)fbBasicListInit(blist, 3,
                                                          val->infoElement,
                                                          total);
                 ypFillBasicList(flow, dpi, total, fwdcap, &ftpVar, totalIndex);
@@ -3086,7 +3135,7 @@ void *ypProcessIMAP(
             if (val) {
                 char *sc = (char *)rec;
                 blist = (fbBasicList_t *)(sc + val->BLoffset);
-                imapVar = (fbVarfield_t *)fbBasicListInit(blist, 0,
+                imapVar = (fbVarfield_t *)fbBasicListInit(blist, 3,
                                                          val->infoElement,
                                                          total);
                 ypFillBasicList(flow, dpi, total, fwdcap,&imapVar, totalIndex);
@@ -3141,7 +3190,7 @@ void *ypProcessSIP(
             if (val) {
                 char *sc = (char *)rec;
                 blist = (fbBasicList_t *)(sc + val->BLoffset);
-                sipVar = (fbVarfield_t *)fbBasicListInit(blist, 0,
+                sipVar = (fbVarfield_t *)fbBasicListInit(blist, 3,
                                                          val->infoElement,
                                                          total);
                 ypFillBasicList(flow, dpi, total, fwdcap, &sipVar, totalIndex);
@@ -3198,7 +3247,7 @@ void *ypProcessSMTP(
             if (val) {
                 char *sc = (char *)rec;
                 blist = (fbBasicList_t *)(sc + val->BLoffset);
-                smtpVar = (fbVarfield_t *)fbBasicListInit(blist, 0,
+                smtpVar = (fbVarfield_t *)fbBasicListInit(blist, 3,
                                                          val->infoElement,
                                                          total);
                 ypFillBasicList(flow, dpi, total,fwdcap, &smtpVar, totalIndex);
@@ -3244,7 +3293,7 @@ void *ypProcessNNTP(
         }
     }
 
-    nntpVar = (fbVarfield_t *)fbBasicListInit(&(rec->nntpResponse), 0,
+    nntpVar = (fbVarfield_t *)fbBasicListInit(&(rec->nntpResponse), 3,
                            fbInfoModelGetElementByName(model, "nntpResponse"),
                                               total);
 
@@ -3260,7 +3309,7 @@ void *ypProcessNNTP(
         }
     }
 
-    nntpVar = (fbVarfield_t *)fbBasicListInit(&(rec->nntpCommand), 0,
+    nntpVar = (fbVarfield_t *)fbBasicListInit(&(rec->nntpCommand), 3,
                             fbInfoModelGetElementByName(model, "nntpCommand"),
                                               total);
 
@@ -3314,7 +3363,7 @@ void *ypProcessSSL(
         }
 
         if (dpi[count].dpacketID == 91) {
-            sslCiphers = (uint32_t *)fbBasicListInit(&(rec->sslCipherList), 0,
+            sslCiphers = (uint32_t *)fbBasicListInit(&(rec->sslCipherList), 3,
                                fbInfoModelGetElementByName(model, "sslCipher"),
                                                  dpi[count].dpacketCaptLen/2);
             for (i=0; i < (dpi[count].dpacketCaptLen/2); i++) {
@@ -3342,7 +3391,7 @@ void *ypProcessSSL(
             rec->sslServerCipher = ntohs(*(uint16_t *)(payload +
                                                       dpi[count].dpacketCapt));
         } else if (dpi[count].dpacketID == 92) {
-            sslCiphers = (uint32_t *)fbBasicListInit(&(rec->sslCipherList), 0,
+            sslCiphers = (uint32_t *)fbBasicListInit(&(rec->sslCipherList), 3,
                                fbInfoModelGetElementByName(model, "sslCipher"),
                                                   dpi[count].dpacketCaptLen/3);
             for (i=0; i < (dpi[count].dpacketCaptLen/3); i++) {
@@ -3369,18 +3418,18 @@ void *ypProcessSSL(
     }
 
     if (!ciphertrue) {
-        fbBasicListInit(&(rec->sslCipherList), 0,
+        fbBasicListInit(&(rec->sslCipherList), 3,
                         fbInfoModelGetElementByName(model, "sslCipher"), 0);
     }
 
     if (!ctx->ssl_off) {
-        sslcert = (yfSSLCertFlow_t *)fbSubTemplateListInit(&(rec->sslCertList), 0,
+        sslcert = (yfSSLCertFlow_t *)fbSubTemplateListInit(&(rec->sslCertList), 3,
                                                            YAF_SSL_CERT_FLOW_TID,
                                                            sslCertTemplate,
                                                            total_certs);
     } else {
         /* NULL since we're doing full cert export */
-        sslcert = (yfSSLCertFlow_t *)fbSubTemplateListInit(&(rec->sslCertList), 0,
+        sslcert = (yfSSLCertFlow_t *)fbSubTemplateListInit(&(rec->sslCertList), 3,
                                                            YAF_SSL_CERT_FLOW_TID,
                                                            sslCertTemplate,
                                                            0);
@@ -3398,17 +3447,17 @@ void *ypProcessSSL(
             if (!ypDecodeSSLCertificate(ctx, &sslcert, payload, paySize, flow,
                                         dpi[totalIndex[i]].dpacketCapt)) {
                 if (sslcert->issuer.tmpl == NULL) {
-                    fbSubTemplateListInit(&(sslcert->issuer), 0,
+                    fbSubTemplateListInit(&(sslcert->issuer), 3,
                                           YAF_SSL_SUBCERT_FLOW_TID,
                                           sslSubTemplate, 0);
                 }
                 if (sslcert->subject.tmpl == NULL) {
-                    fbSubTemplateListInit(&(sslcert->subject), 0,
+                    fbSubTemplateListInit(&(sslcert->subject), 3,
                                           YAF_SSL_SUBCERT_FLOW_TID,
                                           sslSubTemplate, 0);
                 }
                 if (sslcert->extension.tmpl == NULL) {
-                    fbSubTemplateListInit(&(sslcert->extension), 0,
+                    fbSubTemplateListInit(&(sslcert->extension), 3,
                                           YAF_SSL_SUBCERT_FLOW_TID,
                                           sslSubTemplate, 0);
                 }
@@ -3429,7 +3478,7 @@ void *ypProcessSSL(
         fullrec =(yfSSLFullCert_t *)fbSubTemplateMultiListEntryInit(stml,
                                                                     YAF_FULL_CERT_TID,
                                                                     sslFullCertTemplate, 1);
-        sslfull = (fbVarfield_t*)fbBasicListInit(&(fullrec->cert), 0,
+        sslfull = (fbVarfield_t*)fbBasicListInit(&(fullrec->cert), 3,
                                                  fbInfoModelGetElementByName(model,
                                                  "sslCertificate"), total_certs);
         for (i = 0; i < total_certs; i++) {
@@ -3464,7 +3513,7 @@ void *ypProcessSSL(
 
         if (!tot_bl_len) {
             fbBasicListClear(&(fullrec->cert));
-            sslfull = (fbVarfield_t*)fbBasicListInit(&(fullrec->cert), 0,
+            sslfull = (fbVarfield_t*)fbBasicListInit(&(fullrec->cert), 3,
                                          fbInfoModelGetElementByName(model,
                                          "sslCertificate"), 0);
         }
@@ -3521,7 +3570,7 @@ void *ypProcessSSH(
             if (val) {
                 char *sc = (char *)rec;
                 blist = (fbBasicList_t *)(sc + val->BLoffset);
-                sshVar = (fbVarfield_t *)fbBasicListInit(blist, 0,
+                sshVar = (fbVarfield_t *)fbBasicListInit(blist, 3,
                                                          val->infoElement,
                                                          total);
                 ypFillBasicList(flow, dpi, total, fwdcap, &sshVar, totalIndex);
@@ -3567,7 +3616,7 @@ void *ypProcessDNS(
         count++;
     }
 
-    dnsQRecord = (yfDNSQRFlow_t *)fbSubTemplateListInit(&(rec->dnsQRList), 0,
+    dnsQRecord = (yfDNSQRFlow_t *)fbSubTemplateListInit(&(rec->dnsQRList), 3,
                                                         YAF_DNSQR_FLOW_TID,
                                                         dnsQRTemplate,
                                                         recCountFwd +
@@ -3655,7 +3704,7 @@ void *ypProcessRTSP(
             if (val) {
                 char *sc = (char *)rec;
                 blist = (fbBasicList_t *)(sc + val->BLoffset);
-                rtspVar = (fbVarfield_t *)fbBasicListInit(blist, 0,
+                rtspVar = (fbVarfield_t *)fbBasicListInit(blist, 3,
                                                           val->infoElement,
                                                           total);
                 ypFillBasicList(flow, dpi, total, fwdcap,&rtspVar, totalIndex);
@@ -3699,7 +3748,7 @@ void *ypProcessMySQL(
         count++;
     }
 
-    mysql = (yfMySQLTxtFlow_t *)fbSubTemplateListInit(&(rec->mysqlList), 0,
+    mysql = (yfMySQLTxtFlow_t *)fbSubTemplateListInit(&(rec->mysqlList), 3,
                                                       YAF_MYSQLTXT_FLOW_TID,
                                                       mysqlTxtTemplate,
                                                       total);
@@ -3784,7 +3833,7 @@ void *ypProcessDNP(
                                                           YAF_DNP3_FLOW_TID,
                                                           dnp3Template, 1);
 
-    dnp = (yfDNP3Rec_t *)fbSubTemplateListInit(&(rec->dnp_list), 0,
+    dnp = (yfDNP3Rec_t *)fbSubTemplateListInit(&(rec->dnp_list), 3,
                                               YAF_DNP3_REC_FLOW_TID,
                                               dnp3RecTemplate,
                                               total);
@@ -3869,7 +3918,7 @@ void *ypProcessModbus(
                                                           YAF_MODBUS_FLOW_TID,
                                                           modbusTemplate, 1);
 
-    mbvar = (fbVarfield_t *)fbBasicListInit(&(rec->mbmsg), 0,
+    mbvar = (fbVarfield_t *)fbBasicListInit(&(rec->mbmsg), 3,
                              fbInfoModelGetElementByName(model, "modbusData"),
                                             totalcap);
 
@@ -3914,7 +3963,7 @@ void *ypProcessEnIP(
                                                           YAF_ENIP_FLOW_TID,
                                                           enipTemplate, 1);
 
-    enipvar = (fbVarfield_t *)fbBasicListInit(&(rec->enipmsg), 0,
+    enipvar = (fbVarfield_t *)fbBasicListInit(&(rec->enipmsg), 3,
                       fbInfoModelGetElementByName(model, "ethernetIPData"),
                                             totalcap);
 
@@ -4278,7 +4327,7 @@ void ypDNSParser(
         nameLen = ypGetDNSQName(buf, bufSize, payload, payloadSize,
                                 &payloadOffset, export_limit);
         if ((!header.qr || nxdomain)) {
-            fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0,
+            fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3,
                                   YAF_DNSA_FLOW_TID, dnsATemplate, 0);
             (*dnsQRecord)->dnsQName.len = nameLen;
             (*dnsQRecord)->dnsQName.buf = buf + bufSize;
@@ -4411,7 +4460,7 @@ err:
     /* something went wrong so we need to pad the rest of the STL with NULLs */
     /* Most likely we ran out of space in the DNS Export Buffer */
     while (recordCount) {
-        fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0,YAF_DNSA_FLOW_TID,
+        fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3,YAF_DNSA_FLOW_TID,
                               dnsATemplate, 0);
         recordCount--;
         if (recordCount) (*dnsQRecord)++;
@@ -4455,7 +4504,7 @@ uint16_t ypDnsScanResourceRecord(
     *offset += sizeof(uint32_t);
 
     if (*offset >= payloadSize) {
-        fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0,
+        fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3,
                               YAF_DNSA_FLOW_TID, dnsATemplate, 0);
         return rrType;
     }
@@ -4465,7 +4514,7 @@ uint16_t ypDnsScanResourceRecord(
     *offset += sizeof(uint16_t);
 
     if (*offset >= payloadSize) {
-        fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0,
+        fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3,
                               YAF_DNSA_FLOW_TID, dnsATemplate, 0);
         return rrType;
     }
@@ -4473,11 +4522,11 @@ uint16_t ypDnsScanResourceRecord(
     temp_offset = (*offset);
 
     if (rrType == 1) {
-        yfDNSAFlow_t *arecord = (yfDNSAFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0, YAF_DNSA_FLOW_TID, dnsATemplate, 1);
+        yfDNSAFlow_t *arecord = (yfDNSAFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3, YAF_DNSA_FLOW_TID, dnsATemplate, 1);
         arecord->ip = ntohl(*((uint32_t *)(payload + temp_offset)));
 
     } else if (rrType == 2) {
-        yfDNSNSFlow_t *nsrecord = (yfDNSNSFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0, YAF_DNSNS_FLOW_TID, dnsNSTemplate, 1);
+        yfDNSNSFlow_t *nsrecord = (yfDNSNSFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3, YAF_DNSNS_FLOW_TID, dnsNSTemplate, 1);
         nsrecord->nsdname.len = ypGetDNSQName(buf, bufSize, payload,
                                               payloadSize, &temp_offset,
                                               export_limit);
@@ -4485,7 +4534,7 @@ uint16_t ypDnsScanResourceRecord(
         bufSize += nsrecord->nsdname.len;
 
     } else if (rrType == 5) {
-        yfDNSCNameFlow_t *cname = (yfDNSCNameFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0, YAF_DNSCN_FLOW_TID, dnsCNTemplate, 1);
+        yfDNSCNameFlow_t *cname = (yfDNSCNameFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3, YAF_DNSCN_FLOW_TID, dnsCNTemplate, 1);
         cname->cname.len = ypGetDNSQName(buf, bufSize, payload, payloadSize,
                                          &temp_offset,
                                          export_limit);
@@ -4493,7 +4542,7 @@ uint16_t ypDnsScanResourceRecord(
         bufSize += cname->cname.len;
 
     } else if (rrType == 12) {
-        yfDNSPTRFlow_t *ptr = (yfDNSPTRFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0, YAF_DNSPTR_FLOW_TID, dnsPTRTemplate, 1);
+        yfDNSPTRFlow_t *ptr = (yfDNSPTRFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3, YAF_DNSPTR_FLOW_TID, dnsPTRTemplate, 1);
         ptr->ptrdname.len = ypGetDNSQName(buf, bufSize, payload, payloadSize,
                                           &temp_offset,
                                           export_limit);
@@ -4501,7 +4550,7 @@ uint16_t ypDnsScanResourceRecord(
         bufSize += ptr->ptrdname.len;
 
     } else if (rrType == 15) {
-        yfDNSMXFlow_t *mx = (yfDNSMXFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0, YAF_DNSMX_FLOW_TID, dnsMXTemplate, 1);
+        yfDNSMXFlow_t *mx = (yfDNSMXFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3, YAF_DNSMX_FLOW_TID, dnsMXTemplate, 1);
         mx->preference = ntohs(*((uint16_t *)(payload + temp_offset)));
         temp_offset += sizeof(uint16_t);
         if (temp_offset > payloadSize) {
@@ -4514,7 +4563,7 @@ uint16_t ypDnsScanResourceRecord(
         bufSize += mx->exchange.len;
 
     } else if (rrType == 16) {
-        yfDNSTXTFlow_t *txt = (yfDNSTXTFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0, YAF_DNSTXT_FLOW_TID, dnsTXTTemplate, 1);
+        yfDNSTXTFlow_t *txt = (yfDNSTXTFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3, YAF_DNSTXT_FLOW_TID, dnsTXTTemplate, 1);
         txt->txt_data.len = *(payload + temp_offset);
         if (txt->txt_data.len + bufSize > export_limit) {
             temp_offset += txt->txt_data.len + 1;
@@ -4527,11 +4576,11 @@ uint16_t ypDnsScanResourceRecord(
         }
 
     } else if (rrType == 28) {
-        yfDNSAAAAFlow_t *aa = (yfDNSAAAAFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0, YAF_DNSAAAA_FLOW_TID, dnsAAAATemplate, 1);
+        yfDNSAAAAFlow_t *aa = (yfDNSAAAAFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3, YAF_DNSAAAA_FLOW_TID, dnsAAAATemplate, 1);
         memcpy(aa->ip, (payload + temp_offset), sizeof(aa->ip));
 
     } else if (rrType == 6) {
-        yfDNSSOAFlow_t *soa = (yfDNSSOAFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0, YAF_DNSSOA_FLOW_TID, dnsSOATemplate, 1);
+        yfDNSSOAFlow_t *soa = (yfDNSSOAFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3, YAF_DNSSOA_FLOW_TID, dnsSOATemplate, 1);
         soa->mname.len = ypGetDNSQName(buf, bufSize, payload, payloadSize,
                                        &temp_offset, export_limit);
         soa->mname.buf = buf + bufSize;
@@ -4575,7 +4624,7 @@ uint16_t ypDnsScanResourceRecord(
         }
 
     } else if (rrType == 33) {
-        yfDNSSRVFlow_t *srv = (yfDNSSRVFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0, YAF_DNSSRV_FLOW_TID, dnsSRVTemplate, 1);
+        yfDNSSRVFlow_t *srv = (yfDNSSRVFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3, YAF_DNSSRV_FLOW_TID, dnsSRVTemplate, 1);
         srv->dnsPriority = ntohs(*((uint16_t *)(payload + temp_offset)));
         temp_offset += sizeof(uint16_t);
         if (temp_offset >= payloadSize) {
@@ -4601,11 +4650,11 @@ uint16_t ypDnsScanResourceRecord(
 
     } else if (rrType == 43) {
         if (!dnssec) {
-            fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0,
+            fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3,
                                   YAF_DNSA_FLOW_TID, dnsATemplate, 0);
         } else {
             yfDNSDSFlow_t *ds = NULL;
-            ds =(yfDNSDSFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0, YAF_DNSDS_FLOW_TID, dnsDSTemplate, 1);
+            ds =(yfDNSDSFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3, YAF_DNSDS_FLOW_TID, dnsDSTemplate, 1);
             ds->dnsKeyTag = ntohs(*((uint16_t *)(payload + temp_offset)));
             temp_offset += sizeof(uint16_t);
             if (temp_offset >= payloadSize) {
@@ -4633,11 +4682,11 @@ uint16_t ypDnsScanResourceRecord(
         }
     } else if (rrType == 46) {
         if (!dnssec) {
-            fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0,
+            fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3,
                                   YAF_DNSA_FLOW_TID, dnsATemplate, 0);
         } else {
             yfDNSRRSigFlow_t *rrsig = NULL;
-            rrsig = (yfDNSRRSigFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0, YAF_DNSRRSIG_FLOW_TID, dnsRRSigTemplate, 1);
+            rrsig = (yfDNSRRSigFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3, YAF_DNSRRSIG_FLOW_TID, dnsRRSigTemplate, 1);
 
             rrsig->dnsTypeCovered = ntohs(*((uint16_t *)(payload +
                                                          temp_offset)));
@@ -4702,11 +4751,12 @@ uint16_t ypDnsScanResourceRecord(
     } else if (rrType == 47) {
         /* NSEC */
         if (!dnssec) {
-            fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0,
+            fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3,
                                   YAF_DNSA_FLOW_TID, dnsATemplate, 0);
         } else {
             yfDNSNSECFlow_t *nsec = NULL;
-            nsec = (yfDNSNSECFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0, YAF_DNSNSEC_FLOW_TID, dnsNSECTemplate, 1);
+            nsec = (yfDNSNSECFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList),
+                                                            3, YAF_DNSNSEC_FLOW_TID, dnsNSECTemplate, 1);
             nsec->dnsHashData.len = ypGetDNSQName(buf, bufSize, payload,
                                                   payloadSize, &temp_offset,
                                                   export_limit);
@@ -4722,7 +4772,8 @@ uint16_t ypDnsScanResourceRecord(
                                   YAF_DNSA_FLOW_TID, dnsATemplate, 0);
         } else {
             yfDNSKeyFlow_t *dnskey = NULL;
-            dnskey = (yfDNSKeyFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0, YAF_DNSKEY_FLOW_TID, dnsKeyTemplate, 1);
+            dnskey = (yfDNSKeyFlow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList),
+                                                             3, YAF_DNSKEY_FLOW_TID, dnsKeyTemplate, 1);
             dnskey->dnsFlags = ntohs(*((uint16_t *)(payload + temp_offset)));
             temp_offset += sizeof(uint16_t);
 
@@ -4752,7 +4803,8 @@ uint16_t ypDnsScanResourceRecord(
         } else {
             uint16_t off_hold = temp_offset;
             yfDNSNSEC3Flow_t *nsec3 = NULL;
-            nsec3 = (yfDNSNSEC3Flow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0, YAF_DNSNSEC3_FLOW_TID, dnsNSEC3Template, 1);
+            nsec3 = (yfDNSNSEC3Flow_t *)fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList),
+                                                              3, YAF_DNSNSEC3_FLOW_TID, dnsNSEC3Template, 1);
             nsec3->dnsAlgorithm = *(payload + temp_offset);
 
             /* skip over flags */
@@ -4792,7 +4844,7 @@ uint16_t ypDnsScanResourceRecord(
             }
         }
     } else {
-        fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 0,
+        fbSubTemplateListInit(&((*dnsQRecord)->dnsRRList), 3,
                               YAF_DNSA_FLOW_TID, dnsATemplate, 0);
     }
 
@@ -5059,7 +5111,7 @@ gboolean ypDecodeSSLCertificate(
     }
 
     sslObject = (yfSSLObjValue_t *)fbSubTemplateListInit(&((*sslCert)->issuer),
-                                                         0,
+                                                         3,
                                                       YAF_SSL_SUBCERT_FLOW_TID,
                                                          sslSubTemplate,
                                                          seq_count);
@@ -5157,7 +5209,7 @@ gboolean ypDecodeSSLCertificate(
         return FALSE;
     }
 
-    sslObject = (yfSSLObjValue_t *)fbSubTemplateListInit(&((*sslCert)->subject), 0,
+    sslObject = (yfSSLObjValue_t *)fbSubTemplateListInit(&((*sslCert)->subject), 3,
                                                          YAF_SSL_SUBCERT_FLOW_TID,
                                                          sslSubTemplate,
                                                          seq_count);
@@ -5259,7 +5311,7 @@ gboolean ypDecodeSSLCertificate(
     if ((tlv.class != 2) || ((*sslCert)->version != 2)) {
         /* no extensions */
         ext_hold = offsetptr;
-        fbSubTemplateListInit(&((*sslCert)->extension), 0,
+        fbSubTemplateListInit(&((*sslCert)->extension), 3,
                               YAF_SSL_SUBCERT_FLOW_TID, sslSubTemplate, 0);
     } else {
         uint16_t ext_len;
@@ -5279,7 +5331,7 @@ gboolean ypDecodeSSLCertificate(
         /* extensions */
         sslObject =
             (yfSSLObjValue_t *)fbSubTemplateListInit(&((*sslCert)->extension),
-                                                     0,
+                                                     3,
                                                      YAF_SSL_SUBCERT_FLOW_TID,
                                                      sslSubTemplate,
                                                      seq_count);

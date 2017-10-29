@@ -229,8 +229,14 @@
 /* Define to 1 to enable plugin support */
 #undef YAF_ENABLE_HOOKS
 
+/* Define to 1 to enable yaf metadata export */
+#undef YAF_ENABLE_METADATA_EXPORT
+
 /* Define to 1 to enable Napatech support */
 #undef YAF_ENABLE_NAPATECH
+
+/* Define to 1 to enable ndpi */
+#undef YAF_ENABLE_NDPI
 
 /* Define to 1 to enable Netronome support */
 #undef YAF_ENABLE_NETRONOME

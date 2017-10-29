@@ -5,7 +5,7 @@
  ** the IETF standard RFC 5102 information elements
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2009-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2009-2017 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell, Chris Inacio, Emily Ecoff <ecoff@cert.org>
  ** <netsa-help@cert.org>
@@ -124,6 +124,11 @@ static fbInfoElement_t yaf_info_elements[] = {
                     FB_IE_F_ENDIAN | FB_IE_IDENTIFIER, 0, 0, FB_UINT_8, NULL),
     FB_IE_INIT_FULL("mptcpFlags", CERT_PEN, 293, 1,
                     FB_IE_F_ENDIAN | FB_IE_FLAGS, 0, 0, FB_UINT_8, NULL),
+    FB_IE_INIT_FULL("nDPIL7Protocol", CERT_PEN, 300, 2,
+                    FB_IE_F_ENDIAN | FB_IE_IDENTIFIER, 0, 0, FB_UINT_16, NULL),
+    FB_IE_INIT_FULL("nDPIL7SubProtocol", CERT_PEN, 301, 2,
+                    FB_IE_F_ENDIAN | FB_IE_IDENTIFIER, 0, 0, FB_UINT_16, NULL),
+
     /* flow stats */
     FB_IE_INIT_FULL("smallPacketCount", CERT_PEN, 500, 4,
                     ER | FB_IE_TOTALCOUNTER | FB_UNITS_PACKETS, 0, 0,

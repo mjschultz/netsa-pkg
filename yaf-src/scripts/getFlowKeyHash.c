@@ -670,7 +670,11 @@ main (int argc, char *argv[]) {
         flow.vlan = atoi(vlan);
     }
 
-    key_hash = flowKeyHash(&flow, reverse);
+    if (ipfix) {
+        key_hash = flowKeyHash(&flow, FALSE);
+    } else {
+        key_hash = flowKeyHash(&flow, reverse);
+    }
 
     if (date && user_time) {
         split = g_strsplit(date, "-", -1);
@@ -740,6 +744,9 @@ main (int argc, char *argv[]) {
             oflow.sms = (epoch_ms * 1000) + ms;
             oflow.hash = key_hash;
             oflow.pkt = 0;
+            if (reverse) {
+                oflow.rhash = flowKeyHash(&flow, TRUE);
+            }
 
             if (!fBufAppend(buf, (uint8_t *)&oflow, sizeof(oflow), &err)) {
                 fprintf(stderr, "Error appending buffer: %s\n", err->message);
@@ -786,6 +793,9 @@ main (int argc, char *argv[]) {
             oflow.sms = 0;
             oflow.hash = key_hash;
             oflow.pkt = 0;
+            if (reverse) {
+                oflow.rhash = flowKeyHash(&flow, TRUE);
+            }
 
             if (!fBufAppend(buf, (uint8_t *)&oflow, sizeof(oflow), &err)) {
                 fprintf(stderr, "Error appending buffer: %s\n", err->message);

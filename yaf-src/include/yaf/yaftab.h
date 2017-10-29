@@ -201,6 +201,13 @@ typedef struct yfFlowTab_st yfFlowTab_t;
  *                       on flows.
  * @param index_pcap     If TRUE, print one line per packet we export. This
  *                       will give offset and length into the pcap yaf writes.
+ * @param no_vlan_in_key If TRUE, this will remove the vlan in the calculation
+ *                       of the flow key hash.
+ * @param ndpi           If TRUE, enable nDPI application labeling with
+ *                       standard protocols.
+ * @param ndpi_proto_file If not NULL, and ndpi is TRUE, use the provided
+ *                       protocol file to expand the sub-protocols list
+ *                       and port-based detection methods.
  * @param hash           The flow key hash to create a PCAP for.
  * @param stime          The start time to create a PCAP for.
  * @param hfctx          The plugin hooks context variable (NULL if plugins not enabled)
@@ -228,6 +235,9 @@ yfFlowTab_t *yfFlowTabAlloc(
     gboolean        force_read_all,
     gboolean        stats_mode,
     gboolean        index_pcap,
+    gboolean        no_vlan_in_key,
+    gboolean        ndpi,
+    char            *ndpi_proto_file,
     char            *hash,
     char            *stime,
     void            **hfctx);
@@ -253,7 +263,7 @@ void yfFlowTabFree(
 
 void yfUpdateRollingPcapFile(
     yfFlowTab_t                *flowtab,
-    GString                    *new_file_name);
+    char                       *new_file_name);
 
 /**
  * yfGetFlowTabStats

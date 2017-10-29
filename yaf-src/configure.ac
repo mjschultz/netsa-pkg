@@ -13,9 +13,9 @@ dnl ------------------------------------------------------------------------
 
 dnl RCSIDENT("$Id$")
 
-AC_INIT([yaf], [2.8.4], [netsa-help@cert.org],[yaf])
+AC_INIT([yaf], [2.9.0], [netsa-help@cert.org],[yaf])
 AC_CONFIG_AUX_DIR([autoconf])
-AC_COPYRIGHT([Copyright (C) 2006-2016 by Carnegie Mellon University
+AC_COPYRIGHT([Copyright (C) 2006-2017 by Carnegie Mellon University
 GNU Public License (GPL) Rights pursuant to Version 2, June 1991
 Government Purpose License Rights (GPLR) pursuant to DFARS 252.227-7013])
 AC_CANONICAL_BUILD
@@ -278,6 +278,19 @@ AC_MSG_NOTICE([libfixbuf version: $yfpkg_ver])
 AC_MSG_NOTICE([Using libfixbuf installed in: $fixbuf_install_loc])
 AC_DEFINE_UNQUOTED([FIXBUF_VERSION], ["$yfpkg_ver"], [fixbuf version])
 
+
+AC_ARG_ENABLE(ndpi,
+	AS_HELP_STRING([--enable-ndpi], [Enable NDPI application labeling]),[
+	PKG_CHECK_MODULES(libndpi, [libndpi >= 1.7.0],
+	[
+	YF_PKGCONFIG_VERSION(libndpi)
+	YF_PKGCONFIG_LPATH(libndpi)
+	ndpi=true
+        AC_DEFINE(YAF_ENABLE_NDPI, 1, [Define to 1 to enable ndpi])
+	],
+	[
+	AC_MSG_ERROR([Cannot find a suitable libndpi (>= 1.7.0) (Try setting PKG_CONFIG_PATH): $libndpi_PKG_ERRORS])
+])])
 
 dnl ----------------------------------------------------------------------
 dnl Check for libpcap
@@ -902,6 +915,46 @@ AC_ARG_ENABLE(nonip,
     ]
 )
 AM_CONDITIONAL([NONIPENABLE], [test x$nonip = xtrue])
+
+dnl ----------------------------------------------------------------------
+dnl check for disabling export of type information via (RFC 5610) and
+dnl template metadata information
+dnl ----------------------------------------------------------------------
+AC_MSG_NOTICE($yfpkg_ver)
+AX_COMPARE_VERSION($yfpkg_ver, [ge], [1.8.0],
+[
+    AC_ARG_ENABLE(type-export,
+        AC_HELP_STRING([--disable-type-export], [disable exporting of options records for enterprise-specific information elements]),
+        [
+            if test "x$enableval" = "xno"; then
+                AC_DEFINE(YAF_ENABLE_METADATA_EXPORT, 0, [Define to 1 to enable yaf metadata export])
+                type_export=false
+                RPM_CONFIG_FLAGS="${RPM_CONFIG_FLAGS} --disable-type-export"
+                AC_MSG_NOTICE([type export is disabled])
+                OPTION_CONFIG_STRING=${OPTION_CONFIG_STRING}"no type export|"
+            else
+                AC_MSG_NOTICE([type export is not disabled])
+                type_export=true
+                AC_DEFINE(YAF_ENABLE_METADATA_EXPORT, 1, [Define to 1 to enable yaf metadata export])
+                OPTION_CONFIG_STRING=${OPTION_CONFIG_STRING}"type export|"
+            fi
+        ],
+        [
+            AC_DEFINE(YAF_ENABLE_METADATA_EXPORT, 1, [Define to 1 to enable yaf metadata export])
+            AC_MSG_NOTICE([Metadata export is enabled by default])
+            type_export=true
+            OPTION_CONFIG_STRING=${OPTION_CONFIG_STRING}"type export|"
+        ]
+    )
+],[
+    AC_DEFINE(YAF_ENABLE_METADATA_EXPORT, 0, [Define to 1 to enable yaf metadata export])
+    AC_MSG_NOTICE([Metadata export is disabled due to lack of fixbuf >= 1.8.0])
+    type_export=false
+    OPTION_CONFIG_STRING=${OPTION_CONFIG_STRING}"type export|"
+])
+
+
+
 
 dnl ----------------------------------------------------------------------
 dnl Check for Spread Support
