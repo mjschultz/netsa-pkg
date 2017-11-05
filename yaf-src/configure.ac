@@ -13,7 +13,7 @@ dnl ------------------------------------------------------------------------
 
 dnl RCSIDENT("$Id$")
 
-AC_INIT([yaf], [2.9.0], [netsa-help@cert.org],[yaf])
+AC_INIT([yaf], [2.9.1], [netsa-help@cert.org],[yaf])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_COPYRIGHT([Copyright (C) 2006-2017 by Carnegie Mellon University
 GNU Public License (GPL) Rights pursuant to Version 2, June 1991

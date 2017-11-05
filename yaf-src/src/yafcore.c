@@ -1679,12 +1679,12 @@ static gboolean yfSetExportTemplate(
         return FALSE;
     }
 
-     printf("yfSetExportTemplate: %x, %s\n", tid, template_name->str);
+    // printf("yfSetExportTemplate: %x, %s\n", tid, template_name->str);
 #if YAF_ENABLE_METADATA_EXPORT
     if (!fbSessionAddTemplateWithMetadata(session, FALSE, tid, tmpl,
                                           template_name->str, NULL, err))
     {
-        printf("error setting template metadata\n");
+        g_error("error setting template metadata\n");
         return FALSE;
     }
 #else

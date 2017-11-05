@@ -39,12 +39,12 @@ uint16_t ntpplugin_LTX_ycNTP (
     if (flow->key.proto == YF_PROTO_TCP) // must be UDP
         return 0;
 
-    g_debug("NTP: payload size: 0x%x",payloadSize);
+    //g_debug("NTP: payload size: 0x%x",payloadSize);
     if (payload == NULL || payloadSize < 48) //minimum NTP size = 48 bytes
         return 0;
    
     uint8_t ntp_version = (payload[0] & (uint8_t)0x38) >> 3;
-    g_debug("NTP version %d",ntp_version);
+    //g_debug("NTP version %d",ntp_version);
     if (ntp_version == 0 || ntp_version > 4) //NTP is at version 4
     	return 0;
 
@@ -68,10 +68,10 @@ uint16_t ntpplugin_LTX_ycNTP (
         {
             // we have extension fields
             extension_field_len = ((uint16_t)payload[consumed+2])>>8 | payload[consumed+3]; //byte order flipping, ugly
-            g_debug("Extension field length: 0x%x starting at 0x%x",extension_field_len,consumed);
+            //g_debug("Extension field length: 0x%x starting at 0x%x",extension_field_len,consumed);
             if (extension_field_len < 16 || extension_field_len % 4 != 0 || ((extension_field_len + consumed) > (payloadSize-20)))
             {
-                g_debug("Invalid extension field length.");
+                //g_debug("Invalid extension field length.");
                 return 0;
             }
             consumed += extension_field_len;
@@ -84,7 +84,7 @@ uint16_t ntpplugin_LTX_ycNTP (
             return 1;
         }
         else
-            g_debug("Not enough space for key and MAC (0x%x bytes), invalid NTP.",payloadSize-consumed);
+            ;//g_debug("Not enough space for key and MAC (0x%x bytes), invalid NTP.",payloadSize-consumed);
     }
     return 0;
 }
