@@ -67,7 +67,6 @@
 #include <pthread.h>
 #endif
 
-#ident "$Id$"
 
 /**
  * @file
@@ -176,6 +175,30 @@ typedef struct fbUDPConnSpec_st {
 } fbUDPConnSpec_t;
 
 
+/* Template metadata template */
+static fbInfoElementSpec_t template_metadata_spec[] = {
+    /* {"templateInformationElementList",         0, 0 }, */
+    {"templateName",                           0, 0 },
+    {"templateDescription",                    0, 0 },
+    {"templateId",                             0, 0 },
+    FB_IESPEC_NULL
+};
+
+/**
+ * Template metadata options record structure
+ *
+ */
+typedef struct fbTemplateOptRec_st {
+    /** List of PEN, IE num pairs */
+    /* fbSubTemplateList_t info_element_list; */
+    /** Template name */
+    fbVarfield_t   template_name;
+    /** Template description (optional) */
+    fbVarfield_t   template_description;
+    /** Template ID */
+    uint16_t       template_id;
+} fbTemplateOptRec_t;
+
 /**
  * An IPFIX template or options template structure. Part of the private
  * interface. Applications should use the fbTemplate calls defined in public.h
@@ -221,6 +244,8 @@ struct fbTemplate_st {
     uint16_t            *off_cache;
     /** TRUE if this template has been activated (is no longer mutable) */
     gboolean            active;
+
+    fbTemplateOptRec_t  *metadata_rec;
     /**
      * Template context. Created and owned by the application
      * when the listener calls the fbTemplateCtxCallback_fn.
@@ -296,6 +321,20 @@ void         fBufSetSession(
     fBuf_t          *fbuf,
     fbSession_t     *session);
 
+/**
+ * fBufGetExportTemplate
+ *
+ */
+uint16_t        fBufGetExportTemplate(
+    fBuf_t          *fbuf);
+
+
+/**
+ * fBufGetInternalTemplate
+ *
+ */
+uint16_t       fBufGetInternalTemplate(
+    fBuf_t         *fbuf);
 
 /**
  * fbInfoElementHash

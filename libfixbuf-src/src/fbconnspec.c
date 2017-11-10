@@ -58,7 +58,6 @@
 #define _FIXBUF_SOURCE_
 #include <fixbuf/private.h>
 
-#ident "$Id$"
 
 
 #define HAVE_GETADDRINFO 1

@@ -59,7 +59,6 @@
 #define _FIXBUF_SOURCE_
 #include <fixbuf/private.h>
 
-#ident "$Id$"
 
 
 void fbTemplateDebug(
@@ -139,6 +138,15 @@ void                fbTemplateFree(
     }
     g_free(tmpl->ie_ary);
 
+    if (tmpl->metadata_rec && tmpl->metadata_rec->template_name.buf)
+    {
+        g_free(tmpl->metadata_rec->template_name.buf);
+    }
+
+    if (tmpl->metadata_rec)
+    {
+        g_slice_free(fbTemplateOptRec_t, tmpl->metadata_rec);
+    }
     /* destroy offset cache if present */
     if (tmpl->off_cache) g_free(tmpl->off_cache);
     /* destroy template */

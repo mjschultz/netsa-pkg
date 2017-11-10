@@ -72,7 +72,6 @@
 
 #include <pthread.h>
 
-#ident "$Id$"
 
 #ifndef FB_NETFLOW_DEBUG
 #   define FB_NETFLOW_DEBUG 0
@@ -541,7 +540,7 @@ static gboolean    fbCollectorMessageHeaderV9 (
     if (b_len < 20) {
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_NETFLOWV9,
                     "Invalid NetFlow V9 Header. Buffer Length too short. "
-                    "Length: %d", (unsigned int)b_len);
+                    "Length: %u", (unsigned int)b_len);
         return FALSE;
     }
 
@@ -614,7 +613,9 @@ static int netflowDataTemplateParse (
     unsigned int    loop;
     uint16_t        temp;
     int             tmplcount = 0;
+#ifdef FB_MAP_POST_TO_REVERSE
     uint8_t         addReversePenFix = 0;
+#endif
     gboolean        addSysUpTime = FALSE;
     gpointer        hashResult = NULL;
     struct fbCollectorNetflowV9State_st     *transState =
@@ -690,6 +691,14 @@ static int netflowDataTemplateParse (
                 }
             }
 
+#ifdef FB_MAP_POST_TO_REVERSE
+            /*
+             * The code inside the #ifdef FB_MAP_POST_TO_REVERSE
+             * blocks in this function maps post*DeltaCount values to
+             * reverse*DeltaCount values.  The code was written when
+             * NetFlow v9 support was initially added to fixbuf.
+             */
+
             /*
               because the IPFIX standard info model is broken, RFC 5102, we
               have to convert certain info model elements from their NetFlow
@@ -707,6 +716,7 @@ static int netflowDataTemplateParse (
                 WRITEU16(bufPtr, (IPFIX_ENTERPRISE_BIT | 2));
                 addReversePenFix = 1;
             }
+#endif  /* FB_MAP_POST_TO_REVERSE */
 
             if ((21 == temp) || (22 == temp)) {
                 /* need at add element 160 for sysuptime */
@@ -722,9 +732,9 @@ static int netflowDataTemplateParse (
             targetRecSize += temp;
             lengthParsed += sizeof(uint16_t);
 
+#ifdef FB_MAP_POST_TO_REVERSE
             /* if we're supposed to add the reverse PEN for a NetFlow V9 ->
-               IPFIX info model fix, do it now */
-
+               IPFIX info model change, do it now */
             if (0 != addReversePenFix) {
                 addReversePenFix = 0;
                 if (FB_MSGLEN_MAX <= (*msgLen + sizeof(uint32_t))) {
@@ -754,7 +764,7 @@ static int netflowDataTemplateParse (
                 /* also increase the msglen, to note the change */
                 *msgLen += sizeof(uint32_t);
             }
-
+#endif  /* FB_MAP_POST_TO_REVERSE */
         }
 
         /* add the SysUpTime field (IPFIX element 160) to the template */
@@ -1386,7 +1396,7 @@ static gboolean     fbCollectorPostProcV9(
     /* fixup the length value (from record count)*/
     *lengthCountPtr = g_htons(msgOsetPtr - dataBuf);
 
-    if ((msgOsetPtr - dataBuf) < *bufLen) {
+    if ((msgOsetPtr - dataBuf) < (long)*bufLen) {
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_NETFLOWV9,
                     "NetFlow Record Length Mismatch: (buffer has "
                     "%u, processed %u)", (unsigned int)(*bufLen),

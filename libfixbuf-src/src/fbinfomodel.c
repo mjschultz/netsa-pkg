@@ -59,7 +59,8 @@
 #define _FIXBUF_SOURCE_
 #include <fixbuf/private.h>
 
-#ident "$Id$"
+
+#define CERT_PEN 6871
 
 struct fbInfoModel_st {
     GHashTable          *ie_table;
@@ -1191,22 +1192,30 @@ static fbInfoElement_t defaults[] = {
                     FB_IE_F_ENDIAN | FB_IE_IDENTIFIER, 0, 0, FB_UINT_8, NULL),
     FB_IE_INIT_FULL("ciscoNetflowGeneric", 0, FB_CISCO_GENERIC, 8,
                     FB_IE_F_ENDIAN, 0, 0, FB_UINT_64, NULL),
+
+    /* IEs in the CERT_PEN space */
+
+    FB_IE_INIT_FULL("templateName", CERT_PEN, 1000, FB_IE_VARLEN,
+                    FB_IE_F_NONE, 0, 0, FB_STRING, NULL),
+    FB_IE_INIT_FULL("templateDescription", CERT_PEN, 1001, FB_IE_VARLEN,
+                    FB_IE_F_NONE, 0, 0, FB_STRING, NULL),
     FB_IE_NULL
 };
 
 static fbInfoElementSpec_t ie_type_spec[] = {
-    {"informationElementRangeBegin",    0, 0 },
-    {"informationElementRangeEnd",      0, 0 },
     {"privateEnterpriseNumber",         0, 0 },
-    {"informationElementUnits",         0, 0 },
     {"informationElementId",            0, 0 },
     {"informationElementDataType",      0, 0 },
     {"informationElementSemantics",     0, 0 },
+    {"informationElementUnits",         0, 0 },
     {"paddingOctets",                   6, 1 },
+    {"informationElementRangeBegin",    0, 0 },
+    {"informationElementRangeEnd",      0, 0 },
     {"informationElementName",          0, 0 },
     {"informationElementDescription",   0, 0 },
     FB_IESPEC_NULL
 };
+
 
 uint32_t            fbInfoElementHash(
     fbInfoElement_t     *ie)
@@ -1488,7 +1497,7 @@ fbTemplate_t *fbInfoElementAllocTypeTemplate(
     if (!fbTemplateAppendSpecArray(tmpl, ie_type_spec, 0xffffffff, err))
         return NULL;
 
-    fbTemplateSetOptionsScope(tmpl, 1);
+    fbTemplateSetOptionsScope(tmpl, 2);
 
     return tmpl;
 
@@ -1604,6 +1613,7 @@ gboolean fbInfoElementAddOptRecElement(
             break;
           case FB_IP6_ADDR:
             ie.len = 16;
+            break;
           default:
             g_warning("Adding element %s with invalid data type [%d]", name,
                       rec->ie_type);

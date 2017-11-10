@@ -13,4 +13,5 @@
 
 nobase_include_HEADERS = fixbuf/autoinc.h   \
                          fixbuf/public.h    \
-                         fixbuf/private.h
+                         fixbuf/private.h   \
+                         fixbuf/version.h

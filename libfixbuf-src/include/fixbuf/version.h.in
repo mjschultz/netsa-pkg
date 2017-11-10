@@ -1,0 +1,14 @@
+/* version.h
+ *
+ * This is a generated file.  Please modify 'configure.ac'
+ */
+
+#ifndef __FB_VERSION_H__
+#define __FB_VERSION_H__
+
+#define FIXBUF_VERSION_MAJOR @PACKAGE_VERSION_MAJOR@
+#define FIXBUF_VERSION_MINOR @PACKAGE_VERSION_MINOR@
+#define FIXBUF_VERSION_RELEASE @PACKAGE_VERSION_RELEASE@
+#define FIXBUF_VERSION_BUILD @PACKAGE_VERSION_BUILD@
+
+#endif /* __FB_VERSION_H__ */

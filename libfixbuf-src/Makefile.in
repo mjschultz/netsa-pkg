@@ -125,8 +125,10 @@ am__aclocal_m4_deps =  \
 	$(top_srcdir)/m4/ax_prog_doxygen.m4 $(top_srcdir)/m4/debug.m4 \
 	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
 	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
-	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/m4/pkg.m4 \
-	$(top_srcdir)/m4/spread.m4 $(top_srcdir)/configure.ac
+	$(top_srcdir)/m4/lt~obsolete.m4 \
+	$(top_srcdir)/m4/package_version_split.m4 \
+	$(top_srcdir)/m4/pkg.m4 $(top_srcdir)/m4/spread.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(top_srcdir)/configure \
@@ -135,7 +137,8 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/include/fixbuf/config.h
-CONFIG_CLEAN_FILES = libfixbuf.pc libfixbuf.spec Doxyfile
+CONFIG_CLEAN_FILES = include/fixbuf/version.h libfixbuf.pc \
+	libfixbuf.spec Doxyfile
 CONFIG_CLEAN_VPATH_FILES =
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -230,7 +233,8 @@ am__DIST_COMMON = $(srcdir)/Doxyfile.in $(srcdir)/Makefile.in \
 	$(top_srcdir)/autoconf/install-sh \
 	$(top_srcdir)/autoconf/ltmain.sh \
 	$(top_srcdir)/autoconf/missing \
-	$(top_srcdir)/include/fixbuf/config.h.in AUTHORS COPYING \
+	$(top_srcdir)/include/fixbuf/config.h.in \
+	$(top_srcdir)/include/fixbuf/version.h.in AUTHORS COPYING \
 	INSTALL NEWS README autoconf/compile autoconf/config.guess \
 	autoconf/config.sub autoconf/depcomp autoconf/install-sh \
 	autoconf/ltmain.sh autoconf/missing
@@ -356,6 +360,7 @@ LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MKDIR_P = @MKDIR_P@
@@ -372,6 +377,10 @@ PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
+PACKAGE_VERSION_BUILD = @PACKAGE_VERSION_BUILD@
+PACKAGE_VERSION_MAJOR = @PACKAGE_VERSION_MAJOR@
+PACKAGE_VERSION_MINOR = @PACKAGE_VERSION_MINOR@
+PACKAGE_VERSION_RELEASE = @PACKAGE_VERSION_RELEASE@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PKG_CONFIG = @PKG_CONFIG@
 RANLIB = @RANLIB@
@@ -430,6 +439,7 @@ pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
+runstatedir = @runstatedir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
@@ -529,6 +539,8 @@ $(top_srcdir)/include/fixbuf/config.h.in:  $(am__configure_deps)
 
 distclean-hdr:
 	-rm -f include/fixbuf/config.h include/fixbuf/stamp-h1
+include/fixbuf/version.h: $(top_builddir)/config.status $(top_srcdir)/include/fixbuf/version.h.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
 libfixbuf.pc: $(top_builddir)/config.status $(srcdir)/libfixbuf.pc.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 libfixbuf.spec: $(top_builddir)/config.status $(srcdir)/libfixbuf.spec.in
