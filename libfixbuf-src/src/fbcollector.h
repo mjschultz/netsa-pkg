@@ -66,7 +66,6 @@
 #define _FIXBUF_SOURCE_
 #include <fixbuf/public.h>
 
-#ident "$Id$"
 
 /* 30 mins in seconds */
 #define FB_UDP_TIMEOUT 1800

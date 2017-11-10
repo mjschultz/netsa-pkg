@@ -64,7 +64,6 @@
 /*#define _GNU_SOURCE*/
 #include <fixbuf/private.h>
 
-#ident "$Id$"
 
 /**
  * If set in exporter SCTP mode, use simple automatic stream selection as
@@ -1126,7 +1125,6 @@ static void * fbExporterSpreadReceiver(
         /** Send Relevant Templates to New Member only. */
         /** memb_info.changed_member is private group name */
         /** sender is group they are subscribing to */
-
         fbSessionSetPrivateGroup(spread->session,
                                  sender, memb_info.changed_member);
 
@@ -1229,13 +1227,13 @@ static gboolean fbExporterSpreadWrite(
 
     spread = exporter->spec.spread;
 
-    if (spread->num_groups == 1) {
-        ret = SP_multicast(spread->mbox, RELIABLE_MESS,
-                           spread->groups[0].name,
-                           0, msglen, (const char *)msgbase);
-    } else if (spread->num_groups_to_send == 1) {
+    if (spread->num_groups_to_send == 1) {
         ret = SP_multicast(spread->mbox, RELIABLE_MESS,
                            spread->groups_to_send[0].name,
+                           0, msglen, (const char *)msgbase);
+    } else if (spread->num_groups == 1) {
+        ret = SP_multicast(spread->mbox, RELIABLE_MESS,
+                           spread->groups[0].name,
                            0, msglen, (const char *)msgbase);
     } else if (spread->num_groups_to_send > 1) {
         ret = SP_multigroup_multicast(spread->mbox, RELIABLE_MESS,

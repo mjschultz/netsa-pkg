@@ -61,7 +61,6 @@
 #define _FIXBUF_SOURCE_
 #include <fixbuf/private.h>
 
-#ident "$Id$"
 
 #define FB_MTU_MIN              32
 #define FB_TCPLAN_NULL          -1
@@ -1468,10 +1467,16 @@ static gboolean fbEncodeBasicList(
                 }
             }
         } else {
-            /* fixed length info element, just copy the data we already
-            know there's enough room for it */
-            memcpy(*dst, basicList->dataPtr, dataLength);
-            (*dst) += dataLength;
+            uint32_t    ieFlags = basicList->infoElement->flags;
+            thisItem = basicList->dataPtr;
+            for (i = 0; i < basicList->numElements; i++) {
+                if (!fbEncodeFixed(thisItem, dst, d_rem, ie_len, ie_len,
+                                   ieFlags, err)) {
+                    goto err;
+                }
+
+                thisItem += ie_len;
+            }
         }
     }
 
@@ -1664,13 +1669,25 @@ static gboolean fbDecodeBasicList(
     } else {
         if (srcLen) {
             /* fixed length field, allocate if needed, then copy */
+            uint32_t    ieFlags = basicList->infoElement->flags;
+            uint32_t    dRem    = (uint32_t)srcLen;
+
             basicList->numElements = srcLen / elementLen;
             if (!basicList->dataPtr) {
                 basicList->dataLength = srcLen;
                 basicList->dataPtr = g_slice_alloc0(basicList->dataLength);
             }
 
-            memcpy(basicList->dataPtr, src, srcLen);
+            thisItem = basicList->dataPtr;
+
+            for (i = 0; i < basicList->numElements; i++) {
+                if (!fbDecodeFixed(src, &thisItem, &dRem, elementLen,
+                                   elementLen, ieFlags, err)) {
+                    return FALSE;
+                }
+
+                src += elementLen;
+            }
         }
     }
 
@@ -2639,6 +2656,17 @@ void            fBufRewind(
 }
 
 
+
+uint16_t        fBufGetInternalTemplate(
+    fBuf_t          *fbuf)
+
+{
+
+    return fbuf->int_tid;
+}
+
+
+
 /**
  * fBufSetInternalTemplate
  *
@@ -2652,6 +2680,7 @@ gboolean        fBufSetInternalTemplate(
     uint16_t        int_tid,
     GError          **err)
 {
+
     /* Look up new internal template if necessary */
     if (!fbuf->int_tmpl || fbuf->int_tid != int_tid ||
         fbSessionIntTmplTableFlagIsSet(fbuf->session))
@@ -2943,6 +2972,17 @@ void       fBufSetExportGroups(
 }
 
 #endif
+
+
+uint16_t        fBufGetExportTemplate(
+    fBuf_t          *fbuf)
+
+{
+
+    return fbuf->ext_tid;
+}
+
+
 /**
  * fBufSetExportTemplate
  *
@@ -2956,6 +2996,7 @@ gboolean        fBufSetExportTemplate(
     uint16_t        ext_tid,
     GError          **err)
 {
+
     /* Look up new external template if necessary */
     if (!fbuf->ext_tmpl || fbuf->ext_tid != ext_tid ||
         fbSessionExtTmplTableFlagIsSet(fbuf->session))
@@ -3228,6 +3269,8 @@ gboolean        fBufAppendTemplate(
     gboolean        revoked,
     GError          **err)
 {
+
+    /* printf("fBufAppendTemplate: %x\n", tmpl_id); */
     /* Attempt single append */
     if (fBufAppendTemplateSingle(fbuf, tmpl_id, tmpl, revoked, err)) {
         return TRUE;

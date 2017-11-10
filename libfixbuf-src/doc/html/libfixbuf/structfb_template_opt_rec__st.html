@@ -51,59 +51,49 @@
   <div class="summary">
 <a href="#pub-attribs">Data Fields</a>  </div>
   <div class="headertitle">
-<div class="title">fbVarfield_st Struct Reference</div>  </div>
+<div class="title">fbTemplateOptRec_st Struct Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
 
-<p>A variable-length field value.  
- <a href="structfb_varfield__st.html#details">More...</a></p>
+<p>Template metadata options record structure.  
+ <a href="structfb_template_opt_rec__st.html#details">More...</a></p>
 
-<p><code>#include &lt;<a class="el" href="public_8h_source.html">public.h</a>&gt;</code></p>
+<p><code>#include &lt;<a class="el" href="private_8h_source.html">private.h</a>&gt;</code></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Data Fields</h2></td></tr>
-<tr class="memitem:ac1838178ee38c5a077a025e2aceb2761"><td class="memItemLeft" align="right" valign="top">size_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_varfield__st.html#ac1838178ee38c5a077a025e2aceb2761">len</a></td></tr>
-<tr class="memdesc:ac1838178ee38c5a077a025e2aceb2761"><td class="mdescLeft">&#160;</td><td class="mdescRight">Length of content in buffer.  <a href="#ac1838178ee38c5a077a025e2aceb2761">More...</a><br /></td></tr>
-<tr class="separator:ac1838178ee38c5a077a025e2aceb2761"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a926bfc31164a8b92c4566d1f7659c25c"><td class="memItemLeft" align="right" valign="top">uint8_t *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_varfield__st.html#a926bfc31164a8b92c4566d1f7659c25c">buf</a></td></tr>
-<tr class="memdesc:a926bfc31164a8b92c4566d1f7659c25c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Content buffer.  <a href="#a926bfc31164a8b92c4566d1f7659c25c">More...</a><br /></td></tr>
-<tr class="separator:a926bfc31164a8b92c4566d1f7659c25c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae50f9f7299aab9d64a67e6376867851c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="public_8h.html#ae4c56b8891012ac69488b0a9558aaf9e">fbVarfield_t</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_template_opt_rec__st.html#ae50f9f7299aab9d64a67e6376867851c">template_name</a></td></tr>
+<tr class="memdesc:ae50f9f7299aab9d64a67e6376867851c"><td class="mdescLeft">&#160;</td><td class="mdescRight">List of PEN, IE num pairs.  <a href="#ae50f9f7299aab9d64a67e6376867851c">More...</a><br /></td></tr>
+<tr class="separator:ae50f9f7299aab9d64a67e6376867851c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a31dcadde35e3f792c01329ac85f672be"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a31dcadde35e3f792c01329ac85f672be"></a>
+<a class="el" href="public_8h.html#ae4c56b8891012ac69488b0a9558aaf9e">fbVarfield_t</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_template_opt_rec__st.html#a31dcadde35e3f792c01329ac85f672be">template_description</a></td></tr>
+<tr class="memdesc:a31dcadde35e3f792c01329ac85f672be"><td class="mdescLeft">&#160;</td><td class="mdescRight">Template description (optional) <br /></td></tr>
+<tr class="separator:a31dcadde35e3f792c01329ac85f672be"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4cdfed7d7168bffa51cd27d7b0c1dd4f"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a4cdfed7d7168bffa51cd27d7b0c1dd4f"></a>
+uint16_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_template_opt_rec__st.html#a4cdfed7d7168bffa51cd27d7b0c1dd4f">template_id</a></td></tr>
+<tr class="memdesc:a4cdfed7d7168bffa51cd27d7b0c1dd4f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Template ID. <br /></td></tr>
+<tr class="separator:a4cdfed7d7168bffa51cd27d7b0c1dd4f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
-<div class="textblock"><p>A variable-length field value. </p>
-<p>Variable-length information element content is represented by an fbVarfield_t on the internal side of the transcoder; that is, variable length fields in an IPFIX Message must be represented by this structure within the application record. </p>
+<div class="textblock"><p>Template metadata options record structure. </p>
 </div><h2 class="groupheader">Field Documentation</h2>
-<a class="anchor" id="a926bfc31164a8b92c4566d1f7659c25c"></a>
+<a class="anchor" id="ae50f9f7299aab9d64a67e6376867851c"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">uint8_t* fbVarfield_st::buf</td>
+          <td class="memname"><a class="el" href="public_8h.html#ae4c56b8891012ac69488b0a9558aaf9e">fbVarfield_t</a> fbTemplateOptRec_st::template_name</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
-<p>Content buffer. </p>
-<p>In network byte order as appropriate. On write, this buffer will be copied into the message buffer. On read, this buffer points into the message buffer and must be copied by the caller before any call to <a class="el" href="public_8h.html#a11c40f1d55e2d4b29b40eb4c07ce5ee7" title="Retrieve a record from a buffer. ">fBufNext()</a>. </p>
-
-</div>
-</div>
-<a class="anchor" id="ac1838178ee38c5a077a025e2aceb2761"></a>
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">size_t fbVarfield_st::len</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>Length of content in buffer. </p>
+<p>List of PEN, IE num pairs. </p>
+<p>Template name </p>
 
 </div>
 </div>
 <hr/>The documentation for this struct was generated from the following file:<ul>
-<li><a class="el" href="public_8h_source.html">public.h</a></li>
+<li><a class="el" href="private_8h_source.html">private.h</a></li>
 </ul>
 </div><!-- contents -->
       </div><!-- l-content -->

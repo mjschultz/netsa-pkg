@@ -14,7 +14,7 @@ dnl ------------------------------------------------------------------------
 
 dnl RCSIDENT("$Id: configure.in 18509 2012-08-23 19:13:27Z ecoff_svn $")
 
-AC_INIT([libfixbuf], [1.7.1], [netsa-help@cert.org], [libfixbuf])
+AC_INIT([libfixbuf], [1.8.0], [netsa-help@cert.org], [libfixbuf])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_COPYRIGHT([Copyright (C) 2006-2015 by Carnegie Mellon University
 GNU Public License (GPL) Rights pursuant to Version 2, June 1991
@@ -227,10 +227,13 @@ dnl just in case
 AC_SUBST([abs_top_srcdir])
 AC_SUBST([abs_top_builddir])
 
+PACKAGE_VERSION_SPLIT
+
 AC_OUTPUT([
     Makefile
     src/Makefile
     include/Makefile
+    include/fixbuf/version.h
     libfixbuf.pc
     libfixbuf.spec
     Doxyfile])

@@ -61,7 +61,6 @@
 #include <fixbuf/private.h>
 #include <poll.h>
 
-#ident "$Id$"
 
 
 /**
@@ -217,6 +216,7 @@ static gboolean fbListenerInitSocket(
 {
     int                         pfd[2];
     int                         i = 0;
+    int                         count = 0;
     struct pollfd               *cpfd = NULL;
     struct addrinfo             *ai = NULL;
     struct addrinfo             *current = NULL;
@@ -297,10 +297,12 @@ static gboolean fbListenerInitSocket(
             }
         }
         i++;
+        /* Socket successfully bound for listening */
+        count++;
     } while ((ai = ai->ai_next));
 
     /* check for no listenable socket */
-    if (i == 2) {
+    if (!count) {
         fbListenerTeardownSocket(listener);
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_CONN,
                     "couldn't create socket listening to %s:%s: %s",

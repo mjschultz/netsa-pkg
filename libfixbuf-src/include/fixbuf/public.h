@@ -3,7 +3,7 @@
  ** fixbuf IPFIX Implementation Public Interface
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2016 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell, Dan Ruef
  ** ------------------------------------------------------------------------
@@ -139,7 +139,7 @@
  *
  * @section Copyright
  *
- * libfixbuf is copyright 2005-2015 Carnegie Mellon University, and is released
+ * libfixbuf is copyright 2005-2017 Carnegie Mellon University, and is released
  * under the GNU Lesser General Public License (LGPL). See the COPYING file in
  * the distribution for details.
  *
@@ -951,7 +951,15 @@
 extern "C" {
 #endif
 
-#ident "$Id$"
+
+/*
+ * Version check macro
+ */
+#define FIXBUF_CHECK_VERSION(major, minor, release)    \
+    (FIXBUF_VERSION_MAJOR > (major) || \
+     (FIXBUF_VERSION_MAJOR == (major) && FIXBUF_VERSION_MINOR > (minor)) || \
+     (FIXBUF_VERSION_MAJOR == (major) && FIXBUF_VERSION_MINOR == (minor) && \
+      FIXBUF_VERSION_RELEASE >= (release)))
 
 /*
  * Error Handling Definitions
@@ -1019,7 +1027,10 @@ extern "C" {
  * Illegal sFlow content on a read.
  */
 #define FB_ERROR_SFLOW              14
-
+/**
+ * Setup error
+ */
+#define FB_ERROR_SETUP              15
 
 /*
  * Public Datatypes and Constants
@@ -1436,27 +1447,28 @@ typedef struct fbInfoElement_st {
  *
  */
 typedef struct fbInfoElementOptRec_st {
-    /** ie range min */
-    uint64_t       ie_range_begin;
-    /** ie range max */
-    uint64_t       ie_range_end;
     /** private enterprise number */
     uint32_t       ie_pen;
-    /** ie units */
-    uint16_t       ie_units;
     /** information element id */
     uint16_t       ie_id;
     /** ie data type */
     uint8_t        ie_type;
     /** ie semantic */
     uint8_t        ie_semantic;
+    /** ie units */
+    uint16_t       ie_units;
     /** padding to align with template */
     uint8_t        padding[6];
+    /** ie range min */
+    uint64_t       ie_range_begin;
+    /** ie range max */
+    uint64_t       ie_range_end;
     /** information element name */
     fbVarfield_t   ie_name;
     /** information element description */
     fbVarfield_t   ie_desc;
 } fbInfoElementOptRec_t;
+
 
 /**
  * Template ID argument to pass to fbSessionAddTemplate to automatically
@@ -3545,6 +3557,74 @@ fbSession_t         *fbSessionAlloc(
     fbInfoModel_t       *model);
 
 /**
+ * Configure a session to export type information for enterprise-specific
+ * information elements as options records according to RFC 5610
+ *
+ * @param session pointer
+ * @param enabled TRUE to enable type metadata export, FALSE to disable
+ * @param err error mesasge
+ * @return NONE
+ */
+gboolean fbSessionEnableTypeMetadata(
+    fbSession_t                *session,
+    gboolean                    enabled,
+    GError                    **err);
+
+/**
+ * Configure a session to export template metadata as options records
+ *
+ * @param session pointer
+ * @param enabled TRUE to enable template metadata export, FALSE to disable
+ * @param err error mesasge
+ * @return NONE
+ */
+gboolean fbSessionEnableTemplateMetadata(
+    fbSession_t                *session,
+    gboolean                    enabled,
+    GError                    **err);
+
+/**
+ * Add a template to the session with the provided metadata.
+ * This function appends the metadata to the buffer as well
+ * as the template.
+ *
+ * @param session   A session state container
+ * @param internal  TRUE if the template is internal, FALSE if external.
+ * @param tid       Template ID to assign, replacing any current template
+ *                  in case of collision; or FB_TID_AUTO to assign a new tId.
+ * @param tmpl      Template to add
+ * @param name      Template name
+ * @param description Template description
+ * @param err       error message
+ * @return template id of newly added template
+ */
+uint16_t fbSessionAddTemplateWithMetadata(
+    fbSession_t         *session,
+    gboolean             internal,
+    uint16_t             tid,
+    fbTemplate_t           *tmpl,
+    const char           *name,
+    const char           *description,
+    GError               **err);
+
+/**
+ * Add template metadata for a given template
+ *
+ * @param session pointer
+ * @param tid template id
+ * @param name template name
+ * @param description template description
+ * @param err error mesasge
+ * @return NONE
+ */
+gboolean fbSessionSetTemplateMetadata(
+    fbSession_t         *session,
+    uint16_t             tid,
+    const char          *name,
+    const char          *description,
+    GError                    **err);
+
+/**
  * fbSessionGetInfoModel
  *
  * @param session
@@ -3801,14 +3881,90 @@ fbCollector_t *fbSessionGetCollector(
  * @param tid        template id
  * @param tmpl       pointer to template with template id tid
  * @param err        error mesasge
+ * @return           template ID
  */
-gboolean        fbSessionAddTemplatesMulticast(
+uint16_t        fbSessionAddTemplatesMulticast(
     fbSession_t      *session,
     char             **groups,
     gboolean         internal,
     uint16_t         tid,
     fbTemplate_t     *tmpl,
     GError           **err);
+
+/**
+ * fbSessionAddTemplatesMulticastWithMetadata
+ *
+ * Set and send templates for 1 or more groups.
+ * This loops through the groups and adds the template to each
+ * group's session and adds the template to the buffer.
+ * This function is really meant for external templates, since
+ * they are exported, although can be used for internal templates.
+ * Since internal templates are not managed per group, they can simply
+ * be added with fbSessionAddTemplate().
+ * It is necessary to use this function if you plan on managing
+ * templates per group.  Using fbSessionAddTemplate() will not allow
+ * you to send a tmpl(s) to more than 1 group.
+ *
+ * @param session    a session state container
+ * @param group      group names
+ * @param internal   TRUE for internal tmpl, FALSE for external
+ * @param tid        template id
+ * @param tmpl       pointer to template with template id tid
+ * @param name       name of template (required)
+ * @param description description of template (optional)
+ * @param err        error mesasge
+ * @return           template ID
+ */
+uint16_t        fbSessionAddTemplatesMulticastWithMetadata(
+    fbSession_t      *session,
+    char             **groups,
+    gboolean         internal,
+    uint16_t         tid,
+    fbTemplate_t     *tmpl,
+    char             *name,
+    char             *description,
+    GError           **err);
+
+/**
+ * fbSessionSpreadEnableTemplateMetadata
+ *
+ * Enable template metadata export for Spread Sessions.
+ * This will configure a session to send option records
+ * that describe templates.
+ *
+ * @param session pointer
+ * @param groups spread groups to enable
+ * @param enabled TRUE to enable template metadata export, FALSE to disable
+ * @param err error message
+ * @return TRUE/FALSE (False only if templates could not be added to the session).
+ *
+ */
+
+gboolean fbSessionSpreadEnableTemplateMetadata(
+    fbSession_t                *session,
+    char                       **groups,
+    gboolean                   enabled,
+    GError                     **err);
+
+/**
+ * fbSessionSpreadEnableTypeMetadata
+ *
+ * Enable information element metadata export for Spread Sessions.
+ * This will configure a session to send option records for
+ * each private enterprise element added to the information model.
+ *
+ * @param session pointer
+ * @param groups spread groups to enable
+ * @param enable TRUE to eanble metadata export, FALSE to disable
+ * @param err error message
+ * @return TRUE/FALSE (False only if IE type template could not be added to the session).
+ *
+ */
+gboolean fbSessionSpreadEnableTypeMetadata(
+    fbSession_t                *session,
+    char                       **groups,
+    gboolean                   enabled,
+    GError                     **err);
 
 #endif
 

@@ -72,7 +72,6 @@
 #include <sys/time.h>
 #include <pthread.h>
 
-#ident "$Id$"
 
 #ifndef FB_SFLOW_DEBUG
 #   define FB_SFLOW_DEBUG 0

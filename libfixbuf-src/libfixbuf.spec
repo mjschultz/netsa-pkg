@@ -1,18 +1,18 @@
 %define name libfixbuf
-%define version 1.7.1
+%define version 1.8.0
 %define release 1
 
-Summary: fixbuf IPFIX implementation library
+Summary: Fixbuf IPFIX implementation library
 Name: %{name}
 Version: %{version}
 Release: %{release}%{?dist}
 Group: Applications/System
-License: LGPL
-Source: %{name}-%{version}.tar.gz
+License: LGPLv2
+Source: http://tools.netsa.cert.org/releases/%{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}
 Vendor: http://tools.netsa.cert.org/
-Provides: libfixbuf
-Provides: libfixbuf.so
+URL: http://tools.netsa.cert.org/fixbuf/
+
 Requires: glib2 >= 2.4.7
 %if "x" == "x1"
 Requires: libsctp
@@ -82,3 +82,4 @@ rm -rf $RPM_BUILD_ROOT
 %{_includedir}/*
 %{_libdir}/pkgconfig/*
 
+%changelog

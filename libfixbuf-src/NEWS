@@ -1,4 +1,13 @@
-Version 1.7.1: 2105-10-09
+Version 1.8.0: 2017-11-07
+=========================
+
+The ability to add template metadata to exported templates
+
+Macro to check fixbuf version number
+
+Minor bug fixes
+
+Version 1.7.1: 2015-10-09
 =========================
 
 Bug Fix for NetFlow v9 devices that implement Reverse Information Elements
