@@ -13,7 +13,7 @@ dnl ------------------------------------------------------------------------
 
 dnl RCSIDENT("$Id$")
 
-AC_INIT([yaf], [2.9.1], [netsa-help@cert.org],[yaf])
+AC_INIT([yaf], [2.9.2], [netsa-help@cert.org],[yaf])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_COPYRIGHT([Copyright (C) 2006-2017 by Carnegie Mellon University
 GNU Public License (GPL) Rights pursuant to Version 2, June 1991
@@ -277,6 +277,7 @@ fixbuf_install_loc=`$PKG_CONFIG --variable=prefix libfixbuf`
 AC_MSG_NOTICE([libfixbuf version: $yfpkg_ver])
 AC_MSG_NOTICE([Using libfixbuf installed in: $fixbuf_install_loc])
 AC_DEFINE_UNQUOTED([FIXBUF_VERSION], ["$yfpkg_ver"], [fixbuf version])
+fixbuf_version=$yfpkg_ver
 
 
 AC_ARG_ENABLE(ndpi,
@@ -920,8 +921,9 @@ dnl ----------------------------------------------------------------------
 dnl check for disabling export of type information via (RFC 5610) and
 dnl template metadata information
 dnl ----------------------------------------------------------------------
-AC_MSG_NOTICE($yfpkg_ver)
-AX_COMPARE_VERSION($yfpkg_ver, [ge], [1.8.0],
+AC_MSG_NOTICE([Fixbuf version: $fixbuf_version])
+AC_MSG_NOTICE($fixbuf_version)
+AX_COMPARE_VERSION($fixbuf_version, [ge], [1.8.0],
 [
     AC_ARG_ENABLE(type-export,
         AC_HELP_STRING([--disable-type-export], [disable exporting of options records for enterprise-specific information elements]),

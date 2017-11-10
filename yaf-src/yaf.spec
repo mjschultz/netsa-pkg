@@ -1,5 +1,5 @@
 %define name yaf
-%define version 2.9.1
+%define version 2.9.2
 %define release 2
 
 Summary: Yet Another Flow sensor
@@ -37,7 +37,7 @@ Static libraries and C header files for yaf.
 %setup -q -n %{name}-%{version}
 
 %build
-./configure --disable-static  --enable-plugins --enable-applabel
+./configure --disable-static  --enable-plugins --enable-applabel --enable-p0fprinter
 sed -i 's|^hardcode_libdir_flag_spec=.*|hardcode_libdir_flag_spec=""|g' libtool
 sed -i 's|^runpath_var=LD_RUN_PATH|runpath_var=DIE_RPATH_DIE|g' libtool
 %{__make}
@@ -92,7 +92,7 @@ rm -rf $RPM_BUILD_ROOT
 %config(noreplace) %{_sysconfdir}/yafDPIRules.conf
 %config(noreplace) %{_sysconfdir}/dhcp_fingerprints.conf
 %endif
-%if "x" == "x1"
+%if "x1" == "x1"
 %config(noreplace) %{_sysconfdir}/p0f.fp
 %endif
 %config(noreplace) %{_sysconfdir}/yaf.conf
