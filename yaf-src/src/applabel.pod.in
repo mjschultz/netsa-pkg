@@ -318,6 +318,6 @@ http://www.cert.org/netsa
 
 =head1 SEE ALSO
 
-L<yaf(1)>, L<yafscii(1)>
+B<yaf(1)>, B<yafscii(1)>
 
 =cut

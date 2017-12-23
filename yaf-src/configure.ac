@@ -13,7 +13,7 @@ dnl ------------------------------------------------------------------------
 
 dnl RCSIDENT("$Id$")
 
-AC_INIT([yaf], [2.9.2], [netsa-help@cert.org],[yaf])
+AC_INIT([yaf], [2.9.3], [netsa-help@cert.org],[yaf])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_COPYRIGHT([Copyright (C) 2006-2017 by Carnegie Mellon University
 GNU Public License (GPL) Rights pursuant to Version 2, June 1991
@@ -282,7 +282,7 @@ fixbuf_version=$yfpkg_ver
 
 AC_ARG_ENABLE(ndpi,
 	AS_HELP_STRING([--enable-ndpi], [Enable NDPI application labeling]),[
-	PKG_CHECK_MODULES(libndpi, [libndpi >= 1.7.0],
+	PKG_CHECK_MODULES(libndpi, [libndpi >= 1.7.0 libndpi < 1.8.0],
 	[
 	YF_PKGCONFIG_VERSION(libndpi)
 	YF_PKGCONFIG_LPATH(libndpi)
@@ -290,7 +290,7 @@ AC_ARG_ENABLE(ndpi,
         AC_DEFINE(YAF_ENABLE_NDPI, 1, [Define to 1 to enable ndpi])
 	],
 	[
-	AC_MSG_ERROR([Cannot find a suitable libndpi (>= 1.7.0) (Try setting PKG_CONFIG_PATH): $libndpi_PKG_ERRORS])
+	AC_MSG_ERROR([Cannot find a suitable libndpi (>= 1.7.0 and < 1.8.0) (Try setting PKG_CONFIG_PATH): $libndpi_PKG_ERRORS])
 ])])
 
 dnl ----------------------------------------------------------------------

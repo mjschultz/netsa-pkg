@@ -233,7 +233,12 @@ stop() {
     fi
     /bin/echo -n "Stopping ${MYNAME}:	"
     /bin/kill -s INT $PID
-    sleep 5
+    i=0
+    while [ -e /proc/$PID ]; do
+        if [ $i = 1800 ]; then break; fi
+        sleep 0.1
+        i=$(( i+1 ))
+    done
     (checkpid $PID)
     RETVAL=$?
     [ "$RETVAL" -eq "1" ] && echo '[OK]' || echo '[Failed]'
