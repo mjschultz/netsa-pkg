@@ -1,3 +1,9 @@
+Version 2.9.3: 2017-12-21
+==========================
+
+Fixed configure-time dependency for libndpi to limit use of v1.8.0 and greater.
+init script now gives YAF more time to shut down gracefully.
+
 Version 2.9.2: 2017-11-08
 ==========================
 

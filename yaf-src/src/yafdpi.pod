@@ -173,7 +173,7 @@ only recognized if B<--plugin-name> is set to the DPI plugin, application labeli
 =head2  DPI Templates & Information Elements by Protocol
 
 B<yaf>'s output consists of an IPFIX message stream.  B<yaf> uses a variety of templates for IPFIX data records; As of B<yaf> 2.0, B<yaf> uses a subTemplateMultiList to export optional information elements, such as Deep Packet Inspection fields, relating to the flow.  Below are templates that may appear in this subTemplateMultiList depending on the application label of the flow.
-For more information on B<yaf> information elements see L<yaf(1)>.  For more information on IPFIX Structured lists, see the Internet Draft, Export of Structured Data in IPFIX, <RFC 6313>.  Most of the elements are exported as a basicList. An IPFIX basicList represents a list of zero or more instances of any Information Element (IE 291).
+For more information on B<yaf> information elements see B<yaf(1)>.  For more information on IPFIX Structured lists, see the Internet Draft, Export of Structured Data in IPFIX, <RFC 6313>.  Most of the elements are exported as a basicList. An IPFIX basicList represents a list of zero or more instances of any Information Element (IE 291).
 
 =head2 FTP
 
@@ -1382,7 +1382,7 @@ Emily Sarneso <ecoff@cert.org> and the CERT Network Situational Awareness Group 
 
 =head1 SEE ALSO
 
-L<yaf(1)>, L<yafscii(1)>, PCRE Documentation
+B<yaf(1)>, B<yafscii(1)>, PCRE Documentation
 
 =cut
 

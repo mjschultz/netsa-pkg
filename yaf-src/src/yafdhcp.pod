@@ -125,6 +125,6 @@ http://www.cert.org/netsa
 
 =head1 SEE ALSO
 
-L<yaf(1)>, L<yafscii(1)>, L<yafdpi(1)>, L<applabel(1)>, L<super_mediator(1)>
+B<yaf(1)>, B<yafscii(1)>, B<yafdpi(1)>, B<applabel(1)>, B<super_mediator(1)>
 
 =cut
