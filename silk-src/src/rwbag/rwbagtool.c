@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2017 by Carnegie Mellon University.
+** Copyright (C) 2004-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagtool.c be27ed2dac34 2017-03-14 15:39:34Z mthomas $");
+RCSIDENT("$SiLK: rwbagtool.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skipaddr.h>
@@ -1383,7 +1383,6 @@ applyCutoffs(
     skBagTypedKey_t key;
     skBagTypedCounter_t counter;
     skBagErr_t rv_bag;
-    int fail = 0;
 
     /* determine whether there are any cut-offs to apply. If no sets
      * are given and the limits are all at their defaults, return. */
@@ -1408,24 +1407,14 @@ applyCutoffs(
     }
 
     while (skBagIteratorNextTyped(iter, &key, &counter) == SKBAG_OK) {
-        if (mask_set) {
-            if (skIPSetCheckAddress(mask_set, &key.val.addr)) {
-                /* address is in set; if the --complement was
-                 * requested, we should fail this key. */
-                fail = app_flags.complement_set;
-            } else {
-                fail = !app_flags.complement_set;
-            }
-        }
-
-        if (fail
+        if ((mask_set && (skIPSetCheckAddress(mask_set, &key.val.addr)
+                          == app_flags.complement_set))
             || (have_minkey && skipaddrCompare(&key.val.addr, &minkey) < 0)
             || (have_maxkey && skipaddrCompare(&key.val.addr, &maxkey) > 0)
             || (counter.val.u64 < mincounter)
             || (counter.val.u64 > maxcounter))
         {
             /* if we're here, we DO NOT want the record */
-            fail = 0;
             rv_bag = skBagKeyRemove(bag, &key);
             if (SKBAG_OK != rv_bag) {
                 ERR_REMOVE_KEY(key, rv_bag);

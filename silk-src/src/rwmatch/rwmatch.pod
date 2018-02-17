@@ -588,7 +588,7 @@ used for the incoming data:
 We can now match the flow records to produce the file
 F<matched-scans.rw>:
 
- $ rwmatch --relate=1,2 --relate-3,4 --relate=2,1 --relate=4,3      \
+ $ rwmatch --relate=1,2 --relate=3,4 --relate=2,1 --relate=4,3      \
         smtp-scans.rw  scan-response.rw  matched-scans.rw
 
 The results file, F<matched-scans.rw>, will contain all the exchanges
@@ -757,7 +757,7 @@ switch and added support for IPv6 flow records.
 
 =cut
 
-$SiLK: rwmatch.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
+$SiLK: rwmatch.pod 91fe97970f1f 2017-10-31 21:53:12Z mthomas $
 
 Local Variables:
 mode:text

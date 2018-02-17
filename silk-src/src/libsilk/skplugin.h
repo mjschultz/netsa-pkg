@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2008-2017 by Carnegie Mellon University.
+** Copyright (C) 2008-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -25,7 +25,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKPLUGIN_H, "$SiLK: skplugin.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_SKPLUGIN_H, "$SiLK: skplugin.h 06ddb5f84a04 2018-02-09 19:47:08Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/utils.h>         /* need "struct option" */
@@ -881,8 +881,10 @@ skpinRegTransformer(
  *      'bin_to_text' callback should write no more than 'width'
  *      characters into 'dst'.
  *
- *      'bin_merge(dst, src, cbdata)' is called to merge the binary
- *      aggregate values of 'src' and 'dst' into 'dst'.
+ *      'bin_merge(dst, src, cbdata)' is called to merge (or add) the
+ *      binary aggregate values of 'src' and 'dst' into 'dst'.
+ *      Whereas 'add_rec_to_bin' combines a Flow record's field's
+ *      value and a bin, 'bin_merge' combines the values of two bins.
  *
  *      'bin_compare(val, a, b, cbdata)' is called to compare the
  *      binary aggregate values 'a' and 'b'.  It must set 'val' to an

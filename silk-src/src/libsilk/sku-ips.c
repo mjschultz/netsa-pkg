@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2017 by Carnegie Mellon University.
+** Copyright (C) 2007-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-ips.c b1f14bba708e 2017-06-28 15:29:44Z mthomas $");
+RCSIDENT("$SiLK: sku-ips.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/utils.h>
@@ -1235,9 +1235,11 @@ ipwildcardIterNext(
     i = iter->ipwild->num_blocks;
     while (i > 0) {
         --i;
+        assert(i < (SK_ENABLE_IPV6 ? 8 : 4));
         /* 'idx' is array position of the uint32_t we are currently
          * looking at in the bitmap for this octet/hexadectet */
         idx = _BMAP_INDEX(iter->i_block[i]);
+        assert(idx < (SK_ENABLE_IPV6 ? (65536/32) : (256/32)));
         /* this is the CIDR block adjustment to make due to this
          * octet/hexadectet only */
         cidr_adjust = 0;
@@ -1277,6 +1279,7 @@ ipwildcardIterNext(
                  * we already checked one uint32_t. */
                 ++idx;
                 for (j = 1; j < check_ints; ++j, ++idx) {
+                    assert(idx < (SK_ENABLE_IPV6 ? (65536/32) : (256/32)));
                     if (iter->ipwild->m_blocks[i][idx] != 0xFFFFFFFF) {
                         break;
                     }

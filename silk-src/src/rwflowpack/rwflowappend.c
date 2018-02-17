@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2017 by Carnegie Mellon University.
+** Copyright (C) 2006-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwflowappend.c 4ba08a73ecbf 2017-05-05 22:05:45Z mthomas $");
+RCSIDENT("$SiLK: rwflowappend.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/rwrec.h>

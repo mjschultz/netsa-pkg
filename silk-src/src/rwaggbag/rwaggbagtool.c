@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2017 by Carnegie Mellon University.
+** Copyright (C) 2017-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaggbagtool.c 7a9876ac5e52 2017-05-23 22:09:29Z mthomas $");
+RCSIDENT("$SiLK: rwaggbagtool.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/skaggbag.h>
 #include <silk/skbag.h>
@@ -1274,6 +1274,7 @@ abtoolToBag(
         break;
       case SKAGGBAG_FIELD_SUM_ELAPSED:
         c_type = SKBAG_FIELD_SUM_ELAPSED;
+        break;
       case SKAGGBAG_FIELD_CUSTOM_COUNTER:
         c_type = SKBAG_FIELD_CUSTOM;
         break;

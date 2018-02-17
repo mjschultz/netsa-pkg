@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2017 by Carnegie Mellon University.
+** Copyright (C) 2004-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -72,7 +72,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skprefixmap.c f4bda4d34f32 2017-04-13 16:35:04Z mthomas $");
+RCSIDENT("$SiLK: skprefixmap.c 44f8a3303e3c 2018-02-14 22:29:49Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/rwrec.h>
@@ -657,6 +657,7 @@ prefixMapFind(
         key32 = skipaddrGetV4((const skipaddr_t*)key);
 #else
         if (skipaddrGetAsV4((const skipaddr_t*)key, &key32)) {
+            *depth = 32;
             return SKPREFIXMAP_NOT_FOUND;
         }
 #endif
@@ -1130,7 +1131,7 @@ prefixMapReadDictionary(
     start = map->dict_buf;
     end = start + map->dict_buf_used;
     for (i = 0; i < map->dict_words_used; ++i) {
-        if ('\0' == start) {
+        if ('\0' == *start) {
             if (start > end) {
                 skAbort();
             }

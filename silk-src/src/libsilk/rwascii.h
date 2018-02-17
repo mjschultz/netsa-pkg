@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2017 by Carnegie Mellon University.
+** Copyright (C) 2001-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWASCII_H, "$SiLK: rwascii.h 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENTVAR(rcsID_RWASCII_H, "$SiLK: rwascii.h 85080f144289 2018-02-09 19:48:46Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/skstringmap.h>
@@ -93,9 +93,9 @@ typedef struct rwAsciiStream_st rwAsciiStream_t;
  *    added.
  */
 typedef void (*rwAsciiStreamGetTitle_t)(
-    char        *text_buf,
-    size_t       text_buf_size,
-    void        *cb_data);
+    char               *text_buf,
+    size_t              text_buf_size,
+    void               *cb_data);
 
 
 /**
@@ -110,10 +110,10 @@ typedef void (*rwAsciiStreamGetTitle_t)(
  *    The return value of this function is ignored by rwAsciiStream.
  */
 typedef int (*rwAsciiStreamGetValue_t)(
-    const rwRec *rwrec,
-    char        *text_buf,
-    size_t       text_buf_size,
-    void        *cb_data);
+    const rwRec        *rwrec,
+    char               *text_buf,
+    size_t              text_buf_size,
+    void               *cb_data);
 
 
 /**
@@ -129,11 +129,11 @@ typedef int (*rwAsciiStreamGetValue_t)(
  *    The return value of this function is ignored by rwAsciiStream.
  */
 typedef int (*rwAsciiStreamGetValueExtra_t)(
-    const rwRec *rwrec,
-    char        *text_buf,
-    size_t       text_buf_size,
-    void        *cb_data,
-    void        *extra);
+    const rwRec        *rwrec,
+    char               *text_buf,
+    size_t              text_buf_size,
+    void               *cb_data,
+    void               *extra);
 
 
 /**
@@ -253,7 +253,7 @@ rwAsciiAppendOneField(
  *
  *    'get_value_fn' is used to get the value of the field.  The
  *    stream will invoke get_value_fn(rec, buf, bufsize,
- *    callback_data) to generate the value for the feild given the
+ *    callback_data) to generate the value for the field given the
  *    specified record 'rec'.
  *
  *    'callback_data' will be passed unchanged into the callbacks for

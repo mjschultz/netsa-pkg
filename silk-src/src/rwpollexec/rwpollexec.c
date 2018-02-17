@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2010-2017 by Carnegie Mellon University.
+** Copyright (C) 2010-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpollexec.c 6d21d1f3d455 2017-06-28 16:32:15Z mthomas $");
+RCSIDENT("$SiLK: rwpollexec.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skthread.h>

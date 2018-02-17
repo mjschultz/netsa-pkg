@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2017 by Carnegie Mellon University.
+** Copyright (C) 2005-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -20,7 +20,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKVECTOR_H, "$SiLK: skvector.h 78caf6ae8f54 2017-02-14 14:54:52Z mthomas $");
+RCSIDENTVAR(rcsID_SKVECTOR_H, "$SiLK: skvector.h 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/silk_types.h>
 

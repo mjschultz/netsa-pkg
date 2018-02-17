@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #######################################################################
-# Copyright (C) 2008-2017 by Carnegie Mellon University.
+# Copyright (C) 2008-2018 by Carnegie Mellon University.
 #
 # @OPENSOURCE_LICENSE_START@
 # See license information in ../../../LICENSE.txt
@@ -9,7 +9,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: sendrcv_tests.py 275df62a2e41 2017-01-05 17:30:40Z mthomas $
+# $SiLK: sendrcv_tests.py 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $
 #######################################################################
 
 import sys

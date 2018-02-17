@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2017 by Carnegie Mellon University.
+** Copyright (C) 2001-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sklog.c 4ba08a73ecbf 2017-05-05 22:05:45Z mthomas $");
+RCSIDENT("$SiLK: sklog.c 6afdbc8e3e34 2018-02-16 20:14:28Z mthomas $");
 
 #include <silk/sklog.h>
 #include <silk/skstringmap.h>
@@ -38,6 +38,9 @@ RCSIDENT("$SiLK: sklog.c 4ba08a73ecbf 2017-05-05 22:05:45Z mthomas $");
 /* size of our hostname field; not all systems seem to define
  * HOST_NAME_MAX, so we'll use 255+1 from POSIX. */
 #define SKLOG_HOST_NAME_MAX 256
+
+/* size of date buffer */
+#define SKLOG_DATE_BUFSIZ 32
 
 /* hour at which to rotate the logs */
 #define SKLOG_ROTATE_HOUR 0
@@ -121,7 +124,7 @@ typedef struct sklog_simple_st {
     /* function to call to prepend the time/machine stamp to the message */
     sklog_stamp_fn_t    stamp_fn;
     char                machine_name[SKLOG_HOST_NAME_MAX];
-    char                path[PATH_MAX];
+    char                path[2 * (PATH_MAX + SKLOG_DATE_BUFSIZ)];
     const char         *app_name;
     FILE               *fp;
 } sklog_simple_t;
@@ -421,7 +424,7 @@ logCompress(
         free(file);
 #endif  /* SK_LOG_COMPRESSOR */
 
-    } else if ('\0' == logctx->l_rot.post_rotate) {
+    } else if ('\0' == *logctx->l_rot.post_rotate) {
         /* do nothing when post-rotate command is empty string */
         free(file);
         return;
@@ -653,7 +656,7 @@ static int
 logRotatedOpen(
     void)
 {
-    char date[32];
+    char date[SKLOG_DATE_BUFSIZ];
     time_t t;
     struct tm ts;
     int rv;
