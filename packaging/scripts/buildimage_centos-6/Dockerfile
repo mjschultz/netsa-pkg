@@ -19,6 +19,7 @@ RUN yum install -y \
     zlib-devel
 
 RUN gem install json -v 1.8.3
+RUN gem install ffi -v 1.9.18
 RUN gem install fpm -v 1.4.0
 
 ADD ["./libfixbuf-src/", "/netsa-pkg/libfixbuf-src/"]
