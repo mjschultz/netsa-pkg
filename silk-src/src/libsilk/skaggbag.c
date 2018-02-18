@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2016-2017 by Carnegie Mellon University.
+** Copyright (C) 2016-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skaggbag.c c8180024f48a 2017-03-24 21:48:42Z mthomas $");
+RCSIDENT("$SiLK: skaggbag.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/skaggbag.h>
 #include <silk/skipaddr.h>
@@ -257,8 +257,15 @@ aggBagHentryGetFieldType(
 /*  ****************************************************************  */
 
 #if AGGBAG_TRACE
-#define ABTRACE(...)    abTrace(__FILE__, __LINE__, __VA_ARGS__)
-#define ABTRACEQ(...)   abTraceQuiet(__VA_ARGS__)
+#ifdef SK_HAVE_C99___FUNC__
+#define ABTRACE_V(...)  abTrace(__func__, __LINE__, __VA_ARGS__)
+#else
+#define ABTRACE_V(...)  abTrace(__FILE__, __LINE__, __VA_ARGS__)
+#endif  /* SK_HAVE_C99___FUNC__ */
+#define ABTRACEQ_V(...) abTraceQuiet(__VA_ARGS__)
+
+#define ABTRACE(t_t)    ABTRACE_V t_t
+#define ABTRACEQ(q_q)   ABTRACEQ_V q_q
 
 #define V(v_v)          (void *)(v_v)
 
@@ -276,7 +283,11 @@ abTrace(
 {
     va_list ap;
 
+#ifdef SK_HAVE_C99___FUNC__
     fprintf(stderr, "%s():%d: ", func, lineno);
+#else
+    fprintf(stderr, "%s:%d: ", func, lineno);
+#endif
     va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
@@ -296,9 +307,9 @@ abTraceQuiet(
 #endif  /* AGGBAG_TRACE */
 
 #ifndef ABTRACE
-#define ABTRACE(...)
-#define ABTRACEQ(...)
-#endif
+#define ABTRACE(x_x)
+#define ABTRACEQ(x_x)
+#endif  /* #ifndef ABTRACE */
 
 
 
@@ -772,27 +783,27 @@ sk_rbtree_find(
     assert(tree);
     assert(tree->data_len);
 
-    ABTRACE("searching for key =");
+    ABTRACE(("searching for key ="));
     for (i = 0; i < tree->layout[0]->field_octets; ++i, ++u_data) {
-        ABTRACEQ(" %02x", *u_data);
+        ABTRACEQ((" %02x", *u_data));
     }
-    ABTRACEQ("\n");
+    ABTRACEQ(("\n"));
 
     node = tree->root;
-    ABTRACE("root = %p, RBT_NIL = %p\n", V(node), V(RBT_NIL));
+    ABTRACE(("root = %p, RBT_NIL = %p\n", V(node), V(RBT_NIL)));
     while (node != RBT_NIL) {
-        ABTRACE("node's data =");
+        ABTRACE(("node's data ="));
         u_data = node->data_color;
         for (i = 0; i < tree->data_len; ++i, ++u_data) {
             if (i == tree->layout[0]->field_octets) {
-                ABTRACEQ(" |");
+                ABTRACEQ((" |"));
             }
-            ABTRACEQ(" %02x", *u_data);
+            ABTRACEQ((" %02x", *u_data));
         }
-        ABTRACEQ(" | %02x\n", *u_data);
+        ABTRACEQ((" | %02x\n", *u_data));
 
         cmp = rbtree_compare_data(tree, node->data_color, data);
-        ABTRACE("node = %p, cmp = %d\n", V(node), cmp);
+        ABTRACE(("node = %p, cmp = %d\n", V(node), cmp));
         if (cmp < 0) {
             node = node->link[RBT_RIGHT];
         } else if (cmp > 0) {
@@ -804,7 +815,7 @@ sk_rbtree_find(
          * the right subtree for this to work */
         /* node = node->link[cmp < 0]; */
     }
-    ABTRACE("return NULL\n");
+    ABTRACE(("return NULL\n"));
     return NULL;
 }
 
@@ -842,19 +853,19 @@ sk_rbtree_insert(
         size_t i;
         const uint8_t *u;
 
-        ABTRACE("t = p = g = &head = %p, RBT_NIL = %p, q = tree->root = %p",
-                V(t), V(RBT_NIL), V(q));
-        ABTRACEQ("  data =");
+        ABTRACE(("t = p = g = &head = %p, RBT_NIL = %p, q = tree->root = %p",
+                 V(t), V(RBT_NIL), V(q)));
+        ABTRACEQ(("  data ="));
         u = (const uint8_t *)key_data;
         for (i = 0; i < tree->layout[0]->field_octets; ++i, ++u) {
-            ABTRACEQ(" %02x", *u);
+            ABTRACEQ((" %02x", *u));
         }
-        ABTRACEQ(" |");
+        ABTRACEQ((" |"));
         u = (const uint8_t *)counter_data;
         for (i = 0; i < tree->layout[1]->field_octets; ++i, ++u) {
-            ABTRACEQ(" %02x", *u);
+            ABTRACEQ((" %02x", *u));
         }
-        ABTRACEQ("\n");
+        ABTRACEQ(("\n"));
     }
 #endif  /* AGGBAG_TRACE */
 
@@ -879,8 +890,8 @@ sk_rbtree_insert(
                    tree->layout[1]->field_octets);
             q->link[RBT_LEFT] = q->link[RBT_RIGHT] = RBT_NIL;
 
-            ABTRACE("inserted new node %p as %s child of %p\n",
-                    V(q), (dir ? "RIGHT" : "LEFT"), V(p));
+            ABTRACE(("inserted new node %p as %s child of %p\n",
+                     V(q), (dir ? "RIGHT" : "LEFT"), V(p)));
 
             p->link[dir] = q;
             ++tree->size;
@@ -888,7 +899,7 @@ sk_rbtree_insert(
                    && rbtree_node_is_red(tree, q->link[RBT_RIGHT]))
         {
             /* Simple red violation: color flip */
-            ABTRACE("simple red violation on q = %p\n", V(q));
+            ABTRACE(("simple red violation on q = %p\n", V(q)));
 
             rbtree_set_node_red(tree, q);
             rbtree_set_node_black(tree, q->link[RBT_LEFT]);
@@ -899,10 +910,10 @@ sk_rbtree_insert(
             /* Hard red violation: rotations necessary */
             int dir2 = (t->link[RBT_RIGHT] == g);
 
-            ABTRACE(("hard red violation on p = %p, q = %p, g = %p, t = %p,"
-                     " performing %s rotation\n"),
-                    V(p), V(q), V(g), V(t),
-                    ((q == p->link[last]) ? "single" : "double"));
+            ABTRACE((("hard red violation on p = %p, q = %p, g = %p, t = %p,"
+                      " performing %s rotation\n"),
+                     V(p), V(q), V(g), V(t),
+                     ((q == p->link[last]) ? "single" : "double")));
 
             if (q == p->link[last]) {
                 t->link[dir2] = rbtree_rotate_single(tree, g, !last);
@@ -913,7 +924,7 @@ sk_rbtree_insert(
 
         /* Stop working if we inserted a node */
         if (inserted) {
-            ABTRACE("stop after insertion\n");
+            ABTRACE(("stop after insertion\n"));
             break;
         }
 
@@ -921,7 +932,7 @@ sk_rbtree_insert(
         cmp = rbtree_compare_data(tree, q->data_color, key_data);
         if (0 == cmp) {
             rv = SK_RBTREE_ERR_DUPLICATE;
-            ABTRACE("stop after duplicate\n");
+            ABTRACE(("stop after duplicate\n"));
             break;
         }
 
@@ -933,15 +944,15 @@ sk_rbtree_insert(
         g = p;
         p = q;
         q = q->link[dir];
-        ABTRACE("descent direction is %d, t = %p, g = %p, p = %p, q = %p\n",
-                dir, V(t), V(g), V(p), V(q));
+        ABTRACE(("descent direction is %d, t = %p, g = %p, p = %p, q = %p\n",
+                 dir, V(t), V(g), V(p), V(q)));
 
     }
 
-    ABTRACE("updating root from %p[%s] to %p[black]\n",
-            V(tree->root),
-            (rbtree_node_is_red(tree, tree->root) ? "red" : "black"),
-            V(head.link[RBT_RIGHT]));
+    ABTRACE(("updating root from %p[%s] to %p[black]\n",
+             V(tree->root),
+             (rbtree_node_is_red(tree, tree->root) ? "red" : "black"),
+             V(head.link[RBT_RIGHT])));
 
     /* Update the root (it may be different) */
     tree->root = head.link[RBT_RIGHT];
@@ -1246,7 +1257,7 @@ aggBagHentryCreate(
     len = (sizeof(ab_hdr->he_spec) + sizeof(uint32_t)
            + (sizeof(uint16_t) * (2 + field_count)));
 
-    ABTRACE("Computed length of header is %" SK_PRIuZ "\n", len);
+    ABTRACE(("Computed length of header is %" SK_PRIuZ "\n", len));
     ab_hdr = (sk_hentry_aggbag_t*)calloc(1, sizeof(sk_hentry_aggbag_t));
     if (NULL == ab_hdr) {
         return NULL;
@@ -1270,7 +1281,7 @@ aggBagHentryCreate(
         *u16 = ab->layout[1]->fields[i].f_type;
     }
 
-    ABTRACE("Created new aggbag header entry %p\n", V(ab_hdr));
+    ABTRACE(("Created new aggbag header entry %p\n", V(ab_hdr)));
     return (sk_header_entry_t*)ab_hdr;
 }
 
@@ -1458,7 +1469,7 @@ aggBagHentryUnpacker(
     /* create space for new header */
     ab_hdr = (sk_hentry_aggbag_t *)calloc(1, sizeof(sk_hentry_aggbag_t));
     if (NULL == ab_hdr) {
-        ABTRACE("Header allocation failed\n");
+        ABTRACE(("Header allocation failed\n"));
         return NULL;
     }
 
@@ -1467,14 +1478,15 @@ aggBagHentryUnpacker(
     skHeaderEntrySpecUnpack(&(ab_hdr->he_spec), in_packed);
     assert(skHeaderEntryGetTypeId(ab_hdr) == SK_HENTRY_AGGBAG_ID);
     len = ab_hdr->he_spec.hes_len;
-    ABTRACE("Header length is %" SK_PRIuZ "\n", len);
+    ABTRACE(("Header length is %" SK_PRIuZ "\n", len));
     assert(len > sizeof(ab_hdr->he_spec));
     b += sizeof(ab_hdr->he_spec);
     len -= sizeof(ab_hdr->he_spec);
 
     /* header_version */
     if (len < sizeof(uint32_t)) {
-        ABTRACE("Remaining header length (%" SK_PRIuZ ") is too small\n", len);
+        ABTRACE(("Remaining header length (%" SK_PRIuZ ") is too small\n",
+                 len));
         free(ab_hdr);
         return NULL;
     }
@@ -1483,14 +1495,16 @@ aggBagHentryUnpacker(
     b += sizeof(u32);
     len -= sizeof(u32);
     if (AB_HENTRY_VERSION != ab_hdr->header_version) {
-        ABTRACE("Header version (%u) is unsupported\n",ab_hdr->header_version);
+        ABTRACE(("Header version (%u) is unsupported\n",
+                 ab_hdr->header_version));
         free(ab_hdr);
         return NULL;
     }
 
     /* field_count */
     if (len < sizeof(uint16_t)) {
-        ABTRACE("Remaining header length (%" SK_PRIuZ ") is too small\n", len);
+        ABTRACE(("Remaining header length (%" SK_PRIuZ ") is too small\n",
+                 len));
         free(ab_hdr);
         return NULL;
     }
@@ -1499,14 +1513,15 @@ aggBagHentryUnpacker(
     b += sizeof(u16);
     len -= sizeof(u16);
     if (ab_hdr->field_count < 2) {
-        ABTRACE("Field count (%u) is too small\n", ab_hdr->field_count);
+        ABTRACE(("Field count (%u) is too small\n", ab_hdr->field_count));
         free(ab_hdr);
         return NULL;
     }
 
     /* key_count */
     if (len < sizeof(uint16_t)) {
-        ABTRACE("Remaining header length (%" SK_PRIuZ ") is too small\n", len);
+        ABTRACE(("Remaining header length (%" SK_PRIuZ ") is too small\n",
+                 len));
         free(ab_hdr);
         return NULL;
     }
@@ -1515,17 +1530,17 @@ aggBagHentryUnpacker(
     b += sizeof(u16);
     len -= sizeof(u16);
     if (ab_hdr->key_count >= ab_hdr->field_count) {
-        ABTRACE("Key count (%u) should not be larger than field count (%u)\n",
-                ab_hdr->key_count, ab_hdr->field_count);
+        ABTRACE(("Key count (%u) should not be larger than field count (%u)\n",
+                 ab_hdr->key_count, ab_hdr->field_count));
         free(ab_hdr);
         return NULL;
     }
 
     /* remainder of length is for the fields */
     if (len != ab_hdr->field_count * sizeof(uint16_t)) {
-        ABTRACE(("Remaining header length (%" SK_PRIuZ ") does not"
-                 " match expected length (%u %" SK_PRIuZ "-byte fieldIDs)\n"),
-                len, ab_hdr->field_count, sizeof(uint16_t));
+        ABTRACE((("Remaining header length (%" SK_PRIuZ ") does not"
+                  " match expected length (%u %" SK_PRIuZ "-byte fieldIDs)\n"),
+                 len, ab_hdr->field_count, sizeof(uint16_t)));
         free(ab_hdr);
         return NULL;
     }
@@ -1533,8 +1548,8 @@ aggBagHentryUnpacker(
     /* allocate an array for the fields */
     ab_hdr->fields = (uint16_t *)calloc(ab_hdr->field_count, sizeof(uint16_t));
     if (NULL == ab_hdr->fields) {
-        ABTRACE("Unable to allocate array of %u %" SK_PRIuZ "-byte fieldIDs\n",
-                ab_hdr->field_count, sizeof(uint16_t));
+        ABTRACE(("Unable to allocate array of %u %" SK_PRIuZ "-byte fieldIDs\n",
+                 ab_hdr->field_count, sizeof(uint16_t)));
         free(ab_hdr);
         return NULL;
     }
@@ -1622,14 +1637,14 @@ abLayoutCreate(
             ++search.field_count;
         }
     }
-    ABTRACE("search bmap: %08x ... %08x",
-            search.bitmap[0], search.bitmap[0xc000 >> 5]);
+    ABTRACE(("search bmap: %08x ... %08x\n",
+             search.bitmap[0], search.bitmap[0xc000 >> 5]));
 #if AGGBAG_TRACE && 0
-    ABTRACE("search bmap:");
+    ABTRACE(("search bmap:"));
     for (i = 0; (i << 5) < AB_LAYOUT_BMAP_SIZE; ++i) {
-        ABTRACEQ(" %08x", search.bitmap[i]);
+        ABTRACEQ((" %08x", search.bitmap[i]));
     }
-    ABTRACEQ("\n");
+    ABTRACEQ(("\n"));
 #endif  /* AGGBAG_TRACE */
 
     if (NULL == layouts) {
@@ -1640,7 +1655,7 @@ abLayoutCreate(
     } else {
         lo_found = (ab_layout_t *)rbfind(&search, layouts);
         if (lo_found) {
-            ABTRACE("match found %p\n", V(lo_found));
+            ABTRACE(("match found %p\n", V(lo_found)));
             ++lo_found->ref_count;
             return lo_found;
         }
@@ -1684,22 +1699,22 @@ abLayoutCreate(
         lo_new->field_octets += f->f_len;
     }
 
-    ABTRACE("new bmap: %08x ... %08x",
-            lo_new->bitmap[0], lo_new->bitmap[0xc000 >> 5]);
+    ABTRACE(("new bmap: %08x ... %08x\n",
+             lo_new->bitmap[0], lo_new->bitmap[0xc000 >> 5]));
     lo_found = (ab_layout_t *)rbsearch(lo_new, layouts);
     if (lo_found != lo_new) {
         skAbort();
     }
 
-    ABTRACE("new layout %p fields %p count %u\n",
-            V(lo_new), V(lo_new->fields), lo_new->field_count);
+    ABTRACE(("new layout %p fields %p count %u\n",
+             V(lo_new), V(lo_new->fields), lo_new->field_count));
     for (i = 0; i < lo_new->field_count; ++i) {
-        ABTRACEQ("    field %u type %d, len %2u, offset %2u,",
-                i, lo_new->fields[i].f_type,  lo_new->fields[i].f_len,
-                lo_new->fields[i].f_offset);
+        ABTRACEQ(("    field %u type %d, len %2u, offset %2u,",
+                  i, lo_new->fields[i].f_type,  lo_new->fields[i].f_len,
+                  lo_new->fields[i].f_offset));
         info = aggBagGetTypeInfo(lo_new->fields[i].f_type);
         assert(info);
-        ABTRACEQ(" name '%s'\n", info->ti_name);
+        ABTRACEQ((" name '%s'\n", info->ti_name));
     }
 
     lo_new->ref_count = 1;
@@ -1772,8 +1787,8 @@ abLayoutFieldSorter(
     const ab_field_t *a = (const ab_field_t *)v_a;
     const ab_field_t *b = (const ab_field_t *)v_b;
 
-    ABTRACE("sorter  a = %u, b = %u  ==> %d\n",
-            a->f_type, b->f_type, (int)a->f_type - (int)b->f_type);
+    ABTRACE(("sorter  a = %u, b = %u  ==> %d\n",
+             a->f_type, b->f_type, (int)a->f_type - (int)b->f_type));
 
     return ((int)a->f_type - (int)b->f_type);
 }
@@ -1962,13 +1977,13 @@ aggBagSetLayout(
     }
 
 #if AGGBAG_TRACE
-    ABTRACE("%s layout (%u fields): %u",
-            (SK_AGGBAG_KEY == key_counter_flag) ? "key" : "counter",
-            field_count, fields[0]);
+    ABTRACE(("%s layout (%u fields): %u",
+             (SK_AGGBAG_KEY == key_counter_flag) ? "key" : "counter",
+             field_count, fields[0]));
     for (i = 1; i < field_count; ++i) {
-        ABTRACEQ(", %u", fields[i]);
+        ABTRACEQ((", %u", fields[i]));
     }
-    ABTRACEQ("\n");
+    ABTRACEQ(("\n"));
 #endif  /* AGGBAG_TRACE */
 
     new_lo = abLayoutCreate(field_count, fields);
@@ -2319,8 +2334,8 @@ skAggBagAggregateSetUnsigned(
     }
     field = &layout->fields[field_iter->pos];
 
-    ABTRACE("set unsigned id = %u, value = %" PRIu64 "\n",
-            field->f_type, unsigned_value);
+    ABTRACE(("set unsigned id = %u, value = %" PRIu64 "\n",
+             field->f_type, unsigned_value));
 
     switch (field->f_type) {
       case SKAGGBAG_FIELD_SIPv4:
@@ -2916,26 +2931,26 @@ skAggBagLoad(
     ssize_t rv;
 
     if (NULL == filename || NULL == ab) {
-        ABTRACE("Got a null parameter ab=%p, filename=%p\n",
-                V(ab), V(filename));
+        ABTRACE(("Got a null parameter ab=%p, filename=%p\n",
+                 V(ab), V(filename)));
         return SKAGGBAG_E_NULL_PARM;
     }
 
-    ABTRACE("Creating stream for file '%s'\n", filename);
+    ABTRACE(("Creating stream for file '%s'\n", filename));
     if ((rv = skStreamCreate(&stream, SK_IO_READ, SK_CONTENT_SILK))
         || (rv = skStreamBind(stream, filename))
         || (rv = skStreamOpen(stream)))
     {
-        ABTRACE("Failed to create stream\n");
+        ABTRACE(("Failed to create stream\n"));
         err = SKAGGBAG_E_READ;
         goto END;
     }
 
-    ABTRACE("Reading from stream...\n");
+    ABTRACE(("Reading from stream...\n"));
     err = skAggBagRead(ab, stream);
 
   END:
-    ABTRACE("Destroying stream and returning %d\n", err);
+    ABTRACE(("Destroying stream and returning %d\n", err));
     skStreamDestroy(&stream);
     return err;
 }
@@ -3017,45 +3032,45 @@ skAggBagRead(
     ssize_t rv;
 
     if (NULL == ab_param || NULL == stream) {
-        ABTRACE("Got a null parameter ab_param=%p, stream=%p\n",
-                V(ab_param), V(stream));
+        ABTRACE(("Got a null parameter ab_param=%p, stream=%p\n",
+                 V(ab_param), V(stream)));
         return SKAGGBAG_E_NULL_PARM;
     }
 
     /* read header */
-    ABTRACE("Reading stream header\n");
+    ABTRACE(("Reading stream header\n"));
     rv = skStreamReadSilkHeader(stream, &hdr);
     if (rv) {
-        ABTRACE("Failure while reading stream header\n");
+        ABTRACE(("Failure while reading stream header\n"));
         return SKAGGBAG_E_READ;
     }
 
-    ABTRACE("Checking stream header\n");
+    ABTRACE(("Checking stream header\n"));
     rv = skStreamCheckSilkHeader(stream, FT_AGGREGATEBAG, 1,1, &skAppPrintErr);
     if (rv) {
-        ABTRACE("Failure while checking stream header\n");
+        ABTRACE(("Failure while checking stream header\n"));
         return SKAGGBAG_E_HEADER;
     }
 
     swap_flag = !skHeaderIsNativeByteOrder(hdr);
 
-    ABTRACE("Checking for aggbag header entry\n");
+    ABTRACE(("Checking for aggbag header entry\n"));
     hentry = skHeaderGetFirstMatch(hdr, SK_HENTRY_AGGBAG_ID);
     if (NULL == hentry) {
-        ABTRACE("Failure while checking for aggbag header entry \n");
+        ABTRACE(("Failure while checking for aggbag header entry \n"));
         return SKAGGBAG_E_HEADER;
     }
     if (AB_HENTRY_VERSION != aggBagHentryGetVersion(hentry)) {
-        ABTRACE("Aggbag header entry version (%u) is not supported\n",
-                aggBagHentryGetVersion(hentry));
+        ABTRACE(("Aggbag header entry version (%u) is not supported\n",
+                 aggBagHentryGetVersion(hentry)));
         return SKAGGBAG_E_HEADER;
     }
 
     /* allocate the new aggbag */
-    ABTRACE("Creating a new aggbag\n");
+    ABTRACE(("Creating a new aggbag\n"));
     err = skAggBagCreate(&ab);
     if (err) {
-        ABTRACE("Failure (%d) while creating new aggbag\n", err);
+        ABTRACE(("Failure (%d) while creating new aggbag\n", err));
         return err;
     }
 
@@ -3064,7 +3079,7 @@ skAggBagRead(
     }
     err = aggBagSetLayout(ab, SK_AGGBAG_KEY, i, field_array);
     if (err) {
-        ABTRACE("Failure (%d) while setting key layout\n", err);
+        ABTRACE(("Failure (%d) while setting key layout\n", err));
         goto END;
     }
 
@@ -3073,7 +3088,7 @@ skAggBagRead(
     }
     err = aggBagSetLayout(ab, SK_AGGBAG_COUNTER, i, field_array);
     if (err) {
-        ABTRACE("Failure (%d) while setting counter layout\n", err);
+        ABTRACE(("Failure (%d) while setting counter layout\n", err));
         goto END;
     }
 
@@ -3081,11 +3096,11 @@ skAggBagRead(
      * are reasonable */
     entry_read_len = ab->layout[0]->field_octets + ab->layout[1]->field_octets;
     if (entry_read_len != skHeaderGetRecordLength(hdr)) {
-        ABTRACE(("Record length reported in header"
-                 " (%" SK_PRIuZ ") does not match computed entry length"
-                 " (%" SK_PRIuZ "==key=%u + counter=%u)\n"),
-                skHeaderGetRecordLength(hdr), entry_read_len,
-                ab->layout[0]->field_octets, ab->layout[1]->field_octets);
+        ABTRACE((("Record length reported in header"
+                  " (%" SK_PRIuZ ") does not match computed entry length"
+                  " (%" SK_PRIuZ "==key=%u + counter=%u)\n"),
+                 skHeaderGetRecordLength(hdr), entry_read_len,
+                 ab->layout[0]->field_octets, ab->layout[1]->field_octets));
         goto END;
     }
 
@@ -3093,7 +3108,7 @@ skAggBagRead(
 
     /* set up is complete; read key/counter pairs */
     if (!swap_flag) {
-        ABTRACE("Starting to read data from stream\n");
+        ABTRACE(("Starting to read data from stream\n"));
         while ((b = skStreamRead(stream, &entrybuf, entry_read_len))
                == (ssize_t)entry_read_len)
         {
@@ -3105,7 +3120,7 @@ skAggBagRead(
                 goto END;
             }
         }
-        ABTRACE("Finished reading data from stream\n");
+        ABTRACE(("Finished reading data from stream\n"));
     } else {
         /* FIXME: Values in tree always in big endian.  no need for
          * this branch of the read function */
@@ -3120,7 +3135,7 @@ skAggBagRead(
         unsigned int q;
         uint8_t *buf;
 
-        ABTRACE("Starting to read data from stream\n");
+        ABTRACE(("Starting to read data from stream\n"));
         while ((b = skStreamRead(stream, &entrybuf, entry_read_len))
                == (ssize_t)entry_read_len)
         {
@@ -3165,21 +3180,21 @@ skAggBagRead(
                 goto END;
             }
         }
-        ABTRACE("Finished reading data from stream\n");
+        ABTRACE(("Finished reading data from stream\n"));
     }
 
-    ABTRACE("Checking the integrity of the red black tree returns %d\n",
-            rbtree_assert(ab, ab->root, stderr));
+    ABTRACE(("Checking the integrity of the red black tree returns %d\n",
+             rbtree_assert(ab, ab->root, stderr)));
 
     /* check for a read error or a partially read entry */
     if (b != 0) {
-        ABTRACE("Result of read return unexpected value %" SK_PRIdZ "\n", b);
+        ABTRACE(("Result of read return unexpected value %" SK_PRIdZ "\n", b));
         err = SKAGGBAG_E_READ;
-        ABTRACE("Returning error code %d\n", err);
+        ABTRACE(("Returning error code %d\n", err));
         goto END;
     }
 
-    ABTRACE("Reading aggbag from file was successful\n");
+    ABTRACE(("Reading aggbag from file was successful\n"));
     *ab_param = ab;
     err = SKAGGBAG_OK;
 
@@ -3313,42 +3328,41 @@ skAggBagWrite(
     ssize_t rv;
 
     if (NULL == ab || NULL == stream) {
-        ABTRACE("Got a null parameter ab=%p, stream=%p\n",
-                V(ab), V(stream));
+        ABTRACE(("Got a null parameter ab=%p, stream=%p\n", V(ab), V(stream)));
         return SKAGGBAG_E_NULL_PARM;
     }
 
     if (NULL == ab->layout[0] || NULL == ab->layout[1]) {
-        ABTRACE("AggBag is not fully configured, key = %p, counter = %p\n",
-                V(ab->layout[0]), V(ab->layout[1]));
+        ABTRACE(("AggBag is not fully configured, key = %p, counter = %p\n",
+                 V(ab->layout[0]), V(ab->layout[1])));
         return ((NULL == ab->layout[0])
                 ? SKAGGBAG_E_UNDEFINED_KEY : SKAGGBAG_E_UNDEFINED_COUNTER);
     }
 
     hdr = skStreamGetSilkHeader(stream);
-    ABTRACE("Header for stream %p is %p\n", V(stream), V(hdr));
+    ABTRACE(("Header for stream %p is %p\n", V(stream), V(hdr)));
     skHeaderSetByteOrder(hdr, SILK_ENDIAN_NATIVE);
     skHeaderSetFileFormat(hdr, FT_AGGREGATEBAG);
     skHeaderSetRecordVersion(hdr, 1);
     skHeaderSetRecordLength(hdr, ab->data_len);
 
     hentry = aggBagHentryCreate(ab);
-    ABTRACE("Created the aggbag header entry %p\n", V(hentry));
+    ABTRACE(("Created the aggbag header entry %p\n", V(hentry)));
     if (NULL == hentry) {
         return SKAGGBAG_E_ALLOC;
     }
 
     rv = skHeaderAddEntry(hdr, hentry);
-    ABTRACE("Result of adding hentry to header is %" SK_PRIdZ "\n", rv);
+    ABTRACE(("Result of adding hentry to header is %" SK_PRIdZ "\n", rv));
     if (rv) {
         aggBagHentryFree(hentry);
         return SKAGGBAG_E_ALLOC;
     }
 
     /* write the file's header */
-    ABTRACE("Preparing to write header\n");
+    ABTRACE(("Preparing to write header\n"));
     rv = skStreamWriteSilkHeader(stream);
-    ABTRACE("Result of writing header is %" SK_PRIdZ "\n", rv);
+    ABTRACE(("Result of writing header is %" SK_PRIdZ "\n", rv));
     if (rv) {
         return SKAGGBAG_E_WRITE;
     }
@@ -3403,38 +3417,38 @@ skAggBagWrite(
            ab->layout[1]->field_count * sizeof(ab_field_t));
     field_count += ab->layout[1]->field_count;
 
-    ABTRACE("Fields in unsorted order:\n");
+    ABTRACE(("Fields in unsorted order:\n"));
     for (i = 0, f = fields; i < ab->layout[0]->field_count; ++i, ++f) {
         const ab_type_info_t *info = aggBagGetTypeInfo(f->f_type);
-        ABTRACEQ("  %u  %3u  %3u  %s(%u)\n",
-                 i, f->f_offset, f->f_len, info->ti_name, f->f_type);
+        ABTRACEQ(("  %u  %3u  %3u  %s(%u)\n",
+                  i, f->f_offset, f->f_len, info->ti_name, f->f_type));
     }
     for ( ; i < field_count; ++i, ++f) {
         const ab_type_info_t *info = aggBagGetTypeInfo(f->f_type);
         f->f_offset += ab->layout[0]->field_octets;
-        ABTRACEQ("  %u  %3u  %3u  %s(%u)\n",
-                 i, f->f_offset, f->f_len, info->ti_name, f->f_type);
+        ABTRACEQ(("  %u  %3u  %3u  %s(%u)\n",
+                  i, f->f_offset, f->f_len, info->ti_name, f->f_type));
     }
 
     skQSort(fields, field_count, sizeof(ab_field_t), &abLayoutFieldSorter);
 
-    ABTRACE("Fields in sorted order:\n");
+    ABTRACE(("Fields in sorted order:\n"));
     for (i = 0, f = fields; i < field_count; ++i, ++f) {
         const ab_type_info_t *info = aggBagGetTypeInfo(f->f_type);
-        ABTRACEQ("  %u  %3u  %3u  %s(%u)\n",
-                 i, f->f_offset, f->f_len, info->ti_name, f->f_type);
+        ABTRACEQ(("  %u  %3u  %3u  %s(%u)\n",
+                  i, f->f_offset, f->f_len, info->ti_name, f->f_type));
     }
 
     /* create an iterator to visit the contents */
-    ABTRACE("Creating redblack iterator\n");
+    ABTRACE(("Creating redblack iterator\n"));
     it = sk_rbtree_iter_create(ab);
     if (NULL == it) {
-        ABTRACE("Failure while creating redblack iterator\n");
+        ABTRACE(("Failure while creating redblack iterator\n"));
         return SKAGGBAG_E_ALLOC;
     }
 
     /* write keys and counters */
-    ABTRACE("Writing keys and counters...\n");
+    ABTRACE(("Writing keys and counters...\n"));
     while ((data = (const uint8_t *)sk_rbtree_iter_next(it)) != NULL) {
         b = buffer;
         for (i = 0, f = fields; i < field_count; ++i, ++f) {
@@ -3447,7 +3461,7 @@ skAggBagWrite(
             return SKAGGBAG_E_WRITE;
         }
     }
-    ABTRACE("Writing keys and counters...done.\n");
+    ABTRACE(("Writing keys and counters...done.\n"));
     /* FROM HERE, SHOULD FLUSH STREAM AND RETURN.  DO NOT FALL INTO
      * THE CODE BELOW */
 #endif  /* 0 */
@@ -3455,15 +3469,15 @@ skAggBagWrite(
     memset(zero_buf, 0, sizeof(zero_buf));
 
     /* create an iterator to visit the contents */
-    ABTRACE("Creating iterator to visit bag contents\n");
+    ABTRACE(("Creating iterator to visit bag contents\n"));
     it = sk_rbtree_iter_create(ab);
     if (NULL == it) {
-        ABTRACE("Failure while creating iterator to visit bag contents\n");
+        ABTRACE(("Failure while creating iterator to visit bag contents\n"));
         return SKAGGBAG_E_ALLOC;
     }
 
     /* write keys and counters */
-    ABTRACE("Iterating over keys and counters...\n");
+    ABTRACE(("Iterating over keys and counters...\n"));
     while ((data = (const uint8_t *)sk_rbtree_iter_next(it)) != NULL) {
         /* only print counters that are non-zero */
         if (0 != memcmp(zero_buf, data + ab->layout[0]->field_octets,
@@ -3477,10 +3491,10 @@ skAggBagWrite(
         }
     }
 
-    ABTRACE("Iterating over keys and counters...done.\n");
+    ABTRACE(("Iterating over keys and counters...done.\n"));
     sk_rbtree_iter_free(it);
 
-    ABTRACE("Flushing stream and returning\n");
+    ABTRACE(("Flushing stream and returning\n"));
     rv = skStreamFlush(stream);
     if (rv) {
         return SKAGGBAG_E_WRITE;

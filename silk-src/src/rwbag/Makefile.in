@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-# RCSIDENT("$SiLK: Makefile.am 638dc247c4f7 2016-06-13 19:13:09Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 405461487899 2017-10-09 21:45:39Z mthomas $");
 
 # Installed Targets
 
@@ -862,6 +862,17 @@ TESTS = \
 	tests/rwbagcat-net-struct.pl \
 	tests/rwbagcat-net-struct-ATS.pl \
 	tests/rwbagcat-net-struct-12.pl \
+	tests/rwbagcat-net-struct-b1-v4.pl \
+	tests/rwbagcat-net-struct-b2-v4.pl \
+	tests/rwbagcat-net-struct-14-b2-v4.pl \
+	tests/rwbagcat-net-struct-v6.pl \
+	tests/rwbagcat-net-struct-48-v6.pl \
+	tests/rwbagcat-net-struct-60.pl \
+	tests/rwbagcat-net-struct-b1-v6.pl \
+	tests/rwbagcat-net-struct-b2-v6.pl \
+	tests/rwbagcat-net-struct-b2-61-v6.pl \
+	tests/rwbagcat-net-struct-b1-v4-b1-v6.pl \
+	tests/rwbagcat-net-struct-v4-b3-v6.pl \
 	tests/rwbagcat-bin-ips-linear.pl \
 	tests/rwbagcat-bin-ips-binary.pl \
 	tests/rwbagcat-bin-ips-decimal.pl \
@@ -1803,6 +1814,83 @@ tests/rwbagcat-net-struct-ATS.pl.log: tests/rwbagcat-net-struct-ATS.pl
 tests/rwbagcat-net-struct-12.pl.log: tests/rwbagcat-net-struct-12.pl
 	@p='tests/rwbagcat-net-struct-12.pl'; \
 	b='tests/rwbagcat-net-struct-12.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagcat-net-struct-b1-v4.pl.log: tests/rwbagcat-net-struct-b1-v4.pl
+	@p='tests/rwbagcat-net-struct-b1-v4.pl'; \
+	b='tests/rwbagcat-net-struct-b1-v4.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagcat-net-struct-b2-v4.pl.log: tests/rwbagcat-net-struct-b2-v4.pl
+	@p='tests/rwbagcat-net-struct-b2-v4.pl'; \
+	b='tests/rwbagcat-net-struct-b2-v4.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagcat-net-struct-14-b2-v4.pl.log: tests/rwbagcat-net-struct-14-b2-v4.pl
+	@p='tests/rwbagcat-net-struct-14-b2-v4.pl'; \
+	b='tests/rwbagcat-net-struct-14-b2-v4.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagcat-net-struct-v6.pl.log: tests/rwbagcat-net-struct-v6.pl
+	@p='tests/rwbagcat-net-struct-v6.pl'; \
+	b='tests/rwbagcat-net-struct-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagcat-net-struct-48-v6.pl.log: tests/rwbagcat-net-struct-48-v6.pl
+	@p='tests/rwbagcat-net-struct-48-v6.pl'; \
+	b='tests/rwbagcat-net-struct-48-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagcat-net-struct-60.pl.log: tests/rwbagcat-net-struct-60.pl
+	@p='tests/rwbagcat-net-struct-60.pl'; \
+	b='tests/rwbagcat-net-struct-60.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagcat-net-struct-b1-v6.pl.log: tests/rwbagcat-net-struct-b1-v6.pl
+	@p='tests/rwbagcat-net-struct-b1-v6.pl'; \
+	b='tests/rwbagcat-net-struct-b1-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagcat-net-struct-b2-v6.pl.log: tests/rwbagcat-net-struct-b2-v6.pl
+	@p='tests/rwbagcat-net-struct-b2-v6.pl'; \
+	b='tests/rwbagcat-net-struct-b2-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagcat-net-struct-b2-61-v6.pl.log: tests/rwbagcat-net-struct-b2-61-v6.pl
+	@p='tests/rwbagcat-net-struct-b2-61-v6.pl'; \
+	b='tests/rwbagcat-net-struct-b2-61-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagcat-net-struct-b1-v4-b1-v6.pl.log: tests/rwbagcat-net-struct-b1-v4-b1-v6.pl
+	@p='tests/rwbagcat-net-struct-b1-v4-b1-v6.pl'; \
+	b='tests/rwbagcat-net-struct-b1-v4-b1-v6.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/rwbagcat-net-struct-v4-b3-v6.pl.log: tests/rwbagcat-net-struct-v4-b3-v6.pl
+	@p='tests/rwbagcat-net-struct-v4-b3-v6.pl'; \
+	b='tests/rwbagcat-net-struct-v4-b3-v6.pl'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \

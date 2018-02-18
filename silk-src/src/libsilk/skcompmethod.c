@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2017 by Carnegie Mellon University.
+** Copyright (C) 2006-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -18,7 +18,7 @@
 #define SKCOMPMETHOD_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skcompmethod.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skcompmethod.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/silk_files.h>
 #include <silk/skstringmap.h>

@@ -1,3 +1,28 @@
+SiLK-3.16.1 Release, 2018-Feb-15
+
+* rwstats
+  -- Fix a bug that occurred when using a large amount of memory and
+     could result in corrupted output.
+* rwuniq
+  -- Fix a bug that occurred when using a large amount of memory and
+     could result in corrupted output.
+* rwbagcat
+  -- Fix bugs that occur when using the --network-structure switch
+     with an IPv4-specific argument and bag file contains addresses in
+     the ::ffff:0:0/96 netblock.
+* rwsetcat
+  -- Print an error message when rwsetcat is unable to read an IPset.
+* rwsender, rwreceiver
+  -- Fix an issue when using installations of GnuTLS that do not
+     provide support for thread locking.
+* rwflowpack, flowcap
+  -- Fix a bug where NetFlow v9 records were being ignored because the
+     application was decoding them with the wrong internal template.
+* Building
+  -- Fix issues when determining compilation flags necessary for
+     Python support.
+
+
 SiLK-3.16.0 Release, 2017-Jun-29
 
 * rwstats

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2017 by Carnegie Mellon University.
+** Copyright (C) 2001-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcutsetup.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
+RCSIDENT("$SiLK: rwcutsetup.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skcountry.h>

@@ -1,4 +1,4 @@
-## Copyright (C) 2009-2017 by Carnegie Mellon University.
+## Copyright (C) 2009-2018 by Carnegie Mellon University.
 ##
 ## @OPENSOURCE_LICENSE_START@
 ## See license information in ../LICENSE.txt
@@ -11,7 +11,7 @@
 #  March 2009
 #
 #######################################################################
-#  RCSIDENT("$SiLK: SiLKTests.pm 9a4f4ca2d067 2017-06-21 17:41:59Z mthomas $")
+#  RCSIDENT("$SiLK: SiLKTests.pm 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $")
 #######################################################################
 #
 #    Perl module used by the scripts that "make check" runs.

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2017 by Carnegie Mellon University.
+** Copyright (C) 2006-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skheader-test.c 4d3dd8f76605 2017-01-12 16:13:52Z mthomas $");
+RCSIDENT("$SiLK: skheader-test.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstream.h>
@@ -274,7 +274,6 @@ dowrite(
 {
     skstream_t *stream;
     sk_file_header_t *hdr;
-    sk_header_entry_t *hentry;
     int rv;
 
     if ((rv = skStreamCreate(&stream, SK_IO_WRITE, SK_CONTENT_SILK))
@@ -287,42 +286,22 @@ dowrite(
 
     hdr = skStreamGetSilkHeader(stream);
 
-    hentry = skHentryPackedfileCreate(1164215667, 1, 5);
-    if (NULL == hentry) {
-        skAppPrintErr("Unable to create packedfile header");
-        return -1;
-    }
-    if (skHeaderAddEntry(hdr, hentry)) {
+    if (skHeaderAddPackedfile(hdr, 1164215667, 1, 5)) {
         skAppPrintErr("Unable to add packedfile hentry");
         return -1;
     }
 
-    hentry = skHentryInvocationCreate(1, argc, argv);
-    if (NULL == hentry) {
-        skAppPrintErr("Unable to create invocation header");
-        return -1;
-    }
-    if (skHeaderAddEntry(hdr, hentry)) {
+    if (skHeaderAddInvocation(hdr, 1, argc, argv)) {
         skAppPrintErr("Unable to add invocation hentry");
         return -1;
     }
 
-    hentry = skHentryAnnotationCreate("blah blah blah");
-    if (NULL == hentry) {
-        skAppPrintErr("Unable to create annotation header");
-        return -1;
-    }
-    if (skHeaderAddEntry(hdr, hentry)) {
+    if (skHeaderAddAnnotation(hdr, "blah blah blah")) {
         skAppPrintErr("Unable to add annotation hentry");
         return -1;
     }
 
-    hentry = skHentryProbenameCreate("S1_yaf");
-    if (NULL == hentry) {
-        skAppPrintErr("Unable to create probename header");
-        return -1;
-    }
-    if (skHeaderAddEntry(hdr, hentry)) {
+    if (skHeaderAddProbename(hdr, "S1_yaf")) {
         skAppPrintErr("Unable to add probename hentry");
         return -1;
     }

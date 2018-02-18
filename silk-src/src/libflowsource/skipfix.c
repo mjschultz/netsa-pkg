@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2017 by Carnegie Mellon University.
+** Copyright (C) 2007-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -22,7 +22,7 @@
 #define SKIPFIX_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipfix.c 97a30a8874f3 2017-05-02 16:49:05Z mthomas $");
+RCSIDENT("$SiLK: skipfix.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/skipaddr.h>
@@ -240,23 +240,27 @@ RCSIDENT("$SiLK: skipfix.c 97a30a8874f3 2017-05-02 16:49:05Z mthomas $");
  *    examined initially.
  */
 
-/*  either octetDeltaCount or packetDeltaCount */
+/*  octetDeltaCount */
 #define TMPL_BIT_octetDeltaCount                (UINT64_C(1) << 32)
-/*  either octetTotalCount or packetTotalCount */
-#define TMPL_BIT_octetTotalCount                (UINT64_C(1) << 33)
+/*  packetDeltaCount */
+#define TMPL_BIT_packetDeltaCount               (UINT64_C(1) << 33)
+/*  octetTotalCount */
+#define TMPL_BIT_octetTotalCount                (UINT64_C(1) << 34)
+/*  packetTotalCount */
+#define TMPL_BIT_packetTotalCount               (UINT64_C(1) << 35)
 /*  either initiatorOctets or initiatorPackets */
-#define TMPL_BIT_initiatorOctets                (UINT64_C(1) << 34)
+#define TMPL_BIT_initiatorOctets                (UINT64_C(1) << 36)
 /*  either responderOctets or responderPackets */
-#define TMPL_BIT_responderOctets                (UINT64_C(1) << 35)
+#define TMPL_BIT_responderOctets                (UINT64_C(1) << 37)
 /*  either reverseOctetDeltaCount or reversePacketDeltaCount */
-#define TMPL_BIT_reverseOctetDeltaCount         (UINT64_C(1) << 36)
-#define TMPL_BIT_initialTCPFlags                (UINT64_C(1) << 37)
-#define TMPL_BIT_reverseFlowDeltaMilliseconds   (UINT64_C(1) << 38)
-#define TMPL_BIT_subTemplateMultiList           (UINT64_C(1) << 39)
+#define TMPL_BIT_reverseOctetDeltaCount         (UINT64_C(1) << 38)
+#define TMPL_BIT_initialTCPFlags                (UINT64_C(1) << 39)
+#define TMPL_BIT_reverseFlowDeltaMilliseconds   (UINT64_C(1) << 40)
+#define TMPL_BIT_subTemplateMultiList           (UINT64_C(1) << 41)
 /*  either postOctetDeltaCount or postPacketDeltaCount */
-#define TMPL_BIT_postOctetDeltaCount            (UINT64_C(1) << 40)
+#define TMPL_BIT_postOctetDeltaCount            (UINT64_C(1) << 42)
 /*  either postOctetTotalCount or postPacketTotalCount */
-#define TMPL_BIT_postOctetTotalCount            (UINT64_C(1) << 41)
+#define TMPL_BIT_postOctetTotalCount            (UINT64_C(1) << 43)
 
 /* The following are only seen in options templates, so the bit
  * position here can repeat those above */
@@ -297,18 +301,22 @@ RCSIDENT("$SiLK: skipfix.c 97a30a8874f3 2017-05-02 16:49:05Z mthomas $");
      TMPL_BIT_sourceIPv6Address)
 
 #define TMPL_MASK_VOLUME_YAF                    \
-    (TMPL_BIT_octetTotalCount                   \
-     | TMPL_BIT_octetDeltaCount)
+    (TMPL_BIT_octetTotalCount  |                \
+     TMPL_BIT_packetTotalCount |                \
+     TMPL_BIT_octetDeltaCount  |                \
+     TMPL_BIT_packetDeltaCount)
 
 #define TMPL_MASK_TIME_MILLI_YAF                \
     (TMPL_BIT_flowStartMilliseconds |           \
      TMPL_BIT_flowEndMilliseconds)
 
 #define TMPL_MASK_VOLUME_NF9                    \
-    (TMPL_BIT_octetDeltaCount |                 \
-     TMPL_BIT_octetTotalCount |                 \
-     TMPL_BIT_initiatorOctets |                 \
-     TMPL_BIT_responderOctets |                 \
+    (TMPL_BIT_octetDeltaCount     |             \
+     TMPL_BIT_packetDeltaCount    |             \
+     TMPL_BIT_octetTotalCount     |             \
+     TMPL_BIT_packetTotalCount    |             \
+     TMPL_BIT_initiatorOctets     |             \
+     TMPL_BIT_responderOctets     |             \
      TMPL_BIT_postOctetDeltaCount |             \
      TMPL_BIT_postOctetTotalCount)
 
@@ -1323,14 +1331,20 @@ skiTemplateCallbackCtx(
                     bmap |= TMPL_BIT_sourceIPv6Address;
                     break;
                   case 1:
-                  case 2:
-                    /* octetDeltaCount and/or packetDeltaCount */
+                    /* octetDeltaCount */
                     bmap |= TMPL_BIT_octetDeltaCount;
                     break;
+                  case 2:
+                    /* packetDeltaCount */
+                    bmap |= TMPL_BIT_packetDeltaCount;
+                    break;
                   case 85:
-                  case 86:
-                    /* octetTotalCount and/or packetTotalCount */
+                    /* octetTotalCount */
                     bmap |= TMPL_BIT_octetTotalCount;
+                    break;
+                  case 86:
+                    /* packetTotalCount */
+                    bmap |= TMPL_BIT_packetTotalCount;
                     break;
                   case 23:
                   case 24:
@@ -1511,19 +1525,24 @@ skiTemplateCallbackCtx(
 
         /* check whether the template may be processed by the YAF
          * template by: not using any IEs outside of those defined the
-         * YAF template, by having IP addresses, and by having
-         * consistent IEs for volume */
+         * YAF template, by having IP addresses, by using millisecond
+         * times, and by having consistent IEs for volume */
         if (0 == (bmap & ~TMPL_MASK_YAFREC)
             && (bmap & TMPL_MASK_IPADDRESS)
-            && ((bmap & TMPL_MASK_VOLUME_YAF) == TMPL_BIT_octetDeltaCount
-                || (bmap & TMPL_MASK_VOLUME_YAF) == TMPL_BIT_octetTotalCount))
+            && (bmap & TMPL_MASK_TIME_MILLI_YAF)
+            && (((bmap & TMPL_MASK_VOLUME_YAF)
+                 == (TMPL_BIT_octetDeltaCount | TMPL_BIT_packetDeltaCount))
+                || ((bmap & TMPL_MASK_VOLUME_YAF)
+                    ==(TMPL_BIT_octetTotalCount | TMPL_BIT_packetTotalCount))))
         {
             /* Which volume element is present? */
-            if ((bmap & TMPL_MASK_VOLUME_YAF) == TMPL_BIT_octetDeltaCount) {
+            if ((bmap & TMPL_MASK_VOLUME_YAF)
+                == (TMPL_BIT_octetDeltaCount | TMPL_BIT_packetDeltaCount))
+            {
                 out |= YAFREC_DELTA;
             } else {
-                assert((bmap & TMPL_MASK_VOLUME_YAF)
-                       == TMPL_BIT_octetTotalCount);
+                assert((TMPL_BIT_octetTotalCount | TMPL_BIT_packetTotalCount)
+                       == (bmap & TMPL_MASK_VOLUME_YAF));
                 out |= YAFREC_TOTAL;
             }
             /* Which IP addresses are present? */
@@ -1595,18 +1614,32 @@ skiTemplateCallbackCtx(
                 }
 
                 /* Which volume is present */
-                if ((bmap & TMPL_MASK_VOLUME_NF9)
-                    & (TMPL_BIT_initiatorOctets | TMPL_BIT_responderOctets))
+                if (((bmap & TMPL_MASK_VOLUME_NF9)
+                     & (TMPL_BIT_initiatorOctets
+                        | TMPL_BIT_responderOctets))
+                    && 0 == ((bmap & TMPL_MASK_VOLUME_NF9)
+                             & ~(TMPL_BIT_initiatorOctets
+                                 | TMPL_BIT_responderOctets)))
                 {
                     out |= NF9REC_INITIATOR;
-                } else if ((bmap & TMPL_MASK_VOLUME_NF9)
-                           & (TMPL_BIT_octetDeltaCount
-                              | TMPL_BIT_postOctetDeltaCount))
+                } else if (((bmap & TMPL_MASK_VOLUME_NF9)
+                            & (TMPL_BIT_octetDeltaCount
+                               | TMPL_BIT_packetDeltaCount
+                               | TMPL_BIT_postOctetDeltaCount))
+                           && 0 == ((bmap & TMPL_MASK_VOLUME_NF9)
+                                    & ~(TMPL_BIT_octetDeltaCount
+                                        | TMPL_BIT_packetDeltaCount
+                                        | TMPL_BIT_postOctetDeltaCount)))
                 {
                     out |= NF9REC_DELTA;
-                } else if ((bmap & TMPL_MASK_VOLUME_NF9)
-                           & (TMPL_BIT_octetTotalCount
-                              | TMPL_BIT_postOctetTotalCount))
+                } else if (((bmap & TMPL_MASK_VOLUME_NF9)
+                            & (TMPL_BIT_octetTotalCount
+                               | TMPL_BIT_packetTotalCount
+                               | TMPL_BIT_postOctetTotalCount))
+                           && 0 == ((bmap & TMPL_MASK_VOLUME_NF9)
+                                    & ~(TMPL_BIT_octetTotalCount
+                                        | TMPL_BIT_packetTotalCount
+                                        | TMPL_BIT_postOctetTotalCount)))
                 {
                     out |= NF9REC_TOTAL;
                 } else if (((bmap & TMPL_MASK_VOLUME_NF9) == 0)

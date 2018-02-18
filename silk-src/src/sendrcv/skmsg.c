@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2017 by Carnegie Mellon University.
+** Copyright (C) 2006-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skmsg.c b1f14bba708e 2017-06-28 15:29:44Z mthomas $");
+RCSIDENT("$SiLK: skmsg.c f6b044e2ec71 2018-02-07 14:46:44Z mthomas $");
 
 #include "intdict.h"
 #include "multiqueue.h"
@@ -40,16 +40,13 @@ RCSIDENT("$SiLK: skmsg.c b1f14bba708e 2017-06-28 15:29:44Z mthomas $");
 #  endif
 #endif
 
-#if GNUTLS_VERSION_NUMBER <= 0x020b00
-/* avoid stupid deprecation warnings from libgcrypt 1.5.x. */
+#if GNUTLS_VERSION_NUMBER < 0x020b00
+/* define 'gcry_threads_pthread' variable used below */
 SK_DIAGNOSTIC_IGNORE_PUSH("-Wdeprecated-declarations")
-
 #include <gcrypt.h>
-
 GCRY_THREAD_OPTION_PTHREAD_IMPL;
-
 SK_DIAGNOSTIC_IGNORE_POP("-Wdeprecated-declarations")
-#endif  /* GNUTLS_VERSION_NUMBER */
+#endif  /* GNUTLS_VERSION_NUMBER < 0x020b00 */
 
 #endif  /* SK_ENABLE_GNUTLS */
 
@@ -1791,6 +1788,68 @@ tls_recv(
 #endif /* SK_ENABLE_GNUTLS */
 
 
+#if SK_ENABLE_GNUTLS && (GNUTLS_VERSION_NUMBER >= 0x020b00)
+/*
+ *    Since we cannot be certain that GnuTLS was built with pthread
+ *    support (hello redhat), define our own functions that are copies
+ *    of the functions gnutls_system_mutex_init(), etc, with
+ *    pthread-support found in gnutls-3.x/lib/system/threads.c.
+ */
+
+/*    Initialize a mutex. */
+static int
+skMsgGnuTLSMutexInit(
+    void             **priv)
+{
+    pthread_mutex_t *lock = malloc(sizeof(pthread_mutex_t));
+
+    *priv = lock;
+    if (NULL == lock) {
+        return GNUTLS_E_MEMORY_ERROR;
+    }
+    if (pthread_mutex_init(lock, NULL)) {
+        free(lock);
+        *priv = NULL;
+        return GNUTLS_E_LOCKING_ERROR;
+    }
+    return 0;
+}
+
+/*    Destroy/Free a mutex. */
+static int
+skMsgGnuTLSMutexDeinit(
+    void             **priv)
+{
+    pthread_mutex_destroy((pthread_mutex_t *)*priv);
+    free(*priv);
+    *priv = NULL;
+    return 0;
+}
+
+/*    Lock a mutex. */
+static int
+skMsgGnuTLSMutexLock(
+    void             **priv)
+{
+    if (pthread_mutex_lock((pthread_mutex_t *)*priv)) {
+        return GNUTLS_E_LOCKING_ERROR;
+    }
+    return 0;
+}
+
+/*    Unlock a mutex. */
+static int
+skMsgGnuTLSMutexUnlock(
+    void             **priv)
+{
+    if (pthread_mutex_unlock((pthread_mutex_t *)*priv)) {
+        return GNUTLS_E_LOCKING_ERROR;
+    }
+    return 0;
+}
+#endif  /* SK_ENABLE_GNUTLS && (GNUTLS_VERSION_NUMBER >= 0x020b00) */
+
+
 /***********************************************************************/
 
 
@@ -1809,7 +1868,10 @@ skMsgGnuTLSInit(
     if (!sk_msg_gnutls_initialized) {
         int rv;
 
-#if GNUTLS_VERSION_NUMBER <= 0x020b00
+#if GNUTLS_VERSION_NUMBER >= 0x020b00
+        gnutls_global_set_mutex(skMsgGnuTLSMutexInit, skMsgGnuTLSMutexDeinit,
+                                skMsgGnuTLSMutexLock, skMsgGnuTLSMutexUnlock);
+#else
         rv = gcry_control(GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
         if (rv == 0)
 #endif

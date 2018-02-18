@@ -1,12 +1,12 @@
-# RCSIDENT("$SiLK: Makefile.am 0d61d1fd9e1f 2017-06-29 17:05:33Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am d45c27ed70a8 2018-02-15 23:12:26Z mthomas $");
 
 # Installed Targets
 
 bin_PROGRAMS = silk_config
 
 lib_LTLIBRARIES = libsilk.la libsilk-thrd.la
-libsilk_version = 24:0:0
-# At previous release: libsilk_version = 24:0:0
+libsilk_version = 24:1:0
+# At previous release: libsilk_version = 24:1:0
 
 libsilk_thrd_version = 6:3:1
 # At previous release: libsilk_thrd_version = 6:3:1

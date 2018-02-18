@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2017 by Carnegie Mellon University.
+** Copyright (C) 2001-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -48,7 +48,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-options.c b814c8307c05 2017-03-24 20:22:12Z mthomas $");
+RCSIDENT("$SiLK: sku-options.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sksite.h>
@@ -178,7 +178,7 @@ printVersion(
     void)
 {
 #define COPYRIGHT_LICENSE                                       \
-    ("Copyright (C) 2001-2017 by Carnegie Mellon University\n"  \
+    ("Copyright (C) 2001-2018 by Carnegie Mellon University\n"  \
      "GNU General Public License (GPL) Rights"                  \
      " pursuant to Version 2, June 1991.\n"                     \
      "Some included library code covered by LGPL 2.1;"          \

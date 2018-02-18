@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2003-2017 by Carnegie Mellon University.
+** Copyright (C) 2003-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsetcat.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
+RCSIDENT("$SiLK: rwsetcat.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skipset.h>
@@ -569,7 +569,9 @@ printIPs(
     const skipset_t    *ipset,
     skstream_t         *setstream)
 {
+    char errbuf[2 * PATH_MAX];
     skipset_procstream_parm_t param;
+    ssize_t rv;
 
     memset(&param, 0, sizeof(param));
     param.v6_policy = SK_IPV6POLICY_MIX;
@@ -578,10 +580,21 @@ printIPs(
 
     if (ipset) {
         printIPsInitialize(ipset, NULL, NULL, &param);
-        skIPSetWalk(ipset, param.visit_cidr, param.v6_policy,
-                    param.cb_entry_func, param.cb_entry_func_ctx);
+        rv = skIPSetWalk(ipset, param.visit_cidr, param.v6_policy,
+                         param.cb_entry_func, param.cb_entry_func_ctx);
     } else {
-        skIPSetProcessStream(setstream, printIPsInitialize, NULL, &param);
+        rv = skIPSetProcessStream(setstream, printIPsInitialize, NULL, &param);
+    }
+    if (rv) {
+        if (SKIPSET_ERR_FILEIO == rv) {
+            skStreamLastErrMessage(setstream,
+                                   skStreamGetLastReturnValue(setstream),
+                                   errbuf, sizeof(errbuf));
+        } else {
+            strncpy(errbuf, skIPSetStrerror(rv), sizeof(errbuf));
+        }
+        skAppPrintErr("Error while reading IPset from '%s': %s",
+                      skStreamGetPathname(setstream), errbuf);
     }
 }
 
@@ -616,8 +629,10 @@ printNetwork(
     const skipset_t    *ipset,
     skstream_t         *setstream)
 {
+    char errbuf[2 * PATH_MAX];
     skNetStruct_t *ns = NULL;
     skipset_procstream_parm_t param;
+    ssize_t rv;
 
     /* Set up the skNetStruct */
     if (skNetStructureCreate(&ns, 0 /*no counts*/)) {
@@ -641,10 +656,21 @@ printNetwork(
     param.cb_entry_func_ctx = ns;
 
     if (ipset) {
-        skIPSetWalk(ipset, param.visit_cidr, param.v6_policy,
-                    param.cb_entry_func, param.cb_entry_func_ctx);
+        rv = skIPSetWalk(ipset, param.visit_cidr, param.v6_policy,
+                         param.cb_entry_func, param.cb_entry_func_ctx);
     } else {
-        skIPSetProcessStream(setstream, NULL, NULL, &param);
+        rv = skIPSetProcessStream(setstream, NULL, NULL, &param);
+    }
+    if (rv) {
+        if (SKIPSET_ERR_FILEIO == rv) {
+            skStreamLastErrMessage(setstream,
+                                   skStreamGetLastReturnValue(setstream),
+                                   errbuf, sizeof(errbuf));
+        } else {
+            strncpy(errbuf, skIPSetStrerror(rv), sizeof(errbuf));
+        }
+        skAppPrintErr("Error while reading IPset from '%s': %s",
+                      skStreamGetPathname(setstream), errbuf);
     }
 
     /* set the last key flag and call it once more, for good measure.
@@ -896,8 +922,10 @@ printRanges(
     const skipset_t    *ipset,
     skstream_t         *setstream)
 {
+    char errbuf[2 * PATH_MAX];
     setcat_range_state_t state;
     skipset_procstream_parm_t param;
+    ssize_t rv;
 
     memset(&param, 0, sizeof(param));
     memset(&state, 0, sizeof(state));
@@ -908,10 +936,22 @@ printRanges(
 
     if (ipset) {
         printRangesInitialize(ipset, NULL, NULL, &param);
-        skIPSetWalk(ipset, param.visit_cidr, param.v6_policy,
-                    param.cb_entry_func, param.cb_entry_func_ctx);
+        rv = skIPSetWalk(ipset, param.visit_cidr, param.v6_policy,
+                         param.cb_entry_func, param.cb_entry_func_ctx);
     } else {
-        skIPSetProcessStream(setstream, printRangesInitialize, NULL, &param);
+        rv = skIPSetProcessStream(setstream, printRangesInitialize,
+                                  NULL, &param);
+    }
+    if (rv) {
+        if (SKIPSET_ERR_FILEIO == rv) {
+            skStreamLastErrMessage(setstream,
+                                   skStreamGetLastReturnValue(setstream),
+                                   errbuf, sizeof(errbuf));
+        } else {
+            strncpy(errbuf, skIPSetStrerror(rv), sizeof(errbuf));
+        }
+        skAppPrintErr("Error while reading IPset from '%s': %s",
+                      skStreamGetPathname(setstream), errbuf);
     }
 
     if (state.count[0] || state.count[1]) {

@@ -1,4 +1,4 @@
-# RCSIDENT($SiLK: Makefile.am fb0b4814fb3d 2016-05-05 21:15:30Z mthomas $)
+# RCSIDENT($SiLK: Makefile.am caf8c87ce61d 2017-10-06 13:43:54Z mthomas $)
 
 ACLOCAL_AMFLAGS = -I m4
 
@@ -20,7 +20,7 @@ template-dir:
 	done
 
 cvs-id-to-silk:
-	perl -MFile::Find -0777 -we '$$File::Find::dont_use_nlink=1; for $$d (@ARGV){find(sub{$$n=$$File::Find::name;return if -l; if (/^(\.svn|CVS)$$/ && -d) {$$File::Find::prune = 1;return;} return unless -f _ && -w _ && -T; ($$a,$$m)=((stat(_))[8,9]); open(F,"+<$$_") or die "open $$n: $$!\n"; $$f=<F>; $$f=~s/\$$Id\:/\$$SiLK:/g; seek F,0,0 or die "seek $$n:$$!\n"; print F $$f; close F or die "$$n: $$!\n"; utime $$a,$$m,$$_ or die "utime $$n: $$!\n"},$$d);}' $(distdir)
+	perl -MFile::Find -0777 -we '$$File::Find::dont_use_nlink=1; for $$d (@ARGV){find(sub{$$n=$$File::Find::name;return if -l; if (/^(\.git|\.hg|\.svn|CVS)$$/ && -d) {$$File::Find::prune = 1;return;} return unless -f _ && -w _ && -T; ($$a,$$m)=((stat(_))[8,9]); open(F,"+<$$_") or die "open $$n: $$!\n"; $$f=<F>; $$f=~s/\$$Id\:/\$$SiLK:/g; seek F,0,0 or die "seek $$n:$$!\n"; print F $$f; close F or die "$$n: $$!\n"; utime $$a,$$m,$$_ or die "utime $$n: $$!\n"},$$d);}' $(distdir)
 
 
 install-data-hook: $(PYTHON_REMINDER) remind-silk-conf

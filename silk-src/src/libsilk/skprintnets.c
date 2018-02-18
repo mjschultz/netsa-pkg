@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2017 by Carnegie Mellon University.
+** Copyright (C) 2005-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skprintnets.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skprintnets.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
@@ -1142,7 +1142,6 @@ netStructureAddKeyCounterV4(
             if ( !ns->column[i].co_print) {
                 continue;
             }
-
             /* Row label: IP/CIDR or NET_TOTAL_TITLE */
             if (ns->total_level == i) {
                 strncpy(cidr_buf, NET_TOTAL_TITLE, sizeof(cidr_buf));
@@ -1209,11 +1208,12 @@ netStructureAddKeyCounterV4(
         }
     } /* if !first_entry */
 
-    /* store this IP */
-    skipaddrCopy(&ns->prev_ipaddr, ipaddr);
+    /* store this IP as IPv4 */
+    skipaddrSetV4(&ns->prev_ipaddr, &ip);
 
     /* Increment the CIDR count and sums for all blocks that are
-     * smaller than the one where the change was seen */
+     * larger (numerically smaller) than the one where the change was
+     * seen */
     for (i = 1; i <= ns->total_level; ++i) {
         for (j = 0; j < i && j <= max_block; ++j) {
             ++ns->cblock.v4[i].cb_ips[j];
@@ -1226,7 +1226,7 @@ netStructureAddKeyCounterV4(
         skStreamPrint(ns->outstrm, ("%*s%*s%s%*" PRIu64 "%s\n"),
                       ns->column[0].co_indent, "",
                       ns->column[0].co_width,
-                      skipaddrString(ip_buf, ipaddr, ns->ip_format),
+                      skipaddrString(ip_buf, &ns->prev_ipaddr, ns->ip_format),
                       ns->ip_count_delim,
                       ns->count_width, *count, ns->count_eol_delim);
     }

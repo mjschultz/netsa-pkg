@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2017 by Carnegie Mellon University.
+** Copyright (C) 2004-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -29,7 +29,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmaplookup.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
+RCSIDENT("$SiLK: rwpmaplookup.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>

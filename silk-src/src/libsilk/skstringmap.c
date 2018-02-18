@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2017 by Carnegie Mellon University.
+** Copyright (C) 2005-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skstringmap.c a0772d608106 2017-02-14 15:15:29Z mthomas $");
+RCSIDENT("$SiLK: skstringmap.c fbf0b5b38535 2018-02-09 19:50:04Z mthomas $");
 
 #include <silk/skdllist.h>
 #include <silk/skstringmap.h>
@@ -36,7 +36,7 @@ typedef struct stringmap_iter_node_st {
 static const char *stringmap_no_attr = "";
 
 /* for returning an error to the caller */
-static char errbuf[1024];
+static char errbuf[2 * PATH_MAX];
 
 
 /* LOCAL FUNCTION DECLARATIONS */
@@ -529,7 +529,7 @@ stringMapFindCheckDupes(
         buf[token_len] = '\0';                  \
     }
 
-    char buf[128];
+    char buf[PATH_MAX];
     sk_stringmap_status_t rv;
     sk_stringmap_entry_t *entry;
     void *ptr;
@@ -815,7 +815,7 @@ stringMapParseHelper(
     char                          **bad_token,
     char                          **errmsg)
 {
-    char buf[128];
+    char buf[PATH_MAX];
 
     const char *delim;
     const char *cp;

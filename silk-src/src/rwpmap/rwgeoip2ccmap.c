@@ -490,7 +490,7 @@ char *geoip2ccmap_text;
 #line 1 "rwgeoip2ccmap.l"
 #line 2 "rwgeoip2ccmap.l"
 /*
-** Copyright (C) 2016-2017 by Carnegie Mellon University.
+** Copyright (C) 2016-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -528,7 +528,7 @@ char *geoip2ccmap_text;
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwgeoip2ccmap.l 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: rwgeoip2ccmap.l 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>

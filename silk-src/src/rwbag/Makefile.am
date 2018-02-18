@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 638dc247c4f7 2016-06-13 19:13:09Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 405461487899 2017-10-09 21:45:39Z mthomas $");
 
 # Installed Targets
 
@@ -107,6 +107,17 @@ TESTS = \
 	tests/rwbagcat-net-struct.pl \
 	tests/rwbagcat-net-struct-ATS.pl \
 	tests/rwbagcat-net-struct-12.pl \
+	tests/rwbagcat-net-struct-b1-v4.pl \
+	tests/rwbagcat-net-struct-b2-v4.pl \
+	tests/rwbagcat-net-struct-14-b2-v4.pl \
+	tests/rwbagcat-net-struct-v6.pl \
+	tests/rwbagcat-net-struct-48-v6.pl \
+	tests/rwbagcat-net-struct-60.pl \
+	tests/rwbagcat-net-struct-b1-v6.pl \
+	tests/rwbagcat-net-struct-b2-v6.pl \
+	tests/rwbagcat-net-struct-b2-61-v6.pl \
+	tests/rwbagcat-net-struct-b1-v4-b1-v6.pl \
+	tests/rwbagcat-net-struct-v4-b3-v6.pl \
 	tests/rwbagcat-bin-ips-linear.pl \
 	tests/rwbagcat-bin-ips-binary.pl \
 	tests/rwbagcat-bin-ips-decimal.pl \

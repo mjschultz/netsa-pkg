@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2017 by Carnegie Mellon University.
+** Copyright (C) 2007-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -15,7 +15,7 @@
 #undef NDEBUG
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skmsg-test.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skmsg-test.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sklog.h>
@@ -309,7 +309,7 @@ int main(int UNUSED(argc), char **argv)
     int rv;
     int status;
     int retval;
-    pid_t pa, pb, pr;
+    pid_t pa, pb;
 
     skAppRegister(argv[0]);
     skAppVerifyFeatures(&features, NULL);
@@ -358,7 +358,7 @@ int main(int UNUSED(argc), char **argv)
         return 0;
     }
 
-    pr = waitpid(pa, &status, 0);
+    waitpid(pa, &status, 0);
     if (WIFEXITED(status)) {
         retval = WEXITSTATUS(status);
         INFOMSG("Thread A exited %d", retval);
@@ -368,7 +368,7 @@ int main(int UNUSED(argc), char **argv)
         }
         retval = EXIT_FAILURE;
     }
-    pr = waitpid(pb, &status, 0);
+    waitpid(pb, &status, 0);
     if (retval == EXIT_SUCCESS) {
         if (WIFEXITED(status)) {
             retval = WEXITSTATUS(status);

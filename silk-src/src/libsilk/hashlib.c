@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2017 by Carnegie Mellon University.
+** Copyright (C) 2001-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -10,7 +10,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: hashlib.c b0731eaff96d 2017-06-20 14:47:48Z mthomas $");
+RCSIDENT("$SiLK: hashlib.c 5e6b30b050ad 2018-02-14 17:34:01Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/utils.h>
@@ -291,21 +291,21 @@ hashlib_compute_max_initial_entries(
  *    'tbl_blk_ptr', which may be a HashTable or a HashBlock.
  */
 #define HASH_GET_KEY_LEN(tbl_blk_ptr)           \
-    ((tbl_blk_ptr)->table->key_len)
+    ((uint64_t)(tbl_blk_ptr)->table->key_len)
 
 /*
  *    Get number of bytes of storage required to hold a value in
  *    'tbl_blk_ptr', which may be a HashTable or a HashBlock.
  */
-#define HASH_GET_VALUE_LEN(tbl_blk_ptr)         \
-    ((tbl_blk_ptr)->table->value_len)
+#define HASH_GET_VALUE_LEN(tbl_blk_ptr)                 \
+    ((uint64_t)(tbl_blk_ptr)->table->value_len)
 
 /*
  *    Get number of bytes of storage required to hold an entry in
  *    'tbl_blk_ptr', which may be a HashTable or a HashBlock.
  */
 #define HASH_GET_ENTRY_LEN(tbl_blk_ptr)                                 \
-    ((tbl_blk_ptr)->table->key_len + (tbl_blk_ptr)->table->value_len)
+    (HASH_GET_KEY_LEN(tbl_blk_ptr) + HASH_GET_VALUE_LEN(tbl_blk_ptr))
 
 /*
  *    Get a pointer to the storage key part of 'entry_ptr' in
@@ -559,16 +559,15 @@ hashlib_create_block(
 {
     HashBlock *block_ptr;
     uint64_t block_bytes;
-    uint32_t entry_i;
 
     HASH_ASSERT_SIZE_IS_POWER_2(block_entries);
 
     HASH_STAT_INCR(table_ptr, blocks_allocated);
 
-    block_bytes = block_entries * (uint64_t)HASH_GET_ENTRY_LEN(table_ptr);
+    block_bytes = block_entries * HASH_GET_ENTRY_LEN(table_ptr);
 
     TRACEMSG(1,((TRC_FMT "Creating block; requesting %#" PRIx64
-                 " %" PRIu32 "-byte entries (%" PRIu64 " bytes)..."),
+                 " %" PRIu64 "-byte entries (%" PRIu64 " bytes)..."),
                 TRC_ARG(table_ptr), block_entries,
                 HASH_GET_ENTRY_LEN(table_ptr), block_bytes));
 
@@ -609,13 +608,14 @@ hashlib_create_block(
         memset(block_ptr->data_ptr, table_ptr->no_value_ptr[0], block_bytes);
     } else {
         uint8_t *data_ptr;
+        uint64_t i;
 
         /* Initialize 'data_ptr' to point to at the value part of the
          * first entry in the block; move 'data_ptr' to the next value
          * at every iteration */
-        for (entry_i = 0, data_ptr = HASH_VALUE_AT(block_ptr, 0);
-             entry_i < block_ptr->max_entries;
-             ++entry_i, data_ptr += HASH_GET_ENTRY_LEN(table_ptr))
+        for (i = 0, data_ptr = HASH_VALUE_AT(block_ptr, 0);
+             i < block_ptr->max_entries;
+             ++i, data_ptr += HASH_GET_ENTRY_LEN(table_ptr))
         {
             memcpy(data_ptr, table_ptr->no_value_ptr,
                    HASH_GET_VALUE_LEN(block_ptr));
@@ -683,7 +683,7 @@ hashlib_rehash(
     assert(num_entries > 0);
 
     TRACEMSG(1,((TRC_FMT "Rehashing table having %" PRIu64
-                 " %" PRIu32 "-byte entries..."),
+                 " %" PRIu64 "-byte entries..."),
                 TRC_ARG(table_ptr), num_entries,
                 HASH_GET_ENTRY_LEN(table_ptr)));
 
@@ -946,7 +946,7 @@ hashlib_compute_max_initial_entries(
                       * (double)total_basis);
 
         TRACEMSG(2,((TRC_FMT "desired max mem = %" PRIu64
-                     "; entry size = %" PRIu32
+                     "; entry size = %" PRIu64
                      "; max total entry = %" PRIu64
                      "; total size / init block size = %.4f"
                      "; max initial entry = %" PRIu64
@@ -1065,7 +1065,7 @@ hashlib_resize_table(
      * it. */
     if (table_ptr->num_blocks == HASH_MAX_BLOCKS) {
         TRACEMSG(1,((TRC_FMT "Unable to resize table: no more blocks;"
-                     " table contains %" PRIu64 " %" PRIu32 "-byte entries"
+                     " table contains %" PRIu64 " %" PRIu64 "-byte entries"
                      " in %" PRIu64 " buckets across %u blocks"),
                     TRC_ARG(table_ptr), hashlib_count_entries(table_ptr),
                     HASH_GET_ENTRY_LEN(table_ptr),
@@ -1627,8 +1627,8 @@ hashlib_make_contiguous(
     unsigned int k;
     uint8_t *entry_i;
     uint8_t *entry_j;
-    const uint32_t entry_len = HASH_GET_ENTRY_LEN(table_ptr);
-    const uint32_t value_len = HASH_GET_VALUE_LEN(table_ptr);
+    const uint64_t entry_len = HASH_GET_ENTRY_LEN(table_ptr);
+    const uint64_t value_len = HASH_GET_VALUE_LEN(table_ptr);
 
     TRACEMSG(1,(TRC_FMT "Making the HashTable contiguous...",
                 TRC_ARG(table_ptr)));

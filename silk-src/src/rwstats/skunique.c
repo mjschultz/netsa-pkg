@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2017 by Carnegie Mellon University.
+** Copyright (C) 2001-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skunique.c 7ef130398e4c 2017-06-20 14:58:08Z mthomas $");
+RCSIDENT("$SiLK: skunique.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/rwascii.h>

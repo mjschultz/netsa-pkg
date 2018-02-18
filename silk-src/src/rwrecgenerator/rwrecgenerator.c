@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2011-2017 by Carnegie Mellon University.
+** Copyright (C) 2011-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -26,7 +26,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwrecgenerator.c 6ed7bbd25102 2017-03-21 20:57:52Z mthomas $");
+RCSIDENT("$SiLK: rwrecgenerator.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/rwascii.h>
 #include <silk/rwrec.h>
@@ -1318,7 +1318,7 @@ static void
 emptyProcessingDirectory(
     void)
 {
-    char path[PATH_MAX];
+    char path[2 * PATH_MAX];
     struct dirent *entry;
     DIR *dir;
     int file_count = 0;
@@ -1447,8 +1447,8 @@ flushIncrementalFiles(
     void)
 {
     int tmp_fd;
-    char oldpath[PATH_MAX];
-    char newpath[PATH_MAX];
+    char oldpath[2 * PATH_MAX];
+    char newpath[2 * PATH_MAX];
     struct dirent *entry;
     DIR *dir;
     int file_count = 0;

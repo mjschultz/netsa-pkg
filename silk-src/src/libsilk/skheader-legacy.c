@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2017 by Carnegie Mellon University.
+** Copyright (C) 2006-2018 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skheader-legacy.c 275df62a2e41 2017-01-05 17:30:40Z mthomas $");
+RCSIDENT("$SiLK: skheader-legacy.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include "skheader_priv.h"
 #include "skstream_priv.h"
@@ -323,7 +323,6 @@ legacyHeaderInvocation(
     sk_file_header_t   *hdr,
     size_t             *bytes_read)
 {
-    sk_header_entry_t *hentry;
     uint32_t cmd_count;
     uint16_t cmd_line_len;
     uint16_t buf_len = INVOCATION_BUFSIZE;
@@ -419,14 +418,7 @@ legacyHeaderInvocation(
         *c = '\0';
 
         /* create a header entry for the command line */
-        hentry = skHentryInvocationCreate(0, 1, &buf);
-        if (hentry == NULL) {
-            save_errno = errno;
-            goto END;
-        }
-
-        /* add it */
-        rv = skHeaderAddEntry(hdr, hentry);
+        rv = skHeaderAddInvocation(hdr, 0, 1, &buf);
         if (rv) {
             save_errno = errno;
             goto END;
@@ -462,7 +454,6 @@ legacyHeaderPackedfile(
     sk_file_header_t   *hdr,
     size_t             *bytes_read)
 {
-    sk_header_entry_t *hentry;
     uint32_t start_time;
     sk_flowtype_id_t flow_type;
     sk_sensor_id_t sensor_id;
@@ -495,14 +486,8 @@ legacyHeaderPackedfile(
     }
 
     /* create the header entry */
-    hentry = skHentryPackedfileCreate(sktimeCreate(start_time, 0),
-                                      flow_type, sensor_id);
-    if (hentry == NULL) {
-        return SKHEADER_ERR_ALLOC;
-    }
-
-    /* add it */
-    return skHeaderAddEntry(hdr, hentry);
+    return skHeaderAddPackedfile(hdr, sktimeCreate(start_time, 0),
+                                 flow_type, sensor_id);
 }
 
 
@@ -525,7 +510,6 @@ legacyHeaderProbename(
     /* Old flowcap files have a sensor name and probe name field, each
      * of 25 bytes (SK_MAX_STRLEN_SENSOR+1) */
 #define SK_HENTRY_SP_LEGACY_ENTRYSIZE  25
-    sk_header_entry_t *hentry;
     char sensor_probe[2 * SK_HENTRY_SP_LEGACY_ENTRYSIZE];
     char *probe_name;
     char *cp;
@@ -568,13 +552,7 @@ legacyHeaderProbename(
     sensor_probe[sizeof(sensor_probe)-1] = '\0';
 
     /* create the header entry */
-    hentry = skHentryProbenameCreate(sensor_probe);
-    if (hentry == NULL) {
-        return SKHEADER_ERR_ALLOC;
-    }
-
-    /* add it */
-    return skHeaderAddEntry(hdr, hentry);
+    return skHeaderAddProbename(hdr, sensor_probe);
 }
 
 

@@ -114,9 +114,12 @@ configurations into logical units.
 =head2 Probe Block
 
 With the exception of the B<probe> command, the commands listed below
-are accepted within the probe context.  Note that one and only one of
-B<listen-on-port>, B<listen-on-unix-socket>, B<read-from-file>, or
-B<poll-directory> must be specified.
+are accepted within the probe context.  Within a probe block, one and
+only one of the following must be specified: B<listen-on-port> to
+listen on a network socket, B<poll-directory> to poll a directory for
+files, B<read-from-file> to read a single file, or
+B<listen-on-unix-socket> to listen on a UNIX domain socket.  These
+commands are described below.
 
 =over 4
 
@@ -194,14 +197,22 @@ B<end probe> command, top-level commands are again accepted.
 
 =item B<listen-on-port> I<port>
 
-This command specifies the network port where the probe should collect
-flow data.  When listening to NetFlow from a Cisco router, this is the
-I<port> that was specified to the Cisco ISO command
+This command configures the probe to accept flow records over the
+network, and I<port> specifies the network port number where the probe
+should listen for flow data.  The B<protocol> command is required when
+B<listen-on-port> is specified, and the B<listen-as-host> and
+B<accept-from-host> commands are optional.  Multiple probes may use
+the same value for I<port> as long as the probes are the same type and
+the B<accept-from-host> command is specified in each probe block.
+Probes of different types may not bind to the same port, meaning the
+combination of the following three values must be different:
+B<listen-on-port>, B<protocol>, and B<listen-as-host>.  When listening
+to IPFIX data from B<yaf>, this is the value specified to B<yaf>'s
+B<--ipfix-port> switch.  When listening to NetFlow from a Cisco
+router, this is the I<port> that was specified to the Cisco IOS
+command
 
  ip flow-export [ip-address] [port]
-
-When listening to IPFIX data from B<yaf>, this is the value specified
-to B<yaf>'s B<--ipfix-port> switch.
 
 =item B<protocol> { B<tcp> | B<udp> }
 
@@ -217,9 +228,12 @@ This optional command specifies the IPs or names of the hosts that are
 allowed to connect to the port where the probe is listening.  When
 this command is not present, any host may connect.  The command may
 only be specified when the B<listen-on-port> command is also present.
-When listening for NetFlow, this attribute would be the IP address of
-the router as seen from the machine running B<rwflowpack> or
-B<flowcap>.  (Prior to SiLK 3.10.1, the B<accept-from-host> command
+When multiple probes use the same B<listen-on-port>, B<protocol>, and
+B<listen-as-host> values, the B<accept-from-host> switch must be used
+so that B<rwflowpack> may assign incoming records to a specified
+probe.  When listening for NetFlow, this attribute would be the IP
+address of the router as seen from the machine running B<rwflowpack>
+or B<flowcap>.  (Prior to SiLK 3.10.1, the B<accept-from-host> command
 accepted only a single argument.)
 
 =item B<listen-as-host> I<host-name>
@@ -230,7 +244,7 @@ name of the host or its IP address.  If not present, the program will
 listen on all the machine's addresses.  The command may only be
 specified when the B<listen-on-port> command is also present.  For
 listening to NetFlow, the value would be the I<ip-address> that was
-specified to the Cisco ISO command
+specified to the Cisco IOS command
 
  ip flow-export [ip-address] [port]
 
@@ -238,17 +252,19 @@ specified to the Cisco ISO command
 
 The value contains the path name to a UNIX domain socket where the
 flow generator writes its data.  The parent directory of
-I<path-to-unix-socket> must exist.
+I<path-to-unix-socket> must exist.  Multiple probes may not use the
+same I<path-to-unix-socket>.
 
 =item B<poll-directory> I<directory-path>
 
 When this command is given, B<rwflowpack> will periodically poll the
 I<directory-path> to look for files to process.  B<flowcap> will exit
 with an error if you attempt to use probes that contain this command
-since B<flowcap> does not support reading data from files.  When
-polling the directory, zero length files and files whose name begin
-with a dot (C<.>) are ignored.  This command may be used with the
-following probe types:
+since B<flowcap> does not support reading data from files.  Multiple
+probes may not use the same I<directory-path>.  When polling the
+directory, zero length files and files whose name begin with a dot
+(C<.>) are ignored.  This command may be used with the following probe
+types:
 
 =over 4
 
@@ -1032,7 +1048,7 @@ configuration uses an IPset file to define the internal network.
 =head2 NetFlow v9 from a Cisco ASA Router
 
 When collecting NetFlow v9 data from a Cisco ASA (Adaptive Security
-Appliance), specify the B<quriks> statement as shown in this example
+Appliance), specify the B<quirks> statement as shown in this example
 to enable special handling of the NetFlow data.
 
   probe S20 netflow-v9
@@ -1153,13 +1169,15 @@ received the traffic.
 
 =head2 Multiple Sources to Multiple Sensors (Same Port)
 
-Suppose your network has multiple flow generators (NetFlow v5 routers
-or B<yaf> processes) that you wish to treat as separate sensors, but
-you want to open a single port on your firewall to collect these flow
-records.  To support this configuration, configure the probes to
-distinguish the traffic based on the source address.  Specifically,
-create a separate probe for each sensor where each probe uses the same
-B<listen-on-port> value but different B<accept-from-host> values.  The
+Suppose your network has multiple flow generators that you wish to
+treat as separate sensors, but you would like to minimize the number
+of open ports on your firewall.  To support this configuration,
+configure the probes to distinguish the traffic based on the source
+address.  Specifically, create a separate probe for each sensor where
+the probes of the same type use the same B<listen-on-port> value but
+different B<accept-from-host> values.  (Different probe types may not
+bind the same port; the combination of B<listen-on-port>, B<protocol>,
+and B<listen-as-host> must be unique for different probe types.)  The
 following configuration uses a NetFlow v5 probe, which works for all
 versions of SiLK.  A similar configuration works for any type of input
 as of SiLK 3.4.0 and libfixbuf-1.2.0.
@@ -1406,7 +1424,7 @@ The B<quirks> command was introduced in SiLK 3.8.0.
 
 =cut
 
-$SiLK: sensor.conf.pod 97a30a8874f3 2017-05-02 16:49:05Z mthomas $
+$SiLK: sensor.conf.pod a2684b2e4c23 2017-12-01 22:50:53Z mthomas $
 
 Local Variables:
 mode:text
