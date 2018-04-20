@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwscan_db.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwscan_db.c e69deb81239c 2018-03-13 14:56:37Z mthomas $");
 
 #include "rwscan_db.h"
 
@@ -71,7 +71,7 @@ write_scan_record(
     int  width;
     char stimestr[RWSCAN_TIME_BUFFER_SIZE];
     char etimestr[RWSCAN_TIME_BUFFER_SIZE];
-    char sipstr[SK_NUM2DOT_STRLEN+1];
+    char sipstr[SKIPADDR_STRLEN+1];
 
     timestamp_to_datetime(stimestr, rec->stime);
     timestamp_to_datetime(etimestr, rec->etime);
@@ -95,7 +95,9 @@ write_scan_record(
             if (options.integer_ips) {
                 fprintf(out, "%*u", width, rec->ip);
             } else {
-                fprintf(out, "%*s", width, num2dot_r(rec->ip, sipstr));
+                skipaddr_t ipaddr;
+                skipaddrSetV4(&ipaddr, &rec->ip);
+                fprintf(out, "%*s", width, skipaddrString(sipstr, &ipaddr, 0));
             }
             break;
           case RWSCAN_FIELD_PROTO:

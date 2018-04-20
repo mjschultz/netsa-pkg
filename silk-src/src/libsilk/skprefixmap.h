@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKPREFIXMAP_H, "$SiLK: skprefixmap.h 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENTVAR(rcsID_SKPREFIXMAP_H, "$SiLK: skprefixmap.h 593b6514b1fe 2018-04-05 18:48:14Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/skplugin.h>
@@ -58,7 +58,9 @@ typedef enum skPrefixMapErr_en {
     /** Operation failed since it requires an empty prefix map  */
     SKPREFIXMAP_ERR_NOTEMPTY = 5,
     /** Unexpected values found in file header */
-    SKPREFIXMAP_ERR_HEADER = 6
+    SKPREFIXMAP_ERR_HEADER = 6,
+    /** Prefix map does not support IPv6 addresses */
+    SKPREFIXMAP_ERR_NO_IPV6 = 7
 } skPrefixMapErr_t;
 
 /**
@@ -472,6 +474,8 @@ skPrefixMapSave(
 
 /**
  *    Set the content type of the prefix map 'map' to 'content_type'.
+ *    Return SKPREFIXMAP_ERR_NO_IPV6 if SiLK is built without IPv6
+ *    support.
  */
 skPrefixMapErr_t
 skPrefixMapSetContentType(

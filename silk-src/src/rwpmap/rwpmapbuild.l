@@ -19,7 +19,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmapbuild.l 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwpmapbuild.l c6181353fab0 2018-04-05 20:48:33Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skprefixmap.h>
@@ -139,8 +139,8 @@ static int invocation_strip = 0;
 /* OPTIONS SETUP */
 
 typedef enum {
-    OPT_INPUT_FILE,
-    OPT_OUTPUT_FILE,
+    OPT_INPUT_PATH,
+    OPT_OUTPUT_PATH,
     OPT_MODE,
     OPT_DRY_RUN,
     OPT_IGNORE_ERRORS,
@@ -148,8 +148,8 @@ typedef enum {
 } appOptionsEnum;
 
 static struct option appOptions[] = {
-    {"input-file",          REQUIRED_ARG, 0, OPT_INPUT_FILE},
-    {"output-file",         REQUIRED_ARG, 0, OPT_OUTPUT_FILE},
+    {"input-path",          REQUIRED_ARG, 0, OPT_INPUT_PATH},
+    {"output-path",         REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
     {"mode",                REQUIRED_ARG, 0, OPT_MODE},
     {"dry-run",             NO_ARG,       0, OPT_DRY_RUN},
     {"ignore-errors",       NO_ARG,       0, OPT_IGNORE_ERRORS},
@@ -159,7 +159,7 @@ static struct option appOptions[] = {
 
 
 static const char *appHelp[] = {
-    "Read prefix map definition from this file",
+    "Read the prefix map definition from this file",
     "Write the binary prefix map to this file",
     ("Set the type of the input; this must agree with any 'mode'\n"
      "\tstatement in the input."),
@@ -168,6 +168,39 @@ static const char *appHelp[] = {
     ("Strip invocation history from the prefix map file.\n"
      "\tDef. Record command used to create the file"),
     (char *)NULL
+};
+
+static struct option deprecatedOptions[] = {
+    {"input-file",      REQUIRED_ARG, 0, OPT_INPUT_PATH},
+    {"output-file",     REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {0,0,0,0}           /* sentinel entry */
+};
+
+static const char *deprecatedHelp[] = {
+    ("DEPRECATED. Read the prefix map definition from this\n"
+     "\tfile.  Replace with --input-path"),
+    ("DEPRECATED. Write the binary prefix map to this file.\n"
+     "\tReplace with --output-path"),
+    (char *)NULL
+};
+
+/* allow the shortest unique prefixes for input-{path,file} and
+ * output-{path,file} */
+static struct option deprecatedOptionsShort[] = {
+    /* --inp is required due to --invocation-strip */
+    {"input-",          REQUIRED_ARG, 0, OPT_INPUT_PATH},
+    {"input",           REQUIRED_ARG, 0, OPT_INPUT_PATH},
+    {"inpu",            REQUIRED_ARG, 0, OPT_INPUT_PATH},
+    {"inp",             REQUIRED_ARG, 0, OPT_INPUT_PATH},
+    /* --o is sufficient */
+    {"output-",         REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {"output",          REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {"outpu",           REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {"outp",            REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {"out",             REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {"ou",              REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {"o",               REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {0,0,0,0}           /* sentinel entry */
 };
 
 
@@ -188,48 +221,8 @@ static int stmtProPorts(int state, char *string);
 static int gotLabel(char *string);
 
 /* to keep gcc quiet  */
-int
-yylex(
-    void);
+int yylex(void);
 
-#if 0
-/* Newer versions of flex define these functions.  Declare them here
- * to avoid gcc warnings, and just hope that their signatures don't
- * change. */
-int
-pmapbuild_get_leng(
-    void);
-char *
-pmapbuild_get_text(
-    void);
-int
-pmapbuild_get_debug(
-    void);
-void
-pmapbuild_set_debug(
-    int                 bdebug);
-int
-pmapbuild_get_lineno(
-    void);
-void
-pmapbuild_set_lineno(
-    int                 line_number);
-FILE *
-pmapbuild_get_in(
-    void);
-void
-pmapbuild_set_in(
-    FILE               *in_str);
-FILE *
-pmapbuild_get_out(
-    void);
-void
-pmapbuild_set_out(
-    FILE               *out_str);
-int
-pmapbuild_lex_destroy(
-    void);
-#endif  /* #if 0 */
 
 SK_DIAGNOSTIC_IGNORE_PUSH("-Wwrite-strings")
 
@@ -239,8 +232,9 @@ SK_DIAGNOSTIC_IGNORE_PUSH("-Wwrite-strings")
 
 %option prefix="pmapbuild_" outfile="lex.yy.c"
 %option never-interactive
-%option noinput nounput noyywrap noreject
+%option noinput nounput noreject
 
+    /* %option noyywrap  -- use a function to avoid gcc warning */
     /* %option noyyget_extra noyyset_extra noyyget_leng noyyget_text */
     /* %option noyyget_lineno noyyset_lineno noyyget_in noyyset_in */
     /* %option noyyget_out noyyset_out noyyget_lval noyyset_lval */
@@ -279,6 +273,7 @@ mapname [^#:, \t\r\n]+
 
 <ST_MODE>{mapname}                { if (stmtMode(0, yytext)) {
                                         ++error_count;
+                                        return 0;
                                     }
                                     BEGIN(ST_EOL); }
 
@@ -436,6 +431,11 @@ appUsageLong(
                     SK_OPTION_HAS_ARG(appOptions[i]), appHelp[i],
                     modeToName(DEFAULT_MODE), mode_name_id_map[0].name);
             for (j = 1; j < mode_name_id_map_len; ++j) {
+#if !SK_ENABLE_IPV6
+                if (SKPREFIXMAP_CONT_ADDR_V6 == mode_name_id_map[j].id) {
+                    continue;
+                }
+#endif  /* !SK_ENABLE_IPV6 */
                 fprintf(fh, ", %s", mode_name_id_map[j].name);
             }
             fprintf(fh, "\n");
@@ -452,6 +452,11 @@ appUsageLong(
                     SK_OPTION_HAS_ARG(appOptions[i]), appHelp[i]);
             break;
         }
+    }
+
+    for (i = 0; deprecatedOptions[i].name; ++i) {
+        fprintf(fh, "--%s %s. %s\n", deprecatedOptions[i].name,
+                SK_OPTION_HAS_ARG(deprecatedOptions[i]), deprecatedHelp[i]);
     }
 }
 
@@ -518,6 +523,8 @@ appSetup(
 
     /* register the options */
     if (skOptionsRegister(appOptions, &appOptionsHandler, NULL)
+        || skOptionsRegister(deprecatedOptions, &appOptionsHandler, NULL)
+        || skOptionsRegister(deprecatedOptionsShort, &appOptionsHandler, NULL)
         || skOptionsNotesRegister(NULL))
     {
         skAppPrintErr("Unable to register options");
@@ -548,7 +555,7 @@ appSetup(
     if (!in_stream.of_name) {
         if (FILEIsATty(stdin)) {
             skAppPrintErr("Specify '--%s=-' to read from the terminal",
-                          appOptions[OPT_INPUT_FILE].name);
+                          appOptions[OPT_INPUT_PATH].name);
             exit(EXIT_FAILURE);
         }
         in_stream.of_name = "-";
@@ -594,14 +601,15 @@ appSetup(
  */
 static int
 appOptionsHandler(
-    clientData   UNUSED(cData),
+    clientData          cData,
     int                 opt_index,
     char               *opt_arg)
 {
     int rv;
 
+    SK_UNUSED_PARAM(cData);
     switch ((appOptionsEnum)opt_index) {
-      case OPT_INPUT_FILE:
+      case OPT_INPUT_PATH:
         if (in_stream.of_name) {
             skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
@@ -610,7 +618,7 @@ appOptionsHandler(
         in_stream.of_name = opt_arg;
         break;
 
-      case OPT_OUTPUT_FILE:
+      case OPT_OUTPUT_PATH:
         if (out_stream) {
             skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
@@ -637,6 +645,14 @@ appOptionsHandler(
                           appOptions[opt_index].name, opt_arg);
             return 1;
         }
+#if !SK_ENABLE_IPV6
+        if (SKPREFIXMAP_CONT_ADDR_V6 == mode) {
+            skAppPrintErr(("Unsupported %s '%s': This SiLK installation was"
+                           " built without IPv6 address support"),
+                          appOptions[opt_index].name, opt_arg);
+            return 1;
+        }
+#endif  /* !SK_ENABLE_IPV6 */
         break;
 
       case OPT_DRY_RUN:
@@ -773,12 +789,14 @@ checkRange(
  */
 static int
 stmtCIDR(
-    int          UNUSED(state),
+    int                 state,
     char               *string)
 {
     skipaddr_t ip;
     uint32_t cidr;
     int rv;
+
+    SK_UNUSED_PARAM(state);
 
     stmt.type = STMT_CIDR;
 
@@ -813,9 +831,12 @@ stmtCIDR(
  */
 static int
 stmtDefault(
-    int          UNUSED(state),
-    char        UNUSED(*string))
+    int                 state,
+    char               *string)
 {
+    SK_UNUSED_PARAM(state);
+    SK_UNUSED_PARAM(string);
+
     if (default_set) {
         skAppPrintErr(("Invalid default on line %d: "
                        " Multiple default statements or"
@@ -930,11 +951,12 @@ stmtLabel(
  */
 static int
 stmtMapName(
-    int          UNUSED(state),
+    int                 state,
     char               *string)
 {
     skPrefixMapErr_t rv;
 
+    SK_UNUSED_PARAM(state);
     if (skPrefixMapGetMapName(map) != NULL) {
         skAppPrintErr("Multiple map-names specified in input");
         return -1;
@@ -961,11 +983,12 @@ stmtMapName(
  */
 static int
 stmtMode(
-    int          UNUSED(state),
+    int                 state,
     char               *string)
 {
     skPrefixMapContent_t new_mode;
 
+    SK_UNUSED_PARAM(state);
     if (parseMode(string, &new_mode)) {
         /* Allow 'ip' as an alias for 'ipv4' */
         if (0 == strcmp(string, "ip")) {
@@ -976,6 +999,14 @@ stmtMode(
             return -1;
         }
     }
+#if !SK_ENABLE_IPV6
+    if (SKPREFIXMAP_CONT_ADDR_V6 == new_mode) {
+        skAppPrintErr(("Unsupported mode '%s' given on line %d: This SiLK"
+                       " installation was built without IPv6 address support"),
+                      string, linenum);
+        return -1;
+    }
+#endif  /* !SK_ENABLE_IPV6 */
 
     if (MODE_SET_DEFAULT == mode_set) {
         /* not explicitly set yet */
@@ -1277,6 +1308,16 @@ gotLabel(
     }
 
     return 0;
+}
+
+
+/* we could handle this with "%option noyywrap", but defining this as
+ * a function eliminates an unreachable-code compiler warning. */
+int
+yywrap(
+    void)
+{
+    return 1;
 }
 
 

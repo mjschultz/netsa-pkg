@@ -8,8 +8,8 @@ use SiLKTests;
 my $rwpmapcat = check_silk_app('rwpmapcat');
 my %file;
 $file{address_types} = get_data_or_exit77('address_types');
-$ENV{SILK_COUNTRY_CODES} = "$SiLKTests::PWD/$file{fake_cc}";
 $ENV{SILK_ADDRESS_TYPES} = "$SiLKTests::PWD/$file{address_types}";
+$ENV{SILK_COUNTRY_CODES} = "$SiLKTests::PWD/$file{fake_cc}";
 my $cmd = "$rwpmapcat --no-cidr --address-types";
 my $md5 = "045c3a9fd792d585bec7047b42e2618b";
 

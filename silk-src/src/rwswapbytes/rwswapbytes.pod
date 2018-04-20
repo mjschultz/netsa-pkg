@@ -48,19 +48,19 @@ One of these switches must be provided:
 
 =item B<--big-endian>
 
-Write the output-file in big-endian (network byte-order) format.
+Write the output file in big-endian (network byte-order) format.
 
 =item B<--little-endian>
 
-Write the output-file in little-endian (Intel) format.
+Write the output file in little-endian (Intel) format.
 
 =item B<--native-endian>
 
-Write the output-file in this machine's native format.
+Write the output file in this machine's native format.
 
 =item B<--swap-endian>
 
-Unconditionally swap the byte-order of the input-file.
+Unconditionally swap the byte-order of the input file.
 
 =item B<--help>
 
@@ -158,7 +158,7 @@ the input file and the output file.
 
 =cut
 
-$SiLK: rwswapbytes.pod 89b3ca5a7207 2017-06-01 19:19:24Z mthomas $
+$SiLK: rwswapbytes.pod a273c76a6e08 2018-04-02 19:21:06Z mthomas $
 
 Local Variables:
 mode:text

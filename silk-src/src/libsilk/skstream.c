@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skstream.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: skstream.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/skstream.h>
 #include <silk/sksite.h>
@@ -128,19 +128,16 @@ static void
 streamCacheHeader(
     skstream_t         *stream)
 {
-    union h_un {
-        sk_header_entry_t          *he;
-        sk_hentry_packedfile_t     *pf;
-    } h;
+    const sk_header_entry_t *hentry;
 
     assert(stream);
     assert(stream->is_silk_flow);
 
-    h.he = skHeaderGetFirstMatch(stream->silk_hdr, SK_HENTRY_PACKEDFILE_ID);
-    if (h.he) {
-        stream->hdr_starttime = skHentryPackedfileGetStartTime(h.pf);
-        stream->hdr_sensor    = skHentryPackedfileGetSensorID(h.pf);
-        stream->hdr_flowtype  = skHentryPackedfileGetFlowtypeID(h.pf);
+    hentry = skHeaderGetFirstMatch(stream->silk_hdr, SK_HENTRY_PACKEDFILE_ID);
+    if (hentry) {
+        stream->hdr_starttime = skHentryPackedfileGetStartTime(hentry);
+        stream->hdr_sensor    = skHentryPackedfileGetSensorID(hentry);
+        stream->hdr_flowtype  = skHentryPackedfileGetFlowtypeID(hentry);
     }
 }
 

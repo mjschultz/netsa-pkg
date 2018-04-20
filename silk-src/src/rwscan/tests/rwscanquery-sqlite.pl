@@ -1,7 +1,7 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: rwscanquery-sqlite.pl 57438dede53e 2015-03-20 16:14:32Z mthomas $")
+# RCSIDENT("$SiLK: rwscanquery-sqlite.pl e3e3e6e795a9 2018-03-15 19:45:45Z mthomas $")
 
 use strict;
 use SiLKTests;
@@ -38,6 +38,9 @@ unless (eval "require DBD::SQLite;") {
     skip_test("DBD::SQLite module not available");
 }
 
+# create our tempdir
+my $tmpdir = make_tempdir();
+
 # update path so rwscanquery can find the tools it executes
 $ENV{RWFILTER}   = $rwfilter;
 $ENV{RWSET}      = $rwset;
@@ -47,8 +50,23 @@ $ENV{RWSETCAT}   = $rwsetcat;
 # include those envars in the log
 push @SiLKTests::DUMP_ENVVARS, qw(RWSCANRC RWFILTER RWSET RWSETBUILD RWSETCAT);
 
-# create our tempdir
-my $tmpdir = make_tempdir();
+# create wrapper scripts for tools when running under valgrind
+if ($ENV{SK_TESTS_VALGRIND}) {
+    for my $e (qw(RWFILTER RWSET RWSETBUILD RWSETCAT)) {
+        my $wrapper = "$tmpdir/\L$e";
+        open F, "> $wrapper" or die "$NAME: open '$wrapper': $!";
+        print F "#! /bin/sh\n";
+        print F "exec ", $ENV{$e}, ' "$@"', "\n";
+        close F or die "$NAME: close '$wrapper': $!";
+        chmod 0700, $wrapper;
+        $ENV{$e} = $wrapper;
+    }
+    $rwfilter = $ENV{RWFILTER};
+    $rwset = $ENV{RWSET};
+    $rwsetbuild = $ENV{RWSETBUILD};
+    $rwsetcat = $ENV{RWSETCAT};
+}
+
 
 # result of running MD5 on /dev/null
 my $empty_md5 = 'd41d8cd98f00b204e9800998ecf8427e';
@@ -344,9 +362,12 @@ $cmd = join " ", ($rwscanquery,
                   '--start-date=2009/02/11',
                   '--end-date=2009/02/15',
                   '|',
+                  $rwsort,
+                  '--fields=9,1-5',
+                  '|',
                   @clean_flows,
     );
-$md5 = '24be386188897452d6f3ff84a5303dc6';
+$md5 = 'baf8480efc4044255d4d2e4a5d4c5a2b';
 scanquery_md5($md5, $cmd);
 
 $cmd = join " ", ($rwscanquery,
@@ -506,7 +527,7 @@ sub create_data_repo
         # child
         my @prog = split " ", $cmd;
         exec @prog
-            or die "Cannot exec $cmd: $!\n";
+            or die "$NAME: Cannot exec $cmd: $!\n";
     }
     # parent
 

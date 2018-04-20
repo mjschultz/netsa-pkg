@@ -1,7 +1,7 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: rwflowpack-pack-pdu-dir.pl 40a363507ed0 2014-04-01 14:09:52Z mthomas $")
+# RCSIDENT("$SiLK: rwflowpack-pack-pdu-dir.pl 598c37b616f6 2018-03-26 21:57:09Z mthomas $")
 
 use strict;
 use SiLKTests;
@@ -71,14 +71,9 @@ die "ERROR: Missing data directory '$data_dir'\n"
 my $expected_count = 0;
 my $file_count = 0;
 
-# read in the MD5s for every packed file we expect to find.  Although
-# we are packing IPv4 data, whether we write IPv4 or IPv6 files
-# depends on how SiLK was compiled.  In the packed IPv4 files, bytes
-# are stored as a byte/packet ratio, and due to rounding the "bytes"
-# value in the IPv4 and IPv6 files may differ.  Thus, we read in
-# separate MD5 sums for each.
+# read in the MD5s for every packed file we expect to find.
 my %md5_map;
-my $md5_file = "$0-ipv".(($SiLKTests::SK_ENABLE_IPV6) ? "6" : "4").".txt";
+my $md5_file = "$0-ipv4.txt";
 
 open F, $md5_file
     or die "ERROR: Cannot open $md5_file: $!\n";

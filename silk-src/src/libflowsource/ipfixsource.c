@@ -21,12 +21,13 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: ipfixsource.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: ipfixsource.c f7a89df0ba0f 2018-03-15 22:06:43Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/redblack.h>
 #include <silk/skthread.h>
 #include <silk/skvector.h>
+#include "infomodel.h"
 
 #ifdef  SKIPFIXSOURCE_TRACE_LEVEL
 #define TRACEMSG_LEVEL SKIPFIXSOURCE_TRACE_LEVEL
@@ -137,19 +138,6 @@ RCSIDENT("$SiLK: ipfixsource.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
 /* LOCAL DEFINES AND TYPEDEFS */
 
 /*
- *    The NetFlowV9/IPFIX standard stays that a 'stream' is unique if
- *    the source-address and domain are unique.  SiLK violates the
- *    standard in that it also treats the sending port as part of the
- *    unique 'stream' key.
- *
- *    To have SiLK follow the standard---that is, to treat UDP packets
- *    coming from the same source address but different source ports
- *    as being part of the same protocol stream, set the following
- *    environment variable prior to invoking rwflowpack or flowcap.
- */
-#define SK_IPFIX_UDP_IGNORE_SOURCE_PORT "SK_IPFIX_UDP_IGNORE_SOURCE_PORT"
-
-/*
  *    Name of environment variable that, when set, cause SiLK to
  *    ignore any G_LOG_LEVEL_WARNING messages.
  */
@@ -192,87 +180,16 @@ typedef struct peeraddr_source_st {
 } peeraddr_source_t;
 
 
-/*  **********  Augment the Information Model  **********  */
-
-/*
- *    Define the IPFIX information elements in IPFIX_CERT_PEN space
- *    for SiLK.  These are added to the information model by the
- *    skiInfoModel() function.
- */
-static fbInfoElement_t ski_info_elements[] = {
-    /* Extra fields produced by yaf for SiLK records */
-    FB_IE_INIT("initialTCPFlags",              IPFIX_CERT_PEN, 14,  1,
-               FB_IE_F_ENDIAN | FB_IE_F_REVERSIBLE),
-    FB_IE_INIT("unionTCPFlags",                IPFIX_CERT_PEN, 15,  1,
-               FB_IE_F_ENDIAN | FB_IE_F_REVERSIBLE),
-    FB_IE_INIT("reverseFlowDeltaMilliseconds", IPFIX_CERT_PEN, 21,  4,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("silkFlowType",                 IPFIX_CERT_PEN, 30,  1,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("silkFlowSensor",               IPFIX_CERT_PEN, 31,  2,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("silkTCPState",                 IPFIX_CERT_PEN, 32,  1,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("silkAppLabel",                 IPFIX_CERT_PEN, 33,  2,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("flowAttributes",               IPFIX_CERT_PEN, 40,  2,
-               FB_IE_F_ENDIAN | FB_IE_F_REVERSIBLE),
-
-    /* Extra fields produced by yaf for yaf statistics */
-    FB_IE_INIT("expiredFragmentCount",         IPFIX_CERT_PEN, 100, 4,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("assembledFragmentCount",       IPFIX_CERT_PEN, 101, 4,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("meanFlowRate",                 IPFIX_CERT_PEN, 102, 4,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("meanPacketRate",               IPFIX_CERT_PEN, 103, 4,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("flowTableFlushEventCount",     IPFIX_CERT_PEN, 104, 4,
-               FB_IE_F_ENDIAN),
-    FB_IE_INIT("flowTablePeakCount",           IPFIX_CERT_PEN, 105, 4,
-               FB_IE_F_ENDIAN),
-    FB_IE_NULL
-};
-
-/*
- *    Define IPFIX information elements that are either in the
- *    standard IANA model or are specific to NetFlowV9 but are not
- *    defined by all versions of libfixbuf.  These are added to the
- *    information model by the skiInfoModel() function.
- */
-static fbInfoElement_t ski_std_info_elements[] = {
-    FB_IE_NULL
-};
-
-
 /* EXPORTED VARIABLE DEFINITIONS */
 
 /* descriptions are in ipfixsource.h */
 
-/*
- *    If non-zero, print the templates when they arrive.  This can be
- *    set by defining the environment variable specified in
- *    SKI_ENV_PRINT_TEMPLATES.
- */
+/* whether to print templates to log file as they arrive
+ * (SK_ENV_PRINT_TEMPLATES) */
 int print_templates = 0;
 
-/*
- *    The names of IE 48, 49, 50 used by fixbuf (flowSamplerFOO) do
- *    not match the names specified by IANA (samplerFOO).  At some
- *    point the names used by fixbuf will change, and this variable is
- *    for forward compatibility to determine which names fixbuf uses.
- *    It is set by skiInitialize().
- *
- *    Variables and structure members in this file use the IANA name.
- */
+/* do the names of IE 48, 49, 50 follow fixbuf-1.x or 2.x? */
 uint32_t sampler_flags = 0;
-
-
-/* Whether to consider the source port when determining whether a
- * source is unique.  See fbCollectorManageUDPStreamByPort().  This is
- * TRUE unless the environment variable named by
- * SK_IPFIX_UDP_IGNORE_SOURCE_PORT is set to a non-zero value. */
-int consider_udp_sport = 1;
 
 
 /* LOCAL VARIABLE DEFINITIONS */
@@ -644,8 +561,10 @@ skiInfoModel(
 {
     if (!ski_model) {
         ski_model = fbInfoModelAlloc();
-        fbInfoModelAddElementArray(ski_model, ski_info_elements);
-        fbInfoModelAddElementArray(ski_model, ski_std_info_elements);
+        /* call a function in infomodel.c to update the info model
+         * with the info elements defined in the .xml file(s) in the
+         * infomodel subdirectory */
+        infomodelAddGlobalElements(ski_model);
     }
     return ski_model;
 }
@@ -1286,11 +1205,12 @@ ipfixSourceCreateFromSockaddr(
             /* Enable the multi-UDP support in libfixbuf. */
             fbCollectorSetUDPMultiSession(collector, 1);
 
+#if !FIXBUF_CHECK_VERSION(2,0,0)
             /* Treat UDP streams from the same address but different
-             * ports as different streams unless
-             * SK_IPFIX_UDP_IGNORE_SOURCE_PORT is set to non-zero,
-             * which is checked in skIPFIXSourcesSetup(). */
-            fbCollectorManageUDPStreamByPort(collector, consider_udp_sport);
+             * ports as different streams, in accordance with the
+             * IPFIX/NetFlow v9 RFCs. */
+            fbCollectorManageUDPStreamByPort(collector, TRUE);
+#endif  /* FIXBUF_CHECK_VERSION */
 
             /* If this is a Netflow v9 source or an sFlow source, tell
              * the collector. */
@@ -1492,14 +1412,6 @@ skIPFIXSourcesSetup(
         g_thread_init(NULL);
     }
 #endif
-
-    /* Determine whether to consider the source port when determining
-     * whether a source is unique.  We do unless this environemnt
-     * variable is set.  See fbCollectorManageUDPStreamByPort(). */
-    env = getenv(SK_IPFIX_UDP_IGNORE_SOURCE_PORT);
-    if (NULL != env && *env && *env != '0') {
-        consider_udp_sport = 0;
-    }
 
     /* Determine whether to print templates to the log file as they
      * arrive. */

@@ -236,18 +236,37 @@ displays those entries.
 
 =item B<ipset>
 
-SiLK 3.0.0 and SiLK 3.7.0 introduced new output formats for IPset data
-structures, and these formats are denoted by record-versions 3 and 4,
-respectively.  (To select these formats, use the B<--record-version>
-switch on B<rwset(1)>, B<rwsetbuild(1)>, or B<rwsettool(1)>, or use
-the B<--ipset-record-version> switch on B<rwbagtool(1)>.)  When the
-record-version is 3, the file contains a version of the IPset data
-structure that can be read directly into memory, and the file contains
-a header entry that specifies the number of nodes, the number of
+The IPset writing tools (B<rwset(1)>, B<rwsetbuild(1)>,
+B<rwsettool(1)>, B<rwaggbagtool(1)>, and B<rwbagtool(1)>) support the
+following output formats for IPset data structures:
+
+=over 4
+
+=item S< 2 >
+
+May hold only IPv4 addresses and does not have an ipset header entry.
+
+=item S< 3 >
+
+May hold IPv4 or IPv6 addresses and is readable by S<SiLK 3.0> and
+later.  It contains a header entry that describes the IPset data
+structure, and the entry specifies the number of nodes, the number of
 branches from each node, the number of leaves, the size of the nodes
-and leaves, and which node is the root of the tree.  When the
-record-version is 4, the header entry specifies whether the file
-contains IPv4 addresses or IPv6 addresses.
+and leaves, and which node is the root of the tree.
+
+=item S< 4 >
+
+May hold IPv4 or IPv6 addresses and is readable by S<SiLK 3.7> and
+later.  The file's header entry specifies whether the file contains
+IPv4 addresses or IPv6 addresses.
+
+=item S< 5 >
+
+May hold only IPv6 addresses and is readable by
+S<SiLK 3.14> and later.  The header entry specifies that the file
+contains IPv6 data.
+
+=back
 
 =item B<bag>
 
@@ -255,6 +274,12 @@ Since SiLK 3.0.0, the tools that write binary Bag files (B<rwbag(1)>,
 B<rwbagbuild(1)>, and B<rwbagtool(1)>) have written a header entry
 that specifies the type and size of the key and of the counter in the
 file.
+
+=item B<aggregate-bag>
+
+The tools B<rwaggbag(1)>, B<rwaggbagbuild(1)>, and B<rwaggbagtool(1)>
+write a header entry that contains the field types that comprise the
+key and the counter.
 
 =item B<prefix-map>
 
@@ -528,14 +553,15 @@ checked when the B<--site-config-file> switch is not provided.
 
 =head1 SEE ALSO
 
-B<rwfilter(1)>, B<rwbag(1)>, B<rwbagbuild(1)>, B<rwbagtool(1)>,
+B<rwfilter(1)>, B<rwaggbag(1)>, B<rwaggbagbuild(1)>,
+B<rwaggbagtool(1)>, B<rwbag(1)>, B<rwbagbuild(1)>, B<rwbagtool(1)>,
 B<rwpmapbuild(1)>, B<rwset(1)>, B<rwsetbuild(1)>, B<rwsettool(1)>
 B<rwswapbytes(1)>, B<silk.conf(5)>, B<pmapfilter(3)>, B<flowcap(8)>,
 B<rwflowpack(8)>, B<silk(7)>, B<gzip(1)>
 
 =cut
 
-$SiLK: rwfileinfo.pod 92ab6152d2f4 2017-03-21 19:49:03Z mthomas $
+$SiLK: rwfileinfo.pod 1ab93cad9e81 2018-02-26 19:07:35Z mthomas $
 
 Local Variables:
 mode:text

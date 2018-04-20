@@ -72,7 +72,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skprefixmap.c 44f8a3303e3c 2018-02-14 22:29:49Z mthomas $");
+RCSIDENT("$SiLK: skprefixmap.c 593b6514b1fe 2018-04-05 18:48:14Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/rwrec.h>
@@ -2052,7 +2052,7 @@ skPrefixMapRead(
       case 5:
         skAppPrintErr("Support for IPv6 prefix maps not included"
                       " in this installation");
-        err = SKPREFIXMAP_ERR_HEADER;
+        err = SKPREFIXMAP_ERR_NO_IPV6;
         goto ERROR;
 #else
       case 4:
@@ -2186,6 +2186,11 @@ skPrefixMapSetContentType(
     skPrefixMap_t          *map,
     skPrefixMapContent_t    content_type)
 {
+#if !SK_ENABLE_IPV6
+    if (SKPREFIXMAP_CONT_ADDR_V6 == content_type) {
+        return SKPREFIXMAP_ERR_NO_IPV6;
+    }
+#endif  /* SK_ENABLE_IPV6 */
     map->content_type = content_type;
     return SKPREFIXMAP_OK;
 
@@ -2263,6 +2268,8 @@ skPrefixMapStrerror(
         return "Cannot set default in non-empty map";
       case SKPREFIXMAP_ERR_HEADER:
         return "Invalid version, type, or compression method in file header";
+      case SKPREFIXMAP_ERR_NO_IPV6:
+        return "IPv6 prefix maps not supported by this SiLK installation";
     }
 
     snprintf(buf, sizeof(buf), "Unrecognized prefix map error code %d",

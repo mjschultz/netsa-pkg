@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_STRINGMAP_H, "$SiLK: skstringmap.h 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENTVAR(rcsID_STRINGMAP_H, "$SiLK: skstringmap.h ebac5d25b6ab 2018-04-13 20:35:03Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -420,8 +420,7 @@ skStringMapGetByNameWithAttributes(
 /**
  *    Given a numeric identifier 'id', allocate a sk_stringmap_iter_t
  *    to iterate over the entries with that identifier, and store the
- *    location of the iterator at the memory location point to by
- *    'iter'.
+ *    the iterator in the referent of 'iter'.
  *
  *    When the caller is finished with the iterator, she must call
  *    skStringMapIterDestroy() to free the resources used by the
@@ -430,6 +429,8 @@ skStringMapGetByNameWithAttributes(
  *    Return SKSTRINGMAP_OK on success.  Return SKSTRINGMAP_ERR_INPUT
  *    if a parameter is NULL, and return SKSTRINGMAP_ERR_MEM if an
  *    error occurs when creating or appending to the iterator.
+ *
+ *    If only one entry is needed, use skStringMapGetFirstName().
  */
 sk_stringmap_status_t
 skStringMapGetByID(
@@ -443,6 +444,8 @@ skStringMapGetByID(
  *    and return the name associated with the entry.  Return NULL if
  *    'id' is not in the StringMap.  The caller should not modify nor
  *    free the returned value.
+ *
+ *    To get all entries that have that ID, use skStringMapGetByID().
  */
 const char *
 skStringMapGetFirstName(
@@ -470,9 +473,9 @@ skStringMapIterDestroy(
 
 /**
  *    If more entries are available in the stringmap iterator 'iter',
- *    set the memory at 'entry' to point to the next entry, set the
- *    memory at 'attr' to point at the next attribute string for that
- *    entry, and return SK_ITERATOR_OK; otherwise, return
+ *    set the referent of 'entry' to point to the next entry, set the
+ *    referent of 'attr' to point at the next attribute string for
+ *    that entry, and return SK_ITERATOR_OK; otherwise, return
  *    SK_ITERATOR_NO_MORE_ENTRIES.  If there is no attribute for the
  *    entry, the memory at 'attr' is set to point to an empty string.
  *

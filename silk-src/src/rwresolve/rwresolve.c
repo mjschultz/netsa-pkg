@@ -59,7 +59,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwresolve.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwresolve.c 9dfb5116673a 2018-04-02 19:18:40Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/skipaddr.h>
@@ -321,7 +321,7 @@ static size_t namebuf_avail = 0;
 /* maintain list of line objects previous allocated */
 static line_t *free_list = NULL;
 
-/* FIXME: Consider adding --pager and --output-file support. */
+/* FIXME: Consider adding --pager and --output-path support. */
 
 
 

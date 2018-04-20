@@ -7,9 +7,9 @@ B<rwsetcat> - Print the IP addresses in a binary IPset file
 =head1 SYNOPSIS
 
   rwsetcat [--count-ips] [--print-statistics] [--print-ips]
-        [--cidr-blocks | --cidr-blocks=0 | --cidr-blocks=1]
-        [--network-structure | --network-structure=STRUCTURE]
-        [--ip-ranges]
+        [{ --cidr-blocks | --cidr-blocks=0 | --cidr-blocks=1
+           | --network-structure | --network-structure=STRUCTURE
+           | --ip-ranges }]
         [--ip-format=FORMAT] [--integer-ips] [--zero-pad-ips]
         [--no-columns] [--column-separator=C] [--no-final-delimiter]
         [{--delimited | --delimited=C}]
@@ -24,21 +24,33 @@ B<rwsetcat> - Print the IP addresses in a binary IPset file
 
 When run with no switches, B<rwsetcat> reads each IPset file given on
 the command line and prints its constituent IP addresses to the
-standard output.  When the input IPset contains IPv4 data, B<rwsetcat>
-prints one IP address per line; when the IPset contains IPv6 data,
-B<rwsetcat> prints the IPs as CIDR blocks.  If no file names are
-listed on the command line, B<rwsetcat> will attempt to read an IPset
-from the standard input.
+standard output.  If no file names are listed on the command line,
+B<rwsetcat> attempts to read an IPset from the standard input.
+
+By default, an IPset containing only IPv4 addresses is printed with
+one IP address per line.  For other IPsets, B<rwsetcat> uses CIDR
+blocks when printing.  The B<--cidr-blocks> switch may be used to
+choose which representation is used.
+
+When processing a mix of IPv4 and IPv6 addresses, the SiLK tools that
+build IPsets (e.g., B<rwset(1)>, B<rwsetbuild(1)>) map each IPv4
+address into the ::ffff:0:0/96 IPv6 netblock.  For example 192.0.2.1
+becomes ::ffff:192.0.2.1 or ::ffff:c000:201.  For releases prior to
+SiLK 3.17.0, B<rwsetcat> always displayed these addresses as IPv6 in
+the ::ffff:0:0/96 netblock.  Starting in SiLK 3.17.0, B<rwsetcat>
+shows these addresses as IPv4 unless the C<map-v4> argument is given
+to the B<--ip-format> switch.
 
 B<rwsetcat> can produce additional information about IPset files, such
-as the number of IPs they contain, the number of IPs at the /8, /16,
-/24, and /27 levels, and the minimum and maximum IPs.
+as the number of IPs they contain (use B<--count>), the number of IPs
+in netblocks of arbitrary size (B<--network-structure>), and the
+minimum and maximum IPs (B<--print-statistics>).
 
 To create an IPset file from SiLK Flow records, use B<rwset(1)>.
-B<rwsetbuild(1)> creates an IPset from textual input.  The
-B<--coverset> switch on B<rwbagtool(1)> creates an IPset from a binary
-SiLK Bag.  To determine whether an IPset file contains an IP address,
-use B<rwsetmember(1)>.
+B<rwsetbuild(1)> creates an IPset from textual input.  An IPset may
+also be created by the B<--coverset> switch on B<rwbagtool(1)> and the
+B<--to-ipset> switch of B<rwaggbagtool(1)>.  To determine whether an
+IPset file contains an IP address, use B<rwsetmember(1)>.
 
 =head1 OPTIONS
 
@@ -53,28 +65,29 @@ required for options that take optional parameters.
 
 Print a count of the number of IP addresses in the IPset file.  This
 switch disables the printing of the IP addresses in the IPset file.
-See B<--print-ips> for more information.  When B<--count-ips> is
-specified and more than one IPset file is provided, B<rwsetcat>
-prepends the name of the input file and a colon to the IP address
-count.  See the description of the B<--print-filenames> switch for
-more information.
+Use B<--print-ips> to print the contents of the IPset in addition to
+the count.  When B<--count-ips> is specified and more than one IPset
+file is provided, B<rwsetcat> prepends the name of the input file and
+a colon to the IP address count.  See the description of the
+B<--print-filenames> switch for more information.
 
 =item B<--print-statistics>
 
 Print a summary of the IPset.  The summary includes the minimum IP
 address, the maximum IP address, the number of IP addresses in the
-IPset, and the number of IPs in each netblock predefined netblocks.
+IPset, and the number of IPs in a specific set of netblocks.
 For an IPset containing only IPv4 addresses, the netblocks are /8,
 /16, /24, and /27, and the output includes what percentage of IPv4
 address space is covered.  For an IPv6 IPset, the netblock are /8,
 /16, /24, /32, /40, /48, /56, /64, /72, /80, /88, /96, /112, and /120.
 
 This switch disables the printing of the IP addresses in the IPset.
-See B<--print-ips> for more information.  When B<--print-statistics>
-is specified and more than one IPset file is provided, B<rwsetcat>
-prints the name of the input file, a colon, and a newline prior to
-printing the statistics.  See the description of the
-B<--print-filenames> switch for more information.
+Use B<--print-ips> to print the contents of the IPset in addition to
+the statistics.  When B<--print-statistics> is specified and more than
+one IPset file is provided, B<rwsetcat> prints the name of the input
+file, a colon, and a newline prior to printing the statistics.  See
+the description of the B<--print-filenames> switch for more
+information.
 
 =item B<--print-ips>
 
@@ -91,9 +104,18 @@ When an argument is not provided to the switch or when the argument is
 1, group sequential IPs into the largest possible CIDR block and print
 CIDR blocks in the IPset file, If the argument is 0, print the
 individual IPs in the IPset file.  By default, B<rwsetcat> prints
-individual IPs for IPv4 IPsets and CIDR blocks for IPv6 IPsets.  See
-also the B<--ip-ranges> switch.  This switch cannot be combined with
-the B<--network-structure> switch.
+individual IPs for IPv4 IPsets and CIDR blocks for IPv6 IPsets.  This
+switch may not be combined with the B<--ip-ranges> or
+B<--network-structure> switches.
+
+=item B<--ip-ranges>
+
+Print the IPset in three pipe-delimited (B<|>) columns where each row
+represents a contiguous IP range: the first column is the number of
+IPs in the range, the second is the start of the range, and the final
+is the end of the range.  This prints the IPset in the fewest number
+of lines.  This switch may not be combined with the B<--cidr-blocks>
+or B<--network-structure> switches.
 
 =item B<--network-structure>
 
@@ -157,56 +179,103 @@ C<A>, C<B>, C<C>, and C<X> are supported as aliases for 8, 16, 24, and
 27, respectively.  A comma is not required between adjacent letters.
 The B<--network-structure> switch disables printing of the IPs in the
 IPset file; specify the C<H> argument to the switch to print each
-individual IP address.
-
-=item B<--ip-ranges>
-
-Cause the output to contain three pipe-delimited (B<|>) columns: the
-first is the number of IPs in the contiguous range, the second is the
-start of the range, and the final is the end of the range.  This
-prints the IPset in the fewest number of lines.
+individual IP address.  This switch may not be combined with the
+B<--cidr-blocks> or B<--ip-ranges> switches.
 
 =item B<--ip-format>=I<FORMAT>
 
-Specify how IP addresses are printed.  When this switch is not
-specified, the SILK_IP_FORMAT environment variable is checked for a
-format.  If it is empty or contains an invalid format, IPs are printed
-in the canonical format.  The I<FORMAT> is one of:
+Specify how IP addresses are printed, where I<FORMAT> is a
+comma-separated list of the arguments described below.  When this
+switch is not specified, the SILK_IP_FORMAT environment variable is
+checked for a value and that format is used if it is valid.  The
+default I<FORMAT> is C<canonical>,C<unmap-v6>.  (The default
+presentation of IPv4 addresses in a mixed IPv4-IPv6 IPset changed in
+SiLK 3.17.0 as described above in L<DESCRIPTION/>.)  I<Since SiLK
+3.7.0.>
 
 =over 4
 
 =item canonical
 
-Print IP addresses in their canonical form: dotted quad for IPv4
-(C<127.0.0.1>) and hexadectet for IPv6 (C<2001:db8::1>).  Note that
-IPv6 addresses in ::ffff:0:0/96 and some IPv6 addresses in ::/96 will
-be printed as a mixture of IPv6 and IPv4.
+Print IP addresses in the canonical format.  For an IPv4 address, use
+dot-separated decimal (C<192.0.2.1>).  Also use dot-separated decimal
+for IPv4-mapped IPv6 addresses (addresses in the ::ffff:0:0/96
+netblock) unless I<FORMAT> includes C<map-v4>.  For other IPv6
+addresses, use either colon-separated hexadecimal (C<2001:db8::1>) or
+a mixed IPv4-IPv6 representation for IPv4-compatible IPv6 addresses
+(the ::/96 netblock other than ::/127, e.g., C<::192.0.2.1>).  When
+C<map-v4> is part of the argument, use the mixed representation for
+IPv4-mapped IPv6 addresses (the ::ffff:0:0/96 netblock, e.g.,
+C<::ffff:192.0.2.1>).
 
-=item zero-padded
+=item no-mixed
 
-Print IP addresses in their canonical form, but add zeros to the
-output so it fully fills the width of column.  The addresses
-C<127.0.0.1> and C<2001:db8::1> are printed as C<127.000.000.001> and
-C<2001:0db8:0000:0000:0000:0000:0000:0001>, respectively.
+Print IP addresses in the canonical format (C<192.0.2.1> or
+C<2001:db8::1>) but do not used the mixed IPv4-IPv6 representations.
+For example, use C<::c000:201> instead of C<::192.0.2.1>.  When
+I<FORMAT> includes C<map-v4>, also use C<::ffff:c000:201> instead of
+C<::ffff:192.0.2.1>.  I<Since SiLK 3.17.0>.
 
 =item decimal
 
-Print IP addresses as integers in decimal format.  The addresses
-C<127.0.0.1> and C<2001:db8::1> are printed as C<2130706433> and
-C<42540766411282592856903984951653826561>, respectively.
+Print IP addresses as integers in decimal format.  For example, print
+C<192.0.2.1> and C<2001:db8::1> as C<3221225985> and
+C<42540766411282592856903984951653826561>, respectively.  Values in
+the ::ffff:0:0/96 netblock are not converted to IPv4 unless
+C<unmap-v6> is explicitly given.
 
 =item hexadecimal
 
-Print IP addresses as integers in hexadecimal format.  The addresses
-C<127.0.0.1> and C<2001:db8::1> are printed as C<7f000001> and
-C<20010db8000000000000000000000001>, respectively.
+Print IP addresses as integers in hexadecimal format.  For example,
+print C<192.0.2.1> and C<2001:db8::1> as C<c00000201> and
+C<20010db8000000000000000000000001>, respectively.  Values in
+the ::ffff:0:0/96 netblock are not converted to IPv4 unless
+C<unmap-v6> is explicitly given.
+
+=item zero-padded
+
+Make all IP address strings contain the same number of characters by
+padding numbers with leading zeros.  For example, print C<192.0.2.1>
+and C<2001:db8::1> as C<192.000.002.001> and
+C<2001:0db8:0000:0000:0000:0000:0000:0001>, respectively.  For IPv6
+addresses, this setting implies C<no-mixed>, so that C<::192.0.2.1> is
+printed as C<0000:0000:0000:0000:0000:0000:c000:0201>.  As of SiLK
+3.17.0, may be combined with any of the above, including C<decimal>
+and C<hexadecimal>.  IPv4-mapped IPv6 addresses are printed as IPv6
+unless I<FORMAT> also includes C<map-v4>, C<decimal>, or
+C<hexadecimal>.
+
+=back
+
+The following arguments modify certain IP addresses prior to printing.
+These arguments may be combined with the above formats.
+
+=over 4
+
+=item map-v4
+
+When the IPset contains only IPv4 addresses, change all IPv4 addresses
+to IPv4-mapped IPv6 addresses (addresses in the ::ffff:0:0/96
+netblock) prior to formatting.  For an IPset containing IPv6
+addresses, do not map addresses in the ::ffff:0:0/96 netblock to IPv4.
+I<Since SiLK 3.17.0>.
+
+=item unmap-v6
+
+When the IPset contains IPv6 addresses, change any IPv4-mapped IPv6
+addresses (addresses in the ::ffff:0:0/96 netblock) to IPv4 addresses
+prior to formatting.  This argument is enabled by default for the
+C<canonical> and C<no-mixed> formats.  I<Since SiLK 3.17.0>.
+
+=back
+
+The following argument is also available:
+
+=over 4
 
 =item force-ipv6
 
-Print all IP addresses in the canonical form for IPv6 without using
-any IPv4 notation.  Any IPv4 address is mapped into the ::ffff:0:0/96
-netblock.  The addresses C<127.0.0.1> and C<2001:db8::1> are printed
-as C<::ffff:7f00:1> and C<2001:db8::1>, respectively.
+Set I<FORMAT> to C<map-v4>,C<no-mixed>.
 
 =back
 
@@ -410,6 +479,10 @@ range, its starting IP, and its ending IP.
  $ rwsetcat --ip-ranges sample.set
          11|     10.1.2.250|       10.1.3.4|
 
+Since contiguous but different-sized CIDR blocks can be combined into
+a single range, the B<--ip-ranges> switch prints the IPset in the
+first number of rows.
+
 Add the B<--ip-format=decimal> switch to see contiguous IPs printed as
 ranges of integers.
 
@@ -495,11 +568,12 @@ B<rwsetcat> prints the contents of each file one after the other.
 To print the union of multiple the IPset files, use B<rwsettool(1)> to
 join the files and have B<rwsetcat> print the result.
 
- $ rwsettool --union set1-v6.set sample.set | rwsetcat --cidr-blocks=1
- ::ffff:10.1.2.250/127
- ::ffff:10.1.2.252/126
- ::ffff:10.1.3.0/126
- ::ffff:10.1.3.4
+ $ rwsettool --union set1-v6.set sample.set \
+   | rwsetcat --cidr-blocks=1
+ 10.1.2.250/127
+ 10.1.2.252/126
+ 10.1.3.0/126
+ 10.1.3.4
  2001:db8:0:5::/68
  2001:db8:0:5:f000::/68
  2001:db8:0:c::/67
@@ -752,7 +826,7 @@ B<rwbagtool(1)>, B<rwcut(1)>, B<silk(7)>, B<cut(1)>
 
 =cut
 
-$SiLK: rwsetcat.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
+$SiLK: rwsetcat.pod 62a32b7637cc 2018-03-16 17:30:43Z mthomas $
 
 Local Variables:
 mode:text

@@ -16,7 +16,7 @@
                                    headers */
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pysilk.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: pysilk.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skbag.h>
@@ -6895,7 +6895,7 @@ silkPySilkFile_invocations(
         skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_INVOCATION_ID);
         while ((entry = skHeaderIteratorNext(&iter)) != NULL) {
             invoc = PyUnicode_FromString(
-                ((sk_hentry_invocation_t*)entry)->command_line);
+                skHentryInvocationGetInvocation(entry));
             if (invoc == NULL) {
                 Py_DECREF(list);
                 return NULL;
@@ -6932,7 +6932,7 @@ silkPySilkFile_notes(
         skHeaderIteratorBindType(&iter, hdr, SK_HENTRY_ANNOTATION_ID);
         while ((entry = skHeaderIteratorNext(&iter)) != NULL) {
             annot = PyUnicode_FromString(
-                ((sk_hentry_annotation_t*)entry)->annotation);
+                skHentryAnnotationGetNote(entry));
             if (annot == NULL) {
                 Py_DECREF(list);
                 return NULL;

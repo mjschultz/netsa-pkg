@@ -19,7 +19,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfileinfo.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwfileinfo.c 9dfb5116673a 2018-04-02 19:18:40Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/skstream.h>
@@ -214,7 +214,7 @@ static int no_titles = 0;
 /* for looping over files on the command line */
 static sk_options_ctx_t *optctx = NULL;
 
-/* FIXME: Consider adding --pager and --output-file support. */
+/* FIXME: Consider adding --pager and --output-path support. */
 
 
 /* OPTIONS SETUP */

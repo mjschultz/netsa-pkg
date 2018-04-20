@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbag.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwbag.c f9d6dfd21826 2018-03-07 21:48:09Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skbag.h>
@@ -379,6 +379,7 @@ appTeardown(
         }
         skVectorDestroy(pmap_vec);
     }
+    skCountryTeardown();
 
     /* close the copy stream */
     skOptionsCtxCopyStreamClose(optctx, &skAppPrintErr);

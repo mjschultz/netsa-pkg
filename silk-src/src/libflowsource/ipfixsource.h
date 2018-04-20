@@ -31,7 +31,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_IPFIXSOURCE_H, "$SiLK: ipfixsource.h 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENTVAR(rcsID_IPFIXSOURCE_H, "$SiLK: ipfixsource.h f7a89df0ba0f 2018-03-15 22:06:43Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/skipfix.h>
@@ -454,28 +454,19 @@ ipfixSourceGetRecordFromFile(
 /**
  *    If non-zero, print the templates when they arrive.  This can be
  *    set by defining the environment variable specified in
- *    SK_ENV_PRINT_TEMPLATES.
+ *    SK_ENV_PRINT_TEMPLATES ("SILK_IPFIX_PRINT_TEMPLATES").
  */
 extern int print_templates;
 
 /**
- *    The names of IE 48, 49, 50 used by fixbuf (flowSamplerFOO) do
- *    not match the names specified by IANA (samplerFOO).  At some
- *    point the names used by fixbuf will change, and this variable is
- *    for forward compatibility to determine which names fixbuf uses.
- *    It is set by skiInitialize().
+ *    The names of IE 48, 49, 50 used by fixbuf-1.x (flowSamplerFOO)
+ *    do not match the names specified by IANA (samplerFOO).  In
+ *    fixbuf-2.x, the names match the IANA names.  This variable
+ *    reflects which names fixbuf uses.  It is set by skiInitialize().
  *
- *    Variables and structure members in this file use the IANA name.
+ *    Variables and structure members in SiLK use the IANA name.
  */
 extern uint32_t sampler_flags;
-
-/**
- *    Whether to consider the source port when determining whether a
- *    source is unique.  See fbCollectorManageUDPStreamByPort().  This
- *    is TRUE unless the environment variable named by
- *    SK_IPFIX_UDP_IGNORE_SOURCE_PORT is set to a non-zero value.
- */
-extern int consider_udp_sport;
 
 
 #ifdef __cplusplus

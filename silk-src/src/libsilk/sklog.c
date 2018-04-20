@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sklog.c 6afdbc8e3e34 2018-02-16 20:14:28Z mthomas $");
+RCSIDENT("$SiLK: sklog.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/sklog.h>
 #include <silk/skstringmap.h>
@@ -76,6 +76,10 @@ RCSIDENT("$SiLK: sklog.c 6afdbc8e3e34 2018-02-16 20:14:28Z mthomas $");
         SKLOG_CALL_LOGGER((pri), (fmt), _args); \
         va_end(_args);                          \
     }
+
+/* return non-zero if messages at level 'pri' are being logged */
+#define SKLOG_INCLUDES_PRI(pri)                 \
+    logctx->l_priority & LOG_MASK(pri)
 
 /* invoke the lock and unlock functions if they are defined */
 #define SKLOG_LOCK()                                    \
@@ -167,7 +171,7 @@ typedef struct sklog_context_st {
     /* the command line invocation of the application */
     char           *l_cmd;
     /* which levels of messages to log */
-    int             l_mask;
+    int             l_priority;
     /* what features users requested in sklogSetup() */
     int             l_features;
     /* whether the log is open */
@@ -574,7 +578,7 @@ logRotatedLog(
     char *rotated_path = NULL;
     int rv;
 
-    if (logctx && logctx->l_open) {
+    if (logctx && logctx->l_open && SKLOG_INCLUDES_PRI(priority)) {
         SKLOG_LOCK();
         if (logctx->l_rot.rolltime < time(NULL)) {
             /* Must rotate logs.  First, grab current log file. */
@@ -751,7 +755,7 @@ logSimpleLog(
     const char         *fmt,
     va_list             args)
 {
-    if (logctx && logctx->l_open) {
+    if (logctx && logctx->l_open && SKLOG_INCLUDES_PRI(priority)) {
         SKLOG_LOCK();
 
         logSimpleVPrintf(priority, fmt, args);
@@ -829,9 +833,8 @@ logSimpleVPrintf(
     char msgbuf[MSGBUF_SIZE];
     size_t len;
 
-    if ( !(LOG_MASK(priority) & logctx->l_mask)) {
-        return;
-    }
+    SK_UNUSED_PARAM(priority);
+    assert(LOG_MASK(priority) & logctx->l_priority);
 
     len = logctx->l_sim.stamp_fn(msgbuf, sizeof(msgbuf));
     vsnprintf(msgbuf+len, (sizeof(msgbuf)-len), fmt, args);
@@ -977,15 +980,17 @@ sklogNonBlock(
           case SKLOG_DEST_STDOUT:
           case SKLOG_DEST_STDERR:
           case SKLOG_DEST_DIRECTORY:
-            if (logctx->l_trylock_fn) {
-                if (0 != logctx->l_trylock_fn(logctx->l_lock_data)) {
-                    /* cannot get lock */
-                    break;
+            if (SKLOG_INCLUDES_PRI(priority)) {
+                if (logctx->l_trylock_fn) {
+                    if (0 != logctx->l_trylock_fn(logctx->l_lock_data)) {
+                        /* cannot get lock */
+                        break;
+                    }
                 }
-            }
-            logSimpleVPrintf(priority, fmt, args);
-            if (logctx->l_unlock_fn) {
-                logctx->l_unlock_fn(logctx->l_lock_data);
+                logSimpleVPrintf(priority, fmt, args);
+                if (logctx->l_unlock_fn) {
+                    logctx->l_unlock_fn(logctx->l_lock_data);
+                }
             }
             break;
 
@@ -998,6 +1003,18 @@ sklogNonBlock(
 
     va_end(args);
 }
+
+
+int
+sklogCheckLevel(
+    int                 level)
+{
+    if (logctx) {
+        return (SKLOG_INCLUDES_PRI(level) ? 1 : 0);
+    }
+    return 0;
+}
+
 
 /* close a log if open. */
 void
@@ -1123,7 +1140,7 @@ sklogGetLevel(
 
     if (logctx) {
         for (e = log_level; e->name != NULL; ++e) {
-            if (LOG_UPTO(e->id) == logctx->l_mask) {
+            if (LOG_UPTO(e->id) == logctx->l_priority) {
                 return e->name;
             }
         }
@@ -1138,7 +1155,7 @@ sklogGetMask(
     void)
 {
     if (logctx) {
-        return logctx->l_mask;
+        return logctx->l_priority;
     }
     return 0;
 }
@@ -1868,8 +1885,8 @@ sklogSetMask(
         skAppPrintErr("Must setup the log before setting the mask");
         return -1;
     }
-    old_mask = logctx->l_mask;
-    logctx->l_mask = new_mask;
+    old_mask = logctx->l_priority;
+    logctx->l_priority = new_mask;
 
     switch (logctx->l_dest) {
       case SKLOG_DEST_NOT_SET:
@@ -1981,7 +1998,7 @@ sklogSetup(
     logctx = &logger;
     memset(logctx, 0, sizeof(sklog_context_t));
     logctx->l_dest = SKLOG_DEST_NOT_SET;
-    logctx->l_mask = LOG_UPTO(SKLOG_DEFAULT_LEVEL);
+    logctx->l_priority = LOG_UPTO(SKLOG_DEFAULT_LEVEL);
     logctx->l_sys.options = SKLOG_SYSOPTIONS;
     logctx->l_sys.facility = SKLOG_SYSFACILITY;
     logctx->l_features = feature_flags;

@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKUNIQUE_H, "$SiLK: skunique.h 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENTVAR(rcsID_SKUNIQUE_H, "$SiLK: skunique.h 36aa83adce9e 2018-03-19 18:06:42Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -517,8 +517,12 @@ typedef enum sk_fieldid_en {
     SK_FIELD_SUM_BYTES,
 
     SK_FIELD_SUM_ELAPSED,       /* 32 */
+    SK_FIELD_SUM_ELAPSED_MSEC,
     SK_FIELD_MIN_STARTTIME,
     SK_FIELD_MAX_ENDTIME,
+
+    SK_FIELD_MIN_STARTTIME_MSEC,/* 36 */
+    SK_FIELD_MAX_ENDTIME_MSEC,
     SK_FIELD_CALLER
 } sk_fieldid_t;
 

@@ -191,11 +191,12 @@ B<addrtype(3)>.  The Address Type file provides a way to map an IPv4
 address to an integer denoting the IP as internal, external, or
 non-routable.
 
-B<ccfilter(3)>.  The Country Code file provides a mapping from an IPv4
+B<ccfilter(3)>.  The Country Code file provides a mapping from an IP
 address to two-letter, lowercase abbreviation of the country what that
 IP address is located.  The abbreviations used by the Country Code
-utility are those used by the Root-Zone Whois Index (see for example
-L<http://www.iana.org/cctld/cctld-whois.htm>).
+utility are those defined by ISO 3166-1 (see for example
+L<https://www.iso.org/iso-3166-country-codes.html> or
+L<https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2>).
 
 B<pmapfilter(3)>.  Prefix map files provide a way to map field
 values to string labels based on a user-defined map file.  The map
@@ -563,7 +564,9 @@ are disabled and the source and destination ports remain unchanged.
 
 For the IPset family of tools, this environment variable is used as
 the default value for the B<--record-version> switch when the switch
-is not provided on the command line.  I<Since SiLK 3.7.0.>
+is not provided on the command line.  The variable is also used by
+B<rwbagtool(1)> and B<rwaggbagtool(1)> when writing an IPset file.
+I<Since SiLK 3.7.0.>
 
 =item SILK_IPV6_POLICY
 
@@ -782,7 +785,7 @@ L<http://tools.netsa.cert.org/silk/>
 
 =cut
 
-$SiLK: silk.pod 0a5374cd2f26 2017-05-09 17:11:42Z mthomas $
+$SiLK: silk.pod c95fb6174130 2018-04-13 20:33:46Z mthomas $
 
 Local Variables:
 mode:text

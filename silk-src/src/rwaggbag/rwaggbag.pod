@@ -269,19 +269,20 @@ added to the Aggregate Bag.
 =item asv4
 
 Convert IPv6 flow records that contain addresses in the ::ffff:0:0/96
-prefix to IPv4 and ignore all other IPv6 flow records.
+netblock (that is, IPv4-mapped IPv6 addresses) to IPv4 and ignore all
+other IPv6 flow records.
 
 =item mix
 
 Process the input as a mixture of IPv4 and IPv6 flow records.  When
 creating a bag whose key is an IP address and the input contains IPv6
-addresses outside of the ::ffff:0:0/96 prefix, this policy is
+addresses outside of the ::ffff:0:0/96 netblock, this policy is
 equivalent to B<force>; otherwise it is equivalent to B<asv4>.
 
 =item force
 
 Convert IPv4 flow records to IPv6, mapping the IPv4 addresses into the
-::ffff:0:0/96 prefix.
+::ffff:0:0/96 netblock.
 
 =item only
 
@@ -461,7 +462,7 @@ B<zlib(3)>
 
 =cut
 
-$SiLK: rwaggbag.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
+$SiLK: rwaggbag.pod b0e7e8c70cb5 2017-12-15 19:38:06Z mthomas $
 
 Local Variables:
 mode:text

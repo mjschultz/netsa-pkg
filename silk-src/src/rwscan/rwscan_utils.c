@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwscan_utils.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwscan_utils.c e69deb81239c 2018-03-13 14:56:37Z mthomas $");
 
 #include "rwscan.h"
 
@@ -617,13 +617,16 @@ void
 print_flow(
     const rwRec        *rwcurr)
 {
-    char sipstr[SK_NUM2DOT_STRLEN];
-    char dipstr[SK_NUM2DOT_STRLEN];
+    char sipstr[SKIPADDR_STRLEN];
+    char dipstr[SKIPADDR_STRLEN];
     char timestr[SKTIMESTAMP_STRLEN];
     char flag_string[SK_TCPFLAGS_STRLEN];
+    skipaddr_t ipaddr;
 
-    num2dot_r(rwRecGetSIPv4(rwcurr), sipstr);
-    num2dot_r(rwRecGetDIPv4(rwcurr), dipstr);
+    rwRecMemGetSIP(rwcurr, &ipaddr);
+    skipaddrString(sipstr, &ipaddr, 0);
+    rwRecMemGetDIP(rwcurr, &ipaddr);
+    skipaddrString(dipstr, &ipaddr, 0);
     sktimestamp_r(timestr, rwRecGetStartTime(rwcurr), 0);
     switch (rwRecGetProto(rwcurr)) {
       case IPPROTO_ICMP:

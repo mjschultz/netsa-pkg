@@ -86,7 +86,7 @@ An unsigned 32-bit integer:
 
 =item *
 
-An IPv6 address in canonical form (when SiLK has been compiled with
+An IPv6 address in canonical format (when SiLK has been compiled with
 IPv6 support):
 
  2001:db8:a:1::2:4
@@ -106,10 +106,10 @@ four octets are still required:
 
 SiLK IP wildcard notation.  A SiLK IP Wildcard can represent multiple
 IPv4 or IPv6 addresses.  An IP Wildcard contains an IP in its
-canonical form, except each part of the IP (where I<part> is an octet
-for IPv4 or a hexadectet for IPv6) may be a single value, a range, a
-comma separated list of values and ranges, or the letter C<x> to
-signify all values for that part of the IP (that is, C<0-255> for
+canonical format, except each part of the IP (where I<part> is an
+octet for IPv4 or a hexadectet for IPv6) may be a single value, a
+range, a comma separated list of values and ranges, or the letter C<x>
+to signify all values for that part of the IP (that is, C<0-255> for
 IPv4).  You may not specify a CIDR suffix when using the IP Wildcard
 notation.
 
@@ -344,11 +344,12 @@ column to a country code and stores the country code in the bag.  Uses
 the mapping file specified by the SILK_COUNTRY_CODES environment
 variable or the F<country_codes.pmap> mapping file, as described in
 L</FILES>.  (See also B<ccfilter(3)>.)  The abbreviations are those
-used by the Root-Zone Whois Index (see for example
-L<http://www.iana.org/cctld/cctld-whois.htm>) or the following special
-codes: B<--> N/A (e.g. private and experimental reserved addresses);
-B<a1> anonymous proxy; B<a2> satellite provider; B<o1> other I<Since
-SiLK 3.12.0.>
+defined by ISO 3166-1 (see for example
+L<https://www.iso.org/iso-3166-country-codes.html> or
+L<https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2>) or the following
+special codes: B<--> N/A (e.g. private and experimental reserved
+addresses); B<a1> anonymous proxy; B<a2> satellite provider; B<o1>
+other I<Since SiLK 3.12.0.>
 
 =item dip-country
 
@@ -680,7 +681,7 @@ A less efficient solution is to convert each IPset to a bag and then
 use B<rwbagtool(1)> to add the bags together:
 
  $ for i in *.set ; do
-        rwbagbuild --set-input=$i --output-file=/tmp/$i.bag ;
+        rwbagbuild --set-input=$i --output-path=/tmp/$i.bag ;
    done
  $ rwbagtool --add /tmp/*.set.bag > total2.bag
  $ rm /tmp/*.set.bag
@@ -693,10 +694,10 @@ a bag on its standard output, B<rwbagtool> creates F<tmp.bag> by
 adding its standard input to F<total3.bag>, and we rename F<tmp.bag>
 to F<total3.bag>:
 
- $ rwbagbuild --bag-input=/dev/null --output-file=total3.bag
+ $ rwbagbuild --bag-input=/dev/null --output-path=total3.bag
  $ for i in *.set ; do
         rwbagbuild --set-input=$i  \
-        | rwbagtool --output-file=tmp.bag --add total3.bag stdin ;
+        | rwbagtool --output-path=tmp.bag --add total3.bag stdin ;
         /bin/mv tmp.bag total3.bag ;
    done
  $ rwbagcat total3.bag
@@ -715,12 +716,12 @@ mapping an IP address to a country code is identical to that when
 building an ordinary bag.
 
  $ rwbagbuild --bag-input=mybag.txt --delimiter=,       \
-        --key-type=any-country --output-file=scc1.bag
+        --key-type=any-country --output-path=scc1.bag
  $ rwbagcat scc1.bag
  --|                 527|
 
  $ rwbagbuild --set-input=A.set --key-type=any-country  \
-        --output-file=scc2.bag
+        --output-path=scc2.bag
  $ rwbagcat scc2.bag
  --|                   2|
 
@@ -741,7 +742,7 @@ normal bag file.
 
  $ rwbagbuild --bag-input=mybag.txt --delimiter=,       \
         --key-type=sip-pmap --pmap-file=ip-map.pmap     \
-        --output-file=test2.bag
+        --output-path=test2.bag
 
 The prefix map file is not stored as part of the Bag, so you must
 provide the name of the prefix map when running B<rwbagcat(1)>.
@@ -828,7 +829,7 @@ The B<--default-count> switch is poorly named.
 
 =cut
 
-$SiLK: rwbagbuild.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
+$SiLK: rwbagbuild.pod c95fb6174130 2018-04-13 20:33:46Z mthomas $
 
 Local Variables:
 mode:text

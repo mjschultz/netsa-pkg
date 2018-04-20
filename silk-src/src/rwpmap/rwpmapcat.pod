@@ -179,46 +179,85 @@ switch is ignored for prefix map files containing protocol/port pairs.
 
 =item B<--ip-format>=I<FORMAT>
 
-Specify how IP addresses are printed.  This switch is ignored for
-prefix map files containing protocol/port pairs.  When this switch is
-not specified, the SILK_IP_FORMAT environment variable is checked for
-a format.  If it is empty or contains an invalid format, IPs are
-printed in the canonical format.  The I<FORMAT> is one of:
+Specify how IP addresses are printed, where I<FORMAT> is a
+comma-separated list of the arguments described below.  This switch is
+ignored for prefix map files containing protocol/port pairs.  When this
+switch is not specified, the SILK_IP_FORMAT environment variable is
+checked for a value and that format is used if it is valid.  The
+default I<FORMAT> is C<canonical> according to whether the prefix map
+file is IPv4 or IPv6.  I<Since SiLK 3.7.0.>
 
 =over 4
 
 =item canonical
 
-Print IP addresses in their canonical form: dotted quad for IPv4
-(C<127.0.0.1>) and hexadectet for IPv6 (C<2001:db8::1>).  Note that
-IPv6 addresses in ::ffff:0:0/96 and some IPv6 addresses in ::/96 will
-be printed as a mixture of IPv6 and IPv4.
+Print IP addresses in the canonical format.  For an IPv4 prefix map,
+use dot-separated decimal (C<192.0.2.1>).  For an IPv6 prefix map, use
+colon-separated hexadecimal (C<2001:db8::1>) or a mixed IPv4-IPv6
+representation for IPv4-mapped IPv6 addresses (the ::ffff:0:0/96
+netblock, e.g., C<::ffff:192.0.2.1>) and IPv4-compatible IPv6
+addresses (the ::/96 netblock other than ::/127, e.g.,
+C<::192.0.2.1>).
 
-=item zero-padded
+=item no-mixed
 
-Print IP addresses in their canonical form, but add zeros to the
-output so it fully fills the width of column.  The addresses
-C<127.0.0.1> and C<2001:db8::1> are printed as C<127.000.000.001> and
-C<2001:0db8:0000:0000:0000:0000:0000:0001>, respectively.
+Print IP addresses in the canonical format (C<192.0.2.1> or
+C<2001:db8::1>) but do not used the mixed IPv4-IPv6 representations.
+For example, use C<::ffff:c000:201> instead of C<::ffff:192.0.2.1>.
+I<Since SiLK 3.17.0>.
 
 =item decimal
 
-Print IP addresses as integers in decimal format.  The addresses
-C<127.0.0.1> and C<2001:db8::1> are printed as C<2130706433> and
+Print IP addresses as integers in decimal format.  For example, print
+C<192.0.2.1> and C<2001:db8::1> as C<3221225985> and
 C<42540766411282592856903984951653826561>, respectively.
 
 =item hexadecimal
 
-Print IP addresses as integers in hexadecimal format.  The addresses
-C<127.0.0.1> and C<2001:db8::1> are printed as C<7f000001> and
+Print IP addresses as integers in hexadecimal format.  For example,
+print C<192.0.2.1> and C<2001:db8::1> as C<c00000201> and
 C<20010db8000000000000000000000001>, respectively.
+
+=item zero-padded
+
+Make all IP address strings contain the same number of characters by
+padding numbers with leading zeros.  For example, print C<192.0.2.1>
+and C<2001:db8::1> as C<192.000.002.001> and
+C<2001:0db8:0000:0000:0000:0000:0000:0001>, respectively.  For IPv6
+addresses, this setting implies C<no-mixed>, so that
+C<::ffff:192.0.2.1> is printed as
+C<0000:0000:0000:0000:0000:ffff:c000:0201>.  As of SiLK 3.17.0, may be
+combined with any of the above, including C<decimal> and
+C<hexadecimal>.
+
+=back
+
+The following arguments modify certain IP addresses prior to printing.
+These arguments may be combined with the above formats.
+
+=over 4
+
+=item map-v4
+
+When the prefix map contains only IPv4 addresses, change all IPv4
+addresses to IPv4-mapped IPv6 addresses (addresses in the
+::ffff:0:0/96 netblock) prior to formatting.  I<Since SiLK 3.17.0>.
+
+=item unmap-v6
+
+When the prefix map contains IPv6 addresses, change any IPv4-mapped
+IPv6 addresses (addresses in the ::ffff:0:0/96 netblock) to IPv4
+addresses prior to formatting.  I<Since SiLK 3.17.0>.
+
+=back
+
+The following argument is also available:
+
+=over 4
 
 =item force-ipv6
 
-Print all IP addresses in the canonical form for IPv6 without using
-any IPv4 notation.  Any IPv4 address is mapped into the ::ffff:0:0/96
-netblock.  The addresses C<127.0.0.1> and C<2001:db8::1> are printed
-as C<::ffff:7f00:1> and C<2001:db8::1>, respectively.
+Set I<FORMAT> to C<map-v4>,C<no-mixed>.
 
 =back
 
@@ -318,7 +357,7 @@ textual input.
        192.0.2.0/24  non-routable
      192.168.0.0/16  non-routable
  255.255.255.255/32  non-routable
- $ rwpmapbuild --input-file=sample.txt --output-file=sample.txt
+ $ rwpmapbuild --input-path=sample.txt --output-path=sample.txt
 
 Invoking B<rwpmapcat> with the name of the file as its only argument
 prints the range-to-label contents of the prefix map file, and the
@@ -500,7 +539,7 @@ SiLK 3.8.0.
 
 =cut
 
-$SiLK: rwpmapcat.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
+$SiLK: rwpmapcat.pod 814fc64df055 2018-04-02 19:15:45Z mthomas $
 
 Local Variables:
 mode:text

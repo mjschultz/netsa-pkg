@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKAGGBAG_H, "$SiLK: skaggbag.h 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENTVAR(rcsID_SKAGGBAG_H, "$SiLK: skaggbag.h fb6bbde7cf83 2018-02-23 22:01:16Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/skstream.h>
@@ -25,6 +25,9 @@ RCSIDENTVAR(rcsID_SKAGGBAG_H, "$SiLK: skaggbag.h 2e9b8964a7da 2017-12-22 18:13:1
  *    The API to AggBag, a container and associated file format that
  *    contains a Bag-like data structure (see skbag.h) where the key
  *    and counter are aggregates of multiple fields.
+ *
+ *    Since SiLK 3.15.0.
+ *
  *
  *    To create an AggBag, use skAggBagCreate().  Specify the type of
  *    the fields that comprise the key and counter by calling
@@ -423,16 +426,16 @@ skAggBagFieldIterNext(
     sk_aggbag_field_t  *field_iter);
 
 
-#if 0
 /**
  *    Reset the iterator 'field_iter' that supports iterating over the
  *    fields that comprise the key or counter.  This function sets the
  *    iterator to point at the first field in the key or counter.
+ *
+ *    Since SiLK 3.17.0.
  */
 void
 skAggBagFieldIterReset(
     sk_aggbag_field_t  *field_iter);
-#endif  /* 0 */
 
 
 /**

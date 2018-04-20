@@ -207,12 +207,13 @@ guess as to the content of the flow
 the country code of the source IP address.  Uses the mapping file
 specified by the SILK_COUNTRY_CODES environment variable or the
 F<country_codes.pmap> mapping file, as described in L</FILES>.  (See
-also B<ccfilter(3)>.)  The abbreviations are those used by the
-Root-Zone Whois Index (see for example
-L<http://www.iana.org/cctld/cctld-whois.htm>) or the following special
-codes: B<--> N/A (e.g. private and experimental reserved addresses);
-B<a1> anonymous proxy; B<a2> satellite provider; B<o1> other I<Since
-SiLK 3.12.0.>
+also B<ccfilter(3)>.)  The abbreviations are those defined by ISO
+3166-1 (see for example
+L<https://www.iso.org/iso-3166-country-codes.html> or
+L<https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2>) or the following
+special codes: B<--> N/A (e.g. private and experimental reserved
+addresses); B<a1> anonymous proxy; B<a2> satellite provider; B<o1>
+other I<Since SiLK 3.12.0.>
 
 =item scc
 
@@ -361,19 +362,20 @@ added to the bag(s).
 =item asv4
 
 Convert IPv6 flow records that contain addresses in the ::ffff:0:0/96
-prefix to IPv4 and ignore all other IPv6 flow records.
+netblock (that is, IPv4-mapped IPv6 addresses) to IPv4 and ignore all
+other IPv6 flow records.
 
 =item mix
 
 Process the input as a mixture of IPv4 and IPv6 flow records.  When
 creating a bag whose key is an IP address and the input contains IPv6
-addresses outside of the ::ffff:0:0/96 prefix, this policy is
+addresses outside of the ::ffff:0:0/96 netblock, this policy is
 equivalent to B<force>; otherwise it is equivalent to B<asv4>.
 
 =item force
 
 Convert IPv4 flow records to IPv6, mapping the IPv4 addresses into the
-::ffff:0:0/96 prefix.
+::ffff:0:0/96 netblock.
 
 =item only
 
@@ -383,10 +385,10 @@ contained in IPv6 flow records will be added to the bag(s).
 =back
 
 Regardless of the IPv6 policy, when all IPv6 addresses in the bag are
-in the ::ffff:0:0/96 prefix, B<rwbag> treats them as IPv4 addresses
+in the ::ffff:0:0/96 netblock, B<rwbag> treats them as IPv4 addresses
 and writes an IPv4 bag.  When any other IPv6 addresses are present in
 the bag, the IPv4 addresses in the bag are mapped into the
-::ffff:0:0/96 prefix and B<rwbag> writes an IPv6 bag.
+::ffff:0:0/96 netblock and B<rwbag> writes an IPv6 bag.
 
 =item B<--compression-method>=I<COMP_METHOD>
 
@@ -846,7 +848,7 @@ B<zlib(3)>
 
 =cut
 
-$SiLK: rwbag.pod 118af073bc56 2017-06-05 18:13:10Z mthomas $
+$SiLK: rwbag.pod c95fb6174130 2018-04-13 20:33:46Z mthomas $
 
 Local Variables:
 mode:text

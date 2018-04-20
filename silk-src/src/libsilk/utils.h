@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h ecb4f46a7d39 2018-03-15 13:28:58Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -1308,7 +1308,7 @@ skOptionsTempDirUsage(
  *    The parameter 'var_location' must be specified.  The variable at
  *    that location will be set to the value the user specifies in the
  *    various switches.  This value will be one of the values defined
- *    in skipaddr_flags_t.
+ *    in skipaddr_flags_t (see silk_types.h).
  *
  *    Use skOptionsIPFormatUsage() to print the usage for these
  *    switches.
@@ -1320,6 +1320,12 @@ skOptionsTempDirUsage(
  *
  *    When SK_OPTION_IP_FORMAT_ZERO_PAD_IPS is specified, a
  *    --zero-pad-ips switch is also registered.
+ *
+ *    When SK_OPTION_IP_FORMAT_UNMAP_V6 is specified, unmap-v6
+ *    (SKIPADDR_UNMAP_V6) is automatically added to the default IP
+ *    format and to the result of parsing the --ip-format switch
+ *    unless that format specifies map-v4 explicitly or the output
+ *    format is decimal or hexadecimal.
  *
  *    The variable at 'var_location' is only modified if the user
  *    specifies the --ip-format switch.
@@ -1357,6 +1363,16 @@ skOptionsIPFormatUsage(
  *    switch should be included.  Since SiLK 3.15.0.
  */
 #define SK_OPTION_IP_FORMAT_ZERO_PAD_IPS    (1u << 1)
+
+/**
+ *    A bit to include in the 'settings' argument to
+ *    skOptionsIPFormatRegister() that causes SKIPADDR_UNMAP_V6
+ *    (unmap-v6) to be automatically added to the default IP format
+ *    and to the result of parsing the --ip-format switch unless that
+ *    format specifies map-v4 explicitly or the output format is
+ *    decimal or hexadecimal.  Since SiLK 3.17.0.
+ */
+#define SK_OPTION_IP_FORMAT_UNMAP_V6        (1u << 2)
 
 
 /**
@@ -2784,7 +2800,7 @@ skIPWildcardCheckIp(
  *    the form in which they were specified when 'ipwild' was
  *    created---that is, as either IPv4 or as IPv6.  To force an
  *    IPWildcard of IPv4 addresses to be returned as IPv6 addresses
- *    (in the ::FFFF:0:0/96 subnet), use skIPWildcardIteratorBindV6().
+ *    (in the ::ffff:0:0/96 subnet), use skIPWildcardIteratorBindV6().
  *
  *    Return 0 unless 'ipwild' is NULL.
  */
@@ -2800,7 +2816,7 @@ skIPWildcardIteratorBind(
  *    skIPWildcard_t 'ipwild'.  Similar to skIPWildcardIteratorBind(),
  *    but instructs the iterator to return IPv6 addresses even when
  *    the 'ipwild' contains IPv4 addresses.  The IPv4 addresses are
- *    mapped into the ::FFFF:0:0/96 subnet.
+ *    mapped into the ::ffff:0:0/96 subnet.
  */
 int
 skIPWildcardIteratorBindV6(
@@ -2811,7 +2827,7 @@ skIPWildcardIteratorBindV6(
  *    Bind the iterator 'iter' to iterate over the entries in the
  *    skIPWildcard_t 'ipwild'.  Similar to skIPWildcardIteratorBind(),
  *    but instructs the iterator to only visit IPv6 addresses within
- *    the ::FFFF:0:0/96 subnet and return them as IPv4 addresses.
+ *    the ::ffff:0:0/96 subnet and return them as IPv4 addresses.
  *
  *    Since SiLK 3.9.0.
  */
@@ -2878,8 +2894,8 @@ skIPWildcardIteratorReset(
  *    'ip'.  The form of the string will depend on the values in
  *    'ip_flags', which should contain a value from
  *    'skipaddr_flags_t', defined in silk_types.h.  The size of
- *    'outbuf' must be at least SK_NUM2DOT_STRLEN bytes in length.
- *    The function returns a pointer to 'outbuf'.  SK_NUM2DOT_STRLEN
+ *    'outbuf' must be at least SKIPADDR_STRLEN bytes in length.
+ *    The function returns a pointer to 'outbuf'.  SKIPADDR_STRLEN
  *    is defined in silk_types.h.
  */
 char *
@@ -2890,11 +2906,36 @@ skipaddrString(
 
 
 /**
+ *    Return the length of longest string expected to be returned by
+ *    skipaddrString() when 'ip_flags' represent the flags value
+ *    passed to that function and 'allow_ipv6' is 0 when only IPv4
+ *    addresses are passed to skipaddrString() and non-zero otherwise.
+ *
+ *    The return value should only ever be used to set a column width.
+ *    Always use a buffer having at least SKIPADDR_STRLEN characters
+ *    as the 'outbuf' parameter.
+ */
+int
+skipaddrStringMaxlen(
+    unsigned int        allow_ipv6,
+    uint32_t            ip_flags);
+
+
+/**
+ *    DEPRECATED.  Use skipaddrString() instead.
+ *
  *    Converts the integer form of an IPv4 IP address to the dotted-quad
  *    version.  ip is taken to be in native byte order; returns a
  *    pointer to a static string buffer.
  *
  *    Returns NULL on error.
+ *
+ *    Replace with:
+ *
+ *    skipaddr_t ipaddr;
+ *    char outbuf[SKIPADDR_STRLEN];
+ *    skipaddrSetV4(&ipaddr, &ip);
+ *    skipaddrString(outbuf, &ipaddr, 0);
  */
 char *
 num2dot(
@@ -2902,17 +2943,36 @@ num2dot(
 
 
 /**
+ *    DEPRECATED.  Use skipaddrString() instead.
+ *
  *    Like num2dot(), but will zero-pad the octects: num2dot0(0) will
- *    return "000.000.000.000"
+ *    return "000.000.000.000".
+ *
+ *    Replace with:
+ *
+ *    skipaddr_t ipaddr;
+ *    char outbuf[SKIPADDR_STRLEN];
+ *    skipaddrSetV4(&ipaddr, &ip);
+ *    skipaddrString(outbuf, &ipaddr, SKIPADDR_ZEROPAD);
  */
 char *
 num2dot0(
-    uint32_t            ip);
+    uint32_t            ip)
+    SK_GCC_DEPRECATED;
 
 
 /**
+ *    DEPRECATED.  Use skipaddrString() instead.
+ *
  *    Thread safe version of num2dot().  The 'outbuf' should be at
- *    least SK_NUM2DOT_STRLEN characters long.
+ *    least SKIPADDR_STRLEN characters long.
+ *
+ *    Replace with:
+ *
+ *    skipaddr_t ipaddr;
+ *    char outbuf[SKIPADDR_STRLEN];
+ *    skipaddrSetV4(&ipaddr, &ip);
+ *    skipaddrString(outbuf, &ipaddr, 0);
  */
 char *
 num2dot_r(
@@ -2921,46 +2981,72 @@ num2dot_r(
 
 
 /**
- *    Thread safe version of num2dot0().  The 'outbuf' should be at
- *    least SK_NUM2DOT_STRLEN characters long.
+ *    DEPRECATED.  Use skipaddrString() instead.
+ *
+ *    Thread safe version of num2dot0().  The 'outbuf' must be at
+ *    least SKIPADDR_STRLEN characters long.
+ *
+ *    Replace with:
+ *
+ *    skipaddr_t ipaddr;
+ *    char outbuf[SKIPADDR_STRLEN];
+ *    skipaddrSetV4(&ipaddr, &ip);
+ *    skipaddrString(outbuf, &ipaddr, SKIPADDR_ZEROPAD);
  */
 char *
 num2dot0_r(
     uint32_t            ip,
-    char               *outbuf);
+    char               *outbuf)
+    SK_GCC_DEPRECATED;
 
 
+/**
+ *    A value that may be included in the 'print_flags' value of
+ *    skTCPFlagsString() and skTCPStateString() that causes the
+ *    returned string to contain spaces for bits that are not set.
+ */
 #define SK_PADDED_FLAGS (1u << 0)
 
 
+/**
+ *    The minimum size of the buffer to pass to skTCPFlagsString().
+ */
 #define SK_TCPFLAGS_STRLEN 9
 
 /**
- *    Fill a buffer with a string representation of a TCP flags value.
- *    If all flags are on, FSRPAUEC would be the resulting string.
- *    The 'outbuf' should be at least SK_TCPFLAGS_STRLEN long.
+ *    Fill a buffer with a string representation of the TCP flags
+ *    (tcpControlBits) value 'tcp_flags'.  If all flags are on, the
+ *    resulting string is "FSRPAUEC".  The 'outbuf' is expected to be
+ *    at least SK_TCPFLAGS_STRLEN long.
  *
  *    If 'print_flags' is SK_PADDED_FLAGS, a space ' ' appears in
- *    place of the character if the TCP flag is off.
+ *    place of the character if the TCP flag is off, and the
+ *    representation of a particular TCP bit always appears in the
+ *    same column.
  */
 char *
 skTCPFlagsString(
-    uint8_t             flags,
+    uint8_t             tcp_flags,
     char               *outbuf,
     unsigned int        print_flags);
 
 
+/**
+ *    The minimum size of the buffer to pass to skTCPStateString().
+ */
 #define SK_TCP_STATE_STRLEN 9
 
 /**
- *    Fill a buffer with a string representation of an Rwrec TCP state
- *    value.  If all state flags are on, TCFS would be the resulting
- *    string.  The 'outbuf' should be at least SK_TCP_STATE_STRLEN
- *    long.
+ *    Fill a buffer with a string representation of a SiLK atttributes
+ *    (TCP state) value.  If all state flags are on, the resulting
+ *    string is "TCFS".  The 'outbuf' is expected to be at least
+ *    SK_TCP_STATE_STRLEN long.
  *
  *    If 'print_flags' is SK_PADDED_FLAGS, a space ' ' appears in
- *    place of the character if the state flag is off, and the string
- *    will be padded to 8 characters.
+ *    place of the character if the state flag is off, the
+ *    representation of a particular attribute bit always appears in
+ *    the same column, and four space characters are appended to the
+ *    string to the result is always 8 characters.
  */
 char *
 skTCPStateString(
@@ -3149,7 +3235,7 @@ skStringParseIP(
  *
  *    The 'ip_string' can be in CIDR notation such as "1.2.3.0/24" or
  *    "ff80::/16"; in the canonical form "1.2.3.4" or
- *    "::FFFF:0102:0304", an integer 16909056, an integer with a CIDR
+ *    "::ffff:0102:0304", an integer 16909056, an integer with a CIDR
  *    designation 16909056/24, or in SiLK wildcard notation: a IP in
  *    the canonical form with an 'x' respresenting an entire octet
  *    "1.2.3.x" in IPv4 or entire hexadectet in IPv6

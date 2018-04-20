@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaggbagtool.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwaggbagtool.c 95aec76c40ea 2018-03-13 21:09:01Z mthomas $");
 
 #include <silk/skaggbag.h>
 #include <silk/skbag.h>
@@ -63,29 +63,20 @@ RCSIDENT("$SiLK: rwaggbagtool.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
                   skipaddrString(ipbuf1, &(erk_key).val.addr, 0),       \
                   skAggBagStrerror(erk_err))
 
-#define ERR_ITERATOR(ei_description, ei_err)                    \
+#define ERR_ITERATOR(ei_description, ei_err)                       \
     skAppPrintErr("Error in %s aggbag iterator: %s",               \
                   ei_description, skAggBagStrerror(ei_err))
 
-/* the IDs for options.  we need this early */
-typedef enum {
-    OPT_ADD,
-    OPT_SUBTRACT,
-    OPT_INSERT_FIELD,
-    OPT_REMOVE_FIELDS,
-    OPT_SELECT_FIELDS,
-    OPT_TO_IPSET,
-    OPT_TO_BAG,
-    OPT_OUTPUT_PATH
-} appOptionsEnum;
+/* what action the user wants to do */
+typedef enum action_en {
+    AB_ACTION_UNSET, AB_ACTION_ADD, AB_ACTION_SUBTRACT
+} action_t;
 
 /* parsed_value_t is a structure to hold the unparsed value, an
  * indication as to whether the value is active, and the parsed
  * value. there is an array of these for all possible field
  * identifiers */
 typedef struct parsed_value_st {
-    const char     *pv_raw;
-    uint32_t        pv_target_type;
     /* True if the field is part of the key or counter */
     unsigned        pv_is_used  : 1;
     /* True if the field was specified by --constant-field and its
@@ -102,6 +93,27 @@ typedef struct parsed_value_st {
     }               pv;
 } parsed_value_t;
 
+/* minmax_value_t holds a field ID and a parsed values representing
+ * an argument to the --min-field or --max-field switches */
+typedef struct minmax_value_st {
+    /* the field ID */
+    uint32_t            mmv_field;
+    /* whether min(0) or max(1) */
+    uint32_t            mmv_is_max: 1;
+    /* the parsed value */
+    parsed_value_t      mmv_val;
+} minmax_value_t;
+
+/* setmask_value_t holds a field ID and an IPset path representing an
+ * argument to the --set-intersect or --set-complement switches */
+typedef struct setmask_value_st {
+    /* the field ID */
+    uint32_t            sv_field;
+    /* whether intersect(0) or complement(1) */
+    uint32_t            sv_is_complement: 1;
+    /* the IPset */
+    skipset_t          *sv_ipset;
+} setmask_value_t;
 
 
 /* LOCAL VARIABLES */
@@ -113,13 +125,8 @@ static skstream_t *out_stream = NULL;
  * the Bag or IPset */
 static sk_aggbag_t *out_ab = NULL;
 
-/* What action the user wants to take (add, intersect, etc).  The
- * variable 'user_action' should be a value between OPT_ADD and
- * OPT_SCALAR_MULTIPLY.  Set 'user_action_none' to a value outside
- * that range; this denotes that the user did not choose a value.
- */
-static const appOptionsEnum user_action_none = OPT_OUTPUT_PATH;
-static appOptionsEnum user_action;
+/* What action the user wants to take (add, subtract, etc) */
+static action_t action = AB_ACTION_UNSET;
 
 /* Index of current file argument in argv */
 static int arg_index = 0;
@@ -144,8 +151,17 @@ static sk_vector_t *remove_fields = NULL;
  * vector of uint32_t */
 static sk_vector_t *select_fields = NULL;
 
-/* fields that have been parsed by --add-fields; the index into this
- * array is an sk_aggbag_type_t type ID */
+/* arguments to the --min-field and --max-field switches; vector of
+ * minmax_value_t */
+static sk_vector_t *minmax_fields = NULL;
+
+/* arguments to the --min-field and --max-field switches; vector of
+ * setmask_value_t */
+static sk_vector_t *setmask_fields = NULL;
+
+/* an array capable of holding a parsed value for every possible
+ * sk_aggbag_type_t, indexed by that ID.  It holds the parsed values
+ * for fields set by --insert-field. */
 static parsed_value_t parsed_value[AGGBAGTOOL_ARRAY_SIZE];
 
 /* names the key and counter fields to use when --to-bag is specified */
@@ -163,14 +179,33 @@ static int note_strip = 0;
 
 /* OPTIONS SETUP */
 
+typedef enum {
+    OPT_ADD,
+    OPT_SUBTRACT,
+    OPT_INSERT_FIELD,
+    OPT_REMOVE_FIELDS,
+    OPT_SELECT_FIELDS,
+    OPT_TO_BAG,
+    OPT_TO_IPSET,
+    OPT_MIN_FIELD,
+    OPT_MAX_FIELD,
+    OPT_SET_INTERSECT,
+    OPT_SET_COMPLEMENT,
+    OPT_OUTPUT_PATH
+} appOptionsEnum;
+
 static struct option appOptions[] = {
     {"add",                  NO_ARG,       0, OPT_ADD},
     {"subtract",             NO_ARG,       0, OPT_SUBTRACT},
     {"insert-field",         REQUIRED_ARG, 0, OPT_INSERT_FIELD},
     {"remove-fields",        REQUIRED_ARG, 0, OPT_REMOVE_FIELDS},
     {"select-fields",        REQUIRED_ARG, 0, OPT_SELECT_FIELDS},
-    {"to-ipset",             REQUIRED_ARG, 0, OPT_TO_IPSET},
     {"to-bag",               REQUIRED_ARG, 0, OPT_TO_BAG},
+    {"to-ipset",             REQUIRED_ARG, 0, OPT_TO_IPSET},
+    {"min-field",            REQUIRED_ARG, 0, OPT_MIN_FIELD},
+    {"max-field",            REQUIRED_ARG, 0, OPT_MAX_FIELD},
+    {"set-intersect",        REQUIRED_ARG, 0, OPT_SET_INTERSECT},
+    {"set-complement",       REQUIRED_ARG, 0, OPT_SET_COMPLEMENT},
     {"output-path",          REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
     {0,0,0,0}                /* sentinel entry */
 };
@@ -185,13 +220,29 @@ static const char *appHelp[] = {
      "\tremoved by --remove-fields, insert FIELD into the Aggregate Bag\n"
      "\tand set its value to VALUE.  May be repeated to set multiple FIELDs"),
     ("Remove this comma-separated list of fields from each\n"
-     "\tAggregate Bag input file"),
+     "\tAggregate Bag input file.  May not be used with --select-fields,\n"
+     "\t--to-bag, or --to-ipset"),
     ("Remove all fields from each Aggregate Bag input file\n"
-     "\tEXCEPT those in this comma-separated list of fields"),
-    ("Use the IPs in this field of the Aggregate Bag file to\n"
-     "\tcreate a new IPset file"),
-    ("Use these two fields as the key and counter, respectively,\n"
-     "\tfor a new Bag file"),
+     "\tEXCEPT those in this comma-separated list of fields.  May not be\n"
+     "\tused with --remove-fields, --to-bag, or --to-ipset"),
+    ("Given an argument of FIELD,FIELD, use these two fields\n"
+     "\tas the key and counter, respectively, for a new Bag file.  May not\n"
+     "\tbe used with --select-fields, --remove-fields, or --to-ipset"),
+    ("Given an argument of FIELD, use the values in this field\n"
+     "\tof the Aggregate Bag file to create a new IPset file.  May not be\n"
+     "\tused with --select-fields, --remove-fields, or --to-bag"),
+    ("Given an argument of FIELD=VALUE, remove from the\n"
+     "\tAggregate Bag all rows where FIELD has a value less than VALUE.\n"
+     "\tThis occurs immediately before producing output. May be repeated"),
+    ("Given an argument of FIELD=VALUE, remove from the\n"
+     "\tAggregate Bag all rows where FIELD has a value greater than VALUE.\n"
+     "\tThis occurs immediately before producing output. May be repeated"),
+    ("Given an argument of FIELD=SET_FILE, remove from the\n"
+     "\tAggregate Bag all rows where FIELD is not in the IPset file SET_FILE.\n"
+     "\tThis occurs immediately before producing output. May be repeated"),
+    ("Given an argument of FIELD=SET_FILE, remove from the\n"
+     "\tAggregate Bag all rows where FIELD is in the IPset file SET_NAME.\n"
+     "\tThis occurs immediately before producing output. May be repeated"),
     "Write the output to this stream or file. Def. stdout",
     (char *)NULL
 };
@@ -201,9 +252,12 @@ static const char *appHelp[] = {
 
 static int  appOptionsHandler(clientData cData, int opt_index, char *opt_arg);
 static int  createStringmap(void);
+static int  chooseAction(int opt_index);
 static int  abtoolCheckFields(void);
 static int  writeOutput(void);
 static int  parseInsertField(const char *argument);
+static int  parseMinMax(int opt_index, const char *str_argument);
+static ssize_t parseSetMask(int opt_index, const char *str_argument);
 static int  parseFieldList(sk_vector_t **vec, int opt_idx, const char *fields);
 
 
@@ -279,6 +333,23 @@ appTeardown(
     field_map = NULL;
     skIPSetOptionsTeardown();
 
+    /* free all vectors */
+    skVectorDestroy(insert_field);
+    skVectorDestroy(remove_fields);
+    skVectorDestroy(select_fields);
+    skVectorDestroy(minmax_fields);
+    if (setmask_fields) {
+        setmask_value_t *sv;
+        size_t i;
+        i = skVectorGetCount(setmask_fields);
+        while (i > 0) {
+            --i;
+            sv = (setmask_value_t *)skVectorGetValuePointer(setmask_fields, i);
+            skIPSetDestroy(&sv->sv_ipset);
+        }
+        skVectorDestroy(setmask_fields);
+    }
+
     skAppUnregister();
 }
 
@@ -312,7 +383,6 @@ appSetup(
     skOptionsSetUsageCallback(&appUsageLong);
 
     /* initialize globals */
-    user_action = user_action_none;
     memset(&ipset_options, 0, sizeof(skipset_options_t));
 
     /* register the options */
@@ -356,8 +426,8 @@ appSetup(
     }
 
     /* The default action is to add the aggbags together */
-    if (user_action_none == user_action) {
-        user_action = OPT_ADD;
+    if (AB_ACTION_UNSET == action) {
+        action = AB_ACTION_ADD;
     }
 
     if ((arg_index == argc) && (FILEIsATty(stdin))) {
@@ -419,18 +489,9 @@ appOptionsHandler(
     switch ((appOptionsEnum)opt_index) {
       case OPT_ADD:
       case OPT_SUBTRACT:
-        if (user_action != user_action_none) {
-            if (user_action == (appOptionsEnum)opt_index) {
-                skAppPrintErr("Invalid %s: Switch used multiple times",
-                              appOptions[opt_index].name);
-            } else {
-                skAppPrintErr("Switches --%s and --%s are incompatible",
-                              appOptions[opt_index].name,
-                              appOptions[user_action].name);
-            }
+        if (chooseAction(opt_index)) {
             return 1;
         }
-        user_action = (appOptionsEnum)opt_index;
         break;
 
       case OPT_INSERT_FIELD:
@@ -461,6 +522,15 @@ appOptionsHandler(
         }
         break;
 
+      case OPT_TO_BAG:
+        if (to_bag) {
+            skAppPrintErr("Invalid %s: Switch used multiple times",
+                          appOptions[opt_index].name);
+            return 1;
+        }
+        to_bag = opt_arg;
+        break;
+
       case OPT_TO_IPSET:
         if (to_ipset) {
             skAppPrintErr("Invalid %s: Switch used multiple times",
@@ -470,13 +540,18 @@ appOptionsHandler(
         to_ipset = opt_arg;
         break;
 
-      case OPT_TO_BAG:
-        if (to_bag) {
-            skAppPrintErr("Invalid %s: Switch used multiple times",
-                          appOptions[opt_index].name);
+      case OPT_MIN_FIELD:
+      case OPT_MAX_FIELD:
+        if (parseMinMax(opt_index, opt_arg)) {
             return 1;
         }
-        to_bag = opt_arg;
+        break;
+
+      case OPT_SET_INTERSECT:
+      case OPT_SET_COMPLEMENT:
+        if (parseSetMask(opt_index, opt_arg)) {
+            return 1;
+        }
         break;
 
       case OPT_OUTPUT_PATH:
@@ -546,27 +621,141 @@ createStringmap(
 
 
 /*
- *    Parse the string in 'str_value' which is a value for the field
- *    'id' and set the appropriate entry in the global 'parsed_value'
- *    array.  The 'is_const_field' parameter is used in error
- *    reporting.  Report an error message and return -1 if parsing
- *    fails.
+ *    Map the current option 'opt_index' to an 'action_t' and set the
+ *    global 'action' variable.
+ */
+static int
+chooseAction(
+    int                 opt_index)
+{
+    /* map an action_t to an appOptionsEnum */
+    const struct action_map_st {
+        action_t            am_action;
+        appOptionsEnum      am_option;
+    } action_map[] = {
+        {AB_ACTION_ADD,         OPT_ADD},
+        {AB_ACTION_SUBTRACT,    OPT_SUBTRACT}
+    };
+    action_t new_act;
+    size_t i;
+
+    new_act = AB_ACTION_UNSET;
+    for (i = 0; i < sizeof(action_map)/sizeof(action_map[0]); ++i) {
+        if (action_map[i].am_option == (appOptionsEnum)opt_index) {
+            new_act = action_map[i].am_action;
+            break;
+        }
+    }
+    if (AB_ACTION_UNSET == new_act) {
+        skAbortBadCase(new_act);
+    }
+
+    if (AB_ACTION_UNSET == action) {
+        /* Success */
+        action = new_act;
+        return 0;
+    }
+
+    if (action == new_act) {
+        skAppPrintErr("Invalid %s: Switch used multiple times",
+                      appOptions[opt_index].name);
+    } else {
+        appOptionsEnum old_opt = OPT_OUTPUT_PATH;
+
+        for (i = 0; i < sizeof(action_map)/sizeof(action_map[0]); ++i) {
+            if (action_map[i].am_action == action) {
+                old_opt = action_map[i].am_option;
+                break;
+            }
+        }
+        if (OPT_OUTPUT_PATH == old_opt) {
+            skAbortBadCase(new_act);
+        }
+        skAppPrintErr("Switches --%s and --%s are incompatible",
+                      appOptions[old_opt].name,
+                      appOptions[opt_index].name);
+    }
+
+    return 1;
+}
+
+
+/*
+ *    Parse a "NAME=VALUE" style argument given to the --insert-field,
+ *    --min-field, or --max-field switch, where 'opt_index' is the
+ *    switch and 'str_argument' is its argument.  Set the referent of
+ *    'id' to the sk_aggbag_type_t that represents the field's ID.
+ *    Set the referent of 'pv' to the result of parsing the
+ *    value---all fields of 'pv' are set to 0 and the appropriate
+ *    field of the 'pv' union is set to the value.
+ *
+ *    Return 0 on success; on error, print an error message and return
+ *    -1.
  */
 static int
 parseSingleField(
-    const char         *str_value,
-    uint32_t            id)
+    int                 opt_index,
+    const char         *str_argument,
+    uint32_t           *id,
+    parsed_value_t     *pv)
 {
-    parsed_value_t *pv;
+    sk_stringmap_entry_t *sm_entry;
+    sk_stringmap_status_t sm_err;
+    char *argument;
+    char *str_value;
+    char *eq;
     sktime_t tmp_time;
     uint8_t tcp_flags;
-    int rv;
+    int parse_error = 0;
+    int rv = -1;
 
-    assert(id < AGGBAGTOOL_ARRAY_SIZE);
-    pv = &parsed_value[id];
+    assert(str_argument);
+    assert(id);
+    assert(pv);
 
-    assert(1 == pv->pv_is_used);
-    switch (id) {
+    memset(pv, 0, sizeof(*pv));
+
+    argument = strdup(str_argument);
+    if (NULL == argument) {
+        goto END;
+    }
+
+    /* find the '=' */
+    eq = strchr(argument, '=');
+    if (NULL == eq) {
+        skAppPrintErr(("Invalid %s '%s': Expected FIELD_NAME=VALUE"
+                       " but unable to find '=' character"),
+                      appOptions[opt_index].name, argument);
+        goto END;
+    }
+
+    /* ensure a value is given */
+    str_value = eq + 1;
+    while (*str_value && isspace((int)*str_value)) {
+        ++str_value;
+    }
+    if ('\0' == *str_value) {
+        skAppPrintErr("Invalid %s '%s': No value specified for field",
+                      appOptions[opt_index].name, argument);
+        goto END;
+    }
+
+    /* split into name and value */
+    *eq = '\0';
+    str_value = eq + 1;
+
+    /* find the field with that name */
+    sm_err = skStringMapGetByName(field_map, argument, &sm_entry);
+    if (sm_err) {
+        skAppPrintErr("Invalid %s: Unable to find a field named '%s': %s",
+                      appOptions[opt_index].name, argument,
+                      skStringMapStrerror(sm_err));
+        goto END;
+    }
+
+    /* parse the value */
+    parse_error = 1;
+    switch (sm_entry->id) {
       case SKAGGBAG_FIELD_RECORDS:
       case SKAGGBAG_FIELD_SUM_BYTES:
       case SKAGGBAG_FIELD_SUM_PACKETS:
@@ -576,13 +765,9 @@ parseSingleField(
       case SKAGGBAG_FIELD_ELAPSED:
       case SKAGGBAG_FIELD_CUSTOM_KEY:
       case SKAGGBAG_FIELD_CUSTOM_COUNTER:
-        if (NULL == str_value) {
-            pv->pv.pv_int = 0;
-            break;
-        }
         rv = skStringParseUint64(&pv->pv.pv_int, str_value, 0, UINT64_MAX);
         if (rv) {
-            goto PARSE_ERROR;
+            goto END;
         }
         break;
 
@@ -593,26 +778,18 @@ parseSingleField(
       case SKAGGBAG_FIELD_OUTPUT:
       case SKAGGBAG_FIELD_ANY_SNMP:
       case SKAGGBAG_FIELD_APPLICATION:
-        if (NULL == str_value) {
-            pv->pv.pv_int = 0;
-            break;
-        }
         rv = skStringParseUint64(&pv->pv.pv_int, str_value, 0, UINT16_MAX);
         if (rv) {
-            goto PARSE_ERROR;
+            goto END;
         }
         break;
 
       case SKAGGBAG_FIELD_PROTO:
       case SKAGGBAG_FIELD_ICMP_TYPE:
       case SKAGGBAG_FIELD_ICMP_CODE:
-        if (NULL == str_value) {
-            pv->pv.pv_int = 0;
-            break;
-        }
         rv = skStringParseUint64(&pv->pv.pv_int, str_value, 0, UINT8_MAX);
         if (rv) {
-            goto PARSE_ERROR;
+            goto END;
         }
         break;
 
@@ -626,7 +803,7 @@ parseSingleField(
         }
         rv = skStringParseIP(&pv->pv.pv_ip, str_value);
         if (rv) {
-            goto PARSE_ERROR;
+            goto END;
         }
 #if SK_ENABLE_IPV6
         if (skipaddrIsV6(&pv->pv.pv_ip)
@@ -648,7 +825,7 @@ parseSingleField(
         }
         rv = skStringParseIP(&pv->pv.pv_ip, str_value);
         if (rv) {
-            goto PARSE_ERROR;
+            goto END;
         }
 #if SK_ENABLE_IPV6
         if (!skipaddrIsV6(&pv->pv.pv_ip)) {
@@ -660,14 +837,10 @@ parseSingleField(
       case SKAGGBAG_FIELD_STARTTIME:
       case SKAGGBAG_FIELD_ENDTIME:
       case SKAGGBAG_FIELD_ANY_TIME:
-        if (NULL == str_value) {
-            pv->pv.pv_int = 0;
-            break;
-        }
         rv = skStringParseDatetime(&tmp_time, str_value, NULL);
         if (rv) {
             /* FIXME: Allow small integers as epoch times? */
-            goto PARSE_ERROR;
+            goto END;
         }
         pv->pv.pv_int = sktimeGetSeconds(tmp_time);
         break;
@@ -675,37 +848,25 @@ parseSingleField(
       case SKAGGBAG_FIELD_FLAGS:
       case SKAGGBAG_FIELD_INIT_FLAGS:
       case SKAGGBAG_FIELD_REST_FLAGS:
-        if (NULL == str_value) {
-            pv->pv.pv_int = 0;
-            break;
-        }
         rv = skStringParseTCPFlags(&tcp_flags, str_value);
         if (rv) {
-            goto PARSE_ERROR;
+            goto END;
         }
         break;
 
       case SKAGGBAG_FIELD_TCP_STATE:
-        if (NULL == str_value) {
-            pv->pv.pv_int = 0;
-            break;
-        }
         rv = skStringParseTCPState(&tcp_flags, str_value);
         if (rv) {
-            goto PARSE_ERROR;
+            goto END;
         }
         break;
 
       case SKAGGBAG_FIELD_SID:
-        if (NULL == str_value) {
-            pv->pv.pv_int = SK_INVALID_SENSOR;
-            break;
-        }
         if (isdigit((int)*str_value)) {
             rv = skStringParseUint64(&pv->pv.pv_int, str_value, 0,
                                      SK_INVALID_SENSOR-1);
             if (rv) {
-                goto PARSE_ERROR;
+                goto END;
             }
         } else {
             pv->pv.pv_int = sksiteSensorLookup(str_value);
@@ -713,18 +874,10 @@ parseSingleField(
         break;
 
       case SKAGGBAG_FIELD_FTYPE_CLASS:
-        if (NULL == str_value) {
-            pv->pv.pv_int = SK_INVALID_FLOWTYPE;
-            break;
-        }
         pv->pv.pv_int = sksiteClassLookup(str_value);
         break;
 
       case SKAGGBAG_FIELD_FTYPE_TYPE:
-        if (NULL == str_value) {
-            pv->pv.pv_int = SK_INVALID_FLOWTYPE;
-            break;
-        }
         pv->pv.pv_int = (sksiteFlowtypeLookupByClassIDType(
                              parsed_value[SKAGGBAG_FIELD_FTYPE_CLASS].pv.pv_int,
                              str_value));
@@ -734,14 +887,18 @@ parseSingleField(
         break;
     }
 
-    return 0;
+    *id = sm_entry->id;
+    parse_error = 0;
+    rv = 0;
 
-  PARSE_ERROR:
-    skAppPrintErr("Invalid %s '%s=%s': %s",
-                  appOptions[OPT_INSERT_FIELD].name,
-                  skAggBagFieldTypeGetName((sk_aggbag_type_t)id), str_value,
-                  skStringParseStrerror(rv));
-    return -1;
+  END:
+    if (parse_error) {
+        skAppPrintErr("Invalid %s: Error parsing %s value '%s': %s",
+                      appOptions[opt_index].name, argument, str_value,
+                      skStringParseStrerror(rv));
+    }
+    free(argument);
+    return rv;
 }
 
 
@@ -757,15 +914,108 @@ static int
 parseInsertField(
     const char         *str_argument)
 {
+    parsed_value_t tmp_pv;
+    uint32_t id;
+
+    if (parseSingleField(OPT_INSERT_FIELD, str_argument, &id, &tmp_pv)) {
+        return -1;
+    }
+    assert(id < AGGBAGTOOL_ARRAY_SIZE);
+
+    if (parsed_value[id].pv_is_used) {
+        skAppPrintErr("Invalid %s: A value for '%s' is already set",
+                      appOptions[OPT_INSERT_FIELD].name,
+                      skAggBagFieldTypeGetName((sk_aggbag_type_t)id));
+        return -1;
+    }
+
+    tmp_pv.pv_is_used = 1;
+    parsed_value[id] = tmp_pv;
+
+    if (NULL == insert_field) {
+        insert_field = skVectorNew(sizeof(uint32_t));
+        if (NULL == insert_field) {
+            skAppPrintOutOfMemory("vector");
+            return -1;
+        }
+    }
+    if (skVectorAppendValue(insert_field, &id)) {
+        skAppPrintOutOfMemory("vector element");
+        return -1;
+    }
+
+    return 0;
+}
+
+
+/*
+ *    Parse the NAME=VALUE argument to the --min-field or --max-field
+ *    switch and append the result to the global 'minmax_fields'
+ *    vector.
+ *
+ *    Return 0 on success or -1 on failure.
+ */
+static int
+parseMinMax(
+    int                 opt_index,
+    const char         *str_argument)
+{
+    minmax_value_t mmv;
+
+    assert(OPT_MAX_FIELD == opt_index || OPT_MIN_FIELD == opt_index);
+
+    memset(&mmv, 0, sizeof(mmv));
+    mmv.mmv_is_max = (OPT_MAX_FIELD == opt_index);
+
+    if (parseSingleField(opt_index, str_argument, &mmv.mmv_field,&mmv.mmv_val))
+    {
+        return -1;
+    }
+
+    if (NULL == minmax_fields) {
+        minmax_fields = skVectorNew(sizeof(minmax_value_t));
+        if (NULL == minmax_fields) {
+            skAppPrintOutOfMemory("vector");
+            return -1;
+        }
+    }
+    if (skVectorAppendValue(minmax_fields, &mmv)) {
+        skAppPrintOutOfMemory("vector element");
+        return -1;
+    }
+
+    return 0;
+}
+
+
+/*
+ *    Parse the NAME=SETFILE argument to the --set-intersect or
+ *    --set-complement switch and append the result to the global
+ *    'setmask_fields' vector.
+ *
+ *    Return 0 on success or -1 on failure.
+ */
+static ssize_t
+parseSetMask(
+    int                 opt_index,
+    const char         *str_argument)
+{
     sk_stringmap_entry_t *sm_entry;
     sk_stringmap_status_t sm_err;
-    parsed_value_t *pv;
     char *argument;
     char *cp;
     char *eq;
-    int rv = -1;
+    setmask_value_t sv;
+    skstream_t *stream;
+    ssize_t rv = -1;
 
     assert(str_argument);
+    assert(OPT_SET_INTERSECT == opt_index
+           || OPT_SET_COMPLEMENT == opt_index);
+
+    memset(&sv, 0, sizeof(sv));
+    sv.sv_is_complement = (OPT_SET_COMPLEMENT == opt_index);
+
     argument = strdup(str_argument);
     if (NULL == argument) {
         goto END;
@@ -774,8 +1024,9 @@ parseInsertField(
     /* find the '=' */
     eq = strchr(argument, '=');
     if (NULL == eq) {
-        skAppPrintErr("Invalid %s '%s': Unable to find '=' character",
-                      appOptions[OPT_INSERT_FIELD].name, argument);
+        skAppPrintErr(("Invalid %s '%s': Expected FIELD_NAME=SET_FILE"
+                       " but unable to find '=' character"),
+                      appOptions[opt_index].name, argument);
         goto END;
     }
 
@@ -785,8 +1036,8 @@ parseInsertField(
         ++cp;
     }
     if ('\0' == *cp) {
-        skAppPrintErr("Invalid %s '%s': No value specified for field",
-                      appOptions[OPT_INSERT_FIELD].name, argument);
+        skAppPrintErr("Invalid %s '%s': No file name specified for field",
+                      appOptions[opt_index].name, argument);
         goto END;
     }
 
@@ -798,33 +1049,69 @@ parseInsertField(
     sm_err = skStringMapGetByName(field_map, argument, &sm_entry);
     if (sm_err) {
         skAppPrintErr("Invalid %s: Unable to find a field named '%s': %s",
-                      appOptions[OPT_INSERT_FIELD].name, argument,
+                      appOptions[opt_index].name, argument,
                       skStringMapStrerror(sm_err));
         goto END;
     }
+    sv.sv_field = sm_entry->id;
 
-    assert(sm_entry->id < AGGBAGTOOL_ARRAY_SIZE);
-    pv = &parsed_value[sm_entry->id];
-    if (pv->pv_is_used) {
-        skAppPrintErr("Invalid %s: A value for '%s' is already set",
-                      appOptions[OPT_INSERT_FIELD].name, sm_entry->name);
+#if 0
+    /* is this an IP address? */
+    switch (sv.sv_field) {
+      case SKAGGBAG_FIELD_SIPv4:
+      case SKAGGBAG_FIELD_DIPv4:
+      case SKAGGBAG_FIELD_NHIPv4:
+      case SKAGGBAG_FIELD_ANY_IPv4:
+      case SKAGGBAG_FIELD_SIPv6:
+      case SKAGGBAG_FIELD_DIPv6:
+      case SKAGGBAG_FIELD_NHIPv6:
+      case SKAGGBAG_FIELD_ANY_IPv6:
+        break;
+      default:
+        skAppPrintErr("Invalid %s: Ignoring switch for non-IP field %s",
+                      appOptions[opt_index].name, argument);
+        rv = 0;
+        goto END;
+    }
+#endif  /* 0 */
+
+    /* read the IPset */
+    if ((rv = skStreamCreate(&stream, SK_IO_READ, SK_CONTENT_SILK))
+        || (rv = skStreamBind(stream, cp))
+        || (rv = skStreamOpen(stream)))
+    {
+        skStreamPrintLastErr(stream, rv, &skAppPrintErr);
+        skStreamDestroy(&stream);
+        rv = -1;
         goto END;
     }
 
-    pv->pv_is_used = 1;
-    if (parseSingleField(cp, sm_entry->id)) {
+    rv = skIPSetRead(&sv.sv_ipset, stream);
+    if (rv) {
+        if (SKIPSET_ERR_FILEIO == rv) {
+            skStreamPrintLastErr(stream, skStreamGetLastReturnValue(stream),
+                                 &skAppPrintErr);
+        } else {
+            skAppPrintErr("Unable to read IPset from '%s': %s",
+                          cp, skIPSetStrerror(rv));
+        }
+        skStreamDestroy(&stream);
+        rv = -1;
         goto END;
     }
+    rv = -1;
 
-    if (NULL == insert_field) {
-        insert_field = skVectorNew(sizeof(uint32_t));
-        if (NULL == insert_field) {
+    if (NULL == setmask_fields) {
+        setmask_fields = skVectorNew(sizeof(setmask_value_t));
+        if (NULL == setmask_fields) {
             skAppPrintOutOfMemory("vector");
+            skIPSetDestroy(&sv.sv_ipset);
             goto END;
         }
     }
-    if (skVectorAppendValue(insert_field, &sm_entry->id)) {
+    if (skVectorAppendValue(setmask_fields, &sv)) {
         skAppPrintOutOfMemory("vector element");
+        skIPSetDestroy(&sv.sv_ipset);
         goto END;
     }
 
@@ -932,7 +1219,6 @@ parseChangeField(
     }
 
     pv->pv_is_used = 1;
-    pv->pv_target_type = sm_entry->id;
 
     if (NULL == change_field) {
         change_field = skVectorNew(sizeof(uint32_t));
@@ -1111,13 +1397,260 @@ abtoolCheckFields(
 
     if (insert_field && remove_fields) {
         /* FIXME: Remove from remove_fields any field that also
-         * appears in insert_field.  This subject to determining whether
-         * a field appearing in both add-fields and either
+         * appears in insert_field.  This is subject to determining
+         * whether a field appearing in both add-fields and either
          * select-field or remove-field signifies overwrite vs
          * add-if-not-present.  */
     }
 
     return 0;
+}
+
+
+/*
+ *    Reorder the fields in the minmax_fields and setmask_fields
+ *    vectors to be in the same order as the keys and values in the
+ *    output aggbag, and remove any fields from the vectors that are
+ *    not present in the aggbag.
+ */
+static void
+reorderFilterFields(
+    void)
+{
+    sk_aggbag_field_t f;
+    uint32_t pos[AGGBAGTOOL_ARRAY_SIZE];
+    size_t i;
+    size_t j;
+
+    if (NULL == minmax_fields && NULL == setmask_fields) {
+        return;
+    }
+
+    /* note the location of each key/counter in the aggbag */
+    memset(pos, 0, sizeof(pos));
+    i = 0;
+    for (j = 0; j < 2; ++j) {
+        if (0 == j) {
+            skAggBagInitializeKey(out_ab, NULL, &f);
+        } else {
+            skAggBagInitializeCounter(out_ab, NULL, &f);
+        }
+        do {
+            ++i;
+            pos[skAggBagFieldIterGetType(&f)] = i;
+        } while (skAggBagFieldIterNext(&f) == SK_ITERATOR_OK);
+    }
+
+    if (minmax_fields) {
+        /* remove fields not in the aggbag */
+        minmax_value_t mmv, mmv2;
+
+        j = 0;
+        for (i = 0; i < skVectorGetCount(minmax_fields); ++i) {
+            skVectorGetValue(&mmv, minmax_fields, i);
+            if (pos[mmv.mmv_field]) {
+                if (i != j) {
+                    skVectorSetValue(minmax_fields, j, &mmv);
+                }
+                ++j;
+            }
+        }
+        if (0 == j) {
+            skVectorDestroy(minmax_fields);
+            minmax_fields = NULL;
+        } else {
+            /* remove all elements >= j */
+            skVectorSetCapacity(minmax_fields, j);
+
+            /* use insertion sort to order the vector's elements */
+            for (i = 1; i < skVectorGetCount(minmax_fields); ++i) {
+                skVectorGetValue(&mmv, minmax_fields, i);
+                for (j = i; j > 0; --j) {
+                    skVectorGetValue(&mmv2, minmax_fields, j-1);
+                    if (pos[mmv.mmv_field] >= pos[mmv2.mmv_field]) {
+                        break;
+                    }
+                    skVectorSetValue(minmax_fields, j, &mmv2);
+                }
+                if (i != j) {
+                    skVectorSetValue(minmax_fields, j, &mmv);
+                }
+            }
+        }
+    }
+
+    if (setmask_fields) {
+        /* remove fields not in the aggbag */
+        setmask_value_t sv, sv2;
+
+        j = 0;
+        for (i = 0; i < skVectorGetCount(setmask_fields); ++i) {
+            skVectorGetValue(&sv, setmask_fields, i);
+            if (pos[sv.sv_field]) {
+                if (i != j) {
+                    skVectorGetValue(&sv2, setmask_fields, j);
+                    skIPSetDestroy(&sv2.sv_ipset);
+                    skVectorSetValue(setmask_fields, j, &sv);
+                }
+                ++j;
+            }
+        }
+        if (0 == j) {
+            skVectorDestroy(setmask_fields);
+            setmask_fields = NULL;
+        } else {
+            skVectorSetCapacity(setmask_fields, j);
+
+            for (i = 1; i < skVectorGetCount(setmask_fields); ++i) {
+                skVectorGetValue(&sv, setmask_fields, i);
+                for (j = i; j > 0; --j) {
+                    skVectorGetValue(&sv2, setmask_fields, j-1);
+                    if (pos[sv.sv_field] >= pos[sv2.sv_field]) {
+                        break;
+                    }
+                    skVectorSetValue(setmask_fields, j, &sv2);
+                }
+                if (i != j) {
+                    skVectorSetValue(setmask_fields, j, &sv);
+                }
+            }
+        }
+    }
+}
+
+
+/*
+ *    Run through the aggbag and zero out any entries not within range or
+ *    which aren't in the masking set.
+ */
+static void
+applyFilters(
+    void)
+{
+    sk_aggbag_iter_t iter = SK_AGGBAG_ITER_INITIALIZER;
+    sk_aggbag_iter_t *it = &iter;
+    size_t minmax_count;
+    size_t setmask_count;
+    size_t mmv_pos = 0;
+    size_t sv_pos = 0;
+    const minmax_value_t *mmv = NULL;
+    setmask_value_t *sv = NULL;
+    sk_aggbag_aggregate_t *kc_value;
+    sk_aggbag_field_t *kc_field;
+    sk_aggbag_type_t id;
+    uint64_t number;
+    skipaddr_t ip;
+    int zero_row = 0;
+
+    reorderFilterFields();
+
+    minmax_count = (minmax_fields ? skVectorGetCount(minmax_fields) : 0);
+    setmask_count = (setmask_fields ? skVectorGetCount(setmask_fields) : 0);
+    if (0 == minmax_count && 0 == setmask_count) {
+        return;
+    }
+
+    skAggBagIteratorBind(it, out_ab);
+    while (skAggBagIteratorNext(it) == SK_ITERATOR_OK) {
+        if (minmax_count) {
+            mmv_pos = 0;
+            mmv = ((minmax_value_t *)
+                   skVectorGetValuePointer(minmax_fields, mmv_pos));
+        }
+        if (setmask_count) {
+            sv_pos = 0;
+            sv = ((setmask_value_t *)
+                  skVectorGetValuePointer(setmask_fields, sv_pos));
+        }
+
+        kc_field = &it->key_field_iter;
+        kc_value = &it->key;
+        while (mmv || sv) {
+            id = skAggBagFieldIterGetType(kc_field);
+            if ((mmv && id == mmv->mmv_field)
+                || (sv && id == sv->sv_field))
+            {
+                switch (id) {
+                  case SKAGGBAG_FIELD_SIPv6:
+                  case SKAGGBAG_FIELD_SIPv4:
+                  case SKAGGBAG_FIELD_DIPv6:
+                  case SKAGGBAG_FIELD_DIPv4:
+                  case SKAGGBAG_FIELD_NHIPv6:
+                  case SKAGGBAG_FIELD_NHIPv4:
+                  case SKAGGBAG_FIELD_ANY_IPv6:
+                  case SKAGGBAG_FIELD_ANY_IPv4:
+                    skAggBagAggregateGetIPAddress(
+                        kc_value, kc_field, &ip);
+                    while (mmv && id == mmv->mmv_field) {
+                        if (mmv->mmv_is_max
+                            ? skipaddrCompare(&ip, &mmv->mmv_val.pv.pv_ip) > 0
+                            : skipaddrCompare(&ip, &mmv->mmv_val.pv.pv_ip) < 0)
+                        {
+                            zero_row = 1;
+                            sv = NULL;
+                            break;
+                        }
+                        ++mmv_pos;
+                        mmv = ((minmax_value_t *)
+                               skVectorGetValuePointer(minmax_fields, mmv_pos));
+                    }
+                    while (sv && id == sv->sv_field) {
+                        if (skIPSetCheckAddress(sv->sv_ipset, &ip)
+                            == sv->sv_is_complement)
+                        {
+                            zero_row = 1;
+                            break;
+                        }
+                        ++sv_pos;
+                        sv = ((setmask_value_t *)
+                              skVectorGetValuePointer(setmask_fields, sv_pos));
+                    }
+                    break;
+
+                  default:
+                    skAggBagAggregateGetUnsigned(
+                        kc_value, kc_field, &number);
+                    while (mmv && id == mmv->mmv_field) {
+                        if (mmv->mmv_is_max
+                            ? (number > mmv->mmv_val.pv.pv_int)
+                            : (number < mmv->mmv_val.pv.pv_int))
+                        {
+                            zero_row = 1;
+                            break;
+                        }
+                        ++mmv_pos;
+                        mmv = ((minmax_value_t *)
+                               skVectorGetValuePointer(minmax_fields, mmv_pos));
+                    }
+                    break;
+                }
+            }
+
+            if (skAggBagFieldIterNext(kc_field) != SK_ITERATOR_OK) {
+                if (kc_field == &it->key_field_iter) {
+                    kc_field = &it->counter_field_iter;
+                    kc_value = &it->counter;
+                } else {
+                    assert(kc_field == &it->counter_field_iter);
+                    break;
+                }
+            }
+        }
+
+        if (zero_row) {
+            zero_row = 0;
+            skAggBagFieldIterReset(&it->counter_field_iter);
+            do {
+                skAggBagAggregateSetUnsigned(
+                    &it->counter, &it->counter_field_iter, 0);
+            } while (skAggBagFieldIterNext(&it->counter_field_iter)
+                     == SK_ITERATOR_OK);
+            skAggBagKeyCounterSet(out_ab, &it->key, &it->counter);
+        }
+    }
+
+
+
 }
 
 
@@ -1358,6 +1891,7 @@ abtoolToIPSet(
     skipset_t *set = NULL;
     skipaddr_t ip;
     int is_ipaddr;
+    uint64_t number;
     ssize_t rv;
 
     skAggBagInitializeKey(out_ab, NULL, &f);
@@ -1391,19 +1925,39 @@ abtoolToIPSet(
     skAggBagIteratorBind(it, out_ab);
     if (is_ipaddr) {
         while (skAggBagIteratorNext(it) == SK_ITERATOR_OK) {
-            skAggBagAggregateGetIPAddress(&it->key, &it->key_field_iter, &ip);
-            skIPSetInsertAddress(set, &ip, 0);
+            number = 0;
+            do {
+                skAggBagAggregateGetUnsigned(
+                    &it->counter, &it->counter_field_iter, &number);
+            } while (0 == number
+                     && (skAggBagFieldIterNext(&it->counter_field_iter)
+                         == SK_ITERATOR_OK));
+            if (number) {
+                skAggBagAggregateGetIPAddress(
+                    &it->key, &it->key_field_iter, &ip);
+                skIPSetInsertAddress(set, &ip, 0);
+            }
         }
     } else {
         uint64_t u64;
         uint32_t u32;
 
         while (skAggBagIteratorNext(it) == SK_ITERATOR_OK) {
-            skAggBagAggregateGetUnsigned(&it->key, &it->key_field_iter, &u64);
-            if (u64 <= UINT32_MAX) {
-                u32 = u64;
-                skipaddrSetV4(&ip, &u32);
-                skIPSetInsertAddress(set, &ip, 0);
+            number = 0;
+            do {
+                skAggBagAggregateGetUnsigned(
+                    &it->counter, &it->counter_field_iter, &number);
+            } while (0 == number
+                     && (skAggBagFieldIterNext(&it->counter_field_iter)
+                         == SK_ITERATOR_OK));
+            if (number) {
+                skAggBagAggregateGetUnsigned(
+                    &it->key, &it->key_field_iter, &u64);
+                if (u64 <= UINT32_MAX) {
+                    u32 = u64;
+                    skipaddrSetV4(&ip, &u32);
+                    skIPSetInsertAddress(set, &ip, 0);
+                }
             }
         }
     }
@@ -1800,85 +2354,6 @@ manipulateFields(
 }
 
 
-#if 0
-/*
- *  ok = applyFilters(aggbag);
- *
- *    Run through the aggbag and zero out any entries not within range or
- *    which aren't in the masking set.  Return 0 on success, non-zero
- *    otherwise.
- *
- *    FIXME: We could do some of this during the insertion stage
- *    instead output to save ourselves some storage. This is not the
- *    most efficient implementation.
- */
-static int
-applyFilters(
-    sk_aggbag_t        *aggbag)
-{
-    skAggBagIterator_t *iter = NULL;
-    skAggBagTypedKey_t key;
-    skAggBagTypedCounter_t counter;
-    ssize_t rv_aggbag;
-    int fail = 0;
-
-    /* determine whether there are any cut-offs to apply. If no sets
-     * are given and the limits are all at their defaults, return. */
-    if ((NULL == mask_set)
-        && (0 == have_minkey)
-        && (0 == have_maxkey)
-        && (SKAGGBAG_COUNTER_MIN == mincounter)
-        && (SKAGGBAG_COUNTER_MAX == maxcounter))
-    {
-        return 0;
-    }
-
-    /* set the types for the keys and counter */
-    key.type = SKAGGBAG_KEY_IPADDR;
-    counter.type = SKAGGBAG_COUNTER_U64;
-
-    /* Create an iterator to loop over the aggbag */
-    rv_aggbag = skAggBagIteratorCreate(aggbag, &iter);
-    if (SKAGGBAG_OK != rv_aggbag) {
-        iter = NULL;
-        goto END;
-    }
-
-    while (skAggBagIteratorNextTyped(iter, &key, &counter) == SKAGGBAG_OK) {
-        if (mask_set) {
-            if (skIPSetCheckAddress(mask_set, &key.val.addr)) {
-                /* address is in set; if the --complement was
-                 * requested, we should fail this key. */
-                fail = app_flags.complement_set;
-            } else {
-                fail = !app_flags.complement_set;
-            }
-        }
-
-        if (fail
-            || (have_minkey && skipaddrCompare(&key.val.addr, &minkey) < 0)
-            || (have_maxkey && skipaddrCompare(&key.val.addr, &maxkey) > 0)
-            || (counter.val.u64 < mincounter)
-            || (counter.val.u64 > maxcounter))
-        {
-            /* if we're here, we DO NOT want the record */
-            fail = 0;
-            rv_aggbag = skAggBagKeyRemove(aggbag, &key);
-            if (SKAGGBAG_OK != rv_aggbag) {
-                ERR_REMOVE_KEY(key, rv_aggbag);
-                goto END;
-            }
-        }
-    }
-
-  END:
-    if (iter) {
-        skAggBagIteratorDestroy(iter);
-    }
-    return ((SKAGGBAG_OK == rv_aggbag) ? 0 : -1);
-}
-#endif  /* 0 */
-
 /*
  *  ok = writeOutput();
  *
@@ -1892,6 +2367,7 @@ writeOutput(
 
     /* Remove anything that's not in range or not in the intersecting
      * set (or complement) as appropriate */
+    applyFilters();
 
     /* add any notes (annotations) to the output */
     rv = skOptionsNotesAddToStream(out_stream);
@@ -2034,8 +2510,11 @@ int main(int argc, char **argv)
 
     /* Open up each remaining aggbag and process it appropriately */
     while (1 == appNextInput(argc, argv, &ab)) {
-        switch (user_action) {
-          case OPT_ADD:
+        switch (action) {
+          case AB_ACTION_UNSET:
+            skAbortBadCase(action);
+
+          case AB_ACTION_ADD:
             rv = skAggBagAddAggBag(out_ab, ab);
             if (SKAGGBAG_OK != rv) {
                 skAppPrintErr("Error when adding aggbags: %s",
@@ -2045,7 +2524,7 @@ int main(int argc, char **argv)
             }
             break;
 
-          case OPT_SUBTRACT:
+          case AB_ACTION_SUBTRACT:
             rv = skAggBagSubtractAggBag(out_ab, ab);
             if (SKAGGBAG_OK != rv) {
                 skAppPrintErr("Error when subtracting aggbags: %s",
@@ -2054,9 +2533,6 @@ int main(int argc, char **argv)
                 return EXIT_FAILURE;
             }
             break;
-
-          default:
-            skAbortBadCase(user_action);
         }
 
         skAggBagDestroy(&ab);

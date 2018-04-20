@@ -148,7 +148,8 @@ it contains.  Only records marked as IPv4 will be processed.
 =item asv4
 
 Convert IPv6 flow records that contain addresses in the ::ffff:0:0/96
-prefix to IPv4 and ignore all other IPv6 flow records.
+netblock (that is, IPv4-mapped IPv6 addresses) to IPv4 and ignore all
+other IPv6 flow records.
 
 =item mix
 
@@ -157,7 +158,7 @@ Process the input as a mixture of IPv4 and IPv6 flows.
 =item force
 
 Convert IPv4 flow records to IPv6, mapping the IPv4 addresses into the
-::ffff:0:0/96 prefix.
+::ffff:0:0/96 netblock.
 
 =item only
 
@@ -345,7 +346,7 @@ B<rwfileinfo(1)>, B<silk(7)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwnetmask.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwnetmask.pod b0e7e8c70cb5 2017-12-15 19:38:06Z mthomas $
 
 Local Variables:
 mode:text

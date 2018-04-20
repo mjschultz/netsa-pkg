@@ -27,7 +27,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaddrcount.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: rwaddrcount.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/iptree.h>
 #include <silk/rwrec.h>
@@ -856,6 +856,8 @@ dumpRecords(
 
     if (no_columns) {
         memset(w, 0, sizeof(w));
+    } else {
+        w[0] = skipaddrStringMaxlen(0, ip_format);
     }
 
     if ( !no_titles) {
@@ -920,6 +922,8 @@ dumpRecordsSorted(
 
     if (no_columns) {
         memset(w, 0, sizeof(w));
+    } else {
+        w[0] = skipaddrStringMaxlen(0, ip_format);
     }
 
     hashToIPTree(&ipset);
@@ -992,9 +996,12 @@ dumpIPs(
     countRecord_t *bin;
     char ip_st[SK_NUM2DOT_STRLEN];
     skipaddr_t ipaddr;
+    int w;
+
+    w = ((no_columns) ? 0 : skipaddrStringMaxlen(0, ip_format));
 
     if ( !no_titles) {
-        fprintf(outfp, "%15s\n", (use_dest ? "dIP" : "sIP"));
+        fprintf(outfp, "%*s\n", w, (use_dest ? "dIP" : "sIP"));
     }
 
     for (i = 0; i < RWAC_ARRAYSIZE; i++) {
@@ -1003,8 +1010,8 @@ dumpIPs(
             do {
                 if (IS_RECORD_WITHIN_LIMITS(bin)) {
                     skipaddrSetV4(&ipaddr, &bin->cr_key);
-                    fprintf(outfp, "%15s\n",
-                            skipaddrString(ip_st, &ipaddr, ip_format));
+                    fprintf(outfp, "%*s\n",
+                            w, skipaddrString(ip_st, &ipaddr, ip_format));
                 }
                 bin = bin->cr_next;
             } while (bin != hash_bins[i]);
@@ -1029,6 +1036,7 @@ dumpIPsSorted(
     skIPTreeIterator_t iter;
     char ip_st[SK_NUM2DOT_STRLEN];
     skipaddr_t ipaddr;
+    int w;
 
     hashToIPTree(&ipset);
     if (skIPTreeIteratorBind(&iter, ipset)) {
@@ -1037,12 +1045,14 @@ dumpIPsSorted(
         return 1;
     }
 
+    w = ((no_columns) ? 0 : skipaddrStringMaxlen(0, ip_format));
+
     if ( !no_titles) {
-        fprintf(outfp, "%15s\n", (use_dest ? "dIP" : "sIP"));
+        fprintf(outfp, "%*s\n", w, (use_dest ? "dIP" : "sIP"));
     }
     while (skIPTreeIteratorNext(&ip, &iter) == SK_ITERATOR_OK) {
         skipaddrSetV4(&ipaddr, &ip);
-        fprintf(outfp, "%15s\n", skipaddrString(ip_st, &ipaddr, ip_format));
+        fprintf(outfp, "%*s\n", w, skipaddrString(ip_st, &ipaddr, ip_format));
     }
 
     skIPTreeDelete(&ipset);

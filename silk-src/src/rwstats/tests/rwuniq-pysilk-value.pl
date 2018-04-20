@@ -1,6 +1,6 @@
 #! /usr/bin/perl -w
 # MD5: 5ad4ab835e9c315d4aebd443a0da76d7
-# TEST: ./rwuniq --python-file=../../tests/pysilk-plugin.py --fields=sip --values=max_bytes --ipv6=ignore --sort-output ../../tests/data.rwf
+# TEST: ./rwuniq --python-file=../../tests/pysilk-plugin.py --fields=sip --values=max_bytes --ipv6-policy=ignore --sort-output ../../tests/data.rwf
 
 use strict;
 use SiLKTests;
@@ -13,7 +13,7 @@ $ENV{PYTHONPATH} = $SiLKTests::testsdir.((defined $ENV{PYTHONPATH}) ? ":$ENV{PYT
 add_plugin_dirs('/src/pysilk');
 
 check_python_plugin($rwuniq);
-my $cmd = "$rwuniq --python-file=$file{pysilk_plugin} --fields=sip --values=max_bytes --ipv6=ignore --sort-output $file{data}";
+my $cmd = "$rwuniq --python-file=$file{pysilk_plugin} --fields=sip --values=max_bytes --ipv6-policy=ignore --sort-output $file{data}";
 my $md5 = "5ad4ab835e9c315d4aebd443a0da76d7";
 
 check_md5_output($md5, $cmd);

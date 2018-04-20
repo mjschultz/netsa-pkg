@@ -38,14 +38,19 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwgeoip2ccmap.l 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwgeoip2ccmap.l b2033f1baa8a 2018-04-13 20:14:33Z mthomas $");
 
+#include <silk/redblack.h>
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
 #include <silk/skprefixmap.h>
 #include <silk/skstream.h>
+#include <silk/skstringmap.h>
 #include <silk/skvector.h>
 #include <silk/utils.h>
+#ifdef SK_ENABLE_LIBMAXMINDDB
+#include <maxminddb.h>
+#endif
 
 /* use TRACEMSG_LEVEL as our tracing variable */
 #define TRACEMSG(msg) TRACEMSG_TO_TRACEMSGLVL(1, msg)
@@ -60,28 +65,59 @@ RCSIDENT("$SiLK: rwgeoip2ccmap.l 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 /* label to use for unknown ranges */
 #define DEFAULT_LABEL   "--"
 
-/* default mode (type of input) to use */
-#define DEFAULT_MODE    GEOIP2CCMAP_MODE_AUTO
+/* for the legacy CSV input, the number of fields expected on each
+ * line */
+#define LEGACY_CSV_FIELDS   6
 
-/* number of fields expected on each line */
-#define NUM_FIELDS      6
+/*
+ *  Values for "country" that the legacy GeoIP databases used for
+ *  anonymizing services and satellite providers.  These are macros
+ *  since they are used to initialize a struct.
+ */
+#define COUNTRY_ANON    (('a' << 8) | '1')
+#define COUNTRY_SATL    (('a' << 8) | '2')
 
 /* type of input to expect */
 enum geoip2ccmap_mode_en {
     GEOIP2CCMAP_MODE_AUTO,
-    GEOIP2CCMAP_MODE_IPV4,
     GEOIP2CCMAP_MODE_IPV6,
-    GEOIP2CCMAP_MODE_BINARY
+    GEOIP2CCMAP_MODE_IPV4,
+    GEOIP2CCMAP_MODE_CSV,
+    GEOIP2CCMAP_MODE_BINARY,
+    GEOIP2CCMAP_MODE_GEOIP2,
+    GEOIP2CCMAP_MODE_LEGACY
 };
 typedef enum geoip2ccmap_mode_en geoip2ccmap_mode_t;
 
-/* information for the current statement */
-typedef struct pmap_stmt_st {
-    skipaddr_t          range_start;
-    skipaddr_t          range_end;
-    uint32_t            value;
-    uint32_t            position;
-} pmap_stmt_t;
+/* information for the current line of a legacy CSV file */
+typedef struct pmap_legacy_st {
+    skipaddr_t          range[2];
+    uint32_t            country;
+} pmap_legacy_t;
+
+/* information for the current line of a GeoIP2 ipblocks file */
+typedef struct pmap_ipblocks_st {
+    skipaddr_t          ip;
+    uint32_t            prefix;
+    /* geoname_id, registered_country_geoname_id,
+     * represented_country_geoname_id */
+    uint32_t            geoname[3];
+    uint16_t            is_anonymous;
+    uint16_t            is_satellite;
+} pmap_ipblocks_t;
+
+/* information for the current line of a GeoIP2 location file.  this
+ * is also the type of the objects stored in the 'geomap' redblack
+ * tree. */
+typedef struct pmap_location_st {
+    /* the integer key */
+    uint32_t            geoname;
+    /* the two letter country code converted to an integer, or the two
+     * letter continent code if no country */
+    uint32_t            country;
+    /* true if the 'country' value is a country code */
+    uint32_t            is_country;
+} pmap_location_t;
 
 
 /* LOCAL VARIABLE DEFINITIONS */
@@ -89,46 +125,139 @@ typedef struct pmap_stmt_st {
 /* the pmap that we create */
 static skPrefixMap_t *map = NULL;
 
-/* information for the current statement */
-static pmap_stmt_t stmt;
+/* information for the current legacy statement */
+static pmap_legacy_t legacy;
+
+/* names of the ipblocks fields that appear in the files */
+static const char *ipblocks_fields[] = {
+    "network", "geoname_id",
+    "registered_country_geoname_id", "represented_country_geoname_id",
+    "is_anonymous_proxy", "is_satellite_provider"
+};
+
+/* names of the locations fields that appear in the file */
+static const char *location_fields[] = {
+    "geoname_id", "locale_code", "continent_code",
+    "continent_name", "country_iso_code", "country_name"
+    /* ignore this field that we do not use: "is_in_european_union" */
+};
+
+/* number of fields in a GeoIP2 CSV Blocks file.  This may increase if
+ * additional title fields are appended to the fields we expect.
+ * Every data line must have this number of fields. */
+static unsigned int ipblocks_fields_count =
+    sizeof(ipblocks_fields)/sizeof(ipblocks_fields[0]);
+
+/* similar to 'ipblocks_fields_count' for the location fields */
+static unsigned int location_fields_count =
+    sizeof(location_fields)/sizeof(location_fields[0]);
+
+/* information for the current GeoIP2 ipblocks statement */
+static pmap_ipblocks_t ipblocks;
+
+/* information for the current GeoIP2 location statement */
+static pmap_location_t location;
+
+/* mapping from geoname_id to country code */
+static struct rbtree *geomap = NULL;
+
+/* state to BEGIN after handling an error */
+static int next_state;
 
 /* which line of input we are reading */
-static int linenum = 1;
+static unsigned int linenum = 1;
+
+/* which field number of the current input line are we reading.  first
+ * field is 0 */
+static unsigned int field = 0;
 
 /* number of errors encountered during processing */
-static int error_count = 0;
+static unsigned int error_count = 0;
 
 /* type of input: ipv4, ipv6, binary, or determined by first IP */
-static geoip2ccmap_mode_t mode = DEFAULT_MODE;
+static struct mode_st {
+    geoip2ccmap_mode_t ipv6_ipv4;
+    geoip2ccmap_mode_t csv_binary;
+    geoip2ccmap_mode_t geoip2_legacy;
+} mode = {
+    GEOIP2CCMAP_MODE_AUTO, GEOIP2CCMAP_MODE_AUTO, GEOIP2CCMAP_MODE_AUTO
+};
 
 /* default country code value */
 static uint32_t default_value;
 
 /* structure to map between mode names and mode IDs */
-static struct mode_name_id_map_st {
-    const char         *name;
-    geoip2ccmap_mode_t  id;
-} mode_name_id_map[] = {
-    {"auto",       GEOIP2CCMAP_MODE_AUTO},
-    {"ipv6",       GEOIP2CCMAP_MODE_IPV6},
-    {"ipv4",       GEOIP2CCMAP_MODE_IPV4},
-    {"binary",     GEOIP2CCMAP_MODE_BINARY}
+static const sk_stringmap_entry_t mode_map_entries[] = {
+    {"auto",       GEOIP2CCMAP_MODE_AUTO,
+     "Automatically determine the type of input",               NULL},
+    {"ipv6",       GEOIP2CCMAP_MODE_IPV6,
+#if SK_ENABLE_IPV6
+     "Create an IPv6 country code prefix map",
+#else
+     "Exit with error; IPv6 support not available",
+#endif  /* SK_ENABLE_IPV6 */
+     NULL},
+    {"ipv4",       GEOIP2CCMAP_MODE_IPV4,
+     "Create an IPv6 country code prefix map",                  NULL},
+    {"csv",        GEOIP2CCMAP_MODE_CSV,
+     "Read textual input containing comma-separated values",    NULL},
+    {"binary",     GEOIP2CCMAP_MODE_BINARY,
+#ifdef SK_ENABLE_LIBMAXMINDDB
+     "Read MaxMind binary input",
+#else
+     "Read MaxMind Legacy binary input (GeoIP2 unsupported)",
+#endif  /* SK_ENABLE_LIBMAXMINDDB */
+     NULL},
+    {"geoip2",     GEOIP2CCMAP_MODE_GEOIP2,
+#ifdef SK_ENABLE_LIBMAXMINDDB
+     "Read input in the GeoIP2 binary or CSV formats",
+#else
+     "Read input in the GeoIP2 CSV format (binary unsupported)",
+#endif  /* SK_ENABLE_LIBMAXMINDDB */
+     NULL},
+    {"legacy",     GEOIP2CCMAP_MODE_LEGACY,
+     "Read input in the GeoIP Legacy format",                   NULL},
+    SK_STRINGMAP_SENTINEL
 };
 
-/* help for each mode */
-static const char *mode_help[] = {
-    "Automatically determine the type of input",
-    "Read textual IPv6 input and create an IPv6 prefix map",
-    "Read textual IPv4 input and create an IPv4 prefix map",
-    "Read binary input and create an IPv4 or IPv6 prefix map"
-};
+/* the stringmap created from the mode_map_entries */
+static sk_stringmap_t *mode_map = NULL;
 
-/* number of entries in 'mode_name_id_map' */
-static const size_t mode_name_id_map_len
-    = sizeof(mode_name_id_map)/sizeof(mode_name_id_map[0]);
-
-/* input stream for reading the prefix map text */
+/* the current input stream.  may be one of the files in the
+ * csv2_directory or a MaxMind Legacy GeoIP file containing either CSV
+ * data or binary data */
 static sk_fileptr_t in_stream;
+
+/* the GeoIP2 binary database file */
+static const char *mmdb_path = NULL;
+
+/* directory containing the MaxMind GeoIP2 CSV files */
+static const char *csv2_directory = NULL;
+
+/* values to prepend onto the names in csv2_files[] above */
+static const char *csv2_products[] = {"GeoIP2", "GeoLite2", NULL};
+
+/* for CSV GoeIP2 data, the input-path is a directory, and this struct
+ * contains the back half of names of the files in the directory.
+ * These values are prefixed by one of the values from the
+ * csv2_products[] array.  If the 'mode' member is auto, the file is
+ * always processed.  Otherwise the global mode must match the 'mode'
+ * member. */
+static const struct csv2_files_st {
+    geoip2ccmap_mode_t  mode;
+    const char         *path;
+} csv2_files[] = {
+    {GEOIP2CCMAP_MODE_AUTO,     "-Country-Locations-en.csv"},
+    {GEOIP2CCMAP_MODE_IPV6,     "-Country-Blocks-IPv6.csv"},
+    {GEOIP2CCMAP_MODE_AUTO,     "-Country-Blocks-IPv4.csv"},
+    {GEOIP2CCMAP_MODE_BINARY,   NULL} /* sentinel */
+};
+
+/* the name of the csv2 product; points into csv2_products */
+static const char *csv2_prod = NULL;
+
+/* an index into csv2_files[] pointing at the next file to use */
+static unsigned int csv2_index = 0;
 
 /* output stream for the resulting prefix map */
 static skstream_t *out_stream = NULL;
@@ -144,9 +273,11 @@ static int invocation_strip = 0;
 
 /* OPTIONS SETUP */
 
+/* FIXME: Instead of a --csv2-directory switch, should we allow the
+ * directory to be an argument to the --input-path switch? */
 typedef enum {
-    OPT_INPUT_FILE,
-    OPT_OUTPUT_FILE,
+    OPT_INPUT_PATH,
+    OPT_OUTPUT_PATH,
     OPT_MODE,
     OPT_DRY_RUN,
     OPT_INVOCATION_STRIP,
@@ -155,15 +286,19 @@ typedef enum {
     OPT_ENCODED_INPUT
 } appOptionsEnum;
 
+/* how to map old input switches to modes. keep in sync! */
+static const char *input_modes[] = {
+     /* OPT_CSV_INPUT     */    "ipv4,csv,legacy",
+     /* OPT_V6_CSV_INPUT  */    "ipv6,csv,legacy",
+     /* OPT_ENCODED_INPUT */    "binary,legacy"
+};
+
 static struct option appOptions[] = {
-    {"input-file",          REQUIRED_ARG, 0, OPT_INPUT_FILE},
-    {"output-file",         REQUIRED_ARG, 0, OPT_OUTPUT_FILE},
+    {"input-path",          REQUIRED_ARG, 0, OPT_INPUT_PATH},
+    {"output-path",         REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
     {"mode",                REQUIRED_ARG, 0, OPT_MODE},
     {"dry-run",             NO_ARG,       0, OPT_DRY_RUN},
     {"invocation-strip",    NO_ARG,       0, OPT_INVOCATION_STRIP},
-    {"csv-input",           NO_ARG,       0, OPT_CSV_INPUT},
-    {"v6-csv-input",        NO_ARG,       0, OPT_V6_CSV_INPUT},
-    {"encoded-input",       NO_ARG,       0, OPT_ENCODED_INPUT},
     {0,0,0,0}               /* sentinel entry */
 };
 
@@ -180,34 +315,82 @@ static const char *appHelp[] = {
     "Parse the input but do not write the output file",
     ("Strip invocation history from the prefix map file.\n"
      "\tDef. Record command used to create the file"),
-    ("Deprecated.  Replace with --mode=ipv4.\n"
+    (char *)NULL
+};
+
+static struct option deprecatedOptions[] = {
+    {"csv-input",       NO_ARG,       0, OPT_CSV_INPUT},
+    {"v6-csv-input",    NO_ARG,       0, OPT_V6_CSV_INPUT},
+    {"encoded-input",   NO_ARG,       0, OPT_ENCODED_INPUT},
+    {"input-file",      REQUIRED_ARG, 0, OPT_INPUT_PATH},
+    {"output-file",     REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {0,0,0,0}           /* sentinel entry */
+};
+
+static const char *deprecatedHelp[] = {
+    ("Replace with --mode=ipv4,csv,legacy.\n"
      "\tAssume the input is the CSV GeoIP Legacy country code data for IPv4"),
-    ("Deprecated.  Replace with --mode=ipv6.\n"
+    ("Replace with --mode=ipv6,csv,legacy.\n"
      "\tAssume the input is the CSV GeoIP Legacy country code data for IPv6"),
-    ("Deprecated.  Replace with --mode=binary.\n"
+    ("Replace with --mode=binary,legacy.\n"
      "\tAssume the input is binary GeoIP Legacy country code data for either\n"
      "\tIPv4 or IPv6"),
+    ("Replace with --input-path.\n"
+     "\tRead the GeoIP country code data from this file"),
+    ("Replace with --output-path.\n"
+     "\tWrite the binary prefix map to this file"),
     (char *)NULL
+};
+
+/* allow the shortest unique prefixes for input-{path,file} and
+ * output-{path,file} */
+static struct option deprecatedOptionsShort[] = {
+    /* --inp is required due to --invocation-strip */
+    {"input-",          REQUIRED_ARG, 0, OPT_INPUT_PATH},
+    {"input",           REQUIRED_ARG, 0, OPT_INPUT_PATH},
+    {"inpu",            REQUIRED_ARG, 0, OPT_INPUT_PATH},
+    {"inp",             REQUIRED_ARG, 0, OPT_INPUT_PATH},
+    /* --o is sufficient */
+    {"output-",         REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {"output",          REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {"outpu",           REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {"outp",            REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {"out",             REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {"ou",              REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {"o",               REQUIRED_ARG, 0, OPT_OUTPUT_PATH},
+    {0,0,0,0}           /* sentinel entry */
 };
 
 
 /* LOCAL FUNCTION PROTOTYPES */
 
 static int appOptionsHandler(clientData cData, int opt_index, char *opt_arg);
-static int parseMode(int idx, const char *str, geoip2ccmap_mode_t *new_mode);
+static int parseMode(int idx, const char *str);
 static const char *modeToName(geoip2ccmap_mode_t m);
+static int resolveInputModes(void);
+#ifdef TEST_PRINTF_FORMATS
+#define scanWarn printf
+#else
+static int scanWarn(const char *fmt, ...)
+    SK_CHECK_PRINTF(1, 2);
+#endif  /* TEST_PRINTF_FORMATS */
+#define scanErr  ++error_count; scanWarn
 
-static int  stmtEntry(const char *string);
-static void stmtCreateEntry(void);
-static void stmtReset(void);
+static int csv2NextFile(void);
+
+static int  legacyField(const char *string);
+static void legacyCreateEntry(void);
+static void legacyReset(void);
+
+static int  csv2Field(const char *string);
+static void csv2CreateEntry(void);
+static void csv2Reset(void);
 
 /* to keep gcc quiet  */
-int
-yylex(
-    void);
+int yylex(void);
+
 
 SK_DIAGNOSTIC_IGNORE_PUSH("-Wwrite-strings")
-
 
 /*  *****  LEX INPUT FOLLOWS  *****  */
 
@@ -215,86 +398,170 @@ SK_DIAGNOSTIC_IGNORE_PUSH("-Wwrite-strings")
 
 %option prefix="geoip2ccmap_" outfile="lex.yy.c"
 %option never-interactive
-%option noinput nounput noyywrap noreject
+%option noinput nounput noreject
 
+    /* %option noyywrap  -- use a function to avoid gcc warning */
     /* %option noyyget_extra noyyset_extra noyyget_leng noyyget_text */
     /* %option noyyget_lineno noyyset_lineno noyyget_in noyyset_in */
     /* %option noyyget_out noyyset_out noyyget_lval noyyset_lval */
     /* %option noyyget_lloc noyyset_lloc noyyget_debug noyyset_debug */
 
+%x ST_CSV2
+%x ST_CSV2_DQ
+%x ST_CSV2_NEXT
+%x ST_CSV2_ERROR
 
-%s ST_ENTRY
-%s ST_CLOSE_ENTRY
-%s ST_NEXT_ENTRY
-%s ST_ERROR
+%x ST_LEG_ENTRY
+%x ST_LEG_CLOSE_ENTRY
+%x ST_LEG_NEXT_ENTRY
+%x ST_LEG_ERROR
 
-ws_opt  [ \t\r]*
+ws_opt      [ \t\r]*
 
-nl      [ \t\r]*\n
+nl          [ \t\r]*\n
 
-dq      \"
-not_dq  [^\"\r\n]+
+dq          \"
+not_dq      [^\"\r\n]+
+
+not_comma   [^,\r\n]
+
+unquoted    [^,\"\r\n]+
 
 %%
 
-<INITIAL>{nl}                         { ++linenum; stmtReset(); }
-
-<INITIAL>{ws_opt}{dq}                 { BEGIN(ST_ENTRY); }
-
-<ST_ENTRY>{not_dq}                    { if (stmtEntry(yytext)) {
-                                            ++error_count;
-                                            BEGIN(ST_ERROR);
+<ST_CSV2>{unquoted}                   { if (csv2Field(yytext)) {
+                                            BEGIN(ST_CSV2_ERROR);
                                         } else {
-                                            BEGIN(ST_CLOSE_ENTRY);
+                                            BEGIN(ST_CSV2_NEXT);
                                         } }
 
-<ST_CLOSE_ENTRY>{dq}                  { BEGIN(ST_NEXT_ENTRY); }
+<ST_CSV2_DQ>{not_dq}                  { if (csv2Field(yytext)) {
+                                            next_state = ST_CSV2;
+                                            BEGIN(ST_CSV2_ERROR);
+                                        } }
 
-<ST_NEXT_ENTRY>,                      { ++stmt.position; }
+<ST_CSV2>{dq}                         { BEGIN(ST_CSV2_DQ); }
+<ST_CSV2_DQ>{dq}                      { BEGIN(ST_CSV2_NEXT); }
+<ST_CSV2_NEXT>,+                      { field += yyleng;
+                                        BEGIN(ST_CSV2); }
 
-<ST_NEXT_ENTRY>{dq}                   { BEGIN(ST_ENTRY); }
-
-<ST_NEXT_ENTRY>{ws_opt}               ;
-
-<ST_NEXT_ENTRY>{nl}                   |
-<ST_NEXT_ENTRY><<EOF>>                { ++stmt.position;
-                                        stmtCreateEntry();
+<ST_CSV2_NEXT>,+{nl}                  |
+<ST_CSV2_NEXT>{nl}                    { field += yyleng;
+                                        csv2CreateEntry();
                                         ++linenum;
-                                        stmtReset();
-                                        BEGIN(INITIAL); }
+                                        csv2Reset();
+                                        BEGIN(ST_CSV2); }
 
-<ST_ENTRY>{dq}                        { skAppPrintErr("Empty value on line %d",
-                                                      linenum);
-                                        ++error_count;
-                                        BEGIN(ST_ERROR);
+<ST_CSV2><<EOF>>                      { if (field) {
+                                            csv2CreateEntry();
+                                        }
+                                        if (csv2NextFile()) {
+                                            return 0;
+                                        }
+                                        csv2Reset();
+                                        BEGIN(ST_CSV2);
+                                      }
+<ST_CSV2_NEXT><<EOF>>                 { /* unusual */
+                                        if (field) {
+                                            ++field;
+                                            csv2CreateEntry();
+                                        }
+                                        if (csv2NextFile()) {
+                                            return 0;
+                                        }
+                                        csv2Reset();
+                                        BEGIN(ST_CSV2);
                                       }
 
-<ST_ENTRY,ST_CLOSE_ENTRY>\n           { skAppPrintErr(("Line break appears"
-                                                       " in value on line %d"),
-                                                      linenum);
-                                        ++error_count;
+<ST_CSV2>{nl}                         { /* probably an error */
+                                        if (field) {
+                                            csv2CreateEntry();
+                                        }
                                         ++linenum;
-                                        stmtReset();
+                                        csv2Reset();
+                                      }
+
+<ST_CSV2_DQ>{nl}                      { scanErr("Closing quote not found");
+                                        ++linenum;
+                                        csv2Reset();
+                                        BEGIN(ST_CSV2);
+                                      }
+<ST_CSV2_DQ><<EOF>>                   { scanErr("Closing quote not found");
+                                        if (csv2NextFile()) {
+                                            return 0;
+                                        }
+                                        csv2Reset();
+                                        BEGIN(ST_CSV2);
+                                      }
+
+<ST_CSV2,ST_CSV2_NEXT>{ws_opt}        ;
+<ST_CSV2_NEXT>{not_comma}             { scanErr("Expected ',', found %c",
+                                                *yytext);
+                                        next_state = ST_CSV2;
+                                        BEGIN(ST_CSV2_ERROR);
+                                      }
+
+<ST_CSV2_ERROR>.+                     ;
+<ST_CSV2_ERROR>{nl}                   { ++linenum;
+                                        csv2Reset();
+                                        BEGIN(ST_CSV2);
+                                      }
+<ST_CSV2_ERROR><<EOF>>                { if (csv2NextFile()) {
+                                            return 0;
+                                        }
+                                        csv2Reset();
+                                        BEGIN(ST_CSV2);
+                                      }
+
+
+
+<INITIAL>{nl}                         { ++linenum; legacyReset(); }
+<INITIAL>{ws_opt}{dq}                 { BEGIN(ST_LEG_ENTRY); }
+
+<ST_LEG_ENTRY>{not_dq}                { if (legacyField(yytext)) {
+                                            BEGIN(ST_LEG_ERROR);
+                                        } else {
+                                            BEGIN(ST_LEG_CLOSE_ENTRY);
+                                        } }
+
+<ST_LEG_CLOSE_ENTRY>{dq}              { BEGIN(ST_LEG_NEXT_ENTRY); }
+<ST_LEG_NEXT_ENTRY>,                  { ++field; }
+<ST_LEG_NEXT_ENTRY>{dq}               { BEGIN(ST_LEG_ENTRY); }
+<ST_LEG_NEXT_ENTRY>{ws_opt}           ;
+
+<ST_LEG_NEXT_ENTRY>{nl}               |
+<ST_LEG_NEXT_ENTRY><<EOF>>            { ++field;
+                                        legacyCreateEntry();
+                                        ++linenum;
+                                        legacyReset();
                                         BEGIN(INITIAL); }
 
-<ST_ENTRY,ST_CLOSE_ENTRY><<EOF>>      { skAppPrintErr(("End of stream appears"
-                                                       " in value on line %d"),
-                                                      linenum);
-                                        ++error_count;
-                                        BEGIN(ST_ERROR); }
+<ST_LEG_ENTRY>{dq}                    { scanErr("Field %u is empty string",
+                                                field);
+                                        BEGIN(ST_LEG_ERROR);
+                                      }
 
-.                                     { skAppPrintErr(
-                                            "Unexpected input on line %d",
-                                            linenum);
-                                        ++error_count;
-                                        BEGIN(ST_ERROR); }
-
-<ST_ERROR>.*                          ;
-<ST_ERROR>\n                          { ++linenum;
-                                        stmtReset();
+<ST_LEG_ENTRY,ST_LEG_CLOSE_ENTRY>\n   { scanErr(("Unexpected end-of-line"
+                                                 " found in field %u"), field);
+                                        ++linenum;
+                                        legacyReset();
                                         BEGIN(INITIAL); }
 
-<INITIAL,ST_ERROR><<EOF>>             { return 0; }
+<ST_LEG_ENTRY,ST_LEG_CLOSE_ENTRY><<EOF>> {
+                                        scanErr(("Unexpected end-of-stream"
+                                                 " found in field %u"), field);
+                                        return 0; }
+
+.                                     { scanErr("Unexpected input '%c'",
+                                                *yytext);
+                                        BEGIN(ST_LEG_ERROR); }
+
+<ST_LEG_ERROR>.*                      ;
+<ST_LEG_ERROR>\n                      { ++linenum;
+                                        legacyReset();
+                                        BEGIN(INITIAL); }
+
+<INITIAL,ST_LEG_ERROR><<EOF>>         { return 0; }
 
 %%
 
@@ -325,7 +592,6 @@ appUsageLong(
 
     FILE *fh = USAGE_FH;
     int i;
-    size_t j;
 
     fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
     fprintf(fh, "\nSWITCHES:\n");
@@ -336,11 +602,8 @@ appUsageLong(
             fprintf(fh, "--%s %s. %s\tDef. %s. Choices:\n",
                     appOptions[i].name,
                     SK_OPTION_HAS_ARG(appOptions[i]), appHelp[i],
-                    modeToName(DEFAULT_MODE));
-            for (j = 0; j < mode_name_id_map_len; ++j) {
-                fprintf(fh, "\t%-6s - %s\n",
-                        mode_name_id_map[j].name, mode_help[j]);
-            }
+                    modeToName(GEOIP2CCMAP_MODE_AUTO));
+            skStringMapPrintDetailedUsage(mode_map, fh);
             break;
 
           case OPT_INVOCATION_STRIP:
@@ -354,6 +617,12 @@ appUsageLong(
                     SK_OPTION_HAS_ARG(appOptions[i]), appHelp[i]);
             break;
         }
+    }
+
+    fprintf(fh, "\nDEPRECATED SWITCHES:\n");
+    for (i = 0; deprecatedOptions[i].name; ++i) {
+        fprintf(fh, "--%s %s. %s\n", deprecatedOptions[i].name,
+                SK_OPTION_HAS_ARG(deprecatedOptions[i]), deprecatedHelp[i]);
     }
 }
 
@@ -384,6 +653,19 @@ appTeardown(
         skPrefixMapDelete(map);
     }
 
+    if (geomap) {
+        pmap_location_t *entry;
+        RBLIST *iter;
+
+        iter = rbopenlist(geomap);
+        while ((entry = (pmap_location_t *)rbreadlist(iter)) != NULL) {
+            free(entry);
+        }
+        rbcloselist(iter);
+        rbdestroy(geomap);
+    }
+
+    skStringMapDestroy(mode_map);
     skAppUnregister();
 }
 
@@ -406,12 +688,11 @@ appSetup(
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
     int arg_index;
-    int rv;
+    ssize_t rv;
 
     /* verify same number of options and help strings */
     assert((sizeof(appHelp)/sizeof(char *)) ==
            (sizeof(appOptions)/sizeof(struct option)));
-    assert((sizeof(mode_help)/sizeof(mode_help[0])) == mode_name_id_map_len);
 
     /* register the application */
     skAppRegister(argv[0]);
@@ -424,6 +705,8 @@ appSetup(
 
     /* register the options */
     if (skOptionsRegister(appOptions, &appOptionsHandler, NULL)
+        || skOptionsRegister(deprecatedOptions, &appOptionsHandler, NULL)
+        || skOptionsRegister(deprecatedOptionsShort, &appOptionsHandler, NULL)
         || skOptionsNotesRegister(NULL))
     {
         skAppPrintErr("Unable to register options");
@@ -437,36 +720,42 @@ appSetup(
         exit(EXIT_FAILURE);
     }
 
+    /* create the string map */
+    if ((rv = skStringMapCreate(&mode_map))
+        || (rv = skStringMapAddEntries(mode_map, -1, mode_map_entries)))
+    {
+        skAppPrintErr("Unable to create string map: %s",
+                      skStringMapStrerror(rv));
+        exit(EXIT_FAILURE);
+    }
+
     /* parse options */
     arg_index = skOptionsParse(argc, argv);
     if (arg_index < 0) {
         skAppUsage(); /* never returns */
     }
 
-    /* Complain about extra args on command line */
+    /* complain about extra args on command line */
     if (arg_index != argc) {
         skAppPrintErr("Too many or unrecognized argument specified: '%s'",
                       argv[arg_index]);
         exit(EXIT_FAILURE);
     }
 
-    /* check for input; if none specified, use stdin */
-    if (!in_stream.of_name) {
-        if (FILEIsATty(stdin)) {
-            skAppPrintErr("Please specify '--%s=-' to read from the terminal",
-                          appOptions[OPT_INPUT_FILE].name);
-            exit(EXIT_FAILURE);
-        }
-        in_stream.of_name = "-";
-    }
-
-    /* open input stream */
-    rv = skFileptrOpen(&in_stream, SK_IO_READ);
-    if (rv) {
-        skAppPrintErr("Unable to open input '%s': %s",
-                      in_stream.of_name, skFileptrStrerror(rv));
+    /* determine the input modes (CSV vs binary, GeoIP2 vs legacy).
+     * Set csv2_directory or mmdb_path for GeoIP2 input, or open input
+     * file if in legacy mode */
+    if (resolveInputModes()) {
         exit(EXIT_FAILURE);
     }
+    assert(GEOIP2CCMAP_MODE_AUTO != mode.csv_binary);
+    assert(GEOIP2CCMAP_MODE_AUTO != mode.geoip2_legacy);
+    assert(NULL == csv2_directory
+           || (GEOIP2CCMAP_MODE_GEOIP2 == mode.geoip2_legacy
+               && GEOIP2CCMAP_MODE_CSV == mode.csv_binary));
+    assert(NULL == mmdb_path
+           || (GEOIP2CCMAP_MODE_GEOIP2 == mode.geoip2_legacy
+               && GEOIP2CCMAP_MODE_BINARY == mode.csv_binary));
 
     /* output is "stdout" if none specified.  do not bind to stdout
      * when --dry-run is active */
@@ -500,14 +789,17 @@ appSetup(
  */
 static int
 appOptionsHandler(
-    clientData   UNUSED(cData),
+    clientData          cData,
     int                 opt_index,
     char               *opt_arg)
 {
-    int rv;
+    ssize_t rv;
+    int idx;
+
+    SK_UNUSED_PARAM(cData);
 
     switch ((appOptionsEnum)opt_index) {
-      case OPT_INPUT_FILE:
+      case OPT_INPUT_PATH:
         if (in_stream.of_name) {
             skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
@@ -516,7 +808,7 @@ appOptionsHandler(
         in_stream.of_name = opt_arg;
         break;
 
-      case OPT_OUTPUT_FILE:
+      case OPT_OUTPUT_PATH:
         if (out_stream) {
             skAppPrintErr("Invalid %s: Switch used multiple times",
                           appOptions[opt_index].name);
@@ -532,7 +824,7 @@ appOptionsHandler(
         break;
 
       case OPT_MODE:
-        if (parseMode(opt_index, opt_arg, &mode)) {
+        if (parseMode(opt_index, opt_arg)) {
             return 1;
         }
         break;
@@ -546,19 +838,22 @@ appOptionsHandler(
         break;
 
       case OPT_CSV_INPUT:
-        if (parseMode(opt_index, modeToName(GEOIP2CCMAP_MODE_IPV4), &mode)) {
-            return 1;
-        }
-        break;
-
       case OPT_V6_CSV_INPUT:
-        if (parseMode(opt_index, modeToName(GEOIP2CCMAP_MODE_IPV6), &mode)) {
-            return 1;
-        }
-        break;
-
       case OPT_ENCODED_INPUT:
-        if (parseMode(opt_index, modeToName(GEOIP2CCMAP_MODE_BINARY), &mode)) {
+        idx = opt_index - OPT_CSV_INPUT;
+        if (idx >= (int)(sizeof(input_modes)/sizeof(input_modes[0]))
+            || idx < 0)
+        {
+            skAppPrintErr("Programmer error: Invalid mode %d", idx);
+            skAbort();
+        }
+        rv = parseMode(opt_index, input_modes[idx]);
+        if (rv) {
+            if (1 == rv) {
+                skAppPrintErr("Programmer error: Invalid mode %s",
+                              input_modes[idx]);
+                skAbort();
+            }
             return 1;
         }
         break;
@@ -569,47 +864,102 @@ appOptionsHandler(
 
 
 /*
- *  ok = parseMode(string, &new_mode);
+ *    Parse the value in 'string' as a comma-separated list of the
+ *    names input/output modes and set the appropriate global
+ *    variables.
  *
- *    Parse the value in 'string' as the name of a mode and put the
- *    mode's value in 'new_mode'.
- *
- *    Return 0 on success, or -1 if 'string' does not match a mode.
+ *    Return 0 on success.  Return 1 if the mode has already been set.
+ *    Return -1 if 'string' does not match a mode.
  */
 static int
 parseMode(
     int                 opt_index,
-    const char         *string,
-    geoip2ccmap_mode_t *new_mode)
+    const char         *string)
 {
-    static int mode_seen = 0;
-    const char *err;
-    size_t j;
+    static int mode_switch_seen = 0;
+    sk_stringmap_entry_t *map_entry;
+    sk_stringmap_iter_t *iter = NULL;
+    char *errmsg;
+    int rv = -1;
+    int seen_ipv6_ipv4 = 0;
+    int seen_csv_binary = 0;
+    int seen_geoip2_legacy = 0;
 
-    if (mode_seen) {
+#define CHECK_CHOICE(m_var, m_choice1, m_choice2)                       \
+    if (!m_var) {                                                       \
+        m_var = 1;                                                      \
+    } else {                                                            \
+        skAppPrintErr("Invalid %s: Conflicting choices: %s vs %s",      \
+                      appOptions[opt_index].name,                       \
+                      modeToName(m_choice1), modeToName(m_choice2));    \
+        goto END;                                                       \
+    }
+
+    if (mode_switch_seen) {
         skAppPrintErr("Invalid %s: Attempting to set mode multiple times",
                       appOptions[opt_index].name);
-        return -1;
+        return 1;
+    }
+    mode_switch_seen = 1;
+
+    if (skStringMapParse(mode_map, string, SKSTRINGMAP_DUPES_ERROR,
+                         &iter, &errmsg))
+    {
+        skAppPrintErr("Invalid %s: %s",
+                      appOptions[opt_index].name, errmsg);
+        goto END;
+    }
+    while (skStringMapIterNext(iter, &map_entry, NULL) == SK_ITERATOR_OK) {
+        switch ((geoip2ccmap_mode_t)map_entry->id) {
+          case GEOIP2CCMAP_MODE_IPV6:
+          case GEOIP2CCMAP_MODE_IPV4:
+            CHECK_CHOICE(seen_ipv6_ipv4,
+                         GEOIP2CCMAP_MODE_IPV6, GEOIP2CCMAP_MODE_IPV4);
+            mode.ipv6_ipv4 = (geoip2ccmap_mode_t)map_entry->id;
+            continue;
+          case GEOIP2CCMAP_MODE_BINARY:
+          case GEOIP2CCMAP_MODE_CSV:
+            CHECK_CHOICE(seen_csv_binary,
+                         GEOIP2CCMAP_MODE_BINARY, GEOIP2CCMAP_MODE_CSV);
+            mode.csv_binary = (geoip2ccmap_mode_t)map_entry->id;
+            continue;
+          case GEOIP2CCMAP_MODE_GEOIP2:
+          case GEOIP2CCMAP_MODE_LEGACY:
+            CHECK_CHOICE(seen_geoip2_legacy,
+                         GEOIP2CCMAP_MODE_GEOIP2, GEOIP2CCMAP_MODE_LEGACY);
+            mode.geoip2_legacy = (geoip2ccmap_mode_t)map_entry->id;
+            continue;
+          case GEOIP2CCMAP_MODE_AUTO:
+            continue;
+        }
+        skAbortBadCase(map_entry->id);
     }
 
-    for (j = 0; j < mode_name_id_map_len; ++j) {
-        if (0 == strncmp(string, mode_name_id_map[j].name, strlen(string))) {
-            ++mode_seen;
-            *new_mode = mode_name_id_map[j].id;
-        }
+#if !SK_ENABLE_IPV6
+    if (GEOIP2CCMAP_MODE_IPV6 == mode.ipv6_ipv4) {
+        skAppPrintErr(("Unsupported %s: This SiLK installation was"
+                       " built without IPv6 address support"),
+                      appOptions[opt_index].name);
+        goto END;
     }
-    if (1 == mode_seen) {
-        return 0;
+#endif  /* !SK_ENABLE_IPV6 */
+#if !defined(SK_ENABLE_LIBMAXMINDDB)
+    if (GEOIP2CCMAP_MODE_GEOIP2 == mode.geoip2_legacy
+        && GEOIP2CCMAP_MODE_BINARY == mode.csv_binary)
+    {
+        skAppPrintErr(("Unsupported %s: This SiLK installation was"
+                      " built without support for GeoIP2 binary files"),
+                      appOptions[opt_index].name);
+        goto END;
     }
-    if (mode_seen > 1) {
-        err = "Name is ambiguous";
-    } else {
-        err = "Unrecognized name";
-        mode_seen = -1;
-    }
-    skAppPrintErr("Invalid %s '%s': %s",
-                  appOptions[opt_index].name, string, err);
-    return -1;
+#endif  /* !SK_ENABLE_LIBMAXMINDDB */
+
+    /* success */
+    rv = 0;
+
+  END:
+    skStringMapIterDestroy(iter);
+    return rv;
 }
 
 
@@ -623,148 +973,1140 @@ static const char *
 modeToName(
     geoip2ccmap_mode_t  m)
 {
-    size_t j;
+    const char *name;
 
-    for (j = 0; j < mode_name_id_map_len; ++j) {
-        if (m == mode_name_id_map[j].id) {
-            return mode_name_id_map[j].name;
+    name = skStringMapGetFirstName(mode_map, (sk_stringmap_id_t)m);
+    if (NULL == name) {
+        skAppPrintErr("Unknown mode value %d", (int)m);
+        skAbort();
+    }
+    return name;
+}
+
+
+/*
+ *    Check that the string the user provided as the directory
+ *    containing the GeoIP2 files is a directory and contains the
+ *    necessary files.
+ *
+ *    This function sets the global 'csv2_prod' to the proper prefix
+ *    depending on the files that it finds.
+ */
+static int
+csv2CheckDirectory(
+    void)
+{
+    char path[PATH_MAX];
+    unsigned int found = 0;
+    unsigned int i, j;
+    ssize_t sz;
+
+    errno = 0;
+    if (!skDirExists(csv2_directory)) {
+        skAppPrintErr("Invalid %s for %s=%s,%s '%s': %s",
+                      appOptions[OPT_INPUT_PATH].name,
+                      appOptions[OPT_MODE].name,
+                      modeToName(GEOIP2CCMAP_MODE_GEOIP2),
+                      modeToName(GEOIP2CCMAP_MODE_CSV), csv2_directory,
+                      ((0 == errno) ? "Is not a directory" : strerror(errno)));
+        return 1;
+    }
+
+    for (j = 0; (csv2_prod = csv2_products[j]) != NULL; ++j) {
+        found = 0;
+        for (i = 0; csv2_files[i].path != NULL; ++i) {
+            sz = snprintf(path, sizeof(path), "%s/%s%s",
+                          csv2_directory, csv2_prod, csv2_files[i].path);
+            if ((size_t)sz >= sizeof(path)) {
+                skAppPrintErr(("File path for %s too long (%" SK_PRIuZ
+                               " < %" SK_PRIdZ ")"),
+                              csv2_files[i].path, sizeof(path), sz);
+                return 1;
+            }
+            if (skFileExists(path)) {
+                ++found;
+            } else if (0 == found) {
+                break;
+            } else {
+                skAppPrintErr(
+                    "Invalid %s: Expected file %s%s not found: %s",
+                    appOptions[OPT_INPUT_PATH].name,
+                    csv2_prod, csv2_files[i].path,
+                    ((0 == errno) ? "Is not a file" : strerror(errno)));
+                return 1;
+            }
+        }
+        if (1u + found == sizeof(csv2_files)/sizeof(csv2_files[0])) {
+            break;
+        }
+    }
+    if (NULL == csv2_prod) {
+        /* FIXME: do not assume 2 csv2_products */
+        skAppPrintErr("Invalid %s: Expected file %s%s or %s%s not found",
+                      appOptions[OPT_INPUT_PATH].name,
+                      csv2_products[0], csv2_files[0].path,
+                      csv2_products[1], csv2_files[0].path);
+        return 1;
+    }
+
+    return 0;
+}
+
+
+/*
+ *    Determine the input modes (GeoIP2 vs legacy, CSV vs binary).
+ *
+ *    Set 'csv2_directory' for GeoIP2+CSV; set 'mmdb_path' for
+ *    GeoIP2+binary input, or open input file if in either legacy
+ *    mode.
+ *
+ *    Return 0 on success, or -1 on failure.
+ */
+static int
+resolveInputModes(
+    void)
+{
+    const char *errmsg = NULL;
+    size_t len;
+    ssize_t rv;
+    int c;
+
+#define SET_MODE_IF_AUTO(m_member, m_mode, m_reason)                    \
+    if (GEOIP2CCMAP_MODE_AUTO == mode.m_member) {                       \
+        TRACEMSG(("Setting mode." #m_member " to " #m_mode ": %s",      \
+                  m_reason));                                           \
+        mode.m_member = m_mode;                                         \
+    }
+
+    if (GEOIP2CCMAP_MODE_GEOIP2 == mode.geoip2_legacy) {
+        if (NULL == in_stream.of_name) {
+            skAppPrintErr("Must specify --%s for --%s=%s",
+                          appOptions[OPT_INPUT_PATH].name,
+                          appOptions[OPT_MODE].name,
+                          modeToName(GEOIP2CCMAP_MODE_GEOIP2));
+            return -1;
+        }
+        len = strlen(in_stream.of_name);
+        if (0 == strcmp("stdin", in_stream.of_name)
+            || 0 == strcmp("-", in_stream.of_name))
+        {
+            errmsg = "May not use the standard input";
+        } else if (len > 3 && 0 == strcmp(&in_stream.of_name[len-3], ".gz")) {
+            errmsg = "May not use a compressed stream";
+        } else if (isFIFO(in_stream.of_name)) {
+            errmsg = "May not use a named pipe";
+        }
+        if (errmsg) {
+            skAppPrintErr("Invalid %s for --%s=%s '%s': %s",
+                          appOptions[OPT_INPUT_PATH].name,
+                          appOptions[OPT_MODE].name,
+                          modeToName(GEOIP2CCMAP_MODE_GEOIP2),
+                          in_stream.of_name, errmsg);
+            return -1;
+        }
+        if (GEOIP2CCMAP_MODE_CSV == mode.csv_binary
+            || (GEOIP2CCMAP_MODE_AUTO == mode.csv_binary
+                && skDirExists(in_stream.of_name)))
+        {
+            SET_MODE_IF_AUTO(csv_binary, GEOIP2CCMAP_MODE_CSV,
+                             "input-path is directory");
+            csv2_directory = in_stream.of_name;
+            if (csv2CheckDirectory()) {
+                return -1;
+            }
+        } else
+#ifndef SK_ENABLE_LIBMAXMINDDB
+        {
+            if (GEOIP2CCMAP_MODE_BINARY == mode.csv_binary) {
+                skAppPrintErr(("Unsupported %s: This SiLK installation lacks"
+                               " support for GeoIP2 binary files"),
+                              appOptions[OPT_MODE].name);
+            } else {
+                assert(GEOIP2CCMAP_MODE_AUTO == mode.csv_binary);
+                skAppPrintErr("Invalid %s '%s': %s",
+                              appOptions[OPT_INPUT_PATH].name,
+                              in_stream.of_name,
+                              ((0 == errno)
+                               ? ("Is not a directory and GeoIP2 binary"
+                                  " file support is not available")
+                               : strerror(errno)));
+            }
+            return -1;
+        }
+#else  /* SK_ENABLE_LIBMAXMINDDB */
+        {
+            SET_MODE_IF_AUTO(csv_binary, GEOIP2CCMAP_MODE_BINARY,
+                             "input-path is not directory");
+            if (!skFileExists(in_stream.of_name)) {
+                skAppPrintErr("Invalid %s for --%s=%s '%s': %s",
+                              appOptions[OPT_INPUT_PATH].name,
+                              appOptions[OPT_MODE].name,
+                              modeToName(GEOIP2CCMAP_MODE_BINARY),
+                              in_stream.of_name,
+                              ((0 == errno)
+                               ? "Is not a file" : strerror(errno)));
+                return -1;
+            }
+            mmdb_path = in_stream.of_name;
+        }
+#endif  /* #else of #ifndef SK_ENABLE_LIBMAXMINDDB */
+        in_stream.of_name = NULL;
+        assert(GEOIP2CCMAP_MODE_AUTO != mode.csv_binary);
+    } else {
+        /* a NULL input-path forces legacy mode */
+        if (NULL == in_stream.of_name) {
+            SET_MODE_IF_AUTO(geoip2_legacy, GEOIP2CCMAP_MODE_LEGACY,
+                             "input-path is NULL");
+            if (FILEIsATty(stdin)) {
+                skAppPrintErr("Specify '--%s=-' to read from the terminal",
+                              appOptions[OPT_INPUT_PATH].name);
+                return -1;
+            }
+            in_stream.of_name = "-";
+        }
+        rv = skFileptrOpen(&in_stream, SK_IO_READ);
+        if (rv) {
+            skAppPrintErr("Unable to open %s '%s': %s",
+                          appOptions[OPT_INPUT_PATH].name,
+                          in_stream.of_name, skFileptrStrerror(rv));
+            return -1;
+        }
+        if (SK_FILEPTR_IS_STDIO == in_stream.of_type
+            || SK_FILEPTR_IS_PROCESS == in_stream.of_type)
+        {
+            SET_MODE_IF_AUTO(geoip2_legacy, GEOIP2CCMAP_MODE_LEGACY,
+                             "input-path is stdio/process");
+        }
+
+        /* read first char to see if stream is binary */
+        c = getc(in_stream.of_fp);
+        if (EOF == c) {
+            /* error or stream is empty */
+            if (ferror(in_stream.of_fp)) {
+                int saved = errno;
+                if (GEOIP2CCMAP_MODE_BINARY == mode.csv_binary
+                    || GEOIP2CCMAP_MODE_LEGACY == mode.geoip2_legacy
+                    || (EISDIR != errno && EBADF != errno))
+                {
+                    skAppPrintErr("Unable to read from '%s': %s",
+                                  in_stream.of_name, strerror(saved));
+                    return -1;
+                }
+                assert(GEOIP2CCMAP_MODE_AUTO == mode.geoip2_legacy);
+                if (in_stream.of_type != SK_FILEPTR_IS_STDIO
+                    && skDirExists(in_stream.of_name))
+                {
+                    csv2_directory = in_stream.of_name;
+                    if (csv2CheckDirectory()) {
+                        return -1;
+                    }
+                    SET_MODE_IF_AUTO(geoip2_legacy, GEOIP2CCMAP_MODE_GEOIP2,
+                                     "is a directory");
+                    SET_MODE_IF_AUTO(csv_binary, GEOIP2CCMAP_MODE_CSV,
+                                     "is a directory");
+                    skFileptrClose(&in_stream, NULL);
+                    in_stream.of_fp = NULL;
+                    in_stream.of_name = NULL;
+                } else {
+                    skAppPrintErr("Unable to read from '%s': %s",
+                                  in_stream.of_name, strerror(saved));
+                    return -1;
+                }
+            } else {
+                /* file is empty; treat as legacy CSV */
+                SET_MODE_IF_AUTO(csv_binary, GEOIP2CCMAP_MODE_CSV,
+                                 "file is empty");
+                SET_MODE_IF_AUTO(geoip2_legacy, GEOIP2CCMAP_MODE_LEGACY,
+                                 "file is empty");
+            }
+        } else {
+            /* is a readable stream */
+            if (!isprint(c) && !isspace(c)) {
+                /* assume it is a binary stream */
+                SET_MODE_IF_AUTO(csv_binary, GEOIP2CCMAP_MODE_BINARY,
+                                 "read non-printable char");
+                if (GEOIP2CCMAP_MODE_BINARY != mode.csv_binary) {
+                    skAppPrintErr("Invalid %s for --%s=%s '%s': %s",
+                                  appOptions[OPT_INPUT_PATH].name,
+                                  appOptions[OPT_MODE].name,
+                                  modeToName(GEOIP2CCMAP_MODE_CSV),
+                                  in_stream.of_name,
+                                  "File contains binary characters");
+                    return -1;
+                }
+            } else {
+                /* assume it is a text stream */
+                SET_MODE_IF_AUTO(geoip2_legacy, GEOIP2CCMAP_MODE_LEGACY,
+                                 "read printable char; cannot be directory");
+                SET_MODE_IF_AUTO(csv_binary, GEOIP2CCMAP_MODE_CSV,
+                                 "read printable char");
+                if (GEOIP2CCMAP_MODE_CSV != mode.csv_binary) {
+                    skAppPrintErr("Invalid %s for --%s=%s '%s': %s",
+                                  appOptions[OPT_INPUT_PATH].name,
+                                  appOptions[OPT_MODE].name,
+                                  modeToName(GEOIP2CCMAP_MODE_BINARY),
+                                  in_stream.of_name,
+                                  "File does not have correct content type");
+                    return -1;
+                }
+            }
+            if (-1 == fseek(in_stream.of_fp, 0, SEEK_SET)) {
+                SET_MODE_IF_AUTO(geoip2_legacy, GEOIP2CCMAP_MODE_LEGACY,
+                                 "cannot fseek()");
+                c = ungetc(c, in_stream.of_fp);
+                if (EOF == c) {
+                    skAppPrintErr("Unable to put back character");
+                    return -1;
+                }
+            }
+            if (GEOIP2CCMAP_MODE_BINARY == mode.csv_binary
+                && GEOIP2CCMAP_MODE_AUTO == mode.geoip2_legacy)
+#ifndef SK_ENABLE_LIBMAXMINDDB
+            {
+                SET_MODE_IF_AUTO(geoip2_legacy, GEOIP2CCMAP_MODE_LEGACY,
+                                 "GeoIP2 binary support not available");
+            }
+#else  /* SK_ENABLE_LIBMAXMINDDB */
+            {
+                /* attempt to open it has a GeoIP2 binary stream */
+                MMDB_s mmdb;
+                int status;
+
+                status = MMDB_open(in_stream.of_name, MMDB_MODE_MMAP, &mmdb);
+                if (MMDB_SUCCESS == status) {
+                    SET_MODE_IF_AUTO(geoip2_legacy, GEOIP2CCMAP_MODE_GEOIP2,
+                                     "Opened file with MMDB_open()");
+                    MMDB_close(&mmdb);
+                    mmdb_path = in_stream.of_name;
+                    skFileptrClose(&in_stream, NULL);
+                    in_stream.of_fp = NULL;
+                    in_stream.of_name = NULL;
+                } else {
+                    TRACEMSG(("Unable to open '%s' with MMDB_open(): %s",
+                              in_stream.of_name,
+                              ((MMDB_IO_ERROR == status)
+                               ? strerror(errno) : MMDB_strerror(status))));
+                    SET_MODE_IF_AUTO(geoip2_legacy, GEOIP2CCMAP_MODE_LEGACY,
+                                     "Unable to open file with MMDB_open()");
+                }
+            }
+#endif  /* #else of #ifndef SK_ENABLE_LIBMAXMINDDB */
         }
     }
 
-    skAppPrintErr("Unknown mode value %d", (int)m);
-    skAbort();
+    return 0;
+}
+
+#ifndef TEST_PRINTF_FORMATS
+/*
+ *    Above:  #define scanErr  ++error_count; scanWarn
+ */
+
+/*
+ *    Print a message preceded by the application name, the file being
+ *    parsed, and the current line number of that file.
+ */
+static int
+scanWarn(
+    const char         *fmt,
+    ...)
+{
+    char buf[3 * PATH_MAX];
+    va_list args;
+    ssize_t sz;
+
+    va_start(args, fmt);
+    sz = snprintf(buf, sizeof(buf), "%s:%u: ",
+                  ((in_stream.of_name) ? in_stream.of_name : "?"), linenum);
+    assert((size_t)sz < sizeof(buf));
+    vsnprintf(buf + sz, sizeof(buf) - sz, fmt, args);
+    va_end(args);
+    skAppPrintErr("%s", buf);
+    return 0;
+}
+#endif  /* TEST_PRINTF_FORMATS */
+
+
+/*
+ *    Write the prefix map file to the output stream.  The program's
+ *    arguments are written into the output file's header.
+ */
+static void
+writeOutput(
+    int         argc,
+    char      **argv)
+{
+    ssize_t rv;
+
+    if (error_count) {
+        skAppPrintErr("Encountered %u error%s during processing.%s",
+                      error_count, ((error_count > 1) ? "s" : ""),
+                      (dry_run ? "  Output not written." : ""));
+    }
+    if (dry_run) {
+        exit((error_count) ? EXIT_FAILURE : EXIT_SUCCESS);
+    }
+
+    /* add invocation */
+    if (!invocation_strip) {
+        rv = skHeaderAddInvocation(skStreamGetSilkHeader(out_stream), 1,
+                                   argc, argv);
+        if (rv) {
+            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    /* add notes if given */
+    rv = skOptionsNotesAddToStream(out_stream);
+    if (rv) {
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+        exit(EXIT_FAILURE);
+    }
+    skOptionsNotesTeardown();
+
+    /* write output */
+    rv = skStreamOpen(out_stream);
+    if (rv) {
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+        exit(EXIT_FAILURE);
+    }
+
+    rv = skPrefixMapWrite(map, out_stream);
+    if (rv != SKPREFIXMAP_OK) {
+        if (rv == SKPREFIXMAP_ERR_IO) {
+            skStreamPrintLastErr(out_stream,
+                                 skStreamGetLastReturnValue(out_stream),
+                                 &skAppPrintErr);
+        } else {
+            skAppPrintErr("Unable to write prefix map to '%s': %s",
+                          skStreamGetPathname(out_stream),
+                          skPrefixMapStrerror(rv));
+        }
+        exit(EXIT_FAILURE);
+    }
+
+    rv = skStreamClose(out_stream);
+    if (rv) {
+        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+        exit(EXIT_FAILURE);
+    }
 }
 
 
-static void
-stmtReset(
+/* we could handle this with "%option noyywrap", but defining this as
+ * a function eliminates a compiler warning. */
+int
+yywrap(
     void)
 {
-    memset(&stmt, 0, sizeof(stmt));
-    stmt.value = default_value;
+    return 1;
 }
 
 /*
- *  status = stmtEntry(string);
- *
- *    Handle part of the current line of input.
+ *    Prepare to process a new line of input from a CSV file that uses
+ *    the legacy format.
+ */
+static void
+legacyReset(
+    void)
+{
+    memset(&legacy, 0, sizeof(legacy));
+    field = 0;
+}
+
+/*
+ *    Handle a single field of the current line of legacy input.
  *
  *    Return 0 on success or -1 for failure.
  */
 static int
-stmtEntry(
+legacyField(
     const char         *string)
 {
     int rv;
 
-    switch (stmt.position) {
+    switch (field) {
       case 0:
-        /* starting IP */
-        rv = skStringParseIP(&stmt.range_start, string);
-        if (rv) {
-            goto PARSE_ERROR;
-        }
-        break;
       case 1:
-        /* ending IP */
-        rv = skStringParseIP(&stmt.range_end, string);
+        /* starting IP, ending IP */
+        rv = skStringParseIP(&legacy.range[field], string);
         if (rv) {
-            goto PARSE_ERROR;
-        }
-        if (skipaddrCompare(&stmt.range_start, &stmt.range_end) > 0) {
-            skAppPrintErr("Invalid range on line %d: start is greater then end",
-                          linenum);
+            scanErr("Invalid IP '%s': %s", string, skStringParseStrerror(rv));
             return -1;
         }
         break;
+      case 4:
+        /* country code as upper case characters */
+        legacy.country = (uint32_t)skCountryNameToCode(string);
+        if (SK_COUNTRYCODE_INVALID == legacy.country) {
+            scanErr("Invalid country code '%s'", string);
+            return -1;
+        }
+        break;
+#if 0
       case 2:
       case 3:
         /* starting or ending IP as an integer */
         break;
-      case 4:
-        /* country code as upper case characters */
-        stmt.value = (uint32_t)skCountryNameToCode(string);
-        if (SK_COUNTRYCODE_INVALID == stmt.value) {
-            skAppPrintErr("Invalid country code on line %d '%s'",
-                          linenum, string);
-            return -1;
-        }
-        break;
       case 5:
         /* country name */
         break;
-      case NUM_FIELDS:
-        /* too many fields; only print the error for the first
-         * field */
-        skAppPrintErr("Invalid input on line %d:"
-                      " More than %d CSV values are present",
-                      linenum, NUM_FIELDS);
-        return -1;
-        break;
-      default:
-        break;
+#endif  /* 0 */
     }
 
     return 0;
-
-  PARSE_ERROR:
-    skAppPrintErr("Invalid IP on line %d '%s': %s",
-                  linenum, string, skStringParseStrerror(rv));
-    return -1;
 }
 
 
+/*
+ *    Combine the data for all fields on this line into a single entry
+ *    and add it to the prefix map.
+ */
 static void
-stmtCreateEntry(
+legacyCreateEntry(
     void)
 {
     static int first_entry = 1;
     skPrefixMapErr_t rv;
 
-    if (stmt.position < NUM_FIELDS) {
-        skAppPrintErr("Invalid input on line %d:"
-                      " Fewer than %d CSV values are present",
-                      linenum, NUM_FIELDS);
-        ++error_count;
+    if (field != LEGACY_CSV_FIELDS) {
+        scanErr("Expected %d CSV values, found %u", LEGACY_CSV_FIELDS, field);
+        if (1 == first_entry) {
+            exit(EXIT_FAILURE);
+        }
+        return;
     }
-
     if (first_entry) {
         first_entry = 0;
-        if (GEOIP2CCMAP_MODE_AUTO == mode) {
+        if (GEOIP2CCMAP_MODE_AUTO == mode.ipv6_ipv4) {
             skPrefixMapContent_t content;
-            if (skipaddrIsV6(&stmt.range_start)) {
-                mode = GEOIP2CCMAP_MODE_IPV6;
+            if (skipaddrIsV6(&legacy.range[0])) {
+                mode.ipv6_ipv4 = GEOIP2CCMAP_MODE_IPV6;
                 content = SKPREFIXMAP_CONT_ADDR_V6;
             } else {
-                mode = GEOIP2CCMAP_MODE_IPV4;
+                mode.ipv6_ipv4 = GEOIP2CCMAP_MODE_IPV4;
                 content = SKPREFIXMAP_CONT_ADDR_V4;
             }
             skPrefixMapSetContentType(map, content);
         }
     }
 
+    if (skipaddrCompare(&legacy.range[0], &legacy.range[1]) > 0) {
+        scanErr("Invalid IP range: start is greater then end");
+        return;
+    }
+
 #if SK_ENABLE_IPV6
-    if (GEOIP2CCMAP_MODE_IPV4 == mode) {
+    if (GEOIP2CCMAP_MODE_IPV4 == mode.ipv6_ipv4) {
         uint32_t ipv4;
-        if (skipaddrGetAsV4(&stmt.range_start, &ipv4)
-            || skipaddrGetAsV4(&stmt.range_end, &ipv4))
+        if (skipaddrGetAsV4(&legacy.range[0], &ipv4)
+            || skipaddrGetAsV4(&legacy.range[1], &ipv4))
         {
-            skAppPrintErr(("Invalid IP on line %d:"
-                           " IPv6 address not allowed in %s prefix map"),
-                          linenum, modeToName(mode));
-            ++error_count;
+            TRACEMSG(("%s:%d: Ignoring IPv6 address in IPv4 mode",
+                      in_stream.of_name, linenum));
             return;
         }
     }
 #endif  /* SK_ENABLE_IPV6 */
 
-    rv = skPrefixMapAddRange(map, &stmt.range_start, &stmt.range_end,
-                             stmt.value);
+    rv = skPrefixMapAddRange(map, &legacy.range[0], &legacy.range[1],
+                             legacy.country);
     if (rv) {
-        skAppPrintErr("Cannot add entry on line %d to prefix map: %s",
-                      linenum, skPrefixMapStrerror(rv));
-        ++error_count;
+        scanErr("Unable to add entry to prefix map: %s",
+                skPrefixMapStrerror(rv));
     }
+}
+
+
+/*
+ *    Read the data from a textual CSV file that uses the legacy
+ *    maxmind format, add it to a prefix map, and write the prefix map
+ *    to disk.
+ *
+ *    The format contains six fields, each value wrapped in double
+ *    quote characters.  The fields are (0)starting ip in canonical
+ *    form, (1)ending ip in canonical form, (2)starting ip as an
+ *    integer, (3)ending ip as an integer, (4)two letter country code,
+ *    (5)country name.
+ *
+ *    The file does not have a title line.
+ */
+static void
+legacyCSVRead(
+    int                 argc,
+    char              **argv)
+{
+    ssize_t rv;
+
+    /* Create the output prefix map */
+    if (skPrefixMapCreate(&map) != SKPREFIXMAP_OK) {
+        skAppPrintErr("Unable to create prefix map");
+        exit(EXIT_FAILURE);
+    }
+
+    /* set the content type to the current mode, or to IPv4 if the
+     * mode is "auto"; if auto, the content type may be changed once
+     * we have the first line of input */
+    switch (mode.ipv6_ipv4) {
+      case GEOIP2CCMAP_MODE_IPV6:
+        skPrefixMapSetContentType(map, SKPREFIXMAP_CONT_ADDR_V6);
+        break;
+      case GEOIP2CCMAP_MODE_IPV4:
+      case GEOIP2CCMAP_MODE_AUTO:
+        skPrefixMapSetContentType(map, SKPREFIXMAP_CONT_ADDR_V4);
+        break;
+      default:
+        skAbortBadCase(mode.ipv6_ipv4);
+    }
+
+    rv = skPrefixMapSetDefaultVal(map, default_value);
+    if (rv) {
+        skAppPrintErr("Unable to set prefix map's default value: %s",
+                      skPrefixMapStrerror(rv));
+        exit(EXIT_FAILURE);
+    }
+
+    legacyReset();
+
+    /* Process input */
+    yyin = in_stream.of_fp;
+    yylex();
+
+    /* finished scanning.  clean up flex's state */
+#ifdef SK_HAVE_YYLEX_DESTROY
+    yylex_destroy();
+#else
+    yy_delete_buffer(YY_CURRENT_BUFFER);
+#endif
+
+    writeOutput(argc, argv);
+}
+
+
+/*
+ *    Normalize the two character continent code in 'string' to a
+ *    "country" code that is consistent with that used by the legacy
+ *    GeoIP code.  Store the value in the referent of 'country'.
+ *
+ *    Return 0 if the string was a legal and expected value.  Return
+ *    -1 if it was legal but unexpected.  Return
+ *    SK_COUNTRYCODE_INVALID if the string is invalid.
+ */
+static int
+continentToCountry(
+    const char         *string,
+    uint32_t           *country)
+{
+    /*
+     *  For GeoLite2, mapping from continent code to fake country
+     *  code.  This is done since some locations specify only a
+     *  continent (as of this writing (2018.04.02) only Europe and
+     *  Asia/Pacific are used without a more specific country).
+     *
+     *    XF <== AF,Africa
+     *    XA <== AN,Antarctica
+     *    AP <== AS,Asia  -- for consistency w/ GeoIP Legacy
+     *    EU <== EU,Europe
+     *    XN <== NA,"North America"
+     *    XO <== OC,Oceania
+     *    XS <== SA,"South America"
+     */
+    const uint32_t AF = ('x' << 8) | 'f';
+    const uint32_t AN = ('x' << 8) | 'a';
+    const uint32_t AS = ('a' << 8) | 'p';
+    const uint32_t EU = ('e' << 8) | 'u';
+    const uint32_t NA = ('x' << 8) | 'n';
+    const uint32_t OC = ('x' << 8) | 'o';
+    const uint32_t SA = ('x' << 8) | 's';
+
+    switch (skCountryNameToCode(string)) {
+      case (('a' << 8) | 'f'):
+        *country = AF;
+        break;
+      case (('a' << 8) | 'n'):
+        *country = AN;
+        break;
+      case (('a' << 8) | 's'):
+        *country = AS;
+        break;
+      case (('e' << 8) | 'u'):
+        *country = EU;
+        break;
+      case (('n' << 8) | 'a'):
+        *country = NA;
+        break;
+      case (('o' << 8) | 'c'):
+        *country = OC;
+        break;
+      case (('s' << 8) | 'a'):
+        *country = SA;
+        break;
+      case SK_COUNTRYCODE_INVALID:
+        *country = SK_COUNTRYCODE_INVALID;
+        return SK_COUNTRYCODE_INVALID;
+      default:
+        *country = skCountryNameToCode(string);
+        return -1;
+    }
+    return 0;
+}
+
+
+/*
+ *  status = ipblocksField(string);
+ *
+ *    Handle a single field of the current line of input in a
+ *    Geo*2-Country-Blocks-IPv*.csv file.
+ *
+ *    Return 0 on success or -1 for failure.
+ *
+ *    This is a helper function for csv2Field().
+ */
+static int
+ipblocksField(
+    const char         *string)
+{
+    int rv;
+
+    if (1 == linenum) {
+        /* to make this more robust to changes that maxmind may make
+         * to the data files, we should ensure we have the fields we
+         * need and dynamically determine the position of those
+         * fields */
+        if (field >= (sizeof(ipblocks_fields)/sizeof(ipblocks_fields[0]))) {
+            TRACEMSG(("%s:%d: Ignoring additional title field #%u '%s'",
+                      in_stream.of_name, linenum, 1u + field, string));
+            ++ipblocks_fields_count;
+            return 0;
+        }
+        if (0 != strcmp(string, ipblocks_fields[field])) {
+            scanErr("Expected title field %u to have name '%s', found '%s'",
+                    1u + field, ipblocks_fields[field], string);
+            exit(EXIT_FAILURE);
+        }
+        return 0;
+    }
+
+    switch (field) {
+      case 0:
+        /* network */
+        rv = skStringParseCIDR(&ipblocks.ip, &ipblocks.prefix, string);
+        if (rv) {
+            goto PARSE_ERROR;
+        }
+        break;
+      case 1:
+      case 2:
+      case 3:
+        /* geoname_id, registered_country_geoname_id,
+         * represented_country_geoname_id */
+        rv = skStringParseUint32(&ipblocks.geoname[field-1], string, 0, 0);
+        if (rv) {
+            ipblocks.geoname[field-1] = 0;
+            goto PARSE_ERROR;
+        }
+        break;
+      case 4:
+        /* is_anonymous_proxy */
+        if ('1' == string[0]) {
+            ipblocks.is_anonymous = 1;
+        }
+        break;
+      case 5:
+        /* is_satellite_provider */
+        if ('1' == string[0]) {
+            ipblocks.is_satellite = 1;
+        }
+        break;
+    }
+
+    return 0;
+
+  PARSE_ERROR:
+    scanErr("Invalid %s '%s': %s",
+            ipblocks_fields[field], string, skStringParseStrerror(rv));
+    return -1;
+}
+
+
+/*
+ *    Combine the data for all fields on this line into a single entry
+ *    and add it to the prefix map.
+ *
+ *    This is a helper function for csv2CreateEntry().
+ */
+static void
+ipblocksCreateEntry(
+    void)
+{
+    static const pmap_location_t anonymous = {0, COUNTRY_ANON, 0};
+    static const pmap_location_t satellite = {0, COUNTRY_SATL, 0};
+    char ipbuf[SKIPADDR_STRLEN];
+    const pmap_location_t *continent;
+    const pmap_location_t *found;
+    pmap_location_t entry;
+    skipaddr_t start_ip, end_ip;
+    skPrefixMapErr_t rv;
+    unsigned int i;
+
+    if (field != ipblocks_fields_count) {
+        scanErr("Expected %u CSV %s, found %u",
+                ipblocks_fields_count,
+                ((1 == linenum) ? "title fields" : "values"), field);
+        if (1 == linenum) {
+            exit(EXIT_FAILURE);
+        }
+        return;
+    }
+    if (1 == linenum) {
+        return;
+    }
+
+    found = continent = NULL;
+    for (i = 0; i < sizeof(ipblocks.geoname)/sizeof(ipblocks.geoname[0]); ++i){
+        entry.geoname = ipblocks.geoname[i];
+        found = (pmap_location_t *)rbfind(&entry, geomap);
+        if (found) {
+            if (found->is_country) {
+                break;
+            }
+            if (!continent) {
+                continent = found;
+            }
+        }
+    }
+    if (NULL == found) {
+        if (continent) {
+            found = continent;
+        } else if (ipblocks.is_anonymous) {
+            found = &anonymous;
+        } else if (ipblocks.is_satellite) {
+            found = &satellite;
+        } else {
+            scanWarn("Unable to set country code");
+            return;
+        }
+    }
+
+    if (skCIDR2IPRange(&ipblocks.ip, ipblocks.prefix, &start_ip, &end_ip)) {
+        scanErr("Unable to convert %s/%u to an IP address range",
+                skipaddrString(ipbuf, &ipblocks.ip, 0), ipblocks.prefix);
+        return;
+    }
+
+    rv = skPrefixMapAddRange(map, &start_ip, &end_ip, found->country);
+    if (rv) {
+        scanErr("Unable to add entry to prefix map: %s",
+                skPrefixMapStrerror(rv));
+    }
+}
+
+
+/*
+ *  status = locationField(string);
+ *
+ *    Handle a single field of the current line of input in the
+ *    Geo*2-Country-Locations-en.csv file.
+ *
+ *    Return 0 on success or -1 for failure.
+ *
+ *    This is a helper function for csv2Field().
+ */
+static int
+locationField(
+    const char         *string)
+{
+    int rv;
+
+    if (1 == linenum) {
+        /* see note in ipblocksField() regarding robustness */
+        if (field >= (sizeof(location_fields)/sizeof(location_fields[0]))) {
+            TRACEMSG(("%s:%d: Ignoring additional title field #%u '%s'",
+                      in_stream.of_name, linenum, 1u + field, string));
+            ++location_fields_count;
+            return 0;
+        }
+        if (0 != strcmp(string, location_fields[field])) {
+            scanErr("Expected title field %u to have name '%s', found '%s'",
+                    1u + field, location_fields[field], string);
+            exit(EXIT_FAILURE);
+        }
+        return 0;
+    }
+
+    switch (field) {
+      case 2:
+        /* continent_code */
+        switch (continentToCountry(string, &location.country)) {
+          case 0:
+            break;
+          case SK_COUNTRYCODE_INVALID:
+            scanErr("Invalid continent code '%s'", string);
+            return -1;
+          default:
+            scanWarn("Unexpected continent code '%s'", string);
+            break;
+        }
+        break;
+      case 0:
+        /* geoname_id */
+        rv = skStringParseUint32(&location.geoname, string, 0, 0);
+        if (rv) {
+            scanErr("Invalid %s '%s': %s",
+                    location_fields[field], string, skStringParseStrerror(rv));
+            return -1;
+        }
+        break;
+      case 4:
+        /* country_iso_code */
+        location.country = (uint32_t)skCountryNameToCode(string);
+        if (SK_COUNTRYCODE_INVALID == location.country) {
+            scanErr("Invalid country code '%s'", string);
+            return -1;
+        }
+        location.is_country = 1;
+        break;
+#if 0
+      case 1:
+      case 3:
+      case 5:
+      case 6:
+        /* locale_code,...,continent_name,...,country_name,
+         * is_in_european_union */
+        break;
+#endif  /* 0 */
+    }
+
+    return 0;
+}
+
+
+/*
+ *    Use the data for the fields on this line to create a entry in
+ *    the red-black tree that maps from a geoname_id location code to
+ *    a country code (or to a continent code if no country).
+ *
+ *    This is a helper function for csv2CreateEntry().
+ */
+static void
+locationCreateEntry(
+    void)
+{
+    const pmap_location_t *exists;
+    pmap_location_t *entry;
+
+    if (field != location_fields_count) {
+        scanErr("Expected %u CSV %s, found %u",
+                location_fields_count,
+                ((1 == linenum) ? "title fields" : "values"), field);
+        if (1 == linenum) {
+            exit(EXIT_FAILURE);
+        }
+        return;
+    }
+    if (1 == linenum) {
+        return;
+    }
+
+    if (0 == location.country) {
+        scanWarn("Ignoring line with no country/continent code");
+        return;
+    }
+
+    entry = (pmap_location_t *)malloc(sizeof(pmap_location_t));
+    if (NULL == entry) {
+        skAppPrintOutOfMemory("redblack tree entry");
+        exit(EXIT_FAILURE);
+    }
+    *entry = location;
+
+    exists = (pmap_location_t *)rbsearch(entry, geomap);
+    if (exists != entry) {
+        scanWarn("Duplicate geoname_id '%u' found", entry->geoname);
+        free(entry);
+    }
+}
+
+
+/*
+ *    Open the next (or the first) file that is needed to process the
+ *    files in a maxmind country v2 directory.  Return 0 if the file
+ *    was opened.  Return 1 if there are no more files.  Exit the
+ *    program on errror.
+ */
+static int
+csv2NextFile(
+    void)
+{
+    static char path[PATH_MAX];
+    ssize_t sz;
+    ssize_t rv;
+
+    assert(csv2_prod);
+
+    linenum = 1;
+
+    TRACEMSG(("calling csv2NextFile(); current file is %s",
+              in_stream.of_name ? in_stream.of_name : "<none>"));
+
+    skFileptrClose(&in_stream, NULL);
+    memset(&in_stream, 0, sizeof(in_stream));
+
+    if (NULL == csv2_directory || NULL == csv2_files[csv2_index].path) {
+        TRACEMSG(("csv2NextFile() returns 1"));
+        return 1;
+    }
+    /* skip files marked IPv6 if the global mode is not IPv6 */
+    while (csv2_files[csv2_index].mode != GEOIP2CCMAP_MODE_AUTO
+           && csv2_files[csv2_index].mode != mode.ipv6_ipv4)
+    {
+        TRACEMSG(("skipping file %s%s",csv2_prod,csv2_files[csv2_index].path));
+        ++csv2_index;
+        if (NULL == csv2_files[csv2_index].path) {
+            TRACEMSG(("csv2NextFile() returns 1"));
+            return 1;
+        }
+    }
+
+    sz = snprintf(path, sizeof(path), "%s/%s%s",
+                  csv2_directory, csv2_prod, csv2_files[csv2_index].path);
+    assert((size_t)sz < sizeof(path));
+
+    in_stream.of_name = path;
+    rv = skFileptrOpen(&in_stream, SK_IO_READ);
+    if (rv) {
+        skAppPrintErr("Unable to open input file '%s': %s",
+                      in_stream.of_name, skFileptrStrerror(rv));
+        exit(EXIT_FAILURE);
+    }
+    yyin = in_stream.of_fp;
+    TRACEMSG(("csv2NextFile() opened file '%s'", in_stream.of_name));
+
+    ++csv2_index;
+
+    TRACEMSG(("csv2NextFile() returns 0"));
+    return 0;
+}
+
+
+/*
+ *    Prepare to read the next line of a GeoIP2 Location or Blocks
+ *    file.
+ */
+static void
+csv2Reset(
+    void)
+{
+    memset(&location, 0, sizeof(location));
+    memset(&ipblocks, 0, sizeof(ipblocks));
+    field = 0;
+}
+
+/*
+ *    Handle a single field of the current line of input.
+ */
+static int
+csv2Field(
+    const char         *string)
+{
+    return (1 == csv2_index) ? locationField(string) : ipblocksField(string);
+}
+
+/*
+ *    Combine the fields on the current line to create an entry.
+ */
+static void
+csv2CreateEntry(
+    void)
+{
+    (1 == csv2_index) ? locationCreateEntry() : ipblocksCreateEntry();
+}
+
+
+/*
+ *    Return -1, 0, or 1 depending on whether the geoname_id of 'v_a'
+ *    is less than, equal to, or greater than the geoname_id of 'v_b'.
+ *
+ *    This is the comparison function for the red-black tree 'geomap'.
+ */
+static int
+compareGeomapEntry(
+    const void         *v_a,
+    const void         *v_b,
+    const void         *v_c)
+{
+    SK_UNUSED_PARAM(v_c);
+    return ((int64_t)(((const pmap_location_t *)v_a)->geoname)
+            - (int64_t)(((const pmap_location_t *)v_b)->geoname));
+}
+
+/*
+ *    Process the files in the directory that contain a mapping from
+ *    geoname_id to country and from IP blocks to geoname_id.
+ */
+static void
+csv2ReadDirectory(
+    int                 argc,
+    char              **argv)
+{
+    ssize_t rv;
+
+    /* change the initial start state */
+    BEGIN(ST_CSV2);
+
+    /* Create the output prefix map and set its default value */
+    if (skPrefixMapCreate(&map) != SKPREFIXMAP_OK) {
+        skAppPrintErr("Unable to create prefix map");
+        exit(EXIT_FAILURE);
+    }
+    rv = skPrefixMapSetDefaultVal(map, default_value);
+    if (rv) {
+        skAppPrintErr("Unable to set prefix map's default value: %s",
+                      skPrefixMapStrerror(rv));
+        exit(EXIT_FAILURE);
+    }
+
+    /* set the content type to the current mode.  If auto, set 'mode'
+     * to either IPv4 or IPv6---use IPv6 is SiLK supports it;
+     * otherwise IPv4 */
+    if (GEOIP2CCMAP_MODE_AUTO == mode.ipv6_ipv4) {
+        mode.ipv6_ipv4 = ((SK_ENABLE_IPV6)
+                          ? GEOIP2CCMAP_MODE_IPV6 : GEOIP2CCMAP_MODE_IPV4);
+    }
+    switch (mode.ipv6_ipv4) {
+      case GEOIP2CCMAP_MODE_IPV6:
+        skPrefixMapSetContentType(map, SKPREFIXMAP_CONT_ADDR_V6);
+        break;
+      case GEOIP2CCMAP_MODE_IPV4:
+        skPrefixMapSetContentType(map, SKPREFIXMAP_CONT_ADDR_V4);
+        break;
+      default:
+        skAbortBadCase(mode.ipv6_ipv4);
+    }
+
+    /* create the mapping from geoname_id to country code */
+    geomap = rbinit(compareGeomapEntry, NULL);
+    if (NULL == geomap) {
+        skAppPrintOutOfMemory("redblack tree");
+        exit(EXIT_FAILURE);
+    }
+
+    /* open the first file that maps geoname_id to country */
+    csv2_index = 0;
+    csv2NextFile();
+
+    /* Process all the files */
+    yylex();
+
+    /* finished scanning.  clean up flex's state */
+#ifdef SK_HAVE_YYLEX_DESTROY
+    yylex_destroy();
+#else
+    yy_delete_buffer(YY_CURRENT_BUFFER);
+#endif
+
+    writeOutput(argc, argv);
 }
 
 
@@ -788,10 +2130,11 @@ stmtCreateEntry(
 #define INPUT_LEAF_MASK UINT32_C(0x00ffff00)
 
 static void
-handleBinaryInput(
+legacyBinaryRead(
     int                 argc,
     char              **argv)
 {
+    /* known to be in sync with MaxMind API 1.6.12 */
     const char cc[NUM_CC][3] = {
         "--", "ap", "eu", "ad", "ae", "af", "ag", "ai",
         "al", "am", "cw", "ao", "aq", "ar", "as", "at",
@@ -1013,137 +2356,363 @@ handleBinaryInput(
 }
 
 
-int main(
-    int         argc,
-    char      **argv)
+#ifdef SK_ENABLE_LIBMAXMINDDB
+/*
+ *    Given an IP and its netblock prefix that refer to a MaxMind data
+ *    entry, query the entry to get the country code, or the continent
+ *    code, or its anonymous/satellite flag and add an appropriate
+ *    entry to the global prefix map.
+ *
+ *    If we are in IPv4 mode, only the first four byte of 'ip' are
+ *    used.
+ */
+static void
+binary2AddEntry(
+    const uint8_t       ip[],
+    int                 prefix,
+    MMDB_entry_s       *entry)
 {
-    int rv;
+    static const char *lookup_arrays[7][3] = {
+        {"country", "iso_code", NULL},
+        {"registered_country", "iso_code", NULL},
+        {"represented_country", "iso_code", NULL},
+        {"continent", "code", NULL},
+        {"traits", "is_anonymous_proxy", NULL},
+        {"traits", "is_satellite_provider", NULL},
+        {NULL, NULL, NULL}
+    };
+    /* these idx_ variables reference locations in lookup_arrays */
+    const size_t idx_continent = 3;
+    const size_t idx_is_anonymous = 4;
 
-    appSetup(argc, argv);       /* never returns on error */
+    skipaddr_t first;
+    skipaddr_t final;
+    MMDB_entry_data_s entry_data;
+    char buf[64];
+    size_t i;
+    int status;
+    ssize_t rv;
+    int found;
+    uint32_t country;
 
-    if (GEOIP2CCMAP_MODE_AUTO == mode) {
-        /* read first char to see if stream is binary */
-        int c;
-        c = getc(in_stream.of_fp);
-        if (EOF == c) {
-            if (ferror(in_stream.of_fp)) {
-                skAppPrintSyserror("Unable to read from %s",
-                                   in_stream.of_name);
-                exit(EXIT_FAILURE);
-            }
-        } else {
-            if (!isprint(c) && !isspace(c)) {
-                mode = GEOIP2CCMAP_MODE_BINARY;
-            }
-            c = ungetc(c, in_stream.of_fp);
-            if (EOF == c) {
-                skAppPrintErr("Unable to put back character");
-                exit(EXIT_FAILURE);
-            }
+#if TRACEMSG_LEVEL > 0
+    char netblock_buf[64];
+    snprintf(netblock_buf, sizeof(netblock_buf),
+             ("%02x%02x:%02x%02x:%02x%02x:%02x%02x:"
+              "%02x%02x:%02x%02x:%02x%02x:%02x%02x/%3d"),
+             ip[0], ip[1], ip[ 2], ip[ 3], ip[ 4], ip[ 5], ip[ 6], ip[ 7],
+             ip[8], ip[9], ip[10], ip[11], ip[12], ip[13], ip[14], ip[15],
+             prefix);
+#endif  /* TRACEMSG_LEVEL > 0 */
+
+    assert(prefix > 0);
+
+#if SK_ENABLE_IPV6
+    if (GEOIP2CCMAP_MODE_IPV6 == mode.ipv6_ipv4) {
+        skipaddrSetV6(&first, ip);
+    } else
+#endif  /* SK_ENABLE_IPV6 */
+    {
+        uint32_t ipv4 = (ip[0] << 24)| (ip[1] << 16)| (ip[2] << 8) | ip[3];
+        skipaddrSetV4(&first, &ipv4);
+        assert(prefix <= 32);
+    }
+
+    skCIDR2IPRange(&first, prefix, &first, &final);
+
+    for (found = 0, i = 0; lookup_arrays[i][0]; ++i) {
+        status = MMDB_aget_value(entry, &entry_data, lookup_arrays[i]);
+        if (MMDB_SUCCESS == status && entry_data.has_data) {
+            found = 1;
+            break;
         }
     }
-    if (GEOIP2CCMAP_MODE_BINARY == mode) {
-        handleBinaryInput(argc, argv);
-        return 0;
+    if (!found) {
+        return;
     }
+
+    switch (entry_data.type) {
+      case MMDB_DATA_TYPE_BOOLEAN:
+        if (idx_is_anonymous == i) {
+            TRACEMSG(("%s  'a1'", netblock_buf));
+            country = COUNTRY_ANON;
+        } else {
+            TRACEMSG(("%s  'a2'", netblock_buf));
+            country = COUNTRY_SATL;
+        }
+        break;
+      case MMDB_DATA_TYPE_UTF8_STRING:
+        if (entry_data.data_size >= sizeof(buf)) {
+            strncpy(buf, entry_data.utf8_string, sizeof(buf));
+            buf[sizeof(buf)-1u] = '\0';
+        } else {
+            strncpy(buf, entry_data.utf8_string, entry_data.data_size);
+            buf[entry_data.data_size] = '\0';
+        }
+        TRACEMSG(("%s  '%s'%s",
+                  netblock_buf, buf, ((idx_continent == i) ? "*" : "")));
+        if (entry_data.data_size != 2) {
+            skAppPrintErr("Unexpected data length %u", entry_data.data_size);
+            return;
+        }
+        if (idx_continent != i) {
+            country = skCountryNameToCode(buf);
+        } else {
+            switch (continentToCountry(buf, &country)) {
+              case 0:
+                break;
+              case SK_COUNTRYCODE_INVALID:
+                skAppPrintErr("Invalid continent code '%s'", buf);
+                return;
+              default:
+                skAppPrintErr("Unexpected continent code '%s'", buf);
+                return;
+            }
+        }
+        break;
+      default:
+        skAppPrintErr("Unexpected data type %d", entry_data.type);
+        return;
+    }
+
+    rv = skPrefixMapAddRange(map, &first, &final, country);
+    if (rv) {
+        skAppPrintErr("HERE HERE HERE!!!!");
+        skAppPrintErr("Error adding to prefix map: %s",
+                      skPrefixMapStrerror(rv));
+        exit(EXIT_FAILURE);
+    }
+}
+
+
+/*
+ *    Process a binary GeoIP2 database file using the libmaxminddb C
+ *    API and create a prefix map.  This code iterates over all the
+ *    nodes of the tree.
+ *
+ *    By iterating over all the nodes, we end up with multiple copies
+ *    of IPv4 country codes in our output file.  This is because the
+ *    database includes the IPv4 country codes at the following
+ *    locations:
+ *
+ *    ::0:0/96               (we use this fact when in ipv4 mode)
+ *    ::ffff:0:0/96          (IPv6 mapped IPv4 addresses)
+ *    2001:0:a.b.c.d:0:0:0:0 (Teredo)
+ *    2002:a.b.c.d:0:0:0:0:0 (6to4)
+ *
+ *    It would be nice to reduce this duplication.
+ */
+static void
+binary2Read(
+    int                 argc,
+    char              **argv)
+{
+    MMDB_s mmdb;
+    int status;
+#define PENDING_DEPTH 129
+    MMDB_search_node_s node[PENDING_DEPTH];
+    int depth;
+    uint32_t node_num;
+    uint8_t ip[16];
+    unsigned int ip_idx;
+    unsigned int ip_bit;
+    skPrefixMapErr_t rv;
+
+    assert(mmdb_path);
 
     /* Create the output prefix map */
     if (skPrefixMapCreate(&map) != SKPREFIXMAP_OK) {
-        skAppPrintErr("Error creating prefix map");
+        skAppPrintErr("Unable to create prefix map");
         exit(EXIT_FAILURE);
     }
 
-    /* set the content type to the current mode, or to IPv4 if the
-     * mode is "auto"; if auto, the content type may be changed once
-     * we have the first line of input */
-    switch (mode) {
+    /* set the content type to the current mode.  If auto, set 'mode'
+     * to either IPv4 or IPv6---use IPv6 is SiLK supports it;
+     * otherwise IPv4 */
+    if (GEOIP2CCMAP_MODE_AUTO == mode.ipv6_ipv4) {
+        mode.ipv6_ipv4 = ((SK_ENABLE_IPV6)
+                          ? GEOIP2CCMAP_MODE_IPV6 : GEOIP2CCMAP_MODE_IPV4);
+    }
+    switch (mode.ipv6_ipv4) {
       case GEOIP2CCMAP_MODE_IPV6:
         skPrefixMapSetContentType(map, SKPREFIXMAP_CONT_ADDR_V6);
         break;
       case GEOIP2CCMAP_MODE_IPV4:
-      case GEOIP2CCMAP_MODE_AUTO:
         skPrefixMapSetContentType(map, SKPREFIXMAP_CONT_ADDR_V4);
         break;
-      case GEOIP2CCMAP_MODE_BINARY:
-        skAbortBadCase(mode);
+      default:
+        skAbortBadCase(mode.ipv6_ipv4);
     }
 
     rv = skPrefixMapSetDefaultVal(map, default_value);
     if (rv) {
-        skAppPrintErr("Error setting default value: %s",
+        skAppPrintErr("Unable to set prefix map's default value: %s",
                       skPrefixMapStrerror(rv));
         exit(EXIT_FAILURE);
     }
 
-    stmtReset();
-
-    /* Process input */
-    yyin = in_stream.of_fp;
-    yylex();
-
-    /* finished scanning.  clean up flex's state */
-#ifdef SK_HAVE_YYLEX_DESTROY
-    yylex_destroy();
-#else
-    yy_delete_buffer(YY_CURRENT_BUFFER);
-#endif
-
-    if (error_count) {
-        skAppPrintErr("Encountered %d error%s during processing.%s",
-                      error_count, ((error_count > 1) ? "s" : ""),
-                      (dry_run ? "  Output not written." : ""));
-        if (dry_run) {
-            exit(EXIT_FAILURE);
-        }
-    }
-    if (dry_run) {
-        appTeardown();
-        return 0;
-    }
-
-    /* add invocation */
-    if (!invocation_strip) {
-        rv = skHeaderAddInvocation(skStreamGetSilkHeader(out_stream), 1,
-                                   argc, argv);
-        if (rv) {
-            skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    /* add notes if given */
-    rv = skOptionsNotesAddToStream(out_stream);
-    if (rv) {
-        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
-        exit(EXIT_FAILURE);
-    }
-    skOptionsNotesTeardown();
-
-    /* write output */
-    rv = skStreamOpen(out_stream);
-    if (rv) {
-        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
+    /* open the MaxMind database */
+    status = MMDB_open(mmdb_path, MMDB_MODE_MMAP, &mmdb);
+    if (MMDB_SUCCESS != status) {
+        skAppPrintErr("Unable to open datbase file '%s': %s",
+                      mmdb_path,
+                      ((MMDB_IO_ERROR == status)
+                       ? strerror(errno) : MMDB_strerror(status)));
         exit(EXIT_FAILURE);
     }
 
-    rv = skPrefixMapWrite(map, out_stream);
-    if (rv != SKPREFIXMAP_OK) {
-        if (rv == SKPREFIXMAP_ERR_IO) {
-            skStreamPrintLastErr(out_stream,
-                                 skStreamGetLastReturnValue(out_stream),
-                                 &skAppPrintErr);
+    memset(ip, 0, sizeof(ip));
+    node_num = 0;
+    depth = 0;
+
+    if (GEOIP2CCMAP_MODE_IPV4 == mode.ipv6_ipv4) {
+        /* descend down the left hand branch until the depth is 96,
+         * and then reset depth to 0 */
+        do {
+            status = MMDB_read_node(&mmdb, node_num, &node[depth]);
+            if (MMDB_INVALID_NODE_NUMBER_ERROR == status) {
+                skAppPrintErr(("Error reading database file:"
+                               " Unexpected error getting node %u: %s"),
+                              node_num, MMDB_strerror(status));
+                goto ERROR;
+            }
+            if (MMDB_RECORD_TYPE_SEARCH_NODE != node[depth].left_record_type) {
+                skAppPrintErr(("Error finding IPv4 branch of database:"
+                               " Left most branch has depth %d, expected 96"),
+                              depth);
+                goto ERROR;
+            }
+            node_num = node[depth].left_record;
+            ++depth;
+        } while (depth < 96);
+        depth = 0;
+    }
+
+    do {
+        /* descend down left hand branch until we get to a node that
+         * does not point at another node */
+        for (;;) {
+            if (depth >= PENDING_DEPTH) {
+                skAppPrintErr("Error reading database file: Tree is too deep");
+                goto ERROR;
+            }
+            status = MMDB_read_node(&mmdb, node_num, &node[depth]);
+            if (MMDB_INVALID_NODE_NUMBER_ERROR == status) {
+                skAppPrintErr(("Error reading database file:"
+                               " Unexpected error getting node %u: %s"),
+                              node_num, MMDB_strerror(status));
+                goto ERROR;
+            }
+            if (MMDB_RECORD_TYPE_SEARCH_NODE != node[depth].left_record_type) {
+                break;
+            }
+            node_num = node[depth].left_record;
+            ++depth;
+        }
+
+        /* handle the left hand side's data */
+        switch (node[depth].left_record_type) {
+          case MMDB_RECORD_TYPE_INVALID:
+            /* The record is invalid.  Either an invalid node was
+             * looked up or the database is corrupt. */
+            skAppPrintErr("Error reading database file:"
+                          " Node contains an invalid left child");
+            goto ERROR;
+          case MMDB_RECORD_TYPE_EMPTY:
+            /* The record is a placeholder that indicates there is no
+             * data for the IP address.  The search should end
+             * here. */
+            break;
+          case MMDB_RECORD_TYPE_DATA:
+            /* The record is for data in the data section of the
+             * database.  Use the entry for the record when
+             * looking up the data for the record. */
+            binary2AddEntry(ip, 1+depth, &node[depth].left_record_entry);
+            break;
+          case MMDB_RECORD_TYPE_SEARCH_NODE:
+            /* The record points to the next search node */
+            /* this was handled above and should never occur here */
+            skAbortBadCase(node[depth].left_record_type);
+        }
+
+        /* handle the right hand side */
+        do {
+            ip_idx = (depth >> 3);
+            ip_bit = UINT8_C(1) << (7 - (depth & 0x7));
+            TRACEMSG(("set bit %d (ip[%u] |= (1u << %u))",
+                      1+depth, ip_idx, (7 - (depth & 0x7))));
+            ip[ip_idx] |= ip_bit;
+            if (MMDB_RECORD_TYPE_SEARCH_NODE == node[depth].right_record_type) {
+                node_num = node[depth].right_record;
+                ++depth;
+                break;
+            }
+            switch (node[depth].right_record_type) {
+              case MMDB_RECORD_TYPE_INVALID:
+                skAppPrintErr("Error reading database file:"
+                              " Node contains an invalid right child");
+                goto ERROR;
+              case MMDB_RECORD_TYPE_EMPTY:
+                break;
+              case MMDB_RECORD_TYPE_DATA:
+                binary2AddEntry(ip, 1+depth, &node[depth].right_record_entry);
+                break;
+              case MMDB_RECORD_TYPE_SEARCH_NODE:
+                skAbortBadCase(node[depth].right_record_type);
+            }
+            /* travel up the right hand side until we find a node
+             * whose right hand side has not been visited yet, or we
+             * reach the root of the tree */
+            do {
+                TRACEMSG(("clear bit %d (ip[%u] &= ~(1u << %u))",
+                          1+depth, ip_idx, (7 - (depth & 0x7))));
+                ip[ip_idx] &= ~(ip_bit);
+                --depth;
+                if (depth < 0) {
+                    break;
+                }
+                ip_idx = (depth >> 3);
+                ip_bit = UINT8_C(1) << (7 - (depth & 0x7));
+            } while (ip[ip_idx] & ip_bit);
+        } while (depth >= 0);
+    } while (depth >= 0);
+
+    MMDB_close(&mmdb);
+    writeOutput(argc, argv);
+    return;
+
+  ERROR:
+    MMDB_close(&mmdb);
+    exit(EXIT_FAILURE);
+}
+#endif  /* SK_ENABLE_LIBMAXMINDDB */
+
+int main(
+    int         argc,
+    char      **argv)
+{
+    appSetup(argc, argv);       /* never returns on error */
+
+    if (GEOIP2CCMAP_MODE_CSV == mode.csv_binary) {
+        if (csv2_directory) {
+            assert(GEOIP2CCMAP_MODE_GEOIP2 == mode.geoip2_legacy);
+            csv2ReadDirectory(argc, argv);
         } else {
-            skAppPrintErr("Error writing prefix map to '%s': %s",
-                          skStreamGetPathname(out_stream),
-                          skPrefixMapStrerror(rv));
+            assert(GEOIP2CCMAP_MODE_LEGACY == mode.geoip2_legacy);
+            legacyCSVRead(argc, argv);
         }
-        exit(EXIT_FAILURE);
-    }
-
-    rv = skStreamClose(out_stream);
-    if (rv) {
-        skStreamPrintLastErr(out_stream, rv, &skAppPrintErr);
-        exit(EXIT_FAILURE);
+    } else {
+        assert(GEOIP2CCMAP_MODE_BINARY == mode.csv_binary);
+#ifdef SK_ENABLE_LIBMAXMINDDB
+        if (mmdb_path) {
+            assert(GEOIP2CCMAP_MODE_GEOIP2 == mode.geoip2_legacy);
+            binary2Read(argc, argv);
+        } else
+#endif  /* SK_ENABLE_LIBMAXMINDDB */
+        {
+            assert(GEOIP2CCMAP_MODE_LEGACY == mode.geoip2_legacy);
+            legacyBinaryRead(argc, argv);
+        }
     }
 
     return 0;

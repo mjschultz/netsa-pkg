@@ -16,11 +16,11 @@ my $setc = make_setc(make_tempname('setc.set'));
 
 my ($cmd, $md5);
 
-$cmd = "$rwsettool --difference $setb $seta | $rwsetcat --cidr=1";
+$cmd = "$rwsettool --difference $setb $seta | $rwsetcat --cidr=1 --ip-format=map-v4";
 $md5 = 'd41d8cd98f00b204e9800998ecf8427e';
 check_md5_output($md5, $cmd);
 
-$cmd = "$rwsettool --difference $seta $setb | $rwsetcat --cidr=1";
+$cmd = "$rwsettool --difference $seta $setb | $rwsetcat --cidr=1 --ip-format=map-v4";
 $md5 = 'cd055aef88b5d308c9f32578de51a477';
 check_md5_output($md5, $cmd);
 
@@ -28,7 +28,7 @@ $cmd = "$rwsettool --difference $setc $seta | $rwsetcat --cidr=1";
 $md5 = 'a0238acabba8dee04eb1c53a3298bbdb';
 check_md5_output($md5, $cmd);
 
-$cmd = "$rwsettool --difference $seta $setc | $rwsetcat --cidr=1";
+$cmd = "$rwsettool --difference $seta $setc | $rwsetcat --cidr=1 --ip-format=map-v4";
 $md5 = 'cd055aef88b5d308c9f32578de51a477';
 check_md5_output($md5, $cmd);
 
@@ -45,7 +45,7 @@ sub build_set
             unless defined $pid;
 
         # child
-        exec $rwsetbuild, '-', $file
+        exec "$rwsetbuild - '$file'"
             or die "Unable to exec $rwsetbuild: $!";
     }
     print RWSETBUILD ${$data};

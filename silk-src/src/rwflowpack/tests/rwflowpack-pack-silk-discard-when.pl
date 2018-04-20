@@ -1,7 +1,7 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: rwflowpack-pack-silk-discard-when.pl 40a363507ed0 2014-04-01 14:09:52Z mthomas $")
+# RCSIDENT("$SiLK: rwflowpack-pack-silk-discard-when.pl 598c37b616f6 2018-03-26 21:57:09Z mthomas $")
 
 use strict;
 use SiLKTests;
@@ -65,25 +65,13 @@ my $file_count = 0;
 
 # read in the MD5s for every packed file we expect to find.  Although
 # we are packing IPv4 data, whether we write IPv4 or IPv6 files
-# depends on how SiLK was compiled.  In the packed IPv4 files, bytes
-# are stored as a byte/packet ratio, and due to rounding the "bytes"
-# value in the IPv4 and IPv6 files may differ.  Thus, we read in
-# separate MD5 sums for each.
-# fields.
+# depends on how SiLK was compiled.  Since the zero-packets quirk is
+# enabled, both files have separate bytes and packets values, and the
+# MD5 sums for IPv4 and IPv6 are the same.
 my %md5_map;
-my $md5_file = $0;
+my $md5_file = $0."-ipv6.txt";
 # both the discard-when and discard-unless tests give the same output
 $md5_file =~ s/(discard)-(unless|when)/$1/;
-
-if ($SiLKTests::SK_ENABLE_IPV6) {
-    $md5_file .= "-ipv6.txt";
-}
-else {
-    # The sensor.conf file contains the "zero-packets" quirk for the
-    # probe used in this test (simulating the Cisco ASA router),
-    # causing the IPv4 file format to be RWGENERIC.
-    $md5_file .= "-ipv4-asa.txt";
-}
 
 open F, $md5_file
     or die "ERROR: Cannot open $md5_file: $!\n";

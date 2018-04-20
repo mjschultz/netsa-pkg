@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 9a4f4ca2d067 2017-06-21 17:41:59Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 814fc64df055 2018-04-02 19:15:45Z mthomas $");
 
 # The targets in this file are used only by "make check" (and support
 # targest things like "make clean" and "make dist")
@@ -96,7 +96,8 @@ MAKE_TESTDATA_V6 = --ipv6-output='| $(RWTUC) --site-config-file=silk.conf --comp
 endif
 
 
-MAKE_TESTDATA = srcdir='' ; \
+MAKE_TESTDATA = \
+	srcdir='' ; \
 	test -f $(make_flows) || srcdir='$(srcdir)/' ; \
 	$(PERL) $${srcdir}$(make_flows) --status \
 	$(MAKE_TESTDATA_V4) $(MAKE_TESTDATA_V6) \
@@ -115,6 +116,12 @@ endif
 TEST_SET_FILES_SOURCE = set1-v4.txt set2-v4.txt set3-v4.txt set4-v4.txt \
 	 set1-v6.txt set2-v6.txt set3-v6.txt set4-v6.txt
 
+TXT_TO_SET = \
+	srcdir='' ; \
+	test -f $< || srcdir='$(srcdir)/' ; \
+	echo "$(RWSETBUILD) $${srcdir}$< $@" ; \
+	$(RWSETBUILD) $${srcdir}$< $@ \
+	|| { rm -f $@; exit 1; }
 
 $(TEST_SET_FILES): $(RWSETBUILD)
 
@@ -122,11 +129,7 @@ made-set-files: $(TEST_SET_FILES)
 	date > $@
 .txt.set:
 	-rm -f $@
-	@srcdir='' ; \
-	  test -f $< || srcdir='$(srcdir)/' ; \
-	  echo "$(RWSETBUILD) $${srcdir}$< $@" ; \
-	  $(RWSETBUILD) $${srcdir}$< $@ \
-	  || { rm -f $@; exit 1; }
+	@$(TXT_TO_SET)
 
 
 # bags for testing rwbag*
@@ -137,21 +140,25 @@ endif
 TEST_BAG_FILES_SOURCE = bag1-v4.txt bag2-v4.txt bag3-v4.txt \
 	 bag1-v6.txt bag2-v6.txt bag3-v6.txt
 
+TXT_TO_BAG = \
+	srcdir='' ; \
+	test -f $< || srcdir='$(srcdir)/' ; \
+	echo "$(RWBAGBUILD) --bag-input=$${srcdir}$< --output-path=$@" ; \
+	$(RWBAGBUILD) --bag-input=$${srcdir}$< --output-path=$@ \
+	|| { rm -f $@; exit 1; }
+
 $(TEST_BAG_FILES): $(RWBAGBUILD)
 
 made-bag-files: $(TEST_BAG_FILES)
 	date > $@
 .txt.bag:
 	-rm -f $@
-	@srcdir='' ; \
-	  test -f $< || srcdir='$(srcdir)/' ; \
-	  echo "$(RWBAGBUILD) --bag-input=$${srcdir}$< --output-path=$@" ; \
-	  $(RWBAGBUILD) --bag-input=$${srcdir}$< --output-path=$@ \
-	  || { rm -f $@; exit 1; }
+	@$(TXT_TO_BAG)
 
 
 # scan data for testing rwscan
-MAKE_SCANDATA_RWF = srcdir='' ; \
+MAKE_SCANDATA_RWF = \
+	srcdir='' ; \
 	test -f $(make_scans) || srcdir='$(srcdir)/' ; \
 	{ $(PERL) $${srcdir}$(make_scans) --status \
 	  | $(RWTUC) --site-config-file=silk.conf --compression=best --output-path=$@; } \
@@ -161,23 +168,29 @@ scandata.rwf: $(RWTUC) silk.conf $(make_scans)
 	-rm -f $@
 	$(MAKE_SCANDATA_RWF)
 
+MAKE_SIPS_004_008 = \
+	{ echo 4.0.0.0/6 \
+	| $(RWSETBUILD) --record-version=4 \
+	| $(RWSETCAT) --cidr=0 \
+	| $(RWTUC) --site-config-file=silk.conf --fields=sip --stime=1000000000 \
+	| $(RWCAT) --ipv4-output --compression=best --output-path=$@ ; } \
+	|| { rm -f $@ ; exit 1; }
+
 sips-004-008.rw: $(RWCAT) $(RWSETBUILD) $(RWSETCAT) $(RWTUC) silk.conf
 	-rm -f $@
-	echo 4.0.0.0/6 \
-	| $(RWSETBUILD) \
-	| $(RWSETCAT) --cidr=0 \
-	| $(RWTUC) --fields=sip --stime=1000000000 \
-	| $(RWCAT) --ipv4-output --compression=best --output-path=$@ \
-	|| { rm -f $@ ; exit 1; }
+	$(MAKE_SIPS_004_008)
+
+MAKE_SMALL_PDU = \
+	srcdir='' ; \
+	test -f $(make_flows) || srcdir='$(srcdir)/' ; \
+	echo "$(PERL) $${srcdir}$(make_flows) --max=50000 --pdu-output=$@" ; \
+	$(PERL) $${srcdir}$(make_flows) --max=50000 --pdu-output=$@ \
+	|| { rm -f $@; exit 1; }
 
 # for testing rwguess and rwflowpack
 small.pdu: $(make_flows)
 	-rm -f $@
-	@srcdir='' ; \
-	  test -f $(make_flows) || srcdir='$(srcdir)/' ; \
-	  echo "$(PERL) $${srcdir}$(make_flows) --max=50000 --pdu-output=$@" ; \
-	  $(PERL) $${srcdir}$(make_flows) --max=50000 --pdu-output=$@ \
-	  || { rm -f $@; exit 1; }
+	$(MAKE_SMALL_PDU)
 
 
 # for testing the country-code plug-ins
@@ -187,21 +200,27 @@ TEST_CC_FILES += fake-cc-v6.pmap
 endif
 TEST_CC_FILES_SOURCE = fake-cc.csv fake-cc-v6.csv
 
+MAKE_FAKE_CC_V4 = \
+	f=fake-cc.csv  ; srcdir='' ; \
+	test -f $$f || srcdir='$(srcdir)/' ; \
+	echo "$(PERL) $(RWGEOIP2CCMAP) --mode=ipv4 < $${srcdir}$$f > $@" ; \
+	$(PERL) $(RWGEOIP2CCMAP) --mode=ipv4 < $${srcdir}$$f > $@ \
+	|| { rm -f $@; exit 1; }
+
+MAKE_FAKE_CC_V6 = \
+	f=fake-cc-v6.csv  ; srcdir='' ; \
+	test -f $$f || srcdir='$(srcdir)/' ; \
+	echo "$(PERL) $(RWGEOIP2CCMAP) --mode=ipv6 < $${srcdir}$$f > $@" ; \
+	$(PERL) $(RWGEOIP2CCMAP) --mode=ipv6 < $${srcdir}$$f > $@ \
+	|| { rm -f $@; exit 1; }
+
 fake-cc.pmap: $(RWGEOIP2CCMAP) fake-cc.csv
 	-rm -f $@
-	@f=fake-cc.csv  ; srcdir='' ; \
-	  test -f $$f || srcdir='$(srcdir)/' ; \
-	  echo "$(PERL) $(RWGEOIP2CCMAP) --csv < $${srcdir}$$f > $@" ; \
-	  $(PERL) $(RWGEOIP2CCMAP) --csv < $${srcdir}$$f > $@ \
-	  || { rm -f $@; exit 1; }
+	@$(MAKE_FAKE_CC_V4)
 
 fake-cc-v6.pmap: $(RWGEOIP2CCMAP) fake-cc-v6.csv
 	-rm -f $@
-	@f=fake-cc-v6.csv  ; srcdir='' ; \
-	  test -f $$f || srcdir='$(srcdir)/' ; \
-	  echo "$(PERL) $(RWGEOIP2CCMAP) --v6-csv < $${srcdir}$$f > $@" ; \
-	  $(PERL) $(RWGEOIP2CCMAP) --v6-csv < $${srcdir}$$f > $@ \
-	  || { rm -f $@; exit 1; }
+	@$(MAKE_FAKE_CC_V6)
 
 # for testing the addrtype plug-in and rwpmap features
 TEST_PMAP_FILES = address_types.pmap ip-map.pmap proto-port-map.pmap
@@ -211,33 +230,43 @@ endif
 TEST_PMAP_FILES_SOURCE = address_types.txt ip-map.txt ip-map-v6.txt \
 	 proto-port-map.txt
 
+TXT_TO_PMAP = \
+	srcdir='' ; \
+	test -f $< || srcdir='$(srcdir)/' ; \
+	echo "$(RWPMAPBUILD) --input-path=$${srcdir}$< --output-path=$@" ; \
+	$(RWPMAPBUILD) --input-path=$${srcdir}$< --output-path=$@ \
+	|| { rm -f $@; exit 1; }
+
 $(TEST_PMAP_FILES): $(RWPMAPBUILD)
 
 made-pmap-files: $(TEST_PMAP_FILES) $(TEST_CC_FILES)
 	date > $@
 .txt.pmap:
 	-rm -f $@
-	@srcdir='' ; \
-	  test -f $< || srcdir='$(srcdir)/' ; \
-	  echo "$(RWPMAPBUILD) --input-file=$${srcdir}$< --output-file=$@" ; \
-	  $(RWPMAPBUILD) --input-file=$${srcdir}$< --output-file=$@ \
-	  || { rm -f $@; exit 1; }
+	@$(TXT_TO_PMAP)
 
 
-# for generating files for testing rwsender/rwreceiver
+# for generating files to transfer between rwsender and rwreceiver;
+# these are named random-bytes.a, random-bytes.b, ... random-bytes.j
+MAKE_SENDRCV_FILES = \
+	f=$(make_randfiles) ; srcdir='' ; \
+	test -f $$f || srcdir='$(srcdir)/' ; \
+	echo "$(PERL) $${srcdir}$$f --make-files --md5-out='$@'" ; \
+	$(PERL) $${srcdir}$$f --make-files --md5-out='$@'
+
+REMOVE_SENDRCV_FILES = \
+	f=$(make_randfiles) ; srcdir='' ; \
+	test -f $$f || srcdir='$(srcdir)/' ; \
+	list=`$(PERL) $${srcdir}$$f --print-names` ; \
+	echo "rm -f made-sendrcv-data $${list}" ; \
+	rm -f made-sendrcv-data $${list}
+
 made-sendrcv-data: $(make_randfiles)
 	$(MAKE) remove-sendrcv-data
-	@f=$(make_randfiles) ; srcdir='' ; \
-	  test -f $$f || srcdir='$(srcdir)/' ; \
-	  echo "$(PERL) $${srcdir}$$f --make-files --md5-out='$@'" ; \
-	  $(PERL) $${srcdir}$$f --make-files --md5-out='$@'
+	@$(MAKE_SENDRCV_FILES)
 
 remove-sendrcv-data:
-	-@f=$(make_randfiles) ; srcdir='' ; \
-	  test -f $$f || srcdir='$(srcdir)/' ; \
-	  list=`$(PERL) $${srcdir}$$f --print-names` ; \
-	  echo "rm -f made-sendrcv-data $${list}" ; \
-	  rm -f made-sendrcv-data $${list}
+	-@$(REMOVE_SENDRCV_FILES)
 
 # local mini-installation of PySiLK, but only build it if PySiLK
 # support is enabled.
@@ -263,46 +292,59 @@ pysilk-mini-uninstall:
 # other useful targets
 
 # data in the form that "rwcut --fields=... --delimited" creates
-data.txt: $(make_flows)
-	-rm -f $@
-	@srcdir='' ; \
-	  test -f $(make_flows) || srcdir='$(srcdir)/' ; \
-	  echo "$(PERL) $${srcdir}$(make_flows) --ipv4-output='$@'" ; \
-	  $(PERL) $${srcdir}$(make_flows) --ipv4-output='$@' \
-	  || { rm -f '$@'; exit 1; }
-data-v6.txt: $(make_flows)
-	-rm -f $@
-	@srcdir='' ; \
-	  test -f $(make_flows) || srcdir='$(srcdir)/' ; \
-	  echo "$(PERL) $${srcdir}$(make_flows) --ipv6-output='$@'" ; \
-	  $(PERL) $${srcdir}$(make_flows) --ipv6-output='$@' \
-	  || { rm -f '$@'; exit 1; }
+V4_DATA_TXT = \
+	srcdir='' ; \
+	test -f $(make_flows) || srcdir='$(srcdir)/' ; \
+	echo "$(PERL) $${srcdir}$(make_flows) --ipv4-output='$@'" ; \
+	$(PERL) $${srcdir}$(make_flows) --ipv4-output='$@' \
+	|| { rm -f '$@'; exit 1; }
+
+V6_DATA_TXT = \
+	srcdir='' ; \
+	test -f $(make_flows) || srcdir='$(srcdir)/' ; \
+	echo "$(PERL) $${srcdir}$(make_flows) --ipv6-output='$@'" ; \
+	$(PERL) $${srcdir}$(make_flows) --ipv6-output='$@' \
+	|| { rm -f '$@'; exit 1; }
 
 # in fixed-width columns (for IPv4, assumes --ipv6-policy=ignore)
+V4_COLUMNAR_TXT = \
+	srcdir='' ; \
+	test -f $(make_flows) || srcdir='$(srcdir)/' ; \
+	echo "$(PERL) $${srcdir}$(make_flows) --columnar --ipv4-output='$@'" ; \
+	$(PERL) $${srcdir}$(make_flows) --columnar --ipv4-output='$@' \
+	|| { rm -f '$@'; exit 1; }
+
+V6_COLUMNAR_TXT = \
+	srcdir='' ; \
+	test -f $(make_flows) || srcdir='$(srcdir)/' ; \
+	echo "$(PERL) $${srcdir}$(make_flows) --columnar --ipv6-output='$@'" ; \
+	$(PERL) $${srcdir}$(make_flows) --columnar --ipv6-output='$@' \
+	|| { rm -f '$@'; exit 1; }
+
+data.txt: $(make_flows)
+	-rm -f $@
+	@$(V4_DATA_TXT)
+
+data-v6.txt: $(make_flows)
+	-rm -f $@
+	@$(V6_DATA_TXT)
+
 columnar-data.txt: $(make_flows)
 	-rm -f $@
-	@srcdir='' ; \
-	  test -f $(make_flows) || srcdir='$(srcdir)/' ; \
-	  echo "$(PERL) $${srcdir}$(make_flows) --columnar --ipv4-output='$@'" ; \
-	  $(PERL) $${srcdir}$(make_flows) --columnar --ipv4-output='$@' \
-	  || { rm -f '$@'; exit 1; }
+	@$(V4_COLUMNAR_TXT)
+
 columnar-data-v6.txt: $(make_flows)
 	-rm -f $@
-	@srcdir='' ; \
-	  test -f $(make_flows) || srcdir='$(srcdir)/' ; \
-	  echo "$(PERL) $${srcdir}$(make_flows) --columnar --ipv6-output='$@'" ; \
-	  $(PERL) $${srcdir}$(make_flows) --columnar --ipv6-output='$@' \
-	  || { rm -f '$@'; exit 1; }
+	@$(V6_COLUMNAR_TXT)
 
 
 # have all outputs depend on this Makefile
-$(check_DATA) $(data_files) $(other_files) made-bag-files made-pmap-files made-sendrcv-data made-set-files: Makefile
+$(check_DATA) $(data_files) $(other_files) made-sendrcv-data: Makefile
 
 .PHONY: pysilk-mini-install pysilk-mini-uninstall remove-sendrcv-data
 
 # clean up the files we create
 CLEANFILES = $(check_DATA) $(data_files) $(other_files) \
-	 config_vars.pyc daemon_test.pyc \
-	 made-bag-files made-pmap-files made-set-files
+	 config_vars.pyc daemon_test.pyc
 
 clean-local: remove-sendrcv-data pysilk-mini-uninstall

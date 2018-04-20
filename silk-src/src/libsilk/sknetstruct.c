@@ -16,11 +16,11 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skprintnets.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: sknetstruct.c 95aec76c40ea 2018-03-13 21:09:01Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
-#include <silk/skprintnets.h>
+#include <silk/sknetstruct.h>
 #include <silk/skstream.h>
 #include <silk/utils.h>
 
@@ -145,9 +145,9 @@ typedef struct netstruct_column_st netstruct_column_t;
 typedef struct netstruct_cidr_v4_st netstruct_cidr_v4_t;
 typedef struct netstruct_cidr_v6_st netstruct_cidr_v6_t;
 
-/* skNetStruct_t: The context object that holds the current status and
- * the user's preferences. */
-struct skNetStruct_st {
+/* sk_netstruct_t: The context object that holds the current status
+ * and the user's preferences. */
+struct sk_netstruct_st {
     /* output stream where data is written */
     skstream_t             *outstrm;
 
@@ -219,7 +219,7 @@ struct skNetStruct_st {
     unsigned                is_ipv6             :1;
 };
 
-/* netstruct_cidr_v4_t: the 'cblock' member of struct skNetStruct_st
+/* netstruct_cidr_v4_t: the 'cblock' member of struct sk_netstruct_st
  * contains a variable-length array of this structure. see the
  * description of cblock above for more info. */
 struct netstruct_cidr_v4_st {
@@ -242,7 +242,7 @@ struct netstruct_cidr_v4_st {
     uint32_t    cb_bits;
 };
 
-/* netstruct_cidr_v6_t: the 'cblock' member of struct skNetStruct_st
+/* netstruct_cidr_v6_t: the 'cblock' member of struct sk_netstruct_st
  * contains a variable-length array of this structure. see the
  * description of cblock above for more info. */
 struct netstruct_cidr_v6_st {
@@ -262,7 +262,7 @@ struct netstruct_cidr_v6_st {
     uint32_t    cb_bits;
 };
 
-/* netstruct_column_t: the 'column' member of struct skNetStruct_st
+/* netstruct_column_t: the 'column' member of struct sk_netstruct_st
  * contains a variable-length array of this structure. see the
  * description of column above for more info. */
 struct netstruct_column_st {
@@ -291,7 +291,7 @@ static const char *summary_strings[] = {" in", ",", " and", ", and"};
 
 static void
 netStructureInitialize(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     int                 has_count);
 #if SK_ENABLE_IPV6
 static char *
@@ -302,10 +302,10 @@ netStructureNS128ToString(
 #endif  /* SK_ENABLE_IPV6 */
 static void
 netStructurePreparePrint(
-    skNetStruct_t      *ns);
+    sk_netstruct_t     *ns);
 static void
 netStructurePrintEmpty(
-    skNetStruct_t      *ns);
+    sk_netstruct_t     *ns);
 
 
 /* FUNCTION DEFINITIONS */
@@ -313,7 +313,7 @@ netStructurePrintEmpty(
 /* Add a CIDR block to the network-structure */
 static void
 netStructureAddCIDRV4(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     const skipaddr_t   *base_ipaddr,
     uint32_t            prefix)
 {
@@ -340,7 +340,7 @@ netStructureAddCIDRV4(
     assert(base_ipaddr);
     if (ns->use_count) {
         skAppPrintErr("May only use skNetStructureAddCIDR() when"
-                      " skNetStruct_t was created without 'has_count'");
+                      " sk_netstruct_t was created without 'has_count'");
         skAbort();
     }
 
@@ -361,7 +361,7 @@ netStructureAddCIDRV4(
         base_ip &= ~(UINT32_MAX >> prefix);
     }
 
-    if (SKIPADDR_FORCE_IPV6 == ns->ip_format) {
+    if (SKIPADDR_MAP_V4 & ns->ip_format) {
         cidr_adjust = 96;
     }
 
@@ -656,7 +656,7 @@ netStructureAddCIDRV4(
 /* Add a CIDR block to the network-structure */
 static void
 netStructureAddCIDRV6(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     const skipaddr_t   *base_ipaddr,
     uint32_t            prefix)
 {
@@ -686,7 +686,7 @@ netStructureAddCIDRV6(
     assert(base_ipaddr);
     if (ns->use_count) {
         skAppPrintErr("May only use skNetStructureAddCIDR() when"
-                      " skNetStruct_t was created without 'has_count'");
+                      " sk_netstruct_t was created without 'has_count'");
         skAbort();
     }
 
@@ -1055,7 +1055,7 @@ netStructureAddCIDRV6(
 
 void
 skNetStructureAddCIDR(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     const skipaddr_t   *base_ipaddr,
     uint32_t            prefix)
 {
@@ -1075,7 +1075,7 @@ skNetStructureAddCIDR(
 /* Add a key/counter to the network-structure */
 static void
 netStructureAddKeyCounterV4(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     const skipaddr_t   *ipaddr,
     const uint64_t     *count)
 {
@@ -1095,7 +1095,7 @@ netStructureAddKeyCounterV4(
     assert(count);
     if (!ns->use_count) {
         skAppPrintErr("May only use skNetStructureAddKeyCounter() when"
-                      " skNetStruct_t was created with 'has_count'");
+                      " sk_netstruct_t was created with 'has_count'");
         skAbort();
     }
     assert(0 == ns->print_ip_count);
@@ -1236,7 +1236,7 @@ netStructureAddKeyCounterV4(
 /* Add a key/counter to the network-structure */
 static void
 netStructureAddKeyCounterV6(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     const skipaddr_t   *ipaddr,
     const uint64_t     *count)
 {
@@ -1258,7 +1258,7 @@ netStructureAddKeyCounterV6(
     assert(count);
     if (!ns->use_count) {
         skAppPrintErr("May only use skNetStructureAddKeyCounter() when"
-                      " skNetStruct_t was created with 'has_count'");
+                      " sk_netstruct_t was created with 'has_count'");
         skAbort();
     }
     assert(0 == ns->print_ip_count);
@@ -1412,7 +1412,7 @@ netStructureAddKeyCounterV6(
 
 void
 skNetStructureAddKeyCounter(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     const skipaddr_t   *ipaddr,
     const uint64_t     *counter)
 {
@@ -1432,12 +1432,12 @@ skNetStructureAddKeyCounter(
 /* Create the structure */
 int
 skNetStructureCreate(
-    skNetStruct_t     **ns_ptr,
+    sk_netstruct_t    **ns_ptr,
     int                 has_count)
 {
-    skNetStruct_t *ns;
+    sk_netstruct_t *ns;
 
-    ns = (skNetStruct_t*)calloc(1, sizeof(skNetStruct_t));
+    ns = (sk_netstruct_t *)calloc(1, sizeof(sk_netstruct_t));
     if (NULL == ns) {
         return -1;
     }
@@ -1450,9 +1450,9 @@ skNetStructureCreate(
 /* Destroy the structure */
 void
 skNetStructureDestroy(
-    skNetStruct_t     **ns_ptr)
+    sk_netstruct_t    **ns_ptr)
 {
-    skNetStruct_t *ns;
+    sk_netstruct_t *ns;
     uint32_t i;
 
     if (!ns_ptr || !*ns_ptr) {
@@ -1500,11 +1500,11 @@ skNetStructureDestroy(
  */
 static void
 netStructureInitialize(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     int                 has_count)
 {
     assert(ns);
-    memset(ns, 0, sizeof(skNetStruct_t));
+    memset(ns, 0, sizeof(sk_netstruct_t));
     ns->first_entry = 1;
     ns->use_count = (has_count ? 1 : 0);
     ns->ip_format = SKIPADDR_CANONICAL;
@@ -1621,7 +1621,7 @@ netStructureNS128ToString(
  * to count. */
 static int
 netStructureParseV4(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     const char         *input)
 {
 #define MAX_PREFIX_V4 32
@@ -1786,7 +1786,7 @@ netStructureParseV4(
 #if SK_ENABLE_IPV6
 static int
 netStructureParseV6(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     const char         *input)
 {
 #define MAX_PREFIX_V6 128
@@ -1952,7 +1952,7 @@ netStructureParseV6(
 
 int
 skNetStructureParse(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     const char         *input)
 {
     const char ipv6_prefix[] = "v6";
@@ -2012,7 +2012,7 @@ skNetStructureParse(
  */
 static void
 netStructurePreparePrint(
-    skNetStruct_t      *ns)
+    sk_netstruct_t     *ns)
 {
 #define INDENT_LEVEL 2
     uint32_t first_level = UINT32_MAX;
@@ -2108,28 +2108,7 @@ netStructurePreparePrint(
     width = indent - (INDENT_LEVEL * (1 + last_level));
 
     /* Allow space for the IP address. */
-    if (ns->is_ipv6) {
-        if (SKIPADDR_HEXADECIMAL == ns->ip_format) {
-            width += 32;
-        } else {
-            width += 39;
-        }
-    } else {
-        switch (ns->ip_format) {
-          case SKIPADDR_DECIMAL:
-            width += 10;
-            break;
-          case SKIPADDR_HEXADECIMAL:
-            width += 8;
-            break;
-          case SKIPADDR_FORCE_IPV6:
-            width += 16;
-            break;
-          default:
-            width += 15;
-            break;
-        }
-    }
+    width += skipaddrStringMaxlen(ns->is_ipv6, ns->ip_format);
 
     /* Allow space for the CIDR block */
     if (last_level == 0) {
@@ -2137,7 +2116,7 @@ netStructurePreparePrint(
          * be more narrow that the next larger block.  Account for
          * that. */
         if (ns->column[1].co_print) {
-            if (ns->is_ipv6 || SKIPADDR_FORCE_IPV6 == ns->ip_format) {
+            if (ns->is_ipv6 || (SKIPADDR_MAP_V4 & ns->ip_format)) {
                 if (INDENT_LEVEL < 4) {
                     width += (4 - INDENT_LEVEL);
                 }
@@ -2156,7 +2135,7 @@ netStructurePreparePrint(
             /* Allow for something like "/120" */
             width += 4;
         }
-    } else if (SKIPADDR_FORCE_IPV6 == ns->ip_format) {
+    } else if (SKIPADDR_MAP_V4 & ns->ip_format) {
         if (ns->cblock.v4[last_level].cb_bits < (100 - 96)) {
             /* Allow for something like "/96" */
             width += 3;
@@ -2194,7 +2173,7 @@ netStructurePreparePrint(
  */
 static void
 netStructurePrintEmpty(
-    skNetStruct_t      *ns)
+    sk_netstruct_t     *ns)
 {
     const char *joiner;
     uint32_t j;
@@ -2253,7 +2232,7 @@ netStructurePrintEmpty(
  * where no IPs were processed. */
 void
 skNetStructurePrintFinalize(
-    skNetStruct_t      *ns)
+    sk_netstruct_t     *ns)
 {
     skipaddr_t ipaddr;
     uint64_t counter;
@@ -2277,7 +2256,7 @@ skNetStructurePrintFinalize(
 /* Set width of sum-of-counter column. */
 void
 skNetStructureSetCountWidth(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     int                 width)
 {
     assert(ns);
@@ -2288,7 +2267,7 @@ skNetStructureSetCountWidth(
 /* Set the delimiter to use between columns */
 void
 skNetStructureSetDelimiter(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     char                delimiter)
 {
     assert(ns);
@@ -2299,7 +2278,7 @@ skNetStructureSetDelimiter(
 /* Set the format used for printing IP addresses */
 void
 skNetStructureSetIpFormat(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     uint32_t            format)
 {
     assert(ns);
@@ -2310,7 +2289,7 @@ skNetStructureSetIpFormat(
 /* Disable columnar output */
 void
 skNetStructureSetNoColumns(
-    skNetStruct_t      *ns)
+    sk_netstruct_t     *ns)
 {
     assert(ns);
     ns->no_columns = 1;
@@ -2320,7 +2299,7 @@ skNetStructureSetNoColumns(
 /* Disable printing of the final delimiter */
 void
 skNetStructureSetNoFinalDelimiter(
-    skNetStruct_t      *ns)
+    sk_netstruct_t     *ns)
 {
     assert(ns);
     ns->no_final_delimiter = 1;
@@ -2330,7 +2309,7 @@ skNetStructureSetNoFinalDelimiter(
 /* Set the stream used for printed */
 void
 skNetStructureSetOutputStream(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     skstream_t         *stream)
 {
     assert(ns);

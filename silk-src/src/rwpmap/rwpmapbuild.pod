@@ -6,7 +6,7 @@ B<rwpmapbuild> - Create a binary prefix map from a text file
 
 =head1 SYNOPSIS
 
-  rwpmapbuild [--input-file=FILENAME] [--output-file=FILENAME]
+  rwpmapbuild [--input-path=PATH] [--output-path=PATH]
         [--mode={ipv4|ipv6|proto-port}] [--dry-run] [--ignore-errors]
         [--note-add=TEXT] [--note-file-add=FILENAME]
         [--invocation-strip]
@@ -31,9 +31,9 @@ map.  See the B<pmapfilter(3)> manual page for details.  To view the
 contents of a prefix map file, use B<rwpmapcat(1)>.  To query the
 contents of a prefix map, use B<rwpmaplookup(1)>.
 
-The textual input is read from the file specified by B<--input-file>
+The textual input is read from the file specified by B<--input-path>
 or from the standard input when the switch is not provided.  The
-binary output is written to the location named by B<--output-file> or
+binary output is written to the location named by B<--output-path> or
 to the standard output when the switch is not provided and the
 standard output is not connected to a terminal.
 
@@ -185,21 +185,23 @@ required for options that take optional parameters.
 
 =over 4
 
-=item B<--input-file>=I<FILENAME>
+=item B<--input-path>=I<PATH>
 
-Read the textual input from I<FILENAME>.  You may use C<stdin> or C<->
+Read the textual input from I<PATH>.  You may use C<stdin> or C<->
 to represent the standard input.  When this switch is not provided,
 the input is read from the standard input unless the standard input is
 a terminal.  B<rwpmapbuild> will read textual input from the terminal
 if the standard input is explicitly specified as the input.  The input
-file format is described below.
+file format is described below.  (Added in SiLK 3.17.0 as a
+replacement for B<--input-file>.)
 
-=item B<--output-file>=I<FILENAME>
+=item B<--output-path>=I<PATH>
 
-Write the binary prefix map to I<FILENAME>.  You may use C<stdout> or
+Write the binary prefix map to I<PATH>.  You may use C<stdout> or
 C<-> to represent the standard output.  When this switch is not
 provided, the prefix map is written to the standard output unless
-the standard output is connected to a terminal.
+the standard output is connected to a terminal.  (Added in SiLK 3.17.0
+as a replacement for B<--output-file>.)
 
 =item B<--mode=>{B<ipv4>|B<ipv6>|B<proto-port>}
 
@@ -237,6 +239,16 @@ Do not record the command used to create the prefix map in the output.
 When this switch is not given, the invocation is written to the file's
 header, and the invocation may be viewed with B<rwfileinfo(1)>.
 I<Since SiLK 3.12.0.>
+
+=item B<--input-file>=I<PATH>
+
+Read the textual input from I<PATH>.  An alias for B<--input-path>.
+Deprecaated as of SiLK 3.17.0.
+
+=item B<--output-file>=I<PATH>
+
+Write the binary prefix map to I<PATH>.  An alias for
+B<--output-path>.  Deprecaated as of SiLK 3.17.0.
 
 =item B<--help>
 
@@ -493,7 +505,7 @@ B<rwstats(1)>, B<rwuniq(1)>, B<silk(7)>
 
 =cut
 
-$SiLK: rwpmapbuild.pod a8d636e20bfd 2017-04-21 22:04:53Z mthomas $
+$SiLK: rwpmapbuild.pod 814fc64df055 2018-04-02 19:15:45Z mthomas $
 
 Local Variables:
 mode:text

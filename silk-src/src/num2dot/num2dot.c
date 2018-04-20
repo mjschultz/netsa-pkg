@@ -21,8 +21,9 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: num2dot.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: num2dot.c 7148c54d9884 2018-03-13 19:30:21Z mthomas $");
 
+#include <silk/skipaddr.h>
 #include <silk/skstream.h>
 #include <silk/utils.h>
 
@@ -464,7 +465,12 @@ int main(int argc, char **argv)
                     *ep = '\0';
                 }
                 if (0 == skStringParseUint32(&num, cp, 0, 0)) {
-                    fprintf(outf, "%*s", column_width, num2dot(num));
+                    char ipstr[SKIPADDR_STRLEN];
+                    skipaddr_t ipaddr;
+
+                    skipaddrSetV4(&ipaddr, &num);
+                    fprintf(outf, "%*s", column_width,
+                            skipaddrString(ipstr, &ipaddr, 0));
                 } else {
                     while (isspace((int)*cp)) {
                         ++cp;

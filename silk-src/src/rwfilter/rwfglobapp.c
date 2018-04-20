@@ -21,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfglobapp.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwfglobapp.c 9dfb5116673a 2018-04-02 19:18:40Z mthomas $");
 
 #include "rwfilter.h"
 
@@ -67,7 +67,7 @@ static int no_summary = 0;
  * 0==print file names; 1==no file names */
 static int no_file_names = 0;
 
-/* FIXME: Consider adding --pager and --output-file support.  Or
+/* FIXME: Consider adding --pager and --output-path support.  Or
  * perhaps enable different streams for missing files vs existing
  * files. */
 

@@ -13,11 +13,11 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsetcat.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: rwsetcat.c 62a32b7637cc 2018-03-16 17:30:43Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skipset.h>
-#include <silk/skprintnets.h>
+#include <silk/sknetstruct.h>
 #include <silk/skstream.h>
 #include <silk/utils.h>
 
@@ -72,7 +72,8 @@ static uint32_t ip_format = SKIPADDR_CANONICAL;
 
 /* flags when registering --ip-format */
 static const unsigned int ip_format_register_flags =
-    (SK_OPTION_IP_FORMAT_INTEGER_IPS | SK_OPTION_IP_FORMAT_ZERO_PAD_IPS);
+    (SK_OPTION_IP_FORMAT_INTEGER_IPS | SK_OPTION_IP_FORMAT_ZERO_PAD_IPS
+     | SK_OPTION_IP_FORMAT_UNMAP_V6);
 
 /* option flags */
 static struct opt_flags_st {
@@ -349,8 +350,11 @@ appSetup(
                           appOptions[OPT_IP_RANGES].name);
             skAppUsage();
         }
+        /* disable mapping of ::ffff:0:0/96 to IPv4 */
+        ip_format = ip_format & ~SKIPADDR_UNMAP_V6;
     }
 
+    /* cannot use --ip-ranges with --cidr-blocks */
     if (opt_flags.ip_ranges) {
         if (opt_flags.user_cidr) {
             skAppPrintErr("Cannot combine the --%s and --%s switches.",
@@ -418,10 +422,12 @@ appSetup(
  */
 static int
 appOptionsHandler(
-    clientData   UNUSED(cData),
+    clientData          cData,
     int                 opt_index,
     char               *opt_arg)
 {
+    SK_UNUSED_PARAM(cData);
+
     switch ((appOptionsEnum)opt_index) {
       case OPT_PRINT_STATISTICS:
         opt_flags.statistics = 1;
@@ -519,18 +525,39 @@ static int
 printIPsCallback(
     skipaddr_t         *ip,
     uint32_t            prefix,
-    void        UNUSED(*dummy))
+    void               *dummy)
 {
     char ipbuf[SK_NUM2DOT_STRLEN+1];
 
+    SK_UNUSED_PARAM(dummy);
+
     skipaddrString(ipbuf, ip, ip_format);
 
-    if (skipaddrIsV6(ip) ? (prefix == 128) : (prefix == 32)) {
-        /* do not print prefix when it is 128 and this is an IPv6
-         * IPset or when it is 32 and this is an IPv4 IPset */
-        skStreamPrint(outstream, "%s\n", ipbuf);
-    } else {
-        skStreamPrint(outstream, ("%s/%" PRIu32 "\n"), ipbuf, prefix);
+    /* do not print prefix when it is 128 and this is an IPv6
+     * IPset or when it is 32 and this is an IPv4 IPset */
+#if SK_ENABLE_IPV6
+    if (skipaddrIsV6(ip)) {
+        if (prefix < 96) {
+            skStreamPrint(outstream, ("%s/%" PRIu32 "\n"), ipbuf, prefix);
+        } else if (128 == prefix) {
+            skStreamPrint(outstream, "%s\n", ipbuf);
+        } else {
+            if ((ip_format & SKIPADDR_UNMAP_V6) && skipaddrIsV4MappedV6(ip)) {
+                prefix -= 96;
+            }
+            skStreamPrint(outstream, ("%s/%" PRIu32 "\n"), ipbuf, prefix);
+        }
+    } else
+#endif  /* SK_ENABLE_IPV6 */
+    {
+        if (32 == prefix) {
+            skStreamPrint(outstream, "%s\n", ipbuf);
+        } else {
+            if (ip_format & SKIPADDR_MAP_V4) {
+                prefix += 96;
+            }
+            skStreamPrint(outstream, ("%s/%" PRIu32 "\n"), ipbuf, prefix);
+        }
     }
     return SKIPSET_OK;
 }
@@ -546,9 +573,8 @@ printIPsInitialize(
     void                       *cb_init_func_ctx,
     skipset_procstream_parm_t  *proc_stream_settings)
 {
-    /* quiet "unsued parameter" warning */
-    (void)hdr;
-    (void)cb_init_func_ctx;
+    SK_UNUSED_PARAM(hdr);
+    SK_UNUSED_PARAM(cb_init_func_ctx);
 
     proc_stream_settings->visit_cidr = (opt_flags.user_cidr
                                         ? opt_flags.cidr_blocks
@@ -612,7 +638,7 @@ printNetworkAdd(
     uint32_t            prefix,
     void               *v_ns)
 {
-    skNetStructureAddCIDR((skNetStruct_t*)v_ns, ipaddr, prefix);
+    skNetStructureAddCIDR((sk_netstruct_t *)v_ns, ipaddr, prefix);
     return SKIPSET_OK;
 }
 
@@ -630,7 +656,7 @@ printNetwork(
     skstream_t         *setstream)
 {
     char errbuf[2 * PATH_MAX];
-    skNetStruct_t *ns = NULL;
+    sk_netstruct_t *ns = NULL;
     skipset_procstream_parm_t param;
     ssize_t rv;
 
@@ -844,9 +870,8 @@ printRangesInitialize(
 {
     setcat_range_state_t *state;
 
-    /* quiet "unsued parameter" warning */
-    (void)hdr;
-    (void)cb_init_func_ctx;
+    SK_UNUSED_PARAM(hdr);
+    SK_UNUSED_PARAM(cb_init_func_ctx);
 
     /* choose callback function based on type of IPset */
 #if SK_ENABLE_IPV6
@@ -867,39 +892,10 @@ printRangesInitialize(
         state->final_delim[0] = output_delimiter;
     }
     if (!opt_flags.no_columns) {
-        if (skIPSetIsV6(ipset)) {
-            state->widths[0] = 39;
-            switch (ip_format) {
-              case SKIPADDR_HEXADECIMAL:
-                state->widths[1] = state->widths[2] = 32;
-                break;
-              case SKIPADDR_DECIMAL:
-              case SKIPADDR_ZEROPAD:
-              case SKIPADDR_CANONICAL:
-              case SKIPADDR_FORCE_IPV6:
-              default:
-                state->widths[1] = state->widths[2] = 39;
-                break;
-            }
-        } else {
-            state->widths[0] = 10;
-            switch (ip_format) {
-              case SKIPADDR_HEXADECIMAL:
-                state->widths[1] = state->widths[2] = 8;
-                break;
-              case SKIPADDR_DECIMAL:
-                state->widths[1] = state->widths[2] = 10;
-                break;
-              case SKIPADDR_FORCE_IPV6:
-                state->widths[1] = state->widths[2] = 16;
-                break;
-              case SKIPADDR_ZEROPAD:
-              case SKIPADDR_CANONICAL:
-              default:
-                state->widths[1] = state->widths[2] = 15;
-                break;
-            }
-        }
+        state->widths[0]
+            = skipaddrStringMaxlen(skIPSetIsV6(ipset), SKIPADDR_DECIMAL);
+        state->widths[1] = state->widths[2]
+            = skipaddrStringMaxlen(skIPSetIsV6(ipset), ip_format);
     }
 
     return SKIPSET_OK;
@@ -991,6 +987,8 @@ printStatisticsV6(
     uint32_t prefix;
     char ip_str1[SK_NUM2DOT_STRLEN+1];
     char ip_str2[SK_NUM2DOT_STRLEN+1];
+    uint32_t local_fmt;
+    int width;
     uint64_t tmp;
     double d_count;
     int i;
@@ -1016,7 +1014,7 @@ printStatisticsV6(
         }
         tmp = 0;
         skStreamPrint(outstream, ("\t%39" PRIu64 " host%s\n"),
-                      tmp, ((tmp > 1) ? "s (/128s)" : " (/128)"));
+                      tmp, ((tmp == 1) ? " (/128)" : "s (/128s)"));
         return;
     }
 
@@ -1060,18 +1058,22 @@ printStatisticsV6(
     /* get max IP */
     skCIDR2IPRange(&ipaddr, prefix, &ipaddr, &max_ip);
 
+    /* ignore the unmap-v6 ip_format here since we are printing the data
+     * for an IPv6 IPset */
+    local_fmt = ip_format & ~SKIPADDR_UNMAP_V6;
+    width = skipaddrStringMaxlen(1, local_fmt);
     skStreamPrint(outstream,
                   ("Network Summary\n"
-                   "\tminimumIP = %s\n"
-                   "\tmaximumIP = %s\n"),
-                  skipaddrString(ip_str1, &min_ip, ip_format),
-                  skipaddrString(ip_str2, &max_ip, ip_format));
+                   "\tminimumIP = %*s\n"
+                   "\tmaximumIP = %*s\n"),
+                  width, skipaddrString(ip_str1, &min_ip, local_fmt),
+                  width, skipaddrString(ip_str2, &max_ip, local_fmt));
 
     for (i = 0; i < NUM_LEVELS_V6; ++i) {
         if (0 == count[i].upper) {
             skStreamPrint(outstream, ("\t%39" PRIu64 " occupied /%u%s\n"),
                           count[i].lower, cidr[i],
-                          ((count[i].lower > 1) ? "s" : ""));
+                          ((count[i].lower == 1) ? "" : "s"));
         } else {
             d_count = ((double)count[i].upper * ((double)UINT64_MAX + 1.0)
                        + (double)count[i].lower);
@@ -1079,14 +1081,10 @@ printStatisticsV6(
                           d_count, cidr[i]);
         }
     }
-    tmp = skIPSetCountIPs(ipset, &d_count);
-    if (tmp < UINT64_MAX) {
-        skStreamPrint(outstream, ("\t%39" PRIu64 " host%s\n"),
-                      tmp, ((tmp > 1) ? "s (/128s)" : " (/128)"));
-    } else {
-        skStreamPrint(outstream, ("\t%39.f hosts (/128s)\n"),
-                      d_count);
-    }
+    skIPSetCountIPsString(ipset, ip_str1, sizeof(ip_str1));
+    tmp = (0 == strcmp("1", ip_str1));
+    skStreamPrint(outstream, ("\t%39s host%s\n"),
+                  ip_str1, ((tmp == 1) ? " (/128)" : "s (/128s)"));
 }
 #endif  /* SK_ENABLE_IPV6 */
 
@@ -1124,6 +1122,8 @@ printStatisticsV4(
     uint32_t xor_ips;
     char ip_str1[SK_NUM2DOT_STRLEN+1];
     char ip_str2[SK_NUM2DOT_STRLEN+1];
+    uint32_t local_fmt;
+    int width;
     int i;
 
     memset(count, 0, sizeof(count));
@@ -1181,14 +1181,16 @@ printStatisticsV4(
     /* get max IP */
     skCIDR2IPRange(&ipaddr, prefix, &ipaddr, &max_ip);
 
-    /* FIXME: should we ignore the ip_format here if it force_ipv6
-     * since we are printing the data for an IPv4 IPset? */
+    /* ignore the map-v4 ip_format here since we are printing the data
+     * for an IPv4 IPset */
+    local_fmt = ip_format & ~SKIPADDR_MAP_V4;
+    width = skipaddrStringMaxlen(0, local_fmt);
     skStreamPrint(outstream,
                   ("Network Summary\n"
-                   "\tminimumIP = %16s\n"
-                   "\tmaximumIP = %16s\n"),
-                  skipaddrString(ip_str1, &min_ip, ip_format),
-                  skipaddrString(ip_str2, &max_ip, ip_format));
+                   "\tminimumIP = %*s\n"
+                   "\tmaximumIP = %*s\n"),
+                  width, skipaddrString(ip_str1, &min_ip, local_fmt),
+                  width, skipaddrString(ip_str2, &max_ip, local_fmt));
 
     skStreamPrint(outstream,
                   ("\t%10" PRIu64 " host%s  %10.6f%% of 2^32\n"),

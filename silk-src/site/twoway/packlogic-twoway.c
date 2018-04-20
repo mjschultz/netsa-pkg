@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: packlogic-twoway.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: packlogic-twoway.c 598c37b616f6 2018-03-26 21:57:09Z mthomas $");
 
 #include <silk/rwflowpack.h>
 #include <silk/rwrec.h>
@@ -97,9 +97,13 @@ static const char *net_names[NUM_NETWORKS] = {
 /*
  *    Define the file formats used to pack each flowtype.  If these do
  *    not line up with the type IDs defined in the config file, there
- *    will be problems.  Use the more compact formats for flows from
- *    NetFlow v5 based sources, and the expanded formats for flows
- *    from other sources.
+ *    may be problems when storing flow records.  Use the more compact
+ *    formats for flows from NetFlow v5 based sources, and the
+ *    expanded formats for flows from other sources.
+ *
+ *    When SiLK is built with IPv6 support, the FT_RWIPV6 file format
+ *    is used in place of the FT_RWAUG* types listed below for
+ *    'other'.
  */
 static struct filetypeFormats_st {
     sk_file_format_t    netflow_v5;
@@ -138,6 +142,11 @@ static sk_file_format_t
 packLogicDetermineFileFormat(
     const skpc_probe_t *probe,
     sk_flowtype_id_t    ftype);
+static sk_file_format_t
+packLogicDetermineFormatVersion(
+    const skpc_probe_t *probe,
+    sk_flowtype_id_t    ftype,
+    sk_file_version_t  *version);
 
 
 /* FUNCTION DEFINITIONS */
@@ -156,11 +165,12 @@ packLogicInitialize(
         plugin_path = packlogic->path;
     }
 
-    packlogic->setup_fn =                &packLogicSetup;
-    packlogic->teardown_fn =             &packLogicTeardown;
-    packlogic->verify_sensor_fn =        &packLogicVerifySensor;
-    packlogic->determine_flowtype_fn =   &packLogicDetermineFlowtype;
-    packlogic->determine_fileformat_fn = &packLogicDetermineFileFormat;
+    packlogic->setup_fn =                   &packLogicSetup;
+    packlogic->teardown_fn =                &packLogicTeardown;
+    packlogic->verify_sensor_fn =           &packLogicVerifySensor;
+    packlogic->determine_flowtype_fn =      &packLogicDetermineFlowtype;
+    packlogic->determine_fileformat_fn =    &packLogicDetermineFileFormat;
+    packlogic->determine_formatversion_fn = &packLogicDetermineFormatVersion;
     return 0;
 }
 
@@ -272,7 +282,7 @@ packLogicVerifySensor(
         skVectorGetValue(&probe, probe_vec, c);
 
         /* make certain the probe's type is valid */
-        switch (probe->probe_type) {
+        switch (skpcProbeGetType(probe)) {
           case PROBE_ENUM_NETFLOW_V5:
           case PROBE_ENUM_NETFLOW_V9:
           case PROBE_ENUM_IPFIX:
@@ -282,12 +292,12 @@ packLogicVerifySensor(
             break;
 
           default:
-            assert(skpcProbetypeEnumtoName(probe->probe_type));
+            assert(skpcProbetypeEnumtoName(skpcProbeGetType(probe)));
             skAppPrintErr(("Cannot verify sensor '%s':\n"
                            "\tThe probe type '%s' is not supported in the"
                            " packing-logic\n\tfile '%s'"),
-                          sensor->sensor_name,
-                          skpcProbetypeEnumtoName(probe->probe_type),
+                          skpcSensorGetName(sensor),
+                          skpcProbetypeEnumtoName(skpcProbeGetType(probe)),
                           plugin_path);
             skVectorDestroy(probe_vec);
             return -1;
@@ -368,7 +378,7 @@ packLogicVerifySensor(
                        " destination-network, or at least one\n"
                        "\tof %s- and %s-interface, %s- and %s-ipblock,"
                        " or %s- and %s-ipset"),
-                      sensor->sensor_name,
+                      skpcSensorGetName(sensor),
                       net_names[NETWORK_EXTERNAL],net_names[NETWORK_INTERNAL],
                       net_names[NETWORK_EXTERNAL],net_names[NETWORK_INTERNAL],
                       net_names[NETWORK_EXTERNAL],net_names[NETWORK_INTERNAL]);
@@ -383,7 +393,7 @@ packLogicVerifySensor(
     {
         skAppPrintErr(("Cannot verify sensor '%s':\n"
                        "\tOnly one network value may use 'remainder'"),
-                      sensor->sensor_name);
+                      skpcSensorGetName(sensor));
         return -1;
     }
 
@@ -401,7 +411,7 @@ packLogicVerifySensor(
         if (set_count) {
             skAppPrintErr(("Cannot verify sensor '%s':\n"
                            "\tCannot mix <NET>-ipblock and <NET>-ipset"),
-                          sensor->sensor_name);
+                          skpcSensorGetName(sensor));
             return -1;
         }
 
@@ -421,7 +431,7 @@ packLogicVerifySensor(
                 skAppPrintErr(("Cannot verify sensor '%s':\n"
                                "\tCannot mix <NET>-interface"
                                " and <NET>-ipblock"),
-                              sensor->sensor_name);
+                              skpcSensorGetName(sensor));
                 return -1;
             }
         }
@@ -435,7 +445,7 @@ packLogicVerifySensor(
                 skAppPrintErr(("Cannot verify sensor '%s':\n"
                                "\tCannot set ipblocks to remainder when"
                                " no other networks hold IP blocks"),
-                              sensor->sensor_name);
+                              skpcSensorGetName(sensor));
                 return -1;
             }
             return 0;
@@ -468,7 +478,7 @@ packLogicVerifySensor(
         if (block_count) {
             skAppPrintErr(("Cannot verify sensor '%s':\n"
                            "\tCannot mix <NET>-ipset and <NET>-ipblock"),
-                          sensor->sensor_name);
+                          skpcSensorGetName(sensor));
             return -1;
         }
 
@@ -488,7 +498,7 @@ packLogicVerifySensor(
                 skAppPrintErr(("Cannot verify sensor '%s':\n"
                                "\tCannot mix <NET>-interface"
                                " and <NET>-ipset"),
-                              sensor->sensor_name);
+                              skpcSensorGetName(sensor));
                 return -1;
             }
         }
@@ -502,7 +512,7 @@ packLogicVerifySensor(
                 skAppPrintErr(("Cannot verify sensor '%s':\n"
                                "\tCannot set ipsets to remainder when"
                                " no other networks hold IP sets"),
-                              sensor->sensor_name);
+                              skpcSensorGetName(sensor));
                 return -1;
             }
             return 0;
@@ -593,7 +603,7 @@ packLogicDetermineFlowtype(
             continue;
         }
 
-        sensorids[sensor_count] = sensor->sensor_id;
+        sensorids[sensor_count] = skpcSensorGetID(sensor);
 
         if (1 == skpcSensorTestFlowInterfaces(sensor, rwrec,
                                               NETWORK_EXTERNAL, SKPC_DIR_SRC))
@@ -761,7 +771,7 @@ packLogicDetermineFileFormat(
         return FT_RWGENERIC;
     }
 
-    switch (probe->probe_type) {
+    switch (skpcProbeGetType(probe)) {
       case PROBE_ENUM_NETFLOW_V5:
         return filetypeFormats[ftype].netflow_v5;
 
@@ -771,6 +781,46 @@ packLogicDetermineFileFormat(
 }
 
 #endif  /* #else of #if SK_ENABLE_IPV6 */
+
+static sk_file_format_t
+packLogicDetermineFormatVersion(
+    const skpc_probe_t *probe,
+    sk_flowtype_id_t    ftype,
+    sk_file_version_t  *version)
+{
+    assert(ftype < (sizeof(filetypeFormats)/sizeof(filetypeFormats[0])));
+
+    /*
+     *  If a sensor has a single NetFlow-v5 probe, store that data
+     *  using the netflow_v5 member of the 'filetypeFormats[]' array;
+     *  otherwise use the 'other' member.  FIXME: We should use the
+     *  netflow_v5 format when there are multiple probes as long as
+     *  they are all NetFlow-v5.
+     */
+    if (skpcProbeGetType(probe) == PROBE_ENUM_NETFLOW_V5
+        && skpcProbeGetSensorCount(probe) == 1
+        && !(skpcProbeGetQuirks(probe) & SKPC_QUIRK_ZERO_PACKETS))
+    {
+        *version = SK_RECORD_VERSION_ANY;
+        return filetypeFormats[ftype].netflow_v5;
+    } else
+#if  SK_ENABLE_IPV6
+    {
+        *version = SK_RECORD_VERSION_ANY;
+        return FT_RWIPV6;
+    }
+#else
+    {
+        if (skpcProbeGetQuirks(probe) & SKPC_QUIRK_ZERO_PACKETS) {
+            /* Use a format that does not use bytes/packet ratio */
+            *version = 5;
+        } else {
+            *version = SK_RECORD_VERSION_ANY;
+        }
+        return filetypeFormats[ftype].other;
+    }
+#endif  /* #else of #if SK_ENABLE_IPV6 */
+}
 
 
 /*

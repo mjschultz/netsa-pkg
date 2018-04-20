@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skaggbag.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: skaggbag.c 771cf581d1bc 2018-02-26 17:50:09Z mthomas $");
 
 #include <silk/skaggbag.h>
 #include <silk/skipaddr.h>
@@ -931,6 +931,9 @@ sk_rbtree_insert(
         /* Choose a direction and check for a match */
         cmp = rbtree_compare_data(tree, q->data_color, key_data);
         if (0 == cmp) {
+            uint8_t *node_data = q->data_color;
+            memcpy(node_data + tree->layout[0]->field_octets, counter_data,
+                   tree->layout[1]->field_octets);
             rv = SK_RBTREE_ERR_DUPLICATE;
             ABTRACE(("stop after duplicate\n"));
             break;
@@ -2034,6 +2037,7 @@ skAggBagAddAggBag(
     while (skAggBagIteratorNext(&iter) == SK_ITERATOR_OK) {
         skAggBagKeyCounterAdd(ab_augend, &iter.key, &iter.counter, NULL);
     }
+    skAggBagIteratorFree(&iter);
 
     return SKAGGBAG_OK;
 }
@@ -2060,6 +2064,7 @@ skAggBagSubtractAggBag(
     while (skAggBagIteratorNext(&iter) == SK_ITERATOR_OK) {
         skAggBagKeyCounterSubtract(ab_minuend, &iter.key, &iter.counter, NULL);
     }
+    skAggBagIteratorFree(&iter);
 
     return SKAGGBAG_OK;
 }
@@ -2470,7 +2475,13 @@ skAggBagFieldIterNext(
 
 void
 skAggBagFieldIterReset(
-    sk_aggbag_field_t  *field_iter);
+    sk_aggbag_field_t  *field_iter)
+{
+    assert(field_iter);
+    if (field_iter) {
+        field_iter->pos = 0;
+    }
+}
 
 
 const char *
@@ -2848,7 +2859,6 @@ skAggBagKeyCounterSet(
     switch (sk_rbtree_insert(ab, key->data, counter->data)) {
       case SK_RBTREE_OK:
       case SK_RBTREE_ERR_DUPLICATE:
-        rbtree_assert(ab, ab->root, stderr);
         return SKAGGBAG_OK;
       case SK_RBTREE_ERR_ALLOC:
         return SKAGGBAG_E_ALLOC;

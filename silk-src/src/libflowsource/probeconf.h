@@ -22,7 +22,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_PROBECONF_H, "$SiLK: probeconf.h 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENTVAR(rcsID_PROBECONF_H, "$SiLK: probeconf.h 96529cbc24c2 2018-03-22 19:09:27Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -743,9 +743,12 @@ skpcProbeGetType(
  *    Get the probe's protocol.  Before it is set by the user, the
  *    probe's protocol is SKPC_PROTO_UNSET.
  */
+#define skpcProbeGetProtocol(m_probe)   ((m_probe)->protocol)
+#ifndef skpcProbeGetProtocol
 skpc_proto_t
 skpcProbeGetProtocol(
     const skpc_probe_t *probe);
+#endif  /* skpcProbeGetProtocol */
 
 /**
  *    Set the probe's protocol.
@@ -1016,9 +1019,12 @@ skpcProbeSetAcceptFromHost(
 /**
  *    Return a count of sensors that are using this probe.
  */
+#define skpcProbeGetSensorCount(m_probe)    ((m_probe)->sensor_count)
+#ifndef skpcProbeGetSensorCount
 size_t
 skpcProbeGetSensorCount(
     const skpc_probe_t *probe);
+#endif  /* skpcProbeGetSensorCount */
 
 
 /**
@@ -1088,17 +1094,23 @@ skpcSensorDestroy(
  *    Get the numeric ID of the sensor, as determined by the silk.conf
  *    file.
  */
+#define skpcSensorGetID(m_sensor)       ((m_sensor)->sensor_id)
+#ifndef skpcSensorGetID
 sk_sensor_id_t
 skpcSensorGetID(
     const skpc_sensor_t    *sensor);
+#endif  /* skpcSensorGetID */
 
 /**
  *    Get the name of the sensor.  The caller should not modify the
  *    name, and does not need to free() it.
  */
+#define skpcSensorGetName(m_sensor)     ((m_sensor)->sensor_name)
+#ifndef skpcSensorGetName
 const char *
 skpcSensorGetName(
     const skpc_sensor_t    *sensor);
+#endif  /* skpcSensorGetName */
 
 /**
  *    Set the name of a sensor.  The function makes a copy of 'name'

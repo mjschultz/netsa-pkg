@@ -49,91 +49,50 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwuniq.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: rwuniq.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
-#include "rwuniq.h"
-
-
-/* TYPEDEFS AND DEFINES */
-
-/*
- *  These macros extract part of a field-list buffer to get a value,
- *  and then set that value on 'rec' by calling 'func'
- */
-#define KEY_TO_REC(type, func, rec, field_buffer, field_list, field)    \
-    {                                                                   \
-        type k2r_val;                                                   \
-        skFieldListExtractFromBuffer(field_list, field_buffer,          \
-                                     field, (uint8_t*)&k2r_val);        \
-        func((rec), k2r_val);                                           \
-    }
-
-#define KEY_TO_REC_08(func, rec, field_buffer, field_list, field)       \
-    KEY_TO_REC(uint8_t, func, rec, field_buffer, field_list, field)
-
-#define KEY_TO_REC_16(func, rec, field_buffer, field_list, field)       \
-    KEY_TO_REC(uint16_t, func, rec, field_buffer, field_list, field)
-
-#define KEY_TO_REC_32(func, rec, field_buffer, field_list, field)       \
-    KEY_TO_REC(uint32_t, func, rec, field_buffer, field_list, field)
-
+#include "rwstats.h"
 
 
 /* EXPORTED VARIABLES */
 
-sk_unique_t *uniq;
-sk_sort_unique_t *ps_uniq;
-
-sk_fieldlist_t *key_fields;
-sk_fieldlist_t *value_fields;
-sk_fieldlist_t *distinct_fields;
-
-/* to convert the key fields (as an rwRec) to ascii */
-rwAsciiStream_t *ascii_str;
-
-/* flags set by the user options */
-app_flags_t app_flags;
-
-/* which of elapsed, sTime, and eTime are part of the key. uses the
- * PARSE_KEY_* values from rwuniq.h */
-unsigned int time_fields_key = 0;
-
-/* whether dPort is part of the key */
-unsigned int dport_key = 0;
-
-/* how to handle IPv6 flows */
-sk_ipv6policy_t ipv6_policy = SK_IPV6POLICY_MIX;
-
-/* Information about each potential "value" field the user can choose
- * to compute and display.  Ensure these appear in same order as in
- * the OPT_BYTES...OPT_DIP_DISTINCT values in appOptionsEnum. */
-builtin_field_t builtin_values[] = {
-    /* title, min, max, text_len, id, is_distinct, all_counts, switched_on,
-     * description */
-    {"Bytes",          0, UINT64_MAX, 20, SK_FIELD_SUM_BYTES,     0, 1, 0,
-     "Sum of bytes for all flows in the group"},
-    {"Packets",        0, UINT64_MAX, 15, SK_FIELD_SUM_PACKETS,   0, 1, 0,
-     "Sum of packets for all flows in the group"},
-    {"Records",        0, UINT64_MAX, 10, SK_FIELD_RECORDS,       0, 1, 0,
-     "Number of flow records in the group"},
-    {"sTime-Earliest", 0, UINT64_MAX, 19, SK_FIELD_MIN_STARTTIME, 0, 1, 0,
-     "Minimum starting time for flows in the group"},
-    {"eTime-Latest",   0, UINT64_MAX, 19, SK_FIELD_MAX_ENDTIME,   0, 1, 0,
-     "Maximum ending time for flows in the group"},
-    {"sIP-Distinct",   0, UINT64_MAX, 10, SK_FIELD_SIPv4,         1, 0, 0,
-     "Number of distinct source IPs in the group"},
-    {"dIP-Distinct",   0, UINT64_MAX, 10, SK_FIELD_DIPv4,         1, 0, 0,
-     "Number of distinct destination IPs in the group"},
-    {"Distinct",       0, UINT64_MAX, 10, SK_FIELD_CALLER,        1, 0, 0,
-     "You must append a colon and a key field to count the number of"
-     " distinct values seen for that field in the group"}
-};
-
-const size_t num_builtin_values = (sizeof(builtin_values)/
-                                   sizeof(builtin_field_t));
+/* is this rwstats or rwuniq? */
+const statsuniq_program_t this_program = STATSUNIQ_PROGRAM_UNIQ;
 
 
 /* FUNCTION DEFINITIONS */
+
+/* dummy functions needed for linking with rwstatssetup.c */
+int
+protoStatsOptionsRegister(
+    void)
+{
+    skAbort();
+    return 0;                   /* NOTREACHED */
+}
+void
+protoStatsOptionsUsage(
+    FILE               *fh)
+{
+    SK_UNUSED_PARAM(fh);
+    skAbort();
+}
+int
+legacyOptionsSetup(
+    clientData          cData)
+{
+    SK_UNUSED_PARAM(cData);
+    skAbort();
+    return 0;                   /* NOTREACHED */
+}
+void
+legacyOptionsUsage(
+    FILE               *fh)
+{
+    SK_UNUSED_PARAM(fh);
+    skAbort();
+}
+
 
 /*
  *  writeColTitles();
@@ -147,304 +106,6 @@ writeColTitles(
 {
     setOutputHandle();
     rwAsciiPrintTitles(ascii_str);
-}
-
-
-/*
- *  writeAsciiRecord(key, value, distinct);
- *
- *    Verifies that the 'value' and 'distincts' values are within the
- *    limits specified by the user.  If they are not, the function
- *    returns without printing anything.
- *
- *    Unpacks the fields from 'key' and prints the key fields, the
- *    value fields, and the distinct fields to the global output
- *    stream 'output.fp'.
- */
-static void
-writeAsciiRecord(
-    uint8_t           **outbuf)
-{
-    rwRec rwrec;
-    uint64_t val64;
-    uint32_t val32;
-    uint32_t eTime = 0;
-    uint16_t dport = 0;
-    sk_fieldlist_iterator_t fl_iter;
-    sk_fieldentry_t *field;
-    builtin_field_t *bf;
-    int id;
-
-#if  SK_ENABLE_IPV6
-    /* whether IPv4 addresses have been added to a record */
-    int added_ipv4 = 0;
-    uint8_t ipv6[16];
-    ipv6_distinct_t val_ip6;
-#endif
-
-    /* in mixed IPv4/IPv6 setting, keep record as IPv4 unless an IPv6
-     * address forces us to use IPv6. */
-#define KEY_TO_REC_IPV6(func_v6, func_v4, rec, field_buf, field_list, field) \
-    skFieldListExtractFromBuffer(key_fields, field_buf, field, ipv6);   \
-    if (rwRecIsIPv6(rec)) {                                             \
-        /* record is already IPv6 */                                    \
-        func_v6((rec), ipv6);                                           \
-    } else if (SK_IPV6_IS_V4INV6(ipv6)) {                               \
-        /* record is IPv4, and so is the IP */                          \
-        func_v4((rec), ntohl(*(uint32_t*)(ipv6 + SK_IPV6_V4INV6_LEN))); \
-        added_ipv4 = 1;                                                 \
-    } else {                                                            \
-        /* address is IPv6, but record is IPv4 */                       \
-        if (added_ipv4) {                                               \
-            /* record has IPv4 addrs; must convert */                   \
-            rwRecConvertToIPv6(rec);                                    \
-        } else {                                                        \
-            /* no addresses on record yet */                            \
-            rwRecSetIPv6(rec);                                          \
-        }                                                               \
-        func_v6((rec), ipv6);                                           \
-    }
-
-    /* see if values are within limits */
-    if (app_flags.check_limits) {
-        skFieldListIteratorBind(value_fields, &fl_iter);
-        while (NULL != (field = skFieldListIteratorNext(&fl_iter))) {
-            bf = (builtin_field_t*)skFieldListEntryGetContext(field);
-            switch (skFieldListEntryGetId(field)) {
-              case SK_FIELD_SUM_BYTES:
-              case SK_FIELD_SUM_PACKETS:
-                skFieldListExtractFromBuffer(value_fields, outbuf[1], field,
-                                             (uint8_t*)&val64);
-                if ((val64 < bf->bf_min)
-                    || (val64 > bf->bf_max))
-                {
-                    return;
-                }
-                break;
-
-              case SK_FIELD_RECORDS:
-              case SK_FIELD_SUM_ELAPSED:
-                skFieldListExtractFromBuffer(value_fields, outbuf[1], field,
-                                             (uint8_t*)&val32);
-                if ((val32 < bf->bf_min)
-                    || (val32 > bf->bf_max))
-                {
-                    return;
-                }
-                break;
-
-              default:
-                break;
-            }
-        }
-        skFieldListIteratorBind(distinct_fields, &fl_iter);
-        while (NULL != (field = skFieldListIteratorNext(&fl_iter))) {
-            bf = (builtin_field_t*)skFieldListEntryGetContext(field);
-            if (bf) {
-                switch (skFieldListEntryGetId(field)) {
-#if  SK_ENABLE_IPV6
-                  case SK_FIELD_SIPv6:
-                  case SK_FIELD_DIPv6:
-                    skFieldListExtractFromBuffer(distinct_fields, outbuf[2],
-                                                 field, val_ip6.ip);
-                    if ((val_ip6.count < bf->bf_min)
-                        || (val_ip6.count > bf->bf_max))
-                    {
-                        return;
-                    }
-                    break;
-#endif  /* SK_ENABLE_IPV6 */
-
-                  case SK_FIELD_SIPv4:
-                  case SK_FIELD_DIPv4:
-                    skFieldListExtractFromBuffer(distinct_fields, outbuf[2],
-                                                 field, (uint8_t*)&val32);
-                    if ((val32 < bf->bf_min)
-                        || (val32 > bf->bf_max))
-                    {
-                        return;
-                    }
-                    break;
-
-                  default:
-                    break;
-                }
-            }
-        }
-    }
-
-    /* Zero out rwrec to avoid display errors---specifically with msec
-     * fields and eTime. */
-    RWREC_CLEAR(&rwrec);
-
-    /* Initialize the protocol to 1 (ICMP), so that if the user has
-     * requested ICMP type/code but the protocol is not part of the
-     * key, we still get ICMP values. */
-    rwRecSetProto(&rwrec, IPPROTO_ICMP);
-
-#if SK_ENABLE_IPV6
-    if (ipv6_policy > SK_IPV6POLICY_MIX) {
-        /* Force records to be in IPv6 format */
-        rwRecSetIPv6(&rwrec);
-    }
-#endif /* SK_ENABLE_IPV6 */
-
-    /* unpack the key into 'rwrec' */
-    skFieldListIteratorBind(key_fields, &fl_iter);
-    while (NULL != (field = skFieldListIteratorNext(&fl_iter))) {
-        id = skFieldListEntryGetId(field);
-        switch (id) {
-#if SK_ENABLE_IPV6
-          case SK_FIELD_SIPv6:
-            KEY_TO_REC_IPV6(rwRecMemSetSIPv6, rwRecSetSIPv4, &rwrec,
-                            outbuf[0], key_fields, field);
-            break;
-          case SK_FIELD_DIPv6:
-            KEY_TO_REC_IPV6(rwRecMemSetDIPv6, rwRecSetDIPv4, &rwrec,
-                            outbuf[0], key_fields, field);
-            break;
-          case SK_FIELD_NHIPv6:
-            KEY_TO_REC_IPV6(rwRecMemSetNhIPv6, rwRecSetNhIPv4, &rwrec,
-                            outbuf[0], key_fields, field);
-            break;
-#endif  /* SK_ENABLE_IPV6 */
-
-          case SK_FIELD_SIPv4:
-            KEY_TO_REC_32(rwRecSetSIPv4, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_DIPv4:
-            KEY_TO_REC_32(rwRecSetDIPv4, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_NHIPv4:
-            KEY_TO_REC_32(rwRecSetNhIPv4, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_SPORT:
-            KEY_TO_REC_16(rwRecSetSPort, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_DPORT:
-            /* just extract dPort; we will set it later to ensure
-             * dPort takes precedence over ICMP type/code */
-            skFieldListExtractFromBuffer(key_fields, outbuf[0],
-                                         field, (uint8_t*)&dport);
-            break;
-          case SK_FIELD_ICMP_TYPE:
-            KEY_TO_REC_08(rwRecSetIcmpType, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_ICMP_CODE:
-            KEY_TO_REC_08(rwRecSetIcmpCode, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_PROTO:
-            KEY_TO_REC_08(rwRecSetProto, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_PACKETS:
-            KEY_TO_REC_32(rwRecSetPkts, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_BYTES:
-            KEY_TO_REC_32(rwRecSetBytes, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_FLAGS:
-            KEY_TO_REC_08(rwRecSetFlags, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_SID:
-            KEY_TO_REC_16(rwRecSetSensor, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_INPUT:
-            KEY_TO_REC_16(rwRecSetInput, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_OUTPUT:
-            KEY_TO_REC_16(rwRecSetOutput, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_INIT_FLAGS:
-            KEY_TO_REC_08(rwRecSetInitFlags, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_REST_FLAGS:
-            KEY_TO_REC_08(rwRecSetRestFlags, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_TCP_STATE:
-            KEY_TO_REC_08(rwRecSetTcpState, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_APPLICATION:
-            KEY_TO_REC_16(rwRecSetApplication, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_FTYPE_CLASS:
-          case SK_FIELD_FTYPE_TYPE:
-            KEY_TO_REC_08(rwRecSetFlowType, &rwrec, outbuf[0],
-                          key_fields, field);
-            break;
-          case SK_FIELD_STARTTIME:
-          case SK_FIELD_STARTTIME_MSEC:
-            skFieldListExtractFromBuffer(key_fields, outbuf[0],
-                                         field, (uint8_t*)&val32);
-            rwRecSetStartTime(&rwrec, sktimeCreate(val32, 0));
-            break;
-          case SK_FIELD_ELAPSED:
-          case SK_FIELD_ELAPSED_MSEC:
-            skFieldListExtractFromBuffer(key_fields, outbuf[0],
-                                         field, (uint8_t*)&val32);
-            rwRecSetElapsed(&rwrec, val32 * 1000);
-            break;
-          case SK_FIELD_ENDTIME:
-          case SK_FIELD_ENDTIME_MSEC:
-            /* just extract eTime; we will set it later */
-            skFieldListExtractFromBuffer(key_fields, outbuf[0],
-                                         field, (uint8_t*)&eTime);
-            break;
-          default:
-            assert(skFieldListEntryGetId(field) == SK_FIELD_CALLER);
-            break;
-        }
-    }
-
-    if (dport_key) {
-        rwRecSetDPort(&rwrec, dport);
-    }
-
-    switch (time_fields_key) {
-      case PARSE_KEY_ETIME:
-        /* etime only; just set sTime to eTime--elapsed is already 0 */
-        rwRecSetStartTime(&rwrec, sktimeCreate(eTime, 0));
-        break;
-      case (PARSE_KEY_ELAPSED | PARSE_KEY_ETIME):
-        /* etime and elapsed; set start time based on end time and elapsed */
-        val32 = rwRecGetElapsedSeconds(&rwrec);
-        rwRecSetStartTime(&rwrec, sktimeCreate((eTime - val32), 0));
-        break;
-      case (PARSE_KEY_STIME | PARSE_KEY_ETIME):
-        /* etime and stime; set elapsed as their difference */
-        val32 = rwRecGetStartSeconds(&rwrec);
-        assert(val32 <= eTime);
-        rwRecSetElapsed(&rwrec, (1000 * (eTime - val32)));
-        break;
-      case PARSE_KEY_ALL_TIMES:
-        /* 'time_fields_key' should contain 0, 1, or 2 time values */
-        skAbortBadCase(time_fields_key);
-      default:
-        assert(0 == time_fields_key
-               || PARSE_KEY_STIME == time_fields_key
-               || PARSE_KEY_ELAPSED == time_fields_key
-               || (PARSE_KEY_STIME | PARSE_KEY_ELAPSED) == time_fields_key);
-        break;
-    }
-
-    /* print everything */
-    rwAsciiPrintRecExtra(ascii_str, &rwrec, outbuf);
 }
 
 
@@ -494,16 +155,42 @@ uniqRandom(
         appExit(EXIT_FAILURE);
     }
 
-    while (skUniqueIteratorNext(iter, &outbuf[0], &outbuf[2], &outbuf[1])
-           == SK_ITERATOR_OK)
-    {
-        writeAsciiRecord(outbuf);
+    if (app_flags.check_limits) {
+        while (skUniqueIteratorNext(iter, &outbuf[0], &outbuf[2], &outbuf[1])
+               == SK_ITERATOR_OK)
+        {
+            checkLimitsWriteRecord(outbuf);
+        }
+    } else {
+        while (skUniqueIteratorNext(iter, &outbuf[0], &outbuf[2], &outbuf[1])
+               == SK_ITERATOR_OK)
+        {
+            writeAsciiRecord(outbuf);
+        }
     }
+
     skUniqueIteratorDestroy(&iter);
 
     return;
 }
 
+
+static int
+presortedCheckLimitsCallback(
+    const uint8_t          *key,
+    const uint8_t          *distinct,
+    const uint8_t          *value,
+    void            UNUSED(*callback_data))
+{
+    uint8_t *outbuf[3];
+
+    outbuf[0] = (uint8_t*)key;
+    outbuf[1] = (uint8_t*)value;
+    outbuf[2] = (uint8_t*)distinct;
+
+    checkLimitsWriteRecord(outbuf);
+    return 0;
+}
 
 static int
 presortedEntryCallback(
@@ -536,8 +223,16 @@ uniqPresorted(
     /* Write the headings */
     writeColTitles();
 
-    if (skPresortedUniqueProcess(ps_uniq, presortedEntryCallback, NULL)) {
-        skAppPrintErr("Unique processing failed");
+    if (app_flags.check_limits) {
+        if (skPresortedUniqueProcess(
+                ps_uniq, presortedCheckLimitsCallback, NULL))
+        {
+            skAppPrintErr("Unique processing failed");
+        }
+    } else {
+        if (skPresortedUniqueProcess(ps_uniq, presortedEntryCallback, NULL)) {
+            skAppPrintErr("Unique processing failed");
+        }
     }
 }
 

@@ -20,7 +20,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_LOG_H, "$SiLK: sklog.h bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENTVAR(rcsID_LOG_H, "$SiLK: sklog.h 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <syslog.h>
 
@@ -150,6 +150,21 @@ sklog(
     ...)
     SK_CHECK_PRINTF(2, 3);
 #endif
+
+
+/**
+ *    Return a non-zero value if the current logging level includes
+ *    'level', where 'level' is one of the syslog macros LOG_EMERG,
+ *    LOG_ALERT, LOG_CRIT, LOG_ERR, LOG_WARNING, LOG_NOTICE, LOG_INFO,
+ *    or LOG_DEBUG.
+ *
+ *    Return 0 if messages at 'level' are not being written to the log.
+ *
+ *    Since SiLK 3.17.0.
+ */
+int
+sklogCheckLevel(
+    int                 level);
 
 
 /**

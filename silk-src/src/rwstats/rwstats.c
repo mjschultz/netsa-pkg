@@ -138,7 +138,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwstats.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: rwstats.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/skheap.h>
 #include "rwstats.h"
@@ -149,6 +149,15 @@ RCSIDENT("$SiLK: rwstats.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
 /* Initial number of elements for the heap when using a threshold or
  * percentage cut-off */
 #define HEAP_INITIAL_SIZE  512
+
+#define HEAP_PTR_KEY(hp)                        \
+    ((uint8_t*)(hp) + heap_offset_key)
+
+#define HEAP_PTR_VALUE(hp)                      \
+    ((uint8_t*)(hp) + heap_offset_value)
+
+#define HEAP_PTR_DISTINCT(hp)                                   \
+    ((uint8_t*)(hp) + heap_offset_distinct)
 
 /* For output, add an "s" when speaking of values other than 1 */
 #define PLURAL(plural_val) (((plural_val) == 1) ? "" : "s")
@@ -161,29 +170,6 @@ RCSIDENT("$SiLK: rwstats.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
  */
 #define DIR_AND_TYPE(dat_t_or_b, dat_val_type)  \
     ((dat_t_or_b) | ((dat_val_type) << 1))
-
-
-/*
- *  These macros extract part of a field-list buffer to get a value,
- *  and then set that value on 'rec' by calling 'func'
- */
-#define KEY_TO_REC(type, func, rec, field_buffer, field_list, field)    \
-    {                                                                   \
-        type k2r_val;                                                   \
-        skFieldListExtractFromBuffer(field_list, field_buffer,          \
-                                     field, (uint8_t*)&k2r_val);        \
-        func((rec), k2r_val);                                           \
-    }
-
-#define KEY_TO_REC_08(func, rec, field_buffer, field_list, field)       \
-    KEY_TO_REC(uint8_t, func, rec, field_buffer, field_list, field)
-
-#define KEY_TO_REC_16(func, rec, field_buffer, field_list, field)       \
-    KEY_TO_REC(uint16_t, func, rec, field_buffer, field_list, field)
-
-#define KEY_TO_REC_32(func, rec, field_buffer, field_list, field)       \
-    KEY_TO_REC(uint32_t, func, rec, field_buffer, field_list, field)
-
 
 #define MEMSET_HEAP_NODE(mhn_buf, key_buf, value_buf, distinct_buf)     \
     do {                                                                \
@@ -209,112 +195,10 @@ RCSIDENT("$SiLK: rwstats.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
         || ((vmt_value) == limit.value[RWSTATS_THRESHOLD].u64)))
 
 
-/* structure to get the distinct count when using IPv6 */
-typedef union ipv6_distinct_un {
-    uint64_t count;
-    uint8_t  ip[16];
-} ipv6_distinct_t;
-
-
 /* EXPORTED VARIABLES */
 
-/* user limit for this stat: N if top N or bottom N, threshold, or
- * percentage */
-rwstats_limit_t limit;
-
-rwstats_direction_t direction = RWSTATS_DIR_TOP;
-
-/* the final delimiter on each line; assume none */
-char final_delim[] = {'\0', '\0'};
-
-int width[RWSTATS_COLUMN_WIDTH_COUNT] = {
-    15, /* WIDTH_KEY:   key */
-    20, /* WIDTH_VAL:   count */
-    10, /* WIDTH_INTVL: interval maximum */
-    10, /* WIDTH_PCT:   percentage value */
-};
-
-/* non-zero when --overall-stats or --detail-proto-stats is given */
-int proto_stats = 0;
-
-sk_unique_t *uniq;
-sk_sort_unique_t *ps_uniq;
-
-sk_fieldlist_t *key_fields;
-sk_fieldlist_t *value_fields;
-sk_fieldlist_t *distinct_fields;
-
-/* for the key, value, and distinct fields used by the heap, the byte
- * lengths of each and the offsets of each when creating a heap
- * node */
-size_t heap_octets_key = 0;
-size_t heap_octets_value = 0;
-size_t heap_octets_distinct = 0;
-
-size_t heap_offset_key = 0;
-size_t heap_offset_value = 0;
-size_t heap_offset_distinct = 0;
-
-/* the total byte length of a node in the heap */
-size_t heap_octets_node = 0;
-
-/* delimiter between output columns */
-char delimiter = '|';
-
-/* to convert the key fields (as an rwRec) to ascii */
-rwAsciiStream_t *ascii_str;
-
-/* the real output */
-sk_fileptr_t output;
-
-/* flags set by the user options */
-app_flags_t app_flags;
-
-/* number of records read */
-uint64_t record_count = 0;
-
-/* Summation of whatever value (bytes, packets, flows) we are using.
- * When counting flows, this will be equal to record_count. */
-uint64_t value_total = 0;
-
-/* how to handle IPv6 flows */
-sk_ipv6policy_t ipv6_policy = SK_IPV6POLICY_MIX;
-
-/* CIDR block mask for src and dest ips.  If 0, use all bits;
- * otherwise, the IP address should be bitwised ANDed with this
- * value. */
-uint32_t cidr_sip = 0;
-uint32_t cidr_dip = 0;
-
-/* Information about each potential "value" field the user can choose
- * to compute and display.  Ensure these appear in same order as in
- * the OPT_BYTES...OPT_DIP_DISTINCT values in appOptionsEnum. */
-builtin_field_t builtin_values[] = {
-    /* title, min, max, text_len, id, is_distinct, description */
-    {"Bytes",          1, UINT64_MAX, 20, SK_FIELD_SUM_BYTES,     0,
-     "Sum of bytes for all flows in the group"},
-    {"Packets",        1, UINT64_MAX, 15, SK_FIELD_SUM_PACKETS,   0,
-     "Sum of packets for all flows in the group"},
-    {"Records",        1, UINT64_MAX, 10, SK_FIELD_RECORDS,       0,
-     "Number of flow records in the group"},
-    {"sIP-Distinct",   1, UINT64_MAX, 10, SK_FIELD_SIPv4,         1,
-     "Number of distinct source IPs in the group"},
-    {"dIP-Distinct",   1, UINT64_MAX, 10, SK_FIELD_DIPv4,         1,
-     "Number of distinct source IPs in the group"},
-    {"Distinct",       1, UINT64_MAX, 10, SK_FIELD_CALLER,        1,
-     "You must append a colon and a key field to count the number of"
-     " distinct values seen for that field in the group"}
-};
-
-const size_t num_builtin_values = (sizeof(builtin_values)/
-                                   sizeof(builtin_field_t));
-
-/* which of elapsed, sTime, and eTime are part of the key. uses the
- * PARSE_KEY_* values from rwstats.h */
-unsigned int time_fields_key = 0;
-
-/* whether dPort is part of the key */
-unsigned int dport_key = 0;
+/* is this rwstats or rwuniq? */
+const statsuniq_program_t this_program = STATSUNIQ_PROGRAM_STATS;
 
 
 /* LOCAL VARIABLES */
@@ -325,13 +209,22 @@ static skheap_t *heap = NULL;
 /* the comparison function to use for the heap */
 static skheapcmpfn_t cmp_fn = NULL;
 
+/* for the key, value, and distinct fields used by the heap, the byte
+ * lengths of each and the offsets of each when creating a heap
+ * node */
+static size_t heap_octets_key = 0;
+static size_t heap_octets_value = 0;
+static size_t heap_octets_distinct = 0;
 
-/* LOCAL FUNCTION PROTOTYPES */
+static size_t heap_offset_key = 0;
+static size_t heap_offset_value = 0;
+static size_t heap_offset_distinct = 0;
 
+/* the total byte length of a node in the heap */
+static size_t heap_octets_node = 0;
 
 
 /* FUNCTION DEFINITIONS */
-
 
 /*
  *  topnPrintHeader();
@@ -442,229 +335,6 @@ topnPrintHeader(
 
 
 /*
- *  writeAsciiRecord(heap_ptr);
- *
- *    Unpacks the fields from 'key' and the value fields from 'value'.
- *    Prints the key fields and the value fields to the global output
- *    stream 'output.of_fp'.
- */
-static void
-writeAsciiRecord(
-    skheapnode_t        heap_ptr)
-{
-    rwRec rwrec;
-    uint32_t val32;
-    uint32_t eTime = 0;
-    uint16_t dport = 0;
-    sk_fieldlist_iterator_t fl_iter;
-    sk_fieldentry_t *field;
-    int id;
-
-#if  SK_ENABLE_IPV6
-    /* whether IPv4 addresses have been added to a record */
-    int added_ipv4 = 0;
-    uint8_t ipv6[16];
-#endif
-
-    /* in mixed IPv4/IPv6 setting, keep record as IPv4 unless an IPv6
-     * address forces us to use IPv6. */
-#define KEY_TO_REC_IPV6(func_v6, func_v4, rec, field_buf, field_list, field) \
-    skFieldListExtractFromBuffer(key_fields, field_buf, field, ipv6);   \
-    if (rwRecIsIPv6(rec)) {                                             \
-        /* record is already IPv6 */                                    \
-        func_v6((rec), ipv6);                                           \
-    } else if (SK_IPV6_IS_V4INV6(ipv6)) {                               \
-        /* record is IPv4, and so is the IP */                          \
-        func_v4((rec), ntohl(*(uint32_t*)(ipv6 + SK_IPV6_V4INV6_LEN))); \
-        added_ipv4 = 1;                                                 \
-    } else {                                                            \
-        /* address is IPv6, but record is IPv4 */                       \
-        if (added_ipv4) {                                               \
-            /* record has IPv4 addrs; must convert */                   \
-            rwRecConvertToIPv6(rec);                                    \
-        } else {                                                        \
-            /* no addresses on record yet */                            \
-            rwRecSetIPv6(rec);                                          \
-        }                                                               \
-        func_v6((rec), ipv6);                                           \
-    }
-
-    /* Zero out rwrec to avoid display errors---specifically with msec
-     * fields and eTime. */
-    RWREC_CLEAR(&rwrec);
-
-    /* Initialize the protocol to 1 (ICMP), so that if the user has
-     * requested ICMP type/code but the protocol is not part of the
-     * key, we still get ICMP values. */
-    rwRecSetProto(&rwrec, IPPROTO_ICMP);
-
-#if SK_ENABLE_IPV6
-    if (ipv6_policy > SK_IPV6POLICY_MIX) {
-        /* Force records to be in IPv6 format */
-        rwRecSetIPv6(&rwrec);
-    }
-#endif /* SK_ENABLE_IPV6 */
-
-    /* unpack the key into 'rwrec' */
-    skFieldListIteratorBind(key_fields, &fl_iter);
-    while (NULL != (field = skFieldListIteratorNext(&fl_iter))) {
-        id = skFieldListEntryGetId(field);
-        switch (id) {
-#if SK_ENABLE_IPV6
-          case SK_FIELD_SIPv6:
-            KEY_TO_REC_IPV6(rwRecMemSetSIPv6, rwRecSetSIPv4, &rwrec,
-                            HEAP_PTR_KEY(heap_ptr), key_fields, field);
-            break;
-          case SK_FIELD_DIPv6:
-            KEY_TO_REC_IPV6(rwRecMemSetDIPv6, rwRecSetDIPv4, &rwrec,
-                            HEAP_PTR_KEY(heap_ptr), key_fields, field);
-            break;
-          case SK_FIELD_NHIPv6:
-            KEY_TO_REC_IPV6(rwRecMemSetNhIPv6, rwRecSetNhIPv4, &rwrec,
-                            HEAP_PTR_KEY(heap_ptr), key_fields, field);
-            break;
-#endif  /* SK_ENABLE_IPV6 */
-
-          case SK_FIELD_SIPv4:
-            KEY_TO_REC_32(rwRecSetSIPv4, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_DIPv4:
-            KEY_TO_REC_32(rwRecSetDIPv4, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_NHIPv4:
-            KEY_TO_REC_32(rwRecSetNhIPv4, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_SPORT:
-            KEY_TO_REC_16(rwRecSetSPort, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_DPORT:
-            /* just extract dPort; we will set it later to ensure
-             * dPort takes precedence over ICMP type/code */
-            skFieldListExtractFromBuffer(key_fields, HEAP_PTR_KEY(heap_ptr),
-                                         field, (uint8_t*)&dport);
-            break;
-          case SK_FIELD_ICMP_TYPE:
-            KEY_TO_REC_08(rwRecSetIcmpType, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_ICMP_CODE:
-            KEY_TO_REC_08(rwRecSetIcmpCode, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_PROTO:
-            KEY_TO_REC_08(rwRecSetProto, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_PACKETS:
-            KEY_TO_REC_32(rwRecSetPkts, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_BYTES:
-            KEY_TO_REC_32(rwRecSetBytes, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_FLAGS:
-            KEY_TO_REC_08(rwRecSetFlags, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_SID:
-            KEY_TO_REC_16(rwRecSetSensor, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_INPUT:
-            KEY_TO_REC_16(rwRecSetInput, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_OUTPUT:
-            KEY_TO_REC_16(rwRecSetOutput, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_INIT_FLAGS:
-            KEY_TO_REC_08(rwRecSetInitFlags, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_REST_FLAGS:
-            KEY_TO_REC_08(rwRecSetRestFlags, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_TCP_STATE:
-            KEY_TO_REC_08(rwRecSetTcpState, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_APPLICATION:
-            KEY_TO_REC_16(rwRecSetApplication, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_FTYPE_CLASS:
-          case SK_FIELD_FTYPE_TYPE:
-            KEY_TO_REC_08(rwRecSetFlowType, &rwrec, HEAP_PTR_KEY(heap_ptr),
-                          key_fields, field);
-            break;
-          case SK_FIELD_STARTTIME:
-          case SK_FIELD_STARTTIME_MSEC:
-            skFieldListExtractFromBuffer(key_fields, HEAP_PTR_KEY(heap_ptr),
-                                         field, (uint8_t*)&val32);
-            rwRecSetStartTime(&rwrec, sktimeCreate(val32, 0));
-            break;
-          case SK_FIELD_ELAPSED:
-          case SK_FIELD_ELAPSED_MSEC:
-            skFieldListExtractFromBuffer(key_fields, HEAP_PTR_KEY(heap_ptr),
-                                         field, (uint8_t*)&val32);
-            rwRecSetElapsed(&rwrec, val32 * 1000);
-            break;
-          case SK_FIELD_ENDTIME:
-          case SK_FIELD_ENDTIME_MSEC:
-            /* just extract eTime; we will set it later */
-            skFieldListExtractFromBuffer(key_fields, HEAP_PTR_KEY(heap_ptr),
-                                         field, (uint8_t*)&eTime);
-            break;
-          default:
-            assert(skFieldListEntryGetId(field) == SK_FIELD_CALLER);
-            break;
-        }
-    }
-
-    if (dport_key) {
-        rwRecSetDPort(&rwrec, dport);
-    }
-
-    switch (time_fields_key) {
-      case PARSE_KEY_ETIME:
-        /* etime only; just set sTime to eTime--elapsed is already 0 */
-        rwRecSetStartTime(&rwrec, sktimeCreate(eTime, 0));
-        break;
-      case (PARSE_KEY_ELAPSED | PARSE_KEY_ETIME):
-        /* etime and elapsed; set start time based on end time and elapsed */
-        val32 = rwRecGetElapsedSeconds(&rwrec);
-        rwRecSetStartTime(&rwrec, sktimeCreate((eTime - val32), 0));
-        break;
-      case (PARSE_KEY_STIME | PARSE_KEY_ETIME):
-        /* etime and stime; set elapsed as their difference */
-        val32 = rwRecGetStartSeconds(&rwrec);
-        assert(val32 <= eTime);
-        rwRecSetElapsed(&rwrec, (1000 * (eTime - val32)));
-        break;
-      case PARSE_KEY_ALL_TIMES:
-        /* 'time_fields_key' should contain 0, 1, or 2 time values */
-        skAbortBadCase(time_fields_key);
-      default:
-        assert(0 == time_fields_key
-               || PARSE_KEY_STIME == time_fields_key
-               || PARSE_KEY_ELAPSED == time_fields_key
-               || (PARSE_KEY_STIME | PARSE_KEY_ELAPSED) == time_fields_key);
-        break;
-    }
-
-    /* print everything */
-    rwAsciiPrintRecExtra(ascii_str, &rwrec, heap_ptr);
-}
-
-
-/*
  *  rwstatsPrintHeap();
  *
  *    Loop over nodes of the heap and print each, as well as the
@@ -676,6 +346,7 @@ rwstatsPrintHeap(
 {
     skheapiterator_t *itheap;
     skheapnode_t heap_ptr;
+    uint8_t *outbuf[3] = {NULL, NULL, NULL};
     double cumul_pct = 0.0;
     double percent;
     uint64_t val64;
@@ -690,16 +361,21 @@ rwstatsPrintHeap(
 
     if (app_flags.no_percents) {
         while (skHeapIteratorNext(itheap, &heap_ptr) == SKHEAP_OK) {
-            writeAsciiRecord(heap_ptr);
+            outbuf[0] = HEAP_PTR_KEY(heap_ptr);
+            outbuf[1] = HEAP_PTR_VALUE(heap_ptr);
+            outbuf[2] = HEAP_PTR_DISTINCT(heap_ptr);
+            writeAsciiRecord(outbuf);
         }
     } else if (limit.distinct == 0) {
         /* records uses 32-bit counter; others use 64-bit counter */
         switch (limit.fl_id) {
           case SK_FIELD_RECORDS:
             while (skHeapIteratorNext(itheap, &heap_ptr) == SKHEAP_OK) {
-                writeAsciiRecord(heap_ptr);
-                skFieldListExtractFromBuffer(value_fields,
-                                             HEAP_PTR_VALUE(heap_ptr),
+                outbuf[0] = HEAP_PTR_KEY(heap_ptr);
+                outbuf[1] = HEAP_PTR_VALUE(heap_ptr);
+                outbuf[2] = HEAP_PTR_DISTINCT(heap_ptr);
+                writeAsciiRecord(outbuf);
+                skFieldListExtractFromBuffer(value_fields, outbuf[1],
                                              limit.fl_entry, (uint8_t*)&val32);
                 percent = 100.0 * (double)val32 / value_total;
                 cumul_pct += percent;
@@ -712,9 +388,11 @@ rwstatsPrintHeap(
           case SK_FIELD_SUM_BYTES:
           case SK_FIELD_SUM_PACKETS:
             while (skHeapIteratorNext(itheap, &heap_ptr) == SKHEAP_OK) {
-                writeAsciiRecord(heap_ptr);
-                skFieldListExtractFromBuffer(value_fields,
-                                             HEAP_PTR_VALUE(heap_ptr),
+                outbuf[0] = HEAP_PTR_KEY(heap_ptr);
+                outbuf[1] = HEAP_PTR_VALUE(heap_ptr);
+                outbuf[2] = HEAP_PTR_DISTINCT(heap_ptr);
+                writeAsciiRecord(outbuf);
+                skFieldListExtractFromBuffer(value_fields, outbuf[1],
                                              limit.fl_entry, (uint8_t*)&val64);
                 percent = 100.0 * (double)val64 / value_total;
                 cumul_pct += percent;
@@ -726,7 +404,10 @@ rwstatsPrintHeap(
 
           default:
             while (skHeapIteratorNext(itheap, &heap_ptr) == SKHEAP_OK) {
-                writeAsciiRecord(heap_ptr);
+                outbuf[0] = HEAP_PTR_KEY(heap_ptr);
+                outbuf[1] = HEAP_PTR_VALUE(heap_ptr);
+                outbuf[2] = HEAP_PTR_DISTINCT(heap_ptr);
+                writeAsciiRecord(outbuf);
                 fprintf(output.of_fp, ("%c%*c%c%*c%s\n"),
                         delimiter, width[WIDTH_PCT], '?', delimiter,
                         width[WIDTH_PCT], '?', final_delim);
@@ -744,33 +425,32 @@ rwstatsPrintHeap(
 
         len = skFieldListEntryGetBinOctets(limit.fl_entry);
         while (skHeapIteratorNext(itheap, &heap_ptr) == SKHEAP_OK) {
+            outbuf[0] = HEAP_PTR_KEY(heap_ptr);
+            outbuf[1] = HEAP_PTR_VALUE(heap_ptr);
+            outbuf[2] = HEAP_PTR_DISTINCT(heap_ptr);
             switch (len) {
               case 1:
-                skFieldListExtractFromBuffer(distinct_fields,
-                                             HEAP_PTR_DISTINCT(heap_ptr),
+                skFieldListExtractFromBuffer(distinct_fields, outbuf[2],
                                              limit.fl_entry, &count.u8);
                 percent = 100.0 * (double)count.u8 / value_total;
                 break;
 
               case 2:
-                skFieldListExtractFromBuffer(distinct_fields,
-                                             HEAP_PTR_DISTINCT(heap_ptr),
+                skFieldListExtractFromBuffer(distinct_fields, outbuf[2],
                                              limit.fl_entry,
                                              (uint8_t*)&count.u16);
                 percent = 100.0 * (double)count.u16 / value_total;
                 break;
 
               case 4:
-                skFieldListExtractFromBuffer(distinct_fields,
-                                             HEAP_PTR_DISTINCT(heap_ptr),
+                skFieldListExtractFromBuffer(distinct_fields, outbuf[2],
                                              limit.fl_entry,
                                              (uint8_t*)&count.u32);
                 percent = 100.0 * (double)count.u32 / value_total;
                 break;
 
               case 8:
-                skFieldListExtractFromBuffer(distinct_fields,
-                                             HEAP_PTR_DISTINCT(heap_ptr),
+                skFieldListExtractFromBuffer(distinct_fields, outbuf[2],
                                              limit.fl_entry,
                                              (uint8_t*)&count.u64);
                 percent = 100.0 * (double)count.u64 / value_total;
@@ -782,28 +462,25 @@ rwstatsPrintHeap(
               case 7:
                 count.u64 = 0;
 #if SK_BIG_ENDIAN
-                skFieldListExtractFromBuffer(distinct_fields,
-                                             HEAP_PTR_DISTINCT(heap_ptr),
+                skFieldListExtractFromBuffer(distinct_fields, outbuf[2],
                                              limit.fl_entry,
                                              &count.ar[8 - len]);
 #else
-                skFieldListExtractFromBuffer(distinct_fields,
-                                             HEAP_PTR_DISTINCT(heap_ptr),
+                skFieldListExtractFromBuffer(distinct_fields, outbuf[2],
                                              limit.fl_entry, &count.ar[0]);
 #endif  /* SK_BIG_ENDIAN */
                 percent = 100.0 * (double)count.u64 / value_total;
                 break;
 
               default:
-                skFieldListExtractFromBuffer(distinct_fields,
-                                             HEAP_PTR_DISTINCT(heap_ptr),
+                skFieldListExtractFromBuffer(distinct_fields, outbuf[2],
                                              limit.fl_entry, count.ar);
                 percent = 100.0 * (double)count.u64 / value_total;
                 break;
             }
 
             cumul_pct += percent;
-            writeAsciiRecord(heap_ptr);
+            writeAsciiRecord(outbuf);
             fprintf(output.of_fp, ("%c%*.6f%c%*.4f%s\n"),
                     delimiter, width[WIDTH_PCT], percent, delimiter,
                     width[WIDTH_PCT], cumul_pct, final_delim);

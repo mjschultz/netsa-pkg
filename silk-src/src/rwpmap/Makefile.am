@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am e460180628b1 2016-06-13 20:58:23Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 197e90c9052a 2018-04-13 18:09:51Z mthomas $");
 
 # Installed Targets
 
@@ -16,12 +16,13 @@ dist_pkgdata_DATA = addrtype-templ.txt
 
 # Build Rules
 
-AM_CPPFLAGS = $(SK_SRC_INCLUDES) $(SK_CPPFLAGS)
+AM_CPPFLAGS = $(SK_SRC_INCLUDES) $(SK_CPPFLAGS) $(LIBMAXMINDDB_CFLAGS)
 AM_CFLAGS = $(WARN_CFLAGS) $(SK_CFLAGS)
 AM_LDFLAGS = $(SK_LDFLAGS) $(STATIC_APPLICATIONS)
 LDADD = ../libsilk/libsilk.la
 
 rwgeoip2ccmap_SOURCES = rwgeoip2ccmap.l
+rwgeoip2ccmap_LDADD = $(LDADD) $(LIBMAXMINDDB_LDFLAGS)
 
 rwip2cc_SOURCES = rwip2cc.c
 
@@ -45,7 +46,10 @@ include $(top_srcdir)/lib-deps.mk
 # Required files; variables defined in ../../build.mk
 check_DATA = $(SILK_TESTSDIR) $(SILK_TESTDATA)
 
-EXTRA_DIST += $(TESTS)
+EXTRA_DIST += $(TESTS) \
+	tests/GeoLite2-Country-Blocks-IPv4.csv \
+	tests/GeoLite2-Country-Blocks-IPv6.csv \
+	tests/GeoLite2-Country-Locations-en.csv
 
 TESTS = \
 	tests/rwip2cc-help.pl \
@@ -80,6 +84,10 @@ TESTS = \
 	tests/rwip2cc-stdin-zero-pad.pl \
 	tests/rwip2cc-stdin-environ.pl \
 	tests/rwip2cc-many-ips.pl \
+	tests/rwgeoip2ccmap-legacy-csv-v4.pl \
+	tests/rwgeoip2ccmap-legacy-csv-v6.pl \
+	tests/rwgeoip2ccmap-legacy-csv-combo.pl \
+	tests/rwgeoip2ccmap-geo2-csv.pl \
 	tests/rwpmapcat-ip.pl \
 	tests/rwpmapcat-ip-no-cidr.pl \
 	tests/rwpmapcat-ip-integer-ips.pl \

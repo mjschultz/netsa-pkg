@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaggbagcat.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: rwaggbagcat.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/silk_files.h>
 #include <silk/skaggbag.h>
@@ -390,30 +390,13 @@ determineWidths(
           case SKAGGBAG_FIELD_DIPv4:
           case SKAGGBAG_FIELD_NHIPv4:
           case SKAGGBAG_FIELD_ANY_IPv4:
-            switch (ip_format) {
-              case SKIPADDR_DECIMAL:
-                width[col] = 10;
-                break;
-              case SKIPADDR_HEXADECIMAL:
-                width[col] = 8;
-                break;
-              case SKIPADDR_FORCE_IPV6:
-                width[col] = 16;
-                break;
-              default:
-                width[col] = 15;
-                break;
-            }
+            width[col] = skipaddrStringMaxlen(0, ip_format);
             break;
           case SKAGGBAG_FIELD_SIPv6:
           case SKAGGBAG_FIELD_DIPv6:
           case SKAGGBAG_FIELD_NHIPv6:
           case SKAGGBAG_FIELD_ANY_IPv6:
-            if (SKIPADDR_HEXADECIMAL == ip_format) {
-                width[col] = 32;
-            } else {
-                width[col] = 39;
-            }
+            width[col] = skipaddrStringMaxlen(1, ip_format);
             break;
           case SKAGGBAG_FIELD_SPORT:
           case SKAGGBAG_FIELD_DPORT:

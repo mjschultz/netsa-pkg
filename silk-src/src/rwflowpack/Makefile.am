@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 8b44d08476b6 2016-06-03 22:17:44Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 598c37b616f6 2018-03-26 21:57:09Z mthomas $");
 
 # Installed Targets
 
@@ -104,10 +104,8 @@ EXTRA_DIST += \
 	tests/rwflowappend-daemon.py \
 	tests/rwflowpack-daemon.py \
 	tests/rwflowpack-pack-pdu-dir.pl-ipv4.txt \
-	tests/rwflowpack-pack-pdu-dir.pl-ipv6.txt \
 	tests/rwflowpack-pack-silk.pl-ipv4.txt \
 	tests/rwflowpack-pack-silk.pl-ipv6.txt \
-	tests/rwflowpack-pack-silk-discard.pl-ipv4-asa.txt \
 	tests/rwflowpack-pack-silk-discard.pl-ipv6.txt \
 	tests/sensor77.conf \
 	tests/sensors.conf

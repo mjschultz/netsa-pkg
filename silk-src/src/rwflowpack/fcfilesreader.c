@@ -23,7 +23,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: fcfilesreader.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: fcfilesreader.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/skpolldir.h>
 #include <silk/skstream.h>
@@ -80,7 +80,7 @@ flowcapSourceCreateFromFile(
     skpc_probe_t      **probe)
 {
     sk_file_header_t *hdr;
-    sk_hentry_probename_t *sp_hdr;
+    sk_header_entry_t *sp_hdr;
     const char *probe_name;
     int rv;
 
@@ -111,8 +111,7 @@ flowcapSourceCreateFromFile(
      * supported.
      */
     hdr = skStreamGetSilkHeader(*stream);
-    sp_hdr = ((sk_hentry_probename_t*)
-              skHeaderGetFirstMatch(hdr, SK_HENTRY_PROBENAME_ID));
+    sp_hdr = skHeaderGetFirstMatch(hdr, SK_HENTRY_PROBENAME_ID);
     if (sp_hdr == NULL) {
         CRITMSG("No probename header in %s.", path);
         goto error;

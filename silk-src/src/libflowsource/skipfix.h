@@ -20,7 +20,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKIPFIX_H, "$SiLK: skipfix.h 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENTVAR(rcsID_SKIPFIX_H, "$SiLK: skipfix.h 9aa718865e4a 2018-03-12 22:58:37Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/libflowsource.h>
@@ -43,6 +43,15 @@ SK_DIAGNOSTIC_IGNORE_PUSH("-Wundef")
 #include <fixbuf/public.h>
 
 SK_DIAGNOSTIC_IGNORE_POP("-Wundef")
+
+#if !defined(FIXBUF_CHECK_VERSION)
+/* must be older than fixbuf 1.8.0.  always return false */
+#define FIXBUF_CHECK_VERSION(x,y,z)     0
+#elif !defined(FIXBUF_VERSION_MAJOR)
+/* fixbuf 1.8.0 defines FIXBUF_CHECK_VERSION() in public.h but does
+ * not include the file that defines the variables the macro uses */
+#include <fixbuf/version.h>
+#endif  /* FIXBUF_CHECK_VERSION */
 
 
 /**

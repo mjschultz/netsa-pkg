@@ -7,16 +7,15 @@
 */
 
 /*
-**  rwstatsutils.c
+**  rwstatslegacy.c
 **
-**  utility functions for the rwstats application.  See rwstats.c for
-**  a full explanation.
+**  Functions to support deprecated features of rwstats.
 **
 */
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwstatslegacy.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: rwstatslegacy.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include "rwstats.h"
 
@@ -127,8 +126,7 @@ legacyOptionsUsage(
 /*
  *  status = legacyOptionsHandler(cData, opt_index, opt_arg);
  *
- *    Process the legacy versions of the switches by calling the real
- *    appOptionsHandler().
+ *    Process the legacy versions of the switches.
  */
 static int
 legacyOptionsHandler(

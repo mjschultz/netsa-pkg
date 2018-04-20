@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skplugin-simple.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: skplugin-simple.c 7148c54d9884 2018-03-13 19:30:21Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skdllist.h>
@@ -274,15 +274,23 @@ ipv4_to_text(
     void                   *cbdata,
     void           UNUSED(**extra))
 {
-    char addr[SK_NUM2DOT_STRLEN];
+    char addr[SKIPADDR_STRLEN];
     ipv4_field_info_t *info = (ipv4_field_info_t *)cbdata;
+    skipaddr_t ipaddr;
+    uint32_t ipv4;
 
     assert(info != NULL);
     assert(extra == NULL);
 
-    num2dot_r(info->fn(rec), addr);
-    strncpy(dest, addr, width);
-    dest[width - 1] = '\0';
+    ipv4 = info->fn(rec);
+    skipaddrSetV4(&ipaddr, &ipv4);
+    if (width >= sizeof(addr)) {
+        skipaddrString(dest, &ipaddr, SKIPADDR_CANONICAL);
+    } else {
+        skipaddrString(addr, &ipaddr, SKIPADDR_CANONICAL);
+        strncpy(dest, addr, width);
+        dest[width - 1] = '\0';
+    }
 
     return SKPLUGIN_OK;
 }
@@ -317,14 +325,21 @@ ipv4_bin_to_text(
     size_t                  width,
     void            UNUSED(*cbdata))
 {
-    char addr[SK_NUM2DOT_STRLEN];
+    char addr[SKIPADDR_STRLEN];
+    skipaddr_t ipaddr;
     uint32_t val;
 
     assert(cbdata != NULL);
     memcpy(&val, bin, sizeof(val));
-    num2dot_r(ntohl(val), addr);
-    strncpy(dest, addr, width);
-    dest[width - 1] = '\0';
+    val = ntohl(val);
+    skipaddrSetV4(&ipaddr, &val);
+    if (width >= sizeof(addr)) {
+        skipaddrString(dest, &ipaddr, SKIPADDR_CANONICAL);
+    } else {
+        skipaddrString(addr, &ipaddr, SKIPADDR_CANONICAL);
+        strncpy(dest, addr, width);
+        dest[width - 1] = '\0';
+    }
 
     return SKPLUGIN_OK;
 }
@@ -370,16 +385,20 @@ ip_to_text(
     void           UNUSED(**extra))
 {
     skipaddr_t val;
-    char addr[SK_NUM2DOT_STRLEN];
+    char addr[SKIPADDR_STRLEN];
     ip_field_info_t *info = (ip_field_info_t *)cbdata;
 
     assert(info != NULL);
     assert(extra == NULL);
 
     info->fn(&val, rec);
-    skipaddrString(addr, &val, SKIPADDR_CANONICAL);
-    strncpy(dest, addr, width);
-    dest[width - 1] = '\0';
+    if (width >= sizeof(addr)) {
+        skipaddrString(dest, &val, SKIPADDR_CANONICAL);
+    } else {
+        skipaddrString(addr, &val, SKIPADDR_CANONICAL);
+        strncpy(dest, addr, width);
+        dest[width - 1] = '\0';
+    }
 
     return SKPLUGIN_OK;
 }
@@ -422,7 +441,7 @@ ip_bin_to_text(
     void            UNUSED(*cbdata))
 {
     skipaddr_t val;
-    char addr[SK_NUM2DOT_STRLEN];
+    char addr[SKIPADDR_STRLEN];
 
     assert(cbdata != NULL);
 #if SK_ENABLE_IPV6
@@ -436,9 +455,13 @@ ip_bin_to_text(
         skipaddrSetV4(&val, &val32);
     }
 #endif
-    skipaddrString(addr, &val, SKIPADDR_CANONICAL);
-    strncpy(dest, addr, width);
-    dest[width - 1] = '\0';
+    if (width >= sizeof(addr)) {
+        skipaddrString(dest, &val, SKIPADDR_CANONICAL);
+    } else {
+        skipaddrString(addr, &val, SKIPADDR_CANONICAL);
+        strncpy(dest, addr, width);
+        dest[width - 1] = '\0';
+    }
 
     return SKPLUGIN_OK;
 }

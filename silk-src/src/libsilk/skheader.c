@@ -16,9 +16,13 @@
 **
 */
 
+/* Defining SKHEADER_SOURCE ensures we do not define a version of
+ * sk_hentry_packedfile_t that is needed for compatibility by code
+ * that uses libsilk from SiLK-3.16.0 and earlier. */
+#define  SKHEADER_SOURCE    1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skheader.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: skheader.c 06ffa717c9e8 2018-01-31 21:31:26Z mthomas $");
 
 #include "skheader_priv.h"
 #include "skstream_priv.h"
@@ -123,6 +127,12 @@ skHentryDefaultPrint(
 static sk_header_entry_t *
 skHentryDefaultUnpacker(
     uint8_t            *in_packed);
+
+static int hentryRegisterAnnotation(sk_hentry_type_id_t hentry_id);
+static int hentryRegisterInvocation(sk_hentry_type_id_t hentry_id);
+static int hentryRegisterPackedfile(sk_hentry_type_id_t hentry_id);
+static int hentryRegisterProbename(sk_hentry_type_id_t hentry_id);
+static int hentryRegisterTombstone(sk_hentry_type_id_t hentry_id);
 
 
 /* FUNCTION DEFINITIONS */
@@ -734,30 +744,16 @@ skHeaderInitialize(
     }
     initialized = 1;
 
-    rv |= skHentryTypeRegister(SK_HENTRY_PACKEDFILE_ID,
-                               &skHentryPackedfilePacker,
-                               &skHentryPackedfileUnpacker,
-                               &skHentryPackedfileCopy,
-                               &skHentryPackedfileFree,
-                               &skHentryPackedfilePrint);
-    rv |= skHentryTypeRegister(SK_HENTRY_INVOCATION_ID,
-                               &skHentryInvocationPacker,
-                               &skHentryInvocationUnpacker,
-                               &skHentryInvocationCopy,
-                               &skHentryInvocationFree,
-                               &skHentryInvocationPrint);
-    rv |= skHentryTypeRegister(SK_HENTRY_ANNOTATION_ID,
-                               &skHentryAnnotationPacker,
-                               &skHentryAnnotationUnpacker,
-                               &skHentryAnnotationCopy,
-                               &skHentryAnnotationFree,
-                               &skHentryAnnotationPrint);
-    rv |= skHentryTypeRegister(SK_HENTRY_PROBENAME_ID,
-                               &skHentryProbenamePacker,
-                               &skHentryProbenameUnpacker,
-                               &skHentryProbenameCopy,
-                               &skHentryProbenameFree,
-                               &skHentryProbenamePrint);
+    /* defined below */
+    rv |= hentryRegisterPackedfile(SK_HENTRY_PACKEDFILE_ID);
+    /* defined below */
+    rv |= hentryRegisterInvocation(SK_HENTRY_INVOCATION_ID);
+    /* defined below  -- FIXME: Move to skoptions-notes.c */
+    rv |= hentryRegisterAnnotation(SK_HENTRY_ANNOTATION_ID);
+    /* defined below */
+    rv |= hentryRegisterProbename(SK_HENTRY_PROBENAME_ID);
+    /* defined below */
+    rv |= hentryRegisterTombstone(SK_HENTRY_TOMBSTONE_ID);
     /* defined in skprefixmap.c */
     rv |= skPrefixMapRegisterHeaderEntry(SK_HENTRY_PREFIXMAP_ID);
     /* defined in skbag.c */
@@ -1823,50 +1819,41 @@ skHentryDefaultUnpacker(
 
 
 /*
+ *    **********************************************************************
  *
- *  Packed File Headers
+ *    Packed File Headers
  *
  */
 
+typedef struct sk_hentry_packedfile_st {
+    sk_header_entry_spec_t  he_spec;
+    int64_t                 start_time;
+    uint32_t                flowtype_id;
+    uint32_t                sensor_id;
+} sk_hentry_packedfile_t;
 
-int
-skHeaderAddPackedfile(
-    sk_file_header_t   *hdr,
+/* forward declaration */
+static sk_header_entry_t *
+packedfileCreate(
     sktime_t            start_time,
     sk_flowtype_id_t    flowtype_id,
-    sk_sensor_id_t      sensor_id)
-{
-    int rv;
-    sk_header_entry_t *pfh;
+    sk_sensor_id_t      sensor_id);
 
-    pfh = skHentryPackedfileCreate(start_time, flowtype_id, sensor_id);
-    if (pfh == NULL) {
-        return SKHEADER_ERR_ALLOC;
-    }
-
-    rv = skHeaderAddEntry(hdr, pfh);
-    if (rv) {
-        skHentryPackedfileFree(pfh);
-    }
-    return rv;
-}
-
-
-sk_header_entry_t *
-skHentryPackedfileCopy(
+static sk_header_entry_t *
+packedfileCopy(
     const sk_header_entry_t    *hentry)
 {
-    sk_hentry_packedfile_t *pf_hdr = (sk_hentry_packedfile_t*)hentry;
+    const sk_hentry_packedfile_t *pf_hdr = (sk_hentry_packedfile_t*)hentry;
 
     assert(hentry);
-    return skHentryPackedfileCreate(skHentryPackedfileGetStartTime(pf_hdr),
-                                    skHentryPackedfileGetFlowtypeID(pf_hdr),
-                                    skHentryPackedfileGetSensorID(pf_hdr));
+    assert(SK_HENTRY_PACKEDFILE_ID == skHeaderEntryGetTypeId(pf_hdr));
+
+    return packedfileCreate(pf_hdr->start_time, pf_hdr->flowtype_id,
+                                    pf_hdr->sensor_id);
 }
 
-
-sk_header_entry_t *
-skHentryPackedfileCreate(
+static sk_header_entry_t *
+packedfileCreate(
     sktime_t            start_time,
     sk_flowtype_id_t    flowtype_id,
     sk_sensor_id_t      sensor_id)
@@ -1887,9 +1874,8 @@ skHentryPackedfileCreate(
     return (sk_header_entry_t*)pf_hdr;
 }
 
-
-void
-skHentryPackedfileFree(
+static void
+packedfileFree(
     sk_header_entry_t  *hentry)
 {
     /* allocated in a single block */
@@ -1900,19 +1886,18 @@ skHentryPackedfileFree(
     }
 }
 
-
-ssize_t
-skHentryPackedfilePacker(
+static ssize_t
+packedfilePacker(
     const sk_header_entry_t    *in_hentry,
     uint8_t                    *out_packed,
     size_t                      bufsize)
 {
-    sk_hentry_packedfile_t *pf_hdr = (sk_hentry_packedfile_t*)in_hentry;
+    const sk_hentry_packedfile_t *pf_hdr = (sk_hentry_packedfile_t*)in_hentry;
     sk_hentry_packedfile_t tmp_hdr;
 
     assert(pf_hdr);
     assert(out_packed);
-    assert(skHeaderEntryGetTypeId(pf_hdr) == SK_HENTRY_PACKEDFILE_ID);
+    assert(SK_HENTRY_PACKEDFILE_ID == skHeaderEntryGetTypeId(pf_hdr));
 
     if (bufsize >= sizeof(sk_hentry_packedfile_t)) {
         SK_HENTRY_SPEC_PACK(&tmp_hdr, &(pf_hdr->he_spec));
@@ -1926,32 +1911,29 @@ skHentryPackedfilePacker(
     return sizeof(sk_hentry_packedfile_t);
 }
 
-
-void
-skHentryPackedfilePrint(
+static void
+packedfilePrint(
     const sk_header_entry_t    *hentry,
     FILE                       *fh)
 {
-    sk_hentry_packedfile_t *pf_hdr = (sk_hentry_packedfile_t*)hentry;
     char buf[512];
 
-    assert(skHeaderEntryGetTypeId(pf_hdr) == SK_HENTRY_PACKEDFILE_ID);
+    assert(SK_HENTRY_PACKEDFILE_ID == skHeaderEntryGetTypeId(hentry));
     fprintf(fh, "%sZ ",
-            sktimestamp_r(buf, skHentryPackedfileGetStartTime(pf_hdr),
+            sktimestamp_r(buf, skHentryPackedfileGetStartTime(hentry),
                           SKTIMESTAMP_NOMSEC | SKTIMESTAMP_UTC));
 
     sksiteFlowtypeGetName(buf, sizeof(buf),
-                          skHentryPackedfileGetFlowtypeID(pf_hdr));
+                          skHentryPackedfileGetFlowtypeID(hentry));
     fprintf(fh, "%s ", buf);
 
     sksiteSensorGetName(buf, sizeof(buf),
-                        skHentryPackedfileGetSensorID(pf_hdr));
+                        skHentryPackedfileGetSensorID(hentry));
     fprintf(fh, "%s", buf);
 }
 
-
-sk_header_entry_t *
-skHentryPackedfileUnpacker(
+static sk_header_entry_t *
+packedfileUnpacker(
     uint8_t            *in_packed)
 {
     sk_hentry_packedfile_t *pf_hdr;
@@ -1982,50 +1964,111 @@ skHentryPackedfileUnpacker(
     return (sk_header_entry_t*)pf_hdr;
 }
 
-
-
-/*
- *
- *  Invocation (Command Line) History
- *
- */
-
+/*  Called by skHeaderInitialize to register the header type */
+static int
+hentryRegisterPackedfile(
+    sk_hentry_type_id_t hentry_id)
+{
+    assert(hentry_id == SK_HENTRY_PACKEDFILE_ID);
+    return (skHentryTypeRegister(
+                hentry_id, &packedfilePacker, &packedfileUnpacker,
+                &packedfileCopy, &packedfileFree, &packedfilePrint));
+}
 
 int
-skHeaderAddInvocation(
+skHeaderAddPackedfile(
     sk_file_header_t   *hdr,
-    int                 strip_path,
-    int                 argc,
-    char              **argv)
+    sktime_t            start_time,
+    sk_flowtype_id_t    flowtype_id,
+    sk_sensor_id_t      sensor_id)
 {
     int rv;
-    sk_header_entry_t *ci_hdr;
+    sk_header_entry_t *pfh;
 
-    ci_hdr = skHentryInvocationCreate(strip_path, argc, argv);
-    if (ci_hdr == NULL) {
+    pfh = packedfileCreate(start_time, flowtype_id, sensor_id);
+    if (pfh == NULL) {
         return SKHEADER_ERR_ALLOC;
     }
-
-    rv = skHeaderAddEntry(hdr, ci_hdr);
+    rv = skHeaderAddEntry(hdr, pfh);
     if (rv) {
-        skHentryInvocationFree(ci_hdr);
+        packedfileFree(pfh);
     }
     return rv;
 }
 
+sktime_t
+skHentryPackedfileGetStartTime(
+    const sk_header_entry_t    *hentry)
+{
+    const sk_hentry_packedfile_t *pf_hdr = (sk_hentry_packedfile_t*)hentry;
 
-sk_header_entry_t *
-skHentryInvocationCopy(
+    assert(hentry);
+    if (skHeaderEntryGetTypeId(pf_hdr) != SK_HENTRY_PACKEDFILE_ID) {
+        return sktimeCreate(0, 0);
+    }
+    return (sktime_t)pf_hdr->start_time;
+}
+
+sk_sensor_id_t
+skHentryPackedfileGetSensorID(
+    const sk_header_entry_t    *hentry)
+{
+    const sk_hentry_packedfile_t *pf_hdr = (sk_hentry_packedfile_t*)hentry;
+
+    assert(hentry);
+    if (skHeaderEntryGetTypeId(pf_hdr) != SK_HENTRY_PACKEDFILE_ID) {
+        return SK_INVALID_SENSOR;
+    }
+    return (sk_sensor_id_t)pf_hdr->sensor_id;
+}
+
+sk_flowtype_id_t
+skHentryPackedfileGetFlowtypeID(
+    const sk_header_entry_t    *hentry)
+{
+    const sk_hentry_packedfile_t *pf_hdr = (sk_hentry_packedfile_t*)hentry;
+
+    assert(hentry);
+    if (skHeaderEntryGetTypeId(pf_hdr) != SK_HENTRY_PACKEDFILE_ID) {
+        return SK_INVALID_FLOWTYPE;
+    }
+    return (sk_flowtype_id_t)pf_hdr->flowtype_id;
+}
+
+
+
+
+/*
+ *    **********************************************************************
+ *
+ *    Invocation (Command Line) History
+ *
+ */
+
+typedef struct sk_hentry_invocation_st {
+    sk_header_entry_spec_t  he_spec;
+    char                   *command_line;
+} sk_hentry_invocation_t;
+
+/* forward declaration */
+static sk_header_entry_t *
+invocationCreate(
+    int                 strip_path,
+    int                 argc,
+    char              **argv);
+
+static sk_header_entry_t *
+invocationCopy(
     const sk_header_entry_t    *hentry)
 {
     const sk_hentry_invocation_t *ci_hdr = (sk_hentry_invocation_t*)hentry;
 
-    return skHentryInvocationCreate(0, 1, (char**)&(ci_hdr->command_line));
+    assert(SK_HENTRY_INVOCATION_ID == skHeaderEntryGetTypeId(ci_hdr));
+    return invocationCreate(0, 1, (char**)&(ci_hdr->command_line));
 }
 
-
-sk_header_entry_t *
-skHentryInvocationCreate(
+static sk_header_entry_t *
+invocationCreate(
     int                 strip_path,
     int                 argc,
     char              **argv)
@@ -2095,9 +2138,8 @@ skHentryInvocationCreate(
     return (sk_header_entry_t*)ci_hdr;
 }
 
-
-void
-skHentryInvocationFree(
+static void
+invocationFree(
     sk_header_entry_t  *hentry)
 {
     sk_hentry_invocation_t *ci_hdr = (sk_hentry_invocation_t*)hentry;
@@ -2113,9 +2155,8 @@ skHentryInvocationFree(
     }
 }
 
-
-ssize_t
-skHentryInvocationPacker(
+static ssize_t
+invocationPacker(
     const sk_header_entry_t    *in_hentry,
     uint8_t                    *out_packed,
     size_t                      bufsize)
@@ -2144,21 +2185,19 @@ skHentryInvocationPacker(
     return ci_hdr->he_spec.hes_len;
 }
 
-
-void
-skHentryInvocationPrint(
+static void
+invocationPrint(
     const sk_header_entry_t    *hentry,
     FILE                       *fh)
 {
-    sk_hentry_invocation_t *ci_hdr = (sk_hentry_invocation_t*)hentry;
+    const sk_hentry_invocation_t *ci_hdr = (sk_hentry_invocation_t*)hentry;
 
     assert(skHeaderEntryGetTypeId(ci_hdr) == SK_HENTRY_INVOCATION_ID);
     fprintf(fh, "%s", ci_hdr->command_line);
 }
 
-
-sk_header_entry_t *
-skHentryInvocationUnpacker(
+static sk_header_entry_t *
+invocationUnpacker(
     uint8_t            *in_packed)
 {
     sk_hentry_invocation_t *ci_hdr;
@@ -2194,68 +2233,78 @@ skHentryInvocationUnpacker(
     return (sk_header_entry_t*)ci_hdr;
 }
 
+/*  Called by skHeaderInitialize to register the header type */
+static int
+hentryRegisterInvocation(
+    sk_hentry_type_id_t hentry_id)
+{
+    assert(SK_HENTRY_INVOCATION_ID == hentry_id);
+    return (skHentryTypeRegister(
+                hentry_id, &invocationPacker, &invocationUnpacker,
+                &invocationCopy, &invocationFree, &invocationPrint));
+}
+
+int
+skHeaderAddInvocation(
+    sk_file_header_t   *hdr,
+    int                 strip_path,
+    int                 argc,
+    char              **argv)
+{
+    int rv;
+    sk_header_entry_t *ci_hdr;
+
+    ci_hdr = invocationCreate(strip_path, argc, argv);
+    if (ci_hdr == NULL) {
+        return SKHEADER_ERR_ALLOC;
+    }
+    rv = skHeaderAddEntry(hdr, ci_hdr);
+    if (rv) {
+        invocationFree(ci_hdr);
+    }
+    return rv;
+}
+
+const char *
+skHentryInvocationGetInvocation(
+    const sk_header_entry_t    *hentry)
+{
+    const sk_hentry_invocation_t *ci_hdr = (sk_hentry_invocation_t*)hentry;
+
+    if (skHeaderEntryGetTypeId(ci_hdr) != SK_HENTRY_INVOCATION_ID) {
+        return NULL;
+    }
+    return ci_hdr->command_line;
+}
+
+
 
 /*
+ *    **********************************************************************
  *
- *  Annotation
+ *    Annotation
  *
  */
 
+typedef struct sk_hentry_annotation_st {
+    sk_header_entry_spec_t  he_spec;
+    char                   *annotation;
+} sk_hentry_annotation_t;
 
-int
-skHeaderAddAnnotation(
-    sk_file_header_t   *hdr,
-    const char         *annotation)
-{
-    int rv;
-    sk_header_entry_t *an_hdr;
+/* forward declaration */
+static sk_header_entry_t *annotationCreate(const char *annotation);
 
-    an_hdr = skHentryAnnotationCreate(annotation);
-    if (an_hdr == NULL) {
-        return SKHEADER_ERR_ALLOC;
-    }
-
-    rv = skHeaderAddEntry(hdr, an_hdr);
-    if (rv) {
-        skHentryAnnotationFree(an_hdr);
-    }
-    return rv;
-}
-
-
-int
-skHeaderAddAnnotationFromFile(
-    sk_file_header_t   *hdr,
-    const char         *pathname)
-{
-    int rv;
-    sk_header_entry_t *an_hdr;
-
-    an_hdr = skHentryAnnotationCreateFromFile(pathname);
-    if (an_hdr == NULL) {
-        return SKHEADER_ERR_ALLOC;
-    }
-
-    rv = skHeaderAddEntry(hdr, an_hdr);
-    if (rv) {
-        skHentryAnnotationFree(an_hdr);
-    }
-    return rv;
-}
-
-
-sk_header_entry_t *
-skHentryAnnotationCopy(
+static sk_header_entry_t *
+annotationCopy(
     const sk_header_entry_t    *hentry)
 {
     const sk_hentry_annotation_t *an_hdr = (sk_hentry_annotation_t*)hentry;
 
-    return skHentryAnnotationCreate(an_hdr->annotation);
+    return annotationCreate(an_hdr->annotation);
 }
 
-
-sk_header_entry_t *
-skHentryAnnotationCreate(
+static sk_header_entry_t *
+annotationCreate(
     const char         *annotation)
 {
     sk_hentry_annotation_t *an_hdr;
@@ -2283,9 +2332,8 @@ skHentryAnnotationCreate(
     return (sk_header_entry_t*)an_hdr;
 }
 
-
-sk_header_entry_t *
-skHentryAnnotationCreateFromFile(
+static sk_header_entry_t *
+annotationCreateFromFile(
     const char         *pathname)
 {
     sk_hentry_annotation_t *an_hdr = NULL;
@@ -2369,9 +2417,8 @@ skHentryAnnotationCreateFromFile(
     return (sk_header_entry_t*)an_hdr;
 }
 
-
-void
-skHentryAnnotationFree(
+static void
+annotationFree(
     sk_header_entry_t  *hentry)
 {
     sk_hentry_annotation_t *an_hdr = (sk_hentry_annotation_t*)hentry;
@@ -2387,9 +2434,8 @@ skHentryAnnotationFree(
     }
 }
 
-
-ssize_t
-skHentryAnnotationPacker(
+static ssize_t
+annotationPacker(
     const sk_header_entry_t    *in_hentry,
     uint8_t                    *out_packed,
     size_t                      bufsize)
@@ -2418,21 +2464,19 @@ skHentryAnnotationPacker(
     return an_hdr->he_spec.hes_len;
 }
 
-
-void
-skHentryAnnotationPrint(
+static void
+annotationPrint(
     const sk_header_entry_t    *hentry,
     FILE                       *fh)
 {
-    sk_hentry_annotation_t *an_hdr = (sk_hentry_annotation_t*)hentry;
+    const sk_hentry_annotation_t *an_hdr = (sk_hentry_annotation_t*)hentry;
 
     assert(skHeaderEntryGetTypeId(an_hdr) == SK_HENTRY_ANNOTATION_ID);
     fprintf(fh, "%s", an_hdr->annotation);
 }
 
-
-sk_header_entry_t *
-skHentryAnnotationUnpacker(
+static sk_header_entry_t *
+annotationUnpacker(
     uint8_t            *in_packed)
 {
     sk_hentry_annotation_t *an_hdr;
@@ -2468,47 +2512,95 @@ skHentryAnnotationUnpacker(
     return (sk_header_entry_t*)an_hdr;
 }
 
-
-/*
- *
- *  Probename
- *
- */
-
+/*  Called by skHeaderInitialize to register the header type */
+static int
+hentryRegisterAnnotation(
+    sk_hentry_type_id_t hentry_id)
+{
+    assert(SK_HENTRY_ANNOTATION_ID == hentry_id);
+    return (skHentryTypeRegister(
+                hentry_id, &annotationPacker, &annotationUnpacker,
+                &annotationCopy, &annotationFree, &annotationPrint));
+}
 
 int
-skHeaderAddProbename(
+skHeaderAddAnnotation(
     sk_file_header_t   *hdr,
-    const char         *probe_name)
+    const char         *annotation)
 {
     int rv;
-    sk_header_entry_t *pn_hdr;
+    sk_header_entry_t *an_hdr;
 
-    pn_hdr = skHentryProbenameCreate(probe_name);
-    if (pn_hdr == NULL) {
+    an_hdr = annotationCreate(annotation);
+    if (an_hdr == NULL) {
         return SKHEADER_ERR_ALLOC;
     }
-
-    rv = skHeaderAddEntry(hdr, pn_hdr);
+    rv = skHeaderAddEntry(hdr, an_hdr);
     if (rv) {
-        skHentryProbenameFree(pn_hdr);
+        annotationFree(an_hdr);
     }
     return rv;
 }
 
+int
+skHeaderAddAnnotationFromFile(
+    sk_file_header_t   *hdr,
+    const char         *pathname)
+{
+    int rv;
+    sk_header_entry_t *an_hdr;
 
-sk_header_entry_t *
-skHentryProbenameCopy(
+    an_hdr = annotationCreateFromFile(pathname);
+    if (an_hdr == NULL) {
+        return SKHEADER_ERR_ALLOC;
+    }
+    rv = skHeaderAddEntry(hdr, an_hdr);
+    if (rv) {
+        annotationFree(an_hdr);
+    }
+    return rv;
+}
+
+const char *
+skHentryAnnotationGetNote(
+    const sk_header_entry_t    *hentry)
+{
+    const sk_hentry_annotation_t *an_hdr = (sk_hentry_annotation_t*)hentry;
+
+    if (skHeaderEntryGetTypeId(an_hdr) != SK_HENTRY_ANNOTATION_ID) {
+        return NULL;
+    }
+    return an_hdr->annotation;
+}
+
+
+
+/*
+ *    **********************************************************************
+ *
+ *    Probename
+ *
+ */
+
+typedef struct sk_hentry_probename_st {
+    sk_header_entry_spec_t  he_spec;
+    char                   *probe_name;
+} sk_hentry_probename_t;
+
+/* forward declaration */
+static sk_header_entry_t *probenameCreate(const char *probe_name);
+
+static sk_header_entry_t *
+probenameCopy(
     const sk_header_entry_t    *hentry)
 {
     const sk_hentry_probename_t *pn_hdr = (sk_hentry_probename_t*)hentry;
 
-    return skHentryProbenameCreate(pn_hdr->probe_name);
+    return probenameCreate(pn_hdr->probe_name);
 }
 
-
-sk_header_entry_t *
-skHentryProbenameCreate(
+static sk_header_entry_t *
+probenameCreate(
     const char         *probe_name)
 {
     sk_hentry_probename_t *pn_hdr;
@@ -2536,9 +2628,8 @@ skHentryProbenameCreate(
     return (sk_header_entry_t*)pn_hdr;
 }
 
-
-void
-skHentryProbenameFree(
+static void
+probenameFree(
     sk_header_entry_t  *hentry)
 {
     sk_hentry_probename_t *pn_hdr = (sk_hentry_probename_t*)hentry;
@@ -2554,9 +2645,8 @@ skHentryProbenameFree(
     }
 }
 
-
-ssize_t
-skHentryProbenamePacker(
+static ssize_t
+probenamePacker(
     const sk_header_entry_t    *in_hentry,
     uint8_t                    *out_packed,
     size_t                      bufsize)
@@ -2585,9 +2675,8 @@ skHentryProbenamePacker(
     return pn_hdr->he_spec.hes_len;
 }
 
-
-void
-skHentryProbenamePrint(
+static void
+probenamePrint(
     const sk_header_entry_t    *hentry,
     FILE                       *fh)
 {
@@ -2598,9 +2687,8 @@ skHentryProbenamePrint(
             (pn_hdr->probe_name ? pn_hdr->probe_name : "NULL"));
 }
 
-
-sk_header_entry_t *
-skHentryProbenameUnpacker(
+static sk_header_entry_t *
+probenameUnpacker(
     uint8_t            *in_packed)
 {
     sk_hentry_probename_t *pn_hdr;
@@ -2636,6 +2724,287 @@ skHentryProbenameUnpacker(
     return (sk_header_entry_t*)pn_hdr;
 }
 
+/*  Called by skHeaderInitialize to register the header type */
+static int
+hentryRegisterProbename(
+    sk_hentry_type_id_t hentry_id)
+{
+    assert(SK_HENTRY_PROBENAME_ID == hentry_id);
+    return skHentryTypeRegister(hentry_id,&probenamePacker,&probenameUnpacker,
+                                &probenameCopy,&probenameFree,&probenamePrint);
+}
+
+
+int
+skHeaderAddProbename(
+    sk_file_header_t   *hdr,
+    const char         *probe_name)
+{
+    int rv;
+    sk_header_entry_t *pn_hdr;
+
+    pn_hdr = probenameCreate(probe_name);
+    if (pn_hdr == NULL) {
+        return SKHEADER_ERR_ALLOC;
+    }
+    rv = skHeaderAddEntry(hdr, pn_hdr);
+    if (rv) {
+        probenameFree(pn_hdr);
+    }
+    return rv;
+}
+
+const char *
+skHentryProbenameGetProbeName(
+    const sk_header_entry_t    *hentry)
+{
+    const sk_hentry_probename_t *pn_hdr = (sk_hentry_probename_t*)hentry;
+
+    if (skHeaderEntryGetTypeId(pn_hdr) != SK_HENTRY_PROBENAME_ID) {
+        return NULL;
+    }
+    return pn_hdr->probe_name;
+}
+
+
+/*
+ *    **********************************************************************
+ *
+ *    Tombstone
+ *
+ */
+
+/*
+ *    sk_hentry_tombstone_t is the current definition of the tombstone
+ *    header.
+ */
+typedef struct sk_hentry_tombstone_st {
+    sk_header_entry_spec_t  he_spec;
+    uint32_t                ts_version;
+    uint32_t                ts_counter;
+} sk_hentry_tombstone_t;
+
+/*
+ *    tombstone_zero_t is the structure used for tombstone records
+ *    that have a version that is not supported by this release
+ */
+typedef struct tombstone_zero_st {
+    sk_header_entry_spec_t  he_spec;
+    uint32_t                ts_version;
+    uint32_t                ts_dummy;
+} tombstone_zero_t;
+
+/* Forward declaration */
+static sk_header_entry_t *tombstoneCreate(uint32_t tombstone_count);
+static sk_header_entry_t *tombstoneZero(void);
+
+static sk_header_entry_t *
+tombstoneCopy(
+    const sk_header_entry_t    *hentry)
+{
+    const sk_hentry_tombstone_t *ts_hdr = (sk_hentry_tombstone_t*)hentry;
+
+    assert(skHeaderEntryGetTypeId(ts_hdr) == SK_HENTRY_TOMBSTONE_ID);
+
+    if (1 != ts_hdr->ts_version) {
+        return tombstoneZero();
+    }
+    return tombstoneCreate(ts_hdr->ts_counter);
+}
+
+static sk_header_entry_t *
+tombstoneCreate(
+    uint32_t            tombstone_count)
+{
+    sk_hentry_tombstone_t *ts_hdr;
+
+    ts_hdr = (sk_hentry_tombstone_t*)calloc(1, sizeof(sk_hentry_tombstone_t));
+    if (NULL == ts_hdr) {
+        return NULL;
+    }
+    ts_hdr->he_spec.hes_id  = SK_HENTRY_TOMBSTONE_ID;
+    ts_hdr->he_spec.hes_len = sizeof(sk_hentry_tombstone_t);
+    ts_hdr->ts_version = 1;
+    ts_hdr->ts_counter = tombstone_count;
+
+    return (sk_header_entry_t *)ts_hdr;
+}
+
+static void
+tombstoneFree(
+    sk_header_entry_t  *hentry)
+{
+    sk_hentry_tombstone_t *ts_hdr = (sk_hentry_tombstone_t*)hentry;
+
+    if (ts_hdr) {
+        assert(skHeaderEntryGetTypeId(ts_hdr) == SK_HENTRY_TOMBSTONE_ID);
+        ts_hdr->he_spec.hes_id = UINT32_MAX;
+        free(ts_hdr);
+    }
+}
+
+static ssize_t
+tombstonePacker(
+    const sk_header_entry_t    *in_hentry,
+    uint8_t                    *out_packed,
+    size_t                      bufsize)
+{
+    const sk_hentry_tombstone_t *ts_hdr = (sk_hentry_tombstone_t*)in_hentry;
+
+    assert(in_hentry);
+    assert(out_packed);
+    assert(skHeaderEntryGetTypeId(ts_hdr) == SK_HENTRY_TOMBSTONE_ID);
+
+    if (1 != ts_hdr->ts_version) {
+        tombstone_zero_t zero;
+        if (bufsize >= sizeof(zero)) {
+            memset(&zero, 0, sizeof(zero));
+            zero.he_spec.hes_id  = SK_HENTRY_TOMBSTONE_ID;
+            zero.he_spec.hes_len = sizeof(tombstone_zero_t);
+            SK_HENTRY_SPEC_PACK(out_packed, &zero.he_spec);
+            memset(out_packed, 0,
+                   sizeof(zero) - sizeof(sk_header_entry_spec_t));
+        }
+        return sizeof(zero);
+    }
+
+    if (bufsize >= sizeof(sk_hentry_tombstone_t)) {
+        sk_hentry_tombstone_t tmp_hdr;
+        SK_HENTRY_SPEC_PACK(&tmp_hdr, &ts_hdr->he_spec);
+        tmp_hdr.ts_version = htonl(ts_hdr->ts_version);
+        tmp_hdr.ts_counter = htonl(ts_hdr->ts_counter);
+
+        memcpy(out_packed, &tmp_hdr, sizeof(tmp_hdr));
+    }
+
+    return sizeof(sk_hentry_tombstone_t);
+}
+
+static void
+tombstonePrint(
+    const sk_header_entry_t    *hentry,
+    FILE                       *fh)
+{
+    const sk_hentry_tombstone_t *ts_hdr = (sk_hentry_tombstone_t*)hentry;
+
+    assert(skHeaderEntryGetTypeId(ts_hdr) == SK_HENTRY_TOMBSTONE_ID);
+    switch (ts_hdr->ts_version) {
+      case 1:
+        fprintf(fh, "v1, id = %" PRIu32, ts_hdr->ts_counter);
+        break;
+      default:
+        fprintf(fh, "v%u, unsupported", ts_hdr->ts_version);
+        break;
+    }
+}
+
+static sk_header_entry_t *
+tombstoneUnpacker(
+    uint8_t            *in_packed)
+{
+    sk_hentry_tombstone_t *ts_hdr;
+    size_t offset;
+
+    assert(in_packed);
+
+    /* create space for new header */
+    ts_hdr = (sk_hentry_tombstone_t*)calloc(1, sizeof(sk_hentry_tombstone_t));
+    if (NULL == ts_hdr) {
+        return NULL;
+    }
+
+    /* copy the spec */
+    SK_HENTRY_SPEC_UNPACK(&(ts_hdr->he_spec), in_packed);
+    assert(skHeaderEntryGetTypeId(ts_hdr) == SK_HENTRY_TOMBSTONE_ID);
+
+    offset = sizeof(sk_header_entry_spec_t);
+
+    /* get the version number */
+    if (ts_hdr->he_spec.hes_len < offset + sizeof(uint32_t)) {
+        free(ts_hdr);
+        return NULL;
+    }
+    memcpy(&ts_hdr->ts_version, &in_packed[offset],sizeof(ts_hdr->ts_version));
+    ts_hdr->ts_version = ntohl(ts_hdr->ts_version);
+    if (1 != ts_hdr->ts_version) {
+        return tombstoneZero();
+    }
+    offset += sizeof(uint32_t);
+
+    if (ts_hdr->he_spec.hes_len != sizeof(sk_hentry_tombstone_t)) {
+        free(ts_hdr);
+        return NULL;
+    }
+
+    /* handle the count */
+    memcpy(&ts_hdr->ts_counter, &in_packed[offset],sizeof(ts_hdr->ts_counter));
+    ts_hdr->ts_counter = ntohl(ts_hdr->ts_counter);
+
+    return (sk_header_entry_t*)ts_hdr;
+}
+
+/*
+ *    Return a tombstone header entry whose version is 0.  Used when
+ *    an attempt to make to access a tombstone record that is unknown
+ *    by this release of SiLK.
+ */
+static sk_header_entry_t *
+tombstoneZero(
+    void)
+{
+    tombstone_zero_t *ts_hdr;
+
+    ts_hdr = (tombstone_zero_t *)calloc(1, sizeof(tombstone_zero_t));
+    if (NULL == ts_hdr) {
+        return NULL;
+    }
+    ts_hdr->he_spec.hes_id  = SK_HENTRY_TOMBSTONE_ID;
+    ts_hdr->he_spec.hes_len = sizeof(tombstone_zero_t);
+
+    return (sk_header_entry_t *)ts_hdr;
+}
+
+/*  Called by skHeaderInitialize to register the header type */
+static int
+hentryRegisterTombstone(
+    sk_hentry_type_id_t hentry_id)
+{
+    assert(SK_HENTRY_TOMBSTONE_ID == hentry_id);
+    return skHentryTypeRegister(hentry_id, &tombstonePacker,&tombstoneUnpacker,
+                                &tombstoneCopy,&tombstoneFree,&tombstonePrint);
+}
+
+int
+skHeaderAddTombstone(
+    sk_file_header_t   *hdr,
+    uint32_t            tombstone_count)
+{
+    int rv;
+    sk_header_entry_t *ts_hdr;
+
+    ts_hdr = tombstoneCreate(tombstone_count);
+    if (ts_hdr == NULL) {
+        return SKHEADER_ERR_ALLOC;
+    }
+    rv = skHeaderAddEntry(hdr, ts_hdr);
+    if (rv) {
+        tombstoneFree(ts_hdr);
+    }
+    return rv;
+}
+
+uint32_t
+skHentryTombstoneGetCount(
+    const sk_header_entry_t    *hentry)
+{
+    const sk_hentry_tombstone_t *ts_hdr = (sk_hentry_tombstone_t*)hentry;
+
+    assert(skHeaderEntryGetTypeId(ts_hdr) == SK_HENTRY_TOMBSTONE_ID);
+    if (ts_hdr->ts_version != 1) {
+        return UINT32_MAX;
+    }
+    return ts_hdr->ts_counter;
+}
 
 
 /*
