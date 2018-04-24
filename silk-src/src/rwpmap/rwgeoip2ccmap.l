@@ -38,7 +38,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwgeoip2ccmap.l b2033f1baa8a 2018-04-13 20:14:33Z mthomas $");
+RCSIDENT("$SiLK: rwgeoip2ccmap.l a7317ed40a34 2018-04-23 15:37:08Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/skcountry.h>
@@ -228,8 +228,10 @@ static sk_stringmap_t *mode_map = NULL;
  * data or binary data */
 static sk_fileptr_t in_stream;
 
+#ifdef SK_ENABLE_LIBMAXMINDDB
 /* the GeoIP2 binary database file */
 static const char *mmdb_path = NULL;
+#endif  /* SK_ENABLE_LIBMAXMINDDB */
 
 /* directory containing the MaxMind GeoIP2 CSV files */
 static const char *csv2_directory = NULL;

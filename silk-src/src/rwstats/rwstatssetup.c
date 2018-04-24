@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwstatssetup.c 36aa83adce9e 2018-03-19 18:06:42Z mthomas $");
+RCSIDENT("$SiLK: rwstatssetup.c a3aa5034f427 2018-04-23 15:09:17Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skcountry.h>
@@ -78,8 +78,9 @@ typedef enum field_type_en {
     FIELD_TYPE_KEY, FIELD_TYPE_VALUE, FIELD_TYPE_DISTINCT
 } field_type_t;
 
-/* struct to hold information about built-in aggregate value fields */
-typedef struct builtin_field_st {
+/* builtin_field_t is a struct to hold information about built-in
+ * aggregate value fields */
+struct builtin_field_st {
     /* the title of this field */
     const char         *bf_title;
     /* the text width of the field for columnar output */
@@ -94,7 +95,8 @@ typedef struct builtin_field_st {
     unsigned            bf_all_counts   :1;
     /* description of this field */
     const char         *bf_description;
-} builtin_field_t;
+};
+/* typedef struct builtin_field_st builtin_field_t;  // rwstats.h */
 
 /* thresholds (limits) for which bins get displayed by rwuniq */
 typedef struct uniq_limit_st {
@@ -619,7 +621,7 @@ statsAppUsageLong(
           case OPT_LEGACY_HELP:
             fprintf(fh, "\nMISCELLANEOUS SWITCHES:\n");
             skOptionsDefaultUsage(fh);
-            fprintf(fh, "--%s %s. %s", appOptions[i].opt.name,
+            fprintf(fh, "--%s %s. %s\n", appOptions[i].opt.name,
                     SK_OPTION_HAS_ARG(appOptions[i].opt), appOptions[i].help);
             break;
           case OPT_BIN_TIME:
@@ -2569,8 +2571,8 @@ parseValueFieldsAndThresholds(
     /* return value; assume failure */
     int rv = -1;
 
-    builtin_field_t *bf;
-    sk_fieldentry_t *fl_entry;
+    builtin_field_t *bf = NULL;
+    sk_fieldentry_t *fl_entry = NULL;
 
     /*
      *  make changes to the built-in values depending on other command

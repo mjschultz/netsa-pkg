@@ -555,7 +555,7 @@ char *geoip2ccmap_text;
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwgeoip2ccmap.l b2033f1baa8a 2018-04-13 20:14:33Z mthomas $");
+RCSIDENT("$SiLK: rwgeoip2ccmap.l a7317ed40a34 2018-04-23 15:37:08Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/skcountry.h>
@@ -745,8 +745,10 @@ static sk_stringmap_t *mode_map = NULL;
  * data or binary data */
 static sk_fileptr_t in_stream;
 
+#ifdef SK_ENABLE_LIBMAXMINDDB
 /* the GeoIP2 binary database file */
 static const char *mmdb_path = NULL;
+#endif  /* SK_ENABLE_LIBMAXMINDDB */
 
 /* directory containing the MaxMind GeoIP2 CSV files */
 static const char *csv2_directory = NULL;
@@ -925,7 +927,7 @@ SK_DIAGNOSTIC_IGNORE_PUSH("-Wwrite-strings")
 
 
 
-#line 929 "rwgeoip2ccmap.c"
+#line 931 "rwgeoip2ccmap.c"
 
 #define INITIAL 0
 #define ST_CSV2 1
@@ -1093,10 +1095,10 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 430 "rwgeoip2ccmap.l"
+#line 432 "rwgeoip2ccmap.l"
 
 
-#line 1100 "rwgeoip2ccmap.c"
+#line 1102 "rwgeoip2ccmap.c"
 
 	if ( !(yy_init) )
 		{
@@ -1177,7 +1179,7 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 432 "rwgeoip2ccmap.l"
+#line 434 "rwgeoip2ccmap.l"
 { if (csv2Field(geoip2ccmap_text)) {
                                             BEGIN(ST_CSV2_ERROR);
                                         } else {
@@ -1186,7 +1188,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 438 "rwgeoip2ccmap.l"
+#line 440 "rwgeoip2ccmap.l"
 { if (csv2Field(geoip2ccmap_text)) {
                                             next_state = ST_CSV2;
                                             BEGIN(ST_CSV2_ERROR);
@@ -1194,27 +1196,27 @@ YY_RULE_SETUP
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 443 "rwgeoip2ccmap.l"
+#line 445 "rwgeoip2ccmap.l"
 { BEGIN(ST_CSV2_DQ); }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 444 "rwgeoip2ccmap.l"
+#line 446 "rwgeoip2ccmap.l"
 { BEGIN(ST_CSV2_NEXT); }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 445 "rwgeoip2ccmap.l"
+#line 447 "rwgeoip2ccmap.l"
 { field += geoip2ccmap_leng;
                                         BEGIN(ST_CSV2); }
 	YY_BREAK
 case 6:
 /* rule 6 can match eol */
-#line 449 "rwgeoip2ccmap.l"
+#line 451 "rwgeoip2ccmap.l"
 case 7:
 /* rule 7 can match eol */
 YY_RULE_SETUP
-#line 449 "rwgeoip2ccmap.l"
+#line 451 "rwgeoip2ccmap.l"
 { field += geoip2ccmap_leng;
                                         csv2CreateEntry();
                                         ++linenum;
@@ -1222,7 +1224,7 @@ YY_RULE_SETUP
                                         BEGIN(ST_CSV2); }
 	YY_BREAK
 case YY_STATE_EOF(ST_CSV2):
-#line 455 "rwgeoip2ccmap.l"
+#line 457 "rwgeoip2ccmap.l"
 { if (field) {
                                             csv2CreateEntry();
                                         }
@@ -1234,7 +1236,7 @@ case YY_STATE_EOF(ST_CSV2):
                                       }
 	YY_BREAK
 case YY_STATE_EOF(ST_CSV2_NEXT):
-#line 464 "rwgeoip2ccmap.l"
+#line 466 "rwgeoip2ccmap.l"
 { /* unusual */
                                         if (field) {
                                             ++field;
@@ -1250,7 +1252,7 @@ case YY_STATE_EOF(ST_CSV2_NEXT):
 case 8:
 /* rule 8 can match eol */
 YY_RULE_SETUP
-#line 476 "rwgeoip2ccmap.l"
+#line 478 "rwgeoip2ccmap.l"
 { /* probably an error */
                                         if (field) {
                                             csv2CreateEntry();
@@ -1262,7 +1264,7 @@ YY_RULE_SETUP
 case 9:
 /* rule 9 can match eol */
 YY_RULE_SETUP
-#line 484 "rwgeoip2ccmap.l"
+#line 486 "rwgeoip2ccmap.l"
 { scanErr("Closing quote not found");
                                         ++linenum;
                                         csv2Reset();
@@ -1270,7 +1272,7 @@ YY_RULE_SETUP
                                       }
 	YY_BREAK
 case YY_STATE_EOF(ST_CSV2_DQ):
-#line 489 "rwgeoip2ccmap.l"
+#line 491 "rwgeoip2ccmap.l"
 { scanErr("Closing quote not found");
                                         if (csv2NextFile()) {
                                             return 0;
@@ -1281,12 +1283,12 @@ case YY_STATE_EOF(ST_CSV2_DQ):
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 497 "rwgeoip2ccmap.l"
+#line 499 "rwgeoip2ccmap.l"
 ;
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 498 "rwgeoip2ccmap.l"
+#line 500 "rwgeoip2ccmap.l"
 { scanErr("Expected ',', found %c",
                                                 *geoip2ccmap_text);
                                         next_state = ST_CSV2;
@@ -1295,20 +1297,20 @@ YY_RULE_SETUP
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 504 "rwgeoip2ccmap.l"
+#line 506 "rwgeoip2ccmap.l"
 ;
 	YY_BREAK
 case 13:
 /* rule 13 can match eol */
 YY_RULE_SETUP
-#line 505 "rwgeoip2ccmap.l"
+#line 507 "rwgeoip2ccmap.l"
 { ++linenum;
                                         csv2Reset();
                                         BEGIN(ST_CSV2);
                                       }
 	YY_BREAK
 case YY_STATE_EOF(ST_CSV2_ERROR):
-#line 509 "rwgeoip2ccmap.l"
+#line 511 "rwgeoip2ccmap.l"
 { if (csv2NextFile()) {
                                             return 0;
                                         }
@@ -1319,17 +1321,17 @@ case YY_STATE_EOF(ST_CSV2_ERROR):
 case 14:
 /* rule 14 can match eol */
 YY_RULE_SETUP
-#line 518 "rwgeoip2ccmap.l"
+#line 520 "rwgeoip2ccmap.l"
 { ++linenum; legacyReset(); }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 519 "rwgeoip2ccmap.l"
+#line 521 "rwgeoip2ccmap.l"
 { BEGIN(ST_LEG_ENTRY); }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 521 "rwgeoip2ccmap.l"
+#line 523 "rwgeoip2ccmap.l"
 { if (legacyField(geoip2ccmap_text)) {
                                             BEGIN(ST_LEG_ERROR);
                                         } else {
@@ -1338,29 +1340,29 @@ YY_RULE_SETUP
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 527 "rwgeoip2ccmap.l"
+#line 529 "rwgeoip2ccmap.l"
 { BEGIN(ST_LEG_NEXT_ENTRY); }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 528 "rwgeoip2ccmap.l"
+#line 530 "rwgeoip2ccmap.l"
 { ++field; }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 529 "rwgeoip2ccmap.l"
+#line 531 "rwgeoip2ccmap.l"
 { BEGIN(ST_LEG_ENTRY); }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 530 "rwgeoip2ccmap.l"
+#line 532 "rwgeoip2ccmap.l"
 ;
 	YY_BREAK
 case 21:
 /* rule 21 can match eol */
-#line 533 "rwgeoip2ccmap.l"
+#line 535 "rwgeoip2ccmap.l"
 case YY_STATE_EOF(ST_LEG_NEXT_ENTRY):
-#line 533 "rwgeoip2ccmap.l"
+#line 535 "rwgeoip2ccmap.l"
 { ++field;
                                         legacyCreateEntry();
                                         ++linenum;
@@ -1369,7 +1371,7 @@ case YY_STATE_EOF(ST_LEG_NEXT_ENTRY):
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 539 "rwgeoip2ccmap.l"
+#line 541 "rwgeoip2ccmap.l"
 { scanErr("Field %u is empty string",
                                                 field);
                                         BEGIN(ST_LEG_ERROR);
@@ -1378,7 +1380,7 @@ YY_RULE_SETUP
 case 23:
 /* rule 23 can match eol */
 YY_RULE_SETUP
-#line 544 "rwgeoip2ccmap.l"
+#line 546 "rwgeoip2ccmap.l"
 { scanErr(("Unexpected end-of-line"
                                                  " found in field %u"), field);
                                         ++linenum;
@@ -1387,7 +1389,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case YY_STATE_EOF(ST_LEG_ENTRY):
 case YY_STATE_EOF(ST_LEG_CLOSE_ENTRY):
-#line 550 "rwgeoip2ccmap.l"
+#line 552 "rwgeoip2ccmap.l"
 {
                                         scanErr(("Unexpected end-of-stream"
                                                  " found in field %u"), field);
@@ -1395,35 +1397,35 @@ case YY_STATE_EOF(ST_LEG_CLOSE_ENTRY):
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 555 "rwgeoip2ccmap.l"
+#line 557 "rwgeoip2ccmap.l"
 { scanErr("Unexpected input '%c'",
                                                 *geoip2ccmap_text);
                                         BEGIN(ST_LEG_ERROR); }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 559 "rwgeoip2ccmap.l"
+#line 561 "rwgeoip2ccmap.l"
 ;
 	YY_BREAK
 case 26:
 /* rule 26 can match eol */
 YY_RULE_SETUP
-#line 560 "rwgeoip2ccmap.l"
+#line 562 "rwgeoip2ccmap.l"
 { ++linenum;
                                         legacyReset();
                                         BEGIN(INITIAL); }
 	YY_BREAK
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(ST_LEG_ERROR):
-#line 564 "rwgeoip2ccmap.l"
+#line 566 "rwgeoip2ccmap.l"
 { return 0; }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 566 "rwgeoip2ccmap.l"
+#line 568 "rwgeoip2ccmap.l"
 ECHO;
 	YY_BREAK
-#line 1427 "rwgeoip2ccmap.c"
+#line 1429 "rwgeoip2ccmap.c"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -2314,7 +2316,7 @@ void geoip2ccmap_free (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 566 "rwgeoip2ccmap.l"
+#line 568 "rwgeoip2ccmap.l"
 
 
 
