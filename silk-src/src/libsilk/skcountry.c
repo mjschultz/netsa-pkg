@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skcountry.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: skcountry.c 593b6514b1fe 2018-04-05 18:48:14Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skcountry.h>
@@ -257,6 +257,12 @@ skCountrySetup(
         break;
       case SKPREFIXMAP_ERR_IO:
         errmsg = "I/O error";
+        break;
+      case SKPREFIXMAP_ERR_HEADER:
+        errmsg = "Unexpected file type, version, or compression";
+        break;
+      case SKPREFIXMAP_ERR_NO_IPV6:
+        errmsg = "Cannot read IPv6 file";
         break;
       default:
         errmsg = "Unknown error";

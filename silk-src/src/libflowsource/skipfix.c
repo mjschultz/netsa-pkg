@@ -22,7 +22,7 @@
 #define SKIPFIX_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipfix.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: skipfix.c 7148c54d9884 2018-03-13 19:30:21Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/skipaddr.h>
@@ -36,6 +36,14 @@ RCSIDENT("$SiLK: skipfix.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
 
 
 /* LOCAL DEFINES AND TYPEDEFS */
+
+/*
+ *    Whether to process the subTemplateList element of the Tombstone
+ *    record ski_tombstone_t.
+ */
+#ifndef SKIPFIX_ENABLE_TOMBSTONE_TIMES
+#  define SKIPFIX_ENABLE_TOMBSTONE_TIMES 1
+#endif
 
 /*
  *    A context is added to incoming templates to assist when decoding
@@ -262,7 +270,7 @@ RCSIDENT("$SiLK: skipfix.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
 /*  either postOctetTotalCount or postPacketTotalCount */
 #define TMPL_BIT_postOctetTotalCount            (UINT64_C(1) << 43)
 
-/* The following are only seen in options templates, so the bit
+/* The following are only checked in options templates, so the bit
  * position here can repeat those above */
 /* both IE49,IE50 (samplerMode, samplerRandomInterval) are present */
 #define TMPL_BIT_samplerMode                    (UINT32_C(1) <<  1)
@@ -270,6 +278,7 @@ RCSIDENT("$SiLK: skipfix.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
 #define TMPL_BIT_samplingAlgorithm              (UINT32_C(1) <<  2)
 #define TMPL_BIT_flowTableFlushEventCount       (UINT32_C(1) <<  3)
 #define TMPL_BIT_flowTablePeakCount             (UINT32_C(1) <<  4)
+#define TMPL_BIT_tombstoneId                    (UINT32_C(1) <<  5)
 
 /*
  *    Groupings of various bits.
@@ -370,6 +379,8 @@ RCSIDENT("$SiLK: skipfix.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
  *
  *    The template contains all the IPFIX fields that SiLK supports
  *    when importing data.
+ *
+ *    The type for these records is SKI_RECTYPE_FIXREC
  */
 
 #define SKI_FIXREC_TID          0xAFEB
@@ -635,6 +646,8 @@ typedef struct ski_fixrec_st {
  *    These are templates used for reading records we know are coming
  *    from SiLK or YAF.  The templates and struct are used
  *    by ski_yafrec_next() when reading data.
+ *
+ *    The type for these records is SKI_RECTYPE_YAFREC
  */
 
 /*
@@ -876,6 +889,8 @@ typedef struct ski_tcp_stml_st {
  *    The templates and struct are used by ski_yafstats_next() when
  *    reading data.
  *
+ *    The type for these records is SKI_RECTYPE_YAFSTATS
+ *
  *    These types are defined in ipfixsource.h so they may be shared
  *    with ipfixsource.c and that the source structure may contain
  *    them.
@@ -896,6 +911,8 @@ typedef struct ski_tcp_stml_st {
  *    Define the list of information elements and the corresponding
  *    struct for reading common NetFlowV9 records.  The templates and
  *    struct are used by ski_nf9rec_next() when reading data.
+ *
+ *    The type for these records is SKI_RECTYPE_NF9REC
  */
 
 /*
@@ -1059,15 +1076,75 @@ typedef struct ski_nf9rec_st {
 
 
 /*
+ *  **********  Tombstone Record Options Template  **********
+ *
+ *    Define the list of information elements and the corresponding
+ *    structs for reading YAF Options Template records that contain a
+ *    tombstone counter.  The templates and structs are used by
+ *    ski_tombstone_next() when reading data.
+ *
+ *    The type for these records is SKI_RECTYPE_TOMBSTONE
+ *
+ *    The records include a subTemplateList represented by
+ *    ski_tombstone_access_spec[], ski_tombstone_access_t, and
+ *    SKI_TOMBSTONE_ACCESS_TID.
+ */
+
+#define SKI_TOMBSTONE_TID           0xAFEE
+
+/* the internal template id */
+#define SKI_TOMBSTONE_ACCESS_TID    0xAFE9
+
+/* the external template id for the timestamp list */
+#define SKI_YAF_TOMBSTONE_ACCESS    0xD002
+
+
+static fbInfoElementSpec_t ski_tombstone_spec[] = {
+    { (char*)"exporterConfiguredId",      2, 0 },    /* CERT_PEN, 551 */
+    { (char*)"exporterUniqueId",          2, 0 },    /* CERT_PEN, 552 */
+    { (char*)"tombstoneId",               4, 0 },    /* CERT_PEN, 550 */
+#if SKIPFIX_ENABLE_TOMBSTONE_TIMES
+    { (char*)"subTemplateList",           0, 0 },
+#endif
+    FB_IESPEC_NULL
+};
+
+typedef struct ski_tombstone_st {
+    uint16_t    exporterConfiguredId;           /*  0 -  1 */
+    uint16_t    exporterUniqueId;               /*  2 -  3 */
+    uint32_t    tombstoneId;                    /*  4 -  7 */
+#if SKIPFIX_ENABLE_TOMBSTONE_TIMES
+    fbSubTemplateList_t stl;                    /*  8...   */
+#endif
+} ski_tombstone_t;
+
+
+/* The template used by the subTemplateList */
+static fbInfoElementSpec_t ski_tombstone_access_spec[] = {
+    { (char*)"exportingProcessId",        4, 0 },    /* 144 */
+    { (char*)"observationTimeSeconds",    4, 0 },    /* 322 */
+    FB_IESPEC_NULL
+};
+
+typedef struct ski_tombstone_access_st {
+    uint32_t exportingProcessId;
+    uint32_t observationTimeSeconds;
+} ski_tombstone_access_t;
+
+
+
+/*
  *  **********  NetFlowV9 Sampling Options Template  **********
  *
  *    Define the list of information elements and the corresponding
  *    struct for reading NetFlowV9 Options Template records that
- *    contains sampling information.  The template and struct are used
+ *    contain sampling information.  The template and struct are used
  *    by ski_nf9sampling_next() when reading data.
+ *
+ *    The type for these records is SKI_RECTYPE_NF9SAMPLING
  */
 
-#define SKI_NF9SAMPLING_TID     0xAFED
+#define SKI_NF9SAMPLING_TID     0xAFEF
 
 #define SKI_NF9SAMPLING_PADDING 4
 
@@ -1109,6 +1186,8 @@ typedef struct ski_nf9sampling_st {
  *    Simple template for reading data that is thrown away.  The
  *    template and struct are used by ski_ignore_next() when reading
  *    data.
+ *
+ *    The type for these records is SKI_RECTYPE_IGNORE
  */
 
 #define SKI_IGNORE_TID          0x4444
@@ -1134,6 +1213,7 @@ typedef enum ski_rectype_en {
     SKI_RECTYPE_YAFREC,
     SKI_RECTYPE_NF9REC,
     SKI_RECTYPE_YAFSTATS,
+    SKI_RECTYPE_TOMBSTONE,
     SKI_RECTYPE_NF9SAMPLING,
     SKI_RECTYPE_IGNORE
 } ski_rectype_t;
@@ -1145,6 +1225,7 @@ static const char *ski_rectype_name[] = {
     "SKI_RECTYPE_YAFREC",
     "SKI_RECTYPE_NF9REC",
     "SKI_RECTYPE_YAFSTATS",
+    "SKI_RECTYPE_TOMBSTONE",
     "SKI_RECTYPE_NF9SAMPLING",
     "SKI_RECTYPE_IGNORE"
 };
@@ -1169,6 +1250,7 @@ struct ski_record_st {
         ski_yafrec_t        yafrec;
         ski_nf9rec_t        nf9rec;
         ski_yafstats_t      yafstats;
+        ski_tombstone_t     tombstone;
         ski_nf9sampling_t   nf9sampling;
         ski_ignore_t        ignore;
     }                   data;
@@ -1184,8 +1266,13 @@ typedef struct ski_record_st ski_record_t;
 /*
  *    The skiTemplateCallbackCtx() callback is invoked whenever the
  *    session receives a new template.  This function must have the
- *    signature defined by the 'fbTemplateCtxCallback_fn' typedef.
- *    The callback set by calling fbSessionAddTemplateCtxCallback().
+ *    signature defined by a typedef defined by libfixbuf.
+ *
+ *    In fixbuf 2.x, the callback is set by calling
+ *    fbSessionAddNewTemplateCallback() and its signature is given by
+ *    'fbNewTemplateCallback_fn'.  In fixbuf 1.x, it is set by calling
+ *    fbSessionAddTemplateCtxCallback2() and its signature is
+ *    'fbTemplateCtxCallback2_fn'.
  *
  *    One purpose of the callback is the tell fixbuf how to process
  *    items in a subTemplateMultiList.  We tell fixbuf to map from
@@ -1206,12 +1293,16 @@ skiTemplateCallbackCtx(
     fbSession_t            *session,
     uint16_t                tid,
     fbTemplate_t           *tmpl,
+    void                   *app_ctx,
     void                  **ctx,
-    fbTemplateCtxFree_fn   *ctx_free_fn)
+#if FIXBUF_CHECK_VERSION(2,0,0)
+    fbTemplateCtxFree_fn
+#else
+    fbTemplateCtxFree2_fn
+#endif
+    *ctx_free_fn)
 {
     char prefix[36];
-    unsigned int samplingAlgorithm;
-    unsigned int samplerMode;
     const fbInfoElement_t *ie;
     BMAP_TYPE out;
     uint64_t bmap;
@@ -1220,6 +1311,7 @@ skiTemplateCallbackCtx(
     uint32_t i;
 
     TRACE_ENTRY;
+    SK_UNUSED_PARAM(app_ctx);
 
     domain = fbSessionGetDomain(session);
     count = fbTemplateCountElements(tmpl);
@@ -1237,15 +1329,12 @@ skiTemplateCallbackCtx(
                  domain, tid);
     }
 
-    TRACEMSG(2, ("%s [%p] skiTemplateCallback()", prefix, tmpl));
+    TRACEMSG(2, ("%s [%p] skiTemplateCallbackCtx()", prefix, tmpl));
 
-    if (SKI_YAF_TCP_FLOW_TID == (tid & ~SKI_YAF_REVERSE_BIT)) {
-        /* the template ID matches the ID for the YAF template that
-         * contains TCP flags */
-        fbSessionAddTemplatePair(session, tid, SKI_TCP_STML_TID);
-        TRACEMSG(3, ("%s, Added template pair for YAF TCP flags", prefix));
+    if (fbTemplateGetOptionsScope(tmpl)) {
+        unsigned int samplingAlgorithm;
+        unsigned int samplerMode;
 
-    } else if (fbTemplateGetOptionsScope(tmpl)) {
         /* do not define any template pairs for this template */
         fbSessionAddTemplatePair(session, tid, 0);
 
@@ -1285,6 +1374,10 @@ skiTemplateCallbackCtx(
                     ASSERT_IE_NAME_IS(ie, flowTablePeakCount);
                     bmap |= (1 | TMPL_BIT_flowTablePeakCount);
                     break;
+                  case 550:
+                    ASSERT_IE_NAME_IS(ie, tombstoneId);
+                    bmap |= (1 | TMPL_BIT_tombstoneId);
+                    break;
                 }
             }
             TRACEMSG(
@@ -1301,6 +1394,10 @@ skiTemplateCallbackCtx(
             DEBUGMSG(("Will process options template %#06x with the"
                       " YAFstats template"),
                      tid);
+        } else if (bmap & (TMPL_BIT_tombstoneId)) {
+            DEBUGMSG(("Will process options template %#06x with the"
+                      " tombstone template"),
+                     tid);
         } else if (bmap & (TMPL_BIT_samplingAlgorithm | TMPL_BIT_samplerMode)){
             DEBUGMSG(("Will process options template %#06x with the"
                       " sampling template"),
@@ -1312,8 +1409,24 @@ skiTemplateCallbackCtx(
         }
 
     } else {
-        /* do not define any template pairs for this template */
-        fbSessionAddTemplatePair(session, tid, 0);
+        /* tell fixbuf how to transcode templates that appear in lists */
+        if (SKI_YAF_TCP_FLOW_TID == (tid & ~SKI_YAF_REVERSE_BIT)) {
+            /* the template ID matches the ID for the YAF template
+             * that contains TCP flags */
+            fbSessionAddTemplatePair(session, tid, SKI_TCP_STML_TID);
+            TRACEMSG(3, ("%s, Added template pair for YAF TCP flags", prefix));
+#if SKIPFIX_ENABLE_TOMBSTONE_TIMES
+        } else if (SKI_YAF_TOMBSTONE_ACCESS == tid) {
+            /* the template ID matches the ID for the template that
+             * contains tombstone timestamps */
+            fbSessionAddTemplatePair(session, tid, SKI_TOMBSTONE_ACCESS_TID);
+            TRACEMSG(3,
+                    ("%s, Added template pair for tombstone access", prefix));
+#endif  /* SKIPFIX_ENABLE_TOMBSTONE_TIMES */
+        } else {
+            /* do not define any template pairs for this template */
+            fbSessionAddTemplatePair(session, tid, 0);
+        }
 
         /* populate the bitmap */
         for (i = 0; i < count && (ie = fbTemplateGetIndexedIE(tmpl, i)); ++i) {
@@ -1812,6 +1925,27 @@ skiSessionInitReader(
         goto ERROR;
     }
 
+    /* Add the yaf tombstone record template  */
+    tmpl = fbTemplateAlloc(model);
+    if (!fbTemplateAppendSpecArray(tmpl, ski_tombstone_spec, 0, err)) {
+        goto ERROR;
+    }
+    ASSERT_NO_TMPL(session, SKI_TOMBSTONE_TID, err);
+    if (!fbSessionAddTemplate(session, TRUE, SKI_TOMBSTONE_TID, tmpl, err)) {
+        goto ERROR;
+    }
+
+    /* Add the yaf tombstone record template  */
+    tmpl = fbTemplateAlloc(model);
+    if (!fbTemplateAppendSpecArray(tmpl, ski_tombstone_access_spec, 0, err)) {
+        goto ERROR;
+    }
+    ASSERT_NO_TMPL(session, SKI_TOMBSTONE_ACCESS_TID, err);
+    if (!fbSessionAddTemplate(
+            session, TRUE, SKI_TOMBSTONE_ACCESS_TID, tmpl, err)) {
+        goto ERROR;
+    }
+
     /* Add the netflow v9 sampling options template  */
     tmpl = fbTemplateAlloc(model);
     if (!fbTemplateAppendSpecArray(
@@ -1865,7 +1999,11 @@ skiSessionInitReader(
     }
 
     /* Invoke the function above when a new template arrives. */
-    fbSessionAddTemplateCtxCallback(session, &skiTemplateCallbackCtx);
+#if FIXBUF_CHECK_VERSION(2,0,0)
+    fbSessionAddNewTemplateCallback(session, &skiTemplateCallbackCtx, NULL);
+#else
+    fbSessionAddTemplateCtxCallback2(session, &skiTemplateCallbackCtx, NULL);
+#endif
 
     TRACE_RETURN(1);
 
@@ -1906,6 +2044,9 @@ ski_rectype_next(
                             | TMPL_BIT_flowTablePeakCount))
         {
             return (record->rectype = SKI_RECTYPE_YAFSTATS);
+        }
+        if (record->bmap & TMPL_BIT_tombstoneId) {
+            return (record->rectype = SKI_RECTYPE_TOMBSTONE);
         }
         if (record->bmap
             & (TMPL_BIT_samplingAlgorithm | TMPL_BIT_samplerMode))
@@ -2022,6 +2163,109 @@ ski_yafstats_update_source(
 }
 
 
+/**
+ *    Read a YAF Options Record containing the tombstone counter and
+ *    print a log message.
+ */
+static gboolean
+ski_tombstone_next(
+    fBuf_t                 *fbuf,
+    ski_record_t           *record,
+    const skpc_probe_t     *probe,
+    GError                **err)
+{
+    const ski_tombstone_t *ts;
+    size_t len;
+
+    TRACEMSG(2, (("Domain %#06X, TemplateID %#06X [%p], bmap " BMAP_PRI
+                  ", read by ski_tombstone_next()"),
+                 fbSessionGetDomain(fBufGetSession(fbuf)), record->tid,
+                 (void *)record->tmpl, record->bmap));
+    assert(SKI_RECTYPE_TOMBSTONE == record->rectype);
+
+    /* Set internal template to read the options record */
+    if (!fBufSetInternalTemplate(fbuf, SKI_TOMBSTONE_TID, err)) {
+        return FALSE;
+    }
+#if SKIPFIX_ENABLE_TOMBSTONE_TIMES
+    fbSubTemplateListCollectorInit(&record->data.tombstone.stl);
+#endif
+
+    len = sizeof(record->data.tombstone);
+    if (!fBufNext(fbuf, (uint8_t *)&record->data.tombstone, &len, err)) {
+        return FALSE;
+    }
+    assert(len == sizeof(ski_tombstone_t));
+    ts = &record->data.tombstone;
+
+#if SKIPFIX_ENABLE_TOMBSTONE_TIMES
+    if (sklogCheckLevel(LOG_DEBUG)) {
+        const ski_tombstone_access_t *ts_access;
+        void *stl;
+        char stime_buf[SKTIMESTAMP_STRLEN];
+        char buf[1024];
+        char *b = buf;
+        ssize_t sz;
+
+        len = sizeof(buf);
+        sz = snprintf(b, len, ("'%s': Received tombstone record:"
+                               " exporterId: %u:%u, tombstoneId: %u"),
+                      skpcProbeGetName(probe), ts->exporterConfiguredId,
+                      ts->exporterUniqueId, ts->tombstoneId);
+        if (len < (size_t)sz) {
+            goto WRITEMSG;
+        }
+        b += sz;
+        len -= sz;
+
+        stl = NULL;
+        while ((stl = fbSubTemplateListGetNextPtr(&ts->stl, stl))) {
+            ts_access = (ski_tombstone_access_t *)stl;
+
+            sktimestamp_r(
+                stime_buf, sktimeCreate(ts_access->observationTimeSeconds, 0),
+                SKTIMESTAMP_UTC | SKTIMESTAMP_NOMSEC);
+            switch (ts_access->exportingProcessId) {
+              case 1:
+                sz = snprintf(b, len, "; process: yaf, time: %sZ", stime_buf);
+                break;
+              case 2:
+                sz = snprintf(b, len, "; process: super_mediator, time: %sZ",
+                              stime_buf);
+                break;
+              default:
+                sz = snprintf(b, len,
+                              "; process: unknown(%" PRIu32 "), time: %sZ",
+                              ts_access->exportingProcessId, stime_buf);
+                break;
+            }
+            if (len < (size_t)sz) {
+                goto WRITEMSG;
+            }
+            b += sz;
+            len -= sz;
+        }
+
+      WRITEMSG:
+        buf[sizeof(buf)-1] = '\0';
+        DEBUGMSG("%s", buf);
+    } else
+#endif  /* SKIPFIX_ENABLE_TOMBSTONE_TIMES */
+    {
+        INFOMSG(("'%s': Received tombstone record:"
+                 " exporterId: %u:%u, tombstoneId: %u"),
+                skpcProbeGetName(probe), ts->exporterConfiguredId,
+                ts->exporterUniqueId, ts->tombstoneId);
+    }
+
+#if SKIPFIX_ENABLE_TOMBSTONE_TIMES
+    fbSubTemplateListClear((fbSubTemplateList_t *)&ts->stl);
+#endif
+
+    return TRUE;
+}
+
+
 /* Determine which names are used for certain elements in the
  * information model. */
 void
@@ -2106,7 +2350,6 @@ ski_nf9sampling_next(
         }
     }
     return TRUE;
-
 }
 
 
@@ -2747,6 +2990,7 @@ ski_fixrec_ignore(
     const ski_fixrec_t *fixrec,
     const char         *reason)
 {
+    skipaddr_t ipaddr;
     char sipbuf[64];
     char dipbuf[64];
 
@@ -2759,7 +3003,8 @@ ski_fixrec_ignore(
             strcpy(sipbuf, "unknown-v6");
         }
     } else {
-        num2dot_r(fixrec->sourceIPv4Address, sipbuf);
+        skipaddrSetV4(&ipaddr, &fixrec->sourceIPv4Address);
+        skipaddrString(sipbuf, &ipaddr, SKIPADDR_CANONICAL);
     }
     if (!SK_IPV6_IS_ZERO(fixrec->destinationIPv6Address)) {
 #ifdef SK_HAVE_INET_NTOP
@@ -2770,7 +3015,8 @@ ski_fixrec_ignore(
             strcpy(dipbuf, "unknown-v6");
         }
     } else {
-        num2dot_r(fixrec->destinationIPv4Address, dipbuf);
+        skipaddrSetV4(&ipaddr, &fixrec->destinationIPv4Address);
+        skipaddrString(dipbuf, &ipaddr, SKIPADDR_CANONICAL);
     }
 
     INFOMSG(("IGNORED|%s|%s|%u|%u|%u|%" PRIu64 "|%" PRIu64 "|%s|"),
@@ -3560,6 +3806,7 @@ ski_yafrec_ignore(
     const ski_yafrec_t *yafrec,
     const char         *reason)
 {
+    skipaddr_t ipaddr;
     char sipbuf[64];
     char dipbuf[64];
 
@@ -3572,7 +3819,8 @@ ski_yafrec_ignore(
             strcpy(sipbuf, "unknown-v6");
         }
     } else {
-        num2dot_r(yafrec->sourceIPv4Address, sipbuf);
+        skipaddrSetV4(&ipaddr, &yafrec->sourceIPv4Address);
+        skipaddrString(sipbuf, &ipaddr, SKIPADDR_CANONICAL);
     }
     if (!SK_IPV6_IS_ZERO(yafrec->destinationIPv6Address)) {
 #ifdef SK_HAVE_INET_NTOP
@@ -3583,7 +3831,8 @@ ski_yafrec_ignore(
             strcpy(dipbuf, "unknown-v6");
         }
     } else {
-        num2dot_r(yafrec->destinationIPv4Address, dipbuf);
+        skipaddrSetV4(&ipaddr, &yafrec->destinationIPv4Address);
+        skipaddrString(dipbuf, &ipaddr, SKIPADDR_CANONICAL);
     }
 
     INFOMSG(("IGNORED|%s|%s|%u|%u|%u|%" PRIu64 "|%" PRIu64 "|%s|"),
@@ -4025,6 +4274,7 @@ ski_nf9rec_ignore(
     const char         *reason)
 {
     const ski_nf9rec_t *nf9rec = &record->data.nf9rec;
+    skipaddr_t ipaddr;
     char sipbuf[64];
     char dipbuf[64];
 
@@ -4044,8 +4294,10 @@ ski_nf9rec_ignore(
             strcpy(dipbuf, "unknown-v6");
         }
     } else {
-        num2dot_r(nf9rec->addr.ip4.sourceIPv4Address, sipbuf);
-        num2dot_r(nf9rec->addr.ip4.destinationIPv4Address, dipbuf);
+        skipaddrSetV4(&ipaddr, &nf9rec->addr.ip4.sourceIPv4Address);
+        skipaddrString(sipbuf, &ipaddr, SKIPADDR_CANONICAL);
+        skipaddrSetV4(&ipaddr, &nf9rec->addr.ip4.destinationIPv4Address);
+        skipaddrString(dipbuf, &ipaddr, SKIPADDR_CANONICAL);
     }
 
     INFOMSG(("IGNORED|%s|%s|%u|%u|%u|%" PRIu64 "|%" PRIu64 "|%s|"),
@@ -4831,6 +5083,14 @@ ipfix_reader(
                     source, &record, &conn->prev_yafstats);
                 continue;
 
+              case SKI_RECTYPE_TOMBSTONE:
+                if (!ski_tombstone_next(fbuf, &record, source->probe, &err)){
+                    TRACEMSG(2, ("'%s': %s and ski_tombstone_next() is FALSE",
+                                 source->name, ski_rectype_name[rectype]));
+                    break;      /* error */
+                }
+                continue;
+
               case SKI_RECTYPE_NF9SAMPLING:
                 if (!ski_nf9sampling_next(fbuf, &record, source->probe, &err)){
                     /* should have been able to read something */
@@ -5146,6 +5406,18 @@ ipfixSourceGetRecordFromFile(
                 }
                 ski_yafstats_update_source(
                     source, &record, &source->prev_yafstats);
+                continue;
+
+              case SKI_RECTYPE_TOMBSTONE:
+                if (!ski_tombstone_next(
+                        source->readbuf, &record, source->probe, &err))
+                {
+                    TRACEMSG(2, ("'%s': %s and ski_tombstone_next() is FALSE",
+                                 source->name,
+                                 ski_rectype_name[record.rectype]));
+                    rv = -1;
+                    break;      /* error */
+                }
                 continue;
 
               case SKI_RECTYPE_FIXREC:

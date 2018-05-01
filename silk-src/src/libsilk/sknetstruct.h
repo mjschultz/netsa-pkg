@@ -7,7 +7,7 @@
 */
 
 /*
-**  skprintnets.h
+**  sknetstruct.h
 **
 **    Utilities used by IPsets and Bags to group IPs into arbitrarily
 **    sized netblocks for printing.  Each netblock keeps a count of
@@ -15,22 +15,23 @@
 **    netblock sums the counters for the entries in that netblock.
 **
 */
-#ifndef _PRINT_NETWORK_STRUCTURE_H
-#define _PRINT_NETWORK_STRUCTURE_H
+#ifndef _SKNETSTRUCT_H
+#define _SKNETSTRUCT_H
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_PRINT_NETWORK_STRUCTURE_H, "$SiLK: skprintnets.h bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENTVAR(rcsID_SKNETSTRUCT_H, "$SiLK: sknetstruct.h 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/silk_types.h>
 
 /**
  *    The context object for processing IP addresses.
  */
-typedef struct skNetStruct_st skNetStruct_t;
+typedef struct sk_netstruct_st sk_netstruct_t;
+typedef struct sk_netstruct_st skNetStruct_t    SK_GCC_DEPRECATED;
 
 /**
  *    Add the CIDR block 'ipaddr'/'prefix' to the network structure
@@ -39,7 +40,7 @@ typedef struct skNetStruct_st skNetStruct_t;
  */
 void
 skNetStructureAddCIDR(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     const skipaddr_t   *ipaddr,
     uint32_t            prefix);
 
@@ -51,7 +52,7 @@ skNetStructureAddCIDR(
  */
 void
 skNetStructureAddKeyCounter(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     const skipaddr_t   *ipaddr,
     const uint64_t     *counter);
 
@@ -97,7 +98,7 @@ skNetStructureAddKeyCounter(
  */
 int
 skNetStructureCreate(
-    skNetStruct_t     **ns,
+    sk_netstruct_t    **ns,
     int                 has_count);
 
 /**
@@ -106,7 +107,7 @@ skNetStructureCreate(
  */
 void
 skNetStructureDestroy(
-    skNetStruct_t     **ns);
+    sk_netstruct_t    **ns);
 
 /**
  *    Have the network structure context object 'ns' parse the user's
@@ -116,7 +117,7 @@ skNetStructureDestroy(
  */
 int
 skNetStructureParse(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     const char         *input);
 
 /**
@@ -126,7 +127,7 @@ skNetStructureParse(
  */
 void
 skNetStructurePrintFinalize(
-    skNetStruct_t      *ns);
+    sk_netstruct_t     *ns);
 
 /**
  *    Configure the network structure context object 'ns' to use
@@ -135,7 +136,7 @@ skNetStructurePrintFinalize(
  */
 void
 skNetStructureSetCountWidth(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     int                 width);
 
 /**
@@ -144,7 +145,7 @@ skNetStructureSetCountWidth(
  */
 void
 skNetStructureSetDelimiter(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     char                delimiter);
 
 /**
@@ -154,7 +155,7 @@ skNetStructureSetDelimiter(
  */
 void
 skNetStructureSetIpFormat(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     uint32_t            format);
 
 /**
@@ -163,7 +164,7 @@ skNetStructureSetIpFormat(
  */
 void
 skNetStructureSetNoColumns(
-    skNetStruct_t      *ns);
+    sk_netstruct_t     *ns);
 
 /**
  *    Configure the network structure context object 'ns' so it does
@@ -171,7 +172,7 @@ skNetStructureSetNoColumns(
  */
 void
 skNetStructureSetNoFinalDelimiter(
-    skNetStruct_t      *ns);
+    sk_netstruct_t     *ns);
 
 /**
  *    Configure the network structure context object 'ns' to send its
@@ -179,13 +180,13 @@ skNetStructureSetNoFinalDelimiter(
  */
 void
 skNetStructureSetOutputStream(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     skstream_t         *stream);
 
 #ifdef __cplusplus
 }
 #endif
-#endif /* _PRINT_NETWORK_STRUCTURE_H */
+#endif /* _SKNETSTRUCT_H */
 
 /*
 ** Local Variables:

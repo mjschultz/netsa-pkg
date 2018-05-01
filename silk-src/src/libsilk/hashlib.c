@@ -10,7 +10,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: hashlib.c 5e6b30b050ad 2018-02-14 17:34:01Z mthomas $");
+RCSIDENT("$SiLK: hashlib.c 99196b0e695b 2018-03-19 15:47:42Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/utils.h>
@@ -237,13 +237,19 @@ hashbig(
     const void         *key,
     size_t              length,
     uint32_t            initval);
+void
+hashbig2(
+    const void         *key,
+    size_t              length,
+    uint32_t           *pc,
+    uint32_t           *pb);
 
 #include "hashlib-lookup3.c"
 /* define hash() according to the byte order */
 #if SK_BIG_ENDIAN
-#  define hash  hashbig
+#  define hash  hashbig2
 #else
-#  define hash  hashlittle
+#  define hash  hashlittle2
 #endif
 #endif  /* HASHLIB_LOOKUP2 */
 
@@ -490,7 +496,7 @@ hashlib_create_table(
                 ((estimated_count << 8) / table_ptr->load_factor),
                 MIN_BLOCK_ENTRIES, HASH_GET_MAX_BLOCK_ENTRIES(table_ptr)));
 
-    if (initial_entries <= MIN_BLOCK_ENTRIES) {
+    if (initial_entries < MIN_BLOCK_ENTRIES) {
         initial_entries = MIN_BLOCK_ENTRIES;
         TRACEMSG(2,(TRC_FMT "adjusted initial_entries to %" PRIu64,
                     TRC_ARG(table_ptr), initial_entries));
@@ -508,11 +514,17 @@ hashlib_create_table(
     /* Start with one block */
     table_ptr->num_blocks = 1;
     block_ptr = hashlib_create_block(table_ptr, initial_entries);
-    if (block_ptr == NULL) {
+    while (NULL == block_ptr) {
         TRACEMSG(1,(TRC_FMT "Adding block #0 failed.", TRC_ARG(table_ptr)));
-        table_ptr->num_blocks = 0;
-        hashlib_free_table(table_ptr);
-        return NULL;
+        if (initial_entries <= MIN_BLOCK_ENTRIES) {
+            table_ptr->num_blocks = 0;
+            hashlib_free_table(table_ptr);
+            return NULL;
+        }
+        initial_entries >>= 1;
+        TRACEMSG(2,(TRC_FMT "adjusted initial_entries to %" PRIu64,
+                    TRC_ARG(table_ptr), initial_entries));
+        assert(initial_entries >= MIN_BLOCK_ENTRIES);
     }
     table_ptr->block_ptrs[0] = block_ptr;
 
@@ -1250,15 +1262,18 @@ hashlib_block_find_entry(
     const uint8_t      *key_ptr,
     uint8_t           **entry_pptr)
 {
-#ifndef NDEBUG
-    uint32_t num_tries = 0;
-#endif
-    uint32_t hash_index;
-    uint32_t hash_value;
-    uint32_t hash_probe_increment;
 #ifdef HASHLIB_RECORD_STATS
     int first_check = 1;
 #endif
+#ifndef NDEBUG
+    uint32_t num_tries = 0;
+#endif
+    uint64_t hash_index;
+    uint64_t hash_value;
+    uint64_t hash_probe_increment;
+    /* seeds for the hashing function */
+    uint32_t hash_primary = 0x53694c4b;
+    uint32_t hash_secondary = 0x4361726e;
 
     HASH_STAT_INCR(block_ptr, find_entries);
 
@@ -1298,10 +1313,11 @@ hashlib_block_find_entry(
      *  update a bucket's value to the no_value_ptr value---though
      *  there is no way for the hashlib code to enforce this.
      */
-    hash_value = hash(key_ptr, HASH_GET_KEY_LEN(block_ptr), 0);
+    hash(key_ptr, HASH_GET_KEY_LEN(block_ptr), &hash_primary, &hash_secondary);
+    hash_value = hash_primary + (((uint64_t)hash_secondary) << UINT64_C(32));
     hash_probe_increment = hash_value | 0x01; /* must be odd */
     for (;;) {
-        hash_index = hash_value & ((uint32_t)block_ptr->max_entries - 1);
+        hash_index = hash_value & (block_ptr->max_entries - 1);
 
         *entry_pptr = HASH_ENTRY_AT(block_ptr, hash_index);
         if (HASHENTRY_ISEMPTY(block_ptr, *entry_pptr)) {

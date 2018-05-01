@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skunique.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: skunique.c 36aa83adce9e 2018-03-19 18:06:42Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/rwascii.h>
@@ -129,7 +129,35 @@ RCSIDENT("$SiLK: skunique.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
         *((mrg_type*)(mrg_ptr)) += mrg_val;             \
     }
 
-#else
+#define MIN_UPDATE_FROM_INT(mrg_type, mrg_inout_ptr, mrg_other_val)     \
+    {                                                                   \
+        mrg_type *mufi_a = (mrg_type*)(mrg_inout_ptr);                  \
+        if (((mrg_type)(mrg_other_val)) < *mufi_a) {                    \
+            *mufi_a = (mrg_other_val);                                  \
+        }                                                               \
+    }
+
+#define MIN_MERGE_INT_PTRS(mrg_type, mrg_inout_ptr, mrg_other_ptr)      \
+    {                                                                   \
+        mrg_type *mmip_b = (mrg_type*)(mrg_other_ptr);                  \
+        MIN_UPDATE_FROM_INT(mrg_type, mrg_inout_ptr, *mmip_b);          \
+    }
+
+#define MAX_UPDATE_FROM_INT(mrg_type, mrg_inout_ptr, mrg_other_val)     \
+    {                                                                   \
+        mrg_type *mufi_a = (mrg_type*)(mrg_inout_ptr);                  \
+        if (((mrg_type)(mrg_other_val)) > *mufi_a) {                    \
+            *mufi_a = (mrg_other_val);                                  \
+        }                                                               \
+    }
+
+#define MAX_MERGE_INT_PTRS(mrg_type, mrg_inout_ptr, mrg_other_ptr)      \
+    {                                                                   \
+        mrg_type *mmip_b = (mrg_type*)(mrg_other_ptr);                  \
+        MAX_UPDATE_FROM_INT(mrg_type, mrg_inout_ptr, *mmip_b);          \
+    }
+
+#else  /* #if !SKUNIQ_USE_MEMCPY */
 
 #define CMP_INT_PTRS(cmp_out, cmp_type, cmp_a, cmp_b)   \
     {                                                   \
@@ -164,7 +192,41 @@ RCSIDENT("$SiLK: skunique.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
         memcpy((mrg_ptr), &atip_val_a, sizeof(mrg_type));       \
     }
 
-#endif  /* SKUNIQ_USE_MEMCPY */
+#define MIN_UPDATE_FROM_INT(mrg_type, mrg_inout_ptr, mrg_other_val)     \
+    {                                                                   \
+        mrg_type mufi_a;                                                \
+        memcpy(&mufi_a, (mrg_inout_ptr), sizeof(mrg_type));             \
+        if (((mrg_type)(mrg_other_val)) < mufi_a) {                     \
+            mufi_a = (mrg_other_val);                                   \
+            memcpy((mrg_inout_ptr), &mufi_a, sizeof(mrg_type));         \
+        }                                                               \
+    }
+
+#define MIN_MERGE_INT_PTRS(mrg_type, mrg_inout_ptr, mrg_other_ptr)      \
+    {                                                                   \
+        mrg_type mmip_b;                                                \
+        memcpy(&mmip_b, (mrg_other_ptr), sizeof(mrg_type));             \
+        MIN_UPDATE_FROM_INT(mrg_type, mrg_inout_ptr, mmip_b);           \
+    }
+
+#define MAX_UPDATE_FROM_INT(mrg_type, mrg_inout_ptr, mrg_other_val)     \
+    {                                                                   \
+        mrg_type mufi_a;                                                \
+        memcpy(&mufi_a, (mrg_inout_ptr), sizeof(mrg_type));             \
+        if (((mrg_type)(mrg_other_val)) > mufi_a) {                     \
+            mufi_a = (mrg_other_val);                                   \
+            memcpy((mrg_inout_ptr), &mufi_a, sizeof(mrg_type));         \
+        }                                                               \
+    }
+
+#define MAX_MERGE_INT_PTRS(mrg_type, mrg_inout_ptr, mrg_other_ptr)      \
+    {                                                                   \
+        mrg_type mmip_b;                                                \
+        memcpy(&mmip_b, (mrg_other_ptr), sizeof(mrg_type));             \
+        MAX_UPDATE_FROM_INT(mrg_type, mrg_inout_ptr, mmip_b);           \
+    }
+
+#endif  /* #else of #if !SKUNIQ_USE_MEMCPY */
 
 /* typedef struct sk_fieldentry_st sk_fieldentry_t; */
 struct sk_fieldentry_st {
@@ -418,11 +480,9 @@ skFieldListAddKnownField(
       case SK_FIELD_PACKETS:
       case SK_FIELD_BYTES:
       case SK_FIELD_STARTTIME:
-      case SK_FIELD_STARTTIME_MSEC:
       case SK_FIELD_ELAPSED:
       case SK_FIELD_ELAPSED_MSEC:
       case SK_FIELD_ENDTIME:
-      case SK_FIELD_ENDTIME_MSEC:
       case SK_FIELD_RECORDS:
       case SK_FIELD_SUM_ELAPSED:
       case SK_FIELD_MIN_STARTTIME:
@@ -453,6 +513,11 @@ skFieldListAddKnownField(
 
       case SK_FIELD_SUM_PACKETS:
       case SK_FIELD_SUM_BYTES:
+      case SK_FIELD_SUM_ELAPSED_MSEC:
+      case SK_FIELD_STARTTIME_MSEC:
+      case SK_FIELD_ENDTIME_MSEC:
+      case SK_FIELD_MIN_STARTTIME_MSEC:
+      case SK_FIELD_MAX_ENDTIME_MSEC:
         bin_octets = 8;
         break;
 
@@ -572,7 +637,7 @@ skFieldListGetFieldCount(
 
 
 
-/*  get the binary value for each field in 'field_list' and sets that
+/*  get the binary value for each field in 'field_list' and set that
  *  value in 'all_fields_buffer' */
 void
 skFieldListRecToBinary(
@@ -712,16 +777,22 @@ skFieldListRecToBinary(
                 REC_TO_KEY_08(rwRecGetFlowType(rwrec), bin_buffer, f);
                 break;
               case SK_FIELD_STARTTIME:
-              case SK_FIELD_STARTTIME_MSEC:
                 REC_TO_KEY_32(rwRecGetStartSeconds(rwrec), bin_buffer, f);
                 break;
               case SK_FIELD_ELAPSED:
-              case SK_FIELD_ELAPSED_MSEC:
                 REC_TO_KEY_32(rwRecGetElapsedSeconds(rwrec), bin_buffer, f);
                 break;
               case SK_FIELD_ENDTIME:
-              case SK_FIELD_ENDTIME_MSEC:
                 REC_TO_KEY_32(rwRecGetEndSeconds(rwrec), bin_buffer, f);
+                break;
+              case SK_FIELD_STARTTIME_MSEC:
+                REC_TO_KEY_64(rwRecGetStartTime(rwrec), bin_buffer, f);
+                break;
+              case SK_FIELD_ELAPSED_MSEC:
+                REC_TO_KEY_32(rwRecGetElapsed(rwrec), bin_buffer, f);
+                break;
+              case SK_FIELD_ENDTIME_MSEC:
+                REC_TO_KEY_64(rwRecGetEndTime(rwrec), bin_buffer, f);
                 break;
               default:
                 break;
@@ -739,11 +810,6 @@ skFieldListAddRecToBuffer(
     const rwRec            *rwrec,
     uint8_t                *summed)
 {
-#if !SKUNIQ_USE_MEMCPY
-    uint32_t *val_ptr;
-#else
-    uint32_t val_a;
-#endif
     const sk_fieldentry_t *f;
     size_t i;
 
@@ -771,38 +837,30 @@ skFieldListAddRecToBuffer(
                                rwRecGetElapsedSeconds(rwrec));
                 break;
 
-#if !SKUNIQ_USE_MEMCPY
+              case SK_FIELD_SUM_ELAPSED_MSEC:
+                ADD_TO_INT_PTR(uint64_t, FIELD_PTR(summed, f),
+                               rwRecGetElapsed(rwrec));
+                break;
+
               case SK_FIELD_MIN_STARTTIME:
-                val_ptr = (uint32_t*)FIELD_PTR(summed, f);
-                if (rwRecGetStartSeconds(rwrec) < *val_ptr) {
-                    *val_ptr = rwRecGetStartSeconds(rwrec);
-                }
+                MIN_UPDATE_FROM_INT(uint32_t, FIELD_PTR(summed, f),
+                                    rwRecGetStartSeconds(rwrec));
                 break;
 
               case SK_FIELD_MAX_ENDTIME:
-                val_ptr = (uint32_t*)FIELD_PTR(summed, f);
-                if (rwRecGetEndSeconds(rwrec) > *val_ptr) {
-                    *val_ptr = rwRecGetEndSeconds(rwrec);
-                }
+                MAX_UPDATE_FROM_INT(uint32_t, FIELD_PTR(summed, f),
+                                    rwRecGetEndSeconds(rwrec));
                 break;
 
-#else  /* SKUNIQ_USE_MEMCPY */
-              case SK_FIELD_MIN_STARTTIME:
-                memcpy(&val_a, FIELD_PTR(summed, f), f->octets);
-                if (rwRecGetStartSeconds(rwrec) < val_a) {
-                    val_a = rwRecGetStartSeconds(rwrec);
-                    memcpy(FIELD_PTR(summed, f), &val_a, f->octets);
-                }
+              case SK_FIELD_MIN_STARTTIME_MSEC:
+                MIN_UPDATE_FROM_INT(uint64_t, FIELD_PTR(summed, f),
+                                    rwRecGetStartTime(rwrec));
                 break;
 
-              case SK_FIELD_MAX_ENDTIME:
-                memcpy(&val_a, FIELD_PTR(summed, f), f->octets);
-                if (rwRecGetEndSeconds(rwrec) > val_a) {
-                    val_a = rwRecGetEndSeconds(rwrec);
-                    memcpy(FIELD_PTR(summed, f), &val_a, f->octets);
-                }
+              case SK_FIELD_MAX_ENDTIME_MSEC:
+                MAX_UPDATE_FROM_INT(uint64_t, FIELD_PTR(summed, f),
+                                    rwRecGetEndSeconds(rwrec));
                 break;
-#endif  /* SKUNIQ_USE_MEMCPY */
 
               case SK_FIELD_CALLER:
                 break;
@@ -833,6 +891,7 @@ skFieldListInitializeBuffer(
         } else {
             switch (f->id) {
               case SK_FIELD_MIN_STARTTIME:
+              case SK_FIELD_MIN_STARTTIME_MSEC:
                 memset(FIELD_PTR(all_fields_buffer, f), 0xFF, f->octets);
                 break;
               default:
@@ -850,11 +909,6 @@ skFieldListMergeBuffers(
     uint8_t                *all_fields_buffer1,
     const uint8_t          *all_fields_buffer2)
 {
-#if !SKUNIQ_USE_MEMCPY
-    uint32_t *a_ptr, *b_ptr;
-#else
-    uint32_t val_a, val_b;
-#endif
     const sk_fieldentry_t *f;
     size_t i;
 
@@ -874,49 +928,31 @@ skFieldListMergeBuffers(
 
               case SK_FIELD_SUM_PACKETS:
               case SK_FIELD_SUM_BYTES:
+              case SK_FIELD_SUM_ELAPSED_MSEC:
                 MERGE_INT_PTRS(UINT64_MAX, uint64_t,
                                FIELD_PTR(all_fields_buffer1, f),
                                FIELD_PTR(all_fields_buffer2, f));
                 break;
 
-#if !SKUNIQ_USE_MEMCPY
               case SK_FIELD_MIN_STARTTIME:
-                /* put smallest value into a */
-                a_ptr = (uint32_t*)FIELD_PTR(all_fields_buffer1, f);
-                b_ptr = (uint32_t*)FIELD_PTR(all_fields_buffer2, f);
-                if (*b_ptr < *a_ptr) {
-                    *a_ptr = *b_ptr;
-                }
+                MIN_MERGE_INT_PTRS(uint32_t, FIELD_PTR(all_fields_buffer1, f),
+                                   FIELD_PTR(all_fields_buffer2, f));
                 break;
 
               case SK_FIELD_MAX_ENDTIME:
-                /* put largest value into a */
-                a_ptr = (uint32_t*)FIELD_PTR(all_fields_buffer1, f);
-                b_ptr = (uint32_t*)FIELD_PTR(all_fields_buffer2, f);
-                if (*b_ptr > *a_ptr) {
-                    *a_ptr = *b_ptr;
-                }
+                MAX_MERGE_INT_PTRS(uint32_t, FIELD_PTR(all_fields_buffer1, f),
+                                   FIELD_PTR(all_fields_buffer2, f));
                 break;
 
-#else  /* SKUNIQ_USE_MEMCPY */
-              case SK_FIELD_MIN_STARTTIME:
-                memcpy(&val_a, FIELD_PTR(all_fields_buffer1, f), f->octets);
-                memcpy(&val_b, FIELD_PTR(all_fields_buffer2, f), f->octets);
-                if (val_b < val_a) {
-                    val_a = val_b;
-                    memcpy(FIELD_PTR(all_fields_buffer1, f), &val_a, f->octets);
-                }
+              case SK_FIELD_MIN_STARTTIME_MSEC:
+                MIN_MERGE_INT_PTRS(uint64_t, FIELD_PTR(all_fields_buffer1, f),
+                                   FIELD_PTR(all_fields_buffer2, f));
                 break;
 
-              case SK_FIELD_MAX_ENDTIME:
-                memcpy(&val_a, FIELD_PTR(all_fields_buffer1, f), f->octets);
-                memcpy(&val_b, FIELD_PTR(all_fields_buffer2, f), f->octets);
-                if (val_b > val_a) {
-                    val_a = val_b;
-                    memcpy(FIELD_PTR(all_fields_buffer1, f), &val_a, f->octets);
-                }
+              case SK_FIELD_MAX_ENDTIME_MSEC:
+                MAX_MERGE_INT_PTRS(uint64_t, FIELD_PTR(all_fields_buffer1, f),
+                                   FIELD_PTR(all_fields_buffer2, f));
                 break;
-#endif  /* SKUNIQ_USE_MEMCPY */
 
               default:
                 break;
@@ -962,11 +998,9 @@ skFieldListCompareBuffers(
               case SK_FIELD_PACKETS:
               case SK_FIELD_BYTES:
               case SK_FIELD_STARTTIME:
-              case SK_FIELD_STARTTIME_MSEC:
               case SK_FIELD_ELAPSED:
               case SK_FIELD_ELAPSED_MSEC:
               case SK_FIELD_ENDTIME:
-              case SK_FIELD_ENDTIME_MSEC:
               case SK_FIELD_RECORDS:
               case SK_FIELD_SUM_ELAPSED:
               case SK_FIELD_MIN_STARTTIME:
@@ -1000,6 +1034,11 @@ skFieldListCompareBuffers(
 
               case SK_FIELD_SUM_PACKETS:
               case SK_FIELD_SUM_BYTES:
+              case SK_FIELD_SUM_ELAPSED_MSEC:
+              case SK_FIELD_STARTTIME_MSEC:
+              case SK_FIELD_ENDTIME_MSEC:
+              case SK_FIELD_MIN_STARTTIME_MSEC:
+              case SK_FIELD_MAX_ENDTIME_MSEC:
                 CMP_INT_PTRS(rv, uint64_t, FIELD_PTR(all_fields_buffer1, f),
                              FIELD_PTR(all_fields_buffer2, f));
                 break;
@@ -1045,11 +1084,9 @@ skFieldListEntryCompareBuffers(
           case SK_FIELD_PACKETS:
           case SK_FIELD_BYTES:
           case SK_FIELD_STARTTIME:
-          case SK_FIELD_STARTTIME_MSEC:
           case SK_FIELD_ELAPSED:
           case SK_FIELD_ELAPSED_MSEC:
           case SK_FIELD_ENDTIME:
-          case SK_FIELD_ENDTIME_MSEC:
           case SK_FIELD_RECORDS:
           case SK_FIELD_SUM_ELAPSED:
           case SK_FIELD_MIN_STARTTIME:
@@ -1080,6 +1117,11 @@ skFieldListEntryCompareBuffers(
 
           case SK_FIELD_SUM_PACKETS:
           case SK_FIELD_SUM_BYTES:
+          case SK_FIELD_SUM_ELAPSED_MSEC:
+          case SK_FIELD_STARTTIME_MSEC:
+          case SK_FIELD_ENDTIME_MSEC:
+          case SK_FIELD_MIN_STARTTIME_MSEC:
+          case SK_FIELD_MAX_ENDTIME_MSEC:
             CMP_INT_PTRS(rv, uint64_t, field_buffer1, field_buffer2);
             break;
 
@@ -1741,42 +1783,46 @@ static struct allowed_fieldid_st {
     sk_fieldid_t    fieldid;
     uint8_t         kvd;
 } allowed_fieldid[] = {
-    {SK_FIELD_SIPv4,            KEY_DISTINCT},
-    {SK_FIELD_DIPv4,            KEY_DISTINCT},
-    {SK_FIELD_SPORT,            KEY_DISTINCT},
-    {SK_FIELD_DPORT,            KEY_DISTINCT},
-    {SK_FIELD_PROTO,            KEY_DISTINCT},
-    {SK_FIELD_PACKETS,          KEY_DISTINCT},
-    {SK_FIELD_BYTES,            KEY_DISTINCT},
-    {SK_FIELD_FLAGS,            KEY_DISTINCT},
-    {SK_FIELD_STARTTIME,        KEY_DISTINCT},
-    {SK_FIELD_ELAPSED,          KEY_DISTINCT},
-    {SK_FIELD_ENDTIME,          KEY_DISTINCT},
-    {SK_FIELD_SID,              KEY_DISTINCT},
-    {SK_FIELD_INPUT,            KEY_DISTINCT},
-    {SK_FIELD_OUTPUT,           KEY_DISTINCT},
-    {SK_FIELD_NHIPv4,           KEY_DISTINCT},
-    {SK_FIELD_INIT_FLAGS,       KEY_DISTINCT},
-    {SK_FIELD_REST_FLAGS,       KEY_DISTINCT},
-    {SK_FIELD_TCP_STATE,        KEY_DISTINCT},
-    {SK_FIELD_APPLICATION,      KEY_DISTINCT},
-    {SK_FIELD_FTYPE_CLASS,      KEY_DISTINCT},
-    {SK_FIELD_FTYPE_TYPE,       KEY_DISTINCT},
-    {SK_FIELD_STARTTIME_MSEC,   KEY_DISTINCT},
-    {SK_FIELD_ENDTIME_MSEC,     KEY_DISTINCT},
-    {SK_FIELD_ELAPSED_MSEC,     KEY_DISTINCT},
-    {SK_FIELD_ICMP_TYPE,        KEY_DISTINCT},
-    {SK_FIELD_ICMP_CODE,        KEY_DISTINCT},
-    {SK_FIELD_SIPv6,            KEY_DISTINCT},
-    {SK_FIELD_DIPv6,            KEY_DISTINCT},
-    {SK_FIELD_NHIPv6,           KEY_DISTINCT},
-    {SK_FIELD_RECORDS,          VALUE_ONLY},
-    {SK_FIELD_SUM_PACKETS,      VALUE_ONLY},
-    {SK_FIELD_SUM_BYTES,        VALUE_ONLY},
-    {SK_FIELD_SUM_ELAPSED,      VALUE_ONLY},
-    {SK_FIELD_MIN_STARTTIME,    VALUE_ONLY},
-    {SK_FIELD_MAX_ENDTIME,      VALUE_ONLY},
-    {SK_FIELD_CALLER,           KEY_VALUE_DISTINCT}
+    {SK_FIELD_SIPv4,                KEY_DISTINCT},
+    {SK_FIELD_DIPv4,                KEY_DISTINCT},
+    {SK_FIELD_SPORT,                KEY_DISTINCT},
+    {SK_FIELD_DPORT,                KEY_DISTINCT},
+    {SK_FIELD_PROTO,                KEY_DISTINCT},
+    {SK_FIELD_PACKETS,              KEY_DISTINCT},
+    {SK_FIELD_BYTES,                KEY_DISTINCT},
+    {SK_FIELD_FLAGS,                KEY_DISTINCT},
+    {SK_FIELD_STARTTIME,            KEY_DISTINCT},
+    {SK_FIELD_ELAPSED,              KEY_DISTINCT},
+    {SK_FIELD_ENDTIME,              KEY_DISTINCT},
+    {SK_FIELD_SID,                  KEY_DISTINCT},
+    {SK_FIELD_INPUT,                KEY_DISTINCT},
+    {SK_FIELD_OUTPUT,               KEY_DISTINCT},
+    {SK_FIELD_NHIPv4,               KEY_DISTINCT},
+    {SK_FIELD_INIT_FLAGS,           KEY_DISTINCT},
+    {SK_FIELD_REST_FLAGS,           KEY_DISTINCT},
+    {SK_FIELD_TCP_STATE,            KEY_DISTINCT},
+    {SK_FIELD_APPLICATION,          KEY_DISTINCT},
+    {SK_FIELD_FTYPE_CLASS,          KEY_DISTINCT},
+    {SK_FIELD_FTYPE_TYPE,           KEY_DISTINCT},
+    {SK_FIELD_STARTTIME_MSEC,       KEY_DISTINCT},
+    {SK_FIELD_ENDTIME_MSEC,         KEY_DISTINCT},
+    {SK_FIELD_ELAPSED_MSEC,         KEY_DISTINCT},
+    {SK_FIELD_ICMP_TYPE,            KEY_DISTINCT},
+    {SK_FIELD_ICMP_CODE,            KEY_DISTINCT},
+    {SK_FIELD_SIPv6,                KEY_DISTINCT},
+    {SK_FIELD_DIPv6,                KEY_DISTINCT},
+    {SK_FIELD_NHIPv6,               KEY_DISTINCT},
+    {SK_FIELD_RECORDS,              VALUE_ONLY},
+    {SK_FIELD_SUM_PACKETS,          VALUE_ONLY},
+    {SK_FIELD_SUM_BYTES,            VALUE_ONLY},
+    {SK_FIELD_SUM_ELAPSED,          VALUE_ONLY},
+    {SK_FIELD_SUM_ELAPSED_MSEC,     VALUE_ONLY},
+    {SK_FIELD_MIN_STARTTIME,        VALUE_ONLY},
+    {SK_FIELD_MAX_ENDTIME,          VALUE_ONLY},
+    {SK_FIELD_MIN_STARTTIME_MSEC,   VALUE_ONLY},
+    {SK_FIELD_MAX_ENDTIME_MSEC,     VALUE_ONLY},
+
+    {SK_FIELD_CALLER,               KEY_VALUE_DISTINCT}
 };
 
 
@@ -3579,6 +3625,10 @@ struct sk_unique_st {
      * across all bins */
     total_distinct_t        total_dist;
 
+    /* when creating the hash table, the estimated number of entries
+     * for the table */
+    uint64_t                ht_estimated;
+
     /* index of the intermediate temp file member 'temp_fp'. if temp
      * files have been written, its value is one more than the temp
      * file most recently written. */
@@ -3698,7 +3748,7 @@ uniqueCreateHashTable(
                                     no_val,
                                     NULL,
                                     0,
-                                    HASH_INITIAL_SIZE,
+                                    uniq->ht_estimated,
                                     DEFAULT_LOAD_FACTOR);
     if (NULL == uniq->ht) {
         skAppPrintOutOfMemory("hash table");
@@ -3765,6 +3815,7 @@ uniqueDumpHashToTemp(
     distinct_value_t *distincts;
     uint8_t *hash_key;
     uint8_t *hash_val;
+    uint64_t entry_count;
     HASH_ITER ithash;
 
     assert(uniq);
@@ -3778,12 +3829,19 @@ uniqueDumpHashToTemp(
                                  COMP_FUNC_CAST(skFieldListCompareBuffers),
                                  (void*)uniq->fi.key_fields);
 
+    /* use the table's current entry count to set the initial entry
+     * for when the table is re-created */
+    entry_count = hashlib_count_entries(uniq->ht);
+    if (uniq->ht_estimated < (entry_count >> 1)) {
+        uniq->ht_estimated = entry_count >> 1;
+    }
+
     /* create an iterator for the hash table */
     ithash = hashlib_create_iterator(uniq->ht);
 
     if (0 == uniq->fi.distinct_num_fields) {
         uniqDebug(uniq, "Writing %" PRIu64 " key/value paris to #%d...",
-                  hashlib_count_entries(uniq->ht), uniq->temp_idx);
+                  entry_count, uniq->temp_idx);
 
         /* iterate over the hash entries */
         while (hashlib_iterate(uniq->ht, &ithash, &hash_key, &hash_val)
@@ -3805,8 +3863,7 @@ uniqueDumpHashToTemp(
     } else {
         uniqDebug(uniq, ("Writing %" PRIu64
                          " key/value/distinct triples to #%d, #%d..."),
-                  hashlib_count_entries(uniq->ht), uniq->temp_idx,
-                  uniq->max_temp_idx);
+                  entry_count, uniq->temp_idx, uniq->max_temp_idx);
 
         while (hashlib_iterate(uniq->ht, &ithash, &hash_key, &hash_val)
                != ERR_NOMOREENTRIES)
@@ -3847,6 +3904,7 @@ skUniqueCreate(
         return -1;
     }
 
+    u->ht_estimated = HASH_INITIAL_SIZE;
     u->temp_idx = -1;
     u->max_temp_idx = -1;
 

@@ -50,6 +50,10 @@
    records containing IPV6 addresses. */
 #undef ENABLE_IPV6
 
+/* Define to 1 include support for processing MaxMind GeoIP2 binary files.
+   Requires the libmaxminddb library and the <maxminddb.h> header file. */
+#undef ENABLE_LIBMAXMINDDB
+
 /* Define to 1 to use the local timezone for command input and printing
    records. Define to 0 to use UTC. */
 #undef ENABLE_LOCALTIME

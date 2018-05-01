@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SILK_TYPES_H, "$SiLK: silk_types.h bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENTVAR(rcsID_SILK_TYPES_H, "$SiLK: silk_types.h bb84763f2e4c 2018-03-12 18:29:55Z mthomas $");
 
 /**
  *  @file
@@ -66,49 +66,103 @@ typedef struct skipaddr_st {
  */
 typedef enum {
     /**
-     *  Canonical form: dotted quad for IPv4 or hexadectet for
-     *  IPv6. This uses inet_ntop(3) which prints ::ffff:0:0/96 and
-     *  some parts of ::/96 using a mixture of IPv6 and IPv4.
+     *  Canonical format: dotted quad for IPv4 and colon-separated
+     *  hexadecimal for IPv6.  This format calls the inet_ntop(3)
+     *  function which uses a mixture of IPv4 and IPV6 addresss for
+     *  IPv6 addresses that occur in the ::ffff:0:0/96 and ::/96
+     *  netblocks (except ::/127), such as ::192.0.2.1 and
+     *  ::ffff:192.0.2.1.
      *
      *  The maximum length of this string is 15 for IPv4, 39 for IPv6,
      *  18 for IPv4/CIDR, 43 for IPv6/CIDR.
-     */
-    SKIPADDR_CANONICAL,
-    /**
-     *  Similar to the canonical form, except pad each octet of an
-     *  IPv4 with leading zeros so the octet has exactly three
-     *  characters.  For an IPv6 address, do not use :: shortening and
-     *  pad each hexadectet with leading zeros so it has exactly four
-     *  characters.  Useful for string comparisons.
      *
-     *  String lengths are the same as canonical.
+     *  May be used with SKIPADDR_ZEROPAD and either SKIPADDR_MAP_V4
+     *  or SKIPADDR_UNMAP_V6.
      */
-    SKIPADDR_ZEROPAD,
+    SKIPADDR_CANONICAL = 0,
     /**
      *  Value as an integer number, printed as decimal.
      *
      *  The maximum length of this string is 10 for IPv4, 39 for IPv6,
      *  13 for IPv4/CIDR, 43 for IPv6/CIDR.
+     *
+     *  May be used with SKIPADDR_ZEROPAD and either SKIPADDR_MAP_V4
+     *  or SKIPADDR_UNMAP_V6.
      */
-    SKIPADDR_DECIMAL,
+    SKIPADDR_DECIMAL = 1u,
     /**
      *  Value as an integer number, printed as hexadecimal.
      *
      *  The maximum length of this string is 8 for IPv4, 32 for IPv6,
      *  11 for IPv4/CIDR, 36 for IPv6/CIDR.
-     */
-    SKIPADDR_HEXADECIMAL,
-    /**
-     *  Similar to the canonical format of IPv6, but never uses a
-     *  mixture of IPv4 and IPv6, and IPv4 addresses are always printed
-     *  in the ::ffff:0:0/96 netblock.
      *
-     *  String lengths are the same as canonical unless only IPv4
-     *  addresses are present.  For that case, maximum string length
-     *  is 16 for IPv4-as-IPv6, 20 for IPv4-as-IPv6/CIDR.
+     *  May be used with SKIPADDR_ZEROPAD and either
+     *  SKIPADDR_MAP_V4 or SKIPADDR_UNMAP_V6.
      */
-    SKIPADDR_FORCE_IPV6
+    SKIPADDR_HEXADECIMAL = 2u,
+    /**
+     *  Print IPv4 addresses in the canonical form.  Print IPv6 in the
+     *  canonical form but use only hexadecimal numbers and never a
+     *  mixture of IPv4 and IPv6.  That is, prints ::c000:201 instead
+     *  of ::192.0.2.1.
+     *
+     *  May be used with SKIPADDR_ZEROPAD and either SKIPADDR_MAP_V4
+     *  or SKIPADDR_UNMAP_V6.
+     *
+     *  Since SiLK 3.17.0.
+     */
+    SKIPADDR_NO_MIXED = 3u,
+    /**
+     *  Apply any other formatting, and then pad with zeros to expand
+     *  the string to the maximum width: Each IPv4 octet has three
+     *  characters, each IPv6 hexadectet has 4 characters, decimal and
+     *  hexadecimal numbers have leading zeros.  Useful for string
+     *  comparisons.
+     *
+     *  May be used with any other skipaddr_flags_t.
+     */
+    SKIPADDR_ZEROPAD = (1u << 7),
+    /**
+     *  Map each IPv4 address into the IPv6 ::ffff:0:0/96 netblock and
+     *  then apply other formatting.  Has no effect on IPv6 addresses.
+     *
+     *  May be used with any other skipaddr_flags_t except
+     *  SKIPADDR_UNMAP_V6.
+     *
+     *  Since SiLK 3.17.0.
+     */
+    SKIPADDR_MAP_V4 = (1u << 8),
+    /**
+     *  For each IPv4-mapped IPv6 address (i.e., IPv6 addresses in the
+     *  ::ffff:0:0/96 netblock), convert the address to IPv4 and then
+     *  apply other formatting.  Has no effect on IPv4 addresses or on
+     *  IPv6 addresses outside of the ::ffff:0:0/96 netblock.
+     *
+     *  May be used with any other skipaddr_flags_t except
+     *  SKIPADDR_MAP_V4 and SKIPADDR_FORCE_IPV6.
+     *
+     *  Since SiLK 3.17.0.
+     */
+    SKIPADDR_UNMAP_V6 = (1u << 9),
+    /**
+     *  Map each IPv4 address into the IPv6 ::ffff:0:0/96 netblock and
+     *  then apply the SKIPADDR_NO_MIXED format.
+     *
+     *  May be used with SKIPADDR_ZEROPAD.
+     */
+    SKIPADDR_FORCE_IPV6 = (SKIPADDR_MAP_V4 | SKIPADDR_NO_MIXED)
 } skipaddr_flags_t;
+
+/**
+ *    Minimum required size of character buffer that holds the printed
+ *    representation of an IP address.  skipaddrString() expects (and
+ *    assumes) a buffer of at least this size.
+ *
+ *    The length is taken from INET6_ADDRSTRLEN used by inet_ntop(),
+ *    which can return "0000:0000:0000:0000:0000:ffff:000.000.000.000"
+ */
+#define SKIPADDR_STRLEN     46
+#define SK_NUM2DOT_STRLEN   SKIPADDR_STRLEN
 
 /**
  *    How to handle IPv6 Flow records.
@@ -125,13 +179,6 @@ typedef enum sk_ipv6policy_en {
     /** only return IPv6 flows that were marked as IPv6 */
     SK_IPV6POLICY_ONLY = 2
 } sk_ipv6policy_t;
-
-/**
- *    Length of buffer required to hold an IPv6 address.  This is
- *    taken from INET6_ADDRSTRLEN used by inet_ntop(), which can
- *    return "0000:0000:0000:0000:0000:00FF:000.000.000.000"
- */
-#define SK_NUM2DOT_STRLEN 46
 
 /**
  *    A special structure of IP Addresses.  It is defined in utils.h

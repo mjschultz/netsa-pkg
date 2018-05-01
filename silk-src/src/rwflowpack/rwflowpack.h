@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWFLOWPACK_H, "$SiLK: rwflowpack.h 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENTVAR(rcsID_RWFLOWPACK_H, "$SiLK: rwflowpack.h cf1383c6db4f 2018-03-26 19:42:13Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/libflowsource.h>
@@ -71,26 +71,34 @@ struct packlogic_plugin_st {
      *  called with this structure as its argument; it should set the
      *  function pointers listed below.
      */
-    int               (*initialize_fn)(packlogic_plugin_t *packlogic);
+    int
+    (*initialize_fn)(
+        packlogic_plugin_t *packlogic);
 
     /**
      *  Site-specific setup function, called after the site
      *  configuration file (silk.conf) has been loaded but before
      *  parsing the sensor.conf file.
      */
-    int               (*setup_fn)(void);
+    int
+    (*setup_fn)(
+        void);
 
     /**
      *  Site-specific teardown function.
      */
-    void              (*teardown_fn)(void);
+    void
+    (*teardown_fn)(
+        void);
 
 
     /**
      *  Site-specific function to verify that a sensor has all the
      *  information it requires to pack flow records.
      */
-    int               (*verify_sensor_fn)(skpc_sensor_t *sensor);
+    int
+    (*verify_sensor_fn)(
+        skpc_sensor_t  *sensor);
 
     /**
      *  A function that determines the flow type(s) and sensorID(s) of
@@ -113,18 +121,38 @@ struct packlogic_plugin_st {
      *  this record from this probe; a value of -1 indicates an error
      *  condition.
      */
-    int               (*determine_flowtype_fn)(const skpc_probe_t  *probe,
-                                               const rwRec         *rwrec,
-                                               sk_flowtype_id_t    *ftypes,
-                                               sk_sensor_id_t      *sensorids);
+    int
+    (*determine_flowtype_fn)(
+        const skpc_probe_t *probe,
+        const rwRec        *rwrec,
+        sk_flowtype_id_t   *ftypes,
+        sk_sensor_id_t     *sensorids);
+
+    /**
+     *  A function that determines the record format and version to
+     *  use for records whose flowtype is 'ftype'.  The 'probe'
+     *  parameter contains the probe where records are collected.
+     *
+     *  The caller is expected to set 'version' and return the format.
+     *
+     *  Added in SiLK 3.17.0.  If not defined, the
+     *  determine_fileformat_fn is called if it is defined.
+     */
+    sk_file_format_t
+    (*determine_formatversion_fn)(
+        const skpc_probe_t *probe,
+        sk_flowtype_id_t    ftype,
+        sk_file_version_t  *version);
 
     /**
      *  A function that determines the file format to use for records
      *  whose flowtype is 'ftype'.  The 'probe' parameter contains the
      *  probe where records are collected.
      */
-    sk_file_format_t  (*determine_fileformat_fn)(const skpc_probe_t    *probe,
-                                                 sk_flowtype_id_t       ftype);
+    sk_file_format_t
+    (*determine_fileformat_fn)(
+        const skpc_probe_t *probe,
+        sk_flowtype_id_t    ftype);
 };
 
 

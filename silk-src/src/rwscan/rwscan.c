@@ -8,11 +8,10 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwscan.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwscan.c bfc1c9286601 2018-03-15 20:35:23Z mthomas $");
 
 #include "rwscan.h"
 #include "rwscan_db.h"
-#include "rwscan_workqueue.h"
 
 
 /* EXTERNAL VARIABLE DEFINITIONS */
@@ -300,6 +299,8 @@ worker_thread(
 
     rwRec           *flows;
     event_metrics_t *metrics;
+    skipaddr_t       ipaddr;
+    char             ipstr[SKIPADDR_STRLEN];
 
     /* ignore all signals */
     skthread_ignore_signals();
@@ -325,9 +326,10 @@ worker_thread(
 
         pthread_mutex_unlock(&work_queue->mutex);
 
+        skipaddrSetV4(&ipaddr, &metrics->sip);
+        skipaddrString(ipstr, &ipaddr, 0);
         print_verbose_results((RWSCAN_VERBOSE_FH, "%d. %s [%d] (%u) ",
-                               cleanup_node->threadnum,
-                               num2dot(metrics->sip),
+                               cleanup_node->threadnum, ipstr,
                                metrics->protocol, metrics->event_size));
 
         if ((metrics->protocol == IPPROTO_TCP)
@@ -456,7 +458,6 @@ process_file(
     skstream_t      *in;
     rwRec           *event_flows = NULL; /* all flows for a given sip/proto */
     rwRec            rwrec;              /* holds each record read */
-    static char      ipstr[SK_NUM2DOT_STRLEN];
     uint32_t         last_sip   = 0;
     uint32_t         last_proto = 0;
     int              done       = 0;
@@ -509,13 +510,15 @@ process_file(
             /* If we have flows to examine, do so. */
             if (metrics->event_size > 0) {
                 worker_thread_data_t *mywork = NULL;
+                uint32_t prog_ip;
 
-                if ((last_sip & options.verbose_progress)
-                    != (rwRecGetSIPv4(&rwrec) & options.verbose_progress))
-                {
-                    num2dot_r(rwRecGetSIPv4(&rwrec) & options.verbose_progress,
-                              ipstr);
-                    fprintf(RWSCAN_VERBOSE_FH, "progress: %s\n", ipstr);
+                prog_ip = rwRecGetSIPv4(&rwrec) & options.verbose_progress;
+                if ((last_sip & options.verbose_progress) != prog_ip) {
+                    char ipstr[SKIPADDR_STRLEN];
+                    skipaddr_t ipaddr;
+                    skipaddrSetV4(&ipaddr, &prog_ip);
+                    fprintf(RWSCAN_VERBOSE_FH, "progress: %s\n",
+                            skipaddrString(ipstr, &ipaddr, 0));
                 }
                 mywork = ((worker_thread_data_t*)
                           calloc(1, sizeof(worker_thread_data_t)));

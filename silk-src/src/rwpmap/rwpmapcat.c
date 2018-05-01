@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmapcat.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: rwpmapcat.c 95aec76c40ea 2018-03-13 21:09:01Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
@@ -792,28 +792,12 @@ printRangesIP(
         if (skPrefixMapGetContentType(pmap) == SKPREFIXMAP_CONT_ADDR_V6) {
             /* support 3-digit CIDR prefix */
             cidr_extra = 1;
-            if (SKIPADDR_HEXADECIMAL == ip_format) {
-                ip_width = 32;
-            } else {
-                ip_width = 39;
-            }
+            ip_width = skipaddrStringMaxlen(1, ip_format);
         } else {
-            switch (ip_format) {
-              case SKIPADDR_DECIMAL:
-                ip_width = 10;
-                break;
-              case SKIPADDR_HEXADECIMAL:
-                ip_width = 8;
-                break;
-              case SKIPADDR_FORCE_IPV6:
-                /* "255.255.255.255" == "::ffff:ffff:ffff" */
-                ip_width = 16;
+            ip_width = skipaddrStringMaxlen(0, ip_format);
+            if (ip_format & SKIPADDR_MAP_V4) {
                 cidr_extra = 1;
                 prefix_adjust = 96;
-                break;
-              default:
-                ip_width = 15;
-                break;
             }
         }
         if (opt_country_codes) {

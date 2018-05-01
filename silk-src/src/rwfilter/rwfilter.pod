@@ -1142,8 +1142,9 @@ specified in I<COUNTRY_CODE_LIST>.  For B<--scc>, the source IP must
 match.  For B<--dcc>, the destination IP must match.  For B<--any-cc>,
 either the source or the destination must match.  I<COUNTRY_CODE_LIST>
 is a comma separated list of lowercase two-letter country
-codes---based on the Root-Zone Whois Index (see for example
-L<http://www.iana.org/cctld/cctld-whois.htm>)---as well as the
+codes---defined by ISO 3166-1 (see for example
+L<https://www.iso.org/iso-3166-country-codes.html> or
+L<https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2>)---as well as the
 following special codes:
 
 =over 4
@@ -2014,7 +2015,7 @@ Analysis>
 
 =cut
 
-$SiLK: rwfilter.pod 118af073bc56 2017-06-05 18:13:10Z mthomas $
+$SiLK: rwfilter.pod c95fb6174130 2018-04-13 20:33:46Z mthomas $
 
 Local Variables:
 mode:text

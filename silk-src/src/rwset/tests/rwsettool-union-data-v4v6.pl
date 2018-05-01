@@ -1,7 +1,7 @@
 #! /usr/bin/perl -w
 # MD5: multiple
 # TEST: multiple
-# RCSIDENT("$SiLK: rwsettool-union-data-v4v6.pl 6ed5a5c04fbe 2013-01-31 20:17:06Z mthomas $")
+# RCSIDENT("$SiLK: rwsettool-union-data-v4v6.pl 62a32b7637cc 2018-03-16 17:30:43Z mthomas $")
 
 use strict;
 use SiLKTests;
@@ -114,6 +114,6 @@ my %md5s = (
     );
 for my $s (keys %sets) {
     $md5 = $md5s{$s};
-    $cmd = "$rwsetcat --cidr $sets{$s}";
+    $cmd = "$rwsetcat --cidr --ip-format=map-v4 $sets{$s}";
     check_md5_output($md5, $cmd);
 }

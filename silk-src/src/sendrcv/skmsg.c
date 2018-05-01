@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skmsg.c f6b044e2ec71 2018-02-07 14:46:44Z mthomas $");
+RCSIDENT("$SiLK: skmsg.c fa912203de3c 2018-04-02 21:17:14Z mthomas $");
 
 #include "intdict.h"
 #include "multiqueue.h"
@@ -1801,7 +1801,7 @@ static int
 skMsgGnuTLSMutexInit(
     void             **priv)
 {
-    pthread_mutex_t *lock = malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_t *lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
 
     *priv = lock;
     if (NULL == lock) {

@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skpolldir.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: skpolldir.c b93a31269ed2 2018-04-16 20:49:56Z mthomas $");
 
 #include <silk/skdeque.h>
 #include <silk/redblack.h>
@@ -305,6 +305,38 @@ static skTimerRepeat_t
 pollDir(
     void               *vpd)
 {
+    /*
+     *    Things to try in order to improve performance:
+     *
+     *    Use inode to improve comparison times when accessing the
+     *    red-black tree.
+     *
+     *    Make the readdir loop shorter so that its job is to filter
+     *    out files that begin with '.' or where the 'd_type' is
+     *    unwanted; all other files it puts into a temporary Deque
+     *    (the scan_deque).  Provide a second thread that reads file
+     *    names from scan_deque and stat()s the files, updates the
+     *    red-black tree, etc.
+     *
+     *    If we add scan_deque, allow multiple threads to process its
+     *    entries.  To do this, we would need a mutex around the call
+     *    to rbsearch().  Alternately, we could change to rbsearch()
+     *    to rbfind(), and add any new files to another structure.
+     *    Existing nodes in the red-black tree could have their 'seen'
+     *    bit flipped since that does not affect the red-black tree
+     *    directly.  Once all files in scan_deque have been handled,
+     *    the new files then added to the red-black tree.  We could
+     *    also remove unseen elements before adding the new entries,
+     *    which might slightly improvement performance.
+     *
+     *    The scan_deque could also allow for multiple readers of the
+     *    directory.
+     *
+     *    It may be possible to avoid the scan_deque and have use
+     *    readdir_r() to put the directory entries directly into the
+     *    threads that process the entries.
+     */
+
     sk_polldir_t *pd = (sk_polldir_t *)vpd;
     DIR *dir;
     struct dirent *entry;
@@ -341,6 +373,18 @@ pollDir(
     while (PDERR_NONE == pd->error &&
            (entry = readdir(dir)))
     {
+#ifdef SK_HAVE_STRUCT_DIRENT_D_TYPE
+        switch (entry->d_type) {
+          case DT_UNKNOWN:
+          case DT_REG:
+          case DT_LNK:
+            break;
+          default:
+            TRACEMSG(2, ("polldir %p: File '%s' was ignored (non-file [%d])",
+                         pd, entry->d_name, entry->d_type));
+            continue;
+        }
+#endif  /* SK_HAVE_STRUCT_DIRENT_D_TYPE */
 
         /* Ignore dot files. */
         if (entry->d_name[0] == '.') {
@@ -353,15 +397,17 @@ pollDir(
         strcpy(path + pd->filename_offset, entry->d_name);
 
         /* Ignore files that are empty, or that aren't either regular
-           files or symbolic links. */
+         * files or symbolic links. */
         rv = stat(path, &st);
-        if (rv == -1
+        if (-1 == rv
             || !(st.st_mode & (S_IFREG | S_IFLNK))
             || (0 == st.st_size))
         {
             TRACEMSG(2, ("polldir %p: File '%s' was ignored (%s)",
                          pd, entry->d_name,
-                         ((0 == st.st_size) ? "zero-bytes" : "non-file")));
+                         ((-1 == rv)
+                          ? strerror(errno)
+                          : ((0 == st.st_size) ? "zero-bytes" : "non-file"))));
             continue;
         }
 
@@ -729,7 +775,8 @@ skPollDirGetNextFile(
         item = NULL;
     }
 
-    TRACEMSG(2, ("polldir %p: File '%s' was delivered", pd, item->name));
+    TRACEMSG(2, ("polldir %p: File '%s' was delivered",
+                 pd, (filename ? *filename : path)));
 
     return PDERR_NONE;
 }

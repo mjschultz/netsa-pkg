@@ -29,7 +29,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmaplookup.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: rwpmaplookup.c 95aec76c40ea 2018-03-13 21:09:01Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
@@ -471,35 +471,20 @@ appSetup(
             col_width[PMAPLOOKUP_FIELD_BLOCK] =
                 1 + (2 * col_width[PMAPLOOKUP_FIELD_KEY]);
         } else if (PMAPLOOKUP_TYPE_CHECK_IPV6(pmaplookup_type)) {
-            if (ip_format == SKIPADDR_HEXADECIMAL) {
-                col_width[PMAPLOOKUP_FIELD_KEY] = 32;
-            } else {
-                col_width[PMAPLOOKUP_FIELD_KEY] = 39;
-            }
+            col_width[PMAPLOOKUP_FIELD_KEY]
+                = skipaddrStringMaxlen(1, ip_format);
             /* block is IP + "/128" */
             col_width[PMAPLOOKUP_FIELD_BLOCK]
                 = col_width[PMAPLOOKUP_FIELD_KEY] + 1 + 3;
             col_width[PMAPLOOKUP_FIELD_INPUT] = 39;
         } else {
-            switch (ip_format) {
-              case SKIPADDR_DECIMAL:
-                col_width[PMAPLOOKUP_FIELD_KEY] = 10;
-                break;
-              case SKIPADDR_HEXADECIMAL:
-                col_width[PMAPLOOKUP_FIELD_KEY] = 8;
-                break;
-              case SKIPADDR_FORCE_IPV6:
-                col_width[PMAPLOOKUP_FIELD_KEY] = 16;
-                break;
-              default:
-                col_width[PMAPLOOKUP_FIELD_KEY] = 15;
-                break;
-            }
+            col_width[PMAPLOOKUP_FIELD_KEY]
+                = skipaddrStringMaxlen(0, ip_format);
             /* block is IP + "/32" or it is IP + "/128" when
-             * SKIPADDR_FORCE_IPV6 is active */
+             * SKIPADDR_MAP_V4 is active */
             col_width[PMAPLOOKUP_FIELD_BLOCK]
                 = (col_width[PMAPLOOKUP_FIELD_KEY] + 1 + 2
-                   + (ip_format == SKIPADDR_FORCE_IPV6));
+                   + ((ip_format & SKIPADDR_MAP_V4) ? 1 : 0));
         }
         col_width[PMAPLOOKUP_FIELD_START_BLOCK]
             = col_width[PMAPLOOKUP_FIELD_END_BLOCK]
@@ -930,7 +915,7 @@ printAddress(
         skCountryLookupName(ip, label, sizeof(label));
         if (printing_block) {
             skCountryLookupCodeAndRange(ip, &start_ip, &end_ip);
-            if (ip_format == SKIPADDR_FORCE_IPV6 && !skipaddrIsV6(&start_ip)) {
+            if ((ip_format & SKIPADDR_MAP_V4) && !skipaddrIsV6(&start_ip)) {
                 cidr_adjust = 96;
             }
         }
@@ -942,7 +927,7 @@ printAddress(
         skPrefixMapFindString(map, ip, label, sizeof(label));
         if (printing_block) {
             skPrefixMapFindRange(map, ip, &start_ip, &end_ip);
-            if (ip_format == SKIPADDR_FORCE_IPV6 && !skipaddrIsV6(&start_ip)) {
+            if ((ip_format & SKIPADDR_MAP_V4) && !skipaddrIsV6(&start_ip)) {
                 cidr_adjust = 96;
             }
         }

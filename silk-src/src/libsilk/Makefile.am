@@ -1,15 +1,15 @@
-# RCSIDENT("$SiLK: Makefile.am d45c27ed70a8 2018-02-15 23:12:26Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 5b0341959511 2018-04-19 14:45:30Z mthomas $");
 
 # Installed Targets
 
 bin_PROGRAMS = silk_config
 
 lib_LTLIBRARIES = libsilk.la libsilk-thrd.la
-libsilk_version = 24:1:0
-# At previous release: libsilk_version = 24:1:0
+libsilk_version = 25:0:0
+# At previous release: libsilk_version = 25:0:0
 
-libsilk_thrd_version = 6:3:1
-# At previous release: libsilk_thrd_version = 6:3:1
+libsilk_thrd_version = 6:4:1
+# At previous release: libsilk_thrd_version = 6:4:1
 
 
 EXTRA_DIST = silk_config.pod silk.conf.pod silk.pod
@@ -22,8 +22,8 @@ endif
 pkginclude_HEADERS = hashlib.h iptree.h rwascii.h rwrec.h silk.h	\
 	 silk_files.h silk_types.h skaggbag.h skbag.h skcountry.h	\
 	 skdaemon.h skdeque.h skdllist.h skheader.h skheap.h skipaddr.h \
-	 skipset.h sklog.h skmempool.h skplugin.h skpolldir.h		\
-	 skprefixmap.h skprintnets.h sksite.h skstream.h skstringmap.h	\
+	 skipset.h sklog.h skmempool.h sknetstruct.h skplugin.h		\
+	 skpolldir.h skprefixmap.h sksite.h skstream.h skstringmap.h	\
 	 sktempfile.h skthread.h sktimer.h sktracemsg.h skvector.h	\
 	 utils.h			 				\
 	 redblack/redblack.h $(LEGACY_HDRS) $(EXTRA_HDRS)

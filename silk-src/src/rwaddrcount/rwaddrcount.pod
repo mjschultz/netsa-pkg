@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-B<rwaddrcount> - count activity by IP address
+B<rwaddrcount> - count activity by IPv4 address
 
 =head1 SYNOPSIS
 
@@ -33,6 +33,11 @@ are displayed when the B<--print-recs> switch is given.
 B<rwaddrcount> includes facilities for displaying only those IP
 address whose byte-, packet- or flow-counts are between specified
 minima and maxima.
+
+B<rwaddrcount> does not support IPv6 addresses.  To generate output
+for IPv6 records, use the B<rwuniq(1)> tool:
+
+ rwuniq --fields=sip --values=bytes,packets,records,stime,etime
 
 B<rwaddrcount> reads SiLK Flow records from the files named on the
 command line or from the standard input when no file names are
@@ -171,38 +176,74 @@ Use the TZ environment variable or the local timezone.
 =item B<--ip-format>=I<FORMAT>
 
 For the B<--print-recs> and B<--print-ips> output formats, specify how
-IP addresses are printed.  When this switch is not specified, the
-SILK_IP_FORMAT environment variable is checked for a format.  If it is
-empty or contains an invalid format, IPs are printed in the canonical
-format.  The I<FORMAT> is one of:
+IP addresses are printed, where I<FORMAT> is a comma-separated list of
+the arguments described below.  When this switch is not specified, the
+SILK_IP_FORMAT environment variable is checked for a value and that
+format is used if it is valid.  The default I<FORMAT> is C<canonical>.
+I<Since SiLK 3.7.0.>
 
 =over 4
 
 =item canonical
 
-Print IP addresses in their canonical form, C<127.0.0.1>.
+Print IP addresses in the canonical format: dot-separated decimal for
+IPv4 (C<192.0.2.1>).
 
-=item zero-padded
+=item no-mixed
 
-Print IP addresses in their canonical form, but add zeros to the
-output so it fully fills the width of column.  The address
-C<127.0.0.1> is printed as C<127.000.000.001>.
+Print IP addresses in the canonical format (C<192.0.2.1>).  Prevent
+use of the mixed IPv4-IPv6 representation when C<map-v4> is also
+included in I<FORMAT>.  For example, use C<::ffff:c000:201> instead of
+C<::ffff:192.0.2.1>.  I<Since SiLK 3.17.0>.
 
 =item decimal
 
-Print IP addresses as integers in decimal format.  The address
-C<127.0.0.1> is printed as C<2130706433>.
+Print IP addresses as integers in decimal format.  For example, print
+C<192.0.2.1> and C<::ffff:192.0.2.1> as C<3221225985> and
+C<281473902969345>, respectively.
 
 =item hexadecimal
 
-Print IP addresses as integers in hexadecimal format.  The address
-C<127.0.0.1> is printed as C<7f000001>.
+Print IP addresses as integers in hexadecimal format.  For example,
+print C<192.0.2.1> and C<::ffff:192.0.2.1> as C<c00000201> and
+C<ffffc00000201>, respectively.
+
+=item zero-padded
+
+Make all IP address strings contain the same number of characters by
+padding numbers with leading zeros.  For example, print C<192.0.2.1>
+as C<192.000.002.001>.  For IPv6 addresses, this setting implies
+C<no-mixed>, so that C<::ffff:192.0.2.1> is printed as
+C<0000:0000:0000:0000:0000:ffff:c000:0201>.  As of SiLK 3.17.0, may be
+combined with any of the above, including C<decimal> and
+C<hexadecimal>.
+
+=back
+
+The following arguments modify certain IP addresses prior to printing.
+These arguments may be combined with the above formats.
+
+=over 4
+
+=item map-v4
+
+Change addresses to IPv4-mapped IPv6 addresses (addresses in the
+::ffff:0:0/96 netblock) prior to formatting.  I<Since SiLK 3.17.0>.
+
+=item unmap-v6
+
+Do nothing (B<rwaddrcount> does not support IPv6 addresses as the
+key).  I<Since SiLK 3.17.0>.
+
+=back
+
+The following argument is also available:
+
+=over 4
 
 =item force-ipv6
 
-Print all IP addresses in the canonical form for IPv6 without using
-any IPv4 notation.  Any IPv4 address is mapped into the ::ffff:0:0/96
-netblock.  The address C<127.0.0.1> is printed as C<::ffff:7f00:1>.
+Set I<FORMAT> to C<map-v4>,C<no-mixed>.
 
 =back
 
@@ -214,8 +255,8 @@ be removed in the SiLK 4.0 release.
 
 =item B<--zero-pad-ips>
 
-Print IP addresses as fully-expanded, zero-padded values in their
-canonical form.  This switch is equivalent to
+Print IP addresses as fully-expanded, zero-padded values in the
+canonical format.  This switch is equivalent to
 B<--ip-format=zero-padded>, it is deprecated as of SiLK 3.7.0, and it
 will be removed in the SiLK 4.0 release
 
@@ -372,7 +413,7 @@ with B<--print-recs>
 
  $ rwfilter --start-date=2003/01/17:00 --end-date=2003/01/17:23     \
         --proto=6 --pass=stdout                                     \
-   | rwaddrcount --print-rec | head -3
+   | rwaddrcount --print-rec --no-title | head -3
 
   10.10.10.1|  65792| 147|  21| 2003/01/17T00:19:01| 2003/01/17T02:00:13|
   10.10.10.2| 110744|  89|   7| 2003/01/17T01:21:42| 2003/01/17T01:39:21|
@@ -496,7 +537,7 @@ B<rwset(1)>.
 
 =cut
 
-$SiLK: rwaddrcount.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwaddrcount.pod 95aec76c40ea 2018-03-13 21:09:01Z mthomas $
 
 Local Variables:
 mode:text

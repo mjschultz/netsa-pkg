@@ -32,7 +32,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagbuild.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwbagbuild.c f9d6dfd21826 2018-03-07 21:48:09Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skcountry.h>
@@ -296,6 +296,7 @@ appTeardown(
     skStreamDestroy(&bag_input);
     skStreamDestroy(&set_input);
     skPrefixMapDelete(prefix_map);
+    skCountryTeardown();
 
     skAppUnregister();
 }

@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwascii.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: rwascii.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/rwascii.h>
 #include <silk/skipaddr.h>
@@ -250,32 +250,9 @@ rwAsciiSetWidths(
           case RWREC_FIELD_DIP:
           case RWREC_FIELD_NHIP:
             /* ip numbers */
-#if SK_ENABLE_IPV6
-            if (astream->as_ipv6_policy >= SK_IPV6POLICY_MIX) {
-                /* If IPv6 support is available and IPv6 flows are not
-                 * being ignored */
-                if (astream->as_ipformat == SKIPADDR_HEXADECIMAL) {
-                    field->af_width = 32;
-                } else {
-                    field->af_width = 39;
-                }
-                break;
-            }
-#endif /* SK_ENABLE_IPV6 */
-            switch (astream->as_ipformat) {
-              case SKIPADDR_DECIMAL:
-                field->af_width = 10;
-                break;
-              case SKIPADDR_HEXADECIMAL:
-                field->af_width = 8;
-                break;
-              case SKIPADDR_FORCE_IPV6:
-                field->af_width = 16;
-                break;
-              default:
-                field->af_width = 15;
-                break;
-            }
+            field->af_width = skipaddrStringMaxlen(
+                (astream->as_ipv6_policy >= SK_IPV6POLICY_MIX),
+                astream->as_ipformat);
             break;
 
           case RWREC_FIELD_SPORT:

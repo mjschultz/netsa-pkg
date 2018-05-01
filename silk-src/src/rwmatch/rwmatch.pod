@@ -439,18 +439,19 @@ it contains.
 =item asv4
 
 Convert IPv6 flow records that contain addresses in the ::ffff:0:0/96
-prefix to IPv4 and ignore all other IPv6 flow records.
+netblock (that is, IPv4-mapped IPv6 addresses) to IPv4 and ignore all
+other IPv6 flow records.
 
 =item mix
 
 Process the input as a mixture of IPv4 and IPv6 flow records.  Should
 B<rwmatch> need to compare an IPv4 and IPv6 address, it maps the IPv4
-address into the ::ffff:0:0/96 prefix.
+address into the ::ffff:0:0/96 netblock.
 
 =item force
 
 Convert IPv4 flow records to IPv6, mapping the IPv4 addresses into the
-::ffff:0:0/96 prefix.
+::ffff:0:0/96 netblock.
 
 =item only
 
@@ -757,7 +758,7 @@ switch and added support for IPv6 flow records.
 
 =cut
 
-$SiLK: rwmatch.pod 91fe97970f1f 2017-10-31 21:53:12Z mthomas $
+$SiLK: rwmatch.pod b0e7e8c70cb5 2017-12-15 19:38:06Z mthomas $
 
 Local Variables:
 mode:text

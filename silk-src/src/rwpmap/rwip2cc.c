@@ -25,7 +25,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwip2cc.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwip2cc.c 67fc4f1f5ee2 2018-04-02 19:20:18Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
@@ -142,7 +142,8 @@ appUsageLong(
     ("{--address=IP_ADDRESS | --input-file=FILE} [SWITCHES]\n"               \
      "\tMaps from textual IP address(es) to country code(s) using the\n"     \
      "\tspecified country code map file or the default map.  Must specify\n" \
-     "\ta single address or a file or stream containing textual IPs.\n")
+     "\ta single address or a file or stream containing textual IPs.\n"      \
+     "\tThis tool is deprecated; replace its use with rwpmaplookup.\n")
 
     FILE *fh = USAGE_FH;
 

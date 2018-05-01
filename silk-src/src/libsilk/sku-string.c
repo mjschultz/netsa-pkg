@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-string.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: sku-string.c 7148c54d9884 2018-03-13 19:30:21Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skipaddr.h>
@@ -354,8 +354,11 @@ char *
 num2dot(
     uint32_t            ip)
 {
-    static char tmpbuf[SK_NUM2DOT_STRLEN];
-    return num2dot_r(ip, tmpbuf);
+    static char outbuf[SK_NUM2DOT_STRLEN];
+    skipaddr_t ipaddr;
+
+    skipaddrSetV4(&ipaddr, &ip);
+    return skipaddrString(outbuf, &ipaddr, SKIPADDR_CANONICAL);
 }
 
 
@@ -365,13 +368,10 @@ num2dot_r(
     uint32_t            ip,
     char               *outbuf)
 {
-    snprintf(outbuf, SK_NUM2DOT_STRLEN, "%lu.%lu.%lu.%lu",
-             (unsigned long)((ip >> 24) & 0xFF),
-             (unsigned long)((ip >> 16) & 0xFF),
-             (unsigned long)((ip >> 8) & 0xFF),
-             (unsigned long)(ip & 0xFF));
-    outbuf[SK_NUM2DOT_STRLEN-1] = '\0';
-    return outbuf;
+    skipaddr_t ipaddr;
+
+    skipaddrSetV4(&ipaddr, &ip);
+    return skipaddrString(outbuf, &ipaddr, SKIPADDR_CANONICAL);
 }
 
 
@@ -380,8 +380,12 @@ char *
 num2dot0(
     uint32_t            ip)
 {
-    static char dotted[SK_NUM2DOT_STRLEN];
-    return num2dot0_r(ip, dotted);
+    static char outbuf[SKIPADDR_STRLEN];
+    skipaddr_t ipaddr;
+
+    skipaddrSetV4(&ipaddr, &ip);
+    return skipaddrString(outbuf, &ipaddr,
+                          SKIPADDR_CANONICAL | SKIPADDR_ZEROPAD);
 }
 
 
@@ -391,13 +395,11 @@ num2dot0_r(
     uint32_t            ip,
     char               *outbuf)
 {
-    snprintf(outbuf, SK_NUM2DOT_STRLEN, "%03lu.%03lu.%03lu.%03lu",
-             (unsigned long)((ip >> 24) & 0xFF),
-             (unsigned long)((ip >> 16) & 0xFF),
-             (unsigned long)((ip >> 8) & 0xFF),
-             (unsigned long)(ip & 0xFF));
-    outbuf[SK_NUM2DOT_STRLEN-1] = '\0';
-    return outbuf;
+    skipaddr_t ipaddr;
+
+    skipaddrSetV4(&ipaddr, &ip);
+    return skipaddrString(outbuf, &ipaddr,
+                          SKIPADDR_CANONICAL | SKIPADDR_ZEROPAD);
 }
 
 
@@ -976,6 +978,8 @@ skStringParseNumberListToBitmap(
     sk_number_parser_t parser;
     const char *sp;
     int rv;
+
+    memset(&parser, 0, sizeof(parser));
 
     /* check input */
     assert(out_bitmap);
@@ -1601,7 +1605,7 @@ skStringParseIPWildcard(
         block_size = 16;
         block_base = 16;
 
-        /* check for a v4 section, for example "::FFFF:x.x.x.x".  if
+        /* check for a v4 section, for example "::ffff:x.x.x.x".  if
          * we find a '.', move backward to find the ':' and as
          * v4_in_v6 to the character following the ':'. */
         v4_in_v6 = strchr(sp, '.');

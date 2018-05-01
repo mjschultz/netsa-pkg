@@ -1,5 +1,5 @@
 # -*- makefile -*-
-# RCSIDENT("$SiLK: Makefile-sources 7e6884832fbd 2017-01-20 22:59:46Z mthomas $");
+# RCSIDENT("$SiLK: Makefile-sources f46f64e26678 2017-10-09 20:48:58Z mthomas $");
 
 # sources for libsilk
 SOURCES_LIBSILK = addrtype.c flowcapio.c hashlib.c \
@@ -9,9 +9,9 @@ SOURCES_LIBSILK = addrtype.c flowcapio.c hashlib.c \
 	 rwnotroutedio.c rwpack.c rwrec.c rwroutedio.c rwsplitio.c rwwwwio.c \
 	 skaggbag.c skbag.c skbitmap.c skcompmethod.c skcountry.c skdaemon.c \
 	 skdllist.c skfileformat.c skheader.c skheader-legacy.c \
-	 skheader_priv.h skheap.c skiobuf.c skiobuf.h \
-	 skipset.c sklog.c skmempool.c skoptionsctx.c skoptions-notes.c \
-	 skplugin-simple.c skplugin.c skprefixmap.c skprintnets.c skqsort.c \
+	 skheader_priv.h skheap.c skiobuf.c skiobuf.h skipset.c \
+	 sklog.c skmempool.c sknetstruct.c skoptionsctx.c skoptions-notes.c \
+	 skplugin-simple.c skplugin.c skprefixmap.c skqsort.c \
 	 sksite.c sksiteconfig.h sksiteconfig_lex.l sksiteconfig_parse.y \
 	 skstream.c skstream-err.c skstream_priv.h skstringmap.c \
 	 sktempfile.c \

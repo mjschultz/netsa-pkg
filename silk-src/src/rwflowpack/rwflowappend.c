@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwflowappend.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: rwflowappend.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/rwrec.h>
@@ -1120,10 +1120,7 @@ appender_main(
 {
     appender_state_t *state = (appender_state_t*)vstate;
     char errbuf[2 * PATH_MAX];
-    union h_un {
-        sk_header_entry_t          *he;
-        sk_hentry_packedfile_t     *pf;
-    } h;
+    const sk_header_entry_t *hentry;
     skPollDirErr_t pderr;
     int64_t close_pos;
     int rv;
@@ -1187,17 +1184,17 @@ appender_main(
          * packed-file header in the file, but fall back to the file
          * naming convention if we must.  The 'relative_dir' that is
          * set here is used when archiving the file. */
-        h.he = skHeaderGetFirstMatch(in_hdr, SK_HENTRY_PACKEDFILE_ID);
-        if (!(h.he
+        hentry = skHeaderGetFirstMatch(in_hdr, SK_HENTRY_PACKEDFILE_ID);
+        if (!(hentry
               && sksiteGeneratePathname(
                   state->out_path, sizeof(state->out_path),
-                  skHentryPackedfileGetFlowtypeID(h.pf),
-                  skHentryPackedfileGetSensorID(h.pf),
-                  skHentryPackedfileGetStartTime(h.pf),
+                  skHentryPackedfileGetFlowtypeID(hentry),
+                  skHentryPackedfileGetSensorID(hentry),
+                  skHentryPackedfileGetStartTime(hentry),
                   "", /* no suffix */
                   &state->relative_dir, &state->out_basename)))
         {
-            if (h.he) {
+            if (hentry) {
                 DEBUGMSG(("Falling back to file naming convention for '%s':"
                           " Unable to generate path from packed-file header"),
                          state->in_basename);

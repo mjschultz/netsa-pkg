@@ -1,7 +1,7 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: rwflowpack-pack-silk-discard-when-ipset-v4.pl 3c4d6696a20e 2014-10-15 19:18:45Z mthomas $")
+# RCSIDENT("$SiLK: rwflowpack-pack-silk-discard-when-ipset-v4.pl 598c37b616f6 2018-03-26 21:57:09Z mthomas $")
 
 use strict;
 use SiLKTests;
@@ -90,18 +90,8 @@ my $file_count = 0;
 
 # Result of this test is the same as the other discard tests.
 my %md5_map;
-my $md5_file = $0;
+my $md5_file = $0."-ipv6.txt";
 $md5_file =~ s/(discard)-when-ipset-v4/$1/;
-
-if ($SiLKTests::SK_ENABLE_IPV6) {
-    $md5_file .= "-ipv6.txt";
-}
-else {
-    # The sensor.conf file contains the "zero-packets" quirk for the
-    # probe used in this test (simulating the Cisco ASA router),
-    # causing the IPv4 file format to be RWGENERIC.
-    $md5_file .= "-ipv4-asa.txt";
-}
 
 open F, $md5_file
     or die "ERROR: Cannot open $md5_file: $!\n";

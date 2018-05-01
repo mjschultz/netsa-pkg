@@ -6,141 +6,18 @@
 ** @OPENSOURCE_LICENSE_END@
 */
 
-/*
-**  rwstats.c
-**
-**  Implementation of the rwstats suite application.
-**
-**  Reads packed files or reads the output from rwfilter and can
-**  compute a battery of characterizations and statistics:
-**
-**  -- Top N or Bottom N SIPs with counts; count of unique SIPs
-**  -- Top N or Bottom N DIPs with counts; count of unique DIPs
-**  -- Top N or Bottom N SIP/DIP pairs with counts; count of unique
-**     SIP/DIP pairs (for a limited number of records)
-**  -- Top N or Bottom N Src Ports with counts; count of unique Src Ports
-**  -- Top N or Bottom N Dest Ports with counts; count of unique Dest Ports
-**  -- Top N or Bottom N Protocols with counts; count of unique protocols
-**  -- For more continuous variables (bytes, packets, bytes/packet)
-**     provide statistics such as min, max, quartiles, and intervals
-**
-**  Instead of specifying a Top N or Bottom N as an absolute number N,
-**  the user may specify a cutoff threshold.  In this case, the Top N
-**  or Bottom N required to print all counts meeting the threshold is
-**  computed by the application.
-**
-**  Instead of specifying the threshold as an absolute count, the user
-**  may specify the threshold as percentage of all input records.  For
-**  this case, the absolute threshold is calculated and then that is
-**  used to calculate the Top N or Bottom N.
-**
-**  The application will only do calculations and produce output when
-**  asked to do so.  At least one argument is required to tell the
-**  application what to do.
-**
-**  Ideas for expansion
-**  -- Similarly for other variables, e.g., country code.
-**  -- Output each type of data to its own file
-**  -- Save intermediate data in files for faster reprocessing by this
-**     application
-**  -- Save intermediate data in files for processing by other
-**     applications
-**
-*/
-
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwstatsproto.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: rwstatsproto.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include "rwstats.h"
 #include "interval.h"
 
 /*
-**  IMPLEMENTATION NOTES
+**  rwstatsproto.c
 **
-**  For each input type (source ip, dest ip, source port, proto, etc),
-**  there are two globals: limit_<type> contains the value the user
-**  entered for the input type, and wanted_stat_<type> is a member
-**  of the wanted_stat_type and says what the limit_<type> value
-**  represents---e.g., the Top N, the bottom threshold percentage, etc.
+**  Functions to compute and print statistics by IP protocol.
 **
-**  The application takes input (either from stdin or as files on
-**  command line) and calls processFile() on each.  A count of each
-**  unique source IP addresses is stored in the IpCounter hash table
-**  counter_src_ip; Destinations IPs in counter_dest_ip; data for
-**  flow between a Source IP and Destination IP pair are stored in
-**  counter_pair_ip.
-**
-**  Since there are relatively few ports and protocols, two
-**  65536-elements arrays, src_port_array and dest_port_array are
-**  used to store a count of the records for each source and
-**  destination port, respectively, and a 256-element array,
-**  proto_array, is used to store a count of each protocol.
-**
-**  Minima, maxima, quartile, and interval data are stored for each of
-**  bytes, packets, and bytes-per-packet for all flows--regardless of
-**  protocol--and detailed for a limited number (RWSTATS_NUM_PROTO-1)
-**  of protocols..  The minima and maxima are each stored in arrays
-**  for each of bytes, packets, bpp.  For example bytes_min[0]
-**  stores the smallest byte count regardless of protocol (ie, over
-**  all protocols), and pkts_max[1] stores the largest packet count
-**  for the first protocol the user specified.  The mapping from
-**  protocol to array index is given by proto_to_stats_idx[], where
-**  the index into proto_to_stats_idx[] returns an integer that is
-**  the index into bytes_min[].  Data for the intervals is stored in
-**  two dimensional arrays, where the first dimension is the same as
-**  for the minima and maxima, and the second dimension is the number
-**  of intervals, NUM_INTERVALS.
-**
-**  Once data is collected, it is processed.
-**
-**  For the IPs, the user is interested the number of unique IPs and
-**  the IPs with the topN counts (things are similar for the bottomN,
-**  but we use topN in this dicussion to keep things more clear).  In
-**  the printTopIps() function, an array with 2*topN elements is
-**  created and passed to calcTopIps(); that array will be the result
-**  array and it will hold the topN IpAddr and IpCount pairs in sorted
-**  order.  In calcTopIps(), a working array of 2*topN elements and a
-**  Heap data structure with topN nodes are created.  The topN
-**  IpCounts seen are stored as IpCount/IpAddr pairs in the
-**  2*topN-element array (but not in sorted order), and the heap
-**  stores pointers into that array with the lowest IpCount at the
-**  root of the heap.  As the function iterates over the hash table,
-**  it compares the IpCount of the current hash-table element with the
-**  IpCount at the root of the heap.  When the IpCount of the
-**  hash-table element is larger, the root of the heap is removed, the
-**  IpCount/IpAddr pair pointed to by the former heap-root is removed
-**  from the 2*topN-element array and replaced with the new
-**  IpCount/IpAddr pair, and finally a new node is added to the heap
-**  that points to the new IpCount/IpAddr pair.  This continues until
-**  all hash-table entries are processed.  To get the list of topN IPs
-**  from highest to lowest, calcTopIps() removes elements from the
-**  heap and stores them in the result array from position N-1 to
-**  position 0.
-**
-**  Finding the topN source ports, topN destination ports, and topN
-**  protocols are similar to finding the topN IPs, except the ports
-**  and protocols are already stored in an array, so pointers directly
-**  into the src_port_array, dest_port_array, and proto_array
-**  are stored in the heap.  When generating output, the number of the
-**  port or protocol is determined by the diffence between the pointer
-**  into the *_port_array or proto_array and its start.
-**
-**  Instead of specifying a topN, the user may specify a cutoff
-**  threshold.  In this case, the topN required to print all counts
-**  meeting the threshold is computed by looping over the IP
-**  hash-table or port/protocol arrays and finding all entries with at
-**  least threshold hits.
-**
-**  The user may specify a percentage threshold instead of an absolute
-**  threshold.  Once all records are read, the total record count is
-**  multiplied by the percentage threshold to get the absolute
-**  threshold cutoff, and that is used to calculate the topN as
-**  described in the preceeding paragraph.
-**
-**  For the continuous variables bytes, packets, bpp, most of the work
-**  was done while reading the data, so processing is minimal.  Only
-**  the quartiles must be calculated.
 */
 
 
@@ -176,6 +53,27 @@ static uint32_t **interval_defn;
 static int16_t proto_to_stats_idx[256];
 
 
+/* OPTIONS */
+
+typedef enum {
+    OPT_OVERALL_STATS, OPT_DETAIL_PROTO_STATS
+} protoStatsOptionsEnum;
+
+static struct option protoStatsOptions[] = {
+    {"overall-stats",       NO_ARG,       0, OPT_OVERALL_STATS},
+    {"detail-proto-stats",  REQUIRED_ARG, 0, OPT_DETAIL_PROTO_STATS},
+    {0,0,0,0}               /* sentinel entry */
+};
+
+static const char *protoStatsHelp[] = {
+    ("Print minima, maxima, quartiles, and interval-count\n"
+     "\tstatistics for bytes, pkts, bytes/pkt across all flows.  Def. No"),
+    ("Print above statistics for each of the specified\n"
+     "\tprotocols.  List protocols or ranges separated by commas. Def. No"),
+    (char *)NULL
+};
+
+
 /* LOCAL FUNCTION PROTOTYPES */
 
 static int  protoStatsSetup(void);
@@ -199,7 +97,7 @@ protoStatsUpdateStatistics(
  * Side Effects:
  *      Sets values in the global proto_to_stats_idx[]
  */
-int
+static int
 protoStatsParse(
     const char         *arg)
 {
@@ -211,7 +109,8 @@ protoStatsParse(
 
     rv = skStringParseNumberList(&parsed_list, &parse_count, arg, 0, 255, 0);
     if (rv) {
-        skAppPrintErr("Invalid protocol list '%s': %s",
+        skAppPrintErr("Invalid %s '%s': %s",
+                      protoStatsOptions[OPT_DETAIL_PROTO_STATS].name,
                       arg, skStringParseStrerror(rv));
         return 1;
     }
@@ -316,6 +215,63 @@ protoStatsTeardown(
     if (interval_defn) {
         free(interval_defn);
         interval_defn = NULL;
+    }
+}
+
+
+static int
+protoStatsOptionsHandler(
+    clientData   UNUSED(cData),
+    int                 opt_index,
+    char               *opt_arg)
+{
+    switch ((protoStatsOptionsEnum)opt_index) {
+      case OPT_OVERALL_STATS:
+        /* combined stats for all protocols */
+        proto_stats = 1;
+        break;
+
+      case OPT_DETAIL_PROTO_STATS:
+        /* detailed stats for specific proto */
+        if (0 != protoStatsParse(opt_arg)) {
+            return 1;
+        }
+        proto_stats = 1;
+        break;
+    }
+
+    return 0;
+}
+
+
+int
+protoStatsOptionsRegister(
+    void)
+{
+    assert((sizeof(protoStatsHelp)/sizeof(char *)) ==
+           (sizeof(protoStatsOptions)/sizeof(struct option)));
+
+    /* register the options */
+    if (skOptionsRegister(protoStatsOptions, &protoStatsOptionsHandler, NULL))
+    {
+        skAppPrintErr("Unable to register protoStats options");
+        return 1;
+    }
+
+    return 0;
+}
+
+
+void
+protoStatsOptionsUsage(
+    FILE               *fh)
+{
+    unsigned int i;
+
+    fprintf(fh, "\nPROTOCOL STATISTICS SWITCHES:\n");
+    for (i = 0; protoStatsOptions[i].name; ++i) {
+        fprintf(fh, "--%s %s. %s\n", protoStatsOptions[i].name,
+                SK_OPTION_HAS_ARG(protoStatsOptions[i]), protoStatsHelp[i]);
     }
 }
 

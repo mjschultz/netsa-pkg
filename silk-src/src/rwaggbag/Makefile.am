@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 41ecd4b99006 2017-03-24 19:36:33Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 227cef83a91e 2018-03-01 22:45:21Z mthomas $");
 
 # Installed Targets
 
@@ -103,4 +103,13 @@ TESTS = \
 	tests/rwaggbagtool-add-bags.pl \
 	tests/rwaggbagtool-subtract-bags.pl \
 	tests/rwaggbagtool-sip-dip-select-insert.pl \
-	tests/rwaggbagtool-sip-dip-remove-insert.pl
+	tests/rwaggbagtool-sip-dip-remove-insert.pl \
+	tests/rwaggbagtool-subtract-self-aggbag.pl \
+	tests/rwaggbagtool-subtract-self-to-bag.pl \
+	tests/rwaggbagtool-subtract-self-to-ipset.pl \
+	tests/rwaggbagtool-min-max-empty.pl \
+	tests/rwaggbagtool-min-sport-1024.pl \
+	tests/rwaggbagtool-max-ports-1024.pl \
+	tests/rwaggbagtool-min-bytes-100000.pl \
+	tests/rwaggbagtool-sip-intersect-10.pl \
+	tests/rwaggbagtool-dip-complement-10.pl

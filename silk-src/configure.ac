@@ -4,14 +4,10 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: configure.ac d45c27ed70a8 2018-02-15 23:12:26Z mthomas $")
+dnl RCSIDENT("$SiLK: configure.ac 116f2fcfd741 2018-04-23 18:50:32Z mthomas $")
 
 AC_PREREQ(2.64)
-AC_INIT([SiLK],[3.16.1],[netsa-help@cert.org],[silk],[http://tools.netsa.cert.org/silk/])
-AC_COPYRIGHT([Copyright (C) 2001-2018 by Carnegie Mellon University
-GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
-Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013])
-AC_REVISION($SiLK: configure.ac d45c27ed70a8 2018-02-15 23:12:26Z mthomas $)
+AC_INIT([SiLK],[3.17.1],[netsa-help@cert.org],[silk],[http://tools.netsa.cert.org/silk/])
 AC_CONFIG_SRCDIR([src/libsilk/silk.h])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_CONFIG_MACRO_DIR([m4])
@@ -48,6 +44,11 @@ AH_TOP([/*
 #include <silk/silk_config2.h>
 ])
 AX_PREFIX_CONFIG_H([src/include/silk/silk_config.h], [SK], [src/include/silk/silk_config1.h])
+
+AC_REVISION($SiLK: configure.ac 116f2fcfd741 2018-04-23 18:50:32Z mthomas $)
+AC_COPYRIGHT([Copyright (C) 2001-2018 by Carnegie Mellon University
+GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
+Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013])
 
 # Disable the horribly annoying automatic rebuild of configure, Makefile.in, &c
 AM_MAINTAINER_MODE
@@ -261,8 +262,9 @@ SILK_AC_ARG_WITH_PYTHON
 m4_ifdef([PKG_CHECK_MODULES],[],[m4_pattern_forbid([PKG_CHECK_MODULES])])
 
 # pkg_config library checks
+AX_PKG_CHECK_LIBMAXMINDDB([1.2.0])
 AX_PKG_CHECK_GNUTLS([1.4.1])
-AX_PKG_CHECK_LIBFIXBUF([1.7.0],[2.0.0])
+AX_PKG_CHECK_LIBFIXBUF([1.7.0],[3.0.0])
 AX_PKG_CHECK_LIBIPA([0.5.0])
 #AX_ARG_WITH_PCRE
 
@@ -315,6 +317,10 @@ SILK_AC_ARG_DISABLE_PACKING_TOOLS
 SILK_AC_ARG_ENABLE_OUTPUT_COMPRESSION
 SILK_AC_ARG_DATA_ROOTDIR
 
+# Determine infomodel information (always do this so "make dist" works)
+AM_MISSING_PROG(XSLTPROC, xsltproc)
+INFOMODEL_AC_COLLECT_REGISTRIES([src/libflowsource/infomodel])
+
 # Look for special #defines that we want on the compile line
 SILK_AC_COMP_INCLUDE_TO_CFLAG
 
@@ -338,6 +344,7 @@ AC_CONFIG_FILES([
     src/flowcap/Makefile
     src/include/silk/Makefile
     src/libflowsource/Makefile
+    src/libflowsource/infomodel/Makefile
     src/libsilk/Makefile
     src/libsilk/silk_config.c
     src/num2dot/Makefile
@@ -445,10 +452,10 @@ AC_CONFIG_LINKS(sk_make_include_silk_list([
     src/libsilk/skipset.h
     src/libsilk/sklog.h
     src/libsilk/skmempool.h
+    src/libsilk/sknetstruct.h
     src/libsilk/skplugin.h
     src/libsilk/skpolldir.h
     src/libsilk/skprefixmap.h
-    src/libsilk/skprintnets.h
     src/libsilk/sksite.h
     src/libsilk/skstream.h
     src/libsilk/skstringmap.h

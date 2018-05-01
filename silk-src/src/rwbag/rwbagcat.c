@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagcat.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: rwbagcat.c 50d8958dd41d 2018-03-26 21:58:40Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skcountry.h>
@@ -24,7 +24,7 @@ RCSIDENT("$SiLK: rwbagcat.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
 #include <silk/skipaddr.h>
 #include <silk/skipset.h>
 #include <silk/skprefixmap.h>
-#include <silk/skprintnets.h>
+#include <silk/sknetstruct.h>
 #include <silk/sksite.h>
 #include <silk/skstringmap.h>
 #include <silk/skstream.h>
@@ -213,15 +213,21 @@ static char *max_key = NULL;
 /* possible key formats */
 static const sk_stringmap_entry_t key_format_names[] = {
     {"canonical",       KEY_FORMAT_IP | SKIPADDR_CANONICAL,
-     "canonical IP format (127.0.0.0, ::1)", NULL},
-    {"zero-padded",     KEY_FORMAT_IP | SKIPADDR_ZEROPAD,
-     "fully expanded, zero-padded canonical IP format", NULL},
+     "canonical IP format (192.0.2.1, 2001:db8::1, ::ffff:127.0.0.1)", NULL},
     {"decimal",         KEY_FORMAT_IP | SKIPADDR_DECIMAL,
      "integer number in decimal format", NULL},
     {"hexadecimal",     KEY_FORMAT_IP | SKIPADDR_HEXADECIMAL,
      "integer number in hexadecimal format", NULL},
+    {"no-mixed",        KEY_FORMAT_IP | SKIPADDR_NO_MIXED,
+     "canonical IP format but no mixed IPv4/IPv6 for IPv6 IPs", NULL},
+    {"zero-padded",     KEY_FORMAT_IP | SKIPADDR_ZEROPAD,
+     "pad IP result to its maximum width with zeros", NULL},
+    {"map-v4",          KEY_FORMAT_IP | SKIPADDR_MAP_V4,
+     "map IPv4 to ::ffff:0:0/96 netblock prior to formatting", NULL},
+    {"unmap-v6",        KEY_FORMAT_IP | SKIPADDR_UNMAP_V6,
+     "convert IPv6 in ::ffff:0:0/96 to IPv4 prior to formatting", NULL},
     {"force-ipv6",      KEY_FORMAT_IP | SKIPADDR_FORCE_IPV6,
-     "IPv6 hexadectet format with no IPv4 subpart", NULL},
+     "alias equivalent to \"map-v4,no-mixed\"", NULL},
     {"timestamp",       KEY_FORMAT_TIME | 0,
      "time in yyyy/mm/ddThh:mm:ss format", NULL},
     {"iso-time",        KEY_FORMAT_TIME | SKTIMESTAMP_ISO,
@@ -551,6 +557,8 @@ appSetup(
                           appOptions[OPT_NETWORK_STRUCTURE].name);
             exit(EXIT_FAILURE);
         }
+        /* disable mapping of ::ffff:0:0/96 to IPv4 */
+        key_format = key_format & ~SKIPADDR_UNMAP_V6;
     }
 
     /* when printing of entries with counters of 0 is requested,
@@ -768,7 +776,9 @@ appOptionsHandler(
             goto PARSE_ERROR;
         }
         if (skipaddrGetAsV4(&limits.minkey_ip, &limits.minkey_u32)) {
+#if SK_ENABLE_IPV6
             limits.minkey_u32 = 1;
+#endif  /* SK_ENABLE_IPV6 */
         }
         min_key = opt_arg;
         limits.key_is_min = 1;
@@ -781,7 +791,9 @@ appOptionsHandler(
             goto PARSE_ERROR;
         }
         if (skipaddrGetAsV4(&limits.maxkey_ip, &limits.maxkey_u32)) {
+#if SK_ENABLE_IPV6
             limits.maxkey_u32 = UINT32_MAX;
+#endif  /* SK_ENABLE_IPV6 */
         }
         max_key = opt_arg;
         limits.key_is_max = 1;
@@ -900,6 +912,7 @@ keyFormatParse(
     const char         *format)
 {
     const unsigned format_timezone = (SKTIMESTAMP_UTC | SKTIMESTAMP_LOCAL);
+    const unsigned format_ip_mapping = (SKIPADDR_MAP_V4 | SKIPADDR_UNMAP_V6);
     char *errmsg;
     sk_stringmap_iter_t *iter = NULL;
     sk_stringmap_entry_t *found_entry;
@@ -927,9 +940,24 @@ keyFormatParse(
                           appOptions[OPT_KEY_FORMAT].name, format);
             goto END;
         } else if ((KEY_FORMAT_MASK & key_format) == KEY_FORMAT_IP) {
-            skAppPrintErr("Invalid %s '%s': May only specify one IP format",
-                          appOptions[OPT_KEY_FORMAT].name, format);
-            goto END;
+            if (found_entry->id == (KEY_FORMAT_IP | SKIPADDR_ZEROPAD)) {
+                key_format |= found_entry->id;
+            } else if ((key_format & format_ip_mapping)
+                       && (found_entry->id & format_ip_mapping))
+            {
+                skAppPrintErr(
+                    "Invalid %s '%s': May only specify one IP mapping option",
+                    appOptions[OPT_KEY_FORMAT].name, format);
+                goto END;
+            } else if (0 == ((format_ip_mapping | SKIPADDR_ZEROPAD)
+                             & (key_format | found_entry->id)))
+            {
+                skAppPrintErr("Invalid %s '%s': May only specify one IP format",
+                              appOptions[OPT_KEY_FORMAT].name, format);
+                goto END;
+            } else {
+                key_format |= found_entry->id;
+            }
         } else if (SKTIMESTAMP_EPOCH & (key_format | found_entry->id)) {
             skAppPrintErr(
                 "Invalid %s '%s': May not use another time format with '%s'",
@@ -1413,7 +1441,7 @@ bagcatPrintBag(
  */
 static void
 bagcatPrintNetworkRow(
-    skNetStruct_t              *ns,
+    sk_netstruct_t             *ns,
     const skBagTypedKey_t      *key,
     const skBagTypedCounter_t  *counter)
 {
@@ -1426,7 +1454,7 @@ bagcatPrintNetworkRow(
  */
 static int
 bagcatPrintNetwork(
-    skNetStruct_t      *ns,
+    sk_netstruct_t     *ns,
     const skBag_t      *bag)
 {
     skBagTypedKey_t key;
@@ -1842,7 +1870,7 @@ bagcatProcessBag(
     skBagFieldType_t key_field;
     const char *this_net_structure;
     state_t state;
-    skNetStruct_t *ns;
+    sk_netstruct_t *ns;
     int rv = 0;
 
     /* structures that contain state to use while printing */
@@ -2073,9 +2101,10 @@ printStatistics(
                            bc_key->formatter_flags);
 
         } else if (skipaddrGetAsV4(&min_max_key[i], &u32)) {
+#if SK_ENABLE_IPV6
             skAppPrintErr("Cannot convert IP to 32bit number");
             skipaddrString(key_buf[i], &min_max_key[i], SKIPADDR_DECIMAL);
-
+#endif  /* SK_ENABLE_IPV6 */
         } else {
             switch (bc_key->formatter) {
               case BAGCAT_FMT_ATTRIBUTES:
@@ -2314,23 +2343,8 @@ bagcatCheckKeyFormat(
             } else {
                 bc_key->formatter_flags = key_format & ~KEY_FORMAT_MASK;
             }
-            switch (bc_key->formatter_flags) {
-              case SKIPADDR_DECIMAL:
-                bc_key->width = (as_ipv6) ? 39 : 10;
-                break;
-              case SKIPADDR_HEXADECIMAL:
-                bc_key->width = (as_ipv6) ? 32 : 8;
-                break;
-              case SKIPADDR_FORCE_IPV6:
-                bc_key->width = (as_ipv6) ? 39 : 16;
-                break;
-              case SKIPADDR_CANONICAL:
-              case SKIPADDR_ZEROPAD:
-                bc_key->width = (as_ipv6) ? 39 : 15;
-                break;
-              default:
-                skAbortBadCase(bc_key->formatter_flags);
-            }
+            bc_key->width = skipaddrStringMaxlen(as_ipv6,
+                                                 bc_key->formatter_flags);
         }
     }
 
@@ -2363,11 +2377,17 @@ bagcatCheckKeyFormat(
         } else {
             switch (key_format) {
               case KEY_FORMAT_IP | SKIPADDR_DECIMAL:
-                bc_key->formatter_flags = SKIPADDR_DECIMAL;
+              case KEY_FORMAT_IP | SKIPADDR_DECIMAL | SKIPADDR_ZEROPAD:
+                bc_key->formatter_flags = key_format & ~KEY_FORMAT_IP;
                 bc_key->width = 10;
                 break;
               case KEY_FORMAT_IP | SKIPADDR_HEXADECIMAL:
-                bc_key->formatter_flags = SKIPADDR_DECIMAL;
+              case KEY_FORMAT_IP | SKIPADDR_HEXADECIMAL | SKIPADDR_ZEROPAD:
+                bc_key->formatter_flags = key_format & ~KEY_FORMAT_IP;
+                bc_key->width = 8;
+                break;
+              case KEY_FORMAT_IP | SKIPADDR_ZEROPAD:
+                bc_key->formatter_flags = SKIPADDR_DECIMAL | SKIPADDR_ZEROPAD;
                 bc_key->width = 10;
                 break;
               default:

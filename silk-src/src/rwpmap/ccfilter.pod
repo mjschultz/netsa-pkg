@@ -34,10 +34,11 @@ switch, accepts textual input and prints the country code for the IPs,
 which provide a way to print country codes for the IPs in SiLK IPsets
 or bags.
 
-The abbreviations used by the country code utility are those used by
-the Root-Zone Whois Index (see for example
-L<http://www.iana.org/cctld/cctld-whois.htm>) or one of the following
-special codes:
+The abbreviations used by the country code utility are the two-letter
+codes defined in ISO 3166 part 1.  For additional information, see
+L<https://www.iso.org/iso-3166-country-codes.html> and
+L<https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2>.  Some IP
+addresses map to one of the following special codes:
 
 =over 4
 
@@ -65,9 +66,9 @@ alternate location, specify that location in the SILK_COUNTRY_CODES
 environment variable.
 
 Creating the Prefix Map (pmap) file that maps an IP to its country
-code requires the GeoIP Country(R) or free GeoLite database created by
-MaxMind, available from L<http://www.maxmind.com>, as described in the
-L</MAPPING FILE> section below.
+code requires the GeoIP2 Country or free GeoLite2 database created by
+MaxMind, available from L<https://dev.maxmind.com/geoip/>, as
+described in the L</MAPPING FILE> section below.
 
 =head1 OPTIONS
 
@@ -110,19 +111,15 @@ F<country_codes.pmap> data file and install it in the appropriate
 location (see the L</FILES> section below), or specify the path to the
 file in the SILK_COUNTRY_CODES environment variable.
 
-The prefix map data file is based on the GeoIP Country(R) or free
-GeoLite database created by MaxMind and available from
-L<http://www.maxmind.com/>.  We do not distribute the database nor the
-data file, but we provide Perl scripts that will convert the GeoIP
-database to the format that F<ccfilter.so> expects.
+The prefix map data file is based on the GeoIP2 Country(R) or free
+GeoLite2 database created by MaxMind and available from
+L<https://dev.maxmind.com/geoip/>.  We do not distribute the database
+nor the data file, but we provide the B<rwgeoip2ccmap(1)> tool that
+converts the GeoIP database to the format that F<ccfilter.so> expects.
 
 MaxMind distributes multiple versions of their GeoIP Country database;
-one is a free evaluation copy that is C<97% accurate>.  In addition,
-they sell versions with higher accuracy, and they offer various
-subscription services.
-
-The B<rwgeoip2ccmap(1)> program converts the MaxMind GeoIP file to the
-form that the SiLK tools require.
+one is a free evaluation copy.  In addition, they sell versions with
+higher accuracy, and they offer various subscription services.
 
 =head1 ENVIRONMENT
 
@@ -168,7 +165,7 @@ B<silk(7)>
 
 =cut
 
-$SiLK: ccfilter.pod 9e71f5672f24 2013-03-05 23:37:50Z mthomas $
+$SiLK: ccfilter.pod c95fb6174130 2018-04-13 20:33:46Z mthomas $
 
 Local Variables:
 mode:text

@@ -23,7 +23,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKHEADER_H, "$SiLK: skheader.h bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENTVAR(rcsID_SKHEADER_H, "$SiLK: skheader.h 06ffa717c9e8 2018-01-31 21:31:26Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -712,13 +712,6 @@ skHentryTypeRegister(
 
 #define SK_HENTRY_PACKEDFILE_ID 1
 
-typedef struct sk_hentry_packedfile_st {
-    sk_header_entry_spec_t  he_spec;
-    int64_t                 start_time;
-    uint32_t                flowtype_id;
-    uint32_t                sensor_id;
-} sk_hentry_packedfile_t;
-
 int
 skHeaderAddPackedfile(
     sk_file_header_t   *hdr,
@@ -726,53 +719,29 @@ skHeaderAddPackedfile(
     sk_flowtype_id_t    flowtype_id,
     sk_sensor_id_t      sensor_id);
 
-sk_header_entry_t *
-skHentryPackedfileCopy(
+/**
+ *    Return the hour at which data in this file begins.  Return 0 if
+ *    the header entry is not the correct type.
+ */
+sktime_t
+skHentryPackedfileGetStartTime(
     const sk_header_entry_t    *hentry);
 
-sk_header_entry_t *
-skHentryPackedfileCreate(
-    sktime_t            start_time,
-    sk_flowtype_id_t    flowtype_id,
-    sk_sensor_id_t      sensor_id);
+/**
+ *    Return the sensor ID for data in this file.  Return
+ *    SK_INVALID_SENSOR if header is not the correct type.
+ */
+sk_sensor_id_t
+skHentryPackedfileGetSensorID(
+    const sk_header_entry_t    *hentry);
 
-void
-skHentryPackedfileFree(
-    sk_header_entry_t  *hentry);
-
-ssize_t
-skHentryPackedfilePacker(
-    const sk_header_entry_t    *in_hentry,
-    uint8_t                    *out_packed,
-    size_t                      bufsize);
-
-void
-skHentryPackedfilePrint(
-    const sk_header_entry_t    *hentry,
-    FILE                       *fh);
-
-sk_header_entry_t *
-skHentryPackedfileUnpacker(
-    uint8_t            *in_packed);
-
-#define skHentryPackedfileGetStartTime(hentry)  \
-    ((sktime_t)((hentry)->start_time))
-
-#define skHentryPackedfileSetStartTime(hentry, s_time)  \
-    { (hentry)->start_time = (sktime_t)(s_time); }
-
-#define skHentryPackedfileGetSensorID(hentry)   \
-    ((sk_sensor_id_t)((hentry)->sensor_id))
-
-#define skHentryPackedfileSetSensorID(hentry, sensor_id)        \
-    { (hentry)->sensor_id = (sensor_id); }
-
-#define skHentryPackedfileGetFlowtypeID(hentry) \
-    ((sk_flowtype_id_t)((hentry)->flowtype_id))
-
-#define skHentryPackedfileSetFlowtypeID(hentry, flowtype_id)    \
-    { (hentry)->flowtype_id = (flowtype_id); }
-
+/**
+ *    Return the flowtype for data in this file.  Return
+ *    SK_INVALID_FLOWTYPE if header is not the correct type.
+ */
+sk_flowtype_id_t
+skHentryPackedfileGetFlowtypeID(
+    const sk_header_entry_t    *hentry);
 
 
 
@@ -792,11 +761,13 @@ skHentryPackedfileUnpacker(
 
 #define SK_HENTRY_INVOCATION_ID 2
 
-typedef struct sk_hentry_invocation_st {
-    sk_header_entry_spec_t  he_spec;
-    char                   *command_line;
-} sk_hentry_invocation_t;
-
+/**
+ *    Append a single command line invocation to the header.
+ *
+ *    Add the invocation to 'hdr', where 'argc' and 'argv' are the
+ *    arguments to main().  If 'strip_path' is non-zero, the basename
+ *    of the first value in 'argv' is used.
+ */
 int
 skHeaderAddInvocation(
     sk_file_header_t   *hdr,
@@ -804,34 +775,14 @@ skHeaderAddInvocation(
     int                 argc,
     char              **argv);
 
-sk_header_entry_t *
-skHentryInvocationCopy(
+/**
+ *    Return the invocation string from this header entry.  The caller
+ *    must treat the string as read-only.  Return NULL if header entry
+ *    is the wrong type.  Since SiLK 3.17.0.
+ */
+const char *
+skHentryInvocationGetInvocation(
     const sk_header_entry_t    *hentry);
-
-sk_header_entry_t *
-skHentryInvocationCreate(
-    int                 strip_path,
-    int                 argc,
-    char              **argv);
-
-void
-skHentryInvocationFree(
-    sk_header_entry_t  *hentry);
-
-ssize_t
-skHentryInvocationPacker(
-    const sk_header_entry_t    *in_hentry,
-    uint8_t                    *out_packed,
-    size_t                      bufsize);
-
-void
-skHentryInvocationPrint(
-    const sk_header_entry_t    *hentry,
-    FILE                       *fh);
-
-sk_header_entry_t *
-skHentryInvocationUnpacker(
-    uint8_t            *in_packed);
 
 
 
@@ -851,51 +802,37 @@ skHentryInvocationUnpacker(
 
 #define SK_HENTRY_ANNOTATION_ID 3
 
-typedef struct sk_hentry_annotation_st {
-    sk_header_entry_spec_t  he_spec;
-    char                   *annotation;
-} sk_hentry_annotation_t;
-
+/**
+ *    Append a string as a new annotation header.
+ *
+ *    Create a new annotation header from the string 'annotation' and
+ *    append it to the file header 'hdr'.
+ */
 int
 skHeaderAddAnnotation(
     sk_file_header_t   *hdr,
     const char         *annotation);
 
+/**
+ *    Append a file's contents as a new annotation header.
+ *
+ *    Create a new annotation header from the contents of the file
+ *    'pathname' and append it to the file header 'hdr'.
+ */
 int
 skHeaderAddAnnotationFromFile(
     sk_file_header_t   *hdr,
     const char         *pathname);
 
-sk_header_entry_t *
-skHentryAnnotationCopy(
+/**
+ *    Return the annotation string from this header entry.  The caller
+ *    must treat the string as read-only.  Return NULL if header entry
+ *    is the wrong type.  Since SiLK 3.17.0.
+ */
+const char *
+skHentryAnnotationGetNote(
     const sk_header_entry_t    *hentry);
 
-sk_header_entry_t *
-skHentryAnnotationCreate(
-    const char         *annotation);
-
-sk_header_entry_t *
-skHentryAnnotationCreateFromFile(
-    const char         *pathname);
-
-void
-skHentryAnnotationFree(
-    sk_header_entry_t  *hentry);
-
-ssize_t
-skHentryAnnotationPacker(
-    const sk_header_entry_t    *in_hentry,
-    uint8_t                    *out_packed,
-    size_t                      bufsize);
-
-void
-skHentryAnnotationPrint(
-    const sk_header_entry_t    *hentry,
-    FILE                       *fh);
-
-sk_header_entry_t *
-skHentryAnnotationUnpacker(
-    uint8_t            *in_packed);
 
 
 /*
@@ -904,51 +841,33 @@ skHentryAnnotationUnpacker(
  *    The 'probename' header entry type is used to store the name of
  *    the probe where flow data was collected.
  *
+ *    flowcap adds this header entry to the files it creates.  When
+ *    those files are processed by rwflowpack, it reads the probe name
+ *    from the header and then searches the sensor.conf file for the
+ *    sensor(s) that are able to pack data from that probe.
+ *
  *    **********************************************************************
  */
 
 #define SK_HENTRY_PROBENAME_ID  4
 
-typedef struct sk_hentry_probename_st {
-    sk_header_entry_spec_t  he_spec;
-    char                   *probe_name;
-} sk_hentry_probename_t;
-
+/**
+ *    Add a header entry containing the name of the probe.
+ */
 int
 skHeaderAddProbename(
     sk_file_header_t   *hdr,
     const char         *probe_name);
 
-sk_header_entry_t *
-skHentryProbenameCopy(
+/**
+ *    Return the probe name from this header entry.  The caller must
+ *    treat the string as read-only.  Return NULL if header entry is
+ *    the wrong type.
+ */
+const char *
+skHentryProbenameGetProbeName(
     const sk_header_entry_t    *hentry);
 
-sk_header_entry_t *
-skHentryProbenameCreate(
-    const char         *probe_name);
-
-void
-skHentryProbenameFree(
-    sk_header_entry_t  *hentry);
-
-ssize_t
-skHentryProbenamePacker(
-    const sk_header_entry_t    *in_hentry,
-    uint8_t                    *out_packed,
-    size_t                      bufsize);
-
-void
-skHentryProbenamePrint(
-    const sk_header_entry_t    *hentry,
-    FILE                       *fh);
-
-sk_header_entry_t *
-skHentryProbenameUnpacker(
-    uint8_t            *in_packed);
-
-
-#define skHentryProbenameGetProbeName(hentry)   \
-    ((hentry)->probe_name)
 
 
 /*
@@ -999,8 +918,73 @@ skHentryProbenameUnpacker(
  *    **********************************************************************
  */
 
-#define SK_HENTRY_AGGBAG_ID        8
+#define SK_HENTRY_AGGBAG_ID     8
 
+
+
+/*
+ *    **********************************************************************
+ *
+ *    The 'sidecar' header entry type is used to store information
+ *    about additional fields available for each record.
+ *
+ *    This is for SiLK 4 and appears here as a placeholder.
+ *
+ *    **********************************************************************
+ */
+
+#define SK_HENTRY_SIDECAR_ID    9
+
+
+
+/*
+ *    **********************************************************************
+ *
+ *    The 'tombstone' header entry type stores an identifier from the
+ *    YAF or super_mediator process that generated the record.
+ *
+ *    **********************************************************************
+ */
+
+#define SK_HENTRY_TOMBSTONE_ID  10
+
+/**
+ *    Append a new tombstone header.
+ *
+ *    Create a new tombstone header containing the identifier
+ *    'tombstone_count' and append it to 'hdr'.
+ */
+int
+skHeaderAddTombstone(
+    sk_file_header_t   *hdr,
+    uint32_t            tombstone_count);
+
+/**
+ *    Return the count value for this tombstone header.  Returns
+ *    UINT32_MAX if the header is the wrong version.
+ */
+uint32_t
+skHentryTombstoneGetCount(
+    const sk_header_entry_t    *hentry);
+
+
+#ifndef SKHEADER_SOURCE
+/* Define aliases required for consistency with previous releases of
+ * SiLK. */
+
+/**
+ *    Replace uses of sk_hentry_packedfile_t with sk_header_entry_t.
+ *    Deprecated since SiLK 3.17.0.
+ */
+typedef sk_header_entry_t sk_hentry_packedfile_t    SK_GCC_DEPRECATED;
+
+/**
+ *    Replace uses of sk_hentry_invocation_t with sk_header_entry_t.
+ *    Deprecated since SiLK 3.17.0.
+ */
+typedef sk_header_entry_t sk_hentry_probename_t     SK_GCC_DEPRECATED;
+
+#endif  /* SKHEADER_SOURCE */
 
 
 #ifdef __cplusplus

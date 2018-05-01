@@ -229,8 +229,8 @@ version.  The default version is 0.  I<Since SiLK 3.11.0>.
 
 =item S< 0 >
 
-Use the default version for an IPv4 IPset and an IPv6 IPset, currently
-2 and 3, respectively.
+Use the default version for an IPv4 IPset and an IPv6 IPset.  Use the
+B<--help> switch to see the versions used for your SiLK installation.
 
 =item S< 2 >
 
@@ -772,7 +772,7 @@ B<rwset(1)>, B<rwsetbuild(1)>, B<rwsetcat(1)>, B<silk(7)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwbagtool.pod 09f321e0f944 2017-05-23 18:34:32Z mthomas $
+$SiLK: rwbagtool.pod 4162e8e3f110 2018-02-26 19:01:54Z mthomas $
 
 Local Variables:
 mode:text

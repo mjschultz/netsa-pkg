@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKIPADDR_H, "$SiLK: skipaddr.h bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENTVAR(rcsID_SKIPADDR_H, "$SiLK: skipaddr.h 62a32b7637cc 2018-03-16 17:30:43Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -60,7 +60,7 @@ extern const uint8_t sk_ipv6_zero[SK_IPV6_ZERO_LEN];
 
 
 /*
- *  is_zero = SK_IPV6_IS_V4INV6(ipv6);
+ *  is_v4_in_v6 = SK_IPV6_IS_V4INV6(ipv6);
  *
  *    Return true if the specified ipv6 address represents an
  *    IPv6-encoded-IPv4 address, where ipv6 was defined as:
@@ -207,7 +207,7 @@ skipaddrSetVersion(
  *    skipaddr_t pointed at by 'dst'.
  */
 #if 0
-int
+void
 skipaddrCopy(
     skipaddr_t         *dst,
     const skipaddr_t   *src);
@@ -229,9 +229,9 @@ skipaddrCopy(
  *    causes 'addr' to represent the IPv4 address 0.0.0.0.
  */
 #if 0
-int
-skipaddrIsV6(
-    const skipaddr_t   *ipaddr);
+void
+skipaddrClear(
+    skipaddr_t         *ipaddr);
 #endif  /* 0 */
 #if !SK_ENABLE_IPV6
 #  define skipaddrClear(addr)                           \
@@ -255,6 +255,62 @@ skipaddrGetV4(
     const skipaddr_t   *addr);
 #endif  /* 0 */
 #define skipaddrGetV4(addr)    (skIPUnionGetV4(&((addr)->ip_ip)))
+
+
+/**
+ *  is_v4_mapped_v6 = skipaddrIsV4MappedV6(addr);
+ *
+ *    Return true if 'addr' is an IPv6 address and is in the
+ *    ::ffff:0:0/96 netblock.  That is, whether 'addr' is an
+ *    IPv4-mapped IPv6 address.
+ *
+ *    Return false if 'addr' is an IPv4 address.
+ *
+ *    If the IPv4 address is wanted, use skipaddrGetAsV4() which
+ *    extracts the IPv4 address and returns 0 if successful or returns
+ *    -1 if the address is not IPv4 nor an IPv4-mapped IPv6 address.
+ *
+ *    Since SiLK 3.17.0.
+ */
+#if 0
+int
+skipaddrIsV4MappedV6(
+    const skipaddr_t   *ipaddr);
+#endif  /* 0 */
+#if !SK_ENABLE_IPV6
+#  define skipaddrIsV4MappedV6(addr)    0
+#else
+#  define skipaddrIsV4MappedV6(addr)                                    \
+    ((addr)->ip_is_v6 && SK_IPV6_IS_V4INV6((addr)->ip_ip.ipu_ipv6))
+#endif  /* #else of #if !SK_ENABLE_IPV6 */
+
+
+/**
+ *  ok = skipaddrGetAsV4(addr, &ipv4);
+ *
+ *    If the skipaddr_t 'addr' contains an IPv4 address or an
+ *    IPv4-mapped IPv6 address (i.e., an address in the ::ffff:0:0/96
+ *    netblock), set the value pointed at by the uint32_t 'ipv4' to
+ *    the IPv4 address (in native (host) byte order) and return 0.
+ *    Otherwise leave the value pointed at by 'ipv4' unchanged and
+ *    return -1.
+ *
+ *    If 'addr' is known to be IPv4, consider using skipaddrGetV4().
+ *
+ *    If 'addr' is known to be IPv6 and the IPv4-mapped address is not
+ *    needed, you may check whether this function would return 0 by
+ *    using skipaddrIsV4MappedV6().
+ */
+#if !SK_ENABLE_IPV6
+/* use comma expression so expression evaluates to 0 */
+#  define skipaddrGetAsV4(addr, ipv4_ptr)       \
+    ((*(ipv4_ptr) = skipaddrGetV4(addr)), 0)
+#else
+int
+skipaddrGetAsV4(
+    const skipaddr_t   *addr,
+    uint32_t           *ipv4);
+#endif  /* #else of #if !SK_ENABLE_IPV6 */
 
 
 /**
@@ -285,28 +341,6 @@ skipaddrSetV4(
 #if SK_ENABLE_IPV6
 
 /**
- *  skipaddrGetAsV6(addr, dst);
- *
- *    Copy an IPv6 representation of the skipaddr_t 'addr' to the
- *    uint8_t[16] referenced by 'dst'.  If 'addr' contains an IPv4
- *    address, the result will contain an IPv6 representation of the
- *    address.
- */
-#if 0
-void
-skipaddrGetAsV6(
-    const skipaddr_t   *addr,
-    uint8_t             dst[16]);
-#endif  /* 0 */
-#define skipaddrGetAsV6(addr, out_vp)                   \
-    if (skipaddrIsV6(addr)) {                           \
-        skIPUnionGetV6(&((addr)->ip_ip), (out_vp));     \
-    } else {                                            \
-        skIPUnionGetV4AsV6(&((addr)->ip_ip), (out_vp)); \
-    }
-
-
-/**
  *  skipaddrGetV6(addr, dst);
  *
  *    Treat 'addr' as containing an IPv6 address and copy that value
@@ -322,6 +356,30 @@ skipaddrGetV6(
 #endif  /* 0 */
 #define skipaddrGetV6(addr, out_vp)             \
     skIPUnionGetV6(&((addr)->ip_ip), (out_vp))
+
+
+/**
+ *  skipaddrGetAsV6(addr, dst);
+ *
+ *    Copy an IPv6 representation of the skipaddr_t 'addr' to the
+ *    uint8_t[16] referenced by 'dst'.  If 'addr' contains an IPv4
+ *    address, the result contains an IPv4-mapped IPv6 address (that
+ *    is, an IPv6 address in the ::ffff:0:0/96 netblock).
+ *
+ *    If 'addr' is known to be IPv6, consider using skipaddrGetV6().
+ */
+#if 0
+void
+skipaddrGetAsV6(
+    const skipaddr_t   *addr,
+    uint8_t             dst[16]);
+#endif  /* 0 */
+#define skipaddrGetAsV6(addr, out_vp)                   \
+    if (skipaddrIsV6(addr)) {                           \
+        skIPUnionGetV6(&((addr)->ip_ip), (out_vp));     \
+    } else {                                            \
+        skIPUnionGetV4AsV6(&((addr)->ip_ip), (out_vp)); \
+    }
 
 
 /**
@@ -368,7 +426,8 @@ skipaddrSetV6FromUint32(
  *  skipaddrV4toV6(srcaddr, dstaddr);
  *
  *    Assume the skipaddr_t 'srcaddr' contains an IPv4 address,
- *    convert that address to an IPv6 address, and store the result in
+ *    convert that address to an IPv4-mapped IPv6 address (that is, an
+ *    address in the ::ffff:0:0/96 netblock), and store the result in
  *    the skipaddr_t 'dstaddr'. 'srcaddr' and 'dstaddr' may point to
  *    the same skipaddr_t.
  */
@@ -389,11 +448,11 @@ skipaddrV4toV6(
  *  ok = skipaddrV6toV4(srcaddr, dstaddr);
  *
  *    Assume the skipaddr_t 'srcaddr' contains an IPv6 address. If
- *    that address is an IPv6-representation of an IPv4 address,
- *    convert the address to IPv4, store the result in the skipaddr_t
- *    'dstaddr', and return 0.  Otherwise, return -1 and leave
- *    'dstaddr' unchanged. 'srcaddr' and 'dstaddr' may point to the
- *    same skipaddr_t.
+ *    that address is an IPv4-mapped IPv6 address (that is, an address
+ *    in the ::ffff:0:0/96 netblock), convert the address to IPv4,
+ *    store the result in the skipaddr_t 'dstaddr', and return 0.
+ *    Otherwise, return -1 and leave 'dstaddr' unchanged. 'srcaddr'
+ *    and 'dstaddr' may point to the same skipaddr_t.
  */
 int
 skipaddrV6toV4(
@@ -412,7 +471,8 @@ skipaddrV6toV4(
  *    than 0 if 'addr1' is greater than 'addr2'.
  *
  *    When IPv6 is enabled and either address is IPv6, the comparison
- *    is done as if both addresses were IPv6.
+ *    is done as if both addresses were IPv6 by mapping an IPv4
+ *    address to the ::ffff:0:0/96 netblock.
  */
 #if !SK_ENABLE_IPV6
 #  define skipaddrCompare(addr1, addr2)                         \
@@ -438,16 +498,16 @@ skipaddrCompare(
  *    When both addresses are either IPv4 or IPv6, applying the mask
  *    is straightforward.
  *
- *    If 'ipaddr' is IPv6 but 'mask_ip' is IPv4, 'mask_ip' is
- *    converted to IPv6 and then the mask is applied.  This may result
- *    in an odd result.
+ *    When 'ipaddr' is IPv6 and 'mask_ip' is IPv4, the function
+ *    converts 'mask_ip' to an IPv4-mapped IPv6 (i.e., an address in
+ *    the ::ffff:0:0/96 netblock) and then applies the mask.  The
+ *    result is an IPv6 address.
  *
- *    If 'ipaddr' is IPv4 and 'mask_ip' is IPv6, 'ipaddr' will remain
- *    an IPv4 address if masking 'mask_ip' with 'sk_ipv6_v4inv6'
- *    results in 'sk_ipv6_v4inv6' (namely, if bytes 10 and 11 of
- *    'mask_ip' are 0xFFFF).  Otherwise, 'ipaddr' is converted to an
- *    IPv6 address and the mask is performed in IPv6 space, which may
- *    result in an odd result.
+ *    When 'ipaddr' is IPv4 and 'mask_ip' is IPv6, the function
+ *    converts 'ipaddr' to an IPv4-mapped IPv6 address and performs
+ *    the mask.  If the result is still an IPv4-mapped IPv6 address,
+ *    the function converts the result back to IPv4; otherwise the
+ *    result remains an IPv6 address.
  */
 #if !SK_ENABLE_IPV6
 #  define skipaddrMask(ipaddr, mask_ip)                         \
@@ -494,26 +554,6 @@ skipaddrApplyCIDR(
             skIPUnionApplyCIDRV4(&((ipaddr)->ip_ip), cidr);     \
         }                                                       \
     }
-#endif  /* #else of #if !SK_ENABLE_IPV6 */
-
-/**
- *  ok = skipaddrGetAsV4(addr, &ipv4);
- *
- *    If the skipaddr_t 'addr' contains an IPv4 address or an
- *    IPv6-representation of an IPv4 address, set the value pointed at
- *    by the uint32_t 'ipv4' to the IPv4 address (in native (host)
- *    byte order) and return 0.  Otherwise leave the value pointed at
- *    by 'ipv4' unchanged and return -1.
- */
-#if !SK_ENABLE_IPV6
-/* use comma expression so expression evaluates to 0 */
-#  define skipaddrGetAsV4(addr, ipv4_ptr)       \
-    ((*(ipv4_ptr) = skipaddrGetV4(addr)), 0)
-#else
-int
-skipaddrGetAsV4(
-    const skipaddr_t   *addr,
-    uint32_t           *ipv4);
 #endif  /* #else of #if !SK_ENABLE_IPV6 */
 
 
@@ -759,28 +799,28 @@ skcidrSetV6(
 
 
 /**
- *  ok = skipaddrToSockaddr(dest, len, src);
+ *  ok = skipaddrToSockaddr(dest_sockaddr, len, src_ipaddr);
  *
- *    Clears 'dest', and then sets the family and address of 'dest'
- *    from 'src'.  'len' is the length of 'dest'.  Returns -1 if 'len'
- *    is too small, 0 otherwise.
+ *    Clear 'dest_sockaddr', and then set the family and address of
+ *    'dest_sockaddr' from 'src_ipaddr' where 'len' is the length of
+ *    'dest_sockaddr'.  Return -1 if 'len' is too small, 0 otherwise.
  */
 int
 skipaddrToSockaddr(
-    struct sockaddr    *dest,
+    struct sockaddr    *dest_sockaddr,
     size_t              len,
-    const skipaddr_t   *src);
+    const skipaddr_t   *src_ipaddr);
 
 /**
- *  ok = skipaddrFromSockaddr(dest, src)
+ *  ok = skipaddrFromSockaddr(dest_ipaddr, src)
  *
- *    Sets 'dest' to the address in 'src'.  Returns -1 if 'src' does
- *    not represent an IP address, 0 otherwise.
+ *    Set 'dest_ipaddr' to the address in 'src_sockaddr'.  Return -1
+ *    if 'src_sockaddr' does not represent an IP address, 0 otherwise.
  */
 int
 skipaddrFromSockaddr(
-    skipaddr_t             *dest,
-    const struct sockaddr  *src);
+    skipaddr_t             *dest_ipaddr,
+    const struct sockaddr  *src_sockaddr);
 
 
 #ifdef __cplusplus

@@ -1,3 +1,90 @@
+SiLK-3.17.1 Release, 2018-Apr-23
+
+* Building
+  -- Fix a compilation failure on RedHat EL6, CentOS 6, and other
+     systems.
+
+
+SiLK-3.17.0 Release, 2018-Apr-19
+
+* rwaggbagtool
+  -- Add the --min-field switch to remove from the output rows having
+     a key or counter value below the specified minimum.
+  -- Add the --max-field switch to remove from the output rows having
+     a key or counter value above the specified maximum.
+  -- Add the --set-intersect switch to remove from the output rows
+     having a key not in the specified IPset.
+  -- Add the --set-complement switch to remove from the output rows
+     having a key in the specified IPset.
+  -- POTENTIAL INCOMPATIBILITY. When --to-ipset is given, exclude from
+     the IPset those IPs where all counter values are 0.  Previously
+     all IPs were included.
+* rwsetcat
+  -- POTENTIAL INCOMPATIBILITY. Default to using the IPv4 format for
+     IPv6-addresses in the ::ffff:0:0/96 netblock.
+  -- Add new values to the --ip-format switch and change how some
+     values (zero-padded) work.
+* rwuniq
+  -- Add support for millisecond timestamps by allowing the --bin-time
+     switch to accept fractional values.
+  -- Add new values to the --ip-format switch and change how some
+     values (zero-padded) work.
+  -- Add a --threshold switch to limit which rows are printed.  The
+     output may now to limited to the number of distinct counts for
+     any field.
+  -- POTENTIAL INCOMPATIBILITY. Value fields that are only specified
+     by legacy switches (--bytes, --packets, -flows, --stime, --etime,
+     --sip-distinct, --dip-distinct) are now printed in the order in
+     which the switches appear.
+  -- POTENTIAL INCOMPATIBILITY. Change the hash algorithm which may
+     change the order in which rows are printed.
+  -- POTENTIAL INCOMPATIBILITY. Change the widths of some columns.
+* rwstats
+  -- Add support for millisecond timestamps by allowing the --bin-time
+     switch to accept fractional values.
+  -- Add new values to the --ip-format switch and change how some
+     values (zero-padded) work.
+  -- POTENTIAL INCOMPATIBILITY. Change the widths of some columns.
+* rwgeoip2ccmap
+  -- Add support for parsing the MaxMind GeoIP2 comma-separated values
+     files.
+  -- Add support for processing a MaxMind GeoIP2 binary database file
+     when the configure script finds the libmaxminddb package.
+  -- Add switch --input-path as a replacement for --input-file, but
+     retain the old name for compatibility.
+  -- Add switch --output-path as a replacement for --output-file, but
+     retain the old name for compatibility.
+  -- Exit with an error when --mode=ipv6 is specified in an IPv4-only
+     build of SiLK.
+* rwpmapbuild
+  -- Add switch --input-path as a replacement for --input-file, but
+     retain the old name for compatibility.
+  -- Add switch --output-path as a replacement for --output-file, but
+     retain the old name for compatibility.
+  -- Exit with an error when --mode=ipv6 is specified in an IPv4-only
+     build of SiLK.
+* rwp2yaf2silk
+  -- Fix a bug that occurred when the input or output file name
+     included white space.
+* rwaddrcount
+  -- POTENTIAL INCOMPATIBILITY. Change width of the IP address column
+     depending on ip-format.
+* rwflowpack
+  -- Modify the packing-logic plug-in API to allow the plug-in to
+     specify the record version in addition to the record format.
+  -- Write log messages when YAF tombstone records are received.
+  -- Fix an issue where SiLK assumed some incoming template IDs always
+     contained NetSA-specific data.
+* flowcap
+  -- Write log messages when YAF tombstone records are received.
+  -- Fix an issue where SiLK assumed some incoming template IDs always
+     contained NetSA-specific data.
+* Building
+  -- Add support for libfixbuf-2.0.0.
+  -- Have configure exit with an error when --with-PACKAGE is given
+     and configure cannot find PACKAGE.
+
+
 SiLK-3.16.1 Release, 2018-Feb-15
 
 * rwstats
@@ -3252,7 +3339,7 @@ SiLK-0.10.5 Release, 2006-Dec-12
      used to filter out those entries.
   -- Allow the --invert switch to support multiple Bag files by adding
      the Bags (making the switch consistent with the --coverset,
-     --intersect, and --compliment-intersect switches).  This fixes an
+     --intersect, and --complement-intersect switches).  This fixes an
      assertion that would cause the program to abort.
   -- Support values larger than 4294967295 in the --mincount and
      --maxcount switches.

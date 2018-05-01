@@ -16,7 +16,7 @@
 #    Mark Thomas
 #    November 2006
 #
-#  RCSIDENT("$SiLK: rwp2yaf2silk.in 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $")
+#  RCSIDENT("$SiLK: rwp2yaf2silk.in 20999e3771e6 2018-02-19 22:20:48Z mthomas $")
 #
 ##############################################################################
 
@@ -145,25 +145,42 @@ sub parse_options
         print_version_exit();
     }
 
+    # check the $input and $output files, and use quotemeta (\Q) to
+    # quote any the non-alphanumerics in the names.
+    #
+    # A better solution would be to use a pipe-open for the commands
+    # (see Safe Pipe Opens in the perlipc man page), but that could
+    # break the --yaf-args and --rwipfix2silk-args switches unless we
+    # tokenize them by whitespace.  Of course, if --yaf-args contains
+    # a BPF filtering expression, then it needs to be a single
+    # expression and it should not be tokenized.  Given this issue,
+    # using quotemeta seems the easier solution.
+    #
     unless (defined $input) {
         pod2usage(-msg => "$name: the --in switch is required");
     }
-    if ($input eq 'stdin') {
+    if ($input eq 'stdin' || $input eq '-') {
         $input = '-';
+        if (-t STDIN) {
+            die("$name: Cannot read binary data from",
+                " standard input connected to a terminal\n");
+        }
     }
-    if ($input eq '-' && -t STDIN) {
-        die("$name: Cannot read binary data from",
-            " standard input connected to a terminal\n");
+    else {
+        $input = quotemeta($input);
     }
     unless (defined $output) {
         pod2usage(-msg => "$name: the --out switch is required");
     }
-    if ($output eq '-') {
-        $output = 'stdout';
+    if ($output eq 'stdout' || $output eq '-') {
+        $output = '-';
+        if (-t STDOUT) {
+            die("$name: Cannot write binary data to",
+                " standard output connected to a terminal\n");
+        }
     }
-    if ($output eq 'stdout' && -t STDOUT) {
-        die("$name: Cannot write binary data to",
-            " standard output connected to a terminal\n");
+    else {
+        $output = quotemeta($output);
     }
 
     if (@ARGV)

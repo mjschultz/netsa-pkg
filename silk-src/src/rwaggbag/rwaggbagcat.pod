@@ -95,47 +95,82 @@ Use the TZ environment variable or the local timezone.
 
 =item B<--ip-format>=I<FORMAT>
 
-Specify how IP addresses are printed.  When this switch is not
-specified, the SILK_IP_FORMAT environment variable is checked for a
-format.  If it is empty or contains an invalid format, IPs are printed
-in the canonical format.  The I<FORMAT> is one of:
+Specify how IP addresses are printed, where I<FORMAT> is a
+comma-separated list of the arguments described below.  When this
+switch is not specified, the SILK_IP_FORMAT environment variable is
+checked for a value and that format is used if it is valid.  The
+default I<FORMAT> is C<canonical>.
 
 =over 4
 
 =item canonical
 
-Print IP addresses in their canonical form: dotted quad for IPv4
-(C<127.0.0.1>) and hexadectet for IPv6 (C<2001:db8::1>).  Note that
-IPv6 addresses in ::ffff:0:0/96 and some IPv6 addresses in ::/96 will
-be printed as a mixture of IPv6 and IPv4.
+Print IP addresses in the canonical format.  If the column is IPv4,
+use dot-separated decimal (C<192.0.2.1>).  If the column is IPv6, use
+colon-separated hexadecimal (C<2001:db8::1>) or a mixed IPv4-IPv6
+representation for IPv4-mapped IPv6 addresses (the ::ffff:0:0/96
+netblock, e.g., C<::ffff:192.0.2.1>) and IPv4-compatible IPv6
+addresses (the ::/96 netblock other than ::/127, e.g.,
+C<::192.0.2.1>).
 
-=item zero-padded
+=item no-mixed
 
-Print IP addresses in their canonical form, but add zeros to the
-output so it fully fills the width of column.  The addresses
-C<127.0.0.1> and C<2001:db8::1> are printed as C<127.000.000.001> and
-C<2001:0db8:0000:0000:0000:0000:0000:0001>, respectively.  When the
-B<--ipv6-policy> is C<force>, the output for C<127.0.0.1> becomes
-C<0000:0000:0000:0000:0000:ffff:7f00:0001>.
+Print IP addresses in the canonical format (C<192.0.2.1> or
+C<2001:db8::1>) but do not used the mixed IPv4-IPv6 representations.
+For example, use C<::ffff:c000:201> instead of C<::ffff:192.0.2.1>.
+I<Since SiLK 3.17.0>.
 
 =item decimal
 
-Print IP addresses as integers in decimal format.  The addresses
-C<127.0.0.1> and C<2001:db8::1> are printed as C<2130706433> and
+Print IP addresses as integers in decimal format.  For example, print
+C<192.0.2.1> and C<2001:db8::1> as C<3221225985> and
 C<42540766411282592856903984951653826561>, respectively.
 
 =item hexadecimal
 
-Print IP addresses as integers in hexadecimal format.  The addresses
-C<127.0.0.1> and C<2001:db8::1> are printed as C<7f000001> and
+Print IP addresses as integers in hexadecimal format.  For example,
+print C<192.0.2.1> and C<2001:db8::1> as C<c00000201> and
 C<20010db8000000000000000000000001>, respectively.
+
+=item zero-padded
+
+Make all IP address strings contain the same number of characters by
+padding numbers with leading zeros.  For example, print C<192.0.2.1>
+and C<2001:db8::1> as C<192.000.002.001> and
+C<2001:0db8:0000:0000:0000:0000:0000:0001>, respectively.  For IPv6
+addresses, this setting implies C<no-mixed>, so that
+C<::ffff:192.0.2.1> is printed as
+C<0000:0000:0000:0000:0000:ffff:c000:0201>.  As of SiLK 3.17.0, may be
+combined with any of the above, including C<decimal> and
+C<hexadecimal>.
+
+=back
+
+The following arguments modify certain IP addresses prior to printing.
+These arguments may be combined with the above formats.
+
+=over 4
+
+=item map-v4
+
+Change an IPv4 column to IPv4-mapped IPv6 addresses (addresses in the
+::ffff:0:0/96 netblock) prior to formatting.  I<Since SiLK 3.17.0>.
+
+=item unmap-v6
+
+For an IPv6 column, change any IPv4-mapped IPv6 addresses (addresses
+in the ::ffff:0:0/96 netblock) to IPv4 addresses prior to formatting.
+I<Since SiLK 3.17.0>.
+
+=back
+
+The following argument is also available:
+
+=over 4
 
 =item force-ipv6
 
-Print all IP addresses in the canonical form for IPv6 without using
-any IPv4 notation.  Any IPv4 address is mapped into the ::ffff:0:0/96
-netblock.  The addresses C<127.0.0.1> and C<2001:db8::1> are printed
-as C<::ffff:7f00:1> and C<2001:db8::1>, respectively.
+Set I<FORMAT> to C<map-v4>,C<no-mixed>.
 
 =back
 
@@ -361,7 +396,7 @@ B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwaggbagcat.pod 19097c33c9cb 2017-03-24 19:36:51Z mthomas $
+$SiLK: rwaggbagcat.pod 95aec76c40ea 2018-03-13 21:09:01Z mthomas $
 
 Local Variables:
 mode:text

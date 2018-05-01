@@ -6,11 +6,16 @@ B<rwaggbagtool> - Manipulate binary Aggregate Bag files
 
 =head1 SYNOPSIS
 
-  rwaggbagtool { --add | --subtract }
+  rwaggbagtool [{ --add | --subtract }]
         [--insert-field=FIELD=VALUE [--insert-field=FIELD2=VALUE2...]]
-        [--remove-fields=FIELD_LIST] [--select-fields=FIELD_LIST]
-        [--to-ipset=FIELD [--ipset-record-version=VERSION]]
-        [--to-bag=BAG_KEY,BAG_COUNTER] [--output-path=PATH]
+        [{ --remove-fields=FIELD_LIST | --select-fields=FIELD_LIST
+           | --to-ipset=FIELD [--ipset-record-version=VERSION]
+           | --to-bag=BAG_KEY,BAG_COUNTER }]
+        [--min-field=FIELD=VALUE [--min-field=FIELD=VALUE...]]
+        [--max-field=FIELD=VALUE [--max-field=FIELD=VALUE...]]
+        [--set-intersect=FIELD=FILE [--set-intersect=FIELD=FILE...]]
+        [--set-complement=FIELD=FILE [--set-complement=FIELD=FILE...]]
+        [--output-path=PATH]
         [--note-strip] [--note-add=TEXT] [--note-file-add=FILE]
         [--compression-method=COMP_METHOD]
         [--site-config-file=FILENAME]
@@ -119,6 +124,52 @@ or B<--to-bag>.
 
 =back
 
+=head2 Filtering switches
+
+The following switches remove entries from the Aggregate Bag file
+based on a field's value.  These switches are applied immediately
+before the output is generated.
+
+=over 4
+
+=item B<--min-field>=I<FIELD>B<=>I<VALUE>
+
+Remove from the Aggregate Bag file all entries where the value of the
+field I<FIELD> is less than I<VALUE>, where I<VALUE> is a textual
+representation of the field's value as described in the description of
+the B<--fields> switch in the B<rwaggbagbuild(1)> tool.  This switch
+is ignored if I<FIELD> is not present in the Aggregate Bag.  This
+switch may be repeated.  I<Since SiLK 3.17.0.>
+
+=item B<--max-field>=I<FIELD>B<=>I<VALUE>
+
+Remove from the Aggregate Bag file all entries where the value of the
+field I<FIELD> is greater than I<VALUE>, where I<VALUE> is a textual
+representation of the field's value as described in the description of
+the B<--fields> switch in the B<rwaggbagbuild(1)> tool.  This switch
+is ignored if I<FIELD> is not present in the Aggregate Bag.  This
+switch may be repeated.  I<Since SiLK 3.17.0.>
+
+=item B<--set-intersect>=I<FIELD>B<=>I<SET_FILE>
+
+Read an IPset from the stream I<SET_FILE>, and remove from the
+Aggregate Bag file all entries where the value of the field I<FIELD>
+is B<not> present in the IPset.  I<SET_FILE> may be the name a file or
+the string C<-> or C<stdin> to read the IPset from the standard input.
+This switch is ignored if I<FIELD> is not present in the Aggregate
+Bag.  This switch may be repeated.  I<Since SiLK 3.17.0.>
+
+=item B<--set-complement>=I<FIELD>B<=>I<SET_FILE>
+
+Read an IPset from the stream I<SET_FILE>, and remove from the
+Aggregate Bag file all entries where the value of the field I<FIELD>
+is present in the IPset.  I<SET_FILE> may be the name a file or the
+string C<-> or C<stdin> to read the IPset from the standard input.
+This switch is ignored if I<FIELD> is not present in the Aggregate
+Bag.  This switch may be repeated.  I<Since SiLK 3.17.0.>
+
+=back
+
 =head2 Output switches
 
 The following switches control the output.
@@ -148,8 +199,8 @@ version.  The default version is 0.
 
 =item S< 0 >
 
-Use the default version for an IPv4 IPset and an IPv6 IPset, currently
-2 and 3, respectively.
+Use the default version for an IPv4 IPset and an IPv6 IPset.  Use the
+B<--help> switch to see the versions used for your SiLK installation.
 
 =item S< 2 >
 
@@ -420,7 +471,7 @@ B<rwfilter(1)>, B<rwfileinfo(1)>, B<silk(7)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwaggbagtool.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
+$SiLK: rwaggbagtool.pod d39afdae1535 2018-03-01 20:50:10Z mthomas $
 
 Local Variables:
 mode:text

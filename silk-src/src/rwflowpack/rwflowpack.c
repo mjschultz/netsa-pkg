@@ -81,7 +81,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwflowpack.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwflowpack.c cf1383c6db4f 2018-03-26 19:42:13Z mthomas $");
 
 #include <dlfcn.h>
 
@@ -162,11 +162,6 @@ RCSIDENT("$SiLK: rwflowpack.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 /* The number of input modes supported.  Used to set array sizes. */
 #define MAX_INPUT_MODE_TYPE_COUNT 9
-
-/* Default record version to write. */
-#ifndef RWFLOWPACK_DEFAULT_VERSION
-#  define RWFLOWPACK_DEFAULT_VERSION SK_RECORD_VERSION_ANY
-#endif
 
 /* The signal the reader thread (the manageProcessor() function) sends
  * to main thread to indicate that the reader thread is done.
@@ -257,23 +252,19 @@ static pthread_mutex_t fproc_thread_count_mutex = PTHREAD_MUTEX_INITIALIZER;
 /* The packing logic to use to categorize flow records */
 static packlogic_plugin_t packlogic;
 
-/* A pointer to the function to use to determine the file format to
- * use when writing flow records to disk.  This will be
- * packlogic.determine_fileformat_fn unless --pack-interfaces is
- * given. */
-static sk_file_format_t (*determine_fileformat_fn)(
-    const skpc_probe_t *probe,
-    sk_flowtype_id_t    ftype);
-
 /* the compression method to use when writing the file.
  * skCompMethodOptionsRegister() will set this to the default or
  * to the value the user specifies. */
 static sk_compmethod_t comp_method;
 
-/* Command line option giving the sensor---from the probeconf
- * configuration file---that this rwflowpack is packing.  If none
- * given, use first probe in the probeconf file. */
+/* When running in stream mode, rwflowpack normally collects data from
+ * all probes.  This is the value of the --sensor-name command line
+ * switch which limits which probes are activated.  It is also used
+ * when running in PDU single-file mode. */
 static const char *sensor_name = NULL;
+
+/* set to 1 when the --pack-interfaces switch is given. */
+static int pack_interfaces = 0;
 
 /* True as long as we are reading. */
 static uint8_t reading = 0;
@@ -565,14 +556,6 @@ static int  initPackingLogic(const char *user_path);
 #ifndef SK_PACKING_LOGIC_PATH
 static int  initPackingLogicFromPlugin(const char *user_path);
 #endif
-static sk_file_format_t
-defaultDetermineFileFormat(
-    const skpc_probe_t *probe,
-    sk_flowtype_id_t    ftype);
-static sk_file_format_t
-determineFileFormatPackInterfaces(
-    const skpc_probe_t *probe,
-    sk_flowtype_id_t    ftype);
 
 
 /* FUNCTION DEFINITIONS */
@@ -1160,12 +1143,7 @@ appOptionsProcessOpt(
         return byteOrderParse(opt_arg);
 
       case OPT_PACK_INTERFACES:
-        if (determine_fileformat_fn != &defaultDetermineFileFormat) {
-            /* use a function to "round up" the results of calling the
-             * packing logic function.  The defaultDetermineFileFormat
-             * function already uses formats with interfaces. */
-            determine_fileformat_fn = &determineFileFormatPackInterfaces;
-        }
+        pack_interfaces = 1;
         break;
 
       case OPT_NO_FILE_LOCKING:
@@ -1723,12 +1701,6 @@ initPackingLogic(
         goto ERROR;
     }
 
-    /* if not provided, use a default function for determining the
-     * fileformat */
-    determine_fileformat_fn = (packlogic.determine_fileformat_fn
-                               ? packlogic.determine_fileformat_fn
-                               : &defaultDetermineFileFormat);
-
     /* all OK */
     return 0;
 
@@ -1952,8 +1924,9 @@ defineRunModeOptions(
  */
 void
 nullSigHandler(
-    int          UNUSED(s))
+    int                 s)
 {
+    SK_UNUSED_PARAM(s);
     return;
 }
 
@@ -2045,11 +2018,13 @@ printReaderStats(
  */
 static skTimerRepeat_t
 timedFlush(
-    void        UNUSED(*dummy))
+    void               *dummy)
 {
     cache_file_iter_t *iter;
     const char *path;
     uint64_t count;
+
+    SK_UNUSED_PARAM(dummy);
 
     /* Flush the stream cache */
     NOTICEMSG("Flushing files after %" PRIu32 " seconds.", flush_timeout);
@@ -2084,8 +2059,9 @@ timedFlush(
  */
 static skTimerRepeat_t
 timedFlushAndMove(
-    void        UNUSED(*dummy))
+    void               *dummy)
 {
+    SK_UNUSED_PARAM(dummy);
     flushAndMoveFiles();
     printReaderStats();
 
@@ -2655,65 +2631,61 @@ getProbes(
 
 
 /*
- *  format = defaultDetermineFileFormat(probe, ftype);
+ *    Determine the flow record format and version to use for a newly
+ *    opened output file.
  *
- *    This function is used when the packing logic plug-in (normally
- *    probeconf-<SITE>.c) does not set a function to return the file
- *    format, determine_fileformat_fn.
+ *    This function calls one of the functions defined in the-logic
+ *    plug-in (typically probeconf-<SITE>.c) to get the format and
+ *    version if the plug-in provdes such a function.
  *
- *    This function returns the most compact file format capable of
- *    holding all the infomation that this installation of SiLK
- *    supports.  All these file formats provide space for the next-hop
- *    IP address and SNMP interface information.
- */
-#if   SK_ENABLE_IPV6
-static sk_file_format_t
-defaultDetermineFileFormat(
-    const skpc_probe_t  UNUSED(*probe),
-    sk_flowtype_id_t     UNUSED(ftype))
-{
-    /* Use a format with SNMP interface information */
-    return FT_RWIPV6ROUTING;
-}
-#else  /* !SK_ENABLE_IPV6 */
-static sk_file_format_t
-defaultDetermineFileFormat(
-    const skpc_probe_t         *probe,
-    sk_flowtype_id_t     UNUSED(ftype))
-{
-    if (skpcProbeGetQuirks(probe) & SKPC_QUIRK_ZERO_PACKETS) {
-        /* Use a format that does not use bytes/packet ratio */
-        return FT_RWGENERIC;
-    }
-
-    /* Use a format with SNMP interface information */
-    switch (skpcProbeGetType(probe)) {
-      case PROBE_ENUM_NETFLOW_V5:
-        return FT_RWROUTED;
-
-      default:
-        return FT_RWAUGROUTING;
-    }
-}
-#endif  /* #else of #if SK_ENABLE_IPV6 */
-
-
-/*
- *  format = determineFileFormatPackInterfaces(probe, ftype);
+ *    If the --pack-interfaces switch was given, the type returned by
+ *    the plug-in is "rounded up" to a format that contains SNMP
+ *    information.
  *
- *    This function is used when the user requests --pack-interfaces.
- *    This function invokes the packing logic plug-in's
- *    determine_fileformat_fn, and then "rounds up" that value to a
- *    format that includes the SNMP interfaces.
+ *    If the plug-in does not define the needed function, return the
+ *    most compact file format capable of holding all the infomation
+ *    that this installation of SiLK supports.  All these file formats
+ *    provide space for the next-hop IP address and SNMP interface
+ *    information.
  */
 static sk_file_format_t
-determineFileFormatPackInterfaces(
+determineFormatVersion(
     const skpc_probe_t *probe,
-    sk_flowtype_id_t    ftype)
+    sk_flowtype_id_t    ftype,
+    sk_file_version_t  *version)
 {
     sk_file_format_t file_format;
 
-    file_format = packlogic.determine_fileformat_fn(probe, ftype);
+    *version = SK_RECORD_VERSION_ANY;
+    if (packlogic.determine_formatversion_fn) {
+        file_format = packlogic.determine_formatversion_fn(probe, ftype,
+                                                           version);
+    } else if (packlogic.determine_fileformat_fn) {
+        file_format = packlogic.determine_fileformat_fn(probe, ftype);
+    } else
+#if   SK_ENABLE_IPV6
+    {
+        return FT_RWIPV6ROUTING;
+    }
+#else  /* SK_ENABLE_IPV6 */
+    {
+        if (skpcProbeGetQuirks(probe) & SKPC_QUIRK_ZERO_PACKETS) {
+            /* Use a format that does not use bytes/packet ratio */
+            *version = 5;
+            return FT_RWAUGROUTING;
+        }
+        if (PROBE_ENUM_NETFLOW_V5 == skpcProbeGetType(probe)) {
+            return FT_RWROUTED;
+        }
+        return FT_RWAUGROUTING;
+    }
+#endif  /* #else of #if SK_ENABLE_IPV6 */
+
+    if (!pack_interfaces) {
+        return file_format;
+    }
+
+    /* "round up" the format to one that includes SNMP interfaces */
     switch (file_format) {
       case FT_RWAUGROUTING:
       case FT_RWFILTER:
@@ -2725,17 +2697,28 @@ determineFileFormatPackInterfaces(
         return file_format;
 
       case FT_FLOWCAP:
+        /* change the format and version */
+        *version = SK_RECORD_VERSION_ANY;
+        return FT_RWAUGROUTING;
+
       case FT_RWAUGMENTED:
       case FT_RWAUGWEB:
       case FT_RWAUGSNMPOUT:
+        /* change the format; retain the version */
         return FT_RWAUGROUTING;
 
       case FT_RWIPV6:
+        /* change the format and version */
+        *version = SK_RECORD_VERSION_ANY;
         return FT_RWIPV6ROUTING;
 
       case FT_RWNOTROUTED:
       case FT_RWSPLIT:
       case FT_RWWWW:
+        if (*version < 3) {
+            /* V1 and V2 only use 8 bits for SNMP interfaces */
+            *version = 3;
+        }
         return FT_RWROUTED;
 
       default:
@@ -2776,6 +2759,7 @@ openOutputStreamIncr(
     skstream_t *stream = NULL;
     sk_file_header_t *hdr;
     sk_file_format_t file_format;
+    sk_file_version_t file_version;
     size_t sz;
     int fd;
     int rv;
@@ -2817,9 +2801,9 @@ openOutputStreamIncr(
     dotpath[0] = '\0';
     fd = -1;
 
-    /* Call the determineFileFormat function to get the file
-     * output format---HOW the records will be written to disk. */
-    file_format = determine_fileformat_fn(probe, key->flowtype_id);
+    /* Call the function to get the file's record format and
+     * version---HOW the records will be written to disk. */
+    file_format = determineFormatVersion(probe,key->flowtype_id,&file_version);
 
     /* Build the file name--WHERE the records will be written onto
      * disk.  First get the filename, then make the path to the
@@ -2929,7 +2913,7 @@ openOutputStreamIncr(
     /* Get file's header and fill it in */
     hdr = skStreamGetSilkHeader(stream);
     if ((rv = skHeaderSetFileFormat(hdr, file_format))
-        || (rv = skHeaderSetRecordVersion(hdr, RWFLOWPACK_DEFAULT_VERSION))
+        || (rv = skHeaderSetRecordVersion(hdr, file_version))
         || (rv = skHeaderSetCompressionMethod(hdr, comp_method))
         || (rv = skHeaderSetByteOrder(hdr, byte_order))
         || (rv = skHeaderAddPackedfile(hdr, key->time_stamp,
@@ -2999,6 +2983,7 @@ openOutputStreamRepo(
     skstream_t *stream = NULL;
     sk_file_header_t *hdr;
     sk_file_format_t file_format;
+    sk_file_version_t file_version;
     skstream_mode_t mode;
     int rv;
 
@@ -3031,14 +3016,14 @@ openOutputStreamRepo(
         return stream;
     }
 
-    /* Call the determineFileFormat function to get the file
-     * output format---HOW the records will be written to disk. */
-    file_format = determine_fileformat_fn(probe, key->flowtype_id);
+    /* Call the function to get the file's record format and
+     * version---HOW the records will be written to disk. */
+    file_format = determineFormatVersion(probe,key->flowtype_id,&file_version);
 
     /* Get file's header and fill it in */
     hdr = skStreamGetSilkHeader(stream);
     if ((rv = skHeaderSetFileFormat(hdr, file_format))
-        || (rv = skHeaderSetRecordVersion(hdr, RWFLOWPACK_DEFAULT_VERSION))
+        || (rv = skHeaderSetRecordVersion(hdr, file_version))
         || (rv = skHeaderSetCompressionMethod(hdr, comp_method))
         || (rv = skHeaderSetByteOrder(hdr, byte_order))
         || (rv = skHeaderAddPackedfile(hdr, key->time_stamp,

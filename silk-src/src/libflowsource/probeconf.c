@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconf.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: probeconf.c 96529cbc24c2 2018-03-22 19:09:27Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/probeconf.h>
@@ -733,6 +733,7 @@ skpcProbeGetType(
 
 
 /* Get and set the probe's protocol */
+#ifndef skpcProbeGetProtocol
 skpc_proto_t
 skpcProbeGetProtocol(
     const skpc_probe_t *probe)
@@ -740,6 +741,7 @@ skpcProbeGetProtocol(
     assert(probe);
     return probe->protocol;
 }
+#endif  /* skpcProbeGetProtocol */
 
 int
 skpcProbeSetProtocol(
@@ -1092,7 +1094,7 @@ skpcProbeSetAcceptFromHost(
     return 0;
 }
 
-
+#ifndef skpcProbeGetSensorCount
 size_t
 skpcProbeGetSensorCount(
     const skpc_probe_t *probe)
@@ -1100,6 +1102,7 @@ skpcProbeGetSensorCount(
     assert(probe);
     return probe->sensor_count;
 }
+#endif  /* skpcProbeGetSensorCount */
 
 
 static int
@@ -1897,6 +1900,7 @@ skpcSensorDestroy(
 
 
 /* Get and set the name of this sensor. */
+#ifndef skpcSensorGetID
 sk_sensor_id_t
 skpcSensorGetID(
     const skpc_sensor_t    *sensor)
@@ -1904,7 +1908,9 @@ skpcSensorGetID(
     assert(sensor);
     return sensor->sensor_id;
 }
+#endif  /* skpcSensorGetID */
 
+#ifndef skpcSensorGetName
 const char *
 skpcSensorGetName(
     const skpc_sensor_t    *sensor)
@@ -1912,6 +1918,7 @@ skpcSensorGetName(
     assert(sensor);
     return sensor->sensor_name;
 }
+#endif  /* skpcSensorGetName */
 
 int
 skpcSensorSetName(

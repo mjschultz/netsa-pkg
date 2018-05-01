@@ -10,7 +10,7 @@ B<rwstats> - Print top-N or bottom-N lists or summarize data by protocol
         {--count=N | --threshold=N | --percentage=N}
         [{--top | --bottom}] [--presorted-input] [--no-percents]
         [--ipv6-policy={ignore,asv4,mix,force,only}]
-        [{--bin-time | --bin-time=SECONDS}]
+        [{--bin-time=SECONDS | --bin-time}]
         [--timestamp-format=FORMAT] [--epoch-time]
         [--ip-format=FORMAT] [--integer-ips] [--zero-pad-ips]
         [--integer-sensors] [--integer-tcp-flags]
@@ -394,11 +394,12 @@ for the source IP address, a two-letter country code abbreviation
 denoting the country where that IP address is located.  Uses the
 mapping file specified by the SILK_COUNTRY_CODES environment variable,
 or the F<country_codes.pmap> mapping file, as described in
-B<ccfilter(3)>.  The abbreviations are those used by the Root-Zone
-Whois Index (see for example
-L<http://www.iana.org/cctld/cctld-whois.htm>) or the following special
-codes: B<--> N/A (e.g. private and experimental reserved addresses);
-B<a1> anonymous proxy; B<a2> satellite provider; B<o1> other
+B<ccfilter(3)>.  The abbreviations are those defined by ISO 3166-1
+(see for example L<https://www.iso.org/iso-3166-country-codes.html>
+or L<https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2>) or the
+following special codes: B<--> N/A (e.g. private and experimental
+reserved addresses); B<a1> anonymous proxy; B<a2> satellite provider;
+B<o1> other
 
 =item dcc,19
 
@@ -663,7 +664,8 @@ it contains.
 =item asv4
 
 Convert IPv6 flow records that contain addresses in the ::ffff:0:0/96
-prefix to IPv4 and ignore all other IPv6 flow records.
+netblock (that is, IPv4-mapped IPv6 addresses) to IPv4 and ignore all
+other IPv6 flow records.
 
 =item mix
 
@@ -674,7 +676,7 @@ equivalent to B<force>.
 =item force
 
 Convert IPv4 flow records to IPv6, mapping the IPv4 addresses into the
-::ffff:0:0/96 prefix.
+::ffff:0:0/96 netblock.
 
 =item only
 
@@ -683,13 +685,15 @@ records in the input.
 
 =back
 
-=item B<--bin-time>
-
 =item B<--bin-time>=I<SECONDS>
 
-Adjust the key fields 'sTime' and 'eTime' to appear on
-I<SECONDS>-second boundaries (the floor of the time is used).  When no
-value is provided to the switch, 60-second time bins are used.
+=item B<--bin-time>
+
+Adjust the times in the key fields 'sTime' and 'eTime' to appear on
+I<SECONDS>-second boundaries (the floor of the time is used).  As of
+SiLK 3.17.0, I<SECONDS> may be a fractional value of 0.001 or greater.
+By default, times appear on 1-second boundaries.  When the switch is
+used but no argument is given, B<rwstats> uses 60-second time bins.
 
 =item B<--timestamp-format>=I<FORMAT>
 
@@ -746,47 +750,82 @@ will be removed in the SiLK 4.0 release.
 
 =item B<--ip-format>=I<FORMAT>
 
-Specify how IP addresses are printed.  When this switch is not
-specified, the SILK_IP_FORMAT environment variable is checked for a
-format.  If it is empty or contains an invalid format, IPs are printed
-in the canonical format.  The I<FORMAT> is one of:
+Specify how IP addresses are printed, where I<FORMAT> is a
+comma-separated list of the arguments described below.  When this
+switch is not specified, the SILK_IP_FORMAT environment variable is
+checked for a value and that format is used if it is valid.  The
+default I<FORMAT> is C<canonical>.  I<Since SiLK 3.7.0.>
 
 =over 4
 
 =item canonical
 
-Print IP addresses in their canonical form: dotted quad for IPv4
-(C<127.0.0.1>) and hexadectet for IPv6 (C<2001:db8::1>).  Note that
-IPv6 addresses in ::ffff:0:0/96 and some IPv6 addresses in ::/96 will
-be printed as a mixture of IPv6 and IPv4.
+Print IP addresses in the canonical format.  If the key only contains
+IPv4 addresses, use dot-separated decimal (C<192.0.2.1>).  Otherwise,
+use colon-separated hexadecimal (C<2001:db8::1>) or a mixed IPv4-IPv6
+representation for IPv4-mapped IPv6 addresses (the ::ffff:0:0/96
+netblock, e.g., C<::ffff:192.0.2.1>) and IPv4-compatible IPv6
+addresses (the ::/96 netblock other than ::/127, e.g.,
+C<::192.0.2.1>).
 
-=item zero-padded
+=item no-mixed
 
-Print IP addresses in their canonical form, but add zeros to the
-output so it fully fills the width of column.  The addresses
-C<127.0.0.1> and C<2001:db8::1> are printed as C<127.000.000.001> and
-C<2001:0db8:0000:0000:0000:0000:0000:0001>, respectively.  When the
-B<--ipv6-policy> is C<force>, the output for C<127.0.0.1> becomes
-C<0000:0000:0000:0000:0000:ffff:7f00:0001>.
+Print IP addresses in the canonical format (C<192.0.2.1> or
+C<2001:db8::1>) but do not used the mixed IPv4-IPv6 representations.
+For example, use C<::ffff:c000:201> instead of C<::ffff:192.0.2.1>.
+I<Since SiLK 3.17.0>.
 
 =item decimal
 
-Print IP addresses as integers in decimal format.  The addresses
-C<127.0.0.1> and C<2001:db8::1> are printed as C<2130706433> and
+Print IP addresses as integers in decimal format.  For example, print
+C<192.0.2.1> and C<2001:db8::1> as C<3221225985> and
 C<42540766411282592856903984951653826561>, respectively.
 
 =item hexadecimal
 
-Print IP addresses as integers in hexadecimal format.  The addresses
-C<127.0.0.1> and C<2001:db8::1> are printed as C<7f000001> and
+Print IP addresses as integers in hexadecimal format.  For example,
+print C<192.0.2.1> and C<2001:db8::1> as C<c00000201> and
 C<20010db8000000000000000000000001>, respectively.
+
+=item zero-padded
+
+Make all IP address strings contain the same number of characters by
+padding numbers with leading zeros.  For example, print C<192.0.2.1>
+and C<2001:db8::1> as C<192.000.002.001> and
+C<2001:0db8:0000:0000:0000:0000:0000:0001>, respectively.  For IPv6
+addresses, this setting implies C<no-mixed>, so that
+C<::ffff:192.0.2.1> is printed as
+C<0000:0000:0000:0000:0000:ffff:c000:0201>.  As of SiLK 3.17.0, may be
+combined with any of the above, including C<decimal> and
+C<hexadecimal>.
+
+=back
+
+The following arguments modify certain IP addresses prior to printing.
+These arguments may be combined with the above formats.
+
+=over 4
+
+=item map-v4
+
+Change IPv4 addresses to IPv4-mapped IPv6 addresses (addresses in the
+::ffff:0:0/96 netblock) prior to formatting.  I<Since SiLK 3.17.0>.
+
+=item unmap-v6
+
+When the key contains IPv6 addresses, change any IPv4-mapped IPv6
+addresses (addresses in the ::ffff:0:0/96 netblock) to IPv4 addresses
+prior to formatting.  I<Since SiLK 3.17.0>.
+
+=back
+
+The following argument is also available:
+
+=over 4
 
 =item force-ipv6
 
-Print all IP addresses in the canonical form for IPv6 without using
-any IPv4 notation.  Any IPv4 address is mapped into the ::ffff:0:0/96
-netblock.  The addresses C<127.0.0.1> and C<2001:db8::1> are printed
-as C<::ffff:7f00:1> and C<2001:db8::1>, respectively.
+Set I<FORMAT> to C<map-v4>,C<no-mixed>.
 
 =back
 
@@ -911,14 +950,14 @@ the command line.
 =item B<--help>
 
 Print the available options and exit.  Specifying switches that add
-new fields, values, or additional switches before B<--help> will allow
+new fields, values, or additional switches before B<--help> allows
 the output to include descriptions of those fields or switches.
 
 =item B<--help-fields>
 
 Print the description and alias(es) of each field and value and exit.
-Specifying switches that add new fields before B<--help-fields> will
-allow the output to include descriptions of those fields.
+Specifying switches that add new fields before B<--help-fields>
+allows the output to include descriptions of those fields.
 
 =item B<--legacy-help>
 
@@ -947,7 +986,7 @@ Use: B<--fields=sip>
 =item B<--sip>=I<CIDR>
 
 Use the most significant I<CIDR> bits of the source address as the
-key.  Using this switch with IPv6 data will cause an error.  The user
+key.  Using this switch with IPv6 data causes an error.  The user
 should use B<rwnetmask(1)> to mask the data prior to processing it
 with B<rwstats>.
 
@@ -958,7 +997,7 @@ Use: B<--fields=dip>
 =item B<--dip>=I<CIDR>
 
 Use the most significant I<CIDR> bits of the destination address as
-the key.  Using this switch with IPv6 data will cause an error.  The
+the key.  Using this switch with IPv6 data causes an error.  The
 user should use B<rwnetmask> to mask the data prior to processing
 it with B<rwstats>.
 
@@ -1357,7 +1396,7 @@ module.
 
 =item SILK_PYTHON_TRACEBACK
 
-When set, Python plug-ins will output traceback information on Python
+When set, Python plug-ins output traceback information on Python
 errors to the standard error.
 
 =item SILK_COUNTRY_CODES
@@ -1562,7 +1601,7 @@ B<dlopen(3)>, B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwstats.pod 6d21d1f3d455 2017-06-28 16:32:15Z mthomas $
+$SiLK: rwstats.pod c95fb6174130 2018-04-13 20:33:46Z mthomas $
 
 Local Variables:
 mode:text

@@ -21,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcs_CHECK_STRUCT_C, "$SiLK: check-struct.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENTVAR(rcs_CHECK_STRUCT_C, "$SiLK: check-struct.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 
 /*
@@ -285,6 +285,24 @@ skiCheckDataStructure(
     RESET_COUNTERS();
     PRINT_TITLE(ski_ignore_t);
     PRINT_OFFSET(pos, ski_ignore_t, systemInitTimeMilliseconds);
+
+    tmpl = checkDataStructPrepTemplate(ski_tombstone_spec, 0, session);
+    if (!tmpl) { goto END; }
+    RESET_COUNTERS();
+    PRINT_TITLE(ski_tombstone_t);
+    PRINT_OFFSET(pos, ski_tombstone_t, exporterConfiguredId);
+    PRINT_OFFSET(pos, ski_tombstone_t, exporterUniqueId);
+    PRINT_OFFSET(pos, ski_tombstone_t, tombstoneId);
+#if SKIPFIX_ENABLE_TOMBSTONE_TIMES
+    PRINT_OFFSET(pos, ski_tombstone_t, stl);
+#endif
+
+    tmpl = checkDataStructPrepTemplate(ski_tombstone_access_spec, 0, session);
+    if (!tmpl) { goto END; }
+    RESET_COUNTERS();
+    PRINT_TITLE(ski_tombstone_access_t);
+    PRINT_OFFSET(pos, ski_tombstone_access_t, exportingProcessId);
+    PRINT_OFFSET(pos, ski_tombstone_access_t, observationTimeSeconds);
 
     flags = (YAFREC_DELTA | YAFREC_IP_BOTH | YAFREC_BI | YAFREC_STML);
     tmpl = checkDataStructPrepTemplate(ski_yafrec_spec, flags, session);

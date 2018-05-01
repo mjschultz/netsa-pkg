@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skvector.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: skvector.c a66db06a0b1e 2018-03-01 19:00:06Z mthomas $");
 
 #include <silk/skvector.h>
 
@@ -262,7 +262,13 @@ skVectorSetCapacity(
     }
 
     /* must realloc or malloc */
-    return skVectorAlloc(v, capacity);
+    if (skVectorAlloc(v, capacity)) {
+        return -1;
+    }
+    if (v->count > v->capacity) {
+        v->count = v->capacity;
+    }
+    return 0;
 }
 
 

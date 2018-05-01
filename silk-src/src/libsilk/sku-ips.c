@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-ips.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: sku-ips.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/utils.h>
@@ -535,41 +535,59 @@ skipaddrGetAsV4(
 char *
 skipaddrString(
     char               *outbuf,
-    const skipaddr_t   *ip,
+    const skipaddr_t   *ipaddr,
     uint32_t            ip_flags)
 {
+    uint8_t ipv6[16];
+    uint32_t ipv4;
+    int is_ipv6;
+
 #if SK_ENABLE_IPV6
-    if (skipaddrIsV6(ip)) {
+    if (skipaddrIsV6(ipaddr)) {
+        if ((ip_flags & SKIPADDR_UNMAP_V6)
+            && (0 == skipaddrGetAsV4(ipaddr, &ipv4)))
+        {
+            is_ipv6 = 0;
+        } else {
+            is_ipv6 = 1;
+            skipaddrGetV6(ipaddr, ipv6);
+        }
+    } else
+#endif  /* SK_ENABLE_IPV6 */
+    {
+        if (ip_flags & SKIPADDR_MAP_V4) {
+#ifdef skipaddrGetAsV6
+            skipaddrGetAsV6(ipaddr, ipv6);
+#else
+            uint32_t tmp;
+            memcpy(ipv6, sk_ipv6_v4inv6, sizeof(sk_ipv6_v4inv6));
+            tmp = htonl(skipaddrGetV4(ipaddr));
+            memcpy(&ipv6[12], &tmp, sizeof(tmp));
+#endif  /* #else of #ifdef skipaddrGetAsV6 */
+            is_ipv6 = 1;
+        } else {
+            is_ipv6 = 0;
+            ipv4 = skipaddrGetV4(ipaddr);
+        }
+    }
+
+    ip_flags &= ~(uint32_t)(SKIPADDR_MAP_V4 | SKIPADDR_UNMAP_V6);
+
+    if (is_ipv6) {
         /* to represent a 128 bit number, divide the number into 4
          * 64-bit values where each value represents 10 decimal digits
          * of the number, with position 0 holding the least
          * significant bits. */
-        static const uint64_t map_ipv6_to_dec[][4] =
-            {{                   1,                    0,  0, 0}, /* 1 <<  0 */
-             {                 256,                    0,  0, 0}, /* 1 <<  8 */
-             {               65536,                    0,  0, 0}, /* 1 << 16 */
-             {            16777216,                    0,  0, 0}, /* 1 << 24 */
-             { UINT64_C(4294967296),                   0,  0, 0}, /* 1 << 32 */
-             { UINT64_C(9511627776),                 109,  0, 0}, /* 1 << 40 */
-             { UINT64_C(4976710656),               28147,  0, 0}, /* 1 << 48 */
-             { UINT64_C(4037927936),             7205759,  0, 0}, /* 1 << 56 */
-             { UINT64_C(3709551616), UINT64_C(1844674407), 0, 0}, /* 1 << 64 */
-             { UINT64_C(9645213696), UINT64_C(2236648286),      47, 0},/* 72 */
-             { UINT64_C(9174706176), UINT64_C(2581961462),   12089, 0},/* 80 */
-             { UINT64_C(8724781056),  UINT64_C(982134506), 3094850, 0},/* 88 */
-             { UINT64_C(3543950336), UINT64_C(1426433759),
-               /* */           UINT64_C(792281625),          0}, /* 1 <<  96 */
-             { UINT64_C(7251286016), UINT64_C(5167042394),
-               /* */          UINT64_C(2824096036),         20}, /* 1 << 104 */
-             { UINT64_C(6329220096), UINT64_C(2762853049),
-               /* */          UINT64_C(2968585348),       5192}, /* 1 << 112 */
-             {  UINT64_C(280344576), UINT64_C(7290380706),
-                /* */         UINT64_C(9957849158),    1329227}  /* 1 << 120 */
-            };
+        static const uint64_t map_ipv6_to_dec[][3] = {
+            /* 1 << 64 */
+            { UINT64_C(3709551616), UINT64_C(1844674407), 0},
+            /* 1 <<  96 */
+            { UINT64_C(3543950336), UINT64_C(1426433759), UINT64_C(792281625)}
+        };
         /* our 10 decimal digits */
         static const uint64_t lim = UINT64_C(10000000000);
         /* the decimal value being calculated */
-        uint64_t decimal[5] = {0, 0, 0, 0, 0};
+        uint64_t decimal[4] = {0, 0, 0, 0};
         /* when doing our own IPv6 printing, this holds each 16bit
          * section of the address */
         uint16_t hexdec[8];
@@ -581,15 +599,51 @@ skipaddrString(
         char tmpbuf[SK_NUM2DOT_STRLEN];
         char *pos;
         unsigned int len;
-        unsigned int i, j, k;
+        unsigned int i, j;
+        int zero_pad = 0;
 
-        switch ((skipaddr_flags_t)ip_flags) {
+        if (0 == memcmp(ipv6, sk_ipv6_zero, sizeof(sk_ipv6_zero))) {
+            switch (ip_flags) {
+              case SKIPADDR_CANONICAL:
+              case SKIPADDR_NO_MIXED:
+                snprintf(outbuf, SK_NUM2DOT_STRLEN, "::");
+                break;
+
+              case SKIPADDR_DECIMAL:
+              case SKIPADDR_HEXADECIMAL:
+                snprintf(outbuf, SK_NUM2DOT_STRLEN, "0");
+                break;
+
+              case SKIPADDR_ZEROPAD | SKIPADDR_CANONICAL:
+              case SKIPADDR_ZEROPAD | SKIPADDR_NO_MIXED:
+                snprintf(outbuf, SK_NUM2DOT_STRLEN,
+                         "0000:0000:0000:0000:0000:0000:0000:0000");
+                break;
+
+              case SKIPADDR_ZEROPAD | SKIPADDR_DECIMAL:
+                snprintf(outbuf, SK_NUM2DOT_STRLEN,
+                         "000000000000000000000000000000000000000");
+                break;
+
+              case SKIPADDR_ZEROPAD | SKIPADDR_HEXADECIMAL:
+                snprintf(outbuf, SK_NUM2DOT_STRLEN,
+                         "00000000000000000000000000000000");
+                break;
+
+              default:
+                skAbortBadCase(ip_flags);
+            }
+            outbuf[SK_NUM2DOT_STRLEN-1] = '\0';
+            return outbuf;
+        }
+
+        switch (ip_flags) {
           case SKIPADDR_CANONICAL:
 #ifdef SK_HAVE_INET_NTOP
 #  if    SK_NUM2DOT_STRLEN < INET6_ADDRSTRLEN
 #    error "SK_NUM2DOT_STRLEN is not big enough"
 #  endif
-            if (NULL == inet_ntop(AF_INET6, &(ip->ip_ip.ipu_ipv6), outbuf,
+            if (NULL == inet_ntop(AF_INET6, &(ipv6), outbuf,
                                   SK_NUM2DOT_STRLEN))
             {
                 outbuf[0] = '\0';
@@ -597,22 +651,18 @@ skipaddrString(
             break;
 #endif /* SK_HAVE_INET_NTOP */
 
-          case SKIPADDR_FORCE_IPV6:
+          case SKIPADDR_NO_MIXED:
             /* do our own IPV6 printing with no IPv4 representation;
              * follows Section 4 of RFC5952 */
-            if (skipaddrIsZero(ip)) {
-                snprintf(outbuf, SK_NUM2DOT_STRLEN, "::");
-                break;
-            }
             /* compute each hexadectet */
-            hexdec[0] = (ip->ip_ip.ipu_ipv6[ 0]<<8) | ip->ip_ip.ipu_ipv6[ 1];
-            hexdec[1] = (ip->ip_ip.ipu_ipv6[ 2]<<8) | ip->ip_ip.ipu_ipv6[ 3];
-            hexdec[2] = (ip->ip_ip.ipu_ipv6[ 4]<<8) | ip->ip_ip.ipu_ipv6[ 5];
-            hexdec[3] = (ip->ip_ip.ipu_ipv6[ 6]<<8) | ip->ip_ip.ipu_ipv6[ 7];
-            hexdec[4] = (ip->ip_ip.ipu_ipv6[ 8]<<8) | ip->ip_ip.ipu_ipv6[ 9];
-            hexdec[5] = (ip->ip_ip.ipu_ipv6[10]<<8) | ip->ip_ip.ipu_ipv6[11];
-            hexdec[6] = (ip->ip_ip.ipu_ipv6[12]<<8) | ip->ip_ip.ipu_ipv6[13];
-            hexdec[7] = (ip->ip_ip.ipu_ipv6[14]<<8) | ip->ip_ip.ipu_ipv6[15];
+            hexdec[0] = (ipv6[ 0] << 8) | ipv6[ 1];
+            hexdec[1] = (ipv6[ 2] << 8) | ipv6[ 3];
+            hexdec[2] = (ipv6[ 4] << 8) | ipv6[ 5];
+            hexdec[3] = (ipv6[ 6] << 8) | ipv6[ 7];
+            hexdec[4] = (ipv6[ 8] << 8) | ipv6[ 9];
+            hexdec[5] = (ipv6[10] << 8) | ipv6[11];
+            hexdec[6] = (ipv6[12] << 8) | ipv6[13];
+            hexdec[7] = (ipv6[14] << 8) | ipv6[15];
             /* find the starting position and length of the longest
              * run of 0s */
             longest_zero_pos = 8;
@@ -639,184 +689,256 @@ skipaddrString(
                 snprintf(outbuf, SK_NUM2DOT_STRLEN, "%x:%x:%x:%x:%x:%x:%x:%x",
                          hexdec[0], hexdec[1], hexdec[2], hexdec[3],
                          hexdec[4], hexdec[5], hexdec[6], hexdec[7]);
-                break;
-            }
-            i = 0;
-            pos = outbuf;
-            len = SK_NUM2DOT_STRLEN;
-            while (i < 8) {
-                if (i == longest_zero_pos) {
-                    i += longest_zero_len;
-                    if (8 == i) {
-                        j = snprintf(pos, len, "::");
+            } else {
+                i = 0;
+                pos = outbuf;
+                len = SK_NUM2DOT_STRLEN;
+                while (i < 8) {
+                    if (i == longest_zero_pos) {
+                        i += longest_zero_len;
+                        if (8 == i) {
+                            j = snprintf(pos, len, "::");
+                        } else {
+                            j = snprintf(pos, len, ":");
+                        }
+                    } else if (0 == i) {
+                        j = snprintf(pos, len, "%x", hexdec[i]);
+                        ++i;
                     } else {
-                        j = snprintf(pos, len, ":");
+                        j = snprintf(pos, len, ":%x", hexdec[i]);
+                        ++i;
                     }
-                } else if (0 == i) {
-                    j = snprintf(pos, len, "%x", hexdec[i]);
-                    ++i;
-                } else {
-                    j = snprintf(pos, len, ":%x", hexdec[i]);
-                    ++i;
+                    if (j >= len) {
+                        skAbort();
+                    }
+                    pos += j;
+                    len -= j;
                 }
-                if (j >= len) {
-                    skAbort();
-                }
-                pos += j;
-                len -= j;
             }
             break;
 
-          case SKIPADDR_ZEROPAD:
+          case SKIPADDR_ZEROPAD | SKIPADDR_CANONICAL:
+          case SKIPADDR_ZEROPAD | SKIPADDR_NO_MIXED:
             /* Convert integer 0 to string
                "0000:0000:0000:0000:0000:0000:0000:0000" */
             snprintf(outbuf, SK_NUM2DOT_STRLEN,
                      ("%02x%02x:%02x%02x:%02x%02x:%02x%02x"
                       ":%02x%02x:%02x%02x:%02x%02x:%02x%02x"),
-                     ip->ip_ip.ipu_ipv6[ 0], ip->ip_ip.ipu_ipv6[ 1],
-                     ip->ip_ip.ipu_ipv6[ 2], ip->ip_ip.ipu_ipv6[ 3],
-                     ip->ip_ip.ipu_ipv6[ 4], ip->ip_ip.ipu_ipv6[ 5],
-                     ip->ip_ip.ipu_ipv6[ 6], ip->ip_ip.ipu_ipv6[ 7],
-                     ip->ip_ip.ipu_ipv6[ 8], ip->ip_ip.ipu_ipv6[ 9],
-                     ip->ip_ip.ipu_ipv6[10], ip->ip_ip.ipu_ipv6[11],
-                     ip->ip_ip.ipu_ipv6[12], ip->ip_ip.ipu_ipv6[13],
-                     ip->ip_ip.ipu_ipv6[14], ip->ip_ip.ipu_ipv6[15]);
+                     ipv6[ 0], ipv6[ 1], ipv6[ 2], ipv6[ 3],
+                     ipv6[ 4], ipv6[ 5], ipv6[ 6], ipv6[ 7],
+                     ipv6[ 8], ipv6[ 9], ipv6[10], ipv6[11],
+                     ipv6[12], ipv6[13], ipv6[14], ipv6[15]);
             break;
 
+          case SKIPADDR_ZEROPAD | SKIPADDR_HEXADECIMAL:
+            zero_pad = 1;
+            /* FALLTHROUGH */
           case SKIPADDR_HEXADECIMAL:
             /* Fill buffer with a string representation of an integer
              * in hexadecimal format; this works by printing the value
              * then stripping leading 0's. */
-            if (skipaddrIsZero(ip)) {
-                snprintf(outbuf, SK_NUM2DOT_STRLEN, "0");
-                break;
-            }
             snprintf(tmpbuf, sizeof(tmpbuf),
-                     ("%x%02x%02x%02x%02x%02x%02x%02x"
+                     ("%02x%02x%02x%02x%02x%02x%02x%02x"
                       "%02x%02x%02x%02x%02x%02x%02x%02x"),
-                     ip->ip_ip.ipu_ipv6[ 0], ip->ip_ip.ipu_ipv6[ 1],
-                     ip->ip_ip.ipu_ipv6[ 2], ip->ip_ip.ipu_ipv6[ 3],
-                     ip->ip_ip.ipu_ipv6[ 4], ip->ip_ip.ipu_ipv6[ 5],
-                     ip->ip_ip.ipu_ipv6[ 6], ip->ip_ip.ipu_ipv6[ 7],
-                     ip->ip_ip.ipu_ipv6[ 8], ip->ip_ip.ipu_ipv6[ 9],
-                     ip->ip_ip.ipu_ipv6[10], ip->ip_ip.ipu_ipv6[11],
-                     ip->ip_ip.ipu_ipv6[12], ip->ip_ip.ipu_ipv6[13],
-                     ip->ip_ip.ipu_ipv6[14], ip->ip_ip.ipu_ipv6[15]);
-            i = strspn(tmpbuf, "0");
+                     ipv6[ 0], ipv6[ 1], ipv6[ 2], ipv6[ 3],
+                     ipv6[ 4], ipv6[ 5], ipv6[ 6], ipv6[ 7],
+                     ipv6[ 8], ipv6[ 9], ipv6[10], ipv6[11],
+                     ipv6[12], ipv6[13], ipv6[14], ipv6[15]);
+            i = ((zero_pad) ? 0 : strspn(tmpbuf, "0"));
             /* checked for an IP of 0 above, so 'i' must be on some
              * non-zero hex-digit */
             assert('\0' != tmpbuf[i]);
             strncpy(outbuf, &tmpbuf[i], SK_NUM2DOT_STRLEN);
             break;
 
+          case SKIPADDR_ZEROPAD | SKIPADDR_DECIMAL:
+            zero_pad = 1;
+            /* FALLTHROUGH */
           case SKIPADDR_DECIMAL:
-            /* Multiply each octet by the value in the map_ipv6_to_dec
-             * look-up table and create the value in 'decimal' */
-            for (i = 0; i < 16; ++i) {
-                if (ip->ip_ip.ipu_ipv6[15-i]) {
-                    for (j = 0; j < 4 && map_ipv6_to_dec[i][j] > 0; ++j) {
-                        decimal[j] +=
-                            ip->ip_ip.ipu_ipv6[15-i] * map_ipv6_to_dec[i][j];
-                        if (decimal[j] >= lim) {
-                            /* handle overflow */
-                            tmp = decimal[j];
-                            decimal[j] %= lim;
-                            decimal[j+1] += tmp / lim;
-                        }
-                    }
+            /* the lower 64 bits of the IPv6 address */
+            tmp = ((  (uint64_t)ipv6[ 8] << UINT64_C(56))
+                   | ((uint64_t)ipv6[ 9] << UINT64_C(48))
+                   | ((uint64_t)ipv6[10] << UINT64_C(40))
+                   | ((uint64_t)ipv6[11] << UINT64_C(32))
+                   | ((uint64_t)ipv6[12] << UINT64_C(24))
+                   | ((uint64_t)ipv6[13] << UINT64_C(16))
+                   | ((uint64_t)ipv6[14] << UINT64_C( 8))
+                   | ((uint64_t)ipv6[15]));
+            decimal[0] = tmp % lim;
+            decimal[1] = tmp / lim;
+            /* the middle-upper 32 bits, must be multipled by 1<<64 */
+            tmp = ((  (uint64_t)ipv6[4] << UINT64_C(24))
+                   | ((uint64_t)ipv6[5] << UINT64_C(16))
+                   | ((uint64_t)ipv6[6] << UINT64_C( 8))
+                   | ((uint64_t)ipv6[7]));
+            if (tmp) {
+                decimal[0] += tmp * map_ipv6_to_dec[0][0];
+                if (decimal[0] >= lim) {
+                    decimal[1] += decimal[0] / lim;
+                    decimal[0] %= lim;
+                }
+                decimal[1] += tmp * map_ipv6_to_dec[0][1];
+                if (decimal[1] >= lim) {
+                    decimal[2] += decimal[1] / lim;
+                    decimal[1] %= lim;
                 }
             }
-            /* Final check for overflow and determine number of
-             * 'decimal' elements that have a value */
-            i = 0;
-            for (j = 0; j < 4; ++j) {
-                if (decimal[j] >= lim) {
-                    i = k = j;
-                    do {
-                        tmp = decimal[k];
-                        decimal[k] %= lim;
-                        ++k;
-                        decimal[k] += tmp / lim;
-                    } while (decimal[k] >= lim && k < 4);
-                } else if (decimal[j] > 0) {
-                    i = j;
+            /* the upper 32 bits, must be multipled by 1<<96 */
+            tmp = ((  (uint64_t)ipv6[0] << UINT64_C(24))
+                   | ((uint64_t)ipv6[1] << UINT64_C(16))
+                   | ((uint64_t)ipv6[2] << UINT64_C( 8))
+                   | ((uint64_t)ipv6[3]));
+            if (tmp) {
+                decimal[0] += tmp * map_ipv6_to_dec[1][0];
+                if (decimal[0] >= lim) {
+                    decimal[1] += decimal[0] / lim;
+                    decimal[0] %= lim;
+                }
+                decimal[1] += tmp * map_ipv6_to_dec[1][1];
+                if (decimal[1] >= lim) {
+                    decimal[2] += decimal[1] / lim;
+                    decimal[1] %= lim;
+                }
+                decimal[2] += tmp * map_ipv6_to_dec[1][2];
+                if (decimal[2] >= lim) {
+                    decimal[3] += decimal[2] / lim;
+                    decimal[2] %= lim;
                 }
             }
-            /* Print it */
-            switch (i) {
-              case 0:
+            /* print the results */
+            if (zero_pad) {
                 snprintf(outbuf, SK_NUM2DOT_STRLEN,
-                         "%" PRIu64, decimal[0]);
-                break;
-              case 1:
-                snprintf(outbuf, SK_NUM2DOT_STRLEN,
-                         "%" PRIu64 "%010" PRIu64,
-                         decimal[1], decimal[0]);
-                break;
-              case 2:
-                snprintf(outbuf, SK_NUM2DOT_STRLEN,
-                         "%" PRIu64 "%010" PRIu64 "%010" PRIu64,
-                         decimal[2], decimal[1], decimal[0]);
-                break;
-              case 3:
+                         "%010" PRIu64 "%010" PRIu64 "%010" PRIu64
+                         "%010" PRIu64,
+                         decimal[3], decimal[2], decimal[1], decimal[0]);
+            } else if (decimal[3]) {
                 snprintf(outbuf, SK_NUM2DOT_STRLEN,
                          "%" PRIu64 "%010" PRIu64 "%010" PRIu64 "%010" PRIu64,
                          decimal[3], decimal[2], decimal[1], decimal[0]);
-                break;
-              case 4:
+            } else if (decimal[2]) {
                 snprintf(outbuf, SK_NUM2DOT_STRLEN,
-                         ("%" PRIu64 "%010" PRIu64 "%010" PRIu64
-                          "%010" PRIu64 "%010" PRIu64),
-                         decimal[4], decimal[3], decimal[2],
+                         "%" PRIu64 "%010" PRIu64 "%010" PRIu64,
+                         decimal[2], decimal[1], decimal[0]);
+            } else if (decimal[1]) {
+                snprintf(outbuf, SK_NUM2DOT_STRLEN,
+                         "%" PRIu64 "%010" PRIu64,
                          decimal[1], decimal[0]);
-                break;
-              default:
-                skAbortBadCase(i);
+            } else {
+                snprintf(outbuf, SK_NUM2DOT_STRLEN,
+                         "%" PRIu64, decimal[0]);
             }
             break;
-        }
-    } else
-#endif  /* SK_ENABLE_IPV6 */
-    {
-        /* address is IPv4 */
-        switch ((skipaddr_flags_t)ip_flags) {
-          case SKIPADDR_CANONICAL:
-            /* Convert integer 0 to string "0.0.0.0" */
-            snprintf(outbuf, SK_NUM2DOT_STRLEN, "%lu.%lu.%lu.%lu",
-                     (unsigned long)((ip->ip_ip.ipu_ipv4 >> 24) & 0xFF),
-                     (unsigned long)((ip->ip_ip.ipu_ipv4 >> 16) & 0xFF),
-                     (unsigned long)((ip->ip_ip.ipu_ipv4 >> 8) & 0xFF),
-                     (unsigned long)(ip->ip_ip.ipu_ipv4 & 0xFF));
-            break;
 
-          case SKIPADDR_ZEROPAD:
-            /* Convert integer 0 to string "000.000.000.000" */
-            snprintf(outbuf, SK_NUM2DOT_STRLEN, "%03lu.%03lu.%03lu.%03lu",
-                     (unsigned long)((ip->ip_ip.ipu_ipv4 >> 24) & 0xFF),
-                     (unsigned long)((ip->ip_ip.ipu_ipv4 >> 16) & 0xFF),
-                     (unsigned long)((ip->ip_ip.ipu_ipv4 >> 8) & 0xFF),
-                     (unsigned long)(ip->ip_ip.ipu_ipv4 & 0xFF));
+          default:
+            skAbortBadCase(ip_flags);
+        }
+    } else {
+        /* address is IPv4 */
+        switch (ip_flags) {
+          case SKIPADDR_CANONICAL:
+          case SKIPADDR_NO_MIXED:
+            /* Convert integer 0 to string "0.0.0.0" */
+            snprintf(outbuf, SK_NUM2DOT_STRLEN,
+                     "%" PRIu32 ".%" PRIu32 ".%" PRIu32 ".%" PRIu32,
+                     ((ipv4 >> 24) & 0xFF),
+                     ((ipv4 >> 16) & 0xFF),
+                     ((ipv4 >>  8) & 0xFF),
+                     ((ipv4      ) & 0xFF));
             break;
 
           case SKIPADDR_DECIMAL:
-            snprintf(outbuf, SK_NUM2DOT_STRLEN, ("%" PRIu32),
-                     ip->ip_ip.ipu_ipv4);
+            snprintf(outbuf, SK_NUM2DOT_STRLEN, ("%" PRIu32), ipv4);
             break;
 
           case SKIPADDR_HEXADECIMAL:
-            snprintf(outbuf, SK_NUM2DOT_STRLEN, ("%" PRIx32),
-                     ip->ip_ip.ipu_ipv4);
+            snprintf(outbuf, SK_NUM2DOT_STRLEN, ("%" PRIx32), ipv4);
+            break;
+
+          case SKIPADDR_ZEROPAD | SKIPADDR_CANONICAL:
+          case SKIPADDR_ZEROPAD | SKIPADDR_NO_MIXED:
+            snprintf(outbuf, SK_NUM2DOT_STRLEN,
+                     "%03" PRIu32 ".%03" PRIu32 ".%03" PRIu32 ".%03" PRIu32,
+                     ((ipv4 >> 24) & 0xFF),
+                     ((ipv4 >> 16) & 0xFF),
+                     ((ipv4 >>  8) & 0xFF),
+                     ((ipv4      ) & 0xFF));
+            break;
+
+          case SKIPADDR_ZEROPAD | SKIPADDR_DECIMAL:
+            snprintf(outbuf, SK_NUM2DOT_STRLEN, ("%010" PRIu32), ipv4);
+            break;
+
+          case SKIPADDR_ZEROPAD | SKIPADDR_HEXADECIMAL:
+            snprintf(outbuf, SK_NUM2DOT_STRLEN, ("%08" PRIx32), ipv4);
             break;
 
           case SKIPADDR_FORCE_IPV6:
-            snprintf(outbuf, SK_NUM2DOT_STRLEN, "::ffff:%x:%x",
-                     ip->ip_ip.ipu_ipv4 >> 16, ip->ip_ip.ipu_ipv4 & 0xFFFF);
-            break;
+          case SKIPADDR_MAP_V4:
+          case SKIPADDR_UNMAP_V6:
+          default:
+            skAbortBadCase(ip_flags);
         }
     }
 
     outbuf[SK_NUM2DOT_STRLEN-1] = '\0';
     return outbuf;
+}
+
+
+int
+skipaddrStringMaxlen(
+    unsigned int        allow_ipv6,
+    uint32_t            ip_flags)
+{
+#if !SK_ENABLE_IPV6
+    allow_ipv6 = 0;
+#endif
+    /* ignore the SKIPADDR_UNMAP_V6 flag since no way to know whether
+     * all IPv6 data falls in the ::ffff:0:0/96 netblock */
+
+    if (allow_ipv6 || (((SKIPADDR_ZEROPAD | SKIPADDR_MAP_V4) & ip_flags)
+                       == (SKIPADDR_ZEROPAD | SKIPADDR_MAP_V4)))
+    {
+        /* data is IPv6 or data is IPv4 being mapped to IPv6 and
+         * zero-pad is enabled */
+        switch (ip_flags & (SKIPADDR_ZEROPAD - 1)) {
+          case SKIPADDR_CANONICAL:
+          case SKIPADDR_NO_MIXED:
+          case SKIPADDR_DECIMAL:
+            return 39;
+          case SKIPADDR_HEXADECIMAL:
+            return 32;
+          default:
+            skAbortBadCase(ip_flags);
+        }
+    } else if (ip_flags & SKIPADDR_MAP_V4) {
+        /* IPv4 mapped to v6; max ip is ::ffff:255.255.255.255 */
+        switch (ip_flags & (SKIPADDR_ZEROPAD - 1)) {
+          case SKIPADDR_CANONICAL:
+            return 22;
+          case SKIPADDR_NO_MIXED:
+            return 16;
+          case SKIPADDR_DECIMAL:
+            return 15;
+          case SKIPADDR_HEXADECIMAL:
+            return 12;
+          default:
+            skAbortBadCase(ip_flags);
+        }
+    } else {
+        /* IPv4 */
+        switch (ip_flags & (SKIPADDR_ZEROPAD - 1)) {
+          case SKIPADDR_CANONICAL:
+          case SKIPADDR_NO_MIXED:
+            return 15;
+          case SKIPADDR_DECIMAL:
+            return 10;
+          case SKIPADDR_HEXADECIMAL:
+            return 8;
+          default:
+            skAbortBadCase(ip_flags);
+        }
+    }
 }
 
 
@@ -1011,6 +1133,7 @@ skipaddrMask(
     const skipaddr_t   *mask_ip)
 {
     skipaddr_t tmp;
+    uint32_t mask_v4;
 
     if (ipaddr->ip_is_v6) {
         if (mask_ip->ip_is_v6) {
@@ -1023,23 +1146,15 @@ skipaddrMask(
         skIPUnionApplyMaskV6(&ipaddr->ip_ip, tmp.ip_ip.ipu_ipv6);
         return;
     }
-    if (mask_ip->ip_is_v6) {
-        /* 'ipaddr' is IPv4 and 'mask_ip' is IPv6. if bytes 10 and 11
-         * of 'mask_ip' are 0xFFFF, then an IPv4 address will result;
-         * otherwise, we'll get something strange */
-        if (0 == memcmp(&mask_ip->ip_ip.ipu_ipv6[10], &sk_ipv6_v4inv6[10], 2)){
-            uint32_t mask_v4;
-            memcpy(&mask_v4, &mask_ip->ip_ip.ipu_ipv6[12], 4);
-            skIPUnionApplyMaskV4(&ipaddr->ip_ip, ntohl(mask_v4));
-            return;
-        }
+    if (skipaddrGetAsV4(mask_ip, &mask_v4) == -1) {
+        /* 'ipaddr' is IPv4 and 'mask_ip' is IPv6. convert 'ipaddr' to
+         * v6; the result is going to be strange */
         skipaddrV4toV6(ipaddr, ipaddr);
         skIPUnionApplyMaskV6(&ipaddr->ip_ip, mask_ip->ip_ip.ipu_ipv6);
         return;
     }
     /* both addresses are IPv4 */
-    skIPUnionApplyMaskV4(&ipaddr->ip_ip, skIPUnionGetV4(&mask_ip->ip_ip));
-    return;
+    skIPUnionApplyMaskV4(&ipaddr->ip_ip, mask_v4);
 }
 
 #endif /* SK_ENABLE_IPV6 */
@@ -1460,7 +1575,7 @@ skIPWildcardIteratorReset(
 
 #if SK_ENABLE_IPV6
     if (iter->force_ipv4) {
-        /* must ensure that wildcard contains 0:0:0:0:0:FFFF:x:x */
+        /* must ensure that wildcard contains 0:0:0:0:0:ffff:x:x */
         assert(skIPWildcardIsV6(iter->ipwild));
         for (i = 0; i < 5; ++i) {
             if (!_IPWILD_BLOCK_IS_SET(iter->ipwild, i, 0)) {

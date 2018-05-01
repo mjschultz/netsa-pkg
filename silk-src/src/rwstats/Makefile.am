@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 9a4f4ca2d067 2017-06-21 17:41:59Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am c2b77910e602 2018-01-05 15:56:30Z mthomas $");
 
 # Installed Targets
 
@@ -20,15 +20,13 @@ silkpython = ../pysilk/libsilkpython.la
 endif
 LDADD =  $(silkpython) ../libsilk/libsilk.la $(PYTHON_LDFLAGS_EMBEDDED)
 
-STATSUNIQ = skunique.c skunique.h
+STATSUNIQ = rwstats.h rwstatssetup.c skunique.c skunique.h
 
-rwstats_SOURCES = rwstats.c rwstats.h rwstatssetup.c $(STATSUNIQ) \
+rwstats_SOURCES = $(STATSUNIQ) rwstats.c \
 	interval.h intervalstats.c rwstatslegacy.c rwstatsproto.c
 
-rwuniq_SOURCES = rwuniq.c rwuniq.h rwuniqsetup.c $(STATSUNIQ)
+rwuniq_SOURCES = $(STATSUNIQ) rwuniq.c
 
-#include rwstats-old.mk
-#include rwuniq-old.mk
 
 # Global Rules
 include $(top_srcdir)/build.mk
@@ -145,6 +143,7 @@ TESTS = \
 	tests/rwuniq-bin-time-etime.pl \
 	tests/rwuniq-bin-time-stime-etime.pl \
 	tests/rwuniq-bin-time-stime-etime-dur.pl \
+	tests/rwuniq-bin-time-stime-dur.pl \
 	tests/rwuniq-elapsed-bytes.pl \
 	tests/rwuniq-etime.pl \
 	tests/rwuniq-stime-proto-sorted.pl \

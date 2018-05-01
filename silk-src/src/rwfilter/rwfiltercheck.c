@@ -19,7 +19,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwfiltercheck.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: rwfiltercheck.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include "rwfilter.h"
 #include <silk/skipset.h>
@@ -1459,7 +1459,7 @@ filterCheckFile(
     /* get handle to the header and the file's start time */
     pfh = skHeaderGetFirstMatch(hdr, SK_HENTRY_PACKEDFILE_ID);
     if (pfh) {
-        t = skHentryPackedfileGetStartTime((sk_hentry_packedfile_t*)pfh);
+        t = skHentryPackedfileGetStartTime(pfh);
     }
 
     for (j = 0; ((0 == skip_file) && (j < checks->check_count)); ++j) {

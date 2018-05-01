@@ -37,8 +37,11 @@ header to determine how to display the key column.
 
 =item *
 
-A key that is an IP address is printed in the canonical form.  May be
-modified by B<--key-format>.
+A key that is an IP address is printed in the canonical format.
+Specifically, IPs are printed in the IPv4 canonical format if the Bag
+contains only IPv4 addresses; otherwise, in the IPv6 canonical format
+(with IPv4 mapped into the ::ffff:0:0/96 netblock).  May be modified
+by B<--key-format>.
 
 =item *
 
@@ -64,11 +67,12 @@ B<--key-format> may be used.
 
 =item *
 
-A country code key uses the abbreviations from the Root-Zone Whois
-Index (see for example L<http://www.iana.org/cctld/cctld-whois.htm>)
-or the following special codes: B<--> N/A (e.g. private and
-experimental reserved addresses); B<a1> anonymous proxy; B<a2>
-satellite provider; B<o1> other.
+A country code key uses the abbreviations defined by ISO 3166-1 (see
+for example L<https://www.iso.org/iso-3166-country-codes.html> or
+L<https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2>) or the following
+special codes: B<--> N/A (e.g. private and experimental reserved
+addresses); B<a1> anonymous proxy; B<a2> satellite provider; B<o1>
+other.
 
 =item *
 
@@ -386,94 +390,135 @@ B<rwpmapbuild(1)>.  I<Since SiLK 3.12.0.>
 
 =item B<--key-format>=I<FORMAT>
 
-Specify the format to use when printing the keys.  When this switch is
-not specified, a Bag whose keys are known not to be IP addresses are
-printed as decimal numbers, and the keys for all other Bags are
-printed as IP addresses in the canonical format.  The I<FORMAT> is one
-of:
+Specify the format to use when printing a key, where I<FORMAT> is a
+comma-separated list of the arguments described below.  When this
+switch is not specified, B<rwbagcat> uses the key's type to determine
+how to format the key, and a key whose type is unknown or C<custom> is
+assumed to be an IP address.  B<rwbagcat> exits with an error if the
+specified format is incompatible with the key's type (for example,
+attempting to format a timestamp as an IP address).
 
 =over 4
 
-=item canonical
-
-Print keys as IP addresses in the canonical format: dotted quad for
-IPv4 (C<127.0.0.1>) and hexadectet for IPv6 (C<2001:db8::1>).  Note
-that IPv6 addresses in ::ffff:0:0/96 and some IPv6 addresses in ::/96
-will be printed as a mixture of IPv6 and IPv4.  As of SiLK 3.12.0,
-B<rwbagcat> exits with an error when this format is used on a Bag file
-whose key-type is neither C<custom> nor an IP address type.
-
-=item zero-padded
-
-Print keys as IP addresses in their canonical form, but add zeros to
-the output so it fully fills the width of column.  The addresses
-C<127.0.0.1> and C<2001:db8::1> are printed as C<127.000.000.001> and
-C<2001:0db8:0000:0000:0000:0000:0000:0001>, respectively.  As of SiLK
-3.12.0, B<rwbagcat> exits with an error when this format is used on a
-Bag file whose key-type is neither C<custom> nor an IP address type.
-
 =item decimal
 
-Print keys as integers in decimal format.  The addresses C<127.0.0.1>
-and C<2001:db8::1> are printed as C<2130706433> and
-C<42540766411282592856903984951653826561>, respectively.
+Print keys as integers in decimal format.  For example, print
+C<192.0.2.1> and C<2001:db8::1> as C<3221225985> and
+C<42540766411282592856903984951653826561>, respectively.  May be
+combined with C<zero-padded> and either C<map-v4> or C<unmap-v6>.
+B<rwbagcat> exits with an error when this format is used on a Bag file
+whose key-type is a timestamp.
 
 =item hexadecimal
 
-Print keys as integers in hexadecimal format.  The addresses
-C<127.0.0.1> and C<2001:db8::1> are printed as C<7f000001> and
-C<20010db8000000000000000000000001>, respectively.
+Print keys as integers in hexadecimal format.  For example, print
+C<192.0.2.1> and C<2001:db8::1> as C<c00000201> and
+C<20010db8000000000000000000000001>, respectively.  May be combined
+with C<zero-padded> and either C<map-v4> or C<unmap-v6>.  B<rwbagcat>
+exits with an error when this format is used on a Bag file whose
+key-type is a timestamp.
+
+=item canonical
+
+Print keys as IP addresses in the canonical format.  If the key is an
+IPv4 address, use dotted decimal (C<192.0.2.1>).  If the key is an
+IPv6 address, use colon-separated hexadecimal (C<2001:db8::1>) or a
+mixed IPv4-IPv6 representation for IPv4-mapped IPv6 addresses (the
+::ffff:0:0/96 netblock, e.g., C<::ffff:192.0.2.1>) and IPv4-compatible
+IPv6 addresses (the ::/96 netblock other than ::/127, e.g.,
+C<::192.0.2.1>).  May be combined with C<zero-padded> and either
+C<map-v4> or C<unmap-v6>.  As of SiLK 3.12.0, B<rwbagcat> exits with
+an error when this format is used on a Bag file whose key-type is
+neither C<custom> nor an IP address type.
+
+=item no-mixed
+
+Print keys as IP addresses in the canonical format (C<192.0.2.1> or
+C<2001:db8::1>) but do not used the mixed IPv4-IPv6 representations.
+For example, use C<::ffff:c000:201> instead of C<::ffff:192.0.2.1>.
+May be combined with C<zero-padded> and either C<map-v4> or
+C<unmap-v6>.  B<rwbagcat> exits with an error when this format is used
+on a Bag file whose key-type is neither C<custom> nor an IP address
+type.  I<Since SiLK 3.17.0>.
+
+=item map-v4
+
+When the Bag's key is an IPv4 address, change all IPv4 addresses to
+IPv4-mapped IPv6 addresses (addresses in the ::ffff:0:0/96 netblock)
+prior to formatting.  May be combined with one of the above settings.
+B<rwbagcat> exits with an error when this format is used on a Bag file
+whose key-type is neither C<custom> nor an IP address type.  I<Since
+SiLK 3.17.0>.
+
+=item unmap-v6
+
+When the Bag's key is an IPv6 address, change any IPv4-mapped IPv6
+addresses (addresses in the ::ffff:0:0/96 netblock) to IPv4 addresses
+prior to formatting.  May be combined with any one of the above
+settings except C<map-v4>.  B<rwbagcat> exits with an error when this
+format is used on a Bag file whose key-type is neither C<custom> nor
+an IP address type.  I<Since SiLK 3.17.0>.
+
+=item zero-padded
+
+Make all formatted key strings contain the same number of characters
+by padding numbers with leading zeros.  For example, print
+C<192.0.2.1> and C<2001:db8::1> as C<192.000.002.001> and
+C<2001:0db8:0000:0000:0000:0000:0000:0001>, respectively.  For IPv6
+addresses, this setting implies C<no-mixed>, so that
+C<::ffff:192.0.2.1> is printed as
+C<0000:0000:0000:0000:0000:ffff:c000:0201>.  As of SiLK 3.17.0, may be
+combined with any of the above, including C<decimal> and
+C<hexadecimal>.  B<rwbagcat> exits with an error when this format is
+used on a Bag file whose key-type is a timestamp.
 
 =item force-ipv6
 
-Print all keys as IP addresses in the canonical form for IPv6 without
-using any IPv4 notation.  Any integer key or IPv4 address is mapped
-into the ::ffff:0:0/96 netblock.  The addresses C<127.0.0.1> and
-C<2001:db8::1> are printed as C<::ffff:7f00:1> and C<2001:db8::1>,
-respectively.  As of SiLK 3.12.0,
-B<rwbagcat> exits with an error when this format is used on a Bag file
-whose key-type is neither C<custom> nor an IP address type.
+Print keys using the format C<map-v4>,C<no-mixed>.  May be combined
+with C<zero-padded>.  As of SiLK 3.12.0, B<rwbagcat> exits with an
+error when this format is used on a Bag file whose key-type is neither
+C<custom> nor an IP address type.
 
 =item timestamp
 
 Print keys as time in standard SiLK format:
-I<yyyy>/I<mm>/I<dd>TI<hh>:I<mm>:I<ss>.  May be combined with C<utc> or
-C<localtime>.  May only be used on keys whose type is custom or a time
-value.  I<Since SiLK 3.12.0.>
+I<yyyy>/I<mm>/I<dd>TI<hh>:I<mm>:I<ss>.  May be combined with B<utc> or
+B<localtime>.  May only be used on keys whose type is C<custom> or a
+time value.  I<Since SiLK 3.12.0.>
 
 =item iso-time
 
 Print keys as time in the ISO time format
-S<I<yyyy>-I<mm>-I<dd> I<hh>:I<mm>:I<ss>>.  May be combined with C<utc>
-or C<localtime>.  May only be used on keys whose type is custom or a
-time value.  I<Since SiLK 3.12.0.>
+S<I<yyyy>-I<mm>-I<dd> I<hh>:I<mm>:I<ss>>.  May be combined with B<utc>
+or B<localtime>.  May only be used on keys whose type is C<custom> or
+a time value.  I<Since SiLK 3.12.0.>
 
 =item m/d/y
 
 Print keys as time in the format
-S<I<mm>/I<dd>/I<yyyy> I<hh>:I<mm>:I<ss>>.  May be combined with C<utc>
-or C<localtime>.  May only be used on keys whose type is custom or a
-time value.  I<Since SiLK 3.12.0.>
+S<I<mm>/I<dd>/I<yyyy> I<hh>:I<mm>:I<ss>>.  May be combined with B<utc>
+or B<localtime>.  May only be used on keys whose type is C<custom> or
+a time value.  I<Since SiLK 3.12.0.>
 
 =item utc
 
 Print the keys as time in UTC.  If no other time-related key-format is
-provided, formats the time using the C<timestamp> format.  May only be
-used on keys whose type is custom or a time value.  I<Since SiLK
+provided, formats the time using the B<timestamp> format.  May only be
+used on keys whose type is C<custom> or a time value.  I<Since SiLK
 3.12.0.>
 
 =item localtime
 
 Print as the keys as time and get the timezone from either the TZ
 environment variable or local machine.  If no other time-related
-key-format is provided, formats the time using the C<timestamp>
-format.  May only be used on keys whose type is custom or a time
+key-format is provided, formats the time using the B<timestamp>
+format.  May only be used on keys whose type is C<custom> or a time
 value.  I<Since SiLK 3.12.0.>
 
 =item epoch
 
 Print keys as seconds since UNIX epoch.  May only be used on keys
-whose type is custom or a time value.  I<Since SiLK 3.12.0.>
+whose type is C<custom> or a time value.  I<Since SiLK 3.12.0.>
 
 =back
 
@@ -787,8 +832,8 @@ numeric index of the label is displayed as shown in the following
 example which creates a prefix map with a single label.
 
  $ echo 'label 1 none'                                      \
-   | rwpmapbuild --mode=proto-port --input-file=-           \
-        --output-file=tmp.pmap
+   | rwpmapbuild --mode=proto-port --input-path=-           \
+        --output-path=tmp.pmap
  $ rwbagcat --pmap-file=tmp.pmap service.bag
    7|                   1|
    8|                 800|
@@ -898,7 +943,7 @@ B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwbagcat.pod 2c01a5f676fc 2017-05-23 18:38:42Z mthomas $
+$SiLK: rwbagcat.pod c95fb6174130 2018-04-13 20:33:46Z mthomas $
 
 Local Variables:
 mode:text

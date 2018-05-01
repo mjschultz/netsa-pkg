@@ -4,7 +4,7 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in ../LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: silkconfig.m4 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $")
+dnl RCSIDENT("$SiLK: silkconfig.m4 d671fbbb6b9a 2018-04-06 16:04:18Z mthomas $")
 
 # ---------------------------------------------------------------------------
 # SILK_AC_COMPILER
@@ -588,10 +588,8 @@ AC_DEFUN([SILK_AC_INIT],[
     # Tests to run
     silk_enable_extra_checks=0
 
-    # add $(prefix)/lib/pkgconfig to PKG_CONFIG_PATH.  We should
-    # really use $(libdir)/pkgconfig, but trying to get that value is
-    # difficult.
-    silk_extra_pkg_config="$prefix/lib/pkgconfig"
+    # append locations in install directory to PKG_CONFIG_PATH
+    silk_extra_pkg_config=`eval "test \"x${prefix}\" = xNONE && prefix=\"${ac_default_prefix}\" ; test \"x${exec_prefix}\" = xNONE && exec_prefix=\"\\\${prefix}\" ; echo \"${libdir}/pkgconfig:${datarootdir}/pkgconfig\" "`
     if test "x$PKG_CONFIG_PATH" = "x"
     then
         PKG_CONFIG_PATH="$silk_extra_pkg_config"
@@ -1591,6 +1589,20 @@ AC_DEFUN([SILK_AC_WRITE_SUMMARY],[
     * IPA support:                  NO"
     fi
 
+    if test "x$ENABLE_LIBMAXMINDDB" = "x1"
+    then
+        sk_msg_ldflags=`echo "$LIBMAXMINDDB_LDFLAGS" | sed 's/^ *//' | sed 's/ *$//' | sed 's/  */ /g'`
+        if test -n "$sk_msg_ldflags"
+        then
+            sk_msg_ldflags=" ($sk_msg_ldflags)"
+        fi
+        SILK_FINAL_MSG="$SILK_FINAL_MSG
+    * MaxMindDB support:            YES$sk_msg_ldflags"
+    else
+        SILK_FINAL_MSG="$SILK_FINAL_MSG
+    * MaxMindDB support:            NO"
+    fi
+
     if test "x$ENABLE_ZLIB" = "x1"
     then
         sk_msg_ldflags=`echo "$ZLIB_LDFLAGS" | sed 's/^ *//' | sed 's/ *$//' | sed 's/  */ /g'`
@@ -1852,6 +1864,14 @@ AC_DEFUN([SILK_RPM_SPEC_SUBST],[
         RPM_SPEC_BUILDREQUIRES="$RPM_SPEC_BUILDREQUIRES libipa-devel >= $libipa_required_version,"
     else
         RPM_SPEC_CONFIGURE="$RPM_SPEC_CONFIGURE --without-libipa"
+    fi
+
+    if test "x$ENABLE_LIBMAXMINDDB" = "x1"
+    then
+        RPM_SPEC_REQUIRES="$RPM_SPEC_REQUIRES libmaxminddb >= $libmaxminddb_required_version,"
+        RPM_SPEC_BUILDREQUIRES="$RPM_SPEC_BUILDREQUIRES libmaxminddb-devel >= $libmaxminddb_required_version,"
+    else
+        RPM_SPEC_CONFIGURE="$RPM_SPEC_CONFIGURE --without-libmaxminddb"
     fi
 
     if test "x$ENABLE_LZO" = "x1"

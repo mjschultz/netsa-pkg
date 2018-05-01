@@ -48,7 +48,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-options.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: sku-options.c ecb4f46a7d39 2018-03-15 13:28:58Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sksite.h>
@@ -780,7 +780,26 @@ skOptionsTempDirUsage(
  *    Support for formatting IP addresses
  */
 
+/* flags passed to skOptionsIPFormatRegister() that determines what
+ * switches to enable */
 static uint32_t ip_format_flags = 0;
+
+/* some values in ipformat_names[] may not be combined. this array
+ * holds values used to check for invalid combinations.  Each entry is
+ * two 16 bit values where the lower bits indicate the parameter and
+ * the upper 16 bits are the mask of values it conflicts with.  */
+static const uint32_t ip_format_param_group[] = {
+    /* bits | mask */
+    0x0001 | (0x000F << 16),  /* canonical   */
+    0x0002 | (0x000F << 16),  /* decimal     */
+    0x0004 | (0x000F << 16),  /* hexadecimal */
+    0x0008 | (0x000F << 16),  /* no-mixed    */
+    0x0000 | (0x0000 << 16),  /* zero-padded */
+    0x0010 | (0x0030 << 16),  /* map-v4      */
+    0x0020 | (0x0030 << 16),  /* unmap-v6    */
+    0x0018 | (0x003F << 16)   /* force-ipv6  */
+};
+
 
 enum ipformat_option_en {
     OPT_VAL_IP_FORMAT, OPT_VAL_INTEGER_IPS, OPT_VAL_ZERO_PAD_IPS
@@ -795,18 +814,59 @@ static const struct option ipformat_option[] = {
 
 /* printed IP address formats: the first of these will be the default */
 static const sk_stringmap_entry_t ipformat_names[] = {
-    {"canonical",   SKIPADDR_CANONICAL,     NULL,
-     "canonical IP format (127.0.0.0, ::1)"},
-    {"zero-padded", SKIPADDR_ZEROPAD,       NULL,
-     "fully expanded, zero-padded canonical IP format"},
-    {"decimal",     SKIPADDR_DECIMAL,       NULL,
-     "integer number in decimal format"},
-    {"hexadecimal", SKIPADDR_HEXADECIMAL,   NULL,
-     "integer number in hexadecimal format"},
-    {"force-ipv6",  SKIPADDR_FORCE_IPV6,    NULL,
-     "IPv6 hexadectet format with no IPv4 subpart"},
+    {"canonical",       SKIPADDR_CANONICAL,
+     "in canonical format (192.0.2.1, 2001:db8::1)",
+     &ip_format_param_group[0]},
+    {"decimal",         SKIPADDR_DECIMAL,
+     "as integer number in decimal format",
+     &ip_format_param_group[1]},
+    {"hexadecimal",     SKIPADDR_HEXADECIMAL,
+     "as integer number in hexadecimal format",
+     &ip_format_param_group[2]},
+    {"no-mixed",        SKIPADDR_NO_MIXED,
+     "in canonical format but no mixed IPv4/IPv6 for IPv6 IPs",
+     &ip_format_param_group[3]},
+    {"zero-padded",     SKIPADDR_ZEROPAD,
+     "pad result to its maximum width with zeros",
+     &ip_format_param_group[4]},
+    {"map-v4",          SKIPADDR_MAP_V4,
+     "map IPv4 into ::ffff:0:0/96 netblock prior to formatting",
+     &ip_format_param_group[5]},
+    {"unmap-v6",        SKIPADDR_UNMAP_V6,
+     "convert IPv6 in ::ffff:0:0/96 to IPv4 prior to formatting",
+     &ip_format_param_group[6]},
+    {"force-ipv6",      SKIPADDR_FORCE_IPV6,
+     "alias equivalent to \"map-v4,no-mixed\"",
+     &ip_format_param_group[7]},
     SK_STRINGMAP_SENTINEL
 };
+
+
+/*
+ *    If the SK_OPTION_IP_FORMAT_UNMAP_V6 flag was passed to
+ *    skOptionsIPFormatRegister(), enable unmap-v6 (SKIPADDR_UNMAP_V6)
+ *    in the in the ip formatting flags unless the user selected
+ *    decimal or hexadecimal as the format, or the user specified
+ *    map-v4 (SKIPADDR_MAP_V4).
+ */
+static void
+ipformat_check_unmapv6(
+    uint32_t           *out_flags)
+{
+    if (ip_format_flags & SK_OPTION_IP_FORMAT_UNMAP_V6) {
+        switch (*out_flags & 0x7f) {
+          case SKIPADDR_DECIMAL:
+          case SKIPADDR_HEXADECIMAL:
+            break;
+          default:
+            if (0 == (SKIPADDR_MAP_V4 & *out_flags)) {
+                *out_flags |= SKIPADDR_UNMAP_V6;
+            }
+            break;
+        }
+    }
+}
+
 
 /*
  *  status = ipformat_option_parse(format_string, out_flags);
@@ -821,14 +881,18 @@ ipformat_option_parse(
     uint32_t           *out_flags,
     const char         *option_name)
 {
-    char buf[256];
     char *errmsg;
     sk_stringmap_t *str_map = NULL;
     sk_stringmap_iter_t *iter = NULL;
     sk_stringmap_entry_t *found_entry;
     const sk_stringmap_entry_t *entry;
-    int name_seen = 0;
+    uint32_t groups_seen = 0;
+    uint32_t bits;
+    uint32_t mask;
     int rv = -1;
+
+    assert(sizeof(ip_format_param_group)/sizeof(ip_format_param_group[0])
+           == (sizeof(ipformat_names)/sizeof(ipformat_names[0]) - 1));
 
     /* create a stringmap of the available ip formats */
     if (SKSTRINGMAP_OK != skStringMapCreate(&str_map)) {
@@ -851,41 +915,39 @@ ipformat_option_parse(
     *out_flags = 0;
 
     while (skStringMapIterNext(iter, &found_entry, NULL) == SK_ITERATOR_OK) {
-        *out_flags |= found_entry->id;
-        switch (found_entry->id) {
-          case SKIPADDR_CANONICAL:
-          case SKIPADDR_ZEROPAD:
-          case SKIPADDR_DECIMAL:
-          case SKIPADDR_HEXADECIMAL:
-          case SKIPADDR_FORCE_IPV6:
-            if (name_seen) {
-                entry = ipformat_names;
-                strncpy(buf, entry->name, sizeof(buf));
-                for (++entry; entry->name; ++entry) {
-                    strncat(buf, ",", sizeof(buf)-strlen(buf)-1);
+        bits = 0xFFFF & *(uint32_t *)found_entry->userdata;
+        mask = (*(uint32_t *)found_entry->userdata) >> 16;
+        /* check whether have seen another argument in this group */
+        if (groups_seen & (mask & ~bits)) {
+            /* yes, we have; generate error msg and return */
+            char buf[256] = "";
+            int first = 1;
+            for (entry = ipformat_names; entry->name; ++entry) {
+                uint32_t b = 0xFFFF & *(uint32_t *)entry->userdata;
+                if (b & (groups_seen & mask)) {
+                    if (first) {
+                        first = 0;
+                    } else {
+                        strncat(buf, ",", sizeof(buf)-strlen(buf)-1);
+                    }
                     strncat(buf, entry->name, sizeof(buf)-strlen(buf)-1);
                 }
-                skAppPrintErr("Invalid %s: May only specify one of %s",
-                              option_name, buf);
-                goto END;
             }
-            name_seen = 1;
-            break;
-
-          default:
-            skAbortBadCase(found_entry->id);
+            skAppPrintErr("Invalid %s: May not combine %s with %s",
+                          option_name, found_entry->name, buf);
+            goto END;
         }
+        groups_seen |= bits;
+        *out_flags |= found_entry->id;
     }
+
+    ipformat_check_unmapv6(out_flags);
 
     rv = 0;
 
   END:
-    if (str_map) {
-        skStringMapDestroy(str_map);
-    }
-    if (iter) {
-        skStringMapIterDestroy(iter);
-    }
+    skStringMapDestroy(str_map);
+    skStringMapIterDestroy(iter);
     return rv;
 }
 
@@ -940,14 +1002,16 @@ skOptionsIPFormatRegister(
     if (var_location == NULL) {
         return -1;
     }
+
+    ip_format_flags = flags;
+    ipformat_check_unmapv6(var_location);
+
     env = getenv(SK_IP_FORMAT_ENVAR);
     if (env && env[0]) {
         if (0 == ipformat_option_parse(env, &tmp_val, SK_IP_FORMAT_ENVAR)) {
             *var_location = tmp_val;
         }
     }
-
-    ip_format_flags = flags;
 
     memset(opts, 0, sizeof(opts));
 
@@ -976,15 +1040,30 @@ skOptionsIPFormatUsage(
     FILE               *fh)
 {
     const sk_stringmap_entry_t *e;
+    char defaults[256] = "";
+
+    if (0 == (ip_format_flags & SK_OPTION_IP_FORMAT_UNMAP_V6)) {
+        strncpy(defaults, ipformat_names[0].name, sizeof(defaults));
+    } else {
+        for (e = ipformat_names; e->name; ++e) {
+            if (e->id == SKIPADDR_UNMAP_V6) {
+                snprintf(defaults, sizeof(defaults), "%s,%s",
+                         ipformat_names[0].name, e->name);
+                break;
+            }
+        }
+    }
+    assert(defaults[0]);
 
     fprintf(fh, ("--%s %s. Print each IP address in the specified format.\n"
                  "\tDef. $" SK_IP_FORMAT_ENVAR " or %s.  Choices:\n"),
             ipformat_option[OPT_VAL_IP_FORMAT].name,
-            SK_OPTION_HAS_ARG(ipformat_option[OPT_VAL_IP_FORMAT]),
-            ipformat_names[0].name);
+            SK_OPTION_HAS_ARG(ipformat_option[OPT_VAL_IP_FORMAT]), defaults);
     for (e = ipformat_names; e->name; ++e) {
-        fprintf(fh, "\t%-12s - %s\n",
-                e->name, (const char*)e->userdata);
+        if (e->id == SKIPADDR_ZEROPAD) {
+            fprintf(fh, "\tThe following may be combined with the above:\n");
+        }
+        fprintf(fh, "\t%-11s - %s\n", e->name, e->description);
     }
 
     if (ip_format_flags & SK_OPTION_IP_FORMAT_INTEGER_IPS) {
@@ -1022,21 +1101,21 @@ static const struct option time_format_option[] = {
 
 /* timestamp formats: the first of these will be the default */
 static const sk_stringmap_entry_t time_format_names[] = {
-    {"default", 0,                    NULL, "yyyy/mm/ddThh:mm:ss"},
-    {"iso",     SKTIMESTAMP_ISO,      NULL, "yyyy-mm-dd hh:mm:ss"},
-    {"m/d/y",   SKTIMESTAMP_MMDDYYYY, NULL, "mm/dd/yyyy hh:mm:ss"},
-    {"epoch",   SKTIMESTAMP_EPOCH,    NULL,
-     "seconds since UNIX epoch; ignores timezone"},
+    {"default", 0,                      "yyyy/mm/ddThh:mm:ss", NULL},
+    {"iso",     SKTIMESTAMP_ISO,        "yyyy-mm-dd hh:mm:ss", NULL},
+    {"m/d/y",   SKTIMESTAMP_MMDDYYYY,   "mm/dd/yyyy hh:mm:ss", NULL},
+    {"epoch",   SKTIMESTAMP_EPOCH,
+     "seconds since UNIX epoch; ignores timezone", NULL},
     SK_STRINGMAP_SENTINEL
 };
 static const sk_stringmap_entry_t time_format_zones[] = {
-    {"utc",     SKTIMESTAMP_UTC,      NULL, "use UTC"},
-    {"local",   SKTIMESTAMP_LOCAL,    NULL,
-     "use TZ environment variable or local timezone"},
+    {"utc",     SKTIMESTAMP_UTC,        "use UTC", NULL},
+    {"local",   SKTIMESTAMP_LOCAL,
+     "use TZ environment variable or local timezone", NULL},
     SK_STRINGMAP_SENTINEL
 };
 static const sk_stringmap_entry_t time_format_misc[] = {
-    {"no-msec", SKTIMESTAMP_NOMSEC,   NULL, "truncate milliseconds"},
+    {"no-msec", SKTIMESTAMP_NOMSEC,     "truncate milliseconds", NULL},
     SK_STRINGMAP_SENTINEL
 };
 
@@ -1339,13 +1418,13 @@ skOptionsTimestampFormatUsage(
                     sss = "";
                 }
                 fprintf(fh, "\t%-10s%-8s - %s%s\n",
-                        label, e->name, (const char*)e->userdata, sss);
+                        label, e->name, e->description, sss);
                 label = "";
             }
             label = "Timezone:";
             for (e = time_format_zones; e->name; ++e) {
                 fprintf(fh, "\t%-10s%-8s - %s\n",
-                        label, e->name, (const char*)e->userdata);
+                        label, e->name, e->description);
                 label = "";
             }
             if (0 == (time_format_flags & (SK_OPTION_TIMESTAMP_NEVER_MSEC
@@ -1354,7 +1433,7 @@ skOptionsTimestampFormatUsage(
                 label = "Misc:";
                 for (e = time_format_misc; e->name; ++e) {
                     fprintf(fh, "\t%-10s%-8s - %s\n",
-                            label, e->name, (const char*)e->userdata);
+                            label, e->name, e->description);
                     label = "";
                 }
             }

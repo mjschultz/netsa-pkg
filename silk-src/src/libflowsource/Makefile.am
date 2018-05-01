@@ -1,10 +1,12 @@
-# RCSIDENT("$SiLK: Makefile.am d45c27ed70a8 2018-02-15 23:12:26Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 5b0341959511 2018-04-19 14:45:30Z mthomas $");
+
+SUBDIRS = infomodel
 
 # Installed Targets
 
 lib_LTLIBRARIES = libflowsource.la
-libflowsource_version = 16:1:0
-# At previous release: libflowsource_version = 16:1:0
+libflowsource_version = 17:0:0
+# At previous release: libflowsource_version = 17:0:0
 
 EXTRA_DIST = sensor.conf.pod
 if HAVE_POD2MAN
@@ -19,11 +21,25 @@ pkginclude_HEADERS = libflowsource.h probeconf.h \
 # Dependencies on libfixbuf
 if HAVE_FIXBUF
 extra_check_programs = check-struct
-# The *.h files are listed sources since they are not installed
+nodist_sources2 = infomodel.c infomodel.h
 extra_sources2 = ipfixsource.c ipfixsource.h skipfix.c skipfix.h
 extra_headers2 =
 endif
-EXTRA_DIST +=
+
+# Support for getting IPFIX elements from XML file(s)
+EXTRA_DIST += xml2fixbuf.xslt make-infomodel
+
+# script to generate infomodel.c and infomodel.h
+RUN_MAKE_INFOMODEL = $(AM_V_GEN) \
+  srcdir='' ; \
+  test -f ./make-infomodel || srcdir=$(srcdir)/ ; \
+  $(PERL) $${srcdir}make-infomodel --package $(PACKAGE) \
+    $(INFOMODEL_REGISTRY_PREFIXES) || { rm -f $(nodist_sources2) ; exit 1 ; }
+
+ipfixsource.$(OBJEXT) ipfixsource.lo: infomodel.h
+infomodel.c: infomodel.h
+infomodel.h: make-infomodel Makefile
+	$(RUN_MAKE_INFOMODEL)
 
 
 # Additional Targets
@@ -51,9 +67,10 @@ libflowsource_la_SOURCES = circbuf.c circbuf.h \
 	 probeconfparse.y probeconfscan.h probeconfscan.l v5pdu.h \
 	 $(extra_sources1) $(extra_sources2) $(extra_sources3) \
 	 $(extra_sources4) $(extra_sources5) $(extra_sources6)
+nodist_libflowsource_la_SOURCES = \
+	 $(nodist_sources1) $(nodist_sources2) $(nodist_sources3)
 libflowsource_la_LDFLAGS = -version-info $(libflowsource_version)
 #libflowsource_la_LIBADD  = $(LDADD)
-extra_sources1 = 
 
 check_struct_SOURCES = check-struct.c
 check_struct_LDADD = libflowsource.la $(LDADD)
@@ -67,7 +84,7 @@ AM_LFLAGS = $(FLEX_NOFUNS)
 AM_YFLAGS = -d
 probeconfscan.$(OBJEXT) probeconfscan.lo: probeconfparse.h
 
-CLEANFILES = $(EXTRA_PROGRAMS)
+CLEANFILES = $(EXTRA_PROGRAMS) $(nodist_libflowsource_la_SOURCES)
 
 # Global Rules
 include $(top_srcdir)/build.mk

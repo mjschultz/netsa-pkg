@@ -90,13 +90,13 @@ my %md5 = (
     );
 
 
-my $cmd = ("$rwfglob --data-rootdir=. --print-missing --no-summary"
+my $cmd = ("%s --data-rootdir=. --print-missing --no-summary"
            ." --sensors=S13 --type=out --start-date=%s%s 2>&1");
 
 for my $e (@end) {
     my $ed = (('NONE' eq $e) ? "" : " --end-date=$e");
     for my $s (@start) {
-        my $c = sprintf($cmd, $s, $ed);
+        my $c = sprintf($cmd, $rwfglob, $s, $ed);
         check_md5_output($md5{$s}{$e}, $c);
     }
 }

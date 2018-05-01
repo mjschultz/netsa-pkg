@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skbag.c bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENT("$SiLK: skbag.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/skbag.h>
@@ -914,7 +914,7 @@ bagHentryCopy(
     const sk_hentry_bag_t *bag_hdr = (sk_hentry_bag_t*)hentry;
 
     return bagHentryCreate(bag_hdr->key_type, bag_hdr->key_length,
-                             bag_hdr->counter_type, bag_hdr->counter_length);
+                           bag_hdr->counter_type, bag_hdr->counter_length);
 }
 
 

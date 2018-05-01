@@ -28,7 +28,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_IPTREE_H, "$SiLK: iptree.h bb8ebbb2e26d 2018-02-09 18:12:20Z mthomas $");
+RCSIDENTVAR(rcsID_IPTREE_H, "$SiLK: iptree.h 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/skipset.h>
@@ -96,7 +96,7 @@ skIPTreeAddAddress(
  *    'ipset'.
  *
  *    When 'ipwild' contains IPv6 addresses, map each address within
- *    the ::FFFF:0:0/96 netblock to an IPv4 address and add it to
+ *    the ::ffff:0:0/96 netblock to an IPv4 address and add it to
  *    'ipset'.  This behavior is new as of SiLK 3.9.0.  In prior
  *    releases of SiLK, the entire contents of the wildcard was
  *    ignored and SKIP_ERR_IPV6 was returned when 'ipwild' contained
@@ -136,7 +136,7 @@ skIPTreeCheckIntersectIPTree(
  *    IPs in common; otherwise, return 0.
  *
  *    When 'ipwild' contains IPv6 addresses, map each address within
- *    the ::FFFF:0:0/96 netblock to an IPv4 address and determine if
+ *    the ::ffff:0:0/96 netblock to an IPv4 address and determine if
  *    it appears in 'ipset'.  This behavior is new as of SiLK 3.9.0.
  *    In prior relases of SiLK, the entire contents of the wildcard
  *    was ignored and 0 was returned when 'ipwild' contained any IPv6
