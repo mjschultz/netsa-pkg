@@ -138,7 +138,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwstats.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwstats.c 2d2aa9ba7bc5 2018-05-30 20:23:17Z mthomas $");
 
 #include <silk/skheap.h>
 #include "rwstats.h"
@@ -350,7 +350,6 @@ rwstatsPrintHeap(
     double cumul_pct = 0.0;
     double percent;
     uint64_t val64;
-    uint32_t val32;
 
     /* print the headings and column titles */
     topnPrintHeader();
@@ -358,6 +357,10 @@ rwstatsPrintHeap(
     skHeapSortEntries(heap);
 
     itheap = skHeapIteratorCreate(heap, -1);
+    if (NULL == itheap) {
+        skAppPrintOutOfMemory("iterator");
+        return;
+    }
 
     if (app_flags.no_percents) {
         while (skHeapIteratorNext(itheap, &heap_ptr) == SKHEAP_OK) {
@@ -367,24 +370,8 @@ rwstatsPrintHeap(
             writeAsciiRecord(outbuf);
         }
     } else if (limit.distinct == 0) {
-        /* records uses 32-bit counter; others use 64-bit counter */
         switch (limit.fl_id) {
           case SK_FIELD_RECORDS:
-            while (skHeapIteratorNext(itheap, &heap_ptr) == SKHEAP_OK) {
-                outbuf[0] = HEAP_PTR_KEY(heap_ptr);
-                outbuf[1] = HEAP_PTR_VALUE(heap_ptr);
-                outbuf[2] = HEAP_PTR_DISTINCT(heap_ptr);
-                writeAsciiRecord(outbuf);
-                skFieldListExtractFromBuffer(value_fields, outbuf[1],
-                                             limit.fl_entry, (uint8_t*)&val32);
-                percent = 100.0 * (double)val32 / value_total;
-                cumul_pct += percent;
-                fprintf(output.of_fp, ("%c%*.6f%c%*.6f%s\n"),
-                        delimiter, width[WIDTH_PCT], percent, delimiter,
-                        width[WIDTH_PCT], cumul_pct, final_delim);
-            }
-            break;
-
           case SK_FIELD_SUM_BYTES:
           case SK_FIELD_SUM_PACKETS:
             while (skHeapIteratorNext(itheap, &heap_ptr) == SKHEAP_OK) {
@@ -537,27 +524,6 @@ rwstatsPrintHeap(
                                      (uint8_t*)&val_b);         \
         cmp_out = COMPARE(val_a, val_b);                        \
     }
-
-
-static int
-rwstatsCompareValuesTop32(
-    const skheapnode_t  node1,
-    const skheapnode_t  node2)
-{
-    int rv;
-    CMP_INT_HEAP_VALUES(rv, uint32_t, node1, node2);
-    return -rv;
-}
-
-static int
-rwstatsCompareValuesBottom32(
-    const skheapnode_t  node1,
-    const skheapnode_t  node2)
-{
-    int rv;
-    CMP_INT_HEAP_VALUES(rv, uint32_t, node1, node2);
-    return rv;
-}
 
 static int
 rwstatsCompareValuesTop64(
@@ -1278,18 +1244,12 @@ topnMain(
     } else {
         switch (DIR_AND_TYPE(direction, limit.fl_id)) {
           case DIR_AND_TYPE(RWSTATS_DIR_TOP, SK_FIELD_RECORDS):
-            cmp_fn = &rwstatsCompareValuesTop32;
-            break;
-
-          case DIR_AND_TYPE(RWSTATS_DIR_BOTTOM, SK_FIELD_RECORDS):
-            cmp_fn = &rwstatsCompareValuesBottom32;
-            break;
-
           case DIR_AND_TYPE(RWSTATS_DIR_TOP, SK_FIELD_SUM_BYTES):
           case DIR_AND_TYPE(RWSTATS_DIR_TOP, SK_FIELD_SUM_PACKETS):
             cmp_fn = &rwstatsCompareValuesTop64;
             break;
 
+          case DIR_AND_TYPE(RWSTATS_DIR_BOTTOM, SK_FIELD_RECORDS):
           case DIR_AND_TYPE(RWSTATS_DIR_BOTTOM, SK_FIELD_SUM_BYTES):
           case DIR_AND_TYPE(RWSTATS_DIR_BOTTOM, SK_FIELD_SUM_PACKETS):
             cmp_fn = &rwstatsCompareValuesBottom64;

@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: intervalstats.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: intervalstats.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/utils.h>
 #include "interval.h"
@@ -120,6 +120,10 @@ intervalSetup(
     }
 
     cumFrequencies = (uint32_t *)malloc(numIntervals * sizeof(uint32_t));
+    if (NULL == cumFrequencies) {
+        skAppPrintOutOfMemory("array");
+        exit(EXIT_FAILURE);
+    }
     cumFrequencies[0] = data[0];
     for (i = 1; i < numIntervals; i++) {
         cumFrequencies[i] = cumFrequencies[i-1] + data[i];

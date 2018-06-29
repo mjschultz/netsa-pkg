@@ -6,7 +6,7 @@
 
   <title>CERT IPFIX Registry</title>
   <created>2017-11-28</created>
-  <updated>2018-01-17</updated>
+  <updated>2018-06-05</updated>
 
   <registry id="cert-information-elements">
     <title>CERT Enterprise IPFIX Elements (PEN 6871)</title>
@@ -14,6 +14,7 @@
     <!-- Reserved per section 4 of rfc-7012 -->
     <record>
       <name>Reserved</name>
+      <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>0</elementId>
       <description>
         <paragraph>
@@ -26,6 +27,7 @@
     <!-- 1-11 unassigned -->
     <record>
       <name>Unassigned</name>
+      <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>1-11</elementId>
     </record>
 
@@ -60,6 +62,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>14</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          TCP flags on the initial packet in the forward direction of
+          the flow.
+        </paragraph>
+      </description>
       <revision>1</revision>
       <date>2017-12-19</date>
     </record>
@@ -73,6 +81,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>15</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Union of TCP flags of all packets other than the initial
+          packet in the forward direction of the flow.
+        </paragraph>
+      </description>
       <revision>1</revision>
       <date>2017-12-19</date>
     </record>
@@ -107,6 +121,11 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>18</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Initial bytes of flow payload in the forward direction.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
 
@@ -138,6 +157,13 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>21</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Difference in milliseconds between the times of the first
+          packet in forward direction and the first packet in the
+          reverse direction.
+        </paragraph>
+      </description>
       <units>milliseconds</units>
       <revision>0</revision>
     </record>
@@ -145,6 +171,7 @@
     <!-- 22-28 unassigned -->
     <record>
       <name>Unassigned</name>
+      <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>22-28</elementId>
     </record>
 
@@ -200,11 +227,18 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>33</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Application label, defined as the primary well-known port
+          associated with a given application.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
 
     <record>
       <name>Unassigned</name>
+      <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>34</elementId>
     </record>
 
@@ -227,6 +261,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>36</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          p0f OS Name for the forward flow based on the SYN packet and
+          p0f SYN Fingerprints.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
 
@@ -238,6 +278,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>37</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          p0f OS Version for the forward flow based on the SYN packet
+          and p0f SYN Fingerprints.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
 
@@ -249,6 +295,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>38</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          IP and transport headers for first packet in forward
+          direction to be used for external OS Fingerprinters.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
 
@@ -260,6 +312,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>39</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          IP and transport headers for first packet in forward
+          direction to be used for external OS Fingerprinters.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
 
@@ -272,12 +330,19 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>40</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Miscellaneous flow attributes for the forward direction of
+          the flow.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
 
     <!-- 41-99 unassigned -->
     <record>
       <name>Unassigned</name>
+      <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>41-99</elementId>
     </record>
 
@@ -289,6 +354,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>100</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Total number of packet fragments that have been expired
+          since yaf start time.
+        </paragraph>
+      </description>
       <units>packets</units>
       <revision>0</revision>
     </record>
@@ -301,6 +372,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>101</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Total number of packets that been assembled from a series of
+          fragments since yaf start time.
+        </paragraph>
+      </description>
       <units>packets</units>
       <revision>0</revision>
     </record>
@@ -312,6 +389,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>102</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The mean flow rate of the yaf flow sensor since yaf start
+          time, rounded to the nearest integer.
+        </paragraph>
+      </description>
       <units>flows</units>
       <revision>0</revision>
     </record>
@@ -323,6 +406,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>103</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The mean packet rate of the yaf flow sensor since yaf start
+          time, rounded to the nearest integer.
+        </paragraph>
+      </description>
       <units>packets</units>
       <revision>0</revision>
     </record>
@@ -335,6 +424,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>104</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Total number of times the yaf flow table has been flushed
+          since yaf start time.
+        </paragraph>
+      </description>
       <units>flows</units>
       <revision>0</revision>
     </record>
@@ -346,6 +441,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>105</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The maximum number of flows in the yaf flow table at any one
+          time since yaf start time.
+        </paragraph>
+      </description>
       <units>flows</units>
       <revision>0</revision>
     </record>
@@ -358,6 +459,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>106</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The 32 bit hash of the 5-tuple and VLAN that is used as they
+          key to YAF's internal flow table.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
 
@@ -369,12 +476,19 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>107</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          p0f OS Fingerprint for the forward flow based on the SYN
+          packet and p0f SYN fingerprints.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
 
     <!-- 108-109 unassigned -->
     <record>
       <name>Unassigned</name>
+      <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>108-109</elementId>
     </record>
 
@@ -3289,7 +3403,7 @@ id-at-name                   {id-at 41}
         </paragraph>
       </description>
       <revision>0</revision>
-    </record> 
+    </record>
 
     <record>
       <name>rrIPv6</name>
@@ -3326,13 +3440,14 @@ id-at-name                   {id-at 41}
       <name>DNS_A_RECORD</name>
       <dataType>subTemplateList</dataType>
       <group>analysis-pipeline</group>
+      <dataTypeSemantics>list</dataTypeSemantics>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>305</elementId>
       <status>current</status>
       <description>
         <paragraph>
           Element holding an entire DNS A record, which is a sub template list
-          when emitted from YAF. This is used in Analysis Pipeline for fast 
+          when emitted from YAF. This is used in Analysis Pipeline for fast
           flux.
         </paragraph>
       </description>
@@ -3343,13 +3458,14 @@ id-at-name                   {id-at 41}
       <name>DNS_AAAA_RECORD</name>
       <dataType>subTemplateList</dataType>
       <group>analysis-pipeline</group>
+      <dataTypeSemantics>list</dataTypeSemantics>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>306</elementId>
       <status>current</status>
       <description>
         <paragraph>
-          Element holding an entire DNS AAAA record, which is a sub template 
-          list when emitted from YAF. This is used in Analysis Pipeline for 
+          Element holding an entire DNS AAAA record, which is a sub template
+          list when emitted from YAF. This is used in Analysis Pipeline for
           fast flux.
         </paragraph>
       </description>
@@ -3359,6 +3475,7 @@ id-at-name                   {id-at 41}
     <!-- 307-499 unassigned -->
     <record>
       <name>Unassigned</name>
+      <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>307-499</elementId>
     </record>
 
@@ -3371,6 +3488,11 @@ id-at-name                   {id-at 41}
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>500</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The number of packets that contain less than 60 bytes of payload.
+        </paragraph>
+      </description>
       <units>packets</units>
       <revision>0</revision>
     </record>
@@ -3384,6 +3506,11 @@ id-at-name                   {id-at 41}
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>501</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The number of packets that contain at least 1 byte of payload.
+        </paragraph>
+      </description>
       <units>packets</units>
       <revision>0</revision>
     </record>
@@ -3397,6 +3524,11 @@ id-at-name                   {id-at 41}
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>502</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Total bytes transferred as payload.
+        </paragraph>
+      </description>
       <units>octets</units>
       <revision>0</revision>
     </record>
@@ -3409,6 +3541,11 @@ id-at-name                   {id-at 41}
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>503</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Average number of milliseconds between packets.
+        </paragraph>
+      </description>
       <units>milliseconds</units>
       <revision>0</revision>
     </record>
@@ -3421,6 +3558,12 @@ id-at-name                   {id-at 41}
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>504</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Standard deviation of the interarrival time for up to the
+          first ten packets.
+        </paragraph>
+      </description>
       <units>milliseconds</units>
       <revision>0</revision>
     </record>
@@ -3434,6 +3577,11 @@ id-at-name                   {id-at 41}
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>505</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Payload length of the first non-empty packet.
+        </paragraph>
+      </description>
       <units>octets</units>
       <revision>0</revision>
     </record>
@@ -3447,6 +3595,11 @@ id-at-name                   {id-at 41}
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>506</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The largest payload length transferred in the flow.
+        </paragraph>
+      </description>
       <units>octets</units>
       <revision>0</revision>
     </record>
@@ -3460,6 +3613,12 @@ id-at-name                   {id-at 41}
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>507</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Represents directionality for the first 8 non-empty
+          packets. 0 for forward direction, 1 for reverse direction.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
 
@@ -3471,6 +3630,12 @@ id-at-name                   {id-at 41}
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>508</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The standard deviation of the payload length for up to the
+          first 10 non empty packets.
+        </paragraph>
+      </description>
       <units>octets</units>
       <revision>0</revision>
     </record>
@@ -3484,6 +3649,11 @@ id-at-name                   {id-at 41}
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>509</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The number of TCP packets that have the URGENT Flag set.
+        </paragraph>
+      </description>
       <units>packets</units>
       <revision>0</revision>
     </record>
@@ -3497,13 +3667,20 @@ id-at-name                   {id-at 41}
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>510</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The number of packets that contain at least 220 bytes of
+          payload.
+        </paragraph>
+      </description>
       <units>packets</units>
       <revision>0</revision>
     </record>
-    
+
     <!-- 511-549 unassigned -->
     <record>
       <name>Unassigned</name>
+      <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>511-549</elementId>
     </record>
 
@@ -3543,6 +3720,7 @@ id-at-name                   {id-at 41}
     <!-- 553-926 unassigned -->
     <record>
       <name>Unassigned</name>
+      <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>553-926</elementId>
     </record>
 
@@ -3590,6 +3768,7 @@ id-at-name                   {id-at 41}
     <!-- 931-999 unassigned -->
     <record>
       <name>Unassigned</name>
+      <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>931-999</elementId>
     </record>
 
@@ -3616,16 +3795,17 @@ id-at-name                   {id-at 41}
     <!-- 1002-16383 unassigned -->
     <record>
       <name>Unassigned</name>
+      <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>1002-16383</elementId>
     </record>
 
   </registry>
 
   <people>
-    <person id="Michael_Duggan">
-      <name>Michael Duggan</name>
-      <uri>mailto:mwd@cert.org</uri>
-      <updated>2017-11-28</updated>
+    <person id="Netsa_Tools">
+      <name>Netsa Tools Help</name>
+      <uri>mailto:netsa-help@cert.org</uri>
+      <updated>2018-05-01</updated>
     </person>
   </people>
 

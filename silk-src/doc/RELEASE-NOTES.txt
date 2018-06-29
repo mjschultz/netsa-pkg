@@ -1,3 +1,27 @@
+SiLK-3.17.2 Release, 2018-Jun-28
+
+* rwgeoip2ccmap
+  -- Add a --fields switch that gives the user control over which
+     country-code value(s) are used when reading a GeoIP2 file.
+* rwuniq
+  -- Use a 64-bit integer for storing a bin's record count.
+* rwstats
+  -- Use a 64-bit integer for storing a bin's record count.
+* rwaddrcount
+  -- Use 64-bit integers for storing a bin's packet count and record
+     count.
+* rwflowpack
+  -- In sensor.conf, add a new quirk, nf9-out-is-reverse, to simulate
+     the behavior of libfixbuf-1.7.1; i.e., to treat the NetFlow v9
+     elements OUT_BYTES and OUT_PKTS as reverse-volume values.
+  -- When parsing the sensor.conf file, allow double-quoted strings
+     for the path names of IPset files.
+* flowcap
+  -- In sensor.conf, add a new quirk, nf9-out-is-reverse, to simulate
+     the behavior of libfixbuf-1.7.1; i.e., to treat the NetFlow v9
+     elements OUT_BYTES and OUT_PKTS as reverse-volume values.
+
+
 SiLK-3.17.1 Release, 2018-Apr-23
 
 * Building

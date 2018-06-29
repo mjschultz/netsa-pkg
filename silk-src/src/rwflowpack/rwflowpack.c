@@ -81,7 +81,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwflowpack.c cf1383c6db4f 2018-03-26 19:42:13Z mthomas $");
+RCSIDENT("$SiLK: rwflowpack.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <dlfcn.h>
 
@@ -2244,7 +2244,7 @@ createFlowProcessorsPduFile(
                                            sizeof(flow_proc_t));
     if (!flow_processors) {
         skAppPrintOutOfMemory(NULL);
-        return -1;
+        goto END;
     }
     flow_processors[0].probe = have_probe;
     flow_processors[0].input_mode_type = imt;
@@ -2267,13 +2267,9 @@ createFlowProcessorsPduFile(
   END:
     if (rv != 0) {
         /* failure.  clean up the vectors and the flow_processors[] */
-        if (flow_processors) {
-            free(flow_processors);
-            flow_processors = NULL;
-        }
-        if (probe_vec) {
-            skVectorDestroy(probe_vec);
-        }
+        free(flow_processors);
+        flow_processors = NULL;
+        skVectorDestroy(probe_vec);
     }
     return rv;
 }

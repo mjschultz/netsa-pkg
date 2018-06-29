@@ -27,7 +27,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaddrcount.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwaddrcount.c 71a35cb80036 2018-05-30 20:18:35Z mthomas $");
 
 #include <silk/iptree.h>
 #include <silk/rwrec.h>
@@ -93,7 +93,7 @@ RCSIDENT("$SiLK: rwaddrcount.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 /* formats for printing records */
 #define FMT_REC_VALUE                                                   \
-    "%*s%c%*" PRIu64 "%c%*" PRIu32 "%c%*" PRIu32 "%c%*s%c%*s%s\n"
+    "%*s%c%*" PRIu64 "%c%*" PRIu64 "%c%*" PRIu64 "%c%*s%c%*s%s\n"
 #define FMT_REC_TITLE  "%*s%c%*s%c%*s%c%*s%c%*s%c%*s%s\n"
 #define FMT_REC_WIDTH  {15, 20, 10, 10, 20, 20}
 
@@ -107,17 +107,17 @@ typedef struct countRecord_st countRecord_t;
 struct countRecord_st {
     /* total number of bytes */
     uint64_t        cr_bytes;
+    /* total number of packets */
+    uint64_t        cr_packets;
+    /* total number of records */
+    uint64_t        cr_records;
     /* Pointer to the next record for collision */
     countRecord_t  *cr_next;
-    /* IP address, or whatever we don't consider source or dest here*/
+    /* IP address; source or dest does not matter here */
     uint32_t        cr_key;
-    /* total number of packets */
-    uint32_t        cr_packets;
-    /* total number of records */
-    uint32_t        cr_records;
-    /* start time - epoch*/
+    /* start time */
     uint32_t        cr_start;
-    /* total time lasted */
+    /* end time */
     uint32_t        cr_end;
 };
 
@@ -143,10 +143,10 @@ static rwac_print_mode_t print_mode = RWAC_PMODE_NONE;
 /* user-specified limits of bins to print */
 static uint64_t min_bytes = 0;
 static uint64_t max_bytes = UINT64_MAX;
-static uint32_t min_packets = 0;
-static uint32_t max_packets = UINT32_MAX;
-static uint32_t min_records = 0;
-static uint32_t max_records = UINT32_MAX;
+static uint64_t min_packets = 0;
+static uint64_t max_packets = UINT64_MAX;
+static uint64_t min_records = 0;
+static uint64_t max_records = UINT64_MAX;
 
 /* the hash table */
 static countRecord_t *hash_bins[RWAC_ARRAYSIZE];
@@ -522,7 +522,7 @@ appSetup(
     }
     if (min_packets > max_packets) {
         skAppPrintErr(("The %s value is greater than %s:"
-                       " %" PRIu32 " > %" PRIu32),
+                       " %" PRIu64 " > %" PRIu64),
                       appOptions[OPT_MIN_PACKETS].name,
                       appOptions[OPT_MAX_PACKETS].name,
                       min_packets, max_packets);
@@ -530,7 +530,7 @@ appSetup(
     }
     if (min_records > max_records) {
         skAppPrintErr(("The %s value is greater than %s:"
-                       " %" PRIu32 " > %" PRIu32),
+                       " %" PRIu64 " > %" PRIu64),
                       appOptions[OPT_MIN_RECORDS].name,
                       appOptions[OPT_MAX_RECORDS].name,
                       min_records, max_records);
@@ -633,28 +633,28 @@ appOptionsHandler(
         break;
 
       case OPT_MIN_PACKETS:
-        rv = skStringParseUint32(&min_packets, opt_arg, 0, 0);
+        rv = skStringParseUint64(&min_packets, opt_arg, 0, 0);
         if (rv) {
             goto PARSE_ERROR;
         }
         break;
 
       case OPT_MAX_PACKETS:
-        rv = skStringParseUint32(&max_packets, opt_arg, 0, 0);
+        rv = skStringParseUint64(&max_packets, opt_arg, 0, 0);
         if (rv) {
             goto PARSE_ERROR;
         }
         break;
 
       case OPT_MIN_RECORDS:
-        rv = skStringParseUint32(&min_records, opt_arg, 0, 0);
+        rv = skStringParseUint64(&min_records, opt_arg, 0, 0);
         if (rv) {
             goto PARSE_ERROR;
         }
         break;
 
       case OPT_MAX_RECORDS:
-        rv = skStringParseUint32(&max_records, opt_arg, 0, 0);
+        rv = skStringParseUint64(&max_records, opt_arg, 0, 0);
         if (rv) {
             goto PARSE_ERROR;
         }
@@ -1125,8 +1125,8 @@ dumpStats(
 
     /* print qualifying records if limits were given */
     if (0 < min_bytes || max_bytes < UINT64_MAX
-        || 0 < min_packets || max_packets < UINT32_MAX
-        || 0 < min_records || max_records < UINT32_MAX)
+        || 0 < min_packets || max_packets < UINT64_MAX
+        || 0 < min_records || max_records < UINT64_MAX)
     {
         fprintf(outfp, FMT_STAT_VALUE,
                 fmt_width[0], "Qualifying", delimiter,

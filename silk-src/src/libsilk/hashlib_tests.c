@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: hashlib_tests.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: hashlib_tests.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/hashlib.h>
 
@@ -38,6 +38,10 @@ hashlib_test1(
 
     /* Allocate memory for and initialize special "empty" value */
     no_value_ptr = (uint8_t*)malloc(sizeof(iValue));
+    if (!no_value_ptr) {
+        printf("Out of memory\n");
+        exit(EXIT_FAILURE);
+    }
     memcpy(no_value_ptr, &no_value, sizeof(iValue));
 
     /* Create a table to test with */
@@ -101,7 +105,6 @@ hashlib_test1(
     for (iKey = 1; iKey <= max_key; iKey++) {
         uint32_t inv_val;
         key_ref = &iKey;
-        iValue = iKey*2;
         hashlib_lookup(test_ptr, (uint8_t*) &iKey, (uint8_t**) &val_ref);
         inv_val = (*val_ref)/2;
         if (inv_val != *key_ref) {

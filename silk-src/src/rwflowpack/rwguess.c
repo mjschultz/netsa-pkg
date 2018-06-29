@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwguess.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwguess.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/rwrec.h>
@@ -302,6 +302,7 @@ analyze(
     skpcProbeSetFileSource(probe, file_name);
     skpcProbeClearLogFlags(probe);
     if (skpcProbeVerify(probe, 0)) {
+        skpcProbeDestroy(&probe);
         return -1;
     }
 

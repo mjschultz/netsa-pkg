@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: packlogic-generic.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: packlogic-generic.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/rwflowpack.h>
 #include <silk/rwrec.h>
@@ -233,6 +233,7 @@ packLogicVerifySensor(
                        " by the packing-logic\n\tfile '%s'"),
                       sensor->sensor_name,
                       plugin_path);
+        skVectorDestroy(probe_vec);
         return -1;
     }
     skVectorGetValue(&probe, probe_vec, 0);

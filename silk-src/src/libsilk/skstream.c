@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skstream.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: skstream.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/skstream.h>
 #include <silk/sksite.h>
@@ -364,7 +364,6 @@ streamIOBufCreate(
     skstream_t         *stream)
 {
     int rv = SKSTREAM_OK;
-    size_t reclen = 1;
     uint8_t compmethod = SK_COMPMETHOD_NONE;
     skio_abstract_t io_func;
 
@@ -420,6 +419,7 @@ streamIOBufCreate(
     /* get the information for SiLK files */
     if (stream->is_silk) {
         /* make certain the record size is non-zero */
+        size_t reclen;
         reclen = skHeaderGetRecordLength(stream->silk_hdr);
         if (reclen == 0) {
             reclen = 1;

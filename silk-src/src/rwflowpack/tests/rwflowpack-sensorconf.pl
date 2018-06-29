@@ -224,13 +224,13 @@ my @ipblocks_v6 = (
      'remainder');
 
 my @ipsets_v4 = (
-    $file{v4set1},
+    qq("$file{v4set1}"),
     $file{v4set2},
     'remainder');
 
 my @ipsets_v6 = (
     $file{v6set1},
-    $file{v6set2},
+    qq("$file{v6set2}"),
     'remainder');
 
 
@@ -631,7 +631,7 @@ for my $nw (@sensor_networks) {
                                         'destination-interfaces 11',
                                         'any-interfaces '.$interfaces[-1],
                                         'source-ipsets '.$file{v4set1},
-                                        'destination-ipsets '.$file{v4set1},
+                                        qq'destination-ipsets "$file{v4set1}"',
                                         'any-ipsets '.$ipsets_v4[-1],)
                     {
                         my $chance = rand 20;
@@ -797,24 +797,45 @@ EOF
 close SILK
     or die "$NAME: Cannot close $silk_conf: $!\n";
 
-# run rwflowpack on each sensor.conf file
+# holds the names of tests where the checksum does not match
+my @mismatch;
+
+# run rwflowpack on each sensor.conf file and compare the checksum
 for $sensor_conf (@sensor_files) {
     # trailing "; true" is here since check_exit_status() redirects
     # everything to /dev/null, and it ensures the return status is 0.
+    if ($ENV{SK_TESTS_VERBOSE}) {
+        unless (open SENSOR_CONF, '<', $sensor_conf) {
+            warn "$NAME: Cannot open '$sensor_conf'\n";
+            next;
+        }
+        print STDERR "\n>> START OF FILE '$sensor_conf' >>>>>>>>>>\n";
+        while (<SENSOR_CONF>) {
+            print STDERR $_;
+        }
+        close SENSOR_CONF;
+        print STDERR "<< END OF FILE '$sensor_conf' <<<<<<<<<<<<\n";
+    }
     my $cmd = ("$rwflowpack --site-conf=$silk_conf --sensor-conf=$sensor_conf"
                ." --verify-sensor >$sensor_conf.RAWOUT 2>&1"
                ." ; true");
     check_exit_status($cmd);
-}
 
-# modify each output file to remove differences among different runs
-# or different OSes.
-for $sensor_conf (@sensor_files) {
+    # modify the output file to remove differences among different
+    # runs or different OSes.
     open RAWOUT, "$sensor_conf.RAWOUT"
         or die "$NAME: Cannot open '$sensor_conf.RAWOUT': $!\n";
     open OUT, ">$sensor_conf.OUT"
         or die "$NAME: Cannot open '$sensor_conf.OUT': $!\n";
+
+    if ($ENV{SK_TESTS_VERBOSE}) {
+        print STDERR ">> START OF RESULT '$sensor_conf.RAWOUT' >>>>>>>>>>\n";
+    }
     while (<RAWOUT>) {
+        if ($ENV{SK_TESTS_VERBOSE}) {
+            print STDERR $_;
+        }
+
         # replace test-specific sensor config file name with "sensor.conf"
         s/\Q$sensor_conf\E/sensor.conf/g;
 
@@ -825,28 +846,36 @@ for $sensor_conf (@sensor_files) {
 
         print OUT;
     }
+    if ($ENV{SK_TESTS_VERBOSE}) {
+        print STDERR "<< END OF RESULT '$sensor_conf.RAWOUT' <<<<<<<<<<<<\n";
+    }
+
     close RAWOUT;
     close OUT
         or die "$NAME: Cannot close '$sensor_conf.OUT': $!\n";
+
+    # compute MD5 of the file and compare to expected value; if there
+    # is not a match, put name into @mismatch.
+    my $md5;
+    compute_md5(\$md5, "cat $sensor_conf.OUT", 0);
+    if ($md5_sums{$sensor_conf} ne $md5) {
+        if ($ENV{SK_TESTS_VERBOSE}) {
+            print STDERR "$NAME: FAIL: checksum mismatch [$md5]",
+                " (expected ", $md5_sums{$sensor_conf}, ")\n";
+        }
+        my $tail_name = "$sensor_conf.OUT";
+        $tail_name =~ s,.*/,,;
+        push @mismatch, $tail_name;
+    }
+    elsif ($ENV{SK_TESTS_VERBOSE}) {
+        print STDERR "$NAME: PASS: checksums match\n";
+    }
 }
 
 if ($ENV{SK_TESTS_SAVEOUTPUT}) {
     # when saving the output, write a file that combines each probe,
     # sensor, or group block with the errors it generated (if any)
     combine_sensor_and_error();
-}
-
-# compute MD5 of each file and compare to expected value; if there is
-# no match, put name into @mismatch.
-my @mismatch;
-for $sensor_conf (@sensor_files) {
-    my $md5;
-    compute_md5(\$md5, "cat $sensor_conf.OUT", 0);
-    if ($md5_sums{$sensor_conf} ne $md5) {
-        my $tail_name = "$sensor_conf.OUT";
-        $tail_name =~ s,.*/,,;
-        push @mismatch, $tail_name;
-    }
 }
 
 # print names of first few files that don't match

@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skpolldir.c b93a31269ed2 2018-04-16 20:49:56Z mthomas $");
+RCSIDENT("$SiLK: skpolldir.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/skdeque.h>
 #include <silk/redblack.h>
@@ -198,9 +198,9 @@ static void
 remove_unseen(
     sk_polldir_t       *pd)
 {
-    RBLIST *list = NULL;
+    RBLIST *list;
     pd_dirent_t *x;
-    sk_vector_t *dellist = NULL;
+    sk_vector_t *dellist;
     int rv;
     size_t i;
 #if SKPOLLDIR_TIMING
@@ -213,9 +213,8 @@ remove_unseen(
 #endif
 
     dellist = skVectorNew(sizeof(pd_dirent_t *));
-
     list = rbopenlist(pd->tree);
-    if (list == NULL) {
+    if (NULL == dellist || NULL == list) {
         pd->error = PDERR_MEMORY;
         goto end;
     }
@@ -269,7 +268,6 @@ remove_unseen(
     if (list) {
         rbcloselist(list);
     }
-
     if (dellist) {
         skVectorDestroy(dellist);
     }

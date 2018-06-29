@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skaggbag.c 771cf581d1bc 2018-02-26 17:50:09Z mthomas $");
+RCSIDENT("$SiLK: skaggbag.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/skaggbag.h>
 #include <silk/skipaddr.h>
@@ -995,7 +995,7 @@ sk_rbtree_remove(
     head.link[0] = head.link[1] = RBT_NIL;
 
     /* Set up our helpers */
-    g = p = NULL;
+    p = NULL;
     q = (rbtree_node_t *)&head;
     q->link[RBT_RIGHT] = tree->root;
     dir = RBT_RIGHT;

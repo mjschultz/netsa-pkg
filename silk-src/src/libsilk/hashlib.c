@@ -10,7 +10,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: hashlib.c 99196b0e695b 2018-03-19 15:47:42Z mthomas $");
+RCSIDENT("$SiLK: hashlib.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/utils.h>
@@ -1190,6 +1190,7 @@ hashlib_insert(
             return OK_DUPLICATE;
         }
     }
+    assert(block_ptr);
 
     /*
      *  We did not find it; do an insert into the last block by

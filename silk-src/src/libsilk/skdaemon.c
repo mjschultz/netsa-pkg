@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skdaemon.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: skdaemon.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/skdaemon.h>
 #include <silk/sklog.h>
@@ -421,8 +421,8 @@ skdaemonize(
 {
     char errbuf[512];
     pid_t pid;
-    int rv = -1;
-    int fd_devnull = -1;
+    int rv;
+    int fd_devnull;
 
     /* Must call setup before daemonize; make certain we have a
      * shutdown variable */

@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconfparse.y 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: probeconfparse.y 04bb49edf544 2018-05-31 18:25:33Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/probeconf.h>
@@ -134,7 +134,7 @@ static void
 sensor_ipset(
     char               *name,
     sk_vector_t        *wl);
-static void sensor_filter(skpc_filter_t filter, sk_vector_t *v);
+static void sensor_filter(skpc_filter_t filter, sk_vector_t *v, int is_files);
 static void sensor_network(skpc_direction_t direction, char *name);
 static void sensor_probes(char *probe_type, sk_vector_t *v);
 
@@ -212,6 +212,8 @@ static skIPWildcard_t *parse_wildcard_addr(char *s);
 %token ERR_STR_TOO_LONG
 
 %type <vector>      id_list
+%type <vector>      filename_list
+%type <string>      filename
 
 
 %%
@@ -509,6 +511,10 @@ stmt_sensor_ipset:                        NET_NAME_IPSET id_list EOL
 {
     sensor_ipset($1, $2);
 }
+                                        | NET_NAME_IPSET filename_list EOL
+{
+    sensor_ipset($1, $2);
+}
                                         | NET_NAME_IPSET REMAINDER_T EOL
 {
     sensor_ipset($1, NULL);
@@ -525,7 +531,13 @@ stmt_sensor_filter:                       FILTER id_list EOL
 {
     /* discard-{when,unless}
      * {source,destination,any}-{interfaces,ipblocks,ipsets} */
-    sensor_filter($1, $2);
+    sensor_filter($1, $2, 0);
+}
+                                        | FILTER filename_list EOL
+{
+    /* discard-{when,unless}
+     * {source,destination,any}-ipsets */
+    sensor_filter($1, $2, 1);
 }
                                         | FILTER EOL
 {
@@ -625,11 +637,14 @@ stmt_group_ipsets:                        IPSETS_T id_list EOL
 {
     group_add_data($2, SKPC_GROUP_IPSET);
 }
+                                        | IPSETS_T filename_list EOL
+{
+    group_add_data($2, SKPC_GROUP_IPSET);
+}
                                         | IPSETS_T EOL
 {
     missing_value();
 };
-
 
 
     /*
@@ -656,6 +671,47 @@ id_list:                                  ID
     skVectorAppendValue($1, &s);
     $$ = $1;
 };
+
+
+    /*
+     *  Parse a list of strings where at least one of the items is a
+     *  double-quoted string.  The items are separated by whitespace
+     *  and/or commas.  Return as a sk_vector_t*
+     */
+
+filename_list:                            QUOTED_STRING
+{
+    sk_vector_t *v = vectorPoolGet(ptr_pool);
+    char *s = $1;
+    skVectorAppendValue(v, &s);
+    $$ = v;
+}
+                                        | id_list QUOTED_STRING
+{
+    char *s = $2;
+    skVectorAppendValue($1, &s);
+    $$ = $1;
+}
+                                        | id_list COMMA QUOTED_STRING
+{
+    char *s = $3;
+    skVectorAppendValue($1, &s);
+    $$ = $1;
+}
+                                        | filename_list filename
+{
+    char *s = $2;
+    skVectorAppendValue($1, &s);
+    $$ = $1;
+}
+                                        | filename_list COMMA filename
+{
+    char *s = $3;
+    skVectorAppendValue($1, &s);
+    $$ = $1;
+};
+
+filename:                                 ID | QUOTED_STRING;
 
 
 %%
@@ -1749,7 +1805,8 @@ sensor_ipset(
 static void
 sensor_filter(
     skpc_filter_t       filter,
-    sk_vector_t        *v)
+    sk_vector_t        *v,
+    int                 is_files)
 {
     const size_t count = (v ? skVectorGetCount(v) : 0);
     skpc_group_t *g;
@@ -1758,6 +1815,14 @@ sensor_filter(
 
     if (count < 1) {
         skpcParseErr("Missing arguments for %s on sensor '%s'",
+                     pcscan_clause, skpcSensorGetName(sensor));
+        ++defn_errors;
+        goto END;
+    }
+
+    if (is_files && SKPC_GROUP_IPSET != filter.f_group_type) {
+        skpcParseErr(("Error in %s on sensor '%s':"
+                      " Only IPset filenames may be quoted"),
                      pcscan_clause, skpcSensorGetName(sensor));
         ++defn_errors;
         goto END;

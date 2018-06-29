@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-string.c 7148c54d9884 2018-03-13 19:30:21Z mthomas $");
+RCSIDENT("$SiLK: sku-string.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skipaddr.h>
@@ -1444,9 +1444,9 @@ skStringParseIPWildcard(
     /* max value for any octet/hexadectet */
     uint32_t block_max_value = ((1 << block_size) - 1);
     /* base to use for parsing octet/hexadectet values */
-    int block_base = 10;
+    int block_base;
     /* character string between octets/hexadectets */
-    const char *block_sep = ".";
+    const char *block_sep;
     uint64_t i;
     uint32_t range_start = 0;
     uint64_t range_length = 0;
@@ -3179,7 +3179,7 @@ skStringParseUint32(
     uint32_t            min_val,
     uint32_t            max_val)
 {
-    uint64_t tmp;
+    uint64_t tmp = UINT64_MAX;
     int rv;
 
     rv = skStringParseUint64(&tmp, int_string, min_val,

@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwstatssetup.c a3aa5034f427 2018-04-23 15:09:17Z mthomas $");
+RCSIDENT("$SiLK: rwstatssetup.c 2d2aa9ba7bc5 2018-05-30 20:23:17Z mthomas $");
 
 #include <silk/silkpython.h>
 #include <silk/skcountry.h>
@@ -1228,7 +1228,8 @@ appOptionsHandler(
         if (STATSUNIQ_PROGRAM_UNIQ == this_program) {
             /* handle --threshold for rwuniq */
             cp = strdup(opt_arg);
-            if (skVectorAppendValue(threshold_vec, &cp)) {
+            if (!cp || skVectorAppendValue(threshold_vec, &cp)) {
+                free(cp);
                 return 1;
             }
             break;
@@ -1267,7 +1268,8 @@ appOptionsHandler(
             if (bf->bf_all_counts) {
                 snprintf(buf, sizeof(buf), "%s=0-0", bf->bf_title);
                 cp = strdup(buf);
-                if (skVectorAppendValue(threshold_vec, &cp)) {
+                if (!cp || skVectorAppendValue(threshold_vec, &cp)) {
+                    free(cp);
                     return 1;
                 }
             }
@@ -1278,7 +1280,8 @@ appOptionsHandler(
       case OPT_ETIME:
         snprintf(buf, sizeof(buf), "%s=0-0", appOptionName(opt_index));
         cp = strdup(buf);
-        if (skVectorAppendValue(threshold_vec, &cp)) {
+        if (!cp || skVectorAppendValue(threshold_vec, &cp)) {
+            free(cp);
             return 1;
         }
         break;
@@ -1295,7 +1298,8 @@ appOptionsHandler(
                      appOptionName(opt_index), opt_arg);
         }
         cp = strdup(buf);
-        if (skVectorAppendValue(threshold_vec, &cp)) {
+        if (!cp || skVectorAppendValue(threshold_vec, &cp)) {
+            free(cp);
             return 1;
         }
         break;
@@ -1559,6 +1563,7 @@ value_to_ascii(
     uint8_t bin_buf[HASHLIB_MAX_VALUE_WIDTH];
 
     switch (skFieldListEntryGetId(fl_entry)) {
+      case SK_FIELD_RECORDS:
       case SK_FIELD_SUM_BYTES:
       case SK_FIELD_SUM_PACKETS:
         skFieldListExtractFromBuffer(value_fields, ((uint8_t**)v_outbuf)[1],
@@ -1566,7 +1571,6 @@ value_to_ascii(
         snprintf(text_buf, text_buf_size, ("%" PRIu64), val64);
         break;
 
-      case SK_FIELD_RECORDS:
       case SK_FIELD_SUM_ELAPSED:
         skFieldListExtractFromBuffer(value_fields, ((uint8_t**)v_outbuf)[1],
                                      fl_entry, (uint8_t*)&val32);

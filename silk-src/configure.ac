@@ -4,10 +4,10 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: configure.ac 116f2fcfd741 2018-04-23 18:50:32Z mthomas $")
+dnl RCSIDENT("$SiLK: configure.ac aa5bc27c003b 2018-06-28 16:14:57Z mthomas $")
 
 AC_PREREQ(2.64)
-AC_INIT([SiLK],[3.17.1],[netsa-help@cert.org],[silk],[http://tools.netsa.cert.org/silk/])
+AC_INIT([SiLK],[3.17.2],[netsa-help@cert.org],[silk],[http://tools.netsa.cert.org/silk/])
 AC_CONFIG_SRCDIR([src/libsilk/silk.h])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_CONFIG_MACRO_DIR([m4])
@@ -45,7 +45,7 @@ AH_TOP([/*
 ])
 AX_PREFIX_CONFIG_H([src/include/silk/silk_config.h], [SK], [src/include/silk/silk_config1.h])
 
-AC_REVISION($SiLK: configure.ac 116f2fcfd741 2018-04-23 18:50:32Z mthomas $)
+AC_REVISION($SiLK: configure.ac aa5bc27c003b 2018-06-28 16:14:57Z mthomas $)
 AC_COPYRIGHT([Copyright (C) 2001-2018 by Carnegie Mellon University
 GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
 Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013])

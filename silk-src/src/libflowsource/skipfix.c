@@ -22,7 +22,7 @@
 #define SKIPFIX_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipfix.c 7148c54d9884 2018-03-13 19:30:21Z mthomas $");
+RCSIDENT("$SiLK: skipfix.c 6a79ffaa4702 2018-05-30 21:45:15Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/skipaddr.h>
@@ -2774,7 +2774,6 @@ skiGauntletOfTime(
         } else if (record->bmap & TMPL_BIT_observationTimeMicroseconds) {
             time_fields |= 4;
             eTime = skiNTPDecode(fixrec->observationTimeMicroseconds, 1);
-            eTime = fixrec->observationTimeMicroseconds;
             log_rec_time.end_val = fixrec->observationTimeMicroseconds;
             log_rec_time.end_name = "observationTimeMicroseconds";
         } else if (record->bmap & TMPL_BIT_observationTimeNanoseconds) {
@@ -3114,6 +3113,18 @@ ski_fixrec_next(
     } else if ((skpcProbeGetQuirks(probe) & SKPC_QUIRK_MISSING_IPS) == 0) {
         ski_fixrec_ignore(fixrec, "No IP addresses");
         return 0;
+    }
+
+    if (skpcProbeGetQuirks(probe) & SKPC_QUIRK_NF9_OUT_IS_REVERSE) {
+        TRACEMSG(
+            2, (("Setting reverse Octet/Packet counts (currently"
+                 " %" PRIu64 "/%" PRIu64 ") to post Octet/Packet counts"
+                 " (%" PRIu64 "/%" PRIu64 ") due to nf9-out-is-reverse"),
+                fixrec->reverseOctetDeltaCount,fixrec->reversePacketDeltaCount,
+                fixrec->postOctetDeltaCount, fixrec->postPacketDeltaCount));
+        fixrec->reverseOctetDeltaCount = fixrec->postOctetDeltaCount;
+        fixrec->reversePacketDeltaCount = fixrec->postPacketDeltaCount;
+        fixrec->postOctetDeltaCount = fixrec->postPacketDeltaCount = 0;
     }
 
     /* Get the forward and reverse packet and byte counts (run the
@@ -4368,6 +4379,15 @@ ski_nf9rec_next(
         return 0;
     }
 #endif  /* SK_ENABLE_IPV6 */
+
+    /* When the nf9-out-is-reverse quirk is set, flip a bit on the
+     * record's bitmap so volume is treated as initiator/responder. */
+    if (skpcProbeGetQuirks(probe) & SKPC_QUIRK_NF9_OUT_IS_REVERSE) {
+        TRACEMSG(2, (("Modifying record bmap from " BMAP_PRI " to " BMAP_PRI
+                      " due to nf9-out-is-reverse"),
+                     record->bmap, record->bmap |= NF9REC_INITIATOR));
+        record->bmap |= NF9REC_INITIATOR;
+    }
 
     /* Handle the firewall settings and check for reverse (responder)
      * volume.  See the big comment in ski_fixrec_next() for all the

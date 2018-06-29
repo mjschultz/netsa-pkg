@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skbitmap-test.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: skbitmap-test.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/utils.h>
@@ -55,7 +55,7 @@ bitmap_test(
     uint32_t j = 0;
     uint32_t p = 0;
     uint32_t q = 0;
-    int rv = 0xFFFF;
+    int rv;
     uint32_t sz;
     sk_bitmap_t bitmap;
     sk_bitmap_iter_t iter;

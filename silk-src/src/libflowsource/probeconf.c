@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconf.c 96529cbc24c2 2018-03-22 19:09:27Z mthomas $");
+RCSIDENT("$SiLK: probeconf.c 6a79ffaa4702 2018-05-30 21:45:15Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/probeconf.h>
@@ -113,6 +113,7 @@ static const struct skpc_quirks_map_st {
 } skpc_quirks_map[] = {
     {"firewall-event",          SKPC_QUIRK_FW_EVENT},
     {"missing-ips",             SKPC_QUIRK_MISSING_IPS},
+    {"nf9-out-is-reverse",      SKPC_QUIRK_NF9_OUT_IS_REVERSE},
     {"nf9-sysuptime-seconds",   SKPC_QUIRK_NF9_SYSUPTIME_SECS},
     {"none",                    SKPC_QUIRK_NONE},
     {"zero-packets",            SKPC_QUIRK_ZERO_PACKETS},
@@ -2409,7 +2410,7 @@ skpcSensorSetDefaultNonrouted(
 
     if (NULL == nonrouted_group) {
         ifvec = skVectorNew(sizeof(uint32_t));
-        if (skpc_probes == NULL) {
+        if (ifvec == NULL) {
             skAppPrintOutOfMemory(NULL);
             goto END;
         }

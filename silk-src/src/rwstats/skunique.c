@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skunique.c 36aa83adce9e 2018-03-19 18:06:42Z mthomas $");
+RCSIDENT("$SiLK: skunique.c 2d2aa9ba7bc5 2018-05-30 20:23:17Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/rwascii.h>
@@ -483,7 +483,6 @@ skFieldListAddKnownField(
       case SK_FIELD_ELAPSED:
       case SK_FIELD_ELAPSED_MSEC:
       case SK_FIELD_ENDTIME:
-      case SK_FIELD_RECORDS:
       case SK_FIELD_SUM_ELAPSED:
       case SK_FIELD_MIN_STARTTIME:
       case SK_FIELD_MAX_ENDTIME:
@@ -511,6 +510,7 @@ skFieldListAddKnownField(
         bin_octets = 1;
         break;
 
+      case SK_FIELD_RECORDS:
       case SK_FIELD_SUM_PACKETS:
       case SK_FIELD_SUM_BYTES:
       case SK_FIELD_SUM_ELAPSED_MSEC:
@@ -819,7 +819,7 @@ skFieldListAddRecToBuffer(
         } else {
             switch (f->id) {
               case SK_FIELD_RECORDS:
-                ADD_TO_INT_PTR(uint32_t, FIELD_PTR(summed, f), 1);
+                ADD_TO_INT_PTR(uint64_t, FIELD_PTR(summed, f), 1);
                 break;
 
               case SK_FIELD_SUM_BYTES:
@@ -919,13 +919,13 @@ skFieldListMergeBuffers(
                          f->context);
         } else {
             switch (f->id) {
-              case SK_FIELD_RECORDS:
               case SK_FIELD_SUM_ELAPSED:
                 MERGE_INT_PTRS(UINT32_MAX, uint32_t,
                                FIELD_PTR(all_fields_buffer1, f),
                                FIELD_PTR(all_fields_buffer2, f));
                 break;
 
+              case SK_FIELD_RECORDS:
               case SK_FIELD_SUM_PACKETS:
               case SK_FIELD_SUM_BYTES:
               case SK_FIELD_SUM_ELAPSED_MSEC:
@@ -1001,7 +1001,6 @@ skFieldListCompareBuffers(
               case SK_FIELD_ELAPSED:
               case SK_FIELD_ELAPSED_MSEC:
               case SK_FIELD_ENDTIME:
-              case SK_FIELD_RECORDS:
               case SK_FIELD_SUM_ELAPSED:
               case SK_FIELD_MIN_STARTTIME:
               case SK_FIELD_MAX_ENDTIME:
@@ -1032,6 +1031,7 @@ skFieldListCompareBuffers(
                              *(FIELD_PTR(all_fields_buffer2, f)));
                 break;
 
+              case SK_FIELD_RECORDS:
               case SK_FIELD_SUM_PACKETS:
               case SK_FIELD_SUM_BYTES:
               case SK_FIELD_SUM_ELAPSED_MSEC:
@@ -1087,7 +1087,6 @@ skFieldListEntryCompareBuffers(
           case SK_FIELD_ELAPSED:
           case SK_FIELD_ELAPSED_MSEC:
           case SK_FIELD_ENDTIME:
-          case SK_FIELD_RECORDS:
           case SK_FIELD_SUM_ELAPSED:
           case SK_FIELD_MIN_STARTTIME:
           case SK_FIELD_MAX_ENDTIME:
@@ -1115,6 +1114,7 @@ skFieldListEntryCompareBuffers(
             rv = COMPARE(*field_buffer1, *field_buffer2);
             break;
 
+          case SK_FIELD_RECORDS:
           case SK_FIELD_SUM_PACKETS:
           case SK_FIELD_SUM_BYTES:
           case SK_FIELD_SUM_ELAPSED_MSEC:
@@ -6190,7 +6190,7 @@ sortuniqReadSilkNodist(
     uint8_t distinct_buffer[HASHLIB_MAX_KEY_WIDTH];
     uint8_t merged_values[HASHLIB_MAX_VALUE_WIDTH];
     uint32_t heap_count;
-    int rv = -1;
+    int rv;
 
     /* should only be called with value fields and no distinct fields */
     assert(0 == uniq->fi.distinct_num_fields);
@@ -6989,7 +6989,7 @@ sortuniqMergeFilesNodist(
     uint8_t merged_values[HASHLIB_MAX_VALUE_WIDTH];
     uint32_t heap_count;
     int last_errno;
-    int rv = -1;
+    int rv;
 
     /* should only be called with value fields and no distinct fields */
     assert(0 == uniq->fi.distinct_num_fields);
