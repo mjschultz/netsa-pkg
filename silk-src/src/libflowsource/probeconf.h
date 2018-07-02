@@ -22,7 +22,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_PROBECONF_H, "$SiLK: probeconf.h 96529cbc24c2 2018-03-22 19:09:27Z mthomas $");
+RCSIDENTVAR(rcsID_PROBECONF_H, "$SiLK: probeconf.h 6a79ffaa4702 2018-05-30 21:45:15Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -131,7 +131,16 @@ typedef enum {
  */
 #define SKPC_QUIRK_NF9_SYSUPTIME_SECS   0x08
 
-/*#define SKPC_QUIRK_     0x10*/
+/**
+ *    Quirks flag to handle NetFlow v9 from an appliance where the
+ *    OUT_BYTES and OUT_PKTS info elements contain volume counts for
+ *    traffic going in the reverse direction of IN_BYTES and IN_PKTS.
+ *    Versions of libfixbuf prior to 1.8.0 treated those elements as
+ *    reverse-volume elements; starting in 1.8.0, they are treated as
+ *    post-volume elements.  Since SiLK 3.17.2.
+ */
+#define SKPC_QUIRK_NF9_OUT_IS_REVERSE   0x10
+
 /*#define SKPC_QUIRK_     0x20*/
 /*#define SKPC_QUIRK_     0x40*/
 /*#define SKPC_QUIRK_     0x80*/

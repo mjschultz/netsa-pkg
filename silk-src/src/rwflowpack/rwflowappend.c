@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwflowappend.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwflowappend.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/rwrec.h>
@@ -1023,7 +1023,7 @@ openInputStream(
     char errbuf[2 * PATH_MAX];
     skstream_t *stream = NULL;
     ssize_t rv = SKSTREAM_OK;
-    int fd = -1;
+    int fd;
 
     TRACEMSG(3, ("Opening incremental file '%s'", state->in_path));
 

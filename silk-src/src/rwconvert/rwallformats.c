@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwallformats.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwallformats.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -306,6 +306,7 @@ openTempFile(
     }
     if (unlink(temp_name)) {
         skAppPrintSyserror("Cannot remove temp file '%s'", temp_name);
+        fclose(fp);
         return NULL;
     }
 

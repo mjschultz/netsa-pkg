@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagcat.c 50d8958dd41d 2018-03-26 21:58:40Z mthomas $");
+RCSIDENT("$SiLK: rwbagcat.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skcountry.h>
@@ -2048,12 +2048,14 @@ printStatistics(
             skStreamPrint(stream_out,
                           "  No entries in bag within limits.\n");
         }
+        skBagIteratorDestroy(iter);
         return 0;
     }
     if (SKBAG_OK != rv) {
         /* some other unexpected error */
         skAppPrintErr("Error iterating over bag: %s",
                       skBagStrerror(rv));
+        skBagIteratorDestroy(iter);
         return 1;
     }
 

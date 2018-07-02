@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwscan_udp.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwscan_udp.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include "rwscan.h"
 
@@ -47,6 +47,12 @@ calculate_udp_metrics(
 
     skBitmapCreate(&low_dp_bitmap, 1024);
     skBitmapCreate(&sp_bitmap, UINT16_MAX);
+    if (!low_dp_bitmap || !sp_bitmap) {
+        skAppPrintOutOfMemory("bitmap");
+        skBitmapDestroy(&low_dp_bitmap);
+        skBitmapDestroy(&sp_bitmap);
+        return;
+    }
 
     calculate_shared_metrics(event_flows, metrics);
 
@@ -57,9 +63,7 @@ calculate_udp_metrics(
     dip_next     = rwRecGetDIPv4(rwnext);
     class_c_next = dip_next & 0xFFFFFF00;
 
-
     for (i = 0; i < metrics->event_size; ++i, ++rwcurr) {
-
         skBitmapSetBit(sp_bitmap, rwRecGetSPort(rwcurr));
 
         dip_curr     = dip_next;

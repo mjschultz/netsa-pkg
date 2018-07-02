@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h ecb4f46a7d39 2018-03-15 13:28:58Z mthomas $");
+RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -3877,25 +3877,8 @@ skDatetimeFloor(
 
 
 /**
- *    Attempts to parse the C string 'int_string' as an unsigned
- *    32-bit integer.  In addition, verifies that the value is between
- *    'min_val' and 'max_val' inclusive.  A 'max_val' of 0 is
- *    equivalent to UINT32_MAX; i.e., the largest value that will fit
- *    in a 32bit value.  Puts the result into location pointed to by
- *    'result_val'.  Ignores any whitespace around the number.
- *
- *    Returns 0 and fills 'result_val' when 'int_string' contains only
- *    a number and whitespace and the number is parsable and the
- *    resulting value is within the limits.
- *
- *    Returns a positive value and fills 'result_val' when
- *    'int_string' contains a value within the limits and contains
- *    additional non-whitespace text.  The return value is the number
- *    of characters parsed in 'int_string'.  The return value does
- *    not include whitespace between the number and the trailing text;
- *    e.g; "7 x" would set *result_val to 7 and return 1.
- *
- *    Returns a silk_utils_errcode_t value on error.
+ *    A wrapper over skStringParseUint64() that uses unsiged 32-bit
+ *    numbers unstead of 64-bit numbers.
  */
 int
 skStringParseUint32(
@@ -3906,9 +3889,35 @@ skStringParseUint32(
 
 
 /**
- *    As skStringParseUint32(), except that it attempts to parse the
- *    C-string 'int_string' as an unsigned 64-bit integer and a
- *    'max_val' of 0 represents UINT64_MAX.
+ *    Attempts to parse the C string 'int_string' as an unsigned
+ *    64-bit decimal integer, and puts the result into the referent of
+ *    'result_val'.  Ignores any whitespace before and after the
+ *    number.
+ *
+ *    In addition, the function verifies that the value is between
+ *    'min_val' and 'max_val' inclusive.  A 'max_val' of 0 is
+ *    equivalent to UINT64_MAX; i.e., the largest value that will fit
+ *    in a 64bit value.
+ *
+ *    Returns 0 and fills 'result_val' when 'int_string' contains only
+ *    a number and leading or trailing whitespace and the number is
+ *    parsable and the resulting value is within the limits.
+ *
+ *    Returns a positive value and fills 'result_val' when
+ *    'int_string' contains a value within the limits and contains
+ *    additional non-whitespace text after a parsed number.  The
+ *    return value is the number of characters parsed in 'int_string'.
+ *    For example, an 'int_string' of either "7x" or "7 x" causes the
+ *    function to set the referent of 'result_val' to 7 and return 1.
+ *
+ *    Fills 'result_val' and returns either SKUTILS_ERR_MINIMUM or
+ *    SKUTILS_ERR_MAXIMUM when the value is successfully parsed but is
+ *    not within the limits.  When the value falls outside the
+ *    possible range of the function, 'result_val' is unchanged and
+ *    SKUTILS_ERR_OVERFLOW is returned.
+ *
+ *    Returns a silk_utils_errcode_t value on any other error and
+ *    leaves 'result_val' unchanged.
  */
 int
 skStringParseUint64(

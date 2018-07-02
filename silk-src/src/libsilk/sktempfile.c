@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sktempfile.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: sktempfile.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/skstream.h>
 #include <silk/sktempfile.h>
@@ -562,7 +562,7 @@ skTempFileWriteBufferStream(
     uint64_t bytes;
     size_t part;
     const uint8_t *b;
-    ssize_t rv = -1; /* return value */
+    ssize_t rv;
 
     stream = skTempFileCreateStream(tmpctx, tmp_idx);
     if (NULL == stream) {
@@ -601,7 +601,8 @@ skTempFileWriteBufferStream(
     }
 
     TEMPFILE_DEBUG4(
-        tmpctx, "Stored %" PRIu64 " bytes as %" PRId64 " bytes (%.3f%%) in '%s'",
+        tmpctx,
+        "Stored %" PRIu64 " bytes as %" PRId64 " bytes (%.3f%%) in '%s'",
         (uint64_t)rec_size * (uint64_t)rec_count,
         skFileSize(skStreamGetPathname(stream)),
         ((double)skFileSize(skStreamGetPathname(stream))

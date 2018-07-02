@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pdureader.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: pdureader.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include "rwflowpack_priv.h"
 
@@ -88,7 +88,11 @@ readerStart(
 
     /* although we don't need the connection information to make the
      * connection, get it for logging */
-    skpcProbeGetListenOnSockaddr(fproc->probe, &bind_addr);
+    if (skpcProbeGetListenOnSockaddr(fproc->probe, &bind_addr)) {
+        CRITMSG("Unable to get socket address for probe %s",
+                skpcProbeGetName(fproc->probe));
+        skAbort();
+    }
 
     INFOMSG(("Creating " INPUT_MODE_TYPE_NAME " for probe '%s' on %s"),
             skpcProbeGetName(fproc->probe),

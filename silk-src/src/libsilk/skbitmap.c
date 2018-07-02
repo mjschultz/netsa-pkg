@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skbitmap.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: skbitmap.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/utils.h>
 
@@ -99,6 +99,7 @@ skBitmapCreate(
     assert(bitmap_out);
 
     if (num_bits == 0) {
+        *bitmap_out = NULL;
         return -1;
     }
 
@@ -110,6 +111,7 @@ skBitmapCreate(
     (*bitmap_out)->map = (uint32_t*)calloc(word_count, sizeof(uint32_t));
     if (NULL == (*bitmap_out)->map) {
         free(*bitmap_out);
+        *bitmap_out = NULL;
         return -1;
     }
 

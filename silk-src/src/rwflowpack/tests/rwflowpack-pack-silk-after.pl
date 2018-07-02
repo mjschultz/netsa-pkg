@@ -1,7 +1,7 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: rwflowpack-pack-silk-after.pl 3c4d6696a20e 2014-10-15 19:18:45Z mthomas $")
+# RCSIDENT("$SiLK: rwflowpack-pack-silk-after.pl 04bb49edf544 2018-05-31 18:25:33Z mthomas $")
 
 use strict;
 use SiLKTests;
@@ -163,5 +163,5 @@ sensor S0
     silk-probes P0
     internal-ipsets  @internal
     external-ipsets  @external
-    null-ipset       ${null}
+    null-ipset       "${null}"
 end sensor

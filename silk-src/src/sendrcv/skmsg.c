@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skmsg.c fa912203de3c 2018-04-02 21:17:14Z mthomas $");
+RCSIDENT("$SiLK: skmsg.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include "intdict.h"
 #include "multiqueue.h"
@@ -784,6 +784,9 @@ read_trust_file(
     {
         INFOMSG("Error loading x509 CA trust file '%s': %s",
                 ca_filename, strerror(errno));
+        if (-1 != fd) {
+            close(fd);
+        }
         goto END;
     }
 
@@ -1073,6 +1076,9 @@ read_check_pkcs12(
         for (i = 0; NULL == key && i < elements_in_bag; ++i) {
             bag_type = gnutls_pkcs12_bag_get_type(bag, i);
             rv = gnutls_pkcs12_bag_get_data(bag, i, &data);
+            if (rv < 0) {
+                goto ERROR;
+            }
 
             switch (bag_type) {
               case GNUTLS_BAG_PKCS8_ENCRYPTED_KEY:
@@ -1135,6 +1141,9 @@ read_check_pkcs12(
         for (i = 0; NULL == cert && i < elements_in_bag; ++i) {
             bag_type = gnutls_pkcs12_bag_get_type(bag, i);
             rv = gnutls_pkcs12_bag_get_data(bag, i, &data);
+            if (rv < 0) {
+                goto ERROR;
+            }
 
             switch (bag_type) {
               case GNUTLS_BAG_CERTIFICATE:
@@ -2708,8 +2717,7 @@ destroy_connection(
     assert(err == SKDQ_EMPTY);
 
     /* Shut down the queue */
-    err = skDequeUnblock(conn->queue);
-    assert(err == SKDQ_SUCCESS);
+    ASSERT_RESULT(skDequeUnblock(conn->queue), skDQErr_t, SKDQ_SUCCESS);
 
     /* Mark all channels using this connection as closed. */
     if (conn->first_channel) {
@@ -2771,8 +2779,7 @@ destroy_connection(
     }
 
     /* Destroy the queue */
-    err = skDequeDestroy(conn->queue);
-    assert(err == SKDQ_SUCCESS);
+    ASSERT_RESULT(skDequeDestroy(conn->queue), skDQErr_t, SKDQ_SUCCESS);
 
 #if SK_ENABLE_GNUTLS
     /* Destroy the session */
@@ -3564,7 +3571,8 @@ skMsgQueueCreate(
     ASSERT_RESULT(set_channel_connecting(q, chan, conn), int, 0);
 
     /* And let's completely connect it. */
-    rv = set_channel_connected(q, chan, SKMSG_CHANNEL_CONTROL);
+    ASSERT_RESULT(set_channel_connected(q, chan, SKMSG_CHANNEL_CONTROL),
+                  int, 0);
     conn->state = SKM_CONNECTED;
 
     /* Unlock the mutex */

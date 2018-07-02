@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: udpsource.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: udpsource.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #if SK_ENABLE_ZLIB
 #include <zlib.h>
@@ -939,7 +939,7 @@ udpSourceCreateFromUnixDomain(
     sk_sockaddr_t addr;
     skUDPSourceBase_t *base = NULL;
     struct pollfd *pfd_array = NULL;
-    int sock = -1;
+    int sock;
 
     assert(source);
     assert(source->probe);

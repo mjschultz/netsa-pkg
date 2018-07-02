@@ -16,7 +16,7 @@
                                    headers */
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pysilk.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: pysilk.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skbag.h>
@@ -707,14 +707,6 @@ silkPyIPAddr_mask_prefix(
                             "Prefix must be between 0 and %d", max);
     }
 
-#if SK_ENABLE_IPV6
-    if (skipaddrIsV6(&self->addr)) {
-        type = &silkPyIPv6AddrType;
-    } else
-#endif
-    {
-        type = &silkPyIPv4AddrType;
-    }
     retval = PyObject_New(silkPyIPAddr, type);
     if (retval == NULL) {
         return NULL;
@@ -2636,6 +2628,7 @@ silkPyPmapIter_iternext(
         }
         break;
     }
+    assert(startval && endval);
 
     retval = Py_BuildValue("NNk", startval, endval, value);
     if (retval == NULL) {
@@ -7641,8 +7634,7 @@ silk_init_site(
     }
 
     if (siteconf) {
-        rv = sksiteSetConfigPath(siteconf);
-        assert(rv == 0);
+        ASSERT_RESULT(sksiteSetConfigPath(siteconf), int, 0);
     }
 
     if (rootdir) {

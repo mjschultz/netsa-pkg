@@ -38,7 +38,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwgeoip2ccmap.l a7317ed40a34 2018-04-23 15:37:08Z mthomas $");
+RCSIDENT("$SiLK: rwgeoip2ccmap.l c6cc70df0b4e 2018-06-27 16:22:09Z mthomas $");
 
 #include <silk/redblack.h>
 #include <silk/skcountry.h>
@@ -65,9 +65,9 @@ RCSIDENT("$SiLK: rwgeoip2ccmap.l a7317ed40a34 2018-04-23 15:37:08Z mthomas $");
 /* label to use for unknown ranges */
 #define DEFAULT_LABEL   "--"
 
-/* for the legacy CSV input, the number of fields expected on each
- * line */
-#define LEGACY_CSV_FIELDS   6
+/* for the legacy CSV input, the number of columns (fields, values)
+ * expected on each line */
+#define LEGACY_CSV_COLUMNS  6
 
 /*
  *  Values for "country" that the legacy GeoIP databases used for
@@ -119,6 +119,17 @@ typedef struct pmap_location_st {
     uint32_t            is_country;
 } pmap_location_t;
 
+/* fields from the GeoIP2 files that are allowed to be checked for a
+ * valid country code.  may be selected by the --fields switch. */
+typedef enum pmap_fields_en {
+    PMAP_FIELD_LOCATION = 0,
+    PMAP_FIELD_REGISTERED = 1,
+    PMAP_FIELD_REPRESENTED = 2,
+    PMAP_FIELD_CONTINENT = 3,
+    PMAP_FIELD_FLAGS = 4,
+    PMAP_FIELD_END = 0xff
+} pmap_fields_t;
+
 
 /* LOCAL VARIABLE DEFINITIONS */
 
@@ -128,29 +139,32 @@ static skPrefixMap_t *map = NULL;
 /* information for the current legacy statement */
 static pmap_legacy_t legacy;
 
-/* names of the ipblocks fields that appear in the files */
-static const char *ipblocks_fields[] = {
+/* names of the columns (fields, values) that appear in the
+ * GeoLite2-Country-Blocks-IPv{4,6}.csv files */
+static const char *ipblocks_columns[] = {
     "network", "geoname_id",
     "registered_country_geoname_id", "represented_country_geoname_id",
     "is_anonymous_proxy", "is_satellite_provider"
 };
 
-/* names of the locations fields that appear in the file */
-static const char *location_fields[] = {
+/* names of the columns (fields, values) that appear in the
+ * GeoLite2-Country-Locations-en.csv file */
+static const char *location_columns[] = {
     "geoname_id", "locale_code", "continent_code",
     "continent_name", "country_iso_code", "country_name"
-    /* ignore this field that we do not use: "is_in_european_union" */
+    /* ignore this column that we do not use: "is_in_european_union" */
 };
 
-/* number of fields in a GeoIP2 CSV Blocks file.  This may increase if
- * additional title fields are appended to the fields we expect.
- * Every data line must have this number of fields. */
-static unsigned int ipblocks_fields_count =
-    sizeof(ipblocks_fields)/sizeof(ipblocks_fields[0]);
+/* number of columns in a GeoIP2 CSV Blocks file.  The value set here
+ * is a minimum, and the value will be set according to the number of
+ * column titles actually read from the file.  Every data line after
+ * the title must contain the same number of fields as the title. */
+static unsigned int ipblocks_columns_count =
+    sizeof(ipblocks_columns)/sizeof(ipblocks_columns[0]);
 
-/* similar to 'ipblocks_fields_count' for the location fields */
-static unsigned int location_fields_count =
-    sizeof(location_fields)/sizeof(location_fields[0]);
+/* similar to 'ipblocks_columns_count' for the location columns */
+static unsigned int location_columns_count =
+    sizeof(location_columns)/sizeof(location_columns[0]);
 
 /* information for the current GeoIP2 ipblocks statement */
 static pmap_ipblocks_t ipblocks;
@@ -158,23 +172,52 @@ static pmap_ipblocks_t ipblocks;
 /* information for the current GeoIP2 location statement */
 static pmap_location_t location;
 
-/* mapping from geoname_id to country code */
+/* the default order in which the geoname_id values from the GeoIP2
+ * files are selected */
+static pmap_fields_t fields[6] = {
+    PMAP_FIELD_LOCATION, PMAP_FIELD_REGISTERED, PMAP_FIELD_REPRESENTED,
+    PMAP_FIELD_CONTINENT, PMAP_FIELD_FLAGS, PMAP_FIELD_END
+};
+
+/* mapping from field names to values; used to parse the argument to
+ * the --fields switch */
+static sk_stringmap_entry_t fields_map_entries[] = {
+    {"location",        PMAP_FIELD_LOCATION,
+     "Value of the geoname_id field", NULL},
+    {"registered",      PMAP_FIELD_REGISTERED,
+     "Value of the registered_country_geoname_id field", NULL},
+    {"represented",     PMAP_FIELD_REPRESENTED,
+     "Value of the represented_country_geoname_id field", NULL},
+    {"continent",       PMAP_FIELD_CONTINENT,
+     "Use the first continent value found across all fields", NULL},
+    {"flags",           PMAP_FIELD_FLAGS,
+     "Value of is_anonymous_proxy and is_satellite_provider flags", NULL},
+    SK_STRINGMAP_SENTINEL
+};
+
+/* the string-map for field names */
+static sk_stringmap_t *fields_map = NULL;
+
+/* mapping from geoname_id to country code. this is filled with the
+ * data read from the location file */
 static struct rbtree *geomap = NULL;
 
-/* state to BEGIN after handling an error */
+/* parser state to use with BEGIN after handling an error */
 static int next_state;
 
 /* which line of input we are reading */
 static unsigned int linenum = 1;
 
-/* which field number of the current input line are we reading.  first
- * field is 0 */
-static unsigned int field = 0;
+/* which column (field, value) number of the current input line are we
+ * reading.  first column is 0 */
+static unsigned int column = 0;
 
 /* number of errors encountered during processing */
 static unsigned int error_count = 0;
 
-/* type of input: ipv4, ipv6, binary, or determined by first IP */
+/* the type of the input varies in three ways: ipv4 vs ipv6, csv vs
+ * binary, GeoIP2 vs legacy.  by default, the type is determined by
+ * reading a bit of the input */
 static struct mode_st {
     geoip2ccmap_mode_t ipv6_ipv4;
     geoip2ccmap_mode_t csv_binary;
@@ -186,7 +229,8 @@ static struct mode_st {
 /* default country code value */
 static uint32_t default_value;
 
-/* structure to map between mode names and mode IDs */
+/* structure to map between mode names and mode IDs; used when parsing
+ * the --mode switch */
 static const sk_stringmap_entry_t mode_map_entries[] = {
     {"auto",       GEOIP2CCMAP_MODE_AUTO,
      "Automatically determine the type of input",               NULL},
@@ -236,15 +280,15 @@ static const char *mmdb_path = NULL;
 /* directory containing the MaxMind GeoIP2 CSV files */
 static const char *csv2_directory = NULL;
 
-/* values to prepend onto the names in csv2_files[] above */
+/* values to prepend onto the names in csv2_files[] below */
 static const char *csv2_products[] = {"GeoIP2", "GeoLite2", NULL};
 
 /* for CSV GoeIP2 data, the input-path is a directory, and this struct
  * contains the back half of names of the files in the directory.
  * These values are prefixed by one of the values from the
- * csv2_products[] array.  If the 'mode' member is auto, the file is
- * always processed.  Otherwise the global mode must match the 'mode'
- * member. */
+ * csv2_products[] array.  If the 'mode' member of this struct is
+ * auto, the file is always processed.  Otherwise the global mode must
+ * match the 'mode' member. */
 static const struct csv2_files_st {
     geoip2ccmap_mode_t  mode;
     const char         *path;
@@ -275,14 +319,13 @@ static int invocation_strip = 0;
 
 /* OPTIONS SETUP */
 
-/* FIXME: Instead of a --csv2-directory switch, should we allow the
- * directory to be an argument to the --input-path switch? */
 typedef enum {
     OPT_INPUT_PATH,
     OPT_OUTPUT_PATH,
     OPT_MODE,
     OPT_DRY_RUN,
     OPT_INVOCATION_STRIP,
+    OPT_FIELDS,
     OPT_CSV_INPUT,
     OPT_V6_CSV_INPUT,
     OPT_ENCODED_INPUT
@@ -301,22 +344,25 @@ static struct option appOptions[] = {
     {"mode",                REQUIRED_ARG, 0, OPT_MODE},
     {"dry-run",             NO_ARG,       0, OPT_DRY_RUN},
     {"invocation-strip",    NO_ARG,       0, OPT_INVOCATION_STRIP},
+    {"fields",              REQUIRED_ARG, 0, OPT_FIELDS},
     {0,0,0,0}               /* sentinel entry */
 };
 
 
 static const char *appHelp[] = {
-    ("Read the CSV form or the binary form of the GeoIP Legacy\n"
-     "\tcountry code data from this file. Read from the standard input when\n"
-     "\tthe switch is not provided"),
-    ("Write the binary country code prefix map to this file.\n"
-     "\tWrite to the standard output when the switch is not provided"),
+    ("Read the MaxMind country code data from this location.\n"
+     "\tFor GeoIP2 CSV data, must be the directory containing the files.\n"
+     "\tGeoIP Legacy data may be read from the standard input"),
+    ("Write the binary country code prefix map to this file or\n"
+     "\tto the standard output when the switch is not provided"),
     ("Set the type of the input and the type country code file to\n"
      "\tcreate. By default, the type of prefix map is determined by the\n"
      "\tfirst IP address seen."),
     "Parse the input but do not write the output file",
     ("Strip invocation history from the prefix map file.\n"
      "\tDef. Record command used to create the file"),
+    ("Choose which of the fields provided by GeoIP2 data files\n"
+     "\tare checked for a valid country code.\n"),
     (char *)NULL
 };
 
@@ -367,6 +413,7 @@ static struct option deprecatedOptionsShort[] = {
 /* LOCAL FUNCTION PROTOTYPES */
 
 static int appOptionsHandler(clientData cData, int opt_index, char *opt_arg);
+static int parseFields(int idx, const char *str);
 static int parseMode(int idx, const char *str);
 static const char *modeToName(geoip2ccmap_mode_t m);
 static int resolveInputModes(void);
@@ -380,11 +427,11 @@ static int scanWarn(const char *fmt, ...)
 
 static int csv2NextFile(void);
 
-static int  legacyField(const char *string);
+static int  legacyColumn(const char *string);
 static void legacyCreateEntry(void);
 static void legacyReset(void);
 
-static int  csv2Field(const char *string);
+static int  csv2Column(const char *string);
 static void csv2CreateEntry(void);
 static void csv2Reset(void);
 
@@ -431,30 +478,30 @@ unquoted    [^,\"\r\n]+
 
 %%
 
-<ST_CSV2>{unquoted}                   { if (csv2Field(yytext)) {
+<ST_CSV2>{unquoted}                   { if (csv2Column(yytext)) {
                                             BEGIN(ST_CSV2_ERROR);
                                         } else {
                                             BEGIN(ST_CSV2_NEXT);
                                         } }
 
-<ST_CSV2_DQ>{not_dq}                  { if (csv2Field(yytext)) {
+<ST_CSV2_DQ>{not_dq}                  { if (csv2Column(yytext)) {
                                             next_state = ST_CSV2;
                                             BEGIN(ST_CSV2_ERROR);
                                         } }
 
 <ST_CSV2>{dq}                         { BEGIN(ST_CSV2_DQ); }
 <ST_CSV2_DQ>{dq}                      { BEGIN(ST_CSV2_NEXT); }
-<ST_CSV2_NEXT>,+                      { field += yyleng;
+<ST_CSV2_NEXT>,+                      { column += yyleng;
                                         BEGIN(ST_CSV2); }
 
 <ST_CSV2_NEXT>,+{nl}                  |
-<ST_CSV2_NEXT>{nl}                    { field += yyleng;
+<ST_CSV2_NEXT>{nl}                    { column += yyleng;
                                         csv2CreateEntry();
                                         ++linenum;
                                         csv2Reset();
                                         BEGIN(ST_CSV2); }
 
-<ST_CSV2><<EOF>>                      { if (field) {
+<ST_CSV2><<EOF>>                      { if (column) {
                                             csv2CreateEntry();
                                         }
                                         if (csv2NextFile()) {
@@ -464,8 +511,8 @@ unquoted    [^,\"\r\n]+
                                         BEGIN(ST_CSV2);
                                       }
 <ST_CSV2_NEXT><<EOF>>                 { /* unusual */
-                                        if (field) {
-                                            ++field;
+                                        if (column) {
+                                            ++column;
                                             csv2CreateEntry();
                                         }
                                         if (csv2NextFile()) {
@@ -476,7 +523,7 @@ unquoted    [^,\"\r\n]+
                                       }
 
 <ST_CSV2>{nl}                         { /* probably an error */
-                                        if (field) {
+                                        if (column) {
                                             csv2CreateEntry();
                                         }
                                         ++linenum;
@@ -520,38 +567,40 @@ unquoted    [^,\"\r\n]+
 <INITIAL>{nl}                         { ++linenum; legacyReset(); }
 <INITIAL>{ws_opt}{dq}                 { BEGIN(ST_LEG_ENTRY); }
 
-<ST_LEG_ENTRY>{not_dq}                { if (legacyField(yytext)) {
+<ST_LEG_ENTRY>{not_dq}                { if (legacyColumn(yytext)) {
                                             BEGIN(ST_LEG_ERROR);
                                         } else {
                                             BEGIN(ST_LEG_CLOSE_ENTRY);
                                         } }
 
 <ST_LEG_CLOSE_ENTRY>{dq}              { BEGIN(ST_LEG_NEXT_ENTRY); }
-<ST_LEG_NEXT_ENTRY>,                  { ++field; }
+<ST_LEG_NEXT_ENTRY>,                  { ++column; }
 <ST_LEG_NEXT_ENTRY>{dq}               { BEGIN(ST_LEG_ENTRY); }
 <ST_LEG_NEXT_ENTRY>{ws_opt}           ;
 
 <ST_LEG_NEXT_ENTRY>{nl}               |
-<ST_LEG_NEXT_ENTRY><<EOF>>            { ++field;
+<ST_LEG_NEXT_ENTRY><<EOF>>            { ++column;
                                         legacyCreateEntry();
                                         ++linenum;
                                         legacyReset();
                                         BEGIN(INITIAL); }
 
-<ST_LEG_ENTRY>{dq}                    { scanErr("Field %u is empty string",
-                                                field);
+<ST_LEG_ENTRY>{dq}                    { scanErr("Column %u is empty string",
+                                                column);
                                         BEGIN(ST_LEG_ERROR);
                                       }
 
 <ST_LEG_ENTRY,ST_LEG_CLOSE_ENTRY>\n   { scanErr(("Unexpected end-of-line"
-                                                 " found in field %u"), field);
+                                                 " found in column %u"),
+                                                column);
                                         ++linenum;
                                         legacyReset();
                                         BEGIN(INITIAL); }
 
 <ST_LEG_ENTRY,ST_LEG_CLOSE_ENTRY><<EOF>> {
                                         scanErr(("Unexpected end-of-stream"
-                                                 " found in field %u"), field);
+                                                 " found in column %u"),
+                                                column);
                                         return 0; }
 
 .                                     { scanErr("Unexpected input '%c'",
@@ -583,19 +632,38 @@ static void
 appUsageLong(
     void)
 {
-#define USAGE_MSG                                                             \
+#define USAGE_MSG1                                                            \
     ("[SWITCHES]\n"                                                           \
-     "\tCreate a binary prefix map file from an input file in the MaxMind\n"  \
-     "\tGeoIP Legacy format.  Both the comma separated value (CSV) and the\n" \
-     "\tbinary forms of the input are supported.  The input is read from\n"   \
-     "\tthe named input file or from the standard input.  The prefix map\n"   \
-     "\tfile is written to the named location or to the standard output if\n" \
-     "\tstdout is not connected to a terminal.\n")
+     "\tCreate a binary prefix map file from country code data in the\n"      \
+     "\tMaxMind GeoIP2 or GeoIP Legacy formats or the GeoLite versions of\n")
+#ifdef SK_ENABLE_LIBMAXMINDDB
+#define USAGE_MSG2                                                            \
+    ("\teither. The comma-separated value (CSV) and binary formats of all\n"  \
+     "\tMaxMind formats is available.\n")
+#else
+#define USAGE_MSG2                                                            \
+    ("\teither. The comma-separated value (CSV) of all formats is\n"          \
+     "\tsupported as are GeoIP Legacy binary files; GeoIP2 binary file\n"     \
+     "\tsupport is not available due to a missing separate library.\n")
+#endif  /* SK_ENABLE_LIBMAXMINDDB */
+#define USAGE_MSG3                                                            \
+    ("\tThe data is read from the named input-path or from the standard\n"    \
+     "\tinput. The prefix map file is written to the named output-path or\n"  \
+     "\tto the standard output when it is not connected to a terminal.\n")
 
     FILE *fh = USAGE_FH;
-    int i;
+    unsigned int i;
+    unsigned int j;
+    const char *name;
 
-    fprintf(fh, "%s %s", skAppName(), USAGE_MSG);
+#define FILL_FIELD_NAME(m)                                              \
+    name = skStringMapGetFirstName(fields_map, (sk_stringmap_id_t)m);   \
+    if (NULL == name) {                                                 \
+        skAppPrintErr("Unknown field value %d", (int)m);                \
+        skAbort();                                                      \
+    }
+
+    fprintf(fh, "%s %s%s%s", skAppName(), USAGE_MSG1, USAGE_MSG2, USAGE_MSG3);
     fprintf(fh, "\nSWITCHES:\n");
     skOptionsDefaultUsage(fh);
     for (i = 0; appOptions[i].name; ++i) {
@@ -606,6 +674,22 @@ appUsageLong(
                     SK_OPTION_HAS_ARG(appOptions[i]), appHelp[i],
                     modeToName(GEOIP2CCMAP_MODE_AUTO));
             skStringMapPrintDetailedUsage(mode_map, fh);
+            break;
+
+          case OPT_FIELDS:
+            FILL_FIELD_NAME(fields[0])
+            fprintf(fh, "--%s %s. %s\tDef. %s",
+                    appOptions[i].name,
+                    SK_OPTION_HAS_ARG(appOptions[i]), appHelp[i], name);
+            for (j = 1; j < sizeof(fields)/sizeof(fields[0]); ++j) {
+                if (PMAP_FIELD_END == fields[j]) {
+                    break;
+                }
+                FILL_FIELD_NAME(fields[j])
+                fprintf(fh, ",%s", name);
+            }
+            fprintf(fh, ". Choices:\n");
+            skStringMapPrintDetailedUsage(fields_map, fh);
             break;
 
           case OPT_INVOCATION_STRIP:
@@ -668,6 +752,7 @@ appTeardown(
     }
 
     skStringMapDestroy(mode_map);
+    skStringMapDestroy(fields_map);
     skAppUnregister();
 }
 
@@ -722,11 +807,18 @@ appSetup(
         exit(EXIT_FAILURE);
     }
 
-    /* create the string map */
+    /* create the string maps */
     if ((rv = skStringMapCreate(&mode_map))
         || (rv = skStringMapAddEntries(mode_map, -1, mode_map_entries)))
     {
-        skAppPrintErr("Unable to create string map: %s",
+        skAppPrintErr("Unable to create mode string map: %s",
+                      skStringMapStrerror(rv));
+        exit(EXIT_FAILURE);
+    }
+    if ((rv = skStringMapCreate(&fields_map))
+        || (rv = skStringMapAddEntries(fields_map, -1, fields_map_entries)))
+    {
+        skAppPrintErr("Unable to create fields string map: %s",
                       skStringMapStrerror(rv));
         exit(EXIT_FAILURE);
     }
@@ -755,9 +847,11 @@ appSetup(
     assert(NULL == csv2_directory
            || (GEOIP2CCMAP_MODE_GEOIP2 == mode.geoip2_legacy
                && GEOIP2CCMAP_MODE_CSV == mode.csv_binary));
+#ifdef SK_ENABLE_LIBMAXMINDDB
     assert(NULL == mmdb_path
            || (GEOIP2CCMAP_MODE_GEOIP2 == mode.geoip2_legacy
                && GEOIP2CCMAP_MODE_BINARY == mode.csv_binary));
+#endif  /* SK_ENABLE_LIBMAXMINDDB */
 
     /* output is "stdout" if none specified.  do not bind to stdout
      * when --dry-run is active */
@@ -831,6 +925,12 @@ appOptionsHandler(
         }
         break;
 
+      case OPT_FIELDS:
+        if (parseFields(opt_index, opt_arg)) {
+            return 1;
+        }
+        break;
+
       case OPT_DRY_RUN:
         dry_run = 1;
         break;
@@ -862,6 +962,58 @@ appOptionsHandler(
     }
 
     return 0; /* OK */
+}
+
+
+/*
+ *    Parse the value in 'string' as a comma-separated list of the
+ *    geoname_id fields to use from the GeoIP2 files and set the
+ *    appropriate global variables.
+ *
+ *    Return 0 on success.  Return 1 if the fields has already been
+ *    set.  Return -1 if 'string' does not match a valid field.
+ */
+static int
+parseFields(
+    int                 opt_index,
+    const char         *string)
+{
+    static int fields_switch_seen = 0;
+    sk_stringmap_entry_t *map_entry;
+    sk_stringmap_iter_t *iter = NULL;
+    unsigned int i;
+    char *errmsg;
+    int rv = -1;
+
+    if (fields_switch_seen) {
+        skAppPrintErr("Invalid %s: Attempting to set fields multiple times",
+                      appOptions[opt_index].name);
+        return 1;
+    }
+    fields_switch_seen = 1;
+
+    if (skStringMapParse(fields_map, string, SKSTRINGMAP_DUPES_ERROR,
+                         &iter, &errmsg))
+    {
+        skAppPrintErr("Invalid %s: %s",
+                      appOptions[opt_index].name, errmsg);
+        goto END;
+    }
+    i = 0;
+    while (skStringMapIterNext(iter, &map_entry, NULL) == SK_ITERATOR_OK) {
+        assert(i < sizeof(fields)/sizeof(fields[0]));
+        fields[i] = (pmap_fields_t)map_entry->id;
+        ++i;
+    }
+    assert(i < sizeof(fields)/sizeof(fields[0]));
+    fields[i] = PMAP_FIELD_END;
+
+    /* success */
+    rv = 0;
+
+  END:
+    skStringMapIterDestroy(iter);
+    return rv;
 }
 
 
@@ -1414,25 +1566,25 @@ legacyReset(
     void)
 {
     memset(&legacy, 0, sizeof(legacy));
-    field = 0;
+    column = 0;
 }
 
 /*
- *    Handle a single field of the current line of legacy input.
+ *    Handle a single column of the current line of legacy input.
  *
  *    Return 0 on success or -1 for failure.
  */
 static int
-legacyField(
+legacyColumn(
     const char         *string)
 {
     int rv;
 
-    switch (field) {
+    switch (column) {
       case 0:
       case 1:
         /* starting IP, ending IP */
-        rv = skStringParseIP(&legacy.range[field], string);
+        rv = skStringParseIP(&legacy.range[column], string);
         if (rv) {
             scanErr("Invalid IP '%s': %s", string, skStringParseStrerror(rv));
             return -1;
@@ -1462,8 +1614,8 @@ legacyField(
 
 
 /*
- *    Combine the data for all fields on this line into a single entry
- *    and add it to the prefix map.
+ *    Combine the data for all columns on this line into a single
+ *    entry and add it to the prefix map.
  */
 static void
 legacyCreateEntry(
@@ -1472,8 +1624,9 @@ legacyCreateEntry(
     static int first_entry = 1;
     skPrefixMapErr_t rv;
 
-    if (field != LEGACY_CSV_FIELDS) {
-        scanErr("Expected %d CSV values, found %u", LEGACY_CSV_FIELDS, field);
+    if (column != LEGACY_CSV_COLUMNS) {
+        scanErr("Expected %d CSV values, found %u",
+                LEGACY_CSV_COLUMNS, column);
         if (1 == first_entry) {
             exit(EXIT_FAILURE);
         }
@@ -1526,8 +1679,8 @@ legacyCreateEntry(
  *    maxmind format, add it to a prefix map, and write the prefix map
  *    to disk.
  *
- *    The format contains six fields, each value wrapped in double
- *    quote characters.  The fields are (0)starting ip in canonical
+ *    The format contains six columns, each value wrapped in double
+ *    quote characters.  The columns are (0)starting ip in canonical
  *    form, (1)ending ip in canonical form, (2)starting ip as an
  *    integer, (3)ending ip as an integer, (4)two letter country code,
  *    (5)country name.
@@ -1656,41 +1809,41 @@ continentToCountry(
 
 
 /*
- *  status = ipblocksField(string);
+ *  status = ipblocksColumn(string);
  *
- *    Handle a single field of the current line of input in a
+ *    Handle a single column of the current line of input in a
  *    Geo*2-Country-Blocks-IPv*.csv file.
  *
  *    Return 0 on success or -1 for failure.
  *
- *    This is a helper function for csv2Field().
+ *    This is a helper function for csv2Column().
  */
 static int
-ipblocksField(
+ipblocksColumn(
     const char         *string)
 {
     int rv;
 
     if (1 == linenum) {
         /* to make this more robust to changes that maxmind may make
-         * to the data files, we should ensure we have the fields we
+         * to the data files, we should ensure we have the columns we
          * need and dynamically determine the position of those
-         * fields */
-        if (field >= (sizeof(ipblocks_fields)/sizeof(ipblocks_fields[0]))) {
-            TRACEMSG(("%s:%d: Ignoring additional title field #%u '%s'",
-                      in_stream.of_name, linenum, 1u + field, string));
-            ++ipblocks_fields_count;
+         * columns */
+        if (column >= (sizeof(ipblocks_columns)/sizeof(ipblocks_columns[0]))) {
+            TRACEMSG(("%s:%d: Ignoring additional title column #%u '%s'",
+                      in_stream.of_name, linenum, 1u + column, string));
+            ++ipblocks_columns_count;
             return 0;
         }
-        if (0 != strcmp(string, ipblocks_fields[field])) {
-            scanErr("Expected title field %u to have name '%s', found '%s'",
-                    1u + field, ipblocks_fields[field], string);
+        if (0 != strcmp(string, ipblocks_columns[column])) {
+            scanErr("Expected title column %u to have name '%s', found '%s'",
+                    1u + column, ipblocks_columns[column], string);
             exit(EXIT_FAILURE);
         }
         return 0;
     }
 
-    switch (field) {
+    switch (column) {
       case 0:
         /* network */
         rv = skStringParseCIDR(&ipblocks.ip, &ipblocks.prefix, string);
@@ -1703,9 +1856,9 @@ ipblocksField(
       case 3:
         /* geoname_id, registered_country_geoname_id,
          * represented_country_geoname_id */
-        rv = skStringParseUint32(&ipblocks.geoname[field-1], string, 0, 0);
+        rv = skStringParseUint32(&ipblocks.geoname[column-1], string, 0, 0);
         if (rv) {
-            ipblocks.geoname[field-1] = 0;
+            ipblocks.geoname[column-1] = 0;
             goto PARSE_ERROR;
         }
         break;
@@ -1727,14 +1880,14 @@ ipblocksField(
 
   PARSE_ERROR:
     scanErr("Invalid %s '%s': %s",
-            ipblocks_fields[field], string, skStringParseStrerror(rv));
+            ipblocks_columns[column], string, skStringParseStrerror(rv));
     return -1;
 }
 
 
 /*
- *    Combine the data for all fields on this line into a single entry
- *    and add it to the prefix map.
+ *    Combine the data for all columns on this line into a single
+ *    entry and add it to the prefix map.
  *
  *    This is a helper function for csv2CreateEntry().
  */
@@ -1742,20 +1895,20 @@ static void
 ipblocksCreateEntry(
     void)
 {
-    static const pmap_location_t anonymous = {0, COUNTRY_ANON, 0};
-    static const pmap_location_t satellite = {0, COUNTRY_SATL, 0};
     char ipbuf[SKIPADDR_STRLEN];
     const pmap_location_t *continent;
     const pmap_location_t *found;
+    int want_continent;
     pmap_location_t entry;
-    skipaddr_t start_ip, end_ip;
+    skipaddr_t first, final;
     skPrefixMapErr_t rv;
     unsigned int i;
+    uint32_t country;
 
-    if (field != ipblocks_fields_count) {
+    if (column != ipblocks_columns_count) {
         scanErr("Expected %u CSV %s, found %u",
-                ipblocks_fields_count,
-                ((1 == linenum) ? "title fields" : "values"), field);
+                ipblocks_columns_count,
+                ((1 == linenum) ? "title columns" : "values"), column);
         if (1 == linenum) {
             exit(EXIT_FAILURE);
         }
@@ -1765,39 +1918,58 @@ ipblocksCreateEntry(
         return;
     }
 
-    found = continent = NULL;
-    for (i = 0; i < sizeof(ipblocks.geoname)/sizeof(ipblocks.geoname[0]); ++i){
-        entry.geoname = ipblocks.geoname[i];
-        found = (pmap_location_t *)rbfind(&entry, geomap);
-        if (found) {
-            if (found->is_country) {
-                break;
-            }
-            if (!continent) {
-                continent = found;
-            }
-        }
-    }
-    if (NULL == found) {
-        if (continent) {
-            found = continent;
-        } else if (ipblocks.is_anonymous) {
-            found = &anonymous;
-        } else if (ipblocks.is_satellite) {
-            found = &satellite;
-        } else {
-            scanWarn("Unable to set country code");
-            return;
-        }
-    }
-
-    if (skCIDR2IPRange(&ipblocks.ip, ipblocks.prefix, &start_ip, &end_ip)) {
+    if (skCIDR2IPRange(&ipblocks.ip, ipblocks.prefix, &first, &final)) {
         scanErr("Unable to convert %s/%u to an IP address range",
                 skipaddrString(ipbuf, &ipblocks.ip, 0), ipblocks.prefix);
         return;
     }
 
-    rv = skPrefixMapAddRange(map, &start_ip, &end_ip, found->country);
+    country = 0;
+    continent = NULL;
+    want_continent = 0;
+
+    for (i = 0; !country && i < sizeof(fields)/sizeof(fields[0]); ++i) {
+        switch (fields[i]) {
+          case PMAP_FIELD_LOCATION:
+          case PMAP_FIELD_REGISTERED:
+          case PMAP_FIELD_REPRESENTED:
+            entry.geoname = ipblocks.geoname[fields[i]];
+            found = (pmap_location_t *)rbfind(&entry, geomap);
+            if (found) {
+                if (found->is_country || want_continent) {
+                    country = found->country;
+                } else if (!continent) {
+                    continent = found;
+                }
+            }
+            break;
+
+          case PMAP_FIELD_CONTINENT:
+            if (continent) {
+                country = continent->country;
+            } else {
+                want_continent = 1;
+            }
+            break;
+
+          case PMAP_FIELD_FLAGS:
+            if (ipblocks.is_anonymous) {
+                country = COUNTRY_ANON;
+            } else if (ipblocks.is_satellite) {
+                country = COUNTRY_SATL;
+            }
+            break;
+
+          case PMAP_FIELD_END:
+            return;
+        }
+    }
+    if (!country) {
+        skAppPrintErr("PMAP_FIELD_END not found");
+        return;
+    }
+
+    rv = skPrefixMapAddRange(map, &first, &final, country);
     if (rv) {
         scanErr("Unable to add entry to prefix map: %s",
                 skPrefixMapStrerror(rv));
@@ -1806,38 +1978,38 @@ ipblocksCreateEntry(
 
 
 /*
- *  status = locationField(string);
+ *  status = locationColumn(string);
  *
- *    Handle a single field of the current line of input in the
+ *    Handle a single column of the current line of input in the
  *    Geo*2-Country-Locations-en.csv file.
  *
  *    Return 0 on success or -1 for failure.
  *
- *    This is a helper function for csv2Field().
+ *    This is a helper function for csv2Column().
  */
 static int
-locationField(
+locationColumn(
     const char         *string)
 {
     int rv;
 
     if (1 == linenum) {
-        /* see note in ipblocksField() regarding robustness */
-        if (field >= (sizeof(location_fields)/sizeof(location_fields[0]))) {
-            TRACEMSG(("%s:%d: Ignoring additional title field #%u '%s'",
-                      in_stream.of_name, linenum, 1u + field, string));
-            ++location_fields_count;
+        /* see note in ipblocksColumn() regarding robustness */
+        if (column >= (sizeof(location_columns)/sizeof(location_columns[0]))) {
+            TRACEMSG(("%s:%d: Ignoring additional title column #%u '%s'",
+                      in_stream.of_name, linenum, 1u + column, string));
+            ++location_columns_count;
             return 0;
         }
-        if (0 != strcmp(string, location_fields[field])) {
-            scanErr("Expected title field %u to have name '%s', found '%s'",
-                    1u + field, location_fields[field], string);
+        if (0 != strcmp(string, location_columns[column])) {
+            scanErr("Expected title column %u to have name '%s', found '%s'",
+                    1u + column, location_columns[column], string);
             exit(EXIT_FAILURE);
         }
         return 0;
     }
 
-    switch (field) {
+    switch (column) {
       case 2:
         /* continent_code */
         switch (continentToCountry(string, &location.country)) {
@@ -1856,7 +2028,8 @@ locationField(
         rv = skStringParseUint32(&location.geoname, string, 0, 0);
         if (rv) {
             scanErr("Invalid %s '%s': %s",
-                    location_fields[field], string, skStringParseStrerror(rv));
+                    location_columns[column], string,
+                    skStringParseStrerror(rv));
             return -1;
         }
         break;
@@ -1885,7 +2058,7 @@ locationField(
 
 
 /*
- *    Use the data for the fields on this line to create a entry in
+ *    Use the data for the columns on this line to create a entry in
  *    the red-black tree that maps from a geoname_id location code to
  *    a country code (or to a continent code if no country).
  *
@@ -1898,10 +2071,10 @@ locationCreateEntry(
     const pmap_location_t *exists;
     pmap_location_t *entry;
 
-    if (field != location_fields_count) {
+    if (column != location_columns_count) {
         scanErr("Expected %u CSV %s, found %u",
-                location_fields_count,
-                ((1 == linenum) ? "title fields" : "values"), field);
+                location_columns_count,
+                ((1 == linenum) ? "title columns" : "values"), column);
         if (1 == linenum) {
             exit(EXIT_FAILURE);
         }
@@ -1973,7 +2146,11 @@ csv2NextFile(
 
     sz = snprintf(path, sizeof(path), "%s/%s%s",
                   csv2_directory, csv2_prod, csv2_files[csv2_index].path);
-    assert((size_t)sz < sizeof(path));
+    if ((size_t)sz >= sizeof(path)) {
+        skAppPrintErr("Path length (%" SK_PRIdZ ") exceeds maximum %" SK_PRIuZ,
+                      sz, sizeof(path));
+        exit(EXIT_FAILURE);
+    }
 
     in_stream.of_name = path;
     rv = skFileptrOpen(&in_stream, SK_IO_READ);
@@ -2002,21 +2179,21 @@ csv2Reset(
 {
     memset(&location, 0, sizeof(location));
     memset(&ipblocks, 0, sizeof(ipblocks));
-    field = 0;
+    column = 0;
 }
 
 /*
- *    Handle a single field of the current line of input.
+ *    Handle a single column of the current line of input.
  */
 static int
-csv2Field(
+csv2Column(
     const char         *string)
 {
-    return (1 == csv2_index) ? locationField(string) : ipblocksField(string);
+    return (1 == csv2_index) ? locationColumn(string) : ipblocksColumn(string);
 }
 
 /*
- *    Combine the fields on the current line to create an entry.
+ *    Combine the columns on the current line to create an entry.
  */
 static void
 csv2CreateEntry(
@@ -2365,7 +2542,7 @@ legacyBinaryRead(
  *    code, or its anonymous/satellite flag and add an appropriate
  *    entry to the global prefix map.
  *
- *    If we are in IPv4 mode, only the first four byte of 'ip' are
+ *    If we are in IPv4 mode, only the first four bytes of 'ip' are
  *    used.
  */
 static void
@@ -2383,18 +2560,13 @@ binary2AddEntry(
         {"traits", "is_satellite_provider", NULL},
         {NULL, NULL, NULL}
     };
-    /* these idx_ variables reference locations in lookup_arrays */
-    const size_t idx_continent = 3;
-    const size_t idx_is_anonymous = 4;
-
     skipaddr_t first;
     skipaddr_t final;
     MMDB_entry_data_s entry_data;
     char buf[64];
-    size_t i;
+    size_t i, j;
     int status;
     ssize_t rv;
-    int found;
     uint32_t country;
 
 #if TRACEMSG_LEVEL > 0
@@ -2420,46 +2592,57 @@ binary2AddEntry(
         assert(prefix <= 32);
     }
 
-    skCIDR2IPRange(&first, prefix, &first, &final);
-
-    for (found = 0, i = 0; lookup_arrays[i][0]; ++i) {
-        status = MMDB_aget_value(entry, &entry_data, lookup_arrays[i]);
-        if (MMDB_SUCCESS == status && entry_data.has_data) {
-            found = 1;
-            break;
-        }
-    }
-    if (!found) {
+    if (skCIDR2IPRange(&first, prefix, &first, &final)) {
+        char ipbuf[SKIPADDR_STRLEN];
+        skAppPrintErr("Unable to convert %s/%u to an IP address range",
+                      skipaddrString(ipbuf, &ipblocks.ip, 0), ipblocks.prefix);
         return;
     }
 
-    switch (entry_data.type) {
-      case MMDB_DATA_TYPE_BOOLEAN:
-        if (idx_is_anonymous == i) {
-            TRACEMSG(("%s  'a1'", netblock_buf));
-            country = COUNTRY_ANON;
-        } else {
-            TRACEMSG(("%s  'a2'", netblock_buf));
-            country = COUNTRY_SATL;
-        }
-        break;
-      case MMDB_DATA_TYPE_UTF8_STRING:
-        if (entry_data.data_size >= sizeof(buf)) {
-            strncpy(buf, entry_data.utf8_string, sizeof(buf));
-            buf[sizeof(buf)-1u] = '\0';
-        } else {
+    country = 0;
+    for (i = 0; !country && i < sizeof(fields)/sizeof(fields[0]); ++i) {
+        switch (fields[i]) {
+          case PMAP_FIELD_LOCATION:
+          case PMAP_FIELD_REGISTERED:
+          case PMAP_FIELD_REPRESENTED:
+            status = MMDB_aget_value(entry, &entry_data,
+                                     lookup_arrays[fields[i]]);
+            if (MMDB_SUCCESS != status || !entry_data.has_data) {
+                break;
+            }
+            if (entry_data.type != MMDB_DATA_TYPE_UTF8_STRING) {
+                skAppPrintErr("Unexpected data type %d", entry_data.type);
+                break;
+            }
+            if (entry_data.data_size != 2) {
+                skAppPrintErr("Unexpected data length %u",
+                              entry_data.data_size);
+                break;
+            }
             strncpy(buf, entry_data.utf8_string, entry_data.data_size);
             buf[entry_data.data_size] = '\0';
-        }
-        TRACEMSG(("%s  '%s'%s",
-                  netblock_buf, buf, ((idx_continent == i) ? "*" : "")));
-        if (entry_data.data_size != 2) {
-            skAppPrintErr("Unexpected data length %u", entry_data.data_size);
-            return;
-        }
-        if (idx_continent != i) {
+            TRACEMSG(("%s  '%s'", netblock_buf, buf));
             country = skCountryNameToCode(buf);
-        } else {
+            break;
+
+          case PMAP_FIELD_CONTINENT:
+            status = MMDB_aget_value(entry, &entry_data,
+                                     lookup_arrays[fields[i]]);
+            if (MMDB_SUCCESS != status || !entry_data.has_data) {
+                break;
+            }
+            if (entry_data.type != MMDB_DATA_TYPE_UTF8_STRING) {
+                skAppPrintErr("Unexpected data type %d", entry_data.type);
+                break;
+            }
+            if (entry_data.data_size != 2) {
+                skAppPrintErr("Unexpected data length %u",
+                              entry_data.data_size);
+                break;
+            }
+            strncpy(buf, entry_data.utf8_string, entry_data.data_size);
+            buf[entry_data.data_size] = '\0';
+            TRACEMSG(("%s  '%s'*", netblock_buf, buf));
             switch (continentToCountry(buf, &country)) {
               case 0:
                 break;
@@ -2470,16 +2653,35 @@ binary2AddEntry(
                 skAppPrintErr("Unexpected continent code '%s'", buf);
                 return;
             }
+            break;
+
+          case PMAP_FIELD_FLAGS:
+            for (j = 4; !country && j <= 5; ++j) {
+                status = MMDB_aget_value(entry, &entry_data, lookup_arrays[j]);
+                if (MMDB_SUCCESS != status || !entry_data.has_data) {
+                    continue;
+                }
+                if (entry_data.type != MMDB_DATA_TYPE_BOOLEAN) {
+                    skAppPrintErr("Unexpected data type %d", entry_data.type);
+                    continue;
+                }
+                /* value should be "a1" or "a2" */
+                TRACEMSG(("%s  'a%d'", netblock_buf, j - 3));
+                country = (j == 4) ? COUNTRY_ANON : COUNTRY_SATL;
+            }
+            break;
+
+          case PMAP_FIELD_END:
+            return;
         }
-        break;
-      default:
-        skAppPrintErr("Unexpected data type %d", entry_data.type);
+    }
+    if (!country) {
+        skAppPrintErr("PMAP_FIELD_END not found");
         return;
     }
 
     rv = skPrefixMapAddRange(map, &first, &final, country);
     if (rv) {
-        skAppPrintErr("HERE HERE HERE!!!!");
         skAppPrintErr("Error adding to prefix map: %s",
                       skPrefixMapStrerror(rv));
         exit(EXIT_FAILURE);
@@ -2568,8 +2770,8 @@ binary2Read(
     depth = 0;
 
     if (GEOIP2CCMAP_MODE_IPV4 == mode.ipv6_ipv4) {
-        /* descend down the left hand branch until the depth is 96,
-         * and then reset depth to 0 */
+        /* to limit to IPv4 (::0:0/96), descend down the left hand
+         * branch until the depth is 96, and then reset depth to 0 */
         do {
             status = MMDB_read_node(&mmdb, node_num, &node[depth]);
             if (MMDB_INVALID_NODE_NUMBER_ERROR == status) {

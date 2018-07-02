@@ -107,7 +107,8 @@ the top-level context supports the following command:
 
 The B<include> command is used to include the contents of another file
 whose location is I<path>.  This may be used to separate large
-configurations into logical units.
+configurations into logical units.  The argument to B<include> must be
+a double-quoted string.
 
 =back
 
@@ -224,17 +225,18 @@ specified to B<yaf>'s B<--ipfix> switch.
 
 =item B<accept-from-host> I<host-name> [I<host-name>...]
 
-This optional command specifies the IPs or names of the hosts that are
-allowed to connect to the port where the probe is listening.  When
-this command is not present, any host may connect.  The command may
-only be specified when the B<listen-on-port> command is also present.
-When multiple probes use the same B<listen-on-port>, B<protocol>, and
-B<listen-as-host> values, the B<accept-from-host> switch must be used
-so that B<rwflowpack> may assign incoming records to a specified
-probe.  When listening for NetFlow, this attribute would be the IP
-address of the router as seen from the machine running B<rwflowpack>
-or B<flowcap>.  (Prior to SiLK 3.10.1, the B<accept-from-host> command
-accepted only a single argument.)
+This optional command specifies the hosts that are allowed to connect
+to the port where the probe is listening.  The argument is a list of
+IP addresses and/or hostnames separated by whitespace and/or a comma.
+When this command is not present, any host may connect.  The command
+may only be specified when the B<listen-on-port> command is also
+present.  When multiple probes use the same B<listen-on-port>,
+B<protocol>, and B<listen-as-host> values, the B<accept-from-host>
+switch must be used so that B<rwflowpack> may assign incoming records
+to a specified probe.  When listening for NetFlow, this attribute
+would be the IP address of the router as seen from the machine running
+B<rwflowpack> or B<flowcap>.  (Prior to SiLK 3.10.1, the
+B<accept-from-host> command accepted only a single argument.)
 
 =item B<listen-as-host> I<host-name>
 
@@ -301,10 +303,10 @@ that have been compressed with the B<gzip(1)> program.
 
 =item B<log-flags> { B<none> | { B<all> | B<bad> | B<default> | B<firewall-event> | B<missing> | B<record-timestamps> | B<sampling> | ... } }
 
-This optional command gives specific logging instructions for the
-probe.  If you wish to reduce the verbosity of the log, you may use
-the B<log-flag> command to adjust the information logged.  The
-possible values are:
+This optional command accepts a comma- and/or space-separated list of
+names that specify which messages to log for this probe.  If not
+specified, the default is B<default>, which is equivalent to B<bad>,
+B<missing>, B<sampling>.  The possible values are:
 
 =over 4
 
@@ -390,13 +392,13 @@ This setting does not affect whether B<rwflowpack(8)> stores the
 C<input> and C<output> fields to its output files.  Storage of those
 fields is controlled by B<rwflowpack>'s B<--pack-interfaces> switch.
 
-=item B<quirks> { B<none> | { B<firewall-event> | B<zero-packets> | B<missing-ips> | B<nf9-sysuptime-seconds> ... } }
+=item B<quirks> { B<none> | { B<firewall-event> | B<missing-ips> | B<nf9-out-is-reverse> | B<nf9-sysuptime-seconds> | B<zero-packets> ... } }
 
 This optional command is used to indicate that special (or quirky)
 handling of the incoming data is desired.  The value B<none> disables
 all quirks, and that is the default setting.  If the value is not
 B<none>, it may be a list of one or more of the values specified
-below.  I<Since SiLK 3.8.0>.
+below separated by commas and/or spaces.  I<Since SiLK 3.8.0>.
 
 =over 4
 
@@ -416,17 +418,7 @@ message is generated for these dropped records; to suppress these
 messages, use the B<log-flags> command.)  When this quirk is not
 provided, SiLK handles these records normally, which may result in
 duplicate flow records.  (Prior to SiLK 3.8, SiLK dropped all flow
-records that contained a firewall event IE.)
-
-=item I<zero-packets>
-
-Enable support for flow records either that do not contain a valid
-packets field, such as those from the Cisco ASA series of routers, or
-that have an unusually large bytes-per-packet ratio.  When this quirk
-is active, SiLK sets the packet count to 1 when the incoming IPFIX or
-NetFlow v9 flow record has a the packet count if 0.  This quirk may
-modify the file format used by B<rwflowpack> for IPv4 records in order
-to support large byte-per-packet ratios.
+records that contained a firewall event IE.)  I<Since SiLK 3.8.0>.
 
 =item I<missing-ips>
 
@@ -436,13 +428,38 @@ flow records that do not have a source and/or destination IP address;
 this quirk allows one to undo the effect of that change.  I<Since SiLK
 3.8.1>.
 
+=item I<nf9-out-is-reverse>
+
+Change handling of the OUT_BYTES and OUT_PKTS information elements to
+match that in libfixbuf prior to 1.8.0.  Specifically, treat
+information elements 23 and 24 (OUT_BYTES and OUT_PKTS in RFC3954) as
+reverseOctetDeltaCount and reversePacketDeltaCount, respectively.
+Starting with libfixbuf-1.8.0, those NetFlow v9 elements are mapped to
+postOctetDeltaCount and postPacketDeltaCount, respectively.  I<Since
+SiLK 3.17.2.>
+
 =item I<nf9-sysuptime-seconds>
 
-Work around an issue with NetFlow v9 records from a SonicWall
-appliance where the sysUpTime field in the packet header is reported
-in seconds instead of in milliseconds.  The incorrect units cause the
-time stamps on flow records to future dated.  In addition, adjust the
-time fields on single packet flow records.  I<Since SiLK 3.14.0.>
+Work around an issue with NetFlow v9 records created by some
+middleboxes (e.g., SonicWall) where the sysUpTime field in the packet
+header is reported in seconds instead of in milliseconds.  The
+incorrect units cause the time stamps on flow records to be future
+dated.  In addition, adjust the time fields on single packet flow
+records.  I<Since SiLK 3.14.0.>
+
+=item I<none>
+
+Do not enable any quirks.
+
+=item I<zero-packets>
+
+Enable support for flow records either that do not contain a valid
+packets field, such as those from the Cisco ASA series of routers, or
+that have an unusually large bytes-per-packet ratio.  When this quirk
+is active, SiLK sets the packet count to 1 when the incoming IPFIX or
+NetFlow v9 flow record has a the packet count if 0.  This quirk may
+modify the file format used by B<rwflowpack> for IPv4 records in order
+to support large byte-per-packet ratios.  I<Since SiLK 3.8.0>.
 
 =back
 
@@ -467,25 +484,79 @@ To summarize the probe types and the input they can accept:
 =for comment
 #
 
+=head2 Lists of CIDR Blocks, IPsets, or Integers
+
+This subsection describes the syntax of a list of CIDR blocks, a list
+of IPset file names, and a list of integers.  These lists are used in
+the sensor block and group block commands described below.
+
+A group block (see L</Group Block>) allows you to assign names to
+these lists.  Once the name is defined, it may be referenced in other
+lists of the same type by prepending the "at" character (C<@>) to the
+group's name.
+
+The lists are:
+
+=over 4
+
+=item I<cidr-block-list>
+
+A cidr-block-list (or ipblock-list) contains one or more CIDR blocks
+or group references that represent an address space.  Adjacent values
+in the list may be separated by multiple whitespace (space or tab)
+characters and/or a single comma.  When IPv4 and IPv6 addresses
+combined, IPv4 addresses are mapped into the ::ffff:0:0/96 netblock.
+For lists containing more than a few CIDR blocks, consider using an
+IPset list instead.
+
+=item I<ipset-list>
+
+An ipset-list contains the path names of one or more binary IPset
+files or group references.  To create an IPset file, use the
+B<rwsetbuild(1)> tool.  Each path name may be a double-quoted string
+(C<"example">); the quote characters are not necessary if the path
+name does not contain whitespace or any special characters
+(single-quote C<'>, double-quote C<">, comma C<,>, or pound C<#>).
+Adjacent values in the list may be separated by multiple whitespace
+(space or tab) characters and/or a single comma.  When multiple IPset
+files are specified, a new IPset is created in memory and the contents
+of the files are merged into it.  B<rwflowpack(8)> exits with an error
+if the IPset file does not exist or does not contain any IP addresses.
+I<Since SiLK 3.10.0>.
+
+=item I<interface-list>
+
+An interface-list contains one or more integers between 0 and 65535,
+inclusive, or group references or that represent SNMP interface
+indexes or VLAN identifiers.  Adjacent values in the list may be
+separated by multiple whitespace (space or tab) characters and/or a
+single comma.
+
+=back
 
 =head2 Group Block
 
 The use of group blocks is optional.  They are a convenience to define
-a list of commonly used CIDR blocks, IPset files, or integer values
-that are treated as SNMP interfaces or VLAN identifiers.  Groups are
-used in sensor blocks as described in the descriptions for the
-B<discard-when>, B<discard-unless>, I<network-name>B<-ipblocks>,
-I<network-name>B<-ipsets> and I<network-name>B<-interfaces>
-commands, below.
+and give a name to a list of commonly used CIDR blocks, IPset files,
+or integer values that are treated as SNMP interfaces or VLAN
+identifiers.  Groups may be used in sensor blocks (L</Sensor Block>)
+as described in the descriptions for the B<discard-when>,
+B<discard-unless>, I<network-name>B<-ipblocks>,
+I<network-name>B<-ipsets> and I<network-name>B<-interfaces> commands,
+below.
 
 The commands in a group definition must all be of the same type.
 For example, you cannot mix B<ipblocks> and B<ipsets> commands in a
 single group definition, even though both contain IP addresses.
 
 The contents of an existing group may be added to the current group
-block by using a group reference after the appropriate keyword.  A
-I<group reference> is the name of the group prefixed by the at (C<@>)
-character.
+block by using a group reference after the appropriate keyword as long
+as both groups are the same type.  A I<group reference> is the name of
+the group prefixed by the "at" character (C<@>).  When a group
+reference is used, the contents of the existing groups are copied into
+the current group.
+
+For examples of group blocks, see L</Group definitions> below.
 
 The B<group> command is used at top-level to begin a group definition
 block, and the remaining commands are accepted within the group block.
@@ -506,40 +577,27 @@ character (C</>).
 The B<end group> command ends the definition of a group.  Following an
 B<end group> command, top-level commands are again accepted.
 
-=item B<interfaces> {I<integer> | I<group-ref>} [I<integer> I<group-ref>...]
+=item B<interfaces> I<interface-list>
 
 The B<interfaces> command adds integer values to a group, where each
-integer is treated as an SNMP interface number or VLAN identifier.
-The B<interfaces> command may appear multiple times in a group block.
-Each integer value may be between 0 and 65535 inclusive.
+integer is treated as an SNMP interface number or VLAN identifier.  An
+I<interface-list> is a list of integers or group references as defined
+above (L</Lists of CIDR Blocks, IPsets, or Integers>).  The
+B<interfaces> command may appear multiple times in a group block.
 
-=item B<ipblocks> {I<cidr-block> | I<group-ref>} [I<cidr-block> I<group-ref>...]
+=item B<ipblocks> I<cidr-block-list>
 
 The B<ipblocks> command adds CIDR block values to a group.  The
-B<ipblocks> command may appear multiple times in a group block.  For
-groups containing more than a couple of CIDR blocks, consider using an
-IPset instead.
+I<cidr-block-list> is described above.  The B<ipblocks> command may
+appear multiple times in a group block.
 
-=item B<ipsets> {I<filename> | I<group-ref>} [I<filename> I<group-ref>...]
+=item B<ipsets> I<ipset-list>
 
 The B<ipset> command adds the IP addresses specified in an IPset file
-(such as that created by B<rwsetbuild(1)>) a group.  The B<ipsets>
-command may appear multiple times in a group block.  When multiple
-IPset files are specified, the group maintains a single IPset that is
-the union of files.  B<rwflowpack> exits with an error if the IPset
-file does not exist or does not contain any IP addresses.  I<Since
-SiLK 3.10.0>.
+to a group.  The B<ipsets> command may appear multiple times in a
+group block.  I<Since SiLK 3.10.0>.
 
 =back
-
-Specifying the at (C<@>) character and the name of an existing group
-within an B<interfaces>, B<ipblocks>, or B<ipsets> command causes the
-contents of the existing group to be added to the current group as
-long as the existing group contains interfaces, ipblocks, or ipsets,
-respectively.  A group does not reference other groups; the contents
-of the existing groups are copied into the current group.
-
-For example group blocks, see L</Group definitions> below.
 
 =head2 Sensor Block
 
@@ -561,69 +619,41 @@ the C<external>, C<internal>, and C<null> names, where internal refers
 to network being monitored, null are flows that were blocked by the
 router's access control list, and external is everything else.
 
-Several of the commands in the sensor block require as an argument a
-list of CIDR blocks, a list of IPset files, or a list of integers.
-Instead of specifying a list of values, you may specify a group
-reference to a group (see L</Group Block>) containing ipblocks,
-ipsets, or interfaces, respectively.  (A group reference the at (C<@>)
-character followed by group's name.)  These lists are defined as
-follows:
+Several of the commands described below that categorize flow records
+require as an argument a list of CIDR blocks, a list of IPset files,
+or a list of integers.  The syntax of these lists is described in the
+L</Lists of CIDR Blocks, IPsets, or Integers> section above.
 
-=over 4
-
-=item I<cidr-block-list>
-
-A cidr-block-list contains one or more CIDR blocks or group references
-that represent an address space.  As part of determining how to
-process a flow record, B<rwflowpack> may check whether the record's
-source or destination IP address is in the list.  When comparing an IP
-address to a cidr-block-list, note the following:
+As part of  determining how to process a flow record, B<rwflowpack>
+may check a record's source or destination IP address against a
+cidr-block-list or an ipset-set.  Note the following:
 
 =over 4
 
 =item *
 
-the IP address is compared to each element in the cidr-block-list,
-stopping once a match is made
+for a cidr-block-list, the IP address is sequentially compared to each
+element of the list, stopping once a match is made
 
 =item *
 
-when comparing an IPv4 address to a cidr-block-list element that is
-IPv6, the IPv4 address is converted to IPv6 by mapping it into the
-::ffff:0:0/96 prefix for purposes of the comparison
+when comparing an IPv4 address to an IPv6 list, the IPv4 address is
+converted to IPv6 by mapping it into the ::ffff:0:0/96 prefix for
+purposes of the comparison
 
 =item *
 
-when comparing an IPv6 address to a cidr-block-list element that is
-IPv4, an IPv6 address in the ::ffff:0:0/96 prefix will be converted to
-IPv4 for purposes of the comparison and any other IPv6 address will
-fail the comparison
+when comparing an IPv6 address to an IPv4 list, an IPv6 address in the
+::ffff:0:0/96 prefix is converted to IPv4 for purposes of the
+comparison and any other IPv6 address fails the comparison
 
 =back
 
-=item I<ipset-list>
-
-An ipset-list contains the names of one or more IPset files or group
-references.  These files represent an address space, and B<rwflowpack>
-may check whether a flow record's source or destination IP address is
-in this address space.  When multiple IPset files are specified, the
-contents of the files are merged into a single IPset.  B<rwflowpack>
-exits with an error if the IPset file does not exist or does not
-contain any IP addresses.  The rules for comparing IPv4 and IPv6
-addresses are the same as those for the cidr-block-list.  I<Since SiLK
-3.10.0>.
-
-=item I<interface-list>
-
-An interface-list contains one or more group references or integers
-(ranging from 0 to 65535) that represent SNMP interface index(es) or VLAN
-identifiers.  As part of determining how to process a flow record,
-B<rwflowpack> may check whether the record's C<input> or C<output>
-fields are in the list.  Whether the C<input> and C<output> fields
-contain SNMP interfaces or VLAN identifiers is determined by the
+As part of determining how to process a flow record, B<rwflowpack> may
+check whether the record's C<input> or C<output> fields are an
+interface-list.  Whether the C<input> and C<output> fields contain
+SNMP interfaces or VLAN identifiers is determined by the
 B<interface-values> command in the probe block (c.f. L</Probe Block>).
-
-=back
 
 The B<sensor> command is used in the top-level context to begin a
 sensor configuration block, and the remaining commands are accepted
@@ -654,7 +684,8 @@ used.  (Note this also means that a mistyped I<probe-name> will not be
 detected.)  For example, S<netflow-v5-probes S1> says that S1 is a
 netflow-v5 probe; whenever flow data arrives on the S1 probe, the
 sensor associated with the probe notices that data is available and
-processes it.
+processes it.  Adjacent probe names in the argument list may be
+separated by space or tab characters and/or a single comma.
 
 =item B<source-network> I<network-name>
 
@@ -673,33 +704,30 @@ the network named I<network-name>.
 
 This command specifies the IP-space that is assigned to the network
 named I<network-name>.  The value of the command can be the keyword
-B<remainder> or a list containing CIDR blocks and/or group references
-to groups containing CIDR blocks.  When the value is the keyword
-B<remainder>, the IP-space for I<network-name> is conceptually all IPs
-not assigned to other networks on this sensor.  The B<remainder>
-keyword may only appear one time within a sensor block.
-
-=item I<network-name>B<-ipsets> {I<ipset-list> | B<remainder>}
-
-This command specifies the IP-space that is assigned to the network
-named I<network-name>.  The value of the command can be the keyword
-B<remainder> or a list containing the names of IPset files and/or
-group references to groups containing IPset files.  When the value is
+B<remainder> or a cidr-block-list as defined above.  When the value is
 the keyword B<remainder>, the IP-space for I<network-name> is
 conceptually all IPs not assigned to other networks on this sensor.
 The B<remainder> keyword may only appear one time within a sensor
 block.
 
+=item I<network-name>B<-ipsets> {I<ipset-list> | B<remainder>}
+
+This command specifies the IP-space that is assigned to the network
+named I<network-name>.  The value of the command can be the keyword
+B<remainder> or an ipset-list as defined above.  When the value is the
+keyword B<remainder>, the IP-space for I<network-name> is conceptually
+all IPs not assigned to other networks on this sensor.  The
+B<remainder> keyword may only appear one time within a sensor block.
+
 =item I<network-name>B<-interfaces> {I<interface-list> | B<remainder>}
 
 This command specifies the SNMP interface index(es) or VLAN
 identifiers that are assigned to the network named I<network-name>.
-The value of the command can be the keyword B<remainder> or a list
-containing interface numbers and/or group references to groups
-containing interfaces.  When the value is the keyword B<remainder>,
-the interface list is computed by finding all interface values not
-assigned to other networks on this sensor.  The B<remainder> keyword
-may only appear one time within a sensor block.
+The value of the command may be the keyword B<remainder> or an
+interface-list as defined above.  When the value is the keyword
+B<remainder>, the interface list is computed by finding all interface
+values not assigned to other networks on this sensor.  The
+B<remainder> keyword may only appear one time within a sensor block.
 
 =item B<isp-ip> I<ip-address> [I<ip-address> ...]
 
@@ -1187,7 +1215,7 @@ as of SiLK 3.4.0 and libfixbuf-1.2.0.
       accept-from-host 172.16.22.10
       protocol udp
   end probe
-  
+
   probe S11 netflow-v5
       listen-on-port 9910
       accept-from-host 172.16.22.11
@@ -1412,6 +1440,9 @@ B<gzip(1)>
 
 =head1 NOTES
 
+Support for using double-quoted strings for IPset path names was added
+in SiLK 3.17.2.
+
 The accept-from-host command began to accept a list of arguments in
 SiLK 3.10.1.
 
@@ -1424,7 +1455,7 @@ The B<quirks> command was introduced in SiLK 3.8.0.
 
 =cut
 
-$SiLK: sensor.conf.pod a2684b2e4c23 2017-12-01 22:50:53Z mthomas $
+$SiLK: sensor.conf.pod 04bb49edf544 2018-05-31 18:25:33Z mthomas $
 
 Local Variables:
 mode:text

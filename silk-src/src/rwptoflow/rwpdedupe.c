@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpdedupe.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwpdedupe.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include "rwppacketheaders.h"
 #include <silk/skdllist.h>
@@ -443,7 +443,7 @@ bufferInputList(
         } else {
             timeradd(min_ts, &g_duplicate_margin, &cutoff);
             max_ts = getListMaxTimestamp(buffer, idx);
-            if (timercmp(&cutoff, max_ts, <)) {
+            if (max_ts && timercmp(&cutoff, max_ts, <)) {
                 f_read_packets = 1;
             }
         }
@@ -456,6 +456,7 @@ bufferInputList(
             if (cur_pkt->data == NULL) {
                 /* cannot read more records from input */
                 buffer[idx].eof = 1;
+                free(cur_pkt);
                 return; /* do not read any more packets for this input */
             } else {
                 if (skDLListPushTail(buffer[idx].head, (void *) cur_pkt)) {

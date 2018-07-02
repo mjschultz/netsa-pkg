@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-filesys.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: sku-filesys.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/utils.h>
 
@@ -940,6 +940,21 @@ skCopyFile(
 
     max_mapsize -= max_mapsize % pagesize;
 
+    /* Handle dest being a directory */
+    if (skDirExists(destPath)) {
+        skBasename_r(base, srcPath, sizeof(base));
+        rv = snprintf(destBuf, sizeof(destBuf), "%s/%s", destPath, base);
+        if (rv == -1) {
+            return EIO;
+        }
+        if ((unsigned int)rv > (sizeof(destBuf) - 1)) {
+            return ENAMETOOLONG;
+        }
+        dest = destBuf;
+    } else {
+        dest = destPath;
+    }
+
     /* Open source */
     fdin = open(srcPath, O_RDONLY);
     if (fdin == -1) {
@@ -952,23 +967,6 @@ skCopyFile(
         goto copy_error;
     }
     size = st.st_size;
-
-    /* Handle dest being a directory */
-    if (skDirExists(destPath)) {
-        skBasename_r(base, srcPath, sizeof(base));
-        rv = snprintf(destBuf, sizeof(destBuf), "%s/%s", destPath, base);
-        if (rv == -1) {
-            close(fdin);
-            return EIO;
-        }
-        if ((unsigned int)rv > (sizeof(destBuf) - 1)) {
-            close(fdin);
-            return ENAMETOOLONG;
-        }
-        dest = destBuf;
-    } else {
-        dest = destPath;
-    }
 
     /* Open dest */
     fdout = open(dest, O_RDWR | O_CREAT | O_TRUNC, st.st_mode);

@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sklog.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: sklog.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 
 #include <silk/sklog.h>
 #include <silk/skstringmap.h>
@@ -585,6 +585,13 @@ logRotatedLog(
             assert(logctx->l_sim.fp);
             rotated_fp = logctx->l_sim.fp;
             rotated_path = strdup(logctx->l_sim.path);
+            if (!rotated_path) {
+                fprintf(rotated_fp,
+                        "%sLog not rotated--Unable to allocate pathname\n",
+                        msgbuf);
+                SKLOG_UNLOCK();
+                return;
+            }
 
             /* Log a message about rotating the log. */
             (void)logctx->l_sim.stamp_fn(msgbuf, sizeof(msgbuf));
@@ -1728,7 +1735,7 @@ sklogSetFacilityByName(
     sk_stringmap_status_t rv_map;
     sk_stringmap_entry_t *found_entry;
     uint32_t facility;
-    int rv = -1;
+    int rv;
 
     if (!logctx) {
         skAppPrintErr("Must setup the log before setting the facility");

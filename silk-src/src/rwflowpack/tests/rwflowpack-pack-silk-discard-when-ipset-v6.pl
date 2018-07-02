@@ -1,7 +1,7 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: rwflowpack-pack-silk-discard-when-ipset-v6.pl 3c4d6696a20e 2014-10-15 19:18:45Z mthomas $")
+# RCSIDENT("$SiLK: rwflowpack-pack-silk-discard-when-ipset-v6.pl 04bb49edf544 2018-05-31 18:25:33Z mthomas $")
 
 use strict;
 use SiLKTests;
@@ -158,13 +158,13 @@ end probe
 
 group internal
     ipsets ${internal_v4}
-    ipsets ${internal_v6}
+    ipsets "${internal_v6}"
 end group
 group external
-    ipsets ${external_v6} ${external_v4}
+    ipsets "${external_v6}" ${external_v4}
 end group
 group null
-    ipsets ${null_v4}
+    ipsets "${null_v4}"
     ipsets ${null_v6}
 end group
 
@@ -176,7 +176,7 @@ sensor S0
 
     internal-ipsets  @internal
     external-ipsets  @external
-    null-ipsets      ${null_v4} ${null_v6}
+    null-ipsets      ${null_v4} "${null_v6}"
 end sensor
 EOF
 }
