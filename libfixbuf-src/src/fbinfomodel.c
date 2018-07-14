@@ -7,9 +7,8 @@
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell
  ** ------------------------------------------------------------------------
- ** @OPENSOURCE_HEADER_START@
- ** Use of the libfixbuf system and related source code is subject to the terms
- ** of the following licenses:
+ ** @OPENSOURCE_LICENSE_START@
+ ** libfixbuf 2.0
  **
  ** Copyright 2018 Carnegie Mellon University. All Rights Reserved.
  **
@@ -24,16 +23,17 @@
  ** COPYRIGHT INFRINGEMENT.
  **
  ** Released under a GNU-Lesser GPL 3.0-style license, please see
- ** License.txt or contact permission@sei.cmu.edu for full terms.
+ ** LICENSE.txt or contact permission@sei.cmu.edu for full terms.
  **
  ** [DISTRIBUTION STATEMENT A] This material has been approved for
  ** public release and unlimited distribution.  Please see Copyright
  ** notice for non-US Government use and distribution.
  **
- ** Carnegie Mellon® and CERT® are registered in the U.S. Patent and
- ** Trademark Office by Carnegie Mellon University.
+ ** Carnegie Mellon(R) and CERT(R) are registered in the U.S. Patent
+ ** and Trademark Office by Carnegie Mellon University.
  **
- ** @OPENSOURCE_HEADER_END@
+ ** DM18-0325
+ ** @OPENSOURCE_LICENSE_END@
  ** ------------------------------------------------------------------------
  */
 
@@ -205,7 +205,7 @@ void                fbInfoModelAddElement(
     g_ptr_array_add(model->ie_list, model_ie);
     g_hash_table_insert(model->ie_byname, (char *)model_ie->ref.name,model_ie);
 
-    /* Short circuit if not reversible or not IANA-managed */
+    /* Short circuit if not reversible */
     if (!(ie->flags & FB_IE_F_REVERSIBLE)) {
         return;
     }
@@ -411,6 +411,7 @@ gboolean fbInfoElementAddOptRecElement(
     fbInfoElement_t     ie;
     char                name[500];
     char                description[4096];
+    size_t              len;
 
     if (rec->ie_pen != 0) {
 
@@ -419,11 +420,15 @@ gboolean fbInfoElementAddOptRecElement(
         ie.ent = rec->ie_pen;
         ie.num = rec->ie_id;
         ie.type = rec->ie_type;
-        strncpy(name, (char *)rec->ie_name.buf, rec->ie_name.len);
-        name[rec->ie_name.len] = '\0';
+        len = ((rec->ie_name.len < sizeof(name))
+               ? rec->ie_name.len : (sizeof(name) - 1));
+        strncpy(name, (char *)rec->ie_name.buf, len);
+        name[len] = '\0';
         ie.ref.name = name;
-        strncpy(description, (char *)rec->ie_desc.buf, rec->ie_desc.len);
-        description[rec->ie_desc.len] = '\0';
+        len = ((rec->ie_desc.len < sizeof(description))
+               ? rec->ie_desc.len : (sizeof(description) - 1));
+        strncpy(description, (char *)rec->ie_desc.buf, len);
+        description[len] = '\0';
         ie.description = description;
         ie.flags = 0;
         ie.flags |= rec->ie_units << 16;
@@ -446,6 +451,7 @@ gboolean fbInfoElementAddOptRecElement(
           case FB_UINT_16:
           case FB_INT_16:
             ie.len = 2;
+            ie.flags |= FB_IE_F_ENDIAN;
             break;
           case FB_UINT_32:
           case FB_INT_32:
@@ -453,6 +459,7 @@ gboolean fbInfoElementAddOptRecElement(
           case FB_FLOAT_32:
           case FB_IP4_ADDR:
             ie.len = 4;
+            ie.flags |= FB_IE_F_ENDIAN;
             break;
           case FB_MAC_ADDR:
             ie.len = 6;
@@ -464,6 +471,7 @@ gboolean fbInfoElementAddOptRecElement(
           case FB_DT_NANOSEC:
           case FB_FLOAT_64:
             ie.len = 8;
+            ie.flags |= FB_IE_F_ENDIAN;
             break;
           case FB_IP6_ADDR:
             ie.len = 16;

@@ -1,8 +1,9 @@
 ## Process this file with automake to produce Makefile.in
 ## ------------------------------------------------------------------------
-## Makefile.am (toplevel)
+## Makefile.am (include)
 ## autotools build system for libfixbuf
 ## ------------------------------------------------------------------------
+## @OPENSOURCE_LICENSE_START@
 ## libfixbuf 2.0
 ##
 ## Copyright 2018 Carnegie Mellon University. All Rights Reserved.
@@ -18,14 +19,17 @@
 ## COPYRIGHT INFRINGEMENT.
 ##
 ## Released under a GNU-Lesser GPL 3.0-style license, please see
-## License.txt or contact permission@sei.cmu.edu for full terms.
+## LICENSE.txt or contact permission@sei.cmu.edu for full terms.
 ##
 ## [DISTRIBUTION STATEMENT A] This material has been approved for
 ## public release and unlimited distribution.  Please see Copyright
 ## notice for non-US Government use and distribution.
 ##
-## Carnegie Mellon® and CERT® are registered in the U.S. Patent and
-## Trademark Office by Carnegie Mellon University.
+## Carnegie Mellon(R) and CERT(R) are registered in the U.S. Patent
+## and Trademark Office by Carnegie Mellon University.
+##
+## DM18-0325
+## @OPENSOURCE_LICENSE_END@
 ## ------------------------------------------------------------------------
 ## Authors: Brian Trammell
 ## ------------------------------------------------------------------------

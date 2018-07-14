@@ -99,10 +99,20 @@ uint64_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="
 uint8_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_info_element__st.html#a0b5854d2ad00c502ca6c3f57879b4094">type</a></td></tr>
 <tr class="memdesc:a0b5854d2ad00c502ca6c3f57879b4094"><td class="mdescLeft">&#160;</td><td class="mdescRight">Data Type. <br/></td></tr>
 <tr class="separator:a0b5854d2ad00c502ca6c3f57879b4094"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a06430ce7944697e5b16a3806457b26f4"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a06430ce7944697e5b16a3806457b26f4"></a>
-const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_info_element__st.html#a06430ce7944697e5b16a3806457b26f4">description</a></td></tr>
-<tr class="memdesc:a06430ce7944697e5b16a3806457b26f4"><td class="mdescLeft">&#160;</td><td class="mdescRight">description <br/></td></tr>
-<tr class="separator:a06430ce7944697e5b16a3806457b26f4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a38776a02415ea256d27303baec77dbde"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a38776a02415ea256d27303baec77dbde"></a>
+const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_info_element__st.html#a38776a02415ea256d27303baec77dbde">description</a></td></tr>
+<tr class="memdesc:a38776a02415ea256d27303baec77dbde"><td class="mdescLeft">&#160;</td><td class="mdescRight">description <br/></td></tr>
+<tr class="separator:a38776a02415ea256d27303baec77dbde"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aaeba93ac18293577baef8687f36e8b1b"><td class="memItemLeft" >union {</td></tr>
+<tr class="memitem:af5446ff6c97cb4497e5a7152edfe6a4a"><td class="memItemLeft" >&#160;&#160;&#160;struct <a class="el" href="structfb_info_element__st.html">fbInfoElement_st</a> *&#160;&#160;&#160;<a class="el" href="structfb_info_element__st.html#a7173558cac101f44648b4cb7f4bd84df">canon</a></td></tr>
+<tr class="memdesc:af5446ff6c97cb4497e5a7152edfe6a4a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Pointer to canonical copy of IE.  <a href="#af5446ff6c97cb4497e5a7152edfe6a4a">More...</a><br/></td></tr>
+<tr class="separator:af5446ff6c97cb4497e5a7152edfe6a4a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af2ca7e8ec875d50b55e501d66c161684"><td class="memItemLeft" >&#160;&#160;&#160;const char *&#160;&#160;&#160;<a class="el" href="structfb_info_element__st.html#a48f5b066848aa37ace3e67ec87eb45ea">name</a></td></tr>
+<tr class="memdesc:af2ca7e8ec875d50b55e501d66c161684"><td class="mdescLeft">&#160;</td><td class="mdescRight">Information element name.  <a href="#af2ca7e8ec875d50b55e501d66c161684">More...</a><br/></td></tr>
+<tr class="separator:af2ca7e8ec875d50b55e501d66c161684"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aaeba93ac18293577baef8687f36e8b1b"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_info_element__st.html#aaeba93ac18293577baef8687f36e8b1b">ref</a></td></tr>
+<tr class="memdesc:aaeba93ac18293577baef8687f36e8b1b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Information element name.  <a href="#aaeba93ac18293577baef8687f36e8b1b">More...</a><br/></td></tr>
+<tr class="separator:aaeba93ac18293577baef8687f36e8b1b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>A single IPFIX Information Element definition. </p>
@@ -212,6 +222,20 @@ const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" hr
 
 </div>
 </div>
+<a class="anchor" id="aaeba93ac18293577baef8687f36e8b1b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">union { ... }    fbInfoElement_st::ref</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Information element name. </p>
+
+</div>
+</div>
 <a class="anchor" id="a2cdd4c4fce731a0862201cd5be9b5088"></a>
 <div class="memitem">
 <div class="memproto">
@@ -226,7 +250,8 @@ const char *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" hr
 
 </div>
 </div>
-<hr/>The documentation for this struct was generated from the following file:<ul>
+<hr/>The documentation for this struct was generated from the following files:<ul>
+<li><a class="el" href="public_8c.html">public.c</a></li>
 <li><a class="el" href="public_8h_source.html">public.h</a></li>
 </ul>
 </div><!-- contents -->

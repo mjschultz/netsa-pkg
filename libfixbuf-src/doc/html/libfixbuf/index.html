@@ -49,11 +49,13 @@
 <div class="textblock"><p><a class="el" href="_how-_to.html">Getting started with libfixbuf</a></p>
 <h1><a class="anchor" id="Introduction"></a>
 Introduction</h1>
-<p>libfixbuf is a compliant implementation of the IPFIX Protocol, as defined in the "Specification of the IPFIX Protocol for the Export of IP
-Flow Information" (RFC 5101). It supports the information model defined in "Information Model for IP Flow Information Export" (RFC 5102), extended as proposed by "Bidirectional Flow Export using
-IPFIX" (RFC 5103) to support information elements for representing biflows.</p>
+<p>libfixbuf is a compliant implementation of the IPFIX Protocol, as defined in the "Specification of the IPFIX Protocol for the Exchange of
+Flow Information" (<a href="https://tools.ietf.org/html/rfc7011">RFC 7011</a>). It supports the information model defined in "Information Model for IP Flow Information Export" (<a href="https://tools.ietf.org/html/rfc7012">RFC 7012</a>), extended as proposed by "Bidirectional Flow Export using
+IPFIX" (<a href="https://tools.ietf.org/html/rfc5103">RFC 5103</a>) to support information elements for representing biflows.</p>
 <p>libfixbuf supports UDP, TCP, SCTP, TLS over TCP, and Spread as transport protocols. Support for DTLS over UDP and DTLS over SCTP is forthcoming. It also supports operation as an IPFIX File Writer or IPFIX File Reader as defined in "An IPFIX-Based File Format" (draft-trammell-ipfix-file, current revision -05).</p>
-<p>As of version 1.0, libfixbuf supports structured data elements as described in "Export of Structured Data in IPFIX" (RFC 6313). This adds the ability to export basicLists, subTemplateLists, and subTemplateMultiLists.</p>
+<p>As of version 1.0, libfixbuf supports structured data elements as described in "Export of Structured Data in IPFIX" (<a href="https://tools.ietf.org/html/rfc6313">RFC 6313</a>). This adds the ability to export basicLists, subTemplateLists, and subTemplateMultiLists.</p>
+<p>libfixbuf version 1.4 adds support for exporting type information for IPFIX elements as described in "Exporting Type Information for IPFIX Information
+Elements" (<a href="https://tools.ietf.org/html/rfc5610">RFC 5610</a>). This expands the definition of an Information Element in the Information Model. In addition to the PEN, length, name, and ID, an Information Element can also have a data type, description, range, semantics, and units.</p>
 <p>libfixbuf's public API is defined in <a class="el" href="public_8h.html" title="Fixbuf IPFIX protocol library public interface. ">public.h</a>; see the <a class="el" href="_how-_to.html">Getting started with libfixbuf</a> section or <a class="el" href="public_8h.html" title="Fixbuf IPFIX protocol library public interface. ">public.h</a> for general documentation on getting started with libfixbuf, as well as detailed documentation on the public API calls and data types.</p>
 <h1><a class="anchor" id="Downloading"></a>
 Downloading</h1>
@@ -61,7 +63,7 @@ Downloading</h1>
 <h1><a class="anchor" id="Building"></a>
 Building</h1>
 <p>libfixbuf uses a reasonably standard autotools-based build system. The customary build procedure (<code>./configure &amp;&amp; make &amp;&amp; make install</code>) should work in most environments.</p>
-<p>libfixbuf requires glib-2.0 version 2.6.4 or later. If built against version 2.10 or later, it will automatically use the glib slab allocator for increased memory allocation performance. glib is available on most modern Linux distributions and BSD ports collections, or in source form from <a href="http://www.gtk.org">http://www.gtk.org</a>.</p>
+<p>libfixbuf requires glib-2.0 version 2.18 or later. glib is available on most modern Linux distributions and BSD ports collections, or in source form from <a href="http://www.gtk.org">http://www.gtk.org</a>.</p>
 <p>libfixbuf automatically uses the getaddrinfo(3) facility and the accompanying dual IPv4/IPv6 stack support if present. getaddrinfo(3) must be present to export or collect flows over IPv6.</p>
 <p>libfixbuf does not build with SCTP support by default. The &ndash;with-sctp option must be given to the libfixbuf ./configure script to include SCTP support. Also note that SCTP requires kernel support, and applications built against libfixbuf with libsctp may fail at runtime if that kernel support is not present.</p>
 <p>libfixbuf does not build with TLS support by default. The &ndash;with-openssl option must be given to the libfixbuf ./configure script to include TLS support.</p>
@@ -79,7 +81,7 @@ There is no automatic support for periodic template retransmission or periodic t
 </ul>
 <h1><a class="anchor" id="Copyright"></a>
 Copyright</h1>
-<p>libfixbuf is copyright 2005-2017 Carnegie Mellon University, and is released under the GNU Lesser General Public License (LGPL). See the COPYING file in the distribution for details.</p>
+<p>libfixbuf is copyright 2005-2018 Carnegie Mellon University, and is released under the GNU Lesser General Public License (LGPL) Version 3. See the LICENSE.txt file in the distribution for details.</p>
 <p>libfixbuf was developed at Carnegie Mellon University by Brian Trammell and the CERT Network Situational Awareness Group Engineering Team for use in the YAF and SiLK tools. </p>
 </div></div><!-- contents -->
       </div><!-- l-content -->

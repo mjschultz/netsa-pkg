@@ -134,7 +134,7 @@ am_libfixbuf_la_OBJECTS = libfixbuf_la-fbuf.lo \
 	libfixbuf_la-fbsession.lo libfixbuf_la-fbconnspec.lo \
 	libfixbuf_la-fbexporter.lo libfixbuf_la-fbcollector.lo \
 	libfixbuf_la-fblistener.lo libfixbuf_la-fbnetflow.lo \
-	libfixbuf_la-fbsflow.lo
+	libfixbuf_la-fbsflow.lo libfixbuf_la-fbxml.lo
 nodist_libfixbuf_la_OBJECTS = libfixbuf_la-infomodel.lo
 libfixbuf_la_OBJECTS = $(am_libfixbuf_la_OBJECTS) \
 	$(nodist_libfixbuf_la_OBJECTS)
@@ -251,6 +251,7 @@ am__relativize = \
   reldir="$$dir2"
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
+AM_CPPFLAGS = @AM_CPPFLAGS@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AR = @AR@
 AUTOCONF = @AUTOCONF@
@@ -426,7 +427,7 @@ lib_LTLIBRARIES = libfixbuf.la
 WARN_CFLAGS = -g -DDEBUG -Wall
 libfixbuf_la_SOURCES = fbuf.c       fbinfomodel.c fbtemplate.c  fbsession.c \
                         fbconnspec.c fbexporter.c  fbcollector.c fblistener.c \
-			fbnetflow.c fbsflow.c
+			fbnetflow.c  fbsflow.c     fbxml.c
 
 libfixbuf_la_LIBADD = $(GLIB_LDADD)
 libfixbuf_la_LDFLAGS = $(SPREAD_LDFLAGS) $(SPREAD_LIBS) $(GLIB_LIBS) -version-info $(LIBCOMPAT)
@@ -532,6 +533,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libfixbuf_la-fbsflow.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libfixbuf_la-fbtemplate.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libfixbuf_la-fbuf.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libfixbuf_la-fbxml.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libfixbuf_la-infomodel.Plo@am__quote@
 
 .c.o:
@@ -624,6 +626,13 @@ libfixbuf_la-fbsflow.lo: fbsflow.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fbsflow.c' object='libfixbuf_la-fbsflow.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libfixbuf_la_CFLAGS) $(CFLAGS) -c -o libfixbuf_la-fbsflow.lo `test -f 'fbsflow.c' || echo '$(srcdir)/'`fbsflow.c
+
+libfixbuf_la-fbxml.lo: fbxml.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libfixbuf_la_CFLAGS) $(CFLAGS) -MT libfixbuf_la-fbxml.lo -MD -MP -MF $(DEPDIR)/libfixbuf_la-fbxml.Tpo -c -o libfixbuf_la-fbxml.lo `test -f 'fbxml.c' || echo '$(srcdir)/'`fbxml.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libfixbuf_la-fbxml.Tpo $(DEPDIR)/libfixbuf_la-fbxml.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='fbxml.c' object='libfixbuf_la-fbxml.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libfixbuf_la_CFLAGS) $(CFLAGS) -c -o libfixbuf_la-fbxml.lo `test -f 'fbxml.c' || echo '$(srcdir)/'`fbxml.c
 
 libfixbuf_la-infomodel.lo: infomodel.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libfixbuf_la_CFLAGS) $(CFLAGS) -MT libfixbuf_la-infomodel.lo -MD -MP -MF $(DEPDIR)/libfixbuf_la-infomodel.Tpo -c -o libfixbuf_la-infomodel.lo `test -f 'infomodel.c' || echo '$(srcdir)/'`infomodel.c
