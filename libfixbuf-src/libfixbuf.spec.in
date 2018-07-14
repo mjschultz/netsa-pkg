@@ -13,7 +13,7 @@ BuildRoot: %{_tmppath}/%{name}-%{version}
 Vendor: http://tools.netsa.cert.org/
 URL: http://tools.netsa.cert.org/fixbuf/
 
-Requires: glib2 >= 2.4.7
+Requires: glib2 >= 2.18
 %if "x@FIXBUF_REQ_LIBSCTP@" == "x1"
 Requires: libsctp
 %endif
@@ -23,7 +23,7 @@ Requires: libspread
 %if "x@FIXBUF_REQ_LIBSSL@" == "x1"
 Requires: openssl
 %endif
-BuildRequires: glib2-devel >= 2.4.7
+BuildRequires: glib2-devel >= 2.18
 BuildRequires: pkgconfig >= 0.8
 %if "x@FIXBUF_REQ_SCTPDEV@" == "x1"
 BuildRequires: libsctp-devel
@@ -71,7 +71,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files
 %defattr(-, root, root)
-%doc AUTHORS COPYING NEWS README
+%doc AUTHORS LICENSE.txt NEWS README
 %{_libdir}/*.a
 %{_libdir}/*.la
 %{_libdir}/*.so*

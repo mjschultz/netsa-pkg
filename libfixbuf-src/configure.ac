@@ -3,6 +3,7 @@ dnl ------------------------------------------------------------------------
 dnl configure.ac
 dnl autotools build system for libfixbuf
 dnl ------------------------------------------------------------------------
+dnl @OPENSOURCE_LICENSE_START@
 dnl libfixbuf 2.0
 dnl
 dnl Copyright 2018 Carnegie Mellon University. All Rights Reserved.
@@ -18,22 +19,23 @@ dnl ANY KIND WITH RESPECT TO FREEDOM FROM PATENT, TRADEMARK, OR
 dnl COPYRIGHT INFRINGEMENT.
 dnl
 dnl Released under a GNU-Lesser GPL 3.0-style license, please see
-dnl License.txt or contact permission@sei.cmu.edu for full terms.
+dnl LICENSE.txt or contact permission@sei.cmu.edu for full terms.
 dnl
 dnl [DISTRIBUTION STATEMENT A] This material has been approved for
 dnl public release and unlimited distribution.  Please see Copyright
 dnl notice for non-US Government use and distribution.
 dnl
-dnl Carnegie Mellon® and CERT® are registered in the U.S. Patent and
-dnl Trademark Office by Carnegie Mellon University.
+dnl Carnegie Mellon(R) and CERT(R) are registered in the U.S. Patent
+dnl and Trademark Office by Carnegie Mellon University.
+dnl
+dnl DM18-0325
+dnl @OPENSOURCE_LICENSE_END@
 dnl ------------------------------------------------------------------------
 dnl Authors: Brian Trammell, Dan Ruef <druef@cert.org>, Chris Inacio
 dnl <inacio@cert.org>
 dnl ------------------------------------------------------------------------
 
-dnl RCSIDENT("$Id: configure.in 18509 2012-08-23 19:13:27Z ecoff_svn $")
-
-AC_INIT([libfixbuf], [2.0.0], [netsa-help@cert.org], [libfixbuf])
+AC_INIT([libfixbuf], [2.1.0], [netsa-help@cert.org], [libfixbuf], [http://tools.netsa.cert.org/fixbuf/])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_COPYRIGHT([Copyright (C) 2006-2018 by Carnegie Mellon University
 GNU Public License (GPL) Rights pursuant to Version 3, June 2007])
@@ -46,9 +48,8 @@ dnl the second number should be changed for bug fixes, small changes
 dnl the third number should be changed if the first number changes and
 dnl the release is backwards compatible with the previous release.
 
-LIBCOMPAT="6:0:0"
+LIBCOMPAT="7:0:1"
 
-AC_REVISION($Revision: 18509 $)
 AM_CONFIG_HEADER(include/fixbuf/config.h)
 AC_CONFIG_MACRO_DIR([m4])
 AM_PROG_LIBTOOL
@@ -63,7 +64,7 @@ AC_PROG_MAKE_SET
 AC_HEADER_STDC
 AC_LANG_C
 
-CPPFLAGS='-I$(top_builddir)/include -I$(top_srcdir)/include'" $CPPFLAGS"
+AC_SUBST([AM_CPPFLAGS], ['-I$(top_builddir)/include -I$(top_srcdir)/include'])
 
 AC_HEADER_STDC
 AC_CHECK_HEADERS([unistd.h stdint.h errno.h netinet/in.h sys/errno.h sys/socket.h pthread.h])
@@ -102,7 +103,7 @@ dnl ----------------------------------------------------------------------
 GLIB_PRESENT=NO
 GLIB_LDADD=
 
-AM_PATH_GLIB_2_0([2.4.7],[GLIB_PRESENT=YES],,[gthread])
+AM_PATH_GLIB_2_0([2.18.0],[GLIB_PRESENT=YES],,[gthread])
 
 AC_ARG_WITH(glib-static,
 [  --with-glib-static=prefix   use static glib tree],[
@@ -122,7 +123,7 @@ fi
 ])
 
 if test x"$GLIB_PRESENT" != "xYES"; then
-  AC_MSG_ERROR([Cannot find a suitable glib2 (>= 2.4.7)])
+  AC_MSG_ERROR([Cannot find a suitable glib2 (>= 2.18)])
 fi
 
 AC_SUBST(GLIB_LDADD)

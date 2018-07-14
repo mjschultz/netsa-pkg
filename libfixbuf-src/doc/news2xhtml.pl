@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 
+## @OPENSOURCE_LICENSE_START@
 ## libfixbuf 2.0
 ##
 ## Copyright 2018 Carnegie Mellon University. All Rights Reserved.
@@ -15,24 +16,34 @@
 ## COPYRIGHT INFRINGEMENT.
 ##
 ## Released under a GNU-Lesser GPL 3.0-style license, please see
-## License.txt or contact permission@sei.cmu.edu for full terms.
+## LICENSE.txt or contact permission@sei.cmu.edu for full terms.
 ##
 ## [DISTRIBUTION STATEMENT A] This material has been approved for
 ## public release and unlimited distribution.  Please see Copyright
 ## notice for non-US Government use and distribution.
 ##
-## Carnegie Mellon® and CERT® are registered in the U.S. Patent and
-## Trademark Office by Carnegie Mellon University.
+## Carnegie Mellon(R) and CERT(R) are registered in the U.S. Patent
+## and Trademark Office by Carnegie Mellon University.
+##
+## DM18-0325
+## @OPENSOURCE_LICENSE_END@
 
-$project = $ARGV[0] or die;
-$license = $ARGV[1] or die;
-if ($ARGV[2])
-{
-    # If provided, we'll only spit out <p:file> elements for this number
-    # of releases.  We'll still show history for the others, but won't
-    # provide download links for them.
-    $relkeep = $ARGV[2];
-}
+use warnings;
+use strict;
+
+my $project = $ARGV[0] or die "Expected package name as first argument\n";
+
+# Licence for fixbuf-2.0 and later
+my $new_license = 'lgpl3';
+
+# License for older versions of fixbuf
+my $old_license = 'lgpl';
+
+# The date when the license changed
+my $lgpl3_date = '2018-05-01';
+
+# Date of oldest release that the user is allowed to download.
+my $oldest_rel_date = '2015-07-01';  # fixbuf 1.7.0
 
 print <<HEAD;
 <?xml version="1.0"?>
@@ -41,39 +52,46 @@ print <<HEAD;
            xmlns:xi="http://www.w3.org/2001/XInclude">
 HEAD
 
-$ul = 0;
-$li = 0;
+my $ul = 0;
+my $li = 0;
 
-local $/="undef";
-$content = <STDIN>;
+# slurp in all of the standard input
+my $content;
+{
+    local $/ = undef;
+    $content = <STDIN>;
+}
 
-$relcount = 0;
 
 # This regexp is pretty liberal, so as to be able to grok most NEWS formats.
-while($content =~ /^Version (\d[^:]*?):?\s+\(?([^\n]+?)\)?\s*$\s*=+\s*((?:.(?!Version))+)/msg)
+while($content =~ /^Version (\d[^:]*?):?\s+\(?([^\n]+?)\)?\s*\n\s*=+\s*((?:.(?!Version))+)/msg)
 {
-    $ver = $1; $date = $2; $notes = $3;
-    $relcount++;
+    my ($ver, $date, $notes) = ($1, $2, $3);
+
     print <<RELHEAD1;
     <p:release>
         <p:version>$ver</p:version>
         <p:date>$date</p:date>
 RELHEAD1
-;
-    if ($relkeep == undef || $relcount <= $relkeep)
+
+    if ($date ge $oldest_rel_date)
     {
-    print <<RELHEAD2;
+        my $license = (($date ge $lgpl3_date) ? $new_license : $old_license);
+        print <<RELHEAD2;
         <p:file href="../releases/$project-$1.tar.gz" license="$license"/>
 RELHEAD2
-
-;
     }
 
     print <<RELHEAD3;
         <p:notes>
             <ul>
 RELHEAD3
-;
+
+    # html escape the notes
+    $notes =~ s/&/&amp;/g;
+    $notes =~ s/</&lt;/g;
+    $notes =~ s/>/&gt;/g;
+
     # First, see if items are delimited by \n\n
     if ($notes =~m@(.+?)\n\n+?@)
     {

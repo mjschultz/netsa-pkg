@@ -70,14 +70,14 @@ Data Fields</h2></td></tr>
 <tr class="memitem:ac2d983282cc48364a4720033fa246921"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_sub_template_list__st.html#ac2d983282cc48364a4720033fa246921">dataLength</a></td></tr>
 <tr class="memdesc:ac2d983282cc48364a4720033fa246921"><td class="mdescLeft">&#160;</td><td class="mdescRight">length of the allocated buffer used to hold the data  <a href="#ac2d983282cc48364a4720033fa246921">More...</a><br/></td></tr>
 <tr class="separator:ac2d983282cc48364a4720033fa246921"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a44a3fdafc757dc6a029985f9200bcc97"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a44a3fdafc757dc6a029985f9200bcc97"></a>
-const <a class="el" href="public_8h.html#a1a98b02ac2e3547d96e839174270af99">fbTemplate_t</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_sub_template_list__st.html#a44a3fdafc757dc6a029985f9200bcc97">tmpl</a></td></tr>
-<tr class="memdesc:a44a3fdafc757dc6a029985f9200bcc97"><td class="mdescLeft">&#160;</td><td class="mdescRight">pointer to the template used to structure the data <br/></td></tr>
-<tr class="separator:a44a3fdafc757dc6a029985f9200bcc97"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a32111eedea2bff24a1bde9682fdeab03"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a32111eedea2bff24a1bde9682fdeab03"></a>
-uint8_t *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_sub_template_list__st.html#a32111eedea2bff24a1bde9682fdeab03">dataPtr</a></td></tr>
-<tr class="memdesc:a32111eedea2bff24a1bde9682fdeab03"><td class="mdescLeft">&#160;</td><td class="mdescRight">pointer to the buffer used to hold the data <br/></td></tr>
-<tr class="separator:a32111eedea2bff24a1bde9682fdeab03"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad3f043e2fc3b2a8edf1414cf34222784"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad3f043e2fc3b2a8edf1414cf34222784"></a>
+const <a class="el" href="public_8c.html#a1a98b02ac2e3547d96e839174270af99">fbTemplate_t</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_sub_template_list__st.html#ad3f043e2fc3b2a8edf1414cf34222784">tmpl</a></td></tr>
+<tr class="memdesc:ad3f043e2fc3b2a8edf1414cf34222784"><td class="mdescLeft">&#160;</td><td class="mdescRight">pointer to the template used to structure the data <br/></td></tr>
+<tr class="separator:ad3f043e2fc3b2a8edf1414cf34222784"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac7a9c1cae63ab892871bcae3913fb55d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac7a9c1cae63ab892871bcae3913fb55d"></a>
+uint8_t *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_sub_template_list__st.html#ac7a9c1cae63ab892871bcae3913fb55d">dataPtr</a></td></tr>
+<tr class="memdesc:ac7a9c1cae63ab892871bcae3913fb55d"><td class="mdescLeft">&#160;</td><td class="mdescRight">pointer to the buffer used to hold the data <br/></td></tr>
+<tr class="separator:ac7a9c1cae63ab892871bcae3913fb55d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a229f355ded60489b9caae7fb8737baf3"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a229f355ded60489b9caae7fb8737baf3"></a>
 uint16_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_sub_template_list__st.html#a229f355ded60489b9caae7fb8737baf3">tmplID</a></td></tr>
 <tr class="memdesc:a229f355ded60489b9caae7fb8737baf3"><td class="mdescLeft">&#160;</td><td class="mdescRight">ID of the template used to structure the data. <br/></td></tr>
@@ -90,6 +90,14 @@ uint16_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="
 uint8_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_sub_template_list__st.html#a95614572d8e256adbcb9305054c54ee8">semantic</a></td></tr>
 <tr class="memdesc:a95614572d8e256adbcb9305054c54ee8"><td class="mdescLeft">&#160;</td><td class="mdescRight">value used to describe the contents of the list, all-of, one-of, etc <br/></td></tr>
 <tr class="separator:a95614572d8e256adbcb9305054c54ee8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:adbdd3cd97ab411ed15dd3d879cf7f36a"><td class="memItemLeft" >union {</td></tr>
+<tr class="memitem:a4cca4aeea5c93771c7d34112c570478b"><td class="memItemLeft" >&#160;&#160;&#160;size_t&#160;&#160;&#160;<b>length</b></td></tr>
+<tr class="separator:a4cca4aeea5c93771c7d34112c570478b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9bc0acb2b63e255b29fdbf02f401fcaf"><td class="memItemLeft" >&#160;&#160;&#160;uint64_t&#160;&#160;&#160;<b>extra</b></td></tr>
+<tr class="separator:a9bc0acb2b63e255b29fdbf02f401fcaf"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:adbdd3cd97ab411ed15dd3d879cf7f36a"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_sub_template_list__st.html#adbdd3cd97ab411ed15dd3d879cf7f36a">dataLength</a></td></tr>
+<tr class="memdesc:adbdd3cd97ab411ed15dd3d879cf7f36a"><td class="mdescLeft">&#160;</td><td class="mdescRight">length of the allocated buffer used to hold the data  <a href="#adbdd3cd97ab411ed15dd3d879cf7f36a">More...</a><br/></td></tr>
+<tr class="separator:adbdd3cd97ab411ed15dd3d879cf7f36a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Structure used to hold information of a sub template list. </p>
@@ -110,7 +118,23 @@ uint8_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="s
 
 </div>
 </div>
-<hr/>The documentation for this struct was generated from the following file:<ul>
+<a class="anchor" id="adbdd3cd97ab411ed15dd3d879cf7f36a"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">union { ... }   fbSubTemplateList_st::dataLength</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>length of the allocated buffer used to hold the data </p>
+<p>I made this a union to allow this to work on 64-bit archs </p>
+
+</div>
+</div>
+<hr/>The documentation for this struct was generated from the following files:<ul>
+<li><a class="el" href="public_8c.html">public.c</a></li>
 <li><a class="el" href="public_8h_source.html">public.h</a></li>
 </ul>
 </div><!-- contents -->

@@ -4,6 +4,7 @@
 ## Makefile.am (toplevel)
 ## autotools build system for libfixbuf
 ## ------------------------------------------------------------------------
+## @OPENSOURCE_LICENSE_START@
 ## libfixbuf 2.0
 ##
 ## Copyright 2018 Carnegie Mellon University. All Rights Reserved.
@@ -19,14 +20,17 @@
 ## COPYRIGHT INFRINGEMENT.
 ##
 ## Released under a GNU-Lesser GPL 3.0-style license, please see
-## License.txt or contact permission@sei.cmu.edu for full terms.
+## LICENSE.txt or contact permission@sei.cmu.edu for full terms.
 ##
 ## [DISTRIBUTION STATEMENT A] This material has been approved for
 ## public release and unlimited distribution.  Please see Copyright
 ## notice for non-US Government use and distribution.
 ##
-## Carnegie Mellon® and CERT® are registered in the U.S. Patent and
-## Trademark Office by Carnegie Mellon University.
+## Carnegie Mellon(R) and CERT(R) are registered in the U.S. Patent
+## and Trademark Office by Carnegie Mellon University.
+##
+## DM18-0325
+## @OPENSOURCE_LICENSE_END@
 ## ------------------------------------------------------------------------
 ## Authors: Brian Trammell
 ## ------------------------------------------------------------------------
@@ -42,7 +46,7 @@ MOSTLYCLEANFILES = $(DX_CLEANFILES)
 ACLOCAL_AMFLAGS = -I m4
 
 release-note-doc: NEWS
-	$(top_srcdir)/doc/news2xhtml.pl ${PACKAGE_TARNAME} lgpl 10 < $(top_srcdir)/NEWS > doc/releases.xml
+	$(top_srcdir)/doc/news2xhtml.pl ${PACKAGE_TARNAME} < $(top_srcdir)/NEWS > doc/releases.xml
 
 make-doc-path:
 	mkdir -p $(top_builddir)/doc/html
@@ -62,9 +66,8 @@ EXTRA_DIST = \
      Doxyfile.in \
      libfixbuf.spec \
      libfixbuf.spec.in \
-     License.txt \
+     LICENSE.txt \
      doc/Doxyhead.html \
      doc/Doxyfoot.html \
      doc/doxygen.css \
-     doc/news2xhtml.pl \
-     doc/LICENSE.txt
+     doc/news2xhtml.pl

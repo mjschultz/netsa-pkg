@@ -1,8 +1,8 @@
 libfixbuf aims to be a compliant implementation of the IPFIX Protocol,
-as defined in the "Specification of the IPFIX Protocol for the Export of IP
-Flow Information" (RFC 5101). It supports the information model
+as defined in the "Specification of the IPFIX Protocol for the Exchange of
+Flow Information" (RFC 7011). It supports the information model
 defined in "Information Model for IP Flow Information Export"
-(RFC 5102), extended as proposed by "Bidirectional Flow Export using
+(RFC 7012), extended as proposed by "Bidirectional Flow Export using
 IPFIX" (RFC 5103) to support information elements for representing biflows.
 
 libfixbuf supports UDP, TCP, SCTP, TLS over TCP, and Spread as transport
@@ -28,13 +28,12 @@ Information Elements may be added to the Information Model as we receive
 them from the Exporting process.  See public.h for more information. 
 
 As of version 1.0, libfixbuf has support for NetFlow V9.  libfixbuf converts
-the NetFlow v9 to IPFIX by changing the version number, dropping the sysUpTime
-from the header and converting postOctetDeltaCount to reverseOctetDeltaCount and
-postPacketDeltaCount to reversePacketDeltaCount as described
-in RFC 5103.  In order for tools to properly make use of Information Elements
-that are offsets of the sysUpTime (flowStartSysUpTime), libfixbuf adds
-Information Element 160, systemInitTimeMilliseconds, to any template (and
-corresponding records) that contain either flowStartSysUpTime or flowEndSysUpTime.
+the NetFlow v9 to IPFIX by changing the version number, and dropping the
+sysUpTime from the header.  In order for tools to properly make use of
+Information Elements that are offsets of the sysUpTime (flowStartSysUpTime),
+libfixbuf adds Information Element 160, systemInitTimeMilliseconds, to any
+template (and corresponding records) that contain either flowStartSysUpTime or
+flowEndSysUpTime.
 For any element that does not exist in libfixbuf's default Information Model
 (above ID 346), libfixbuf will convert this Information Element to
 "ciscoNetflowGeneric" (ID 9999) in the template.  The only exceptions are the
@@ -84,11 +83,9 @@ libfixbuf uses a reasonably standard autotools-based build system.
 The customary build procedure (./configure && make
 && make install) should work in most environments.
 
-libfixbuf requires glib-2.0 version 2.6.4 or later. If built against
-version 2.10 or later, it will automatically use the glib slab allocator
-for increased memory allocation performance. glib is available on most
-modern Linux distributions and BSD ports collections, or in source form from
-http://www.gtk.org.
+libfixbuf requires glib-2.0 version 2.18 or later.  glib is available
+on most modern Linux distributions and BSD ports collections, or in
+source form from http://www.gtk.org.
 
 libfixbuf automatically uses the getaddrinfo(3) facility and the
 accompanying dual IPv4/IPv6 stack support if present. getaddrinfo(3)

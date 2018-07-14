@@ -114,8 +114,8 @@ DIST_COMMON = $(srcdir)/doxygen.am $(srcdir)/Makefile.in \
 	$(top_srcdir)/include/fixbuf/version.h.in \
 	$(srcdir)/libfixbuf.pc.in $(srcdir)/libfixbuf.spec.in \
 	$(srcdir)/Doxyfile.in AUTHORS INSTALL NEWS README \
-	autoconf/config.guess autoconf/config.sub autoconf/install-sh \
-	autoconf/missing autoconf/ltmain.sh \
+	autoconf/config.guess autoconf/config.sub autoconf/depcomp \
+	autoconf/install-sh autoconf/missing autoconf/ltmain.sh \
 	$(top_srcdir)/autoconf/config.guess \
 	$(top_srcdir)/autoconf/config.sub \
 	$(top_srcdir)/autoconf/install-sh \
@@ -270,6 +270,7 @@ am__distuninstallcheck_listfiles = $(distuninstallcheck_listfiles) \
 distcleancheck_listfiles = find . -type f -print
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
+AM_CPPFLAGS = @AM_CPPFLAGS@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AR = @AR@
 AUTOCONF = @AUTOCONF@
@@ -474,12 +475,11 @@ EXTRA_DIST = \
      Doxyfile.in \
      libfixbuf.spec \
      libfixbuf.spec.in \
-     License.txt \
+     LICENSE.txt \
      doc/Doxyhead.html \
      doc/Doxyfoot.html \
      doc/doxygen.css \
-     doc/news2xhtml.pl \
-     doc/LICENSE.txt
+     doc/news2xhtml.pl
 
 all: all-recursive
 
@@ -1042,7 +1042,7 @@ uninstall-am: uninstall-pkgconfigDATA
 @DX_COND_doc_TRUE@	rm -rf $(DX_CLEANFILES)
 
 release-note-doc: NEWS
-	$(top_srcdir)/doc/news2xhtml.pl ${PACKAGE_TARNAME} lgpl 10 < $(top_srcdir)/NEWS > doc/releases.xml
+	$(top_srcdir)/doc/news2xhtml.pl ${PACKAGE_TARNAME} < $(top_srcdir)/NEWS > doc/releases.xml
 
 make-doc-path:
 	mkdir -p $(top_builddir)/doc/html

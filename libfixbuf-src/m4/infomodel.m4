@@ -1,3 +1,4 @@
+dnl @OPENSOURCE_LICENSE_START@
 dnl libfixbuf 2.0
 dnl
 dnl Copyright 2018 Carnegie Mellon University. All Rights Reserved.
@@ -13,23 +14,28 @@ dnl ANY KIND WITH RESPECT TO FREEDOM FROM PATENT, TRADEMARK, OR
 dnl COPYRIGHT INFRINGEMENT.
 dnl
 dnl Released under a GNU-Lesser GPL 3.0-style license, please see
-dnl License.txt or contact permission@sei.cmu.edu for full terms.
+dnl LICENSE.txt or contact permission@sei.cmu.edu for full terms.
 dnl
 dnl [DISTRIBUTION STATEMENT A] This material has been approved for
 dnl public release and unlimited distribution.  Please see Copyright
 dnl notice for non-US Government use and distribution.
 dnl
-dnl Carnegie Mellon® and CERT® are registered in the U.S. Patent and
-dnl Trademark Office by Carnegie Mellon University.
+dnl Carnegie Mellon(R) and CERT(R) are registered in the U.S. Patent
+dnl and Trademark Office by Carnegie Mellon University.
+dnl
+dnl DM18-0325
+dnl @OPENSOURCE_LICENSE_END@
 
 # ---------------------------------------------------------------------------
-# INFOMODEL_AC_COLLECT_REGISTRIES(srcdir, infomodel_dir)
+# INFOMODEL_AC_COLLECT_REGISTRIES(infomodel_dir)
 #
 #    Create a list of infomodel IE registries located in
-#    $srcdir/$infomodel_dir.  Place the list of registry names in
+#    $(top_srcdir)/$infomodel_dir.  Place the list of registry names in
 #    INFOMODEL_REGISTRIES.  Place a list of registry names in
 #    INFOMODEL_REGISTRY_PREFIXES.  Place a list of registry include
-#    files in INFOMODEL_REGISTRY_INCLUDES.
+#    files in INFOMODEL_REGISTRY_INCLUDE_FILES.  Place a list of
+#    registry include dependencies based from $srcdir in
+#    INFOMODEL_REGISTRY_INCLUDES.
 #
 #    Output variables: INFOMODEL_REGISTRIES INFOMODEL_REGISTRY_PREFIXES
 #        INFOMODEL_REGISTRY_INCLUDE_FILES INFOMODEL_REGISTRY_INCLUDES

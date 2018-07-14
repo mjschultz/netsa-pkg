@@ -7,8 +7,8 @@
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell, Dan Ruef
  ** ------------------------------------------------------------------------
- ** Use of the libfixbuf system and related source code is subject to the terms
- ** of the following licenses:
+ ** @OPENSOURCE_LICENSE_START@
+ ** libfixbuf 2.0
  **
  ** Copyright 2018 Carnegie Mellon University. All Rights Reserved.
  **
@@ -23,14 +23,17 @@
  ** COPYRIGHT INFRINGEMENT.
  **
  ** Released under a GNU-Lesser GPL 3.0-style license, please see
- ** License.txt or contact permission@sei.cmu.edu for full terms.
+ ** LICENSE.txt or contact permission@sei.cmu.edu for full terms.
  **
  ** [DISTRIBUTION STATEMENT A] This material has been approved for
  ** public release and unlimited distribution.  Please see Copyright
  ** notice for non-US Government use and distribution.
  **
- ** Carnegie Mellon® and CERT® are registered in the U.S. Patent and
- ** Trademark Office by Carnegie Mellon University.
+ ** Carnegie Mellon(R) and CERT(R) are registered in the U.S. Patent
+ ** and Trademark Office by Carnegie Mellon University.
+ **
+ ** DM18-0325
+ ** @OPENSOURCE_LICENSE_END@
  **
  ** ------------------------------------------------------------------------
  */
@@ -43,11 +46,12 @@
  * @section Introduction
  *
  * libfixbuf is a compliant implementation of the IPFIX Protocol,
- * as defined in the "Specification of the IPFIX Protocol for the Export of IP
- * Flow Information" (RFC 5101). It supports the information model
+ * as defined in the "Specification of the IPFIX Protocol for the Exchange of
+ * Flow Information" ([RFC 7011][]). It supports the information model
  * defined in "Information Model for IP Flow Information Export"
- * (RFC 5102), extended as proposed by "Bidirectional Flow Export using
- * IPFIX" (RFC 5103) to support information elements for representing biflows.
+ * ([RFC 7012][]), extended as proposed by "Bidirectional Flow Export using
+ * IPFIX" ([RFC 5103][]) to support information elements for representing
+ * biflows.
  *
  * libfixbuf supports UDP, TCP, SCTP, TLS over TCP, and Spread as transport
  * protocols. Support for DTLS over UDP and DTLS over SCTP is forthcoming.
@@ -56,12 +60,25 @@
  * revision -05).
  *
  * As of version 1.0, libfixbuf supports structured data elements as described
- * in "Export of Structured Data in IPFIX" (RFC 6313).  This adds the ability
- * to export basicLists, subTemplateLists, and subTemplateMultiLists.
-
+ * in "Export of Structured Data in IPFIX" ([RFC 6313][]).  This adds the
+ * ability to export basicLists, subTemplateLists, and subTemplateMultiLists.
+ *
+ * libfixbuf version 1.4 adds support for exporting type information for IPFIX
+ * elements as described in "Exporting Type Information for IPFIX Information
+ * Elements" ([RFC 5610][]).  This expands the definition of an Information
+ * Element in the Information Model.  In addition to the PEN, length, name,
+ * and ID, an Information Element can also have a data type, description,
+ * range, semantics, and units.
+ *
  * libfixbuf's public API is defined in public.h; see the \ref How-To section
  * or public.h for general documentation on getting started with libfixbuf, as
  * well as detailed documentation on the public API calls and data types.
+ *
+ * [RFC 7011]: https://tools.ietf.org/html/rfc7011
+ * [RFC 7012]: https://tools.ietf.org/html/rfc7012
+ * [RFC 5103]: https://tools.ietf.org/html/rfc5103
+ * [RFC 6313]: https://tools.ietf.org/html/rfc6313
+ * [RFC 5610]: https://tools.ietf.org/html/rfc5610
  *
  * @section Downloading
  *
@@ -73,11 +90,9 @@
  * The customary build procedure (<tt>./configure && make
  * && make install</tt>) should work in most environments.
  *
- * libfixbuf requires glib-2.0 version 2.6.4 or later. If built against
- * version 2.10 or later, it will automatically use the glib slab allocator
- * for increased memory allocation performance. glib is available on most
- * modern Linux distributions and BSD ports collections, or in source form from
- * <a href="http://www.gtk.org">http://www.gtk.org</a>.
+ * libfixbuf requires glib-2.0 version 2.18 or later. glib is available on
+ * most modern Linux distributions and BSD ports collections, or in source
+ * form from <a href="http://www.gtk.org">http://www.gtk.org</a>.
  *
  * libfixbuf automatically uses the getaddrinfo(3) facility and the
  * accompanying dual IPv4/IPv6 stack support if present. getaddrinfo(3)
@@ -120,9 +135,9 @@
  *
  * @section Copyright
  *
- * libfixbuf is copyright 2005-2017 Carnegie Mellon University, and is released
- * under the GNU Lesser General Public License (LGPL). See the COPYING file in
- * the distribution for details.
+ * libfixbuf is copyright 2005-2018 Carnegie Mellon University, and is released
+ * under the GNU Lesser General Public License (LGPL) Version 3.
+ * See the LICENSE.txt file in the distribution for details.
  *
  * libfixbuf was developed at Carnegie Mellon University
  * by Brian Trammell and the CERT Network Situational Awareness Group
@@ -137,8 +152,8 @@
  * Include fixbuf/public.h
  * in order to use the public fixbuf API.
  *
- * This documentation uses IPFIX terminology as defined in RFC 5101,
- * "Specification of the IPFIX Protocol for the Exchange of IP Traffic Flow
+ * This documentation uses IPFIX terminology as defined in RFC 7011,
+ * "Specification of the IPFIX Protocol for the Exchange of Flow
  * Information"
  *
  * The following sections provide information on specific libfixbuf usage:
@@ -208,7 +223,8 @@
  * The fbInfoModelAlloc() call allocates a new Information Model with the
  * IANA-managed information elements (current as of the fixbuf release date)
  * preloaded. Additional vendor-specific information elements may be added
- * with fbInfoModelAddElement() and fbInfoModelAddElementArray().
+ * with fbInfoModelAddElement(), fbInfoModelAddElementArray(),
+ * fbInfoModelReadXMLFile(), and fbInfoModelReadXMLData().
  *
  * To create an Exporter, first create an fbSession_t attached to the
  * application's fbInfoModel_t to hold the Exporter's Transport Session
@@ -261,7 +277,8 @@
  * Using fixbuf to read from IPFIX Files as a Collecting Process is very
  * much like the Export case. Create an fbInfoModel_t using fbInfoModelAlloc()
  * and any additional, vendor-specific information elements using
- * fbInfoModelAddElement() or fbInfoModelAddElementArray().  Next create
+ * fbInfoModelAddElement(), fbInfoModelAddElementArray(),
+ * fbInfoModelReadXMLFile(), or fbInfoModelReadXMLData().  Next create
  * an fbSession_t using fbSessionAlloc() and add internal templates via
  * fbSessionAddTemplate(). External templates do not need to be added
  * for collection, as they will be loaded from templates in the file.
@@ -291,7 +308,8 @@
  * to listen for connections from IPFIX Exporting Processes via the network.
  * To use a listener, first create an fbInfoModel_t using fbInfoModelAlloc()
  * and any additional, vendor-specific information elements using
- * fbInfoModelAddElement() or fbInfoModelAddElementArray().  Next create
+ * fbInfoModelAddElement(), fbInfoModelAddElementArray(),
+ * fbInfoModelReadXMLFile(), or fbInfoModelReadXMLData().  Next create
  * an fbSession_t using fbSessionAlloc() and add internal templates via
  * fbSessionAddTemplate(). Instead of
  * maintaining state for a particular Transport Session, this fbSession_t
@@ -367,7 +385,7 @@
  * protential loss of messages.  Templates over UDP must be re-sent at regular
  * intervals.  Fixbuf does not automatically retransmit messages at regular
  * intervals, it is left to the application author to call
- * fbSessionExportTemplates().  In accordance with RFC 5101, the templates
+ * fbSessionExportTemplates().  In accordance with RFC 7011, the templates
  * should be resent at least three times in the Template refresh timeout
  * period.  Make sure the record size does not exceed the path MTU.
  * libfixbuf will return an error if the message exceeds the path MTU.
@@ -637,10 +655,12 @@
  * To use fixbuf independent of the transport mode, the application must
  * create an fbInfoModel_t using fbInfoModelAlloc()
  * and any additional, vendor-specific information elements using
- * fbInfoModelAddElement() or fbInfoModelAddElementArray().  Next create
+ * fbInfoModelAddElement(), fbInfoModelAddElementArray(),
+ * fbInfoModelReadXMLFile(), or fbInfoModelReadXMLData().  Next create
  * an fbSession_t using fbSessionAlloc() and add internal templates via
  * fbSessionAddTemplate().
- * The application will handle all connections and reading and simply pass fixbuf
+ * The application will handle all connections and reading and simply
+ * pass fixbuf
  * the buffer to be decoded.  The buffer must contain valid IPFIX and should
  * begin with the standard IPFIX header.  Ideally, the application should
  * provide the necessary templates before any data records to ensure that
@@ -837,7 +857,7 @@
  *
  * What is RFC 5610?
  *
- * RFC 5610 provides a mechanism to export full type information for
+ * [RFC 5610][] provides a mechanism to export full type information for
  * Information Elements from the IPFIX Information Model.  Libfixbuf
  * version 1.4 and later provides API functions to create IPFIX
  * Option Template/Records that can encode the full set of properties
@@ -845,15 +865,20 @@
  * Collecting Process to be able to know how to decode data that
  * contains enterprise-specific Information Elements.
  *
+ * [RFC 5610]: https://tools.ietf.org/html/rfc5610
+ *
  * @section exp RFC 5610 Exporters
  *
  * To create a new enterprise-specific Information Element, the
- * Exporting Process should define a new information element using
- * the FB_IE_INIT_FULL() macro to provide the name, private enterprise
+ * Exporting Process should define a new information element using the
+ * FB_IE_INIT_FULL() macro to provide the name, private enterprise
  * number, id, length, description, data type, and units of the
- * information element.  The Information Elements should then be
- * added to the Information Model using fbInfoModelAddElement() or
- * fbInfoModelAddElementArray().
+ * information element.  The Information Elements should then be added
+ * to the Information Model using fbInfoModelAddElement() or
+ * fbInfoModelAddElementArray().  Alternatively, a file or a string
+ * containing an XML registry that describes Information Elements may
+ * be parsed and loaded into the Information Model using
+ * fbInfoModelReadXMLFile() or fbInfoModelReadXMLData().
  *
  * Once an enterprise-specific information element exists, there are
  * two ways to export that information.  The simplest way is to
@@ -928,8 +953,9 @@ extern "C" {
 #endif
 
 
-/*
- * Version check macro
+/**
+ * Evaluates to a non-zero value if the version number of libfixbuf is
+ * at least major.minor.release.
  */
 #define FIXBUF_CHECK_VERSION(major, minor, release)    \
     (FIXBUF_VERSION_MAJOR > (major) || \
@@ -1115,13 +1141,14 @@ typedef struct fbInfoModelIter_st {
 #define FB_IE_F_ENDIAN                          0x00000001
 
 /**
- * Information element reversible flag. If set for an information element
- * with an enterprise number of 0 (an IETF/IANA IE), adding the information
- * element via fbInfoModelAddElement() or fbInfoModelAddElementArray() will
- * cause a second, reverse information element to be added to the model
- * following the conventions in IETF Internet-Draft draft-ietf-ipfix-biflow-03.
- * Note that the reverse PEN has not yet been assigned, so this implementation
- * uses a provisional reverse IE as defined by the macro FB_IE_PEN_REVERSE.
+ * Information element reversible flag.  Adding the information
+ * element via fbInfoModelAddElement() or fbInfoModelAddElementArray()
+ * will cause a second, reverse information element to be added to the
+ * model following the conventions in IETF RFC 5103.  This means that,
+ * it there is no enterprise number, the reverse element will get an
+ * enterprise number of FB_IE_PEN_REVERSE, and if there is an
+ * enterprise number, the reverse element's numeric identifier will
+ * get the FB_IE_VENDOR_BIT_REVERSE bit set.
  */
 #define FB_IE_F_REVERSIBLE                      0x00000040
 
@@ -1272,10 +1299,22 @@ typedef struct fbInfoModelIter_st {
 #define FB_UNITS_ENTRIES                        0x000C0000
 /**
  * An Information Element Units Flag used to describe the units
- * of an information element.  Recently added for layer 2 frames
+ * of an information element.  Added for layer 2 frames
  *
  */
 #define FB_UNITS_FRAMES                         0x000D0000
+/**
+ * An Information Element Units Flag used to describe the units
+ * of an information element.  See RFC 8045.
+ *
+ */
+#define FB_UNITS_PORTS                          0x000E0000
+/**
+ * An Information Element Units Flag used to describe the units
+ * of an information element.  See RFC 5477.
+ *
+ */
+#define FB_UNITS_INFERRED                       0x000F0000
 
 /**
  * Information element length constant for variable-length IE.
@@ -1299,17 +1338,18 @@ typedef struct fbInfoModelIter_st {
 #define FB_IE_SUBTEMPLATE_MULTILIST             293
 
 /**
- * Private enterprise number for reverse information elements
- * (see draft-ietf-ipfix-biflow-03 section 6.1).  If an information element with
- * FB_IE_F_REVERSIBLE and a zero enterprise number (i.e., an IANA-assigned
- * information element) is added to a model, the reverse IE will be generated
- * by setting the enterprise number to this constant.
+ * Private enterprise number for reverse information elements (see RFC
+ * 5103 section 6.1).  If an information element with
+ * FB_IE_F_REVERSIBLE and a zero enterprise number (i.e., an
+ * IANA-assigned information element) is added to a model, the reverse
+ * IE will be generated by setting the enterprise number to this
+ * constant.
  */
 #define FB_IE_PEN_REVERSE                       29305
 
 /**
  * Reverse information element bit for vendor-specific information elements
- * (see draft-ietf-ipfix-biflow-03 section 6.2). If an information element with
+ * (see RFC 5103 section 6.2). If an information element with
  * FB_IE_F_REVERSIBLE and a non-zero enterprise number (i.e., a vendor-specific
  * information element) is added to a model, the reverse IE number will be
  * generated by ORing this bit with the given forward information element
@@ -1357,28 +1397,78 @@ typedef struct fbInfoModelIter_st {
  * subregistry.
  */
 typedef enum fbInfoElementDataType_en {
+    /** The "octetArray" data type: A finite-length string of
+     *  octets. */
     FB_OCTET_ARRAY,
+    /** The "unsigned8" data type: A non-negative integer value in the
+     *  range of 0 to 255 (0xff). */
     FB_UINT_8,
+    /** The "unsigned16" data type: A non-negative integer value in
+     *  the range of 0 to 65535 (0xffff). */
     FB_UINT_16,
+    /** The "unsigned32" data type: A non-negative integer value in
+     *  the range of 0 to 4_294_967_295 (0xffffffff). */
     FB_UINT_32,
+    /** The "unsigned64" data type: A non-negative integer value in
+     *  the range of 0 to 1_844_674_407_370_955_161
+     *  (0xffffffffffffffff). */
     FB_UINT_64,
+    /** The "signed8" data type: An integer value in the range of -128
+     *  to 127. */
     FB_INT_8,
+    /** The "signed16" data type: An integer value in the range of
+     *  -32768 to 32767.*/
     FB_INT_16,
+    /** The "signed32" data type: An integer value in the range of
+     *  -2_147_483_648 to 2_147_483_647.*/
     FB_INT_32,
+    /** The "signed64" data type: An integer value in the range of
+     *  -9_223_372_036_854_775_808 to 9_223_372_036_854_775_807. */
     FB_INT_64,
+    /** The "float32" data type: An IEEE single-precision 32-bit
+     *  floating point type. */
     FB_FLOAT_32,
+    /** The "float64" data type: An IEEE double-precision 64-bit
+     *  floating point type. */
     FB_FLOAT_64,
+    /** The "boolean" data type: A binary value: "true" or "false". */
     FB_BOOL,
+    /** The "macAddress" data type: A MAC-48 address as a string of 6
+     *  octets. */
     FB_MAC_ADDR,
+    /** The "string" data type: A finite-length string of valid
+     *  characters from the Unicode character encoding set. */
     FB_STRING,
+    /** The "dateTimeSeconds" data type: An unsigned 32-bit integer
+     *  containing the number of seconds since the UNIX epoch,
+     *  1970-Jan-01 00:00 UTC.  */
     FB_DT_SEC,
+    /** The "dateTimeMilliseconds" data type: An unsigned 64-bit
+     *  integer containing the number of milliseconds since the UNIX
+     *  epoch, 1970-Jan-01 00:00 UTC.  */
     FB_DT_MILSEC,
+    /** The "dateTimeMicroseconds" data type: Two 32-bit fields where
+     *  the first is the number seconds since the NTP epoch,
+     *  1900-Jan-01 00:00 UTC, and the second is the number of
+     *  1/(2^32) fractional seconds. */
     FB_DT_MICROSEC,
+    /** The "dateTimeMicroseconds" data type: Two 32-bit fields where
+     *  the first is the number seconds since the NTP epoch,
+     *  1900-Jan-01 00:00 UTC, and the second is the number of
+     *  1/(2^32) fractional seconds. */
     FB_DT_NANOSEC,
+    /** The "ipv4Address" data type: A value of an IPv4 address. */
     FB_IP4_ADDR,
+    /** The "ipv6Address" data type: A value of an IPv6 address. */
     FB_IP6_ADDR,
+    /** The "basicList" data type: A structured data element as
+     *  described in RFC6313, Section 4.5.1. */
     FB_BASIC_LIST,
+    /** The "subTemplateList" data type: A structured data element as
+     *  described in RFC6313, Section 4.5.2. */
     FB_SUB_TMPL_LIST,
+    /** The "subTemplateMultiList" data type: A structured data element as
+     *  described in RFC6313, Section 4.5.3. */
     FB_SUB_TMPL_MULTI_LIST
 } fbInfoElementDataType_t;
 
@@ -1436,7 +1526,7 @@ typedef struct fbInfoElement_st {
 
 /**
  * The corresponding struct to the Information Element Type Options Template.
- * If collecting this element, use the function fbInfoElementAddOptRecElem()
+ * If collecting this element, use the function fbInfoElementAddOptRecElement()
  * to add this element to the info model.
  *
  */
@@ -3078,7 +3168,8 @@ fbTemplate_t    *fBufNextCollectionTemplate(
 /**
  * Allocate a new information model. The information model will contain all
  * the default information elements in the IANA-managed number space, and may
- * be extended via fbInfoModelAddElement() and fbInfoModelAddElementArray().
+ * be extended via fbInfoModelAddElement(), fbInfoModelAddElementArray(),
+ * fbInfoModelReadXMLFile(), and fbInfoModelReadXMLData().
  *
  * An Information Model is required to create Templates and Sessions. Each
  * application should have only one Information Model.
@@ -3127,6 +3218,10 @@ void                fbInfoModelAddElement(
  * The ie parameter points to the first information element in an array,
  * usually statically initialized with an array of FB_IE_INIT macros followed
  * by an FB_IE_NULL macro.
+ *
+ * See also fbInfoModelReadXMLFile() and fbInfoModelReadXMLData() for
+ * alternate ways to add information elements to information models.
+ *
  * @param model     An information model
  * @param ie        Pointer to an IE array to copy into the model
  */
@@ -3134,6 +3229,78 @@ void                fbInfoModelAddElement(
 void                fbInfoModelAddElementArray(
     fbInfoModel_t       *model,
     fbInfoElement_t     *ie);
+
+/**
+ * Add information specified in the given XML file to the information
+ * model. The XML file is expected to be in the format used by the
+ * [IANA IPFIX Entities registry][IPFIX XML], with the following two
+ * additions:
+ *
+ * - An `<enterpriseId>` field can be used to mark the enterprise ID for
+ *   an element.
+ *
+ * - A `<reversible>` field can be used to mark an element as
+ *   reversible (as per [RFC 5103][]).  Valid values for this field are
+ *   true, false, yes, no, 1, and 0.
+ *
+ * If the XML being parsed contains registries for the element data
+ * types, semantics, or units, those will be parsed and used to
+ * interpret the corresponding fields in the element records.  (These
+ * registries exist in IANA's registry.)
+ *
+ * A parsed element that already exists in the given InfoModel will be
+ * replace the existing element.
+ * @param model     An information model
+ * @param filename  The file containing the XML description
+ * @param error     Return location for a GError
+ * @return `FALSE` if an error occurred, TRUE on success
+ * @since libfixbuf 2.1.0
+ *
+ * [IPFIX XML]: https://www.iana.org/assignments/ipfix/ipfix.xml
+ * [RFC 5103]: https://tools.ietf.org/html/rfc5103
+ */
+
+gboolean fbInfoModelReadXMLFile(
+    fbInfoModel_t       *model,
+    const gchar         *filename,
+    GError             **error);
+
+/**
+ * Add information specified in the given XML data to the information
+ * model. The XML data is expected to be in the format used by the
+ * [IANA IPFIX Entities registry][IPFIX XML], with the following two
+ * additions:
+ *
+ * - An `<enterpriseId>` field can be used to mark the enterprise ID for
+ *   an element.
+ *
+ * - A `<reversible>` field can be used to mark an element as
+ *   reversible (as per [RFC 5103][]).  Valid values for this field are
+ *   true, false, yes, no, 1, and 0.
+ *
+ * If the XML being parsed contains registries for the element data
+ * types, semantics, or units, those will be parsed and used to
+ * interpret the corresponding fields in the element records.  (These
+ * registries exist in IANA's registry.)
+ *
+ * A parsed element that already exists in the given InfoModel will be
+ * replace the existing element.
+ * @param model         An information model
+ * @param xml_data      A pointer to the XML data
+ * @param xml_data_len  The length of `xml_data` in bytes
+ * @param error         Return location for a GError
+ * @return `FALSE` if an error occurred, TRUE on success
+ * @since libfixbuf 2.1.0
+ *
+ * [IPFIX XML]: https://www.iana.org/assignments/ipfix/ipfix.xml
+ * [RFC 5103]: https://tools.ietf.org/html/rfc5103
+ */
+
+gboolean fbInfoModelReadXMLData(
+    fbInfoModel_t       *model,
+    const gchar         *xml_data,
+    gssize               xml_data_len,
+    GError             **error);
 
 /**
  * Return a pointer to the canonical information element within an information
@@ -3452,6 +3619,17 @@ gboolean            fbTemplateContainsAllFlaggedElementsByName(
 fbInfoElement_t*    fbTemplateGetIndexedIE(
     fbTemplate_t       *tmpl,
     uint32_t            IEindex);
+
+
+/**
+ * Return the information model, as understood by the template.
+ * @param tmpl Template Pointer
+ * @return The information model
+ * @since libfixbuf 2.1.0
+ */
+
+fbInfoModel_t *     fbTemplateGetInfoModel(
+    fbTemplate_t        *tmpl);
 
 /**
  * Free a template if it is not currently in use by any Session. Use this

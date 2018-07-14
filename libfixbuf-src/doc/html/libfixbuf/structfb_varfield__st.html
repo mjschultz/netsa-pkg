@@ -65,26 +65,26 @@ Data Fields</h2></td></tr>
 <tr class="memitem:ac1838178ee38c5a077a025e2aceb2761"><td class="memItemLeft" align="right" valign="top">size_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_varfield__st.html#ac1838178ee38c5a077a025e2aceb2761">len</a></td></tr>
 <tr class="memdesc:ac1838178ee38c5a077a025e2aceb2761"><td class="mdescLeft">&#160;</td><td class="mdescRight">Length of content in buffer.  <a href="#ac1838178ee38c5a077a025e2aceb2761">More...</a><br/></td></tr>
 <tr class="separator:ac1838178ee38c5a077a025e2aceb2761"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a926bfc31164a8b92c4566d1f7659c25c"><td class="memItemLeft" align="right" valign="top">uint8_t *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_varfield__st.html#a926bfc31164a8b92c4566d1f7659c25c">buf</a></td></tr>
-<tr class="memdesc:a926bfc31164a8b92c4566d1f7659c25c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Content buffer.  <a href="#a926bfc31164a8b92c4566d1f7659c25c">More...</a><br/></td></tr>
-<tr class="separator:a926bfc31164a8b92c4566d1f7659c25c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0adc169a3e6ad9adccd350926cd04ea6"><td class="memItemLeft" align="right" valign="top">uint8_t *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_varfield__st.html#a0adc169a3e6ad9adccd350926cd04ea6">buf</a></td></tr>
+<tr class="memdesc:a0adc169a3e6ad9adccd350926cd04ea6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Content buffer.  <a href="#a0adc169a3e6ad9adccd350926cd04ea6">More...</a><br/></td></tr>
+<tr class="separator:a0adc169a3e6ad9adccd350926cd04ea6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>A variable-length field value. </p>
 <p>Variable-length information element content is represented by an fbVarfield_t on the internal side of the transcoder; that is, variable length fields in an IPFIX Message must be represented by this structure within the application record. </p>
 </div><h2 class="groupheader">Field Documentation</h2>
-<a class="anchor" id="a926bfc31164a8b92c4566d1f7659c25c"></a>
+<a class="anchor" id="a0adc169a3e6ad9adccd350926cd04ea6"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">uint8_t* fbVarfield_st::buf</td>
+          <td class="memname">uint8_t * fbVarfield_st::buf</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
 <p>Content buffer. </p>
-<p>In network byte order as appropriate. On write, this buffer will be copied into the message buffer. On read, this buffer points into the message buffer and must be copied by the caller before any call to <a class="el" href="public_8h.html#a11c40f1d55e2d4b29b40eb4c07ce5ee7" title="Retrieve a record from a buffer. ">fBufNext()</a>. </p>
+<p>In network byte order as appropriate. On write, this buffer will be copied into the message buffer. On read, this buffer points into the message buffer and must be copied by the caller before any call to <a class="el" href="public_8c.html#a11c40f1d55e2d4b29b40eb4c07ce5ee7" title="Retrieve a record from a buffer. ">fBufNext()</a>. </p>
 
 </div>
 </div>
@@ -102,7 +102,8 @@ Data Fields</h2></td></tr>
 
 </div>
 </div>
-<hr/>The documentation for this struct was generated from the following file:<ul>
+<hr/>The documentation for this struct was generated from the following files:<ul>
+<li><a class="el" href="public_8c.html">public.c</a></li>
 <li><a class="el" href="public_8h_source.html">public.h</a></li>
 </ul>
 </div><!-- contents -->

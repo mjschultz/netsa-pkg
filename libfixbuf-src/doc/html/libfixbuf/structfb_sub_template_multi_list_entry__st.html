@@ -62,14 +62,14 @@
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Data Fields</h2></td></tr>
-<tr class="memitem:a7a5548bd8e56ec7e7742b23cec987f56"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7a5548bd8e56ec7e7742b23cec987f56"></a>
-<a class="el" href="public_8h.html#a1a98b02ac2e3547d96e839174270af99">fbTemplate_t</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_sub_template_multi_list_entry__st.html#a7a5548bd8e56ec7e7742b23cec987f56">tmpl</a></td></tr>
-<tr class="memdesc:a7a5548bd8e56ec7e7742b23cec987f56"><td class="mdescLeft">&#160;</td><td class="mdescRight">pointer to the template used to structure the data in this entry <br/></td></tr>
-<tr class="separator:a7a5548bd8e56ec7e7742b23cec987f56"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af484483aee78233dd9fc95713a6c845e"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af484483aee78233dd9fc95713a6c845e"></a>
-uint8_t *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_sub_template_multi_list_entry__st.html#af484483aee78233dd9fc95713a6c845e">dataPtr</a></td></tr>
-<tr class="memdesc:af484483aee78233dd9fc95713a6c845e"><td class="mdescLeft">&#160;</td><td class="mdescRight">pointer to the buffer used to hold the data in this entry <br/></td></tr>
-<tr class="separator:af484483aee78233dd9fc95713a6c845e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab9b11a361fe88546f99f29cd9d1afcf8"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab9b11a361fe88546f99f29cd9d1afcf8"></a>
+<a class="el" href="public_8c.html#a1a98b02ac2e3547d96e839174270af99">fbTemplate_t</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_sub_template_multi_list_entry__st.html#ab9b11a361fe88546f99f29cd9d1afcf8">tmpl</a></td></tr>
+<tr class="memdesc:ab9b11a361fe88546f99f29cd9d1afcf8"><td class="mdescLeft">&#160;</td><td class="mdescRight">pointer to the template used to structure the data in this entry <br/></td></tr>
+<tr class="separator:ab9b11a361fe88546f99f29cd9d1afcf8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a404ed55f9dc64b22865d1356e8d63e9d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a404ed55f9dc64b22865d1356e8d63e9d"></a>
+uint8_t *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_sub_template_multi_list_entry__st.html#a404ed55f9dc64b22865d1356e8d63e9d">dataPtr</a></td></tr>
+<tr class="memdesc:a404ed55f9dc64b22865d1356e8d63e9d"><td class="mdescLeft">&#160;</td><td class="mdescRight">pointer to the buffer used to hold the data in this entry <br/></td></tr>
+<tr class="separator:a404ed55f9dc64b22865d1356e8d63e9d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af1e367960d7405950175bae3a4d34964"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af1e367960d7405950175bae3a4d34964"></a>
 size_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structfb_sub_template_multi_list_entry__st.html#af1e367960d7405950175bae3a4d34964">dataLength</a></td></tr>
 <tr class="memdesc:af1e367960d7405950175bae3a4d34964"><td class="mdescLeft">&#160;</td><td class="mdescRight">length of the buffer used to hold the data in this entry <br/></td></tr>
@@ -86,7 +86,8 @@ uint16_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Entries contain the same type of information at SubTemplateLists: template ID and template pointers to describe the data the number of data elements and the data pointer and data length. </p>
 <p>Sub template multi lists are inherently nested constructions. At a high level, they are a list of sub template lists. The first level is a list of fbSubTemplateMultiListEntry_t's, which each contain the information that describes the data contained in them. Initializing a fbSubTemplateMultiList_t with a semantic and number of elements returns memory that contains numElements blocks of memory containing fbSubTemplateMultiListEntry_t's. It is not ready to accept data. Each of the fbSubTemplateMultiListEntry_t's needed to be set up then data is copied into the entries. </p>
-</div><hr/>The documentation for this struct was generated from the following file:<ul>
+</div><hr/>The documentation for this struct was generated from the following files:<ul>
+<li><a class="el" href="public_8c.html">public.c</a></li>
 <li><a class="el" href="public_8h_source.html">public.h</a></li>
 </ul>
 </div><!-- contents -->

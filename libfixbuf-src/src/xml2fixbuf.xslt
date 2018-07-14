@@ -1,5 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!--
+@OPENSOURCE_LICENSE_START@
 libfixbuf 2.0
 
 Copyright 2018 Carnegie Mellon University. All Rights Reserved.
@@ -15,14 +16,17 @@ ANY KIND WITH RESPECT TO FREEDOM FROM PATENT, TRADEMARK, OR
 COPYRIGHT INFRINGEMENT.
 
 Released under a GNU-Lesser GPL 3.0-style license, please see
-License.txt or contact permission@sei.cmu.edu for full terms.
+LICENSE.txt or contact permission@sei.cmu.edu for full terms.
 
 [DISTRIBUTION STATEMENT A] This material has been approved for
 public release and unlimited distribution.  Please see Copyright
 notice for non-US Government use and distribution.
 
-Carnegie Mellon® and CERT® are registered in the U.S. Patent and
-Trademark Office by Carnegie Mellon University.
+Carnegie Mellon(R) and CERT(R) are registered in the U.S. Patent
+and Trademark Office by Carnegie Mellon University.
+
+DM18-0325
+@OPENSOURCE_LICENSE_END@
 -->
 <xsl:stylesheet version="1.0"
                 xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
@@ -41,7 +45,7 @@ Trademark Office by Carnegie Mellon University.
 
   <!-- A list of IE numbers that should not be considered reversible -->
   <xsl:variable name="non-reversible-ie-ids">|148|145|149|137|210|239|</xsl:variable>
-  
+
   <!-- A list if IE groups that should not be considered reversible -->
   <xsl:variable name="non-reversible-ie-groups">|config|processCounter|netflow v9|</xsl:variable>
 
@@ -53,8 +57,8 @@ Trademark Office by Carnegie Mellon University.
     <xsl:value-of select="$array-name"/>
     <xsl:text>[] = {&#10;</xsl:text>
     <xsl:for-each select="//iana:record[iana:dataType]">
-      <xsl:if test="not($target-groups) or 
-                    (iana:group and contains($tgroup, 
+      <xsl:if test="not($target-groups) or
+                    (iana:group and contains($tgroup,
                     concat('|', iana:group, '|')))">
 
         <xsl:text>    FB_IE_INIT_FULL("</xsl:text>
@@ -99,7 +103,7 @@ Trademark Office by Carnegie Mellon University.
           </xsl:when>
           <xsl:when test="iana:dataType = 'unsigned64' or iana:dataType =
                           'signed64' or iana:dataType = 'float64' or
-                          iana:dataType = 'dateTimeMilliseconds' or 
+                          iana:dataType = 'dateTimeMilliseconds' or
                           iana:dataType = 'dateTimeMicroseconds' or
                           iana:dataType = 'dateTimeNanoseconds'">
             <xsl:text>8</xsl:text>
@@ -267,10 +271,10 @@ Trademark Office by Carnegie Mellon University.
           <xsl:when test="not(iana:range)"><xsl:text>0, 0</xsl:text></xsl:when>
           <xsl:otherwise>
             <xsl:variable name="before"
-                          select="normalize-space(substring-before(iana:range, 
+                          select="normalize-space(substring-before(iana:range,
                                   '-'))"/>
             <xsl:variable name="after"
-                          select="normalize-space(substring-after(iana:range, 
+                          select="normalize-space(substring-after(iana:range,
                                   '-'))"/>
             <xsl:choose>
               <xsl:when test="$before and $after and
