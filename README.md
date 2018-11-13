@@ -27,6 +27,7 @@ libltdl-dev | libtool-ltdl-devel
 liblzo2-dev | lzo-devel
 make | make
 rpm | rpm-build
+xsltproc | libxslt
 zlib1g, zlib1g-dev | zlib-devel
 
 To build the .deb and .rpm files you will need a working Ruby installation
