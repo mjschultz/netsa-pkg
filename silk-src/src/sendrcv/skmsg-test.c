@@ -15,7 +15,7 @@
 #undef NDEBUG
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skmsg-test.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: skmsg-test.c 6523223c4e2c 2018-10-31 21:41:01Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sklog.h>
@@ -65,7 +65,7 @@ static const char *test2 = "Test string 2";
 
 static void *
 threada(
-    void        UNUSED(*dummy))
+    void               *dummy)
 {
     int rv;
     sk_sockaddr_t addr;
@@ -76,6 +76,8 @@ threada(
     char *str;
     int i;
     int chan[TRYS];
+
+    SK_UNUSED_PARAM(dummy);
 
     memset(chan, 0, sizeof(chan));
 
@@ -91,7 +93,7 @@ threada(
     DEBUGMSG("Setup A1");
     rv = skMsgQueueCreate(&q);
     assert(rv == 0);
-    rv = skMsgQueueBindTCP(q, &addra);
+    rv = skMsgQueueBind(q, &addra);
     assert(rv == 0);
     sem_post(sem1);
 
@@ -160,7 +162,7 @@ threada(
     DEBUGMSG("Setup A2");
     rv = skMsgQueueCreate(&q);
     assert(rv == 0);
-    rv = skMsgQueueBindTCP(q, &addra);
+    rv = skMsgQueueBind(q, &addra);
     assert(rv == 0);
     sem_post(sem3);
 
@@ -198,7 +200,7 @@ threada(
 
 static void *
 threadb(
-    void        UNUSED(*dummy))
+    void               *dummy)
 {
     int rv;
     sk_msg_queue_t *q;
@@ -206,6 +208,8 @@ threadb(
     skm_channel_t channel, c2, c3;
     sk_msg_t *msg1, *msg2;
     int i;
+
+    SK_UNUSED_PARAM(dummy);
 
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
@@ -224,8 +228,8 @@ threadb(
     /* Test 1 */
     sem_wait(sem1);
     DEBUGMSG("Test 1");
-    rv = skMsgQueueConnectTCP(q, (struct sockaddr *)&addr, sizeof(addr),
-                              &channel);
+    rv = skMsgQueueConnect(q, (struct sockaddr *)&addr, sizeof(addr),
+                           &channel);
     assert(rv == 0);
 
     /* Test 2 */
@@ -289,8 +293,8 @@ threadb(
         assert(rv == 0);
 
         DEBUGMSG("Test 8/%d", i);
-        rv = skMsgQueueConnectTCP(q, (struct sockaddr *)&addr, sizeof(addr),
-                                  &channel);
+        rv = skMsgQueueConnect(q, (struct sockaddr *)&addr, sizeof(addr),
+                               &channel);
         assert(rv == 0);
 
         DEBUGMSG("Shutdown B1/%d", i);
@@ -303,13 +307,15 @@ threadb(
 }
 
 
-int main(int UNUSED(argc), char **argv)
+int main(int argc, char **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
     int rv;
     int status;
     int retval;
     pid_t pa, pb;
+
+    SK_UNUSED_PARAM(argc);
 
     skAppRegister(argv[0]);
     skAppVerifyFeatures(&features, NULL);

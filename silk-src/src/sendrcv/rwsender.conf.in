@@ -3,7 +3,7 @@
 ## The canonical pathname for this file is
 ## @sysconfdir@/@myprog@.conf
 ##
-## RCSIDENT("$SiLK: rwsender.conf.in 57a2b3e91bee 2016-02-01 20:29:38Z mthomas $")
+## RCSIDENT("$SiLK: rwsender.conf.in 8845fdf19700 2018-11-13 22:39:40Z mthomas $")
 ##
 ## This is a /bin/sh file that gets loaded by the init.d/@myprog@
 ## wrapper script, and this file must follow /bin/sh syntax rules.
@@ -227,8 +227,10 @@ POLLING_INTERVAL=
 # (TLS_CERT) and key (TLS_KEY) files.
 #
 # If the PKCS#12 file is password protected, you must set the
-# RWSENDER_TLS_PASSWORD environment variable to the password prior
-# to starting rwsender.
+# RWSENDER_TLS_PASSWORD environment variable to the password prior to
+# starting rwsender.  If RWSENDER_TLS_PASSWORD is not set, it is
+# treated as a null password; set it to the empty string to allow for
+# an empty password.
 
 # The full path to the root CA file, PEM encoded
 TLS_CA=
@@ -241,6 +243,25 @@ TLS_KEY=
 
 # The full path to the program specific certificate file, PEM encoded
 TLS_CERT=
+
+# The full path to the Certificate Revocation List, PEM encoded.
+# Optional.
+TLS_CRL=
+
+# The preference order (priority) for ciphers, key exchange methods,
+# message authentication codes, and compression methods.  Optional.
+# The default is "NORMAL".  Available arguments depend on your version
+# of GnuTLS.
+TLS_PRIORITY=
+
+# The security level to use when generating Diffie-Hellman parameters.
+# One of low, medium, high, or ultra.  Optional.  The default is
+# "medium".
+TLS_SECURITY=
+
+# The debugging level used internally by the GnuTLS library, a number
+# between 0 (no debugging) and 99 inclusive.  Optional.
+TLS_DEBUG_LEVEL=
 
 ###
 

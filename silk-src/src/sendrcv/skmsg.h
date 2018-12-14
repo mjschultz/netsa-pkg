@@ -20,7 +20,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKMSG_H, "$SiLK: skmsg.h 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENTVAR(rcsID_SKMSG_H, "$SiLK: skmsg.h 6523223c4e2c 2018-10-31 21:41:01Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -114,66 +114,19 @@ skMsgQueueCreate(
  *    Start a listener
  */
 int
-skMsgQueueBindTCP(
+skMsgQueueBind(
     sk_msg_queue_t             *queue,
     const sk_sockaddr_array_t  *addr);
-
-#if SK_ENABLE_GNUTLS
-/*
- *    Start a listener
- */
-int
-skMsgQueueBindTLS(
-    sk_msg_queue_t             *queue,
-    const sk_sockaddr_array_t  *addr);
-#endif
 
 /*
  *    Connect to a listening message queue
  */
 int
-skMsgQueueConnectTCP(
+skMsgQueueConnect(
     sk_msg_queue_t     *queue,
     struct sockaddr    *addr,
     socklen_t           addrlen,
     skm_channel_t      *channel);
-
-#if SK_ENABLE_GNUTLS
-/*
- *    Connect to a listening message queue
- */
-int
-skMsgQueueConnectTLS(
-    sk_msg_queue_t     *queue,
-    struct sockaddr    *addr,
-    socklen_t           addrlen,
-    skm_channel_t      *channel);
-
-/*
- *    Set a message queue's CA public key
- */
-int
-skMsgQueueAddCA(
-    sk_msg_queue_t     *queue,
-    const char         *cred_filename);
-
-/*
- *    Set a message queue's Certificate/Keyfile from PKCS 1 PEM files
- */
-int
-skMsgQueueAddCert(
-    sk_msg_queue_t     *queue,
-    const char         *cert_filename,
-    const char         *key_filename);
-
-/*
- *    Set a message queue's Certificate/Keyfile from PKCS 12 PEM files
- */
-int
-skMsgQueueAddPKCS12(
-    sk_msg_queue_t     *queue,
-    const char         *cert_filename,
-    const char         *password);
 
 /*
  *    Clean up after GNU TLS initialization allocations.  Only
@@ -183,8 +136,6 @@ skMsgQueueAddPKCS12(
 void
 skMsgGnuTLSTeardown(
     void);
-
-#endif /* SK_ENABLE_GNUTLS */
 
 /*
  *    Shut down a message queue
@@ -378,6 +329,38 @@ skMsgSetKeepalive(
     sk_msg_queue_t     *queue,
     skm_channel_t       channel,
     uint16_t            keepalive);
+
+/**
+ *    Register the command line switches related to TLS, where
+ *    'passwd_env_name' is the name of the environment variable
+ *    containing the password for the PKCS12 file.
+ *
+ *    Return 0 on success and non-zero on failure.  Do nothing and
+ *    return 0 if GnuTLS support is not available.
+ */
+int
+skMsgTlsOptionsRegister(
+    const char         *passwd_env_name);
+
+/**
+ *    Print the usage/help for each of the command line switches
+ *    related to TLS.  Do nothing if GnuTLS support is not available.
+ */
+void
+skMsgTlsOptionsUsage(
+    FILE               *fh);
+
+/**
+ *    Verify that user either provided no TLS switches or correctly
+ *    provided a set of switches (i.e., there are no conflicting
+ *    switches).  Return 0 if there is no conflict/error, and non-zero
+ *    if there is.  When `tls_available` is provided, its referent is
+ *    set to 0 if TLS is not being used and 1 if it is.
+ */
+int
+skMsgTlsOptionsVerify(
+    unsigned int       *tls_available);
+
 
 /*
  *    Accessor functions on messages

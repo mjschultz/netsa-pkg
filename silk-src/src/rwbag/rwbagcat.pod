@@ -416,7 +416,8 @@ C<192.0.2.1> and C<2001:db8::1> as C<c00000201> and
 C<20010db8000000000000000000000001>, respectively.  May be combined
 with C<zero-padded> and either C<map-v4> or C<unmap-v6>.  B<rwbagcat>
 exits with an error when this format is used on a Bag file whose
-key-type is a timestamp.
+key-type is a timestamp.  B<Note:> This setting does not apply to CIDR
+prefix values which are printed as decimal.
 
 =item canonical
 
@@ -469,7 +470,8 @@ addresses, this setting implies C<no-mixed>, so that
 C<::ffff:192.0.2.1> is printed as
 C<0000:0000:0000:0000:0000:ffff:c000:0201>.  As of SiLK 3.17.0, may be
 combined with any of the above, including C<decimal> and
-C<hexadecimal>.  B<rwbagcat> exits with an error when this format is
+C<hexadecimal>.  As of SiLK 3.18.0, the values of CIDR prefix are also
+zero-padded.  B<rwbagcat> exits with an error when this format is
 used on a Bag file whose key-type is a timestamp.
 
 =item force-ipv6
@@ -943,7 +945,7 @@ B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwbagcat.pod c95fb6174130 2018-04-13 20:33:46Z mthomas $
+$SiLK: rwbagcat.pod eb16f7937853 2018-12-05 17:05:19Z mthomas $
 
 Local Variables:
 mode:text

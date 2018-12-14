@@ -120,10 +120,6 @@
    you don't. */
 #undef HAVE_DECL_FB_ENABLE_SCTP
 
-/* Define to 1 if you have the declaration of `GNUTLS_CERT_EXPIRED', and to 0
-   if you don't. */
-#undef HAVE_DECL_GNUTLS_CERT_EXPIRED
-
 /* Define to 1 if you have the declaration of `HAVE_OPENSSL', and to 0 if you
    don't. */
 #undef HAVE_DECL_HAVE_OPENSSL
@@ -166,9 +162,6 @@
 
 /* Define to 1 if you have the <glob.h> header file. */
 #undef HAVE_GLOB_H
-
-/* Define to 1 if you have the `gnutls_transport_set_lowat' function. */
-#undef HAVE_GNUTLS_TRANSPORT_SET_LOWAT
 
 /* Define to 1 if you have the `imaxdiv' function. */
 #undef HAVE_IMAXDIV

@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skstream.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
+RCSIDENT("$SiLK: skstream.c 5167535cb6e9 2018-12-05 17:28:54Z mthomas $");
 
 #include <silk/skstream.h>
 #include <silk/sksite.h>
@@ -2059,6 +2059,7 @@ skStreamGetLimit(
                 *value = UINT8_MAX;
                 break;
             }
+            break;
           case FT_RWGENERIC:
             switch (rec_version) {
               case 0:

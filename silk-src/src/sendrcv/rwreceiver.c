@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwreceiver.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwreceiver.c 6523223c4e2c 2018-10-31 21:41:01Z mthomas $");
 
 #include <silk/skdaemon.h>
 #include <silk/skdllist.h>
@@ -422,11 +422,13 @@ appSetup(
  */
 static int
 appOptionsHandler(
-    clientData   UNUSED(cData),
+    clientData          cData,
     int                 opt_index,
     char               *opt_arg)
 {
     int rv;
+
+    SK_UNUSED_PARAM(cData);
 
     switch ((appOptionsEnum)opt_index) {
       case OPT_DESTINATION_DIR:
@@ -526,8 +528,9 @@ rwreceiverVerifyOptions(
 
 int
 transferUnblock(
-    transfer_t  UNUSED(*item))
+    transfer_t         *item)
 {
+    SK_UNUSED_PARAM(item);
     return 0;
 }
 

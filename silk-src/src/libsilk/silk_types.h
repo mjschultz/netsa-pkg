@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SILK_TYPES_H, "$SiLK: silk_types.h bb84763f2e4c 2018-03-12 18:29:55Z mthomas $");
+RCSIDENTVAR(rcsID_SILK_TYPES_H, "$SiLK: silk_types.h eb16f7937853 2018-12-05 17:05:19Z mthomas $");
 
 /**
  *  @file
@@ -163,6 +163,16 @@ typedef enum {
  */
 #define SKIPADDR_STRLEN     46
 #define SK_NUM2DOT_STRLEN   SKIPADDR_STRLEN
+
+/**
+ *    Minimum required size of character buffer that holds the printed
+ *    representation of an IP address, a slash ('/'), and a CIDR
+ *    prefix (netblock) designation.  skipaddrCidrString() expects
+ *    (and assumes) a buffer of at least this size.
+ *
+ *    Since SiLK 3.18.0.
+ */
+#define SKIPADDR_CIDR_STRLEN    (SKIPADDR_STRLEN + 4)
 
 /**
  *    How to handle IPv6 Flow records.

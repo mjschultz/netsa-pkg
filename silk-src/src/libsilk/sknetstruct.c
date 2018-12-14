@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sknetstruct.c 95aec76c40ea 2018-03-13 21:09:01Z mthomas $");
+RCSIDENT("$SiLK: sknetstruct.c be7b495f86b1 2018-07-13 20:24:28Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
@@ -317,9 +317,7 @@ netStructureAddCIDRV4(
     const skipaddr_t   *base_ipaddr,
     uint32_t            prefix)
 {
-    /* buffers for an "IP/prefix" and just for an IP */
-    char cidr_buf[SK_NUM2DOT_STRLEN * 2];
-    char ip_buf[SK_NUM2DOT_STRLEN + 1];
+    char ip_buf[SKIPADDR_CIDR_STRLEN];
     /* 'joiner' will point into 'summary_strings' array */
     const char *joiner;
     skipaddr_t ipaddr;
@@ -405,23 +403,23 @@ netStructureAddCIDRV4(
             }
             /* Row label: IP/CIDR or NET_TOTAL_TITLE */
             if (ns->total_level == i) {
-                strncpy(cidr_buf, NET_TOTAL_TITLE, sizeof(cidr_buf));
+                strncpy(ip_buf, NET_TOTAL_TITLE, sizeof(ip_buf));
             } else {
                 ip = prev_ip & ns->cblock.v4[i].cb_mask;
                 skipaddrSetV4(&ipaddr, &ip);
-                snprintf(cidr_buf, sizeof(cidr_buf), "%s/%d",
-                         skipaddrString(ip_buf, &ipaddr, ns->ip_format),
-                         cidr_adjust + ns->cblock.v4[i].cb_bits);
+                skipaddrCidrString(ip_buf, &ipaddr,
+                                   cidr_adjust + ns->cblock.v4[i].cb_bits,
+                                   ns->ip_format);
             }
             if (ns->print_ip_count) {
                 skStreamPrint(ns->outstrm, "%*s%*s%s %" PRIu64 "\n",
                               ns->column[i].co_indent, "",
-                              ns->column[i].co_width, cidr_buf,
+                              ns->column[i].co_width, ip_buf,
                               ns->ip_count_delim, ns->cblock.v4[i].cb_ips[0]);
             } else {
                 skStreamPrint(ns->outstrm, ("%*s%*s%s %" PRIu64 " host%s"),
                               ns->column[i].co_indent, "",
-                              ns->column[i].co_width, cidr_buf,
+                              ns->column[i].co_width, ip_buf,
                               ns->ip_count_delim, ns->cblock.v4[i].cb_ips[0],
                               PLURAL(ns->cblock.v4[i].cb_ips[0]));
                 joiner = NULL;
@@ -542,12 +540,12 @@ netStructureAddCIDRV4(
             /* print IP/netblock and a count of IPs */
             for (i = 0; i < print_count; ++i) {
                 skipaddrSetV4(&ipaddr, &ip);
-                snprintf(cidr_buf, sizeof(cidr_buf), "%s/%d",
-                         skipaddrString(ip_buf, &ipaddr, ns->ip_format),
-                         cidr_adjust + ns->cblock.v4[print_id].cb_bits);
+                skipaddrCidrString(ip_buf, &ipaddr,
+                                   ns->cblock.v4[print_id].cb_bits,
+                                   ns->ip_format);
                 skStreamPrint(ns->outstrm, "%*s%*s%s %" PRIu32 "\n",
                               ns->column[print_id].co_indent, "",
-                              ns->column[print_id].co_width, cidr_buf,
+                              ns->column[print_id].co_width, ip_buf,
                               ns->ip_count_delim,
                               1u << (32 - ns->cblock.v4[print_id].cb_bits));
                 ip += step;
@@ -556,12 +554,12 @@ netStructureAddCIDRV4(
             /* print IP/netblock, IP count, sub-netblock count */
             for (i = 0; i < print_count; ++i) {
                 skipaddrSetV4(&ipaddr, &ip);
-                snprintf(cidr_buf, sizeof(cidr_buf), "%s/%d",
-                         skipaddrString(ip_buf, &ipaddr, ns->ip_format),
-                         cidr_adjust + ns->cblock.v4[print_id].cb_bits);
+                skipaddrCidrString(ip_buf, &ipaddr,
+                                   ns->cblock.v4[print_id].cb_bits,
+                                   ns->ip_format);
                 skStreamPrint(ns->outstrm, "%*s%*s%s %" PRIu32 " hosts",
                               ns->column[print_id].co_indent, "",
-                              ns->column[print_id].co_width, cidr_buf,
+                              ns->column[print_id].co_width, ip_buf,
                               ns->ip_count_delim,
                               1u << (32 - ns->cblock.v4[print_id].cb_bits));
                 joiner = NULL;
@@ -613,19 +611,18 @@ netStructureAddCIDRV4(
             }
             /* mask the IP for printing */
             skipaddrApplyCIDR(&ipaddr, ns->cblock.v4[i].cb_bits);
-            snprintf(cidr_buf, sizeof(cidr_buf), "%s/%d",
-                     skipaddrString(ip_buf, &ipaddr, ns->ip_format),
-                     cidr_adjust + ns->cblock.v4[i].cb_bits);
+            skipaddrCidrString(ip_buf, &ipaddr, ns->cblock.v4[i].cb_bits,
+                               ns->ip_format);
             if (ns->print_ip_count) {
                 skStreamPrint(ns->outstrm, "%*s%*s%s %" PRIu32 "\n",
                               ns->column[i].co_indent, "",
-                              ns->column[i].co_width, cidr_buf,
+                              ns->column[i].co_width, ip_buf,
                               ns->ip_count_delim,
                               1u << (32 - ns->cblock.v4[i].cb_bits));
             } else {
                 skStreamPrint(ns->outstrm, "%*s%*s%s %" PRIu32 " hosts",
                               ns->column[i].co_indent, "",
-                              ns->column[i].co_width, cidr_buf,
+                              ns->column[i].co_width, ip_buf,
                               ns->ip_count_delim,
                               1u << (32 - ns->cblock.v4[i].cb_bits));
                 joiner = NULL;
@@ -660,9 +657,7 @@ netStructureAddCIDRV6(
     const skipaddr_t   *base_ipaddr,
     uint32_t            prefix)
 {
-    /* buffers for an "IP/prefix" and just for an IP */
-    char cidr_buf[SK_NUM2DOT_STRLEN * 2];
-    char ip_buf[SK_NUM2DOT_STRLEN + 1];
+    char ip_buf[SKIPADDR_CIDR_STRLEN];
     /* buffer for holding 128-bit counters */
     char count_buf[64];
     /* 'joiner' will point into 'summary_strings' array */
@@ -763,25 +758,24 @@ netStructureAddCIDRV6(
 
             /* Row label: IP/CIDR or NET_TOTAL_TITLE */
             if (ns->total_level == i) {
-                strncpy(cidr_buf, NET_TOTAL_TITLE, sizeof(cidr_buf));
+                strncpy(ip_buf, NET_TOTAL_TITLE, sizeof(ip_buf));
             } else {
                 NS128_COPY_AND_MASK(&ip, &prev_ip, ns->cblock.v6[i].cb_bits);
                 NS128_TO_IPADDR(&ip, &ipaddr);
-                snprintf(cidr_buf, sizeof(cidr_buf), "%s/%d",
-                         skipaddrString(ip_buf, &ipaddr, ns->ip_format),
-                         ns->cblock.v6[i].cb_bits);
+                skipaddrCidrString(ip_buf, &ipaddr, ns->cblock.v6[i].cb_bits,
+                                   ns->ip_format);
             }
             netStructureNS128ToString(&ns->cblock.v6[i].cb_ips[0],
                                       count_buf, sizeof(count_buf));
             if (ns->print_ip_count) {
                 skStreamPrint(ns->outstrm, "%*s%*s%s %s\n",
                               ns->column[i].co_indent, "",
-                              ns->column[i].co_width, cidr_buf,
+                              ns->column[i].co_width, ip_buf,
                               ns->ip_count_delim, count_buf);
             } else {
                 skStreamPrint(ns->outstrm, ("%*s%*s%s %s host%s"),
                               ns->column[i].co_indent, "",
-                              ns->column[i].co_width, cidr_buf,
+                              ns->column[i].co_width, ip_buf,
                               ns->ip_count_delim, count_buf,
                               NS128_PLURAL(&ns->cblock.v6[i].cb_ips[0]));
                 joiner = NULL;
@@ -932,15 +926,15 @@ netStructureAddCIDRV6(
             /* print IP/netblock and a count of IPs */
             for (i = 0; i < print_count.ip[1]; ++i) {
                 NS128_TO_IPADDR(&ip, &ipaddr);
-                snprintf(cidr_buf, sizeof(cidr_buf), "%s/%d",
-                         skipaddrString(ip_buf, &ipaddr, ns->ip_format),
-                         ns->cblock.v6[print_id].cb_bits);
+                skipaddrCidrString(ip_buf, &ipaddr,
+                                   ns->cblock.v6[print_id].cb_bits,
+                                   ns->ip_format);
                 NS128_SET_TO_POWER2(&count,
                                     (128 - ns->cblock.v6[print_id].cb_bits));
                 netStructureNS128ToString(&count, count_buf, sizeof(count_buf));
                 skStreamPrint(ns->outstrm, "%*s%*s%s %s\n",
                               ns->column[print_id].co_indent, "",
-                              ns->column[print_id].co_width, cidr_buf,
+                              ns->column[print_id].co_width, ip_buf,
                               ns->ip_count_delim, count_buf);
                 NS128_ADD_NS128(&ip, &print_step);
             }
@@ -948,15 +942,15 @@ netStructureAddCIDRV6(
             /* print IP/netblock, IP count, sub-netblock count */
             for (i = 0; i < print_count.ip[1]; ++i) {
                 NS128_TO_IPADDR(&ip, &ipaddr);
-                snprintf(cidr_buf, sizeof(cidr_buf), "%s/%d",
-                         skipaddrString(ip_buf, &ipaddr, ns->ip_format),
-                         ns->cblock.v6[print_id].cb_bits);
+                skipaddrCidrString(ip_buf, &ipaddr,
+                                   ns->cblock.v6[print_id].cb_bits,
+                                   ns->ip_format);
                 NS128_SET_TO_POWER2(&count,
                                     (128 - ns->cblock.v6[print_id].cb_bits));
                 netStructureNS128ToString(&count, count_buf, sizeof(count_buf));
                 skStreamPrint(ns->outstrm, "%*s%*s%s %s hosts",
                               ns->column[print_id].co_indent, "",
-                              ns->column[print_id].co_width, cidr_buf,
+                              ns->column[print_id].co_width, ip_buf,
                               ns->ip_count_delim, count_buf);
                 joiner = NULL;
                 for (j = print_id - 1; j > 0; --j) {
@@ -1009,22 +1003,21 @@ netStructureAddCIDRV6(
             }
             /* mask the IP for printing */
             skipaddrApplyCIDR(&ipaddr, ns->cblock.v6[i].cb_bits);
-            snprintf(cidr_buf, sizeof(cidr_buf), "%s/%d",
-                     skipaddrString(ip_buf, &ipaddr, ns->ip_format),
-                     ns->cblock.v6[i].cb_bits);
+            skipaddrCidrString(ip_buf, &ipaddr, ns->cblock.v6[i].cb_bits,
+                               ns->ip_format);
             if (ns->print_ip_count) {
                 NS128_SET_TO_POWER2(&count, (128 - ns->cblock.v6[i].cb_bits));
                 netStructureNS128ToString(&count, count_buf, sizeof(count_buf));
                 skStreamPrint(ns->outstrm, "%*s%*s%s %s\n",
                               ns->column[i].co_indent, "",
-                              ns->column[i].co_width, cidr_buf,
+                              ns->column[i].co_width, ip_buf,
                               ns->ip_count_delim, count_buf);
             } else {
                 NS128_SET_TO_POWER2(&count, (128 - ns->cblock.v6[i].cb_bits));
                 netStructureNS128ToString(&count, count_buf, sizeof(count_buf));
                 skStreamPrint(ns->outstrm, "%*s%*s%s %s hosts",
                               ns->column[i].co_indent, "",
-                              ns->column[i].co_width, cidr_buf,
+                              ns->column[i].co_width, ip_buf,
                               ns->ip_count_delim, count_buf);
                 joiner = NULL;
                 for (j = i-1; j > 0; --j) {
@@ -1079,9 +1072,7 @@ netStructureAddKeyCounterV4(
     const skipaddr_t   *ipaddr,
     const uint64_t     *count)
 {
-    /* buffers for an "IP/prefix" and just for an IP */
-    char cidr_buf[SK_NUM2DOT_STRLEN * 2];
-    char ip_buf[SK_NUM2DOT_STRLEN + 1];
+    char ip_buf[SKIPADDR_CIDR_STRLEN];
     /* 'joiner' will point into 'summary_strings' array */
     const char *joiner;
     uint32_t ip;
@@ -1144,21 +1135,20 @@ netStructureAddKeyCounterV4(
             }
             /* Row label: IP/CIDR or NET_TOTAL_TITLE */
             if (ns->total_level == i) {
-                strncpy(cidr_buf, NET_TOTAL_TITLE, sizeof(cidr_buf));
+                strncpy(ip_buf, NET_TOTAL_TITLE, sizeof(ip_buf));
             } else {
                 skipaddr_t tmp_ipaddr;
                 uint32_t tmp_ip;
 
                 tmp_ip = prev_ip & ns->cblock.v4[i].cb_mask;
                 skipaddrSetV4(&tmp_ipaddr, &tmp_ip);
-                snprintf(cidr_buf, sizeof(cidr_buf), "%s/%u",
-                         skipaddrString(ip_buf, &tmp_ipaddr, ns->ip_format),
-                         ns->cblock.v4[i].cb_bits);
+                skipaddrCidrString(ip_buf, &tmp_ipaddr,
+                                   ns->cblock.v4[i].cb_bits, ns->ip_format);
             }
             if (!ns->print_summary) {
                 skStreamPrint(ns->outstrm, ("%*s%*s%s%*" PRIu64 "%s\n"),
                               ns->column[i].co_indent, "",
-                              ns->column[i].co_width, cidr_buf,
+                              ns->column[i].co_width, ip_buf,
                               ns->ip_count_delim,
                               ns->count_width, ns->cblock.v4[i].cb_sum,
                               ns->count_eol_delim);
@@ -1166,7 +1156,7 @@ netStructureAddKeyCounterV4(
                 skStreamPrint(ns->outstrm,
                               ("%*s%*s%s%*" PRIu64 "%s %" PRIu64 " host%s"),
                               ns->column[i].co_indent, "",
-                              ns->column[i].co_width, cidr_buf,
+                              ns->column[i].co_width, ip_buf,
                               ns->ip_count_delim,
                               ns->count_width, ns->cblock.v4[i].cb_sum,
                               ns->count_eol_delim, ns->cblock.v4[i].cb_ips[0],
@@ -1240,9 +1230,7 @@ netStructureAddKeyCounterV6(
     const skipaddr_t   *ipaddr,
     const uint64_t     *count)
 {
-    /* buffers for an "IP/prefix" and just for an IP */
-    char cidr_buf[SK_NUM2DOT_STRLEN * 2];
-    char ip_buf[SK_NUM2DOT_STRLEN + 1];
+    char ip_buf[SKIPADDR_CIDR_STRLEN];
     /* buffers for holding 128-bit counters */
     char count_buf[64];
     char sum_buf[64];
@@ -1318,23 +1306,22 @@ netStructureAddKeyCounterV6(
 
             /* Row label: IP/CIDR or NET_TOTAL_TITLE */
             if (ns->total_level == i) {
-                strncpy(cidr_buf, NET_TOTAL_TITLE, sizeof(cidr_buf));
+                strncpy(ip_buf, NET_TOTAL_TITLE, sizeof(ip_buf));
             } else {
                 skipaddr_t tmp_ipaddr;
                 ns128_t tmp_ip;
 
                 NS128_COPY_AND_MASK(&tmp_ip,&prev_ip,ns->cblock.v6[i].cb_bits);
                 NS128_TO_IPADDR(&tmp_ip, &tmp_ipaddr);
-                snprintf(cidr_buf, sizeof(cidr_buf), "%s/%u",
-                         skipaddrString(ip_buf, &tmp_ipaddr, ns->ip_format),
-                         ns->cblock.v6[i].cb_bits);
+                skipaddrCidrString(ip_buf, &tmp_ipaddr,
+                                   ns->cblock.v6[i].cb_bits, ns->ip_format);
             }
             netStructureNS128ToString(&ns->cblock.v6[i].cb_sum,
                                       sum_buf, sizeof(sum_buf));
             if (!ns->print_summary) {
                 skStreamPrint(ns->outstrm, "%*s%*s%s%*s%s\n",
                               ns->column[i].co_indent, "",
-                              ns->column[i].co_width, cidr_buf,
+                              ns->column[i].co_width, ip_buf,
                               ns->ip_count_delim,
                               ns->count_width, sum_buf,
                               ns->count_eol_delim);
@@ -1344,7 +1331,7 @@ netStructureAddKeyCounterV6(
                 skStreamPrint(ns->outstrm,
                               ("%*s%*s%s%*s%s %s host%s"),
                               ns->column[i].co_indent, "",
-                              ns->column[i].co_width, cidr_buf,
+                              ns->column[i].co_width, ip_buf,
                               ns->ip_count_delim,
                               ns->count_width, sum_buf,
                               ns->count_eol_delim, count_buf,
@@ -1695,8 +1682,15 @@ netStructureParseV4(
                     /* parsed a value, move to last char of the value */
                     cp += rv - 1;
                 } else {
-                    skAppPrintErr("Invalid network-structure '%s': %s",
-                                  input, skStringParseStrerror(rv));
+                    const char *err2 = "";
+#if SK_ENABLE_IPV6
+                    if (rv == SKUTILS_ERR_MAXIMUM) {
+                        err2 = ("; prepend \"v6:\" to argument to"
+                                " allow IPv6 prefixes");
+                    }
+#endif  /* SK_ENABLE_IPV6 */
+                    skAppPrintErr("Invalid network-structure '%s': %s%s",
+                                  input, skStringParseStrerror(rv), err2);
                     return 1;
                 }
                 block[val] |= i;
@@ -2125,7 +2119,9 @@ netStructurePreparePrint(
             }
         }
     } else if (ns->is_ipv6) {
-        if (ns->cblock.v6[last_level].cb_bits < 10) {
+        if (SKIPADDR_ZEROPAD & ns->ip_format) {
+            width += 4;
+        } else if (ns->cblock.v6[last_level].cb_bits < 10) {
             /* Allow for something like "/8" */
             width += 2;
         } else if (ns->cblock.v6[last_level].cb_bits < 100) {
@@ -2136,7 +2132,9 @@ netStructurePreparePrint(
             width += 4;
         }
     } else if (SKIPADDR_MAP_V4 & ns->ip_format) {
-        if (ns->cblock.v4[last_level].cb_bits < (100 - 96)) {
+        if (SKIPADDR_ZEROPAD & ns->ip_format) {
+            width += 4;
+        } else if (ns->cblock.v4[last_level].cb_bits < (100 - 96)) {
             /* Allow for something like "/96" */
             width += 3;
         } else {
@@ -2144,7 +2142,9 @@ netStructurePreparePrint(
             width += 4;
         }
     } else {
-        if (ns->cblock.v4[last_level].cb_bits < 10) {
+        if (SKIPADDR_ZEROPAD & ns->ip_format) {
+            width += 3;
+        } else if (ns->cblock.v4[last_level].cb_bits < 10) {
             /* Allow for something like "/8" */
             width += 2;
         } else {

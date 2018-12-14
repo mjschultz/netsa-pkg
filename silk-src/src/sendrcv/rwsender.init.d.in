@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #######################################################################
-# RCSIDENT("$SiLK: rwsender.init.d.in 7e4bf7c4f743 2017-05-09 20:29:51Z mthomas $")
+# RCSIDENT("$SiLK: rwsender.init.d.in 8845fdf19700 2018-11-13 22:39:40Z mthomas $")
 #######################################################################
 
 # rwsender start/control script
@@ -177,10 +177,26 @@ PROG_OPTIONS="${PROG_OPTIONS} --identifier=${IDENTIFIER}"
 
 # Add GnuTLS options
 if test -n "${TLS_CA}" ; then
+    PROG_OPTIONS="${PROG_OPTIONS} --tls-ca='${TLS_CA}'"
     if test -n "${TLS_PKCS12}" ; then
-        PROG_OPTIONS="${PROG_OPTIONS} --tls-ca='${TLS_CA}' --tls-pkcs12='${TLS_PKCS12}'"
+        PROG_OPTIONS="${PROG_OPTIONS} --tls-pkcs12='${TLS_PKCS12}'"
+    elif test -z "${TLS_KEY}" || test -z "${TLS_CERT}" ; then
+        echo "$0: Setting TLS_CA requires setting either TLS_PKCS12 or both TLS_KEY and TLS_CERT."
+        exit 1
     else
-        PROG_OPTIONS="${PROG_OPTIONS} --tls-ca='${TLS_CA}' --tls-key='${TLS_KEY}' --tls-cert='${TLS_CERT}'"
+        PROG_OPTIONS="${PROG_OPTIONS} --tls-key='${TLS_KEY}' --tls-cert='${TLS_CERT}'"
+    fi
+    if test -n "${TLS_PRIORITY}" ; then
+        PROG_OPTIONS="${PROG_OPTIONS} --tls-priority='${TLS_PRIORITY}'"
+    fi
+    if test -n "${TLS_SECURITY}" ; then
+        PROG_OPTIONS="${PROG_OPTIONS} --tls-security=${TLS_SECURITY}"
+    fi
+    if test -n "${TLS_CRL}" ; then
+        PROG_OPTIONS="${PROG_OPTIONS} --tls-crl='${TLS_CRL}'"
+    fi
+    if test -n "${TLS_DEBUG_LEVEL}" ; then
+        PROG_OPTIONS="${PROG_OPTIONS} --tls-debug-level=${TLS_DEBUG_LEVEL}"
     fi
 fi
 

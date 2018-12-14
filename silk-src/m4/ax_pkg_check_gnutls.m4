@@ -4,7 +4,7 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in ../LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: ax_pkg_check_gnutls.m4 d671fbbb6b9a 2018-04-06 16:04:18Z mthomas $")
+dnl RCSIDENT("$SiLK: ax_pkg_check_gnutls.m4 183c9f4b8881 2018-12-11 19:37:01Z mthomas $")
 
 
 # ---------------------------------------------------------------------------
@@ -15,8 +15,7 @@ dnl RCSIDENT("$SiLK: ax_pkg_check_gnutls.m4 d671fbbb6b9a 2018-04-06 16:04:18Z mt
 #    version.
 #
 #    Output variables:  GNUTLS_CFLAGS, GNUTLS_LDFLAGS
-#    Output definitions: ENABLE_GNUTLS, HAVE_DECL_GNUTLS_CERT_EXPIRED,
-#                        HAVE_GNUTLS_TRANSPORT_SET_LOWAT
+#    Output definitions: ENABLE_GNUTLS
 #
 AC_DEFUN([AX_PKG_CHECK_GNUTLS],[
     AC_SUBST(GNUTLS_CFLAGS)
@@ -157,11 +156,6 @@ gnutls_global_init();
         if test "x${ENABLE_GNUTLS}" = "x1"
         then
             AC_MSG_RESULT([yes])
-
-            # This function went away in GnuTLS 3.0.0
-            AC_CHECK_FUNCS([gnutls_transport_set_lowat])
-            # This was added in GnuTLS 2.6.6
-            AC_CHECK_DECLS([GNUTLS_CERT_EXPIRED], [], [], [[#include <gnutls/gnutls.h>]])
         else
             AC_MSG_RESULT([no])
             AC_MSG_NOTICE([Building without GnuTLS support: pkg-config found gnutls-${sk_pkg_modversion} but failed to compile a program that uses it. Details in config.log])
@@ -188,40 +182,6 @@ gnutls_global_init();
         [Define to 1 build with support for GnuTLS.  Define to 0 otherwise.
          Requires the GnuTLS library and the <gnutls/gnutls.h> header file.])
 ])# AX_PKG_CHECK_GNUTLS
-
-
-# ---------------------------------------------------------------------------
-# AX_CHECK_LIBGCRYPT
-#
-#    Determine how to use libgcrypt.  Used when configuring gnutls
-#    since pkgconfig/gnutls.pc may not include -lgcrypt (which makes
-#    me wonder what the point on pkgconfig is).
-#
-AC_DEFUN([AX_CHECK_LIBGCRYPT],[
-    AC_ARG_WITH([libgcrypt],[AS_HELP_STRING([--with-libgcrypt-config=CONFIG_PROG],
-            [specify location of the libgcrypt cryptographic library configuration program; find "libgcrypt-config" at CONFIG_PROG [auto]])[]dnl
-        ],[
-            if test "x${withval}" != "xyes"
-            then
-                libgcrypt_config="${withval}"
-            fi
-    ])
-
-    ENABLE_LIBGCRYPT=0
-    if test "x${libgcrypt_config}" = "x"
-    then
-        AC_PATH_PROG([IGNORE_LIBGCRYPT_CONFIG], [libgcrypt-config], [no])
-        libgcrypt_config=${IGNORE_LIBGCRYPT_CONFIG}
-    fi
-
-    if test "x${libgcrypt_config}" != "xno"
-    then
-        # Just extract the values but don't check them here; we'll let
-        # gnutls do the checking
-        LIBGCRYPT_LDFLAGS=`${libgcrypt_config} --libs 2>/dev/null`
-        LIBGCRYPT_CFLAGS=`${libgcrypt_config} --cflags 2>/dev/null`
-    fi
-])# AX_CHECK_LIBGCRYPT
 
 dnl Local Variables:
 dnl mode:autoconf

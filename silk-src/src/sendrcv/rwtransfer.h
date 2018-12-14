@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWTRANSFER_H, "$SiLK: rwtransfer.h 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENTVAR(rcsID_RWTRANSFER_H, "$SiLK: rwtransfer.h 6523223c4e2c 2018-10-31 21:41:01Z mthomas $");
 
 /*
 **  rwtransfer.h
@@ -177,11 +177,6 @@ int
 transferVerifyOptions(
     void);
 
-int
-optionsFileCheck(
-    const char         *opt_name,
-    const char         *opt_arg);
-
 transfer_t *
 initTemp(
     void);
@@ -257,12 +252,12 @@ extern volatile int shuttingdown;
 
 /* Return -1 on fatal error, 1 if at least one file was transferred, 0
  * otherwise */
-extern int
+int
 transferFiles(
     sk_msg_queue_t     *q,
     skm_channel_t       channel,
     transfer_t         *rcvr);
-extern int
+int
 transferUnblock(
     transfer_t         *item);
 

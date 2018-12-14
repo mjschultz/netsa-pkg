@@ -21,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: ipfixsource.c f7a89df0ba0f 2018-03-15 22:06:43Z mthomas $");
+RCSIDENT("$SiLK: ipfixsource.c e96145253857 2018-12-05 16:51:41Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/redblack.h>
@@ -559,12 +559,15 @@ fbInfoModel_t *
 skiInfoModel(
     void)
 {
-    if (!ski_model) {
-        ski_model = fbInfoModelAlloc();
+    fbInfoModel_t *m = ski_model;
+
+    if (!m) {
+        m = fbInfoModelAlloc();
         /* call a function in infomodel.c to update the info model
          * with the info elements defined in the .xml file(s) in the
          * infomodel subdirectory */
-        infomodelAddGlobalElements(ski_model);
+        infomodelAddGlobalElements(m);
+        ski_model = m;
     }
     return ski_model;
 }
@@ -576,9 +579,11 @@ void
 skiInfoModelFree(
     void)
 {
-    if (ski_model) {
-        fbInfoModelFree(ski_model);
-        ski_model = NULL;
+    fbInfoModel_t *m = ski_model;
+
+    ski_model = NULL;
+    if (m) {
+        fbInfoModelFree(m);
     }
 }
 
@@ -613,36 +618,50 @@ skiTeardown(
 static fbListener_t *
 skiCreateListener(
     fbConnSpec_t           *spec,
-    fbListenerAppInit_fn    appinit,
-    fbListenerAppFree_fn    appfree,
     GError                **err)
 {
     fbSession_t *session;
+    fbListener_t *listener;
+    int created_vec = 0;
+
+    TRACE_ENTRY;
+
+    ASSERT_MUTEX_LOCKED(&create_listener_mutex);
 
     /* The session is not owned by the buffer or the listener, so
      * maintain a vector of them for later destruction. */
     if (!session_list) {
         session_list = skVectorNew(sizeof(fbSession_t *));
         if (session_list == NULL) {
-            return NULL;
+            TRACE_RETURN(NULL);
         }
+        created_vec = 1;
     }
+    /* fixbuf (glib) exits on allocation error */
     session = fbSessionAlloc(skiInfoModel());
 
     /* Initialize session for reading */
     if (!skiSessionInitReader(session, err)) {
-        fbSessionFree(session);
-        return NULL;
+        goto ERROR;
     }
     if (skVectorAppendValue(session_list, &session) != 0) {
-        fbSessionFree(session);
-        return NULL;
+        goto ERROR;
     }
 
-    /* Allocate a listener.  'appinit' is called on each collection
-     * attempt; vetoes connection attempts and creates application
-     * context. */
-    return fbListenerAlloc(spec, session, appinit, appfree, err);
+    /* Allocate a listener.  'fixbufConnect' is called on each
+     * collection attempt; vetoes connection attempts and creates
+     * application context. */
+    listener = fbListenerAlloc(spec, session, fixbufConnect,
+                               fixbufDisconnect, err);
+    TRACE_RETURN(listener);
+
+  ERROR:
+    fbSessionFree(session);
+    if (created_vec) {
+        skVectorDestroy(session_list);
+        session_list = NULL;
+    }
+    TRACE_RETURN(NULL);
 }
 
 
@@ -750,6 +769,9 @@ ipfixSourceCreateFromFile(
     if (base == NULL) {
         goto ERROR;
     }
+    pthread_mutex_lock(&global_tree_mutex);
+    ++source_base_count;
+    pthread_mutex_unlock(&global_tree_mutex);
 
     /* Create the source object */
     source = (skIPFIXSource_t*)calloc(1, sizeof(*source));
@@ -780,18 +802,13 @@ ipfixSourceCreateFromFile(
     source->name = skpcProbeGetName(probe);
 
     /* Create a file-based fBuf_t for the source */
-    pthread_mutex_lock(&create_listener_mutex);
     source->readbuf = skiCreateReadBufferForFP(source->fileptr.of_fp, &err);
-    pthread_mutex_unlock(&create_listener_mutex);
     if (source->readbuf == NULL) {
         if (err) {
             ERRMSG("%s: %s", "skiCreateReadBufferForFP", err->message);
         }
         goto ERROR;
     }
-    pthread_mutex_lock(&global_tree_mutex);
-    ++source_base_count;
-    pthread_mutex_unlock(&global_tree_mutex);
 
     pthread_mutex_init(&source->stats_mutex, NULL);
 
@@ -810,6 +827,12 @@ ipfixSourceCreateFromFile(
     }
     if (base) {
         free(base);
+        pthread_mutex_lock(&global_tree_mutex);
+        --source_base_count;
+        if (0 == source_base_count) {
+            skiInfoModelFree();
+        }
+        pthread_mutex_unlock(&global_tree_mutex);
     }
     TRACE_RETURN(NULL);
 }
@@ -918,7 +941,7 @@ ipfixSourceBaseAddIPFIXSource(
 
 void
 ipfixSourceBaseFreeListener(
-    skIPFIXSourceBase_t *base)
+    skIPFIXSourceBase_t    *base)
 {
     ASSERT_MUTEX_LOCKED(&base->mutex);
 
@@ -935,6 +958,127 @@ ipfixSourceBaseFreeListener(
     fbListenerFree(base->listener);
     base->listener = NULL;
 }
+
+
+/*
+ *    Adds the skIPFIXSourceBase_t object 'base' to the global
+ *    red-black tree of base objects, creating the tree if it does not
+ *    exist.  Returns 0 on success and -1 on failure.
+ */
+static int
+ipfixSourceBaseAddToGlobalList(
+    skIPFIXSourceBase_t    *base)
+{
+    const void *rv;
+
+    pthread_mutex_lock(&global_tree_mutex);
+
+    if (listener_to_source_base == NULL) {
+        listener_to_source_base = rbinit(listener_to_source_base_find, NULL);
+        if (listener_to_source_base == NULL) {
+            pthread_mutex_unlock(&global_tree_mutex);
+            return -1;
+        }
+    }
+
+    rv = rbsearch(base, listener_to_source_base);
+    pthread_mutex_unlock(&global_tree_mutex);
+
+    if (base != rv) {
+        if (NULL == rv) {
+            CRITMSG("Out of memory");
+        } else {
+            CRITMSG("Duplicate listener created");
+        }
+        return -1;
+    }
+    return 0;
+}
+
+
+#if 0
+/*
+ *    The following is #if 0'ed out because it fails to do what it
+ *    is intended to do.
+ *
+ *    The issue appears to be that fixbuf and SiLK use different
+ *    flags to getaddrinfo(), which changes the set of addresses
+ *    that are returned.
+ */
+/*
+ *    fixbuf does not return an error when it cannot bind to any
+ *    listening address, which means the application can start
+ *    correctly but not be actively listening.  The following code
+ *    attempts to detect this situation before creating the fixbuf
+ *    listener by binding to the port.
+ *
+ *    Return 0 when able to successfully bind to the address or -1
+ *    otherwise.
+ */
+static int
+ipfixSourceBaseVerifyOpenPort(
+    const sk_sockaddr_array_t  *listen_address)
+{
+    const sk_sockaddr_t *addr;
+    char addr_name[PATH_MAX];
+    int *sock_array;
+    int *s;
+    uint16_t port = 0;
+
+    s = sock_array = (int *)calloc(skSockaddrArrayGetSize(listen_address),
+                                   sizeof(int));
+    if (sock_array == NULL) {
+        return -1;
+    }
+
+    DEBUGMSG(("Attempting to bind %" PRIu32 " addresses for %s"),
+             skSockaddrArrayGetSize(listen_address),
+             skSockaddrArrayGetHostPortPair(listen_address));
+    for (i = 0; i < skSockaddrArrayGetSize(listen_address); ++i) {
+        addr = skSockaddrArrayGet(listen_address, i);
+        skSockaddrString(addr_name, sizeof(addr_name), addr);
+
+        /* Get a socket */
+        *s = socket(addr->sa.sa_family, SOCK_DGRAM, 0);
+        if (-1 == *s) {
+            DEBUGMSG("Skipping %s: Unable to create dgram socket: %s",
+                     addr_name, strerror(errno));
+            continue;
+        }
+        /* Bind socket to port */
+        if (bind(*s, &addr->sa, skSockaddrLen(addr)) == -1) {
+            DEBUGMSG("Skipping %s: Unable to bind: %s",
+                     addr_name, strerror(errno));
+            close(*s);
+            *s = -1;
+            continue;
+        }
+        DEBUGMSG("Bound %s for listening", addr_name);
+        ++s;
+        if (0 == port) {
+            port = skSockaddrGetPort(addr);
+        }
+        assert(port == skSockaddrGetPort(addr));
+    }
+
+    if (s == sock_array) {
+        ERRMSG("Failed to bind any addresses for %s",
+               skSockaddrArrayGetHostPortPair(listen_address));
+        free(sock_array);
+        return -1;
+    }
+    DEBUGMSG(("Bound %" PRIu32 "/%" PRIu32 " addresses for %s"),
+             (uint32_t)(s-sock_array),
+             skSockaddrArrayGetSize(listen_address),
+             skSockaddrArrayGetHostPortPair(listen_address));
+    while (s != sock_array) {
+        --s;
+        close(*s);
+    }
+    free(sock_array);
+    return 0;
+}
+#endif  /* 0 */
 
 
 /*
@@ -1008,97 +1152,27 @@ ipfixSourceCreateFromSockaddr(
     pthread_mutex_unlock(&global_tree_mutex);
 
 #if 0
-    /*
-     *    The following is #if 0'ed out because it fails to do what it
-     *    is intended to do.
-     *
-     *    The issue appears to be that fixbuf and SiLK use different
-     *    flags to getaddrinfo(), which changes the set of addresses
-     *    that are returned.
-     */
-
-    /*
-     *    fixbuf does not return an error when it cannot bind to any
-     *    listening address, which means the application can start
-     *    correctly but not be actively listening.  The following code
-     *    attempts to detect this situation before creating the fixbuf
-     *    listener by binding to the port.
-     */
     if (NULL == base) {
-        const sk_sockaddr_t *addr;
-        char addr_name[PATH_MAX];
-        int *sock_array;
-        int *s;
-        uint16_t port = 0;
-
-        s = sock_array = (int *)calloc(skSockaddrArrayGetSize(listen_address),
-                                       sizeof(int));
-        if (sock_array == NULL) {
+        if (ipfixSourceBaseVerifyOpenPort(listen_address)) {
             goto ERROR;
         }
-
-        DEBUGMSG(("Attempting to bind %" PRIu32 " addresses for %s"),
-                 skSockaddrArrayGetSize(listen_address),
-                 skSockaddrArrayGetHostPortPair(listen_address));
-        for (i = 0; i < skSockaddrArrayGetSize(listen_address); ++i) {
-            addr = skSockaddrArrayGet(listen_address, i);
-            skSockaddrString(addr_name, sizeof(addr_name), addr);
-
-            /* Get a socket */
-            *s = socket(addr->sa.sa_family, SOCK_DGRAM, 0);
-            if (-1 == *s) {
-                DEBUGMSG("Skipping %s: Unable to create dgram socket: %s",
-                         addr_name, strerror(errno));
-                continue;
-            }
-            /* Bind socket to port */
-            if (bind(*s, &addr->sa, skSockaddrLen(addr)) == -1) {
-                DEBUGMSG("Skipping %s: Unable to bind: %s",
-                         addr_name, strerror(errno));
-                close(*s);
-                *s = -1;
-                continue;
-            }
-            DEBUGMSG("Bound %s for listening", addr_name);
-            ++s;
-
-            if (0 == port) {
-                port = skSockaddrGetPort(addr);
-            }
-            assert(port == skSockaddrGetPort(addr));
-        }
-        if (s == sock_array) {
-            ERRMSG("Failed to bind any addresses for %s",
-                   skSockaddrArrayGetHostPortPair(listen_address));
-            free(sock_array);
-            goto ERROR;
-        }
-        DEBUGMSG(("Bound %" PRIu32 "/%" PRIu32 " addresses for %s"),
-                 (uint32_t)(s-sock_array),
-                 skSockaddrArrayGetSize(listen_address),
-                 skSockaddrArrayGetHostPortPair(listen_address));
-        while (s != sock_array) {
-            --s;
-            close(*s);
-        }
-        free(sock_array);
     }
 #endif  /* 0 */
 
+    /* if there is an existing base on this listen-address, compare
+     * its accept-from settings with those on this probe */
     if (base) {
         if (accept_from == NULL) {
             /* The new listener wants to be promiscuous but another
              * listener already exists. */
             goto ERROR;
         }
-
         pthread_mutex_lock(&base->mutex);
         if (base->any) {
             /* Already have a listener, and it is promiscuous. */
             pthread_mutex_unlock(&base->mutex);
             goto ERROR;
         }
-
         /* Ensure the accept-from addresses are unique. */
         for (j = 0; j < accept_from_count; ++j) {
             for (i = 0; i < skSockaddrArrayGetSize(accept_from[j]); ++i) {
@@ -1120,7 +1194,7 @@ ipfixSourceCreateFromSockaddr(
         goto ERROR;
     }
 
-    /* Keep a handle the probe and the probe's name */
+    /* Keep a handle to the probe and the probe's name */
     source->probe = probe;
     source->name = skpcProbeGetName(probe);
 
@@ -1160,6 +1234,9 @@ ipfixSourceCreateFromSockaddr(
         if (base == NULL) {
             goto ERROR;
         }
+        pthread_mutex_lock(&global_tree_mutex);
+        ++source_base_count;
+        pthread_mutex_unlock(&global_tree_mutex);
 
         /* Set the listen_address */
         base->listen_address = listen_address;
@@ -1189,8 +1266,7 @@ ipfixSourceCreateFromSockaddr(
 
         /* Create the listener */
         pthread_mutex_lock(&create_listener_mutex);
-        base->listener = skiCreateListener(base->connspec, fixbufConnect,
-                                           fixbufDisconnect, &err);
+        base->listener = skiCreateListener(base->connspec, &err);
         if (NULL == base->listener) {
             pthread_mutex_unlock(&create_listener_mutex);
             goto ERROR;
@@ -1243,24 +1319,10 @@ ipfixSourceCreateFromSockaddr(
             goto ERROR;
         }
 
-        /* Add base to list of bases */
-        pthread_mutex_lock(&global_tree_mutex);
-        if (listener_to_source_base == NULL) {
-            listener_to_source_base = rbinit(listener_to_source_base_find,
-                                             NULL);
-            if (listener_to_source_base == NULL) {
-                pthread_mutex_unlock(&global_tree_mutex);
-                goto ERROR;
-            }
-        }
-        base = ((skIPFIXSourceBase_t *)
-                rbsearch(localbase, listener_to_source_base));
-        if (base != localbase) {
-            pthread_mutex_unlock(&global_tree_mutex);
+        /* Add base to list of bases, creating the list if needed */
+        if (ipfixSourceBaseAddToGlobalList(base)) {
             goto ERROR;
         }
-        ++source_base_count;
-        pthread_mutex_unlock(&global_tree_mutex);
 
         /* Start the listener thread */
         pthread_mutex_lock(&base->mutex);
@@ -1299,6 +1361,16 @@ ipfixSourceCreateFromSockaddr(
             rbdestroy(localbase->addr_to_source);
         }
         free(localbase);
+        pthread_mutex_lock(&global_tree_mutex);
+        --source_base_count;
+        if (0 == source_base_count) {
+            skiInfoModelFree();
+            if (listener_to_source_base) {
+                rbdestroy(listener_to_source_base);
+                listener_to_source_base = NULL;
+            }
+        }
+        pthread_mutex_unlock(&global_tree_mutex);
     }
     if (source) {
         if (source->circbuf) {
@@ -1524,7 +1596,7 @@ skIPFIXSourceStop(
 
 
 /*
- *    Destroys a IPFIX source.
+ *    Destroys an IPFIX source.
  */
 void
 skIPFIXSourceDestroy(

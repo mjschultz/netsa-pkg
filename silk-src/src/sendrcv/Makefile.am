@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am f162742a8f51 2014-05-09 18:47:33Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am a8e9e7fea4ad 2018-11-15 23:04:00Z mthomas $");
 
 # Installed Targets
 
@@ -78,15 +78,20 @@ check_DATA = $(SILK_TESTSDIR) $(SILK_SENDRCVDATA)
 EXTRA_DIST += $(TESTS)
 EXTRA_DIST += tests/sendrcv-one-daemon.pm
 EXTRA_DIST += tests/gencerts.py tests/sendrcv_tests.py
-EXTRA_DIST += tests/ca_cert_key8.pem tests/cert-key1-ca_cert_key8.p12	\
-	tests/cert-key2-ca_cert_key8.p12				\
-	tests/cert-key3-ca_cert_key8.p12				\
-	tests/cert-key4-ca_cert_key8.p12				\
-	tests/cert-key5-ca_cert_key8.p12				\
-	tests/cert-key6-ca_cert_key8.p12				\
-	tests/cert-key7-ca_cert_key8.p12 tests/key1.pem tests/key2.pem	\
-	tests/key3.pem tests/key4.pem tests/key5.pem tests/key6.pem	\
-	tests/key7.pem tests/key8.pem tests/post-command.sh
+EXTRA_DIST += tests/post-command.sh
+EXTRA_DIST += \
+	tests/ca-expired-cert.pem tests/ca-expired-key.pem \
+	tests/ca_cert_key8.pem \
+	tests/cert-key1-ca_cert_key8.p12 tests/cert-key2-ca_cert_key8.p12 \
+	tests/cert-key3-ca_cert_key8.p12 tests/cert-key4-ca_cert_key8.p12 \
+	tests/cert-key5-ca_cert_key8.p12 tests/cert-key6-ca_cert_key8.p12 \
+	tests/cert-key7-ca_cert_key8.p12 \
+	tests/expired-cert.pem tests/expired-key.pem \
+	tests/key1.pem tests/key2.pem tests/key3.pem tests/key4.pem \
+	tests/key5.pem tests/key6.pem tests/key7.pem tests/key8.pem \
+	tests/other-ca-cert.pem tests/other-ca-key.pem \
+	tests/other-cert.pem tests/other-key.pem \
+	tests/signed-expired-ca-cert.pem tests/signed-expired-ca-key.pem
 
 MOSTLYCLEANFILES = tests/gencerts.pyc tests/sendrcv_tests.pyc
 
@@ -109,6 +114,10 @@ TESTS += \
 	tests/sendrcv-testConnectOnlyHostname.pl \
 	tests/sendrcv-testConnectOnlyTLS.pl \
 	tests/sendrcv-testConnectOnlyIPv6Addr.pl \
+	tests/sendrcv-testExpiredCertificateTLS.pl \
+	tests/sendrcv-testExpiredAuthorityTLS.pl \
+	tests/sendrcv-testMismatchedCertsTLS.pl \
+	tests/sendrcv-testOtherCertsTLS.pl \
 	tests/sendrcv-testSendRcvStopReceiverServer.pl \
 	tests/sendrcv-testSendRcvStopSenderServer.pl \
 	tests/sendrcv-testSendRcvStopReceiverClient.pl \

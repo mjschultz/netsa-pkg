@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaggbagtool.c 95aec76c40ea 2018-03-13 21:09:01Z mthomas $");
+RCSIDENT("$SiLK: rwaggbagtool.c 7964448c3555 2018-12-12 17:39:37Z mthomas $");
 
 #include <silk/skaggbag.h>
 #include <silk/skbag.h>
@@ -1006,7 +1006,7 @@ parseSetMask(
     char *cp;
     char *eq;
     setmask_value_t sv;
-    skstream_t *stream;
+    skstream_t *stream = NULL;
     ssize_t rv = -1;
 
     assert(str_argument);
@@ -1081,7 +1081,6 @@ parseSetMask(
         || (rv = skStreamOpen(stream)))
     {
         skStreamPrintLastErr(stream, rv, &skAppPrintErr);
-        skStreamDestroy(&stream);
         rv = -1;
         goto END;
     }
@@ -1095,7 +1094,6 @@ parseSetMask(
             skAppPrintErr("Unable to read IPset from '%s': %s",
                           cp, skIPSetStrerror(rv));
         }
-        skStreamDestroy(&stream);
         rv = -1;
         goto END;
     }
@@ -1118,6 +1116,7 @@ parseSetMask(
     rv = 0;
 
   END:
+    skStreamDestroy(&stream);
     free(argument);
     return rv;
 }
@@ -1648,9 +1647,7 @@ applyFilters(
             skAggBagKeyCounterSet(out_ab, &it->key, &it->counter);
         }
     }
-
-
-
+    skAggBagIteratorFree(it);
 }
 
 

@@ -8,7 +8,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: gencerts.py 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $
+# $SiLK: gencerts.py a8e9e7fea4ad 2018-11-15 23:04:00Z mthomas $
 #######################################################################
 
 import sys
@@ -22,6 +22,11 @@ if top_builddir:
     sys.path.insert(0, os.path.join(top_builddir, "tests"))
 from config_vars import config_vars
 
+certtool = os.environ.get('CERTTOOL')
+if not certtool:
+    certtool = 'certtool'
+
+PASSWORD = "x"
 
 key_bits = 1024
 
@@ -32,24 +37,25 @@ state = "test"
 country = US
 cn = "test"
 serial = 001
-expiration_days = 18300
 """
 
 tls_ca_template = tls_template + """
+expiration_days = 18301
 ca
 signing_key
 cert_signing_key
 """
 
 tls_prog_template = tls_template + """
+expiration_days = 18300
 signing_key
 encryption_key
 """
 
 tls_p12_template = """
 pkcs12_key_name = "test"
-password = ""
-"""
+password = "%s"
+""" % PASSWORD
 
 r = re.compile(r'key[0-9]+\.pem$')
 srcdir = os.environ.get("srcdir")
@@ -90,25 +96,27 @@ p12s_used = []
 
 def check_call(*popenargs, **kwargs):
     sys.stderr.write('Calling "%s"\n' % ' '.join(*popenargs))
-    if call(*popenargs, **kwargs):
-        raise RuntimeError("Failed to execute %s" % ' '.join(*popenargs))
+    sys.stderr.flush()
+    if subprocess.call(*popenargs, **kwargs):
+        raise RuntimeError('Failed to execute "%s"' % ' '.join(*popenargs))
 
 
 def check_certtool():
-    try:
-        proc = subprocess.Popen(['certtool', '--version'], close_fds=True,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT)
-        output = '\n'.join(proc.stdout)
-        if not re.match(r"(?ism)certtool\b.*\b(lib)?gnutls\b", output):
-            raise RuntimeError
-    except OSError as RuntimeError:
-        raise RuntimeError("Cannot find a valid certtool")
+    sys.stderr.write('Calling "%s --version"\n' % certtool)
+    sys.stderr.flush()
+    proc = subprocess.Popen([certtool, '--version'], close_fds=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    output = proc.stdout.read()
+    if not re.search(br"(?i)\b(lib)?gnutls\b", output):
+        raise RuntimeError(
+            "Found %s program but it not associated with GnuTLS" % certtool)
 
 
 def create_certs(tmpdir):
     ca_cert_pair = generate_ca_cert(tmpdir, "ca_cert.pem")
     newname = "ca_cert_" + os.path.basename(ca_cert_pair[0])
+    sys.stderr.write('mv "%s" "%s"\n' % (ca_cert_pair[1], newname))
+    sys.stderr.flush()
     os.rename(ca_cert_pair[1], newname)
     ca_cert_pair = (ca_cert_pair[0], newname)
     key = get_key()
@@ -140,7 +148,7 @@ def generate_key(filename):
         name = filename
         check_certtool()
         check_call(
-            ['certtool', '--generate-privkey', '--outfile', filename,
+            [certtool, '--generate-privkey', '--outfile', filename,
              '--bits', str(key_bits)])
     return name
 
@@ -160,17 +168,14 @@ def reset_ca_certs():
 
 
 def create_self_signed_ca_cert(tmpdir, key, filename):
-    template = os.path.join(tmpdir, "template")
+    template = os.path.join(tmpdir, "ca_template")
     template_file = open(template, "w")
     template_file.write(tls_ca_template)
     template_file.close()
-    try:
-        check_certtool()
-        check_call(
-            ['certtool', '--generate-self-signed', '--template',
-             template, '--load-privkey', key, '--outfile', filename])
-    finally:
-        os.unlink(template)
+    check_certtool()
+    check_call(
+        [certtool, '--generate-self-signed', '--template',
+         template, '--load-privkey', key, '--outfile', filename])
 
 def generate_ca_cert(tmpdir, filename):
     ca_cert = get_ca_cert()
@@ -183,7 +188,7 @@ def generate_ca_cert(tmpdir, filename):
 
 def create_signed_cert(tmpdir, ca_cert_pair, key, filename):
     (ca_key, ca_cert) = ca_cert_pair
-    template = os.path.join(tmpdir, "template")
+    template = os.path.join(tmpdir, "prog_template")
     template_file = open(template, "w")
     template_file.write(tls_prog_template)
     template_file.close()
@@ -191,28 +196,24 @@ def create_signed_cert(tmpdir, ca_cert_pair, key, filename):
     template12_file = open(template12, "w")
     template12_file.write(tls_p12_template)
     template12_file.close()
-    try:
-        check_certtool()
-        check_call(
-            ['certtool', '--generate-request', '--load-privkey', key,
-             '--outfile', os.path.join(tmpdir, 'request.pem'),
-             '--template', template])
-        check_call(
-            ['certtool', '--generate-certificate',
-             '--load-request', os.path.join(tmpdir, 'request.pem'),
-             '--outfile', os.path.join(tmpdir, 'cert.pem'),
-             '--template', template,
-             '--load-ca-certificate', ca_cert,
-             '--load-ca-privkey', ca_key])
-        check_call(
-            ['certtool',
-             '--load-certificate', os.path.join(tmpdir, 'cert.pem'),
-             '--load-privkey', key,
-             '--to-p12', '--outder', '--template', template12,
-             '--outfile', filename])
-    finally:
-        os.unlink(template)
-        os.unlink(template12)
+    check_certtool()
+    check_call(
+        [certtool, '--generate-request', '--load-privkey', key,
+         '--outfile', os.path.join(tmpdir, 'request.pem'),
+         '--template', template])
+    check_call(
+        [certtool, '--generate-certificate',
+         '--load-request', os.path.join(tmpdir, 'request.pem'),
+         '--outfile', os.path.join(tmpdir, 'cert.pem'),
+         '--template', template,
+         '--load-ca-certificate', ca_cert,
+         '--load-ca-privkey', ca_key])
+    check_call(
+        [certtool,
+         '--load-certificate', os.path.join(tmpdir, 'cert.pem'),
+         '--load-privkey', key,
+         '--to-p12', '--outder', '--template', template12,
+         '--outfile', filename])
 
 def generate_signed_cert(tmpdir, ca_cert_pair, key, filename):
     global p12_map
@@ -240,6 +241,83 @@ def reset_all_certs_and_keys():
     reset_used_keys()
     reset_ca_certs()
     reset_used_certs()
+
+######  generating an expired certificate and key that uses the standard CA
+# $ cat expire.tmpl
+# organization = "SiLK rwsender/rwreceiver"
+# activation_date = "2018-11-14 16:00:00"
+# expiration_date = "2018-11-14 16:00:16"
+# encryption_key
+# signing_key
+# $ gnutls-certtool --generate-privkey > tests/expired-key.pem
+# $ gnutls-certtool --generate-certificate         \
+#     --load-ca-privkey tests/key8.pem             \
+#     --load-ca-certificate tests/ca_cert_key8.pem \
+#     --load-privkey tests/expired-key.pem         \
+#     --template expire.tmpl                       \
+#     --outfile tests/expired-cert.pem
+
+######  generating a different CA and key+cert that is signed by that CA
+# $ cat ca.tmpl
+# cn = 'SiLK Test CA'
+# expiration_days = 18300
+# ca
+# cert_signing_key
+# $ gnutls-certtool --generate-privkey > tests/other-ca-key.pem
+# $ gnutls-certtool --generate-self-signed  \
+#     --load-privkey tests/other-ca-key.pem \
+#     --template ca.tmpl                    \
+#     --outfile tests/other-ca-cert.pem
+# $ cat other.tmpl
+# organization = "SiLK rwsender/rwreceiver"
+# expiration_days = 18299
+# encryption_key
+# signing_key
+# $ gnutls-certtool --generate-privkey > tests/other-key.pem
+# $ gnutls-certtool --generate-certificate          \
+#     --load-ca-privkey tests/other-ca-key.pem      \
+#     --load-ca-certificate tests/other-ca-cert.pem \
+#     --load-privkey tests/other-key.pem            \
+#     --template other.tmpl                         \
+#     --outfile tests/other-cert.pem
+# $ gnutls-certtool --to-p12                       \
+#     --load-ca-certificate tests/other-ca-key.pem \
+#     --load-privkey tests/other-key.pem           \
+#     --load-certificate tests/other-cert.pem      \
+#     --outder --outfile tests/other.p12           \
+#     --p12-name=other --empty-password
+
+######  generating an expired CA and "valid" key+cert that is signed by it
+# $ cat ca-expire.tmpl
+# cn = 'SiLK Test CA'
+# activation_date = "2018-11-12 13:14:15"
+# expiration_date = "2018-11-12 13:14:16"
+# ca
+# cert_signing_key
+# $ gnutls-certtool --generate-privkey > tests/ca-expired-key.pem
+# $ gnutls-certtool --generate-self-signed    \
+#     --load-privkey tests/ca-expired-key.pem \
+#     --template ca-expire.tmpl               \
+#     --outfile tests/ca-expired-cert.pem
+# $ cat other.tmpl
+# organization = "SiLK rwsender/rwreceiver"
+# expiration_days = 18299
+# encryption_key
+# signing_key
+# $ gnutls-certtool --generate-privkey > tests/key-signed-expired-ca.pem
+# $ gnutls-certtool --generate-certificate            \
+#     --load-ca-privkey tests/ca-expired-key.pem      \
+#     --load-ca-certificate tests/ca-expired-cert.pem \
+#     --load-privkey tests/key-signed-expired-ca.pem  \
+#     --template other.tmpl                           \
+#     --outfile tests/cert-signed-expired-ca.pem
+# $ gnutls-certtool --to-p12                       \
+#     --load-ca-certificate tests/signed-expired-ca-ca-key.pem \
+#     --load-privkey tests/signed-expired-ca-key.pem           \
+#     --load-certificate tests/signed-expired-ca-cert.pem      \
+#     --outder --outfile tests/signed-expired-ca.p12           \
+#     --p12-name=other --empty-password
+
 
 if __name__ == '__main__':
     if not potentials:

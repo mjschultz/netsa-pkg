@@ -6,7 +6,7 @@
 
   <title>CERT IPFIX Registry</title>
   <created>2017-11-28</created>
-  <updated>2018-06-05</updated>
+  <updated>2018-11-29</updated>
 
   <registry id="cert-information-elements">
     <title>CERT Enterprise IPFIX Elements (PEN 6871)</title>
@@ -3472,7 +3472,25 @@ id-at-name                   {id-at 41}
       <revision>0</revision>
     </record>
 
-    <!-- 307-499 unassigned -->
+    <record>
+      <name>DNS_RESOURCE_RECORD</name>
+      <dataType>subTemplateList</dataType>
+      <group>analysis-pipeline</group>
+      <dataTypeSemantics>list</dataTypeSemantics>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>307</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Element holding an entire DNS resource record, which is a sub template
+          list when emitted from YAF. This is used in Analysis Pipeline.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2018-11-29</date>
+    </record>
+
+    <!-- 308-499 unassigned -->
     <record>
       <name>Unassigned</name>
       <cert:enterpriseId>6871</cert:enterpriseId>

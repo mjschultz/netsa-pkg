@@ -29,7 +29,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmaplookup.c 95aec76c40ea 2018-03-13 21:09:01Z mthomas $");
+RCSIDENT("$SiLK: rwpmaplookup.c be7b495f86b1 2018-07-13 20:24:28Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
@@ -473,18 +473,14 @@ appSetup(
         } else if (PMAPLOOKUP_TYPE_CHECK_IPV6(pmaplookup_type)) {
             col_width[PMAPLOOKUP_FIELD_KEY]
                 = skipaddrStringMaxlen(1, ip_format);
-            /* block is IP + "/128" */
             col_width[PMAPLOOKUP_FIELD_BLOCK]
-                = col_width[PMAPLOOKUP_FIELD_KEY] + 1 + 3;
+                = skipaddrCidrStringMaxlen(1, ip_format);
             col_width[PMAPLOOKUP_FIELD_INPUT] = 39;
         } else {
             col_width[PMAPLOOKUP_FIELD_KEY]
                 = skipaddrStringMaxlen(0, ip_format);
-            /* block is IP + "/32" or it is IP + "/128" when
-             * SKIPADDR_MAP_V4 is active */
             col_width[PMAPLOOKUP_FIELD_BLOCK]
-                = (col_width[PMAPLOOKUP_FIELD_KEY] + 1 + 2
-                   + ((ip_format & SKIPADDR_MAP_V4) ? 1 : 0));
+                = skipaddrCidrStringMaxlen(0, ip_format);
         }
         col_width[PMAPLOOKUP_FIELD_START_BLOCK]
             = col_width[PMAPLOOKUP_FIELD_END_BLOCK]
@@ -896,17 +892,11 @@ printAddress(
     const skipaddr_t   *ip,
     const char         *input_string)
 {
-    char buf[SK_NUM2DOT_STRLEN];
-    char buf_cidr[SK_NUM2DOT_STRLEN+4];
+    char buf[SKIPADDR_CIDR_STRLEN];
     char label[DICTIONARY_ENTRY_BUFLEN];
     skipaddr_t start_ip;
     skipaddr_t end_ip;
-    unsigned int cidr_adjust;
     size_t i;
-
-    /* When printing a CIDR range based on IPv4 addresses but the
-     * output format is IPv6, we must adjust the prefix for IPv6. */
-    cidr_adjust = 0;
 
     /* get the label for the IP */
     switch (pmaplookup_type) {
@@ -915,9 +905,6 @@ printAddress(
         skCountryLookupName(ip, label, sizeof(label));
         if (printing_block) {
             skCountryLookupCodeAndRange(ip, &start_ip, &end_ip);
-            if ((ip_format & SKIPADDR_MAP_V4) && !skipaddrIsV6(&start_ip)) {
-                cidr_adjust = 96;
-            }
         }
         break;
       case PMAPLOOKUP_TYPE_ADDRTYPE_IPV4:
@@ -927,9 +914,6 @@ printAddress(
         skPrefixMapFindString(map, ip, label, sizeof(label));
         if (printing_block) {
             skPrefixMapFindRange(map, ip, &start_ip, &end_ip);
-            if ((ip_format & SKIPADDR_MAP_V4) && !skipaddrIsV6(&start_ip)) {
-                cidr_adjust = 96;
-            }
         }
         break;
       case PMAPLOOKUP_TYPE_PROTOPORT:
@@ -966,11 +950,10 @@ printAddress(
             break;
 
           case PMAPLOOKUP_FIELD_BLOCK:
-            snprintf(buf_cidr, sizeof(buf_cidr), "%s/%d",
-                     skipaddrString(buf, &start_ip, ip_format),
-                     (cidr_adjust
-                      + skCIDRComputePrefix(&start_ip, &end_ip, NULL)));
-            fprintf(output.of_fp, "%*s", col_width[fields[i]], buf_cidr);
+            skipaddrCidrString(buf, &start_ip,
+                               skCIDRComputePrefix(&start_ip, &end_ip, NULL),
+                               ip_format);
+            fprintf(output.of_fp, "%*s", col_width[fields[i]], buf);
             break;
         }
     }

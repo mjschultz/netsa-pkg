@@ -16,7 +16,7 @@
                                    headers */
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pysilk.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
+RCSIDENT("$SiLK: pysilk.c 2754832c7c0e 2018-12-11 19:35:40Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skbag.h>
@@ -33,6 +33,7 @@ RCSIDENT("$SiLK: pysilk.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 #include "pysilk_common.h"
 
 SK_DIAGNOSTIC_IGNORE_PUSH("-Wwrite-strings")
+SK_DIAGNOSTIC_IGNORE_PUSH("-Wcast-function-type")
 
 
 /* LOCAL DEFINES AND TYPEDEFS */

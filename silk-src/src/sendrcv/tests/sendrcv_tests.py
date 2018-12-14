@@ -9,7 +9,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: sendrcv_tests.py 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $
+# $SiLK: sendrcv_tests.py a8e9e7fea4ad 2018-11-15 23:04:00Z mthomas $
 #######################################################################
 
 import sys
@@ -39,9 +39,12 @@ conv = json
 srcdir = os.environ.get("srcdir")
 if srcdir:
     sys.path.insert(0, os.path.join(srcdir, "tests"))
-from gencerts import reset_all_certs_and_keys, generate_signed_cert, generate_ca_cert
+from gencerts import reset_all_certs_and_keys, generate_signed_cert, generate_ca_cert, PASSWORD
 from config_vars import config_vars
 from daemon_test import get_ephemeral_port, Dirobject
+
+os.environ["RWSENDER_TLS_PASSWORD"] = PASSWORD
+os.environ["RWRECEIVER_TLS_PASSWORD"] = PASSWORD
 
 try:
     import hashlib
@@ -176,11 +179,36 @@ def trigger(*specs, **kwd):
                 return retval
     return retval
 
-def check_dh(*daemons):
-    # Wait for Diffie-Hellman parameters to be generated
-    trigger(*((x, 10, "Generating Diffie-Hellman") for x in daemons))
-    trigger(*((x, 300, "Finished generating Diffie-Hellman")
-              for x in daemons))
+def check_started(clients, servers, tls):
+    if tls:
+        tcp_tls = r"\(TCP, TLS\)"
+        timeout = 120
+    else:
+        tcp_tls = r"\(TCP\)"
+        timeout = 10
+    watches = itertools.chain(
+        ((c, timeout, r"Attempting to connect to \S+ %s" % tcp_tls)
+         for c in clients),
+        ((s, timeout, r"Bound to \S+ for listening %s" % tcp_tls)
+         for s in servers))
+    trigger(*watches)
+
+def check_connected(clients, servers, timeout=25):
+    if sys.version_info[0] < 3:
+        zipper = itertools.izip_longest
+    else:
+        zipper = itertools.zip_longest
+    for c,s in zipper(clients, servers):
+        watches = []
+        if c is not None:
+            watches = watches + [
+                (s, timeout, "Connected to remote %s" % c.name) for s in servers
+            ]
+        if s is not None:
+            watches = watches + [
+                (c, timeout, "Connected to remote %s" % s.name) for c in clients
+            ]
+        trigger(*watches)
 
 def create_random_file(suffix="", prefix="random", dir=None, size=(0, 0)):
     (handle, path) = tempfile.mkstemp(suffix, prefix, dir)
@@ -298,7 +326,7 @@ class Daemon(Dirobject):
                     match = self.trigger['re'].search(line)
                     if match:
                         self.log_verbose(
-                            "Trigger fired for %s" % self.trigger['match'])
+                            'Trigger fired for "%s"' % self.trigger['match'])
                         self.dump(('trigger', self.trigger['id'], True, line))
                         self.timeout = None
                         self.trigger = None
@@ -343,7 +371,7 @@ class Daemon(Dirobject):
                 match = regexp.search(line)
                 if match:
                     self.log_verbose(
-                        "Trigger fired for %s" % self.trigger['match'])
+                        'Trigger fired for "%s"' % self.trigger['match'])
                     self.dump(('trigger', self.trigger['id'], True, line))
                     self.trigger = None
                     return retval
@@ -369,7 +397,7 @@ class Daemon(Dirobject):
                     self.channels.remove(self.pipe)
             if self.timeout is not None and time.time() > self.timeout:
                 self.log_verbose(
-                    "Trigger timed out after %s seconds: %s" %
+                    'Trigger timed out after %s seconds: "%s"' %
                     (self.trigger['timeout'], self.trigger['match']))
                 self.dump(('trigger', self.trigger['id'], False))
                 self.timeout = None
@@ -538,7 +566,12 @@ class Sndrcv_base(Daemon):
     def create_cert(self):
         self.cert = generate_signed_cert(self.basedir,
                                          (self.ca_key, self.ca_cert),
-                                         "key.pem", "key.p12")
+                                         os.path.join(self.basedir, "key.pem"),
+                                         os.path.join(self.basedir, "key.p12"))
+
+    def set_ca(self, ca_key, ca_cert):
+        self.ca_key = ca_key
+        self.ca_cert = ca_cert
 
     def init(self):
         Daemon.init(self)
@@ -554,7 +587,11 @@ class Sndrcv_base(Daemon):
                  '--identifier', self.name]
         if self.ca_cert:
             args += ['--tls-ca', os.path.abspath(self.ca_cert),
-                     '--tls-pkcs12', os.path.abspath(self.cert)]
+                     '--tls-pkcs12', os.path.abspath(self.cert),
+                     '--tls-priority=NORMAL',
+                     #'--tls-priority=SECURE128:+SECURE192:-VERS-ALL:+VERS-TLS1.2',
+                     #'--tls-security=ultra',
+                     '--tls-debug-level=0']
         if self.mode == "server":
             if self.listen is not None:
                 args += ['--server-port', "%s:%s" % (self.listen, self.port)]
@@ -646,7 +683,6 @@ class Rwreceiver(Sndrcv_base):
     def check_sent(self, data):
         return self._check_file("dest", data)
 
-
 class System(Dirobject):
 
     def __init__(self):
@@ -660,8 +696,8 @@ class System(Dirobject):
         self.ca_key = None
 
     def create_ca_cert(self):
-        self.ca_key, self.ca_cert = generate_ca_cert(self.basedir,
-                                                     'ca_cert.pem')
+        self.ca_key, self.ca_cert = generate_ca_cert(
+            self.basedir, os.path.join(self.basedir, 'ca_cert.pem'))
 
     def connect(self, clients, servers, tls=False, hostname=None):
         if tls:
@@ -709,10 +745,8 @@ class System(Dirobject):
         self.servers.add(server)
 
         if tls:
-            client.ca_cert = self.ca_cert
-            server.ca_cert = self.ca_cert
-            client.ca_key = self.ca_key
-            server.ca_key = self.ca_key
+            client.set_ca(self.ca_key, self.ca_cert)
+            server.set_ca(self.ca_key, self.ca_cert)
 
     def _forall(self, call, which, *args, **kwds):
         if which == "clients":
@@ -736,6 +770,62 @@ class System(Dirobject):
         self._forall("stop", which)
 
 
+def _rename_pkcs12(x):
+    if x == "--tls-pkcs12":
+        return "--tls-cert"
+    return x
+
+# Like Rwsender but uses customized TLS keys+certificates
+class RwsenderCert(Rwsender):
+    def __init__(self, name, ca_cert, key, cert, **kwds):
+        Rwsender.__init__(self, name, **kwds)
+        self.ca_cert = ca_cert
+        self.key = key
+        self.cert = cert
+
+    def create_cert(self):
+        pass
+
+    def set_ca(self, x, y):
+        pass
+
+    def get_args(self):
+        args = Rwsender.get_args(self)
+        if self.key:
+            args += ['--tls-key', os.path.abspath(self.key)]
+            return map(_rename_pkcs12, args)
+        return args
+
+# Like Rwreceiver but uses customized TLS keys+certificates
+class RwreceiverCert(Rwreceiver):
+    def __init__(self, name, ca_cert, key, cert, **kwds):
+        Rwreceiver.__init__(self, name, **kwds)
+        self.ca_cert = ca_cert
+        self.key = key
+        self.cert = cert
+
+    def create_cert(self):
+        pass
+
+    def set_ca(self, x, y):
+        pass
+
+    def get_args(self):
+        args = Rwreceiver.get_args(self)
+        if self.key:
+            args += ['--tls-key', os.path.abspath(self.key)]
+            return map(_rename_pkcs12, args)
+        return args
+
+# Like System but uses customized TLS keys+certificates
+class SystemCert(System):
+    def __init__(self):
+        System.__init__(self)
+
+    def create_ca_cert(self):
+        pass
+
+
 #def Sender(**kwds):
 #    return Rwsender(overwrite=OVERWRITE, log_level=LOG_LEVEL, **kwds)
 #
@@ -752,10 +842,8 @@ def _testConnectAndClose(tls=False, hostname="localhost"):
     try:
         sy.connect(s1, r1, tls=tls, hostname=hostname)
         sy.start()
-        if tls:
-            check_dh(s1, r1)
-        trigger((s1, 25, "Connected to remote %s" % r1.name),
-                (r1, 25, "Connected to remote %s" % s1.name))
+        check_started([s1], [r1], tls=tls)
+        check_connected([r1], [s1])
         sy.stop()
         trigger((s1, 20, "Finished shutting down"),
                 (r1, 20, "Finished shutting down"))
@@ -823,32 +911,32 @@ def _testSendRcv(tls=False,
             stop = r1.stop
         end = r1.end
         start = r1.start
-
         stopped = r1
     s1.create_dirs()
     s1.send_files(rfiles)
     sy = System()
     try:
         if sender_client:
-            sy.connect(s1, r1, tls=tls)
+            cli = s1
+            srv = r1
         else:
-            sy.connect(r1, s1, tls=tls)
+            cli = r1
+            srv = s1
+        sy.connect(cli, srv, tls=tls)
         sy.start()
-        if tls:
-            check_dh(s1, r1)
-
-        trigger((s1, 75, "Connected to remote %s" % r1.name),
-                (r1, 75, "Connected to remote %s" % s1.name))
+        check_started([cli], [srv], tls=tls)
+        check_connected([cli], [srv], 75)
         trigger((s1, 40, "Succeeded sending .* to %s" % r1.name))
         stop()
         if not kill:
             trigger((stopped, 25, "Stopped logging"))
         end()
         start()
-        if tls:
-            check_dh(stopped)
-        trigger((s1, 75, "Connected to remote %s" % r1.name),
-                (r1, 75, "Connected to remote %s" % s1.name))
+        if stopped == cli:
+            check_started([cli], [], tls=tls)
+        else:
+            check_started([], [srv], tls=tls)
+        check_connected([cli], [srv], 75)
         try:
             for path, data in rfiles:
                 base = os.path.basename(path)
@@ -1028,17 +1116,8 @@ def _testMultiple(tls=False):
     try:
         sy.connect([r1, r2], [s1, s2], tls=tls)
         sy.start()
-        if tls:
-            check_dh(s1, r1, s2, r2)
-
-        trigger((s1, 70, "Connected to remote %s" % r1.name),
-                (r1, 70, "Connected to remote %s" % s1.name),
-                (r2, 70, "Connected to remote %s" % s1.name),
-                (s2, 70, "Connected to remote %s" % r1.name))
-        trigger((s1, 70, "Connected to remote %s" % r2.name),
-                (r1, 70, "Connected to remote %s" % s2.name),
-                (s2, 70, "Connected to remote %s" % r2.name),
-                (r2, 70, "Connected to remote %s" % s2.name))
+        check_started([r1, r2], [s1, s2], tls=tls)
+        check_connected([r1, r2], [s1, s2], timeout=70)
 
         filea = rfiles[0]
         fileb = rfiles[1]
@@ -1102,12 +1181,8 @@ def _testFilter(tls=False):
     try:
         sy.connect([r1, r2], s1, tls=tls)
         sy.start()
-        if tls:
-            check_dh(s1, r1, r2)
-        trigger((s1, 70, "Connected to remote %s" % r1.name),
-                (r1, 70, "Connected to remote %s" % s1.name),
-                (r2, 70, "Connected to remote %s" % s1.name))
-        trigger((s1, 70, "Connected to remote %s" % r2.name))
+        check_started([r1, r2], [s1], tls=tls)
+        check_connected([r1, r2], [s1], timeout=70)
 
         s1.send_files(rfiles)
         cfiles = [x for x in rfiles if 'a' <= x[0][-1] <= 'g']
@@ -1188,8 +1263,7 @@ def testPostCommand():
     try:
         sy.connect(s1, r1)
         sy.start()
-        trigger((s1, 70, "Connected to remote %s" % r1.name),
-                (r1, 70, "Connected to remote %s" % s1.name))
+        check_connected([s1], [r1], timeout=70)
         for path, data in rfiles:
             trigger((r1, 40,
                      ("Post command: Ident: %(sname)s  "
@@ -1197,6 +1271,111 @@ def testPostCommand():
                      {"file": re.escape(os.path.basename(path)),
                       "sname": s1.name}), pid=False)
         sy.stop()
+        trigger((s1, 25, "Stopped logging"),
+                (r1, 25, "Stopped logging"))
+    except:
+        traceback.print_exc()
+        sy.stop()
+        raise
+    finally:
+        sy.end(noremove=NO_REMOVE)
+
+
+def _testFailedConnection(ca_cert, key, cert, hostname="127.0.0.1"):
+    if not tls_supported():
+        return None
+    ca_cert = os.path.join(srcdir, "tests", ca_cert)
+    key = os.path.join(srcdir, "tests", key)
+    cert = os.path.join(srcdir, "tests", cert)
+    s1 = RwsenderCert(None, ca_cert, key, cert)
+    r1 = RwreceiverCert(None, ca_cert, key, cert)
+    sy = SystemCert()
+    try:
+        sy.connect(s1, r1, tls=True, hostname=hostname)
+        sy.start()
+        check_started([s1], [r1], tls=True)
+        trigger((s1, 50, "Attempt to connect to %s failed" % r1.name),
+                (r1, 50, "Unable to initialize connection with"))
+        sy.stop()
+        trigger((s1, 20, "Finished shutting down"),
+                (r1, 20, "Finished shutting down"))
+        trigger((s1, 25, "Stopped logging"),
+                (r1, 25, "Stopped logging"))
+    except:
+        traceback.print_exc()
+        sy.stop()
+        raise
+    finally:
+        sy.end(noremove=NO_REMOVE)
+
+def testExpiredAuthorityTLS():
+    """
+    Test to see if we can start a sender/receiver pair, that they
+    connect, and that they shut down properly.
+    """
+    _testFailedConnection("ca-expired-cert.pem", "signed-expired-ca-key.pem",
+                          "signed-expired-ca-cert.pem")
+
+def testExpiredCertificateTLS():
+    """
+    Test to see if we can start a sender/receiver pair, that they
+    connect, and that they shut down properly.
+    """
+    _testFailedConnection("ca_cert_key8.pem", "expired-key.pem",
+                          "expired-cert.pem")
+
+def testMismatchedCertsTLS():
+    hostname = "127.0.0.1"
+    if not tls_supported():
+        return None
+    s1 = RwsenderCert(
+        name=None, ca_cert=os.path.join(srcdir, "tests", "ca_cert_key8.pem"),
+        key=None,
+        cert=os.path.join(srcdir, "tests", "cert-key5-ca_cert_key8.p12"))
+    r1 = RwreceiverCert(
+        name=None, ca_cert=os.path.join(srcdir, "tests", "other-ca-cert.pem"),
+        key=os.path.join(srcdir, "tests", "other-key.pem"),
+        cert=os.path.join(srcdir, "tests", "other-cert.pem"))
+    sy = SystemCert()
+    try:
+        sy.connect(r1, s1, tls=True, hostname=hostname)
+        sy.start()
+        check_started([r1], [s1], tls=True)
+        trigger((r1, 50, "Attempt to connect to %s failed" % s1.name),
+                (s1, 50, "Unable to initialize connection with"))
+        sy.stop()
+        trigger((s1, 20, "Finished shutting down"),
+                (r1, 20, "Finished shutting down"))
+        trigger((s1, 25, "Stopped logging"),
+                (r1, 25, "Stopped logging"))
+    except:
+        traceback.print_exc()
+        sy.stop()
+        raise
+    finally:
+        sy.end(noremove=NO_REMOVE)
+
+def testOtherCertsTLS():
+    hostname = "127.0.0.1"
+    if not tls_supported():
+        return None
+    s1 = RwsenderCert(
+        name=None, ca_cert=os.path.join(srcdir, "tests", "other-ca-cert.pem"),
+        key=os.path.join(srcdir, "tests", "other-key.pem"),
+        cert=os.path.join(srcdir, "tests", "other-cert.pem"))
+    r1 = RwreceiverCert(
+        name=None, ca_cert=os.path.join(srcdir, "tests", "other-ca-cert.pem"),
+        key=os.path.join(srcdir, "tests", "other-key.pem"),
+        cert=os.path.join(srcdir, "tests", "other-cert.pem"))
+    sy = SystemCert()
+    try:
+        sy.connect(r1, s1, tls=True, hostname=hostname)
+        sy.start()
+        check_started([r1], [s1], tls=True)
+        check_connected([r1], [s1])
+        sy.stop()
+        trigger((s1, 20, "Finished shutting down"),
+                (r1, 20, "Finished shutting down"))
         trigger((s1, 25, "Stopped logging"),
                 (r1, 25, "Stopped logging"))
     except:
@@ -1261,5 +1440,3 @@ if __name__ == '__main__':
         raise
     finally:
         teardown()
-
-

@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwtransfer.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwtransfer.c 6523223c4e2c 2018-10-31 21:41:01Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sklog.h>
@@ -28,12 +28,6 @@ RCSIDENT("$SiLK: rwtransfer.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 /* LOCAL DEFINES AND TYPEDEFS */
 
-#if SK_ENABLE_GNUTLS
-#  define UNUSED_NO_GNUTLS(x) x
-#else
-#  define UNUSED_NO_GNUTLS(x) UNUSED(x)
-#endif
-
 /* Illegal ident characters */
 #define ILLEGAL_IDENT_CHARS " \t:/\\.,"
 
@@ -42,9 +36,6 @@ RCSIDENT("$SiLK: rwtransfer.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
 
 /* Version protocol we emit */
 #define EMIT_VERISION 2
-
-/* Turn on PKCS12 support */
-#define PKCS12 1
 
 /* Environment variable used to turn off keepalive.  Used for
  * debugging. */
@@ -80,15 +71,8 @@ static int server_sentinel;
 /* Daemon identity */
 static char *identity;
 
-#if SK_ENABLE_GNUTLS
-/* Encryption and authentication files */
-static char *tls_ca_file     = NULL;
-static char *tls_cert_file   = NULL;
-static char *tls_key_file    = NULL;
-#ifdef PKCS12
-static char *tls_pkcs12_file = NULL;
-#endif
-#endif /* SK_ENABLE_GNUTLS */
+/* Whether GnuTLS CA/key/certificate files were given */
+static unsigned int tls_available;
 
 /* Message queue */
 static sk_msg_queue_t *control;
@@ -133,49 +117,17 @@ typedef struct conn_info_st {
 typedef enum {
     /* Global options */
     OPT_MODE, OPT_IDENT
-#if SK_ENABLE_GNUTLS
-    , OPT_TLS_CA,
-    OPT_TLS_CERT,
-    OPT_TLS_KEY
-#ifdef PKCS12
-    , OPT_TLS_PKCS12
-#endif
-#endif /* SK_ENABLE_GNUTLS */
 } appOptionsEnum;
 
 static struct option appOptions[] = {
-    {"mode",                 REQUIRED_ARG, 0, OPT_MODE},
-    {"identifier",           REQUIRED_ARG, 0, OPT_IDENT},
-#if SK_ENABLE_GNUTLS
-    {"tls-ca",               REQUIRED_ARG, 0, OPT_TLS_CA},
-    {"tls-cert",             REQUIRED_ARG, 0, OPT_TLS_CERT},
-    {"tls-key",              REQUIRED_ARG, 0, OPT_TLS_KEY},
-#ifdef PKCS12
-    {"tls-pkcs12",           REQUIRED_ARG, 0, OPT_TLS_PKCS12},
-#endif
-#endif /* SK_ENABLE_GNUTLS */
+    {"mode",            REQUIRED_ARG, 0, OPT_MODE},
+    {"identifier",      REQUIRED_ARG, 0, OPT_IDENT},
     {0,0,0,0}           /* sentinel entry */
 };
 
 static const char *appHelp[] = {
     ("Run as a client or as a server. Choices: client, server"),
     ("Specify the name to use when establishing connections"),
-#if SK_ENABLE_GNUTLS
-    ("Load the Certificate Authority from the file in PEM format\n"
-     "\tlocated at this complete path. Def. None. Either --tls-key\n"
-     "\tand --tls-key or --tls-pkcs12 must also be specified"),
-    ("Load the encryption cert from the file in PEM format\n"
-     "\tlocated at this complete path. Def. None.  Requires that --tls-ca\n"
-     "\tand --tls-key are also specified"),
-    ("Load the encryption key from the file in PEM format\n"
-     "\tlocated at this complete path. Def. None. Requires that --tls-ca\n"
-     "\tand --tls-cert are also specified"),
-#ifdef PKCS12
-    ("Load the encryption cert and key from the file in\n"
-     "\tPKCS#12 format located at this complete path. Def. None. Requires\n"
-     "\tthat --tls-ca is also specified"),
-#endif
-#endif /* SK_ENABLE_GNUTLS */
     (char *)NULL
 };
 
@@ -352,11 +304,6 @@ transferUsageLong(
     /* print common options defined in this file, but do not print
      * encryption switches yet */
     for (i = 0; appOptions[i].name; ++i) {
-#if SK_ENABLE_GNUTLS
-        if (OPT_TLS_CA == i) {
-            break;
-        }
-#endif
         fprintf(fh, "--%s %s. %s\n", appOptions[i].name,
                 SK_OPTION_HAS_ARG(appOptions[i]), appHelp[i]);
     }
@@ -370,13 +317,8 @@ transferUsageLong(
     appModeUsage(fh, "Server", appServerOptions, appServerHelp);
 
     /* now print the encryption switches */
-#if SK_ENABLE_GNUTLS
-    fprintf(fh, "\nTransport encryption switches:\n");
-    for ( ; appOptions[i].name; ++i) {
-        fprintf(fh, "--%s %s. %s\n", appOptions[i].name,
-                SK_OPTION_HAS_ARG(appOptions[i]), appHelp[i]);
-    }
-#endif
+    skMsgTlsOptionsUsage(fh);
+
     fprintf(fh, "\nLogging and daemon switches:\n");
     skdaemonOptionsUsage(fh);
 }
@@ -422,6 +364,11 @@ transferSetup(
         return -1;
     }
 
+    if (skMsgTlsOptionsRegister(password_env)) {
+        skAppPrintErr("Unable to register TLS-related options");
+        return -1;
+    }
+
     return 0;
 }
 
@@ -445,10 +392,12 @@ transferSetup(
  */
 static int
 appOptionsHandler(
-    clientData   UNUSED(cData),
+    clientData          cData,
     int                 opt_index,
     char               *opt_arg)
 {
+    SK_UNUSED_PARAM(cData);
+
     switch ((appOptionsEnum)opt_index) {
       case OPT_MODE:
         if (0 == strcmp(opt_arg, "server")) {
@@ -466,39 +415,6 @@ appOptionsHandler(
         checkIdent(opt_arg, appOptions[opt_index].name);
         identity = opt_arg;
         break;
-
-#if SK_ENABLE_GNUTLS
-      case OPT_TLS_CA:
-        if (optionsFileCheck(appOptions[opt_index].name, opt_arg)) {
-            return 1;
-        }
-        tls_ca_file = opt_arg;
-        break;
-
-      case OPT_TLS_CERT:
-        if (optionsFileCheck(appOptions[opt_index].name, opt_arg)) {
-            return 1;
-        }
-        tls_cert_file = opt_arg;
-        break;
-
-      case OPT_TLS_KEY:
-        if (optionsFileCheck(appOptions[opt_index].name, opt_arg)) {
-            return 1;
-        }
-        tls_key_file = opt_arg;
-        break;
-
-#ifdef PKCS12
-      case OPT_TLS_PKCS12:
-        if (optionsFileCheck(appOptions[opt_index].name, opt_arg)) {
-            return 1;
-        }
-        tls_pkcs12_file = opt_arg;
-        break;
-#endif
-#endif /* SK_ENABLE_GNUTLS */
-
     }
 
     return 0;  /* OK */
@@ -546,43 +462,9 @@ transferVerifyOptions(
         ++error_count;
     }
 
-#if SK_ENABLE_GNUTLS
-#ifdef PKCS12
-    if (tls_ca_file || tls_cert_file || tls_key_file || tls_pkcs12_file) {
-        if (!tls_ca_file) {
-            skAppPrintErr("A CA cert file must be specified for "
-                          "encryption: --%s", appOptions[OPT_TLS_CA].name);
-            ++error_count;
-        }
-        if (!(tls_cert_file && tls_key_file && !tls_pkcs12_file) &&
-            !(!tls_cert_file && !tls_key_file && tls_pkcs12_file))
-        {
-            skAppPrintErr("When using encryption, you must specify --%s and "
-                          "--%s, or just --%s",
-                          appOptions[OPT_TLS_CERT].name,
-                          appOptions[OPT_TLS_KEY].name,
-                          appOptions[OPT_TLS_PKCS12].name);
-            ++error_count;
-        }
+    if (skMsgTlsOptionsVerify(&tls_available)) {
+        ++error_count;
     }
-#else /* !PKCS12 */
-    if (tls_ca_file || tls_cert_file || tls_key_file) {
-        if (!tls_ca_file) {
-            skAppPrintErr("A CA cert file must be specified for "
-                          "encryption: --%s", appOptions[OPT_TLS_CA]);
-            ++error_count;
-        }
-        if (!(tls_cert_file && tls_key_file))
-        {
-            skAppPrintErr("When using encryption, you must specify --%s and "
-                          "--%s",
-                          appOptions[OPT_TLS_CERT].name,
-                          appOptions[OPT_TLS_KEY].name);
-            ++error_count;
-        }
-    }
-#endif /* PKCS12 */
-#endif /* SK_ENABLE_GNUTLS */
 
     switch (mode) {
       case SERVER:
@@ -696,58 +578,18 @@ transferTeardown(
         free(global_temp_item);
     }
 
-#if SK_ENABLE_GNUTLS
     skMsgGnuTLSTeardown();
-#endif
-}
-
-
-/*
- *  file_exists = optionsFileCheck(opt_name, opt_arg);
- *
- *    Verify that the file in 'opt_arg' exists and that we have a full
- *    path to the file.  Verify that the length is shorter than
- *    PATH_MAX.  If so, return 0; otherwise, print an error that the
- *    option named by 'opt_name' was bad and return -1.
- */
-int
-optionsFileCheck(
-    const char         *opt_name,
-    const char         *opt_arg)
-{
-    if (!opt_arg || !opt_arg[0]) {
-        skAppPrintErr("Invalid %s: The argument empty", opt_name);
-        return -1;
-    }
-
-    if (strlen(opt_arg)+1 >= PATH_MAX) {
-        skAppPrintErr("Invalid %s: Path is too long", opt_name);
-        return -1;
-    }
-
-    if (!skFileExists(opt_arg)) {
-        skAppPrintErr("Invalid %s: File '%s' does not exist",
-                      opt_name, opt_arg);
-        return -1;
-    }
-
-    if (opt_arg[0] != '/') {
-        skAppPrintErr(("Invalid %s: Must use complete path"
-                       " ('%s' does not begin with slash)"),
-                      opt_name, opt_arg);
-        return -1;
-    }
-
-    return 0;
 }
 
 
 static int
 appClientOptionsHandler(
-    clientData   UNUSED(cData),
+    clientData          cData,
     int                 opt_index,
     char               *opt_arg)
 {
+    SK_UNUSED_PARAM(cData);
+
     client_sentinel = opt_index;
 
     switch ((appClientOptionsEnum)opt_index) {
@@ -762,11 +604,13 @@ appClientOptionsHandler(
 
 static int
 appServerOptionsHandler(
-    clientData   UNUSED(cData),
+    clientData          cData,
     int                 opt_index,
     char               *opt_arg)
 {
     int rv;
+
+    SK_UNUSED_PARAM(cData);
 
     server_sentinel = opt_index;
 
@@ -797,10 +641,11 @@ static int
 transferCompare(
     const void         *va,
     const void         *vb,
-    const void  UNUSED(*cbdata))
+    const void         *cbdata)
 {
     const transfer_t *a = (const transfer_t *)va;
     const transfer_t *b = (const transfer_t *)vb;
+    SK_UNUSED_PARAM(cbdata);
     return strcmp(a->ident, b->ident);
 }
 
@@ -1218,24 +1063,6 @@ handleConnection(
 }
 
 
-static int
-attemptBind(
-    const sk_sockaddr_array_t  *addr,
-    unsigned                   *UNUSED_NO_GNUTLS(tls),
-    const char                **UNUSED_NO_GNUTLS(connection_type))
-{
-#if SK_ENABLE_GNUTLS
-    if (tls_ca_file) {
-        *tls = 1;
-        *connection_type = "TCP, TLS";
-        return skMsgQueueBindTLS(control, addr);
-    }
-#endif /* SK_ENABLE_GNUTLS */
-
-    return skMsgQueueBindTCP(control, addr);
-}
-
-
 /*
  *    THREAD ENTRY POINT
  *
@@ -1244,11 +1071,12 @@ attemptBind(
  */
 static void *
 serverMain(
-    void        UNUSED(*dummy))
+    void       *dummy)
 {
     int rv;
-    unsigned tls = 0;
-    const char *connection_type = "TCP";
+    const char *connection_type = (tls_available ? "TCP, TLS" : "TCP");
+
+    SK_UNUSED_PARAM(dummy);
 
     control_thread_valid = 1;
 
@@ -1256,7 +1084,7 @@ serverMain(
 
     assert(listen_address);
 
-    rv = attemptBind(listen_address, &tls, &connection_type);
+    rv = skMsgQueueBind(control, listen_address);
     if (rv < 0) {
         CRITMSG("Failed to bind to %s for listening", listen_address_arg);
         threadExit(EXIT_FAILURE, NULL);
@@ -1301,7 +1129,7 @@ serverMain(
                 CRITMSG("Memory allocation failure");
                 threadExit(EXIT_FAILURE, NULL);
             }
-            info->tls = tls;
+            info->tls = tls_available;
             info->trnsfr = NULL;
             rv = skMsgChannelSplit(control, channel, &info->queue);
             if (rv != 0) {
@@ -1383,12 +1211,9 @@ startClientConnection(
     transfer_t *item = (transfer_t *)vitem;
     void *exit_status = exit_standard;
     int waitsecs = 0;
-    const char *connection_type = "TCP";
-    connection_fn_t connection_function;
+    const char *connection_type = (tls_available ? "TCP, TLS" : "TCP");
     socklen_t addrlen;
-    int tls = 0;
     char buf[SK_NUM2DOT_STRLEN];
-
 
     item->thread_exists = 1;
 
@@ -1412,15 +1237,6 @@ startClientConnection(
             }
         }
 
-        connection_function = skMsgQueueConnectTCP;
-#if SK_ENABLE_GNUTLS
-        if (tls_ca_file) {
-            tls = 1;
-            connection_function = skMsgQueueConnectTLS;
-            connection_type = "TCP, TLS";
-        }
-#endif /* SK_ENABLE_GNUTLS */
-
         INFOMSG("Attempting to connect to %s (%s)...",
                 item->ident, connection_type);
 
@@ -1440,7 +1256,7 @@ startClientConnection(
             }
             skSockaddrString(buf, sizeof(buf), addr);
             DEBUGMSG("Address for %s is %s", item->ident, buf);
-            rv = connection_function(control, &addr->sa, addrlen, &channel);
+            rv = skMsgQueueConnect(control, &addr->sa, addrlen, &channel);
         }
 
         if (rv != 0) {
@@ -1464,7 +1280,7 @@ startClientConnection(
                 CRITMSG("Memory allocation failure");
                 threadExit(EXIT_FAILURE, exit_failure);
             }
-            info->tls = tls;
+            info->tls = tls_available;
             info->trnsfr = item;
             rv = skMsgChannelSplit(control, channel, &info->queue);
             if (rv != 0) {
@@ -1499,11 +1315,13 @@ startClientConnection(
  */
 static void *
 clientMain(
-    void        UNUSED(*dummy))
+    void               *dummy)
 {
     RBLIST *list;
     transfer_t *item;
     int rv;
+
+    SK_UNUSED_PARAM(dummy);
 
     control_thread_valid = 1;
 
@@ -1591,37 +1409,6 @@ startTransferDaemon(
         skAppPrintErr("Failed to initialize message queue");
         exit(EXIT_FAILURE);
     }
-
-#if SK_ENABLE_GNUTLS
-    if (tls_ca_file) {
-        rv = skMsgQueueAddCA(control, tls_ca_file);
-        if (rv != 0) {
-            CRITMSG("Invalid Certificate Authority file: %s", tls_ca_file);
-            return -1;
-        }
-#ifdef PKCS12
-        if (tls_pkcs12_file) {
-            const char *password = getenv(password_env);
-            if (password == NULL) {
-                password = "";
-            }
-            rv = skMsgQueueAddPKCS12(control, tls_pkcs12_file, password);
-            if (rv != 0) {
-                CRITMSG("Invalid encryption cert file: %s", tls_pkcs12_file);
-                return -1;
-            }
-        } else
-#endif /* PKCS12 */
-        {
-            rv = skMsgQueueAddCert(control, tls_cert_file, tls_key_file);
-            if (rv != 0) {
-                CRITMSG("Invalid encryption cert or key file: %s, %s",
-                        tls_cert_file, tls_key_file);
-                return -1;
-            }
-        }
-    }
-#endif /* SK_ENABLE_GNUTLS */
 
     switch (mode) {
       case CLIENT:

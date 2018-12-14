@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsender.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: rwsender.c 6523223c4e2c 2018-10-31 21:41:01Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skdaemon.h>
@@ -516,15 +516,16 @@ appSetup(
  */
 static int
 appOptionsHandler(
-    clientData   UNUSED(cData),
+    clientData          cData,
     int                 opt_index,
     char               *opt_arg)
 {
     uint32_t tmp32;
     int rv;
 
-    switch ((appOptionsEnum)opt_index) {
+    SK_UNUSED_PARAM(cData);
 
+    switch ((appOptionsEnum)opt_index) {
       case OPT_FILTER:
         rv = skDLListPushHead(filter_list, opt_arg);
         if (rv != 0) {
@@ -1242,11 +1243,13 @@ handle_new_file(
  */
 static void *
 handle_incoming_directory(
-    void        UNUSED(*dummy))
+    void               *dummy)
 {
     char *filename;
     char path[PATH_MAX];
     skPollDirErr_t pderr;
+
+    SK_UNUSED_PARAM(dummy);
 
     incoming_thread_valid = 1;
 

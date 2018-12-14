@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skmsg.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
+RCSIDENT("$SiLK: skmsg.c 953c7660de6a 2018-12-12 17:28:55Z mthomas $");
 
 #include "intdict.h"
 #include "multiqueue.h"
@@ -23,31 +23,13 @@ RCSIDENT("$SiLK: skmsg.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
 #include <silk/skdeque.h>
 #include <silk/sklog.h>
 #include <silk/skstream.h>
+#include <silk/skstringmap.h>
 #include <silk/utils.h>
 #include <poll.h>
 #if SK_ENABLE_GNUTLS
 #include <gnutls/gnutls.h>
 #include <gnutls/x509.h>
 #include <gnutls/pkcs12.h>
-
-/* The GNUTLS_VERSION_NUMBER is called LIBGNUTLS_VERSION_NUMBER in
- * GnuTlS 1.4.1*/
-#ifndef GNUTLS_VERSION_NUMBER
-#  ifdef  LIBGNUTLS_VERSION_NUMBER
-#    define GNUTLS_VERSION_NUMBER LIBGNUTLS_VERSION_NUMBER
-#  else
-#    error  Cannot determine version of GnuTLS
-#  endif
-#endif
-
-#if GNUTLS_VERSION_NUMBER < 0x020b00
-/* define 'gcry_threads_pthread' variable used below */
-SK_DIAGNOSTIC_IGNORE_PUSH("-Wdeprecated-declarations")
-#include <gcrypt.h>
-GCRY_THREAD_OPTION_PTHREAD_IMPL;
-SK_DIAGNOSTIC_IGNORE_POP("-Wdeprecated-declarations")
-#endif  /* GNUTLS_VERSION_NUMBER < 0x020b00 */
-
 #endif  /* SK_ENABLE_GNUTLS */
 
 /* SENDRCV_DEBUG is defined in libsendrcv.h */
@@ -62,6 +44,12 @@ SK_DIAGNOSTIC_IGNORE_POP("-Wdeprecated-declarations")
 /* Maximum number of CA certs that can be in the CA cert file */
 #define MAX_CA_CERTS 32
 
+/* GnuTLS minimum version */
+#define MIN_GNUTLS_VERISON      "2.12.0"
+
+/* Maximum GnuTLS logging level accepted by gnutls_global_set_log_level */
+#define MAX_TLS_DEBUG_LEVEL     99
+
 /* Keepalive timeout for the control channel */
 #define SKMSG_CONTROL_KEEPALIVE_TIMEOUT 60 /* seconds */
 
@@ -72,7 +60,6 @@ SK_DIAGNOSTIC_IGNORE_POP("-Wdeprecated-declarations")
 /* Time used to determine how often to check to see if the connection
  * is still alive. */
 #define SKMSG_MINIMUM_READ_SELECT_TIMEOUT SKMSG_CONTROL_KEEPALIVE_TIMEOUT
-
 
 /* Read and write sides of control pipes */
 #define READ 0
@@ -100,14 +87,19 @@ SK_DIAGNOSTIC_IGNORE_POP("-Wdeprecated-declarations")
 
 #define SKMSG_MINIMUM_SYSTEM_CTL_CHANNEL 0xFFFA
 
-/* Diffie-Hellman bits for GnuTLS */
-#define DH_BITS 1024
+/* Default security level. */
+#define TLS_SECURITY_DEFAULT    "medium"
 
 /* TLS read timeout, in milliseconds */
 #define TLS_POLL_TIMEOUT 1000
 
 /* IO thread check timeout, in milliseconds*/
 #define SKMSG_IO_POLL_TIMEOUT 1000
+
+/* Whether to use the custom tls_pull, tls_push */
+#ifndef SK_TLS_USE_CUSTOM_PULL_PUSH
+#define SK_TLS_USE_CUSTOM_PULL_PUSH 0
+#endif
 
 
 /* Define Macros */
@@ -166,13 +158,6 @@ SK_DIAGNOSTIC_IGNORE_POP("-Wdeprecated-declarations")
     } while (0)
 
 #endif  /* ((SENDRCV_DEBUG) & DEBUG_SKMSG_FN) */
-
-
-#if SK_ENABLE_GNUTLS
-#  define UNUSED_IF_NOTLS(x) x
-#else
-#  define UNUSED_IF_NOTLS(x) UNUSED(x)
-#endif /* SK_ENABLE_GNUTLS */
 
 
 /* MUTEX_* macros are defined in skthread.h */
@@ -308,7 +293,7 @@ SK_DIAGNOSTIC_IGNORE_POP("-Wdeprecated-declarations")
         ar_type ar_rv = (ar_func_args);                         \
         assert(ar_rv == (ar_expected));                         \
     } while(0)
-#endif
+#endif  /* #else of #ifdef NDEBUG */
 
 
 
@@ -402,10 +387,10 @@ typedef struct sk_msg_root_st {
 #endif
 
     unsigned            shuttingdown: 1;
-#if SK_ENABLE_GNUTLS
+    /* whether GnuTLS credentials have been set */
     unsigned            cred_set: 1;
+    /* whether this connection uses TLS */
     unsigned            bind_tls: 1;
-#endif
 } sk_msg_root_t;
 
 
@@ -513,7 +498,7 @@ struct sk_msg_conn_queue_st {
 #if SK_ENABLE_GNUTLS
     gnutls_session_t        session;
     unsigned                use_tls : 1;
-#endif
+#endif  /* SK_ENABLE_GNUTLS */
 };
 
 
@@ -553,6 +538,7 @@ typedef struct sk_channel_pair_st {
 } sk_channel_pair_t;
 
 
+
 /*** Local function prototypes ***/
 
 static void *reader_thread(void *);
@@ -584,16 +570,111 @@ send_message_internal(
 
 /*** Local variables ***/
 
-
 #if SK_ENABLE_GNUTLS
+#if GNUTLS_VERSION_NUMBER < 0x030300
+#define GNUTLS_SEC_PARAM_MEDIUM GNUTLS_SEC_PARAM_NORMAL
+#endif
 
-/* Diffie-Hellman parameters and a mutex to control access to them */
+/* Mutex to control access to GnuTLS global state */
 static pthread_mutex_t sk_msg_gnutls_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int sk_msg_gnutls_initialized = 0;
-static gnutls_dh_params_t dh_params;
+
+/* Local handle to the name of environment variable holding the
+ * password for the PKCS12 file. */
+static const char *password_env_name = NULL;
+
+/* Encryption and authentication files */
+static const char *tls_ca_file     = NULL;
+static const char *tls_cert_file   = NULL;
+static const char *tls_key_file    = NULL;
+static const char *tls_pkcs12_file = NULL;
+static const char *tls_crl_file    = NULL;
+
+/* GnuTLS debugging log level */
+static int tls_debug_level = 0;
+
+/* The priority string the user provides for GnuTLS priority, used to
+ * fill tls_priority_cache. */
+static const char *tls_priority = NULL;
+
+/* GnuTLS priority cache passed to gnutls_priority_set(), based on
+ * tls_priority.  If NULL, the default priority is used. */
+static gnutls_priority_t tls_priority_cache = NULL;
+
+/* The level the user provides for the GnuTLS security parameter
+ * level.  If not provided, defaults to TLS_SECURITY_DEFAULT. */
+static const char *tls_security = NULL;
+
+/* The GnuTLS security parameter level based on 'tls_security'. */
+static gnutls_sec_param_t tls_security_param;
+
+/* Potential values for tls_security */
+static const sk_stringmap_entry_t tls_security_levels[] = {
+    {"low",             GNUTLS_SEC_PARAM_LOW,       NULL,   NULL},
+    {"medium",          GNUTLS_SEC_PARAM_MEDIUM,    NULL,   NULL},
+    {"high",            GNUTLS_SEC_PARAM_HIGH,      NULL,   NULL},
+    {"ultra",           GNUTLS_SEC_PARAM_ULTRA,     NULL,   NULL},
+    SK_STRINGMAP_SENTINEL
+};
+
+typedef enum {
+    OPT_TLS_CA,
+    OPT_TLS_CERT,
+    OPT_TLS_KEY,
+    OPT_TLS_PKCS12,
+    OPT_TLS_SECURITY,
+    OPT_TLS_PRIORITY,
+    OPT_TLS_CRL,
+    OPT_TLS_DEBUG_LEVEL
+} sk_tls_options_enum;
+
+/* Command line switches for encryption/authentication files */
+static struct option sk_tls_options[] = {
+    {"tls-ca",          REQUIRED_ARG, 0, OPT_TLS_CA},
+    {"tls-cert",        REQUIRED_ARG, 0, OPT_TLS_CERT},
+    {"tls-key",         REQUIRED_ARG, 0, OPT_TLS_KEY},
+    {"tls-pkcs12",      REQUIRED_ARG, 0, OPT_TLS_PKCS12},
+    {"tls-security",    REQUIRED_ARG, 0, OPT_TLS_SECURITY},
+    {"tls-priority",    REQUIRED_ARG, 0, OPT_TLS_PRIORITY},
+    {"tls-crl",         REQUIRED_ARG, 0, OPT_TLS_CRL},
+    {"tls-debug-level", REQUIRED_ARG, 0, OPT_TLS_DEBUG_LEVEL},
+    {0, 0, 0, 0}        /* sentinel */
+};
+
+/* Usage text for each command line switch */
+static const char *sk_tls_options_help[] = {
+    ("Load the Certificate Authority from the file in PEM format\n"
+     "\tlocated at this complete path. Def. None. Either --tls-key\n"
+     "\tand --tls-key or --tls-pkcs12 must also be specified"),
+    ("Load the encryption cert from the file in PEM format\n"
+     "\tlocated at this complete path. Def. None.  Requires that --tls-ca\n"
+     "\tand --tls-key are also specified"),
+    ("Load the encryption key from the file in PEM format\n"
+     "\tlocated at this complete path. Def. None. Requires that --tls-ca\n"
+     "\tand --tls-cert are also specified"),
+    ("Load the encryption cert and key from the file in\n"
+     "\tPKCS#12 format located at this complete path. Def. None. Requires\n"
+     "\tthat --tls-ca is also specified"),
+    ("Specify the security level to use when the required\n"
+     "\tfile options are provided. Def. '" TLS_SECURITY_DEFAULT "'.\n"
+     "\tChoices:"),
+    ("Specify the priorities for ciphers, key exchange\n"
+     "\tmethods, message authentication codes, and compression methods.\n"
+     "\tSee the GnuTLS documentation of \"Priority Strings\" for the details\n"
+     "\tabout the format of the argument. Def. 'NORMAL'"),
+    ("Load the Certificate Revocation List from the file in PEM\n"
+     "\tformat located at this complete path. Def. None"),
+    ("Set TLS debugging level to the specified value.\n"
+     "\tDef. 0. Range: 0-"),
+    (char *)NULL
+};
+
 
 #endif /* SK_ENABLE_GNUTLS */
 
+/* Type of connections to use.  Set to TLS when the required files are
+ * specified on the command line. */
+static skm_conn_t connection_type = CONN_TCP;
 
 
 /* Utility functions */
@@ -693,13 +774,13 @@ skmerr_strerror(
         return "Partial read or write (will retry)";
       case SKMERR_EMPTY:
         return "Empty read (will retry)";
-#if SK_ENABLE_GNUTLS
       case SKMERR_GNUTLS:
+#if SK_ENABLE_GNUTLS
         if (conn) {
             return gnutls_strerror(conn->last_errnum);
         }
+#endif  /* SK_ENABLE_GNUTLS */
         return "GnuTLS error";
-#endif
     }
 
     snprintf(buf, sizeof(buf), "Unknown SKMERR_ error code value %d", retval);
@@ -710,518 +791,250 @@ skmerr_strerror(
 
 #if SK_ENABLE_GNUTLS
 /*
- *  status = check_cert_times(x509_cert, generic_file, file_path);
+ *  file_exists = optionsFileCheck(opt_name, opt_arg);
  *
- *    Check the activation and expiry times on the certificate
- *    'x509_cert'.  If the times are valid, return 0.  Otherwise,
- *    print an error about an error in 'generic_file' (which
- *    references the switch used to load the file) and 'file_path'
- *    (which is the path to the file), and return -1.
+ *    Verify that the file in 'opt_arg' exists and that we have a full
+ *    path to the file.  Verify that the length is shorter than
+ *    PATH_MAX.  If so, return 0; otherwise, print an error that the
+ *    option named by 'opt_name' was bad and return -1.
  */
 static int
-check_cert_times(
-    gnutls_x509_crt_t   cert,
-    const char         *file_generic,
-    const char         *file_path)
+optionsFileCheck(
+    const char         *opt_name,
+    const char         *opt_arg)
 {
-    time_t now, t;
+    if (!opt_arg || !opt_arg[0]) {
+        skAppPrintErr("Invalid %s: The argument empty", opt_name);
+        return -1;
+    }
+
+    if (strlen(opt_arg)+1 >= PATH_MAX) {
+        skAppPrintErr("Invalid %s: Path is too long", opt_name);
+        return -1;
+    }
+
+    if (!skFileExists(opt_arg)) {
+        skAppPrintErr(("Invalid %s:"
+                       " File '%s' does not exist or is not a regular file"),
+                      opt_name, opt_arg);
+        return -1;
+    }
+
+    if (opt_arg[0] != '/') {
+        skAppPrintErr(("Invalid %s: Must use complete path"
+                       " ('%s' does not begin with slash)"),
+                      opt_name, opt_arg);
+        return -1;
+    }
+
+    return 0;
+}
+
+
+/**
+ *    Handle a single command line argument.
+ */
+static int
+skMsgTlsOptionsHandler(
+    clientData          cData,
+    int                 opt_index,
+    char               *opt_arg)
+{
+    uint32_t tmp32;
+    int rv;
+
+    SK_UNUSED_PARAM(cData);
+
+#define SET_FILE_OPTION(variable)                                       \
+    if (variable) {                                                     \
+        skAppPrintErr("Invalid %s: Switch used multiple times",         \
+                      sk_tls_options[opt_index].name);                  \
+    }                                                                   \
+    if (optionsFileCheck(sk_tls_options[opt_index].name, opt_arg)) {    \
+        return 1;                                                       \
+    }                                                                   \
+    variable = opt_arg
+
+
+    switch ((sk_tls_options_enum)opt_index) {
+      case OPT_TLS_CA:
+        SET_FILE_OPTION(tls_ca_file);
+        break;
+
+      case OPT_TLS_CERT:
+        SET_FILE_OPTION(tls_cert_file);
+        break;
+
+      case OPT_TLS_KEY:
+        SET_FILE_OPTION(tls_key_file);
+        break;
+
+      case OPT_TLS_PKCS12:
+        SET_FILE_OPTION(tls_pkcs12_file);
+        break;
+
+      case OPT_TLS_CRL:
+        SET_FILE_OPTION(tls_crl_file);
+        break;
+
+      case OPT_TLS_PRIORITY:
+        if (tls_priority) {
+            skAppPrintErr("Invalid %s: Switch used multiple times",
+                          sk_tls_options[opt_index].name);
+        }
+        tls_priority = opt_arg;
+        break;
+
+      case OPT_TLS_SECURITY:
+        if (tls_security) {
+            skAppPrintErr("Invalid %s: Switch used multiple times",
+                          sk_tls_options[opt_index].name);
+        }
+        tls_security = opt_arg;
+        break;
+
+      case OPT_TLS_DEBUG_LEVEL:
+        rv = skStringParseUint32(&tmp32, opt_arg, 0, MAX_TLS_DEBUG_LEVEL);
+        if (rv) {
+            skAppPrintErr("Invalid %s '%s': %s",
+                          sk_tls_options[opt_index].name, opt_arg,
+                          skStringParseStrerror(rv));
+            return 1;
+        }
+        tls_debug_level = (int)tmp32;
+        break;
+    }
+
+    return 0;
+}
+
+
+/* Register the switches and their handler function */
+int
+skMsgTlsOptionsRegister(
+    const char         *passwd_env_name)
+{
+    password_env_name = passwd_env_name;
+    return skOptionsRegister(sk_tls_options, &skMsgTlsOptionsHandler, NULL);
+}
+
+/* Print usage for the switches */
+void
+skMsgTlsOptionsUsage(
+    FILE               *fh)
+{
+    unsigned int i, j;
+
+    fprintf(fh, "\nTransport encryption switches:\n");
+    for (i = 0; sk_tls_options[i].name; ++i) {
+        fprintf(fh, "--%s %s. %s", sk_tls_options[i].name,
+                SK_OPTION_HAS_ARG(sk_tls_options[i]),
+                sk_tls_options_help[i]);
+        switch (sk_tls_options[i].val) {
+#if GNUTLS_VERSION_NUMBER >= 0x030400
+          case OPT_TLS_PRIORITY:
+            {
+                const unsigned int flag = GNUTLS_PRIORITY_LIST_INIT_KEYWORDS;
+                const char *s;
+                fprintf(fh, ".\n\tValues:");
+                for (j = 0; (s = gnutls_priority_string_list(j, flag)); ++j) {
+                    if (*s) {
+                        fprintf(fh, "%s %s", ((0 == j) ? "" : ","), s);
+                    }
+                }
+            }
+            break;
+#endif  /* GNUTLS_VERSION_NUMBER >= 0x030400 */
+          case OPT_TLS_SECURITY:
+            for (j = 0; tls_security_levels[j].name; ++j) {
+                fprintf(fh, "%s %s",
+                        ((0 == j) ? "" : ","), tls_security_levels[j].name);
+            }
+            break;
+          case OPT_TLS_DEBUG_LEVEL:
+            fprintf(fh, "%d", MAX_TLS_DEBUG_LEVEL);
+            break;
+          default:
+            break;
+        }
+        fprintf(fh, "\n");
+    }
+}
+
+/* Verify the switches. */
+int
+skMsgTlsOptionsVerify(
+    unsigned int       *tls_available)
+{
+    sk_stringmap_t *field_map = NULL;
+    sk_stringmap_entry_t *sm_entry;
+    sk_stringmap_status_t sm_err;
     int rv = 0;
 
-    DEBUG_ENTER_FUNC;
-
-    time(&now);
-
-    t = gnutls_x509_crt_get_activation_time(cert);
-    if (t == (time_t)-1) {
-        INFOMSG("Error loading %s file '%s': Unable to get activation time",
-                file_generic, file_path);
-        rv = -1;
-    } else if (now < t) {
-        INFOMSG("Error loading %s file '%s': Certificate is not yet valid",
-                file_generic, file_path);
-        rv = -1;
+    if (NULL == tls_security) {
+        tls_security = TLS_SECURITY_DEFAULT;
     }
 
-    t = gnutls_x509_crt_get_expiration_time(cert);
-    if (t == (time_t)-1) {
-        INFOMSG("Error loading %s file '%s': Unable to get expiration time",
-                file_generic, file_path);
-        rv = -1;
-    } else if (now > t) {
-        INFOMSG("Error loading %s file '%s': Certificate has expired",
-                file_generic, file_path);
-        rv = -1;
-    }
-
-    RETURN(rv);
-}
-
-
-/*
- *  status = read_trust_file(cred, ca_filename, x509_format);
- *
- *    Read the CA list from 'ca_filename', which is in the
- *    'x509_format', and store the CAs in the credential 'cred'.
- */
-static int
-read_trust_file(
-    gnutls_certificate_credentials_t    cred,
-    const char                         *ca_filename,
-    gnutls_x509_crt_fmt_t               x509_format)
-{
-    gnutls_x509_crt_t ca_list[MAX_CA_CERTS];
-    gnutls_x509_crt_t *ca;
-    unsigned int ca_list_len = MAX_CA_CERTS;
-    gnutls_datum_t data;
-    off_t file_len;
-    int fd;
-    int rv = -1;
-
-    DEBUG_ENTER_FUNC;
-
-    if ((fd = open(ca_filename, O_RDONLY)) == -1
-        || (file_len = lseek(fd, 0, SEEK_END)) == -1)
+    /* create a stringmap */
+    if ((sm_err = skStringMapCreate(&field_map))
+        || (sm_err = skStringMapAddEntries(field_map, -1, tls_security_levels)))
     {
-        INFOMSG("Error loading x509 CA trust file '%s': %s",
-                ca_filename, strerror(errno));
-        if (-1 != fd) {
-            close(fd);
-        }
+        skAppPrintErr("Unable to create string map: %s",
+                      skStringMapStrerror(sm_err));
+        rv = 1;
         goto END;
     }
 
-    data.data = (unsigned char*)mmap(0, file_len, PROT_READ, MAP_SHARED, fd, 0);
-    if (data.data == MAP_FAILED) {
-        INFOMSG("Error mapping x509 CA trust file '%s': %s",
-                ca_filename, strerror(errno));
-        close(fd);
-        goto END;
-    }
-    close(fd);
-    data.size = (unsigned int)file_len;
-    rv = gnutls_x509_crt_list_import(ca_list, &ca_list_len, &data,
-                                     x509_format, 0);
-    if (rv < 0) {
-        INFOMSG("Failed to import x509 CA trust file '%s': %s",
-                ca_filename, gnutls_strerror(rv));
-        munmap(data.data, file_len);
-        goto END;
-    }
-
-    rv = 0;
-    ca = ca_list;
-    while (ca_list_len) {
-        if (check_cert_times(*ca, "x509 CA trust", ca_filename)) {
-            rv = -1;
-        }
-        gnutls_x509_crt_deinit(*ca);
-        ++ca;
-        --ca_list_len;
+    /* attempt to match */
+    sm_err = skStringMapGetByName(field_map, tls_security, &sm_entry);
+    switch (sm_err) {
+      case SKSTRINGMAP_OK:
+        tls_security_param = (gnutls_sec_param_t)sm_entry->id;
+        break;
+      case SKSTRINGMAP_PARSE_AMBIGUOUS:
+        skAppPrintErr("Invalid %s: Field '%s' is ambiguous",
+                      sk_tls_options[OPT_TLS_SECURITY].name, tls_security);
+        rv = 1;
+        break;
+      case SKSTRINGMAP_PARSE_NO_MATCH:
+        skAppPrintErr("Invalid %s: Field '%s' is not recognized",
+                      sk_tls_options[OPT_TLS_SECURITY].name, tls_security);
+        rv = 1;
+        break;
+      default:
+        skAppPrintErr("Unexpected return value from string-map parser (%d)",
+                      sm_err);
+        rv = 1;
+        break;
     }
 
-    if (rv == 0) {
-        rv = gnutls_certificate_set_x509_trust_mem(cred, &data,
-                                                   x509_format);
-        if (rv < 0) {
-            INFOMSG("Error loading x509 CA trust file '%s': %s",
-                    ca_filename, gnutls_strerror(rv));
-        } else {
-            rv = 0;
+    if (tls_ca_file || tls_cert_file || tls_key_file || tls_pkcs12_file) {
+        if (!tls_ca_file) {
+            skAppPrintErr("A certificate authority file must be specified"
+                          " with --%s when using encryption",
+                          sk_tls_options[OPT_TLS_CA].name);
+            rv = 1;
+        }
+        if (0 == ((tls_cert_file && tls_key_file) ^ (!!tls_pkcs12_file))) {
+            skAppPrintErr("When using encryption, you must specify --%s and "
+                          "--%s, or just --%s",
+                          sk_tls_options[OPT_TLS_CERT].name,
+                          sk_tls_options[OPT_TLS_KEY].name,
+                          sk_tls_options[OPT_TLS_PKCS12].name);
+            rv = 1;
         }
     }
-    munmap(data.data, file_len);
+
+    if (tls_ca_file && 0 == rv) {
+        connection_type = CONN_TLS;
+    }
+    if (tls_available) {
+        *tls_available = (CONN_TLS == connection_type);
+    }
 
   END:
-    RETURN((0 == rv) ? 0 : -1);
-}
-
-
-/*
- *  status = read_key_file(cred, cert_filename, key_filename, x509_format);
- *
- *    Read the certificate from 'cert_filename' and the key from
- *    'key_filename', where both files are in in the 'x509_format'.
- *    Store the certificate and key in the credential 'cred'.
- *
- *    In addition, check the activation and expiration times on the
- *    certificates.
- *
- *    This function is similar to the following direct GnuTLS call,
- *    except our function checks times while the GnuTLS function does
- *    not.
- *
- *    rv = gnutls_certificate_set_x509_key_file(cred, cert_filename,
- *                                              key_filename, x509_format);
- *    if (rv < 0) { ERRROR; }
- */
-static int
-read_key_file(
-    gnutls_certificate_credentials_t    cred,
-    const char                         *cert_filename,
-    const char                         *key_filename,
-    gnutls_x509_crt_fmt_t               x509_format)
-{
-    skstream_t *stream = NULL;
-    gnutls_x509_crt_t cert = NULL;
-    gnutls_x509_privkey_t key = NULL;
-    gnutls_datum_t datum;
-    ssize_t file_size = 0;
-    int rv;
-
-    DEBUG_ENTER_FUNC;
-
-    /* initialize certificate and key */
-    rv = gnutls_x509_crt_init(&cert);
-    if (rv != GNUTLS_E_SUCCESS) {
-        goto ERROR;
-    }
-    rv = gnutls_x509_privkey_init(&key);
-    if (rv != GNUTLS_E_SUCCESS) {
-        goto ERROR;
-    }
-
-    /* Read certificate file */
-    if ((rv = skStreamCreate(&stream, SK_IO_READ, SK_CONTENT_OTHERBINARY))
-        || (rv = skStreamBind(stream, cert_filename))
-        || (rv = skStreamOpen(stream)))
-    {
-        skStreamPrintLastErr(stream, rv, &ERRMSG);
-        goto END;
-    }
-    datum.data = (unsigned char*)skStreamReadToEndOfFile(stream, &file_size);
-    datum.size = file_size;
-    if (NULL == datum.data) {
-        skStreamPrintLastErr(stream, rv, &ERRMSG);
-        goto END;
-    }
-    skStreamDestroy(&stream);
-
-    /* Parse certificate */
-    rv = gnutls_x509_crt_import(cert, &datum, x509_format);
-    free(datum.data);
-    if (rv != GNUTLS_E_SUCCESS) {
-        goto ERROR;
-    }
-
-    /* Read key file */
-    if ((rv = skStreamCreate(&stream, SK_IO_READ, SK_CONTENT_OTHERBINARY))
-        || (rv = skStreamBind(stream, key_filename))
-        || (rv = skStreamOpen(stream)))
-    {
-        skStreamPrintLastErr(stream, rv, &ERRMSG);
-        goto END;
-    }
-    datum.data = (unsigned char*)skStreamReadToEndOfFile(stream, &file_size);
-    datum.size = file_size;
-    if (NULL == datum.data) {
-        skStreamPrintLastErr(stream, rv, &ERRMSG);
-        goto END;
-    }
-    skStreamDestroy(&stream);
-
-    /* Parse key */
-    rv = gnutls_x509_privkey_import(key, &datum, x509_format);
-    free(datum.data);
-    if (rv != GNUTLS_E_SUCCESS) {
-        goto ERROR;
-    }
-
-    /* Put cert and key onto the credential */
-    rv = gnutls_certificate_set_x509_key(cred, &cert, 1, key);
-    if (rv != GNUTLS_E_SUCCESS) {
-        goto ERROR;
-    }
-
-    /* Check activation/expire times on the certifcate */
-    rv = check_cert_times(cert, "certificate", cert_filename);
-    if (rv) {
-        goto END;
-    }
-
-    rv = 0;
-
-    /* Use "goto ERROR" to print a GnuTLS error; "goto END" otherwise */
-  ERROR:
-    if (0 != rv) {
-        ERRMSG("Error loading certificate or key files '%s', '%s': %s",
-               cert_filename, key_filename, gnutls_strerror(rv));
-    }
-  END:
-    skStreamDestroy(&stream);
-    if (cert) {
-        gnutls_x509_crt_deinit(cert);
-    }
-    if (key) {
-        gnutls_x509_privkey_deinit(key);
-    }
-    RETURN((0 == rv) ? 0 : -1);
-}
-
-
-/*
- *  status = read_pkcs12_file(cred, cert_filename, x509_format, password);
- *
- *    Read the PKCS12 certificates and keys from 'cert_filename',
- *    where the file is in in the 'x509_format'.  Store the
- *    certificate and key in the credential 'cred'.  If the file is
- *    password protected, the 'password' is the password; otherwise it
- *    is NULL.
- *
- *    This function is similar to the following direct GnuTLS call,
- *    except our function checks times while the GnuTLS function does
- *    not.
- *
- *    rv = gnutls_certificate_set_x509_simple_pkcs12_file(cred, cert_filename,
- *                                                        x509_format,
- *                                                        password);
- *    if (rv < 0) { ERROR; }
- */
-static int
-read_check_pkcs12(
-    gnutls_certificate_credentials_t    cred,
-    const char                         *cert_filename,
-    gnutls_x509_crt_fmt_t               x509_format,
-    const char                         *password)
-{
-    /* To verify the PKCS12 cert, we basically need to inline
-     * everything that the GnuTLS functions
-     * gnutls_certificate_set_x509_simple_pkcs12_mem() and
-     * parse_pkcs12() do. Whee! */
-
-    skstream_t *stream = NULL;
-    gnutls_datum_t p12blob;
-    ssize_t file_size = 0;
-    int rv;
-
-    gnutls_pkcs12_t p12 = NULL;
-    gnutls_x509_privkey_t key = NULL;
-    gnutls_x509_crt_t cert = NULL;
-    gnutls_pkcs12_bag_t bag = NULL;
-    int idx = 0;
-    size_t cert_id_size = 0;
-    size_t key_id_size = 0;
-    unsigned char cert_id[20];
-    unsigned char key_id[20];
-    int elements_in_bag;
-    int i;
-    int bag_type;
-    gnutls_datum_t data;
-
-     DEBUG_ENTER_FUNC;
-
-    /* Read pkcs12 file */
-    if ((rv = skStreamCreate(&stream, SK_IO_READ, SK_CONTENT_OTHERBINARY))
-        || (rv = skStreamBind(stream, cert_filename))
-        || (rv = skStreamOpen(stream)))
-    {
-        skStreamPrintLastErr(stream, rv, &ERRMSG);
-        goto END;
-    }
-    p12blob.data = (unsigned char*)skStreamReadToEndOfFile(stream, &file_size);
-    p12blob.size = file_size;
-    if (NULL == p12blob.data) {
-        skStreamPrintLastErr(stream, rv, &ERRMSG);
-        goto END;
-    }
-    skStreamDestroy(&stream);
-
-    /* Initialize PKCS#12 certificate */
-    rv = gnutls_pkcs12_init(&p12);
-    if (rv < 0) {
-        free(p12blob.data);
-        p12 = NULL;
-        goto ERROR;
-    }
-
-    /* Parse PKCS#12 certificate */
-    rv = gnutls_pkcs12_import(p12, &p12blob, x509_format, 0);
-    free(p12blob.data);
-    if (rv < 0)    {
-        goto ERROR;
-    }
-    if (password) {
-        rv = gnutls_pkcs12_verify_mac(p12, password);
-        if (rv < 0) {
-            goto ERROR;
-        }
-    }
-
-    /* Following taken from parse_pkcs12() in GnuTLS 2.8.6 sources */
-
-    /* find the first private key */
-    for (idx = 0; NULL == key; ++idx) {
-        rv = gnutls_pkcs12_bag_init(&bag);
-        if (rv < 0) {
-            bag = NULL;
-            goto ERROR;
-        }
-        rv = gnutls_pkcs12_get_bag(p12, idx, bag);
-        if (rv < 0) {
-            /* either error or no more bags in pkcs structure */
-            goto ERROR;
-        }
-
-        rv = gnutls_pkcs12_bag_get_type(bag, 0);
-        if (rv < 0) {
-            goto ERROR;
-        }
-        if (rv == GNUTLS_BAG_ENCRYPTED) {
-            rv = gnutls_pkcs12_bag_decrypt(bag, password);
-            if (rv < 0) {
-                goto ERROR;
-            }
-        }
-
-        elements_in_bag = gnutls_pkcs12_bag_get_count(bag);
-        for (i = 0; NULL == key && i < elements_in_bag; ++i) {
-            bag_type = gnutls_pkcs12_bag_get_type(bag, i);
-            rv = gnutls_pkcs12_bag_get_data(bag, i, &data);
-            if (rv < 0) {
-                goto ERROR;
-            }
-
-            switch (bag_type) {
-              case GNUTLS_BAG_PKCS8_ENCRYPTED_KEY:
-              case GNUTLS_BAG_PKCS8_KEY:
-                rv = gnutls_x509_privkey_init(&key);
-                if (rv < 0) {
-                    key = NULL;
-                    goto ERROR;
-                }
-                rv = gnutls_x509_privkey_import_pkcs8(
-                    key, &data, GNUTLS_X509_FMT_DER, password,
-                    ((bag_type==GNUTLS_BAG_PKCS8_KEY) ? GNUTLS_PKCS_PLAIN :0));
-                if (rv < 0) {
-                    goto ERROR;
-                }
-                /* get key_id to compare to cert_id below */
-                key_id_size = sizeof(key_id);
-                rv = gnutls_x509_privkey_get_key_id(key, 0, key_id,
-                                                    &key_id_size);
-                if (rv < 0) {
-                    goto ERROR;
-                }
-                break;
-
-              default:
-                break;
-            }
-        }
-
-        gnutls_pkcs12_bag_deinit(bag);
-    }
-
-    bag = NULL;
-
-    /* now find the corresponding certificate */
-    for (idx = 0; NULL == cert; ++idx) {
-        rv = gnutls_pkcs12_bag_init(&bag);
-        if (rv < 0) {
-            bag = NULL;
-            goto ERROR;
-        }
-        rv = gnutls_pkcs12_get_bag(p12, idx, bag);
-        if (rv < 0) {
-            /* either error or no more bags in pkcs structure */
-            goto ERROR;
-        }
-
-        rv = gnutls_pkcs12_bag_get_type(bag, 0);
-        if (rv < 0) {
-            goto ERROR;
-        }
-        if (rv == GNUTLS_BAG_ENCRYPTED) {
-            rv = gnutls_pkcs12_bag_decrypt(bag, password);
-            if (rv < 0) {
-                goto ERROR;
-            }
-        }
-
-        elements_in_bag = gnutls_pkcs12_bag_get_count(bag);
-        for (i = 0; NULL == cert && i < elements_in_bag; ++i) {
-            bag_type = gnutls_pkcs12_bag_get_type(bag, i);
-            rv = gnutls_pkcs12_bag_get_data(bag, i, &data);
-            if (rv < 0) {
-                goto ERROR;
-            }
-
-            switch (bag_type) {
-              case GNUTLS_BAG_CERTIFICATE:
-                rv = gnutls_x509_crt_init(&cert);
-                if (rv < 0) {
-                    cert = NULL;
-                    goto ERROR;
-                }
-                rv = gnutls_x509_crt_import(cert, &data,
-                                            GNUTLS_X509_FMT_DER);
-                if (rv < 0) {
-                    goto ERROR;
-                }
-                /* check if the key id match */
-                cert_id_size = sizeof(cert_id);
-                rv = gnutls_x509_crt_get_key_id(cert, 0, cert_id,
-                                                &cert_id_size);
-                if (rv < 0) {
-                    goto ERROR;
-                }
-                if (memcmp(cert_id, key_id, cert_id_size) != 0) {
-                    /* they don't match - skip the certificate */
-                    gnutls_x509_crt_deinit(cert);
-                    cert = NULL;
-                }
-                break;
-
-              case GNUTLS_BAG_CRL:
-              case GNUTLS_BAG_ENCRYPTED:
-              case GNUTLS_BAG_EMPTY:
-              default:
-                break;
-            }
-        }
-
-        gnutls_pkcs12_bag_deinit(bag);
-    }
-
-    bag = NULL;
-
-    assert(key);
-    assert(cert);
-
-    /* Put cert and key onto the credential */
-    rv = gnutls_certificate_set_x509_key(cred, &cert, 1, key);
-    if (rv < 0) {
-        goto ERROR;
-    }
-
-    /* Check activation/expire times on the certifcate */
-    rv = check_cert_times(cert, "PKCS#12", cert_filename);
-    if (rv) {
-        goto END;
-    }
-
-    rv = 0;
-
-    /* Use "goto ERROR" to print a GnuTLS error; "goto END" otherwise */
-  ERROR:
-    if (rv != 0) {
-        ERRMSG("Error getting PKCS#12 certificate from file '%s': %s",
-               cert_filename, gnutls_strerror(rv));
-    }
-  END:
-    skStreamDestroy(&stream);
-    if (bag) {
-        gnutls_pkcs12_bag_deinit(bag);
-    }
-    if (p12) {
-        gnutls_pkcs12_deinit(p12);
-    }
-    if (cert) {
-        gnutls_x509_crt_deinit(cert);
-    }
-    if (key) {
-        gnutls_x509_privkey_deinit(key);
-    }
-    RETURN((0 == rv) ? 0 : -1);
+    skStringMapDestroy(field_map);
+    return rv;
 }
 
 #endif  /* SK_ENABLE_GNUTLS */
@@ -1797,7 +1610,7 @@ tls_recv(
 #endif /* SK_ENABLE_GNUTLS */
 
 
-#if SK_ENABLE_GNUTLS && (GNUTLS_VERSION_NUMBER >= 0x020b00)
+#if SK_ENABLE_GNUTLS
 /*
  *    Since we cannot be certain that GnuTLS was built with pthread
  *    support (hello redhat), define our own functions that are copies
@@ -1856,7 +1669,7 @@ skMsgGnuTLSMutexUnlock(
     }
     return 0;
 }
-#endif  /* SK_ENABLE_GNUTLS && (GNUTLS_VERSION_NUMBER >= 0x020b00) */
+#endif  /* SK_ENABLE_GNUTLS */
 
 
 /***********************************************************************/
@@ -1864,45 +1677,267 @@ skMsgGnuTLSMutexUnlock(
 
 #if SK_ENABLE_GNUTLS
 
-/*
- *    Initialize GnuTLS.  The caller should have the
- *    sk_msg_gnutls_mutex before calling this function.
- */
-static int
-skMsgGnuTLSInit(
-    void)
+/* Callback function used for debugging messages */
+static void
+skMsgGnuTLSDebugLog(
+    int                 level,
+    const char         *msg)
 {
+    INFOMSG("GnuTLS[%d] %s", level, msg);
+}
+
+#if GNUTLS_VERSION_NUMBER >= 0x030000
+/* Callback function used for audit messages */
+static void
+skMsgGnuTLSAuditLog(
+    gnutls_session_t    session,
+    const char         *msg)
+{
+    SK_UNUSED_PARAM(session);
+    NOTICEMSG("GnuTLS audit: %s", msg);
+}
+#endif  /* GNUTLS_VERSION_NUMBER >= 0x030000 */
+
+#if GNUTLS_VERSION_NUMBER < 0x030406
+/* Callback function to verify the peer's certificate during the TLS
+ * handshake. */
+static int
+skMsgGnuTLSVerifyPeer(
+    gnutls_session_t    session)
+{
+    int rv;
+    unsigned int status;
+    char reasonbuf[256];
+    const char *reason;
+
     DEBUG_ENTER_FUNC;
 
-    if (!sk_msg_gnutls_initialized) {
-        int rv;
+    status = 0;
+    rv = gnutls_certificate_verify_peers2(session, &status);
+    if (0 == rv && 0 == status) {
+        RETURN(0);
+    }
+    if (rv < 0) {
+        NOTICEMSG("Failed to verify peer's certificate: %s",
+                  gnutls_strerror(rv));
+        RETURN(GNUTLS_E_CERTIFICATE_ERROR);
+    }
 
-#if GNUTLS_VERSION_NUMBER >= 0x020b00
+    if (status & GNUTLS_CERT_REVOKED) {
+        reason = "Certificate is revoked by its authority.";
+    } else if (status & GNUTLS_CERT_SIGNER_NOT_FOUND) {
+        reason = "Certificate's issuer is not known.";
+    } else if (status & GNUTLS_CERT_SIGNER_NOT_CA) {
+        reason = "Certificate's signer is not a CA.";
+    } else if (status & GNUTLS_CERT_INSECURE_ALGORITHM) {
+        reason = "Certificate is signed using an insecure algorithm";
+    } else if (status & GNUTLS_CERT_NOT_ACTIVATED) {
+        reason = "Certificate is not yet activated.";
+    } else if (status & GNUTLS_CERT_EXPIRED) {
+        reason = "Certificate has expired.";
+    } else if (status & GNUTLS_CERT_INVALID) {
+        reason = ("Certificate is not signed by a known authority"
+                  " or the signature is invalid");
+    } else {
+        snprintf(reasonbuf, sizeof(reasonbuf), "Other reason [%#x]",
+                 status);
+        reason = reasonbuf;
+    }
+
+    NOTICEMSG("Certificate verification failed: %s", reason);
+    RETURN(GNUTLS_E_CERTIFICATE_ERROR);
+}
+#endif  /* GNUTLS_VERSION_NUMBER < 0x030406 */
+
+/*
+ *    If authentication and encryption files were provided, read and
+ *    load them into the message queue's credentials.
+ *
+ *    Do global initialization of GnuTLS if it has not occurred yet.
+ */
+static int
+skMsgQueueInitializeGnuTLS(
+    sk_msg_queue_t     *queue)
+{
+#if GNUTLS_VERSION_NUMBER < 0x030506
+    static gnutls_dh_params_t dh_params;
+    unsigned int bits;
+#endif  /* GNUTLS_VERSION_NUMBER < 0x030506 */
+    int rv = 0;
+
+    DEBUG_ENTER_FUNC;
+
+    assert(queue);
+    assert(queue->root);
+
+    pthread_mutex_lock(&sk_msg_gnutls_mutex);
+    if (NULL == tls_ca_file) {
+        assert(NULL == tls_cert_file);
+        assert(NULL == tls_key_file);
+        assert(NULL == tls_pkcs12_file);
+        DEBUGMSG("Skipping GnuTLS initialization since not in use");
+        goto END;
+    }
+    assert((tls_cert_file && tls_key_file) ^ (!!tls_pkcs12_file));
+
+    if (NULL == gnutls_check_version(MIN_GNUTLS_VERISON)) {
+        CRITMSG("GnuTLS version is less than required %s", MIN_GNUTLS_VERISON);
+        goto END;
+    }
+
+    if (!sk_msg_gnutls_initialized) {
         gnutls_global_set_mutex(skMsgGnuTLSMutexInit, skMsgGnuTLSMutexDeinit,
                                 skMsgGnuTLSMutexLock, skMsgGnuTLSMutexUnlock);
-#else
-        rv = gcry_control(GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
-        if (rv == 0)
+        rv = gnutls_global_init();
+        if (rv < 0) {
+            WARNINGMSG("Unable to initialize gnutls: %s", gnutls_strerror(rv));
+            goto END;
+        }
+        if (tls_debug_level) {
+            gnutls_global_set_log_function(skMsgGnuTLSDebugLog);
+            gnutls_global_set_log_level(tls_debug_level);
+        }
+        if (tls_priority) {
+            const char *err_pos = NULL;
+            rv = gnutls_priority_init(&tls_priority_cache, tls_priority,
+                                      &err_pos);
+            if (rv != GNUTLS_E_SUCCESS) {
+                if (rv != GNUTLS_E_INVALID_REQUEST || NULL == err_pos) {
+                    CRITMSG("Unable to initialize gnutls priority: %s",
+                            gnutls_strerror(rv));
+                } else {
+                    CRITMSG("Invalid %s: Error at '%s'",
+                            sk_tls_options[OPT_TLS_PRIORITY].name, err_pos);
+                }
+                goto END;
+            }
+        }
+#if GNUTLS_VERSION_NUMBER >= 0x030000
+        gnutls_global_set_audit_log_function(skMsgGnuTLSAuditLog);
 #endif
-        {
-            rv = gnutls_global_init();
+#if GNUTLS_VERSION_NUMBER < 0x030506
+        /* Generate Diffie-Hellman parameters */
+        bits = gnutls_sec_param_to_pk_bits(GNUTLS_PK_DH, tls_security_param);
+        if (0 == bits) {
+            CRITMSG(("Programmer error: Unable to determine number of bits"
+                     " for algorithm %u at security level %u in"
+                     " GnuTLS version %s"),
+                    GNUTLS_PK_DH, tls_security_param,
+                    gnutls_check_version(NULL));
+            rv = -1;
+            goto END;
         }
-        if (rv >= 0) {
-            rv = gnutls_dh_params_init(&dh_params);
+        rv = gnutls_dh_params_init(&dh_params);
+        if (rv < 0) {
+            CRITMSG("Unable to initialize Diffie-Hellman parameters: %s",
+                    gnutls_strerror(rv));
+            goto END;
         }
-        if (rv >= 0) {
-            INFOMSG("Generating Diffie-Hellman parameters...");
-            INFOMSG("This could take some time...");
-            rv = gnutls_dh_params_generate2(dh_params, DH_BITS);
-            INFOMSG("Finished generating Diffie-Hellman parameters");
+        INFOMSG("Generating Diffie-Hellman parameters...");
+        INFOMSG("This could take some time...");
+        rv = gnutls_dh_params_generate2(dh_params, bits);
+        if (rv < 0) {
+            CRITMSG("Unable to generate Diffie-Hellman parameters: %s",
+                    gnutls_strerror(rv));
+            goto END;
         }
-        if (rv >= 0) {
-            sk_msg_gnutls_initialized = 1;
-        }
-        RETURN(rv);
-
+        INFOMSG("Finished generating Diffie-Hellman parameters");
+#endif  /* GNUTLS_VERSION_NUMBER < 0x030506 */
+        sk_msg_gnutls_initialized = 1;
     }
-    RETURN(0);
+
+    /* allocate credentials and set Diffie-Hellman parameters */
+    if (!queue->root->cred_set) {
+        rv = gnutls_certificate_allocate_credentials(&queue->root->cred);
+        if (rv < 0) {
+            WARNINGMSG("Unable to allocate credentials: %s",
+                       gnutls_strerror(rv));
+            goto END;
+        }
+#if GNUTLS_VERSION_NUMBER < 0x030506
+        gnutls_certificate_set_dh_params(queue->root->cred, dh_params);
+#else
+        rv = (gnutls_certificate_set_known_dh_params(
+                  queue->root->cred, GNUTLS_SEC_PARAM_MEDIUM));
+        if (rv < 0) {
+            WARNINGMSG(
+                "Unable to set credentials' Diffie-Hellman parameters: %s",
+                gnutls_strerror(rv));
+            goto END;
+        }
+#endif  /* GNUTLS_VERSION_NUMBER < 0x030506 */
+    }
+
+    /* add the trusted CAs from 'tls_ca_file'; the file should
+     * be in PEM format. */
+    rv = (gnutls_certificate_set_x509_trust_file(
+              queue->root->cred, tls_ca_file, GNUTLS_X509_FMT_PEM));
+    if (rv < 0) {
+        CRITMSG("Invalid Certificate Authority file '%s': %s",
+                tls_ca_file, gnutls_strerror(rv));
+        goto END;
+    }
+
+    /* add the revocation file from 'tls_crl_file' if provided; the
+     * file should be in PEM format. */
+    if (tls_crl_file) {
+        rv = (gnutls_certificate_set_x509_crl_file(
+                  queue->root->cred, tls_crl_file, GNUTLS_X509_FMT_PEM));
+        if (rv < 0) {
+            CRITMSG("Invalid Certificate Revocation List file '%s': %s",
+                    tls_crl_file, gnutls_strerror(rv));
+            goto END;
+        }
+    }
+
+#if  GNUTLS_VERSION_NUMBER < 0x030406
+    /* set the callback function used to verify the peers'
+     * certificates */
+    gnutls_certificate_set_verify_function(
+        queue->root->cred, &skMsgGnuTLSVerifyPeer);
+#endif  /* GNUTLS_VERSION_NUMBER < 0x030406 */
+
+    /* add either the PKCS12 file or the certificate and key files */
+    if (tls_pkcs12_file) {
+        const char *password = getenv(password_env_name);
+        rv = (gnutls_certificate_set_x509_simple_pkcs12_file(
+                  queue->root->cred, tls_pkcs12_file,
+                  GNUTLS_X509_FMT_DER, password));
+        if (rv < 0) {
+            CRITMSG("Invalid encryption cert file '%s': %s",
+                    tls_pkcs12_file, gnutls_strerror(rv));
+            goto END;
+        }
+    } else {
+        /* set a certificate/private-key pair in the credential from
+         * separate certificate and key files, each in PEM format. */
+        rv = (gnutls_certificate_set_x509_key_file(
+                  queue->root->cred, tls_cert_file, tls_key_file,
+                  GNUTLS_X509_FMT_PEM));
+        if (rv < 0) {
+            CRITMSG("Invalid encryption cert or key file '%s', '%s': %s",
+                    tls_cert_file, tls_key_file, gnutls_strerror(rv));
+            goto END;
+        }
+    }
+
+    if (!queue->root->cred_set) {
+        queue->root->cred_set = 1;
+        ++sk_msg_gnutls_initialized;
+    }
+
+    rv = 0;
+
+  END:
+    if (0 != rv) {
+        rv = -1;
+        if (queue->root->cred_set) {
+            gnutls_certificate_free_credentials(queue->root->cred);
+            queue->root->cred_set = 0;
+        }
+    }
+    pthread_mutex_unlock(&sk_msg_gnutls_mutex);
+    RETURN(rv);
 }
 
 
@@ -1914,191 +1949,17 @@ skMsgGnuTLSTeardown(
 
     pthread_mutex_lock(&sk_msg_gnutls_mutex);
 
+    if (tls_priority_cache) {
+        gnutls_priority_deinit(tls_priority_cache);
+        tls_priority_cache = NULL;
+    }
     if (sk_msg_gnutls_initialized) {
         gnutls_global_deinit();
-
         sk_msg_gnutls_initialized = 0;
     }
 
     pthread_mutex_unlock(&sk_msg_gnutls_mutex);
     RETURN_VOID;
-}
-
-
-int
-skMsgQueueAddCA(
-    sk_msg_queue_t     *queue,
-    const char         *ca_filename)
-{
-    int rv;
-
-    DEBUG_ENTER_FUNC;
-
-    assert(queue);
-    assert(queue->root);
-    assert(ca_filename);
-
-    pthread_mutex_lock(&sk_msg_gnutls_mutex);
-    if (!sk_msg_gnutls_initialized) {
-        rv = skMsgGnuTLSInit();
-        if (rv != 0) {
-            goto END;
-        }
-    }
-    /* allocate credentials and set Diffie-Hellman parameters */
-    if (!queue->root->cred_set) {
-        rv = gnutls_certificate_allocate_credentials(&queue->root->cred);
-        if (rv < 0) {
-            INFOMSG("Unable to allocate credentials: %s",
-                    gnutls_strerror(rv));
-            goto END;
-        }
-        gnutls_certificate_set_dh_params(queue->root->cred, dh_params);
-    }
-
-    /* add the trusted CAs from 'ca_filename'; the file should
-     * be in PEM format. */
-    rv = read_trust_file(queue->root->cred, ca_filename, GNUTLS_X509_FMT_PEM);
-    if (rv < 0) {
-        goto END;
-    }
-
-    if (!queue->root->cred_set) {
-        queue->root->cred_set = 1;
-        sk_msg_gnutls_initialized++;
-    }
-    rv = 0;
-
-  END:
-    if (0 != rv) {
-        rv = -1;
-        if (queue->root->cred_set) {
-            gnutls_certificate_free_credentials(queue->root->cred);
-            queue->root->cred_set = 0;
-        }
-    }
-    pthread_mutex_unlock(&sk_msg_gnutls_mutex);
-    RETURN(rv);
-}
-
-int
-skMsgQueueAddCert(
-    sk_msg_queue_t     *queue,
-    const char         *cert_filename,
-    const char         *key_filename)
-{
-    int rv;
-
-    assert(queue);
-    assert(queue->root);
-    assert(cert_filename);
-    assert(key_filename);
-
-    DEBUG_ENTER_FUNC;
-
-    pthread_mutex_lock(&sk_msg_gnutls_mutex);
-    if (!sk_msg_gnutls_initialized) {
-        rv = skMsgGnuTLSInit();
-        if (rv != 0) {
-            goto END;
-        }
-    }
-
-    /* allocate credentials and set Diffie-Hellman parameters */
-    if (!queue->root->cred_set) {
-        rv = gnutls_certificate_allocate_credentials(&queue->root->cred);
-        if (rv < 0) {
-            INFOMSG("Unable to allocate credentials: %s",
-                    gnutls_strerror(rv));
-            goto END;
-        }
-        gnutls_certificate_set_dh_params(queue->root->cred, dh_params);
-    }
-
-    /* set a certificate/private-key pair in the credential from
-     * separate certificate and key files, each in PEM format. */
-    rv = read_key_file(queue->root->cred, cert_filename,
-                       key_filename, GNUTLS_X509_FMT_PEM);
-    if (rv < 0) {
-        goto END;
-    }
-
-    if (!queue->root->cred_set) {
-        queue->root->cred_set = 1;
-        sk_msg_gnutls_initialized++;
-    }
-
-    rv = 0;
-
-  END:
-    if (0 != rv) {
-        rv = -1;
-        if (queue->root->cred_set) {
-            gnutls_certificate_free_credentials(queue->root->cred);
-            queue->root->cred_set = 0;
-        }
-    }
-    pthread_mutex_unlock(&sk_msg_gnutls_mutex);
-    RETURN(rv);
-}
-
-
-int
-skMsgQueueAddPKCS12(
-    sk_msg_queue_t     *queue,
-    const char         *cert_filename,
-    const char         *password)
-{
-    int rv;
-
-    assert(queue);
-    assert(queue->root);
-    assert(cert_filename);
-
-    DEBUG_ENTER_FUNC;
-
-    pthread_mutex_lock(&sk_msg_gnutls_mutex);
-    if (!sk_msg_gnutls_initialized) {
-        rv = skMsgGnuTLSInit();
-        if (rv != 0) {
-            goto END;
-        }
-    }
-
-    /* allocate credentials and set Diffie-Hellman parameters */
-    if (!queue->root->cred_set) {
-        rv = gnutls_certificate_allocate_credentials(&queue->root->cred);
-        if (rv < 0) {
-            INFOMSG("Unable to allocate credentials: %s",
-                    gnutls_strerror(rv));
-            goto END;
-        }
-        gnutls_certificate_set_dh_params(queue->root->cred, dh_params);
-    }
-
-    rv = read_check_pkcs12(queue->root->cred, cert_filename,
-                           GNUTLS_X509_FMT_DER, password);
-    if (rv < 0) {
-        goto END;
-    }
-
-    if (!queue->root->cred_set) {
-        queue->root->cred_set = 1;
-        sk_msg_gnutls_initialized++;
-    }
-
-    rv = 0;
-
-  END:
-    if (0 != rv) {
-        rv = -1;
-        if (queue->root->cred_set) {
-            gnutls_certificate_free_credentials(queue->root->cred);
-            queue->root->cred_set = 0;
-        }
-    }
-    pthread_mutex_unlock(&sk_msg_gnutls_mutex);
-    RETURN(rv);
 }
 
 #endif /* SK_ENABLE_GNUTLS */
@@ -2154,13 +2015,14 @@ create_channel(
 /* Attach a channel to a connection object. */
 static int
 set_channel_connecting(
-    sk_msg_queue_t          UNUSED(*q),
-    sk_msg_channel_queue_t         *chan,
-    sk_msg_conn_queue_t            *conn)
+    sk_msg_queue_t         *q,
+    sk_msg_channel_queue_t *chan,
+    sk_msg_conn_queue_t    *conn)
 {
     int rv;
 
     DEBUG_ENTER_FUNC;
+    SK_UNUSED_PARAM(q);
 
     assert(q);
     assert(chan);
@@ -2247,11 +2109,12 @@ set_channel_closed(
 
 static int
 set_channel_connected(
-    sk_msg_queue_t          UNUSED(*q),
-    sk_msg_channel_queue_t         *chan,
-    skm_channel_t                   rchannel)
+    sk_msg_queue_t         *q,
+    sk_msg_channel_queue_t *chan,
+    skm_channel_t           rchannel)
 {
     DEBUG_ENTER_FUNC;
+    SK_UNUSED_PARAM(q);
 
     assert(q);
     assert(chan);
@@ -2313,6 +2176,7 @@ destroy_channel(
 
 
 #if SK_ENABLE_GNUTLS
+#if SK_TLS_USE_CUSTOM_PULL_PUSH
 /*
  *    A callback function used by GnuTLS for receiving (reading) data.
  *
@@ -2333,7 +2197,13 @@ tls_pull(
     pfd.events = POLLIN;
 
     rv = poll(&pfd, 1, TLS_POLL_TIMEOUT);
-    if (1 == rv) {
+    if (0 == rv) {
+        /* poll() timed out.  According to GnuTLS docs, this function
+         * should act like recv(2) in that case and set errno to
+         * EAGAIN and return -1 */
+        errno = EAGAIN;
+        rv = -1;
+    } else if (1 == rv) {
         rv = read(pfd.fd, buf, len);
 
 #if (SENDRCV_DEBUG) & DEBUG_RWTRANSFER_PROTOCOL
@@ -2355,11 +2225,8 @@ tls_pull(
         } else {
             DEBUG_PRINT2("Returning %" SK_PRIdZ " from tls_pull (poll())", rv);
         }
-#endif
+#endif  /*  (SENDRCV_DEBUG) & DEBUG_RWTRANSFER_PROTOCOL */
     }
-    /* What should happen if result of poll() is 0 (timed out)?
-     * Currently we just return 0, as if there was a zero read.
-     * Possibly we should return -1 with an errno of EAGAIN. */
     return rv;
 }
 
@@ -2405,14 +2272,14 @@ tls_push(
         } else {
             DEBUG_PRINT2("Returning %" SK_PRIdZ " from tls_push (poll())", rv);
         }
-#endif
+#endif  /* (SENDRCV_DEBUG) & DEBUG_RWTRANSFER_PROTOCOL */
     }
     /* What should happen if result of poll() is 0 (timed out)?
      * Currently we just return 0, as if there was a zero write.
      * Possibly we should return -1 with an errno of EAGAIN. */
     return rv;
 }
-
+#endif  /* SK_TLS_USE_CUSTOM_PULL_PUSH */
 
 static int
 setup_tls(
@@ -2423,7 +2290,6 @@ setup_tls(
     skm_tls_type_t          tls)
 {
     int rv;
-    unsigned int status;
 
     DEBUG_ENTER_FUNC;
 
@@ -2435,43 +2301,73 @@ setup_tls(
      * the client or the server */
     switch (tls) {
       case SKM_TLS_CLIENT:
+#if GNUTLS_VERSION_NUMBER < 0x030000
         rv = gnutls_init(&conn->session, GNUTLS_CLIENT);
+#else
+        rv = gnutls_init(&conn->session, GNUTLS_CLIENT | GNUTLS_NONBLOCK);
+#endif  /* #else of GNUTLS_VERSION_NUMBER < 0x030000 */
         break;
       case SKM_TLS_SERVER:
+#if GNUTLS_VERSION_NUMBER < 0x030000
         rv = gnutls_init(&conn->session, GNUTLS_SERVER);
+#else
+        rv = gnutls_init(&conn->session, GNUTLS_SERVER | GNUTLS_NONBLOCK);
+#endif  /* #else of GNUTLS_VERSION_NUMBER < 0x030000 */
         break;
       default:
         skAbortBadCase(tls);
     }
-
     if (rv < 0) {
-        ERRMSG("Failed TLS init: %s", gnutls_strerror(rv));
+        ERRMSG("Unable to initialize TLS in the session: %s",
+               gnutls_strerror(rv));
         RETURN(-1);
     }
-
-    /* use "NORMAL" priority */
-    rv = gnutls_set_default_priority(conn->session);
-    XASSERT(rv >= 0);
 
     /* tell the session to use the public/private keys loaded earlier */
     rv = gnutls_credentials_set(conn->session, GNUTLS_CRD_CERTIFICATE,
                                 q->root->cred);
-    XASSERT(rv >= 0);
+    if (rv < 0) {
+        ERRMSG("Unable to set TLS credentials in the session: %s",
+               gnutls_strerror(rv));
+        RETURN(-1);
+    }
 
+    /* set the priority */
+    if (tls_priority_cache) {
+        rv = gnutls_priority_set(conn->session, tls_priority_cache);
+    } else {
+        /* use "NORMAL" priority */
+        rv = gnutls_set_default_priority(conn->session);
+    }
+    if (rv < 0) {
+        ERRMSG("Unable to initialize TLS priority in the session: %s",
+               gnutls_strerror(rv));
+        RETURN(-1);
+    }
+
+    if (rsocket != wsocket) {
+        WARNINGMSG("Unexpected found read socket %d != write socket %d",
+                   rsocket, wsocket);
+        gnutls_transport_set_ptr2(conn->session,
+                                  (gnutls_transport_ptr_t)(intptr_t)rsocket,
+                                  (gnutls_transport_ptr_t)(intptr_t)wsocket);
+    } else {
+        gnutls_transport_set_ptr(conn->session,
+                                 (gnutls_transport_ptr_t)(intptr_t)rsocket);
+    }
+
+#if SK_TLS_USE_CUSTOM_PULL_PUSH
     /* tell TLS to use our read and write functions (tls_pull,
      * tls_push) instead of the defaults.  The call to set_ptr2()
      * controls what will be passed to tls_pull() and tls_push(). */
-    gnutls_transport_set_ptr2(conn->session,
-                              (gnutls_transport_ptr_t)(intptr_t)rsocket,
-                              (gnutls_transport_ptr_t)(intptr_t)wsocket);
     gnutls_transport_set_pull_function(conn->session, tls_pull);
     gnutls_transport_set_push_function(conn->session, tls_push);
-#ifdef SK_HAVE_GNUTLS_TRANSPORT_SET_LOWAT
+#endif  /* SK_TLS_USE_CUSTOM_PULL_PUSH */
+#if GNUTLS_VERSION_NUMBER < 0x030000
     /* Used to set the low water value in order for select() to check
-     * if there are data pending to be read from the socket buffer.
-     * This function no longer exists in GnuTLS 3. */
+     * if there are data pending to be read from the socket buffer. */
     gnutls_transport_set_lowat(conn->session, 0);
-#endif
+#endif  /* GNUTLS_VERSION_NUMBER < 0x030000 */
     set_nonblock(rsocket);
 
     /* force the client to send its certificate to the server */
@@ -2480,58 +2376,54 @@ setup_tls(
                                               GNUTLS_CERT_REQUIRE);
     }
 
+#if GNUTLS_VERSION_NUMBER >= 0x030406
+    gnutls_session_set_verify_cert(conn->session, NULL, 0);
+#endif
+
     DEBUG_PRINT1("Attempting TLS handshake");
-    while ((rv = gnutls_handshake(conn->session)) < 0) {
-        if (rv == GNUTLS_E_AGAIN || rv == GNUTLS_E_INTERRUPTED) {
-            DEBUG_PRINT1("Received AGAIN/INTERRUPTED;"
-                         " Re-attempting TLS handshake");
-            continue;
-        }
+    while ((rv = gnutls_handshake(conn->session)) < 0
+           && gnutls_error_is_fatal(rv) == 0)
+    {
+        DEBUG_PRINT2("Re-attempting TLS handshake on non-fatal error %s",
+                     gnutls_strerror(rv));
+    }
+    if (rv < 0) {
         if (rv == GNUTLS_E_PUSH_ERROR) {
-            NOTICEMSG("Remote side disconnected during TLS handshake.");
-        } else {
-            NOTICEMSG("TLS handshake failed: %s", gnutls_strerror(rv));
+            NOTICEMSG("Remote side disconnected during TLS handshake."
+                      " Certificate may have been rejected.");
+        } else if (rv == GNUTLS_E_CERTIFICATE_ERROR) {
+            NOTICEMSG("TLS handshake failed while verifying the certificate");
         }
+#if GNUTLS_VERSION_NUMBER >= 0x030406
+        else if (rv == GNUTLS_E_CERTIFICATE_VERIFICATION_ERROR) {
+            int type;
+            unsigned int status;
+            gnutls_datum_t out;
+
+            /* check certificate verification status */
+            type = gnutls_certificate_type_get(conn->session);
+            status = gnutls_session_get_verify_cert_status(conn->session);
+            if (gnutls_certificate_verification_status_print(
+                    status, (gnutls_certificate_type_t)type, &out, 0) == 0)
+            {
+                NOTICEMSG("Failed to verify peer's certificate: %s", out.data);
+                gnutls_free(out.data);
+            } else {
+                NOTICEMSG("Failed to verify peer's certificate"
+                          " during TLS handshake");
+            }
+        }
+#endif  /* GNUTLS_VERSION_NUMBER >= 0x030406 */
+        else {
+            NOTICEMSG(("TLS handshake failed"
+                       " (peer may have rejected the certificate): %s"),
+                      gnutls_strerror(rv));
+        }
+
         gnutls_deinit(conn->session);
         RETURN(-1);
     }
     DEBUG_PRINT1("TLS handshake succeeded");
-
-    status = 0;
-    rv = gnutls_certificate_verify_peers2(conn->session, &status);
-    if (rv < 0) {
-        const char *reason = "Unknown reason";
-
-        NOTICEMSG("Certificate verification failed: %s",
-                  gnutls_strerror(rv));
-
-        if (status & GNUTLS_CERT_REVOKED) {
-            reason = "Certificate was revoked";
-        } else if (status & GNUTLS_CERT_INVALID) {
-            if (status & GNUTLS_CERT_SIGNER_NOT_FOUND) {
-                reason = "Certificate issuer unknown";
-            } else if (status & GNUTLS_CERT_SIGNER_NOT_CA) {
-                reason = "Certificate signer is not a CA";
-            } else if (status & GNUTLS_CERT_INSECURE_ALGORITHM) {
-                reason = "Insecure algorithm";
-#if defined SK_HAVE_DECL_GNUTLS_CERT_EXPIRED && SK_HAVE_DECL_GNUTLS_CERT_EXPIRED
-            } else if (status & GNUTLS_CERT_NOT_ACTIVATED) {
-                reason = "Certificate is not yet activated";
-            } else if (status & GNUTLS_CERT_EXPIRED) {
-                reason = "Certificate has expired";
-#endif
-            }
-        }
-
-        NOTICEMSG("Certificate verification failed: %s", reason);
-
-        /* teardown connection */
-        do {
-            rv = gnutls_bye(conn->session, GNUTLS_SHUT_RDWR);
-        } while (rv == GNUTLS_E_AGAIN || rv == GNUTLS_E_INTERRUPTED);
-        gnutls_deinit(conn->session);
-        RETURN(-1);
-    }
 
     conn->use_tls = 1;
 
@@ -2628,10 +2520,11 @@ create_connection(
 
 static void
 start_connection(
-    sk_msg_queue_t      UNUSED(*q),
-    sk_msg_conn_queue_t        *conn)
+    sk_msg_queue_t         *q,
+    sk_msg_conn_queue_t    *conn)
 {
     DEBUG_ENTER_FUNC;
+    SK_UNUSED_PARAM(q);
 
     assert(q);
     assert(conn);
@@ -2649,8 +2542,8 @@ start_connection(
 
 static void
 unblock_connection(
-    sk_msg_queue_t      UNUSED(*q),
-    sk_msg_conn_queue_t        *conn)
+    sk_msg_queue_t         *q,
+    sk_msg_conn_queue_t    *conn)
 {
     static sk_msg_t unblocker = {{SKMSG_CHANNEL_CONTROL,
                                   SKMSG_WRITER_UNBLOCKER, 0},
@@ -2658,6 +2551,7 @@ unblock_connection(
     skDQErr_t err;
 
     DEBUG_ENTER_FUNC;
+    SK_UNUSED_PARAM(q);
 
     assert(q);
     assert(conn);
@@ -2820,6 +2714,7 @@ accept_connection(
     sk_sockaddr_t addr;
     struct sockaddr *addr_copy;
     socklen_t addrlen = sizeof(addr);
+    char addr_buf[128];
 
     DEBUG_ENTER_FUNC;
 
@@ -2844,20 +2739,18 @@ accept_connection(
         XASSERT(0);
         skAbort();
     }
+    skSockaddrString(addr_buf, sizeof(addr_buf), &addr);
+    DEBUGMSG("Accepted connection from %s", addr_buf);
 
     /* Create the queue and both references */
     addr_copy = (struct sockaddr *)malloc(addrlen);
     if (addr_copy != NULL) {
         memcpy(addr_copy, &addr, addrlen);
     }
-#if SK_ENABLE_GNUTLS
     rv = create_connection(q, fd, fd, addr_copy, addrlen, &conn,
                            q->root->bind_tls ? SKM_TLS_SERVER : SKM_TLS_NONE);
-#else
-    rv = create_connection(q, fd, fd, addr_copy, addrlen, &conn, SKM_TLS_NONE);
-#endif /* SK_ENABLE_GNUTLS */
-
     if (rv != 0) {
+        NOTICEMSG("Unable to initialize connection with %s", addr_buf);
         close(fd);
         free(addr_copy);
         RETURN(-1);
@@ -3168,7 +3061,7 @@ reader_thread(
          * in the session, don't bother polling; we have data. */
         if (conn->transport != CONN_TLS
             || !gnutls_record_check_pending(conn->session))
-#endif
+#endif  /* SK_ENABLE_GNUTLS */
         {
             /* Poll for new data on the socket */
             rv = poll(&pfd, 1, SKMSG_IO_POLL_TIMEOUT);
@@ -3198,7 +3091,7 @@ reader_thread(
                 WRAP_ERRNO(SKTHREAD_DEBUG_PRINT3(
                                "Timeout on poll(%d, POLLIN) for %s",
                                pfd.fd, addr_buf));
-#endif
+#endif  /* DEBUG_SKMSG_POLL_TIMEOUT */
                 continue;
             }
             if (pfd.revents & POLLNVAL) {
@@ -3224,7 +3117,7 @@ reader_thread(
             DEBUG_PRINT2("Skipping poll(); %" SK_PRIuZ " bytes are pending",
                          gnutls_record_check_pending(conn->session));
         }
-#endif
+#endif  /* DEBUG_SKMSG_OTHER */
 
         /* Update time for last received data; used by CONNECTION_STAGNANT */
         conn->last_recv = time(NULL);
@@ -3235,7 +3128,7 @@ reader_thread(
         if (CONN_TLS == conn->transport) {
             rv = tls_recv(conn, &message);
         } else
-#endif
+#endif  /* SK_ENABLE_GNUTLS */
         {
             rv = tcp_recv(conn, &message);
         }
@@ -3424,7 +3317,7 @@ writer_thread(
             WRAP_ERRNO(SKTHREAD_DEBUG_PRINT3(
                            "Timeout on poll(%d, POLLOUT) for %s",
                            pfd.fd, addr_buf));
-#endif
+#endif  /* DEBUG_SKMSG_POLL_TIMEOUT */
             continue;
         }
         if (pfd.revents & (POLLHUP | POLLERR | POLLNVAL)) {
@@ -3441,7 +3334,7 @@ writer_thread(
         if (CONN_TLS == conn->transport) {
             rv = tls_send(conn, &write_buf);
         } else
-#endif
+#endif  /* SK_ENABLE_GNUTLS */
         {
             rv = tcp_send(conn, &write_buf);
         }
@@ -3545,6 +3438,14 @@ skMsgQueueCreate(
         goto error;
     }
 
+#if SK_ENABLE_GNUTLS
+    rv = skMsgQueueInitializeGnuTLS(q);
+    if (rv != 0) {
+        retval = SKMERR_GNUTLS;
+        goto error;
+    }
+#endif  /* SK_ENABLE_GNUTLS */
+
     /* Initialize the listener thread start state */
     pthread_cond_init(&q->root->listener_cond, NULL);
     q->root->listener_state = SKM_THREAD_BEFORE;
@@ -3582,7 +3483,6 @@ skMsgQueueCreate(
     RETURN(0);
 
   error:
-    XASSERT(0);
     skMsgQueueDestroy(q);
     RETURN(retval);
 }
@@ -3652,8 +3552,9 @@ skMsgQueueShutdownAll(
 
     DEBUG_ENTER_FUNC;
 
-    assert(q);
-
+    if (!q) {
+        RETURN_VOID;
+    }
     QUEUE_LOCK(q);
 
     if (q->root->shuttingdown) {
@@ -3726,7 +3627,7 @@ skMsgQueueDestroyAll(
     if (q->root->cred_set) {
         gnutls_certificate_free_credentials(q->root->cred);
     }
-#endif
+#endif  /* SK_ENABLE_GNUTLS */
 
     ASSERT_RESULT(pthread_cond_destroy(&q->root->listener_cond), int, 0);
     ASSERT_RESULT(pthread_mutex_destroy(QUEUE_MUTEX(q)), int, 0);
@@ -3785,11 +3686,10 @@ skMsgQueueDestroy(
     RETURN_VOID;
 }
 
-static int
+int
 skMsgQueueBind(
     sk_msg_queue_t             *q,
-    const sk_sockaddr_array_t  *listen_addrs,
-    int                         UNUSED_IF_NOTLS(conn_type))
+    const sk_sockaddr_array_t  *listen_addrs)
 {
     static int on = 1;
     uint32_t i, n;
@@ -3872,10 +3772,7 @@ skMsgQueueBind(
     assert(q->root->pfd == NULL);
     q->root->pfd = pfd;
     q->root->pfd_len = skSockaddrArrayGetSize(listen_addrs);
-
-#if SK_ENABLE_GNUTLS
-    q->root->bind_tls = (conn_type == CONN_TLS);
-#endif
+    q->root->bind_tls = (connection_type == CONN_TLS);
 
     THREAD_START("skmsg_listener", rv, q, &q->root->listener,
                  listener_thread, q);
@@ -3891,34 +3788,13 @@ skMsgQueueBind(
     RETURN(0);
 }
 
-/* Start a listener */
+
 int
-skMsgQueueBindTCP(
-    sk_msg_queue_t             *queue,
-    const sk_sockaddr_array_t  *addr)
-{
-    return skMsgQueueBind(queue, addr, CONN_TCP);
-}
-
-#if SK_ENABLE_GNUTLS
-/* Start a listener */
-int
-skMsgQueueBindTLS(
-    sk_msg_queue_t             *queue,
-    const sk_sockaddr_array_t  *addr)
-{
-    return skMsgQueueBind(queue, addr, CONN_TLS);
-}
-#endif /* SK_ENABLE_GNUTLS */
-
-
-static int
 skMsgQueueConnect(
     sk_msg_queue_t     *q,
     struct sockaddr    *addr,
     socklen_t           addrlen,
-    skm_channel_t      *channel,
-    skm_conn_t          tls)
+    skm_channel_t      *channel)
 {
     int rv;
     int sock;
@@ -3956,7 +3832,8 @@ skMsgQueueConnect(
         memcpy(copy, addr, addrlen);
     }
     rv = create_connection(q, sock, sock, copy, addrlen, &conn,
-                           (tls == CONN_TLS) ? SKM_TLS_CLIENT : SKM_TLS_NONE);
+                           ((connection_type == CONN_TLS)
+                            ? SKM_TLS_CLIENT : SKM_TLS_NONE));
     if (rv == -1) {
         close(sock);
         free(copy);
@@ -4002,28 +3879,6 @@ skMsgQueueConnect(
 
     RETURN(retval);
 }
-
-int
-skMsgQueueConnectTCP(
-    sk_msg_queue_t     *q,
-    struct sockaddr    *addr,
-    socklen_t           addrlen,
-    skm_channel_t      *channel)
-{
-    return skMsgQueueConnect(q, addr, addrlen, channel, CONN_TCP);
-}
-
-#if SK_ENABLE_GNUTLS
-int
-skMsgQueueConnectTLS(
-    sk_msg_queue_t     *q,
-    struct sockaddr    *addr,
-    socklen_t           addrlen,
-    skm_channel_t      *channel)
-{
-    return skMsgQueueConnect(q, addr, addrlen, channel, CONN_TLS);
-}
-#endif /* SK_ENABLE_GNUTLS */
 
 int
 skMsgChannelNew(
@@ -4640,14 +4495,20 @@ skMsgGetConnectionInformation(
     if (conn->use_tls) {
         const char *protocol;
         const char *encryption;
+        const char *key_exchange;
+        const char *mac;
 
         protocol = gnutls_protocol_get_name(
             gnutls_protocol_get_version(conn->session));
         encryption = gnutls_cipher_get_name(gnutls_cipher_get(conn->session));
+        key_exchange = gnutls_kx_get_name(gnutls_kx_get(conn->session));
+        mac = gnutls_mac_get_name(gnutls_mac_get(conn->session));
+        /* compression = gnutls_compression_get_name(
+         *   gnutls_compression_get(conn->session)); */
         QUEUE_UNLOCK(q);
 
-        rv = snprintf(buffer, buffer_size, "TCP, %s, %s",
-                      protocol, encryption);
+        rv = snprintf(buffer, buffer_size, "TCP, %s, %s, %s, %s",
+                      protocol, encryption, key_exchange, mac);
         RETURN(rv);
     }
 #endif  /* SK_ENABLE_GNUTLS */
@@ -4775,87 +4636,37 @@ skMsgMessage(
 
 
 #if !SK_ENABLE_GNUTLS
+/* no-op function used when gnutls is not available */
 
-/* When GnuTLS is not available, create functions that report a useful
- * error message.  This way the user is not faced with a bizarre
- * "missing symbol" message. */
-
-/* provide prototypes to avoid gcc warning */
-int
-skMsgQueueAddCA(
-    sk_msg_queue_t     *queue,
-    const char         *cred_filename);
-int
-skMsgQueueAddCert(
-    sk_msg_queue_t     *queue,
-    const char         *cert_filename,
-    const char         *key_filename);
-int
-skMsgQueueAddPKCS12(
-    sk_msg_queue_t     *queue,
-    const char         *cert_filename,
-    const char         *password);
-int
-skMsgQueueBindTLS(
-    sk_msg_queue_t     *queue,
-    struct sockaddr    *addr,
-    socklen_t           addrlen);
-int
-skMsgQueueConnectTLS(
-    sk_msg_queue_t     *queue,
-    struct sockaddr    *addr,
-    socklen_t           addrlen,
-    skm_channel_t      *channel);
-
-
-#define FUNC_BODY_NO_TLS                                        \
-    CRITMSG("FATAL ERROR! Attempting to use libskmsg that "     \
-            "does not include GnuTLS support");                 \
-    exit(EXIT_FAILURE);
-
-int
-skMsgQueueAddCA(
-    sk_msg_queue_t  UNUSED(*queue),
-    const char      UNUSED(*ca_filename))
+void
+skMsgGnuTLSTeardown(
+    void)
 {
-    FUNC_BODY_NO_TLS
 }
 
 int
-skMsgQueueAddCert(
-    sk_msg_queue_t  UNUSED(*queue),
-    const char      UNUSED(*cert_filename),
-    const char      UNUSED(*key_filename))
+skMsgTlsOptionsRegister(
+    const char         *passwd_env_name)
 {
-    FUNC_BODY_NO_TLS
+    SK_UNUSED_PARAM(passwd_env_name);
+    return 0;
+}
+
+void
+skMsgTlsOptionsUsage(
+    FILE               *fh)
+{
+    SK_UNUSED_PARAM(fh);
 }
 
 int
-skMsgQueueAddPKCS12(
-    sk_msg_queue_t  UNUSED(*queue),
-    const char      UNUSED(*cert_filename),
-    const char      UNUSED(*password))
+skMsgTlsOptionsVerify(
+    unsigned int       *tls_available)
 {
-    FUNC_BODY_NO_TLS
-}
-
-int
-skMsgQueueBindTLS(
-    sk_msg_queue_t  UNUSED(*queue),
-    struct sockaddr UNUSED(*addr),
-    socklen_t        UNUSED(addrlen))
-{
-    FUNC_BODY_NO_TLS
-}
-
-int
-skMsgQueueConnectTLS(
-    sk_msg_queue_t  UNUSED(*q),
-    struct sockaddr UNUSED(*addr),
-    socklen_t        UNUSED(addrlen),
-    skm_channel_t   UNUSED(*channel))
-{
-    FUNC_BODY_NO_TLS
+    if (tls_available) {
+        *tls_available = 0;
+    }
+    return 0;
 }
 
 #endif /* !SK_ENABLE_GNUTLS */
