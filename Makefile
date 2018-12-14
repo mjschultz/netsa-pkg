@@ -1,6 +1,6 @@
 MAINTAINER = "Bo Bayles <bbayles+netsa@gmail.com>"
-VERSION = 20180712
-PROC_ARC ?= amd64
+VERSION = 20181214
+PROC_ARCH ?= amd64
 TARGET_ROOT = $(shell pwd)/packaging/root
 YAF_PREFIX = ${TARGET_ROOT}/opt/yaf
 SILK_PREFIX = ${TARGET_ROOT}/opt/silk
@@ -42,7 +42,7 @@ deb:
 		-n netsa-pkg \
 		-v ${VERSION} \
 		-p packaging/output/netsa-pkg.deb \
-		-a ${PROC_ARC} \
+		-a ${PROC_ARCH} \
 		--maintainer ${MAINTAINER} \
 		--category admin \
 		--force \
@@ -66,7 +66,7 @@ rpm:
 		-n netsa-pkg \
 		-v ${VERSION} \
 		-p packaging/output/netsa-pkg.rpm \
-		-a ${PROC_ARC} \
+		-a ${PROC_ARCH} \
 		--maintainer ${MAINTAINER} \
 		--category admin \
 		--force \
