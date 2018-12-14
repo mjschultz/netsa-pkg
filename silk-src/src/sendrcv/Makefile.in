@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-# RCSIDENT("$SiLK: Makefile.am f162742a8f51 2014-05-09 18:47:33Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am a8e9e7fea4ad 2018-11-15 23:04:00Z mthomas $");
 
 # Installed Targets
 
@@ -635,16 +635,21 @@ top_srcdir = @top_srcdir@
 EXTRA_DIST = rwreceiver.pod rwsender.pod rwreceiver.conf.in \
 	rwsender.conf.in rwreceiver.init.d.in rwsender.init.d.in \
 	$(TESTS) tests/sendrcv-one-daemon.pm tests/gencerts.py \
-	tests/sendrcv_tests.py tests/ca_cert_key8.pem \
-	tests/cert-key1-ca_cert_key8.p12 \
+	tests/sendrcv_tests.py tests/post-command.sh \
+	tests/ca-expired-cert.pem tests/ca-expired-key.pem \
+	tests/ca_cert_key8.pem tests/cert-key1-ca_cert_key8.p12 \
 	tests/cert-key2-ca_cert_key8.p12 \
 	tests/cert-key3-ca_cert_key8.p12 \
 	tests/cert-key4-ca_cert_key8.p12 \
 	tests/cert-key5-ca_cert_key8.p12 \
 	tests/cert-key6-ca_cert_key8.p12 \
-	tests/cert-key7-ca_cert_key8.p12 tests/key1.pem tests/key2.pem \
+	tests/cert-key7-ca_cert_key8.p12 tests/expired-cert.pem \
+	tests/expired-key.pem tests/key1.pem tests/key2.pem \
 	tests/key3.pem tests/key4.pem tests/key5.pem tests/key6.pem \
-	tests/key7.pem tests/key8.pem tests/post-command.sh
+	tests/key7.pem tests/key8.pem tests/other-ca-cert.pem \
+	tests/other-ca-key.pem tests/other-cert.pem \
+	tests/other-key.pem tests/signed-expired-ca-cert.pem \
+	tests/signed-expired-ca-key.pem
 @HAVE_POD2MAN_TRUE@man8_MANS = rwreceiver.8 rwsender.8 
 conf_files = rwreceiver.conf rwsender.conf
 init_d_scripts = rwreceiver.init.d rwsender.init.d
@@ -855,6 +860,10 @@ TESTS = tests/rwsender-help.pl tests/rwsender-version.pl \
 	tests/sendrcv-testConnectOnlyHostname.pl \
 	tests/sendrcv-testConnectOnlyTLS.pl \
 	tests/sendrcv-testConnectOnlyIPv6Addr.pl \
+	tests/sendrcv-testExpiredCertificateTLS.pl \
+	tests/sendrcv-testExpiredAuthorityTLS.pl \
+	tests/sendrcv-testMismatchedCertsTLS.pl \
+	tests/sendrcv-testOtherCertsTLS.pl \
 	tests/sendrcv-testSendRcvStopReceiverServer.pl \
 	tests/sendrcv-testSendRcvStopSenderServer.pl \
 	tests/sendrcv-testSendRcvStopReceiverClient.pl \
@@ -1372,6 +1381,34 @@ tests/sendrcv-testConnectOnlyTLS.pl.log: tests/sendrcv-testConnectOnlyTLS.pl
 tests/sendrcv-testConnectOnlyIPv6Addr.pl.log: tests/sendrcv-testConnectOnlyIPv6Addr.pl
 	@p='tests/sendrcv-testConnectOnlyIPv6Addr.pl'; \
 	b='tests/sendrcv-testConnectOnlyIPv6Addr.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/sendrcv-testExpiredCertificateTLS.pl.log: tests/sendrcv-testExpiredCertificateTLS.pl
+	@p='tests/sendrcv-testExpiredCertificateTLS.pl'; \
+	b='tests/sendrcv-testExpiredCertificateTLS.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/sendrcv-testExpiredAuthorityTLS.pl.log: tests/sendrcv-testExpiredAuthorityTLS.pl
+	@p='tests/sendrcv-testExpiredAuthorityTLS.pl'; \
+	b='tests/sendrcv-testExpiredAuthorityTLS.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/sendrcv-testMismatchedCertsTLS.pl.log: tests/sendrcv-testMismatchedCertsTLS.pl
+	@p='tests/sendrcv-testMismatchedCertsTLS.pl'; \
+	b='tests/sendrcv-testMismatchedCertsTLS.pl'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+tests/sendrcv-testOtherCertsTLS.pl.log: tests/sendrcv-testOtherCertsTLS.pl
+	@p='tests/sendrcv-testOtherCertsTLS.pl'; \
+	b='tests/sendrcv-testOtherCertsTLS.pl'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \

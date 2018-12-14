@@ -1,3 +1,46 @@
+SiLK-3.18.0 Release, 2018-Dec-13
+
+* rwsetcat
+  -- When --ip-format includes zero-padded and CIDR prefixes are being
+     printed, also apply zero-padding to the prefix.
+  -- Fix a bug when using --ip-format=decimal,zero-padded that caused
+     an extra leading 0 to appear for IPv6 addresses.
+* rwbagcat
+  -- When --key-format includes zero-padded and CIDR prefixes are being
+     printed, also apply zero-padding to the prefix.
+  -- Fix a bug when using --key-format=decimal,zero-padded that caused
+     an extra leading 0 to appear for IPv6 addresses.
+* rwpmapcat, rwpmaplookup
+  -- When --ip-format includes zero-padded and CIDR prefixes are being
+     printed, also apply zero-padding to the prefix.
+  -- Fix a bug when using --ip-format=decimal,zero-padded that caused
+     an extra leading 0 to appear for IPv6 addresses.
+  -- Fix a bug when using --ip-format=unmap-v6 where the prefix for
+     IPs in the ::ffff:0:0/96 netblock was not adjusted to IPv4.
+* rwcut, rwrecgenerator, rwstats, rwuniq
+  -- Fix a bug when using --ip-format=decimal,zero-padded that caused
+     an extra leading 0 to appear for IPv6 addresses.
+* rwsender, rwreceiver
+  -- Change optional TLS support to require GnuTLS-2.12.0 or later.
+  -- Add a --tls-priority switch to set the priority (preference
+     order) of ciphers, key exchange, etc.
+  -- Add a --tls-security switch to set the security level of GnuTLS
+     which determines cryptographic key sizes and security parameters.
+  -- Add a --tls-crl switch to set a certificate revocation list.
+  -- Add a --tls-debug-level to set the debugging level of GnuTLS.
+  -- Not setting RWSENDER_TLS_PASSWORD/RWRECEIVER_TLS_PASSWORD is now
+     treated as a NULL password, not an empty password.
+  -- Exit with an error when any of the switches --tls-ca, --tls-cert,
+     --tls-key, or --tls-pkcs12 are specified multiple times.
+  -- Use GnuTLS's socket reading/writing functions instead of our own.
+* rwflowpack
+  -- Fix a bug that could cause rwflowpack to crash when multiple
+     probes were processing IPFIX files.
+* Building
+  -- Compile in support for transport encryption between rwsender and
+     rwreceiver only when GnuTLS 2.12.0 or later is available.
+
+
 SiLK-3.17.2 Release, 2018-Jun-28
 
 * rwgeoip2ccmap

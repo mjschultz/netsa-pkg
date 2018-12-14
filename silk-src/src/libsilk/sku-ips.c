@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-ips.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: sku-ips.c be7b495f86b1 2018-07-13 20:24:28Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/utils.h>
@@ -532,24 +532,24 @@ skipaddrGetAsV4(
 #endif  /* SK_ENABLE_IPV6 */
 
 
-char *
-skipaddrString(
+static char *
+ipaddrString(
     char               *outbuf,
     const skipaddr_t   *ipaddr,
-    uint32_t            ip_flags)
+    uint32_t            ip_flags,
+    int                *is_ipv6)
 {
     uint8_t ipv6[16];
     uint32_t ipv4;
-    int is_ipv6;
 
 #if SK_ENABLE_IPV6
     if (skipaddrIsV6(ipaddr)) {
         if ((ip_flags & SKIPADDR_UNMAP_V6)
             && (0 == skipaddrGetAsV4(ipaddr, &ipv4)))
         {
-            is_ipv6 = 0;
+            *is_ipv6 = 0;
         } else {
-            is_ipv6 = 1;
+            *is_ipv6 = 1;
             skipaddrGetV6(ipaddr, ipv6);
         }
     } else
@@ -564,16 +564,16 @@ skipaddrString(
             tmp = htonl(skipaddrGetV4(ipaddr));
             memcpy(&ipv6[12], &tmp, sizeof(tmp));
 #endif  /* #else of #ifdef skipaddrGetAsV6 */
-            is_ipv6 = 1;
+            *is_ipv6 = 1;
         } else {
-            is_ipv6 = 0;
+            *is_ipv6 = 0;
             ipv4 = skipaddrGetV4(ipaddr);
         }
     }
 
     ip_flags &= ~(uint32_t)(SKIPADDR_MAP_V4 | SKIPADDR_UNMAP_V6);
 
-    if (is_ipv6) {
+    if (*is_ipv6) {
         /* to represent a 128 bit number, divide the number into 4
          * 64-bit values where each value represents 10 decimal digits
          * of the number, with position 0 holding the least
@@ -808,7 +808,7 @@ skipaddrString(
             /* print the results */
             if (zero_pad) {
                 snprintf(outbuf, SK_NUM2DOT_STRLEN,
-                         "%010" PRIu64 "%010" PRIu64 "%010" PRIu64
+                         "%09" PRIu64 "%010" PRIu64 "%010" PRIu64
                          "%010" PRIu64,
                          decimal[3], decimal[2], decimal[1], decimal[0]);
             } else if (decimal[3]) {
@@ -885,10 +885,11 @@ skipaddrString(
 }
 
 
-int
-skipaddrStringMaxlen(
+static int
+ipaddrStringMaxlen(
     unsigned int        allow_ipv6,
-    uint32_t            ip_flags)
+    uint32_t            ip_flags,
+    int                *is_ipv6)
 {
 #if !SK_ENABLE_IPV6
     allow_ipv6 = 0;
@@ -901,6 +902,7 @@ skipaddrStringMaxlen(
     {
         /* data is IPv6 or data is IPv4 being mapped to IPv6 and
          * zero-pad is enabled */
+        *is_ipv6 = 1;
         switch (ip_flags & (SKIPADDR_ZEROPAD - 1)) {
           case SKIPADDR_CANONICAL:
           case SKIPADDR_NO_MIXED:
@@ -913,6 +915,7 @@ skipaddrStringMaxlen(
         }
     } else if (ip_flags & SKIPADDR_MAP_V4) {
         /* IPv4 mapped to v6; max ip is ::ffff:255.255.255.255 */
+        *is_ipv6 = 1;
         switch (ip_flags & (SKIPADDR_ZEROPAD - 1)) {
           case SKIPADDR_CANONICAL:
             return 22;
@@ -927,6 +930,7 @@ skipaddrStringMaxlen(
         }
     } else {
         /* IPv4 */
+        *is_ipv6 = 0;
         switch (ip_flags & (SKIPADDR_ZEROPAD - 1)) {
           case SKIPADDR_CANONICAL:
           case SKIPADDR_NO_MIXED:
@@ -939,6 +943,94 @@ skipaddrStringMaxlen(
             skAbortBadCase(ip_flags);
         }
     }
+}
+
+
+char *
+skipaddrString(
+    char               *outbuf,
+    const skipaddr_t   *ipaddr,
+    uint32_t            ip_flags)
+{
+    int is_ipv6;
+    return ipaddrString(outbuf, ipaddr, ip_flags, &is_ipv6);
+}
+
+
+char *
+skipaddrCidrString(
+    char               *outbuf,
+    const skipaddr_t   *ipaddr,
+    uint32_t            prefix,
+    uint32_t            ip_flags)
+{
+    int orig_ipv6;
+    int is_ipv6;
+    size_t sz;
+
+#if SK_ENABLE_IPV6
+    if (skipaddrIsV6(ipaddr)) {
+        if (prefix > 128) {
+            return NULL;
+        }
+        if (prefix < 96 && (ip_flags & SKIPADDR_UNMAP_V6)) {
+            ip_flags &= ~SKIPADDR_UNMAP_V6;
+        }
+        orig_ipv6 = 1;
+    } else
+#endif  /* SK_ENABLE_IPV6 */
+    {
+        if (prefix > 32) {
+            return NULL;
+        }
+        orig_ipv6 = 0;
+    }
+
+    if (ipaddrString(outbuf, ipaddr, ip_flags, &is_ipv6) == NULL) {
+        return NULL;
+    }
+
+    if (is_ipv6 != orig_ipv6) {
+        if (is_ipv6) {
+            assert(!orig_ipv6);
+            assert(prefix <= 32);
+            prefix += 96;
+        } else {
+            assert(!is_ipv6);
+            assert(orig_ipv6);
+            assert(prefix >= 96);
+            prefix -= 96;
+        }
+    }
+
+    sz = strlen(outbuf);
+    if (ip_flags & SKIPADDR_ZEROPAD) {
+        snprintf(outbuf + sz, 5, "/%0*u", (is_ipv6 ? 3 : 2), prefix);
+    } else {
+        snprintf(outbuf + sz, 5, "/%u", prefix);
+    }
+    return outbuf;
+}
+
+
+int
+skipaddrStringMaxlen(
+    unsigned int        allow_ipv6,
+    uint32_t            ip_flags)
+{
+    int is_ipv6;
+    return ipaddrStringMaxlen(allow_ipv6, ip_flags, &is_ipv6);
+}
+
+
+int
+skipaddrCidrStringMaxlen(
+    unsigned int        allow_ipv6,
+    uint32_t            ip_flags)
+{
+    int is_ipv6;
+    int len = ipaddrStringMaxlen(allow_ipv6, ip_flags, &is_ipv6);
+    return len + 3 + is_ipv6;
 }
 
 

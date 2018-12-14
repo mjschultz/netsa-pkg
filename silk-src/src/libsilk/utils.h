@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
+RCSIDENTVAR(rcsID_UTILS_H, "$SiLK: utils.h eb16f7937853 2018-12-05 17:05:19Z mthomas $");
 
 #include <silk/silk_types.h>
 
@@ -2891,17 +2891,65 @@ skIPWildcardIteratorReset(
 
 /**
  *    Fill 'outbuf' with a string representation of the IP address in
- *    'ip'.  The form of the string will depend on the values in
- *    'ip_flags', which should contain a value from
- *    'skipaddr_flags_t', defined in silk_types.h.  The size of
- *    'outbuf' must be at least SKIPADDR_STRLEN bytes in length.
- *    The function returns a pointer to 'outbuf'.  SKIPADDR_STRLEN
- *    is defined in silk_types.h.
+ *    'ip'.  The size of 'outbuf' must be at least SKIPADDR_STRLEN bytes
+ *    in length.  The function returns a pointer to 'outbuf'.
+ *
+ *    The form of the string will depend on the values in 'ip_flags',
+ *    which should contain values from the skipaddr_flags_t
+ *    enumeration.  Both skipaddr_flags_t and SKIPADDR_STRLEN are
+ *    defined in silk_types.h.
+ *
+ *    The strlen() of the returned string depends on the values in
+ *    'ip_flags'.  For help in setting the column width of the output,
+ *    use skipaddrStringMaxlen() to get the length of the longest
+ *    possible string.
+ *
+ *    Use skipaddrCidrString() for when a CIDR prefix (netblock)
+ *    length follows the IP address.
  */
 char *
 skipaddrString(
     char               *outbuf,
     const skipaddr_t   *ip,
+    uint32_t            ip_flags);
+
+/**
+ *    Fill 'outbuf' with a string representation of the CIDR block
+ *    (netblock) denoted by the IP address in 'ip' and length in
+ *    'prefix'.  The size of 'outbuf' must be at least
+ *    SKIPADDR_CIDR_STRLEN bytes in length.  The function returns a
+ *    pointer to 'outbuf'.
+ *
+ *    If the 'ip_flags' changes the displayed IP address between IPv4
+ *    and IPv6 then the displayed 'prefix' is adjusted as well.
+ *
+ *    Note: The function assumes the proper mask has already been
+ *    applied to the 'ip' (that is, that the bits below the 'prefix'
+ *    are zero).
+ *
+ *    The form of the string will depend on the values in 'ip_flags',
+ *    which should contain values from the skipaddr_flags_t
+ *    enumeration.  Both skipaddr_flags_t and SKIPADDR_CIDR_STRLEN are
+ *    defined in silk_types.h.
+ *
+ *    When 'ip_flags' contains SKIPADDR_ZEROPAD, the CIDR prefix value
+ *    is also zero-padded.  The SKIPADDR_HEXADECIMAL setting does does
+ *    affect the CIDR prefix, which is always displayed in decimal.
+ *
+ *    The strlen() of the returned string depends on the values in
+ *    'ip_flags'.  For help in setting the column width of the output,
+ *    use skipaddrCidrStringMaxlen() to get the length of the longest
+ *    possible string.
+ *
+ *    See also skipaddrString().
+ *
+ *    Since SiLK 3.18.0.
+ */
+char *
+skipaddrCidrString(
+    char               *outbuf,
+    const skipaddr_t   *ip,
+    uint32_t            prefix,
     uint32_t            ip_flags);
 
 
@@ -2914,9 +2962,45 @@ skipaddrString(
  *    The return value should only ever be used to set a column width.
  *    Always use a buffer having at least SKIPADDR_STRLEN characters
  *    as the 'outbuf' parameter.
+ *
+ *    This function ignores the SKIPADDR_UNMAP_V6 flag since the
+ *    function does not know whether all IP addresses in this column
+ *    fall into the ::ffff:0:0/96 netblock.  If the caller knows this,
+ *    the caller may safely reduce the returned length by 22.  (The
+ *    caller may reduce the length by 24 for SKIPADDR_CANONICAL,
+ *    SKIPADDR_NO_MIXED, and SKIPADDR_HEXADECIMAL, and 22 for
+ *    SKIPADDR_DECIMAL).
+ *
+ *    See also skipaddrCidrStringMaxlen().
  */
 int
 skipaddrStringMaxlen(
+    unsigned int        allow_ipv6,
+    uint32_t            ip_flags);
+
+
+/**
+ *    Return the length of longest string expected to be returned by
+ *    skipaddrCidrString() when 'ip_flags' represent the flags value
+ *    passed to that function and 'allow_ipv6' is 0 when only IPv4
+ *    addresses are passed to skipaddrCidrString() and non-zero
+ *    otherwise.
+ *
+ *    The return value should only ever be used to set a column width.
+ *    Always use a buffer having at least SKIPADDR_CIDR_STRLEN
+ *    characters as the 'outbuf' parameter.
+ *
+ *    This function treats SKIPADDR_UNMAP_V6 in the same way as
+ *    skipaddrStringMaxlen(), which see.  When the input is known to
+ *    contain only IPs in the ::ffff:0:0/96 netblock, the width may be
+ *    reduced by 23 (or 25).
+ *
+ *    See also skipaddrStringMaxlen().
+ *
+ *    Since SiLK 3.18.0.
+ */
+int
+skipaddrCidrStringMaxlen(
     unsigned int        allow_ipv6,
     uint32_t            ip_flags);
 

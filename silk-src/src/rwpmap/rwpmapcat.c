@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmapcat.c 95aec76c40ea 2018-03-13 21:09:01Z mthomas $");
+RCSIDENT("$SiLK: rwpmapcat.c be7b495f86b1 2018-07-13 20:24:28Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
@@ -762,18 +762,12 @@ printRangesIP(
     char final_delim[] = {'\0', '\0'};
     int label_width = 0;
     int ip_width = 0;
-    int cidr_extra = 0;
     const char *label_title;
     char str_label[DICTIONARY_ENTRY_BUFLEN];
-    char str_start[SK_NUM2DOT_STRLEN];
-    char str_end[SK_NUM2DOT_STRLEN];
+    char str_start[SKIPADDR_CIDR_STRLEN];
+    char str_end[SKIPADDR_CIDR_STRLEN];
     int prefix;
-    int prefix_adjust;
-    skipaddr_t new_addr_start;
-
-    /* when printing a CIDR range based on IPv4 addresses but the
-     * output format is IPv6, we must adjust the prefix for IPv6. */
-    prefix_adjust = 0;
+    skipaddr_t next_addr;
 
     if ( !opt_flags.no_final_delimiter) {
         final_delim[0] = delimiter;
@@ -789,16 +783,12 @@ printRangesIP(
         label_width = 1;
         ip_width = 1;
     } else {
-        if (skPrefixMapGetContentType(pmap) == SKPREFIXMAP_CONT_ADDR_V6) {
-            /* support 3-digit CIDR prefix */
-            cidr_extra = 1;
-            ip_width = skipaddrStringMaxlen(1, ip_format);
+        int is_v6 =
+            (skPrefixMapGetContentType(pmap) == SKPREFIXMAP_CONT_ADDR_V6);
+        if (opt_flags.no_cidr_blocks) {
+            ip_width = skipaddrStringMaxlen(is_v6, ip_format);
         } else {
-            ip_width = skipaddrStringMaxlen(0, ip_format);
-            if (ip_format & SKIPADDR_MAP_V4) {
-                cidr_extra = 1;
-                prefix_adjust = 96;
-            }
+            ip_width = skipaddrCidrStringMaxlen(is_v6, ip_format);
         }
         if (opt_country_codes) {
             label_width = 2;
@@ -822,7 +812,7 @@ printRangesIP(
                           label_width, label_title, final_delim);
         } else {
             skStreamPrint(stream_out, "%*s%c%*s%s\n",
-                          (ip_width + cidr_extra + 3), "ipBlock", delimiter,
+                          ip_width, "ipBlock", delimiter,
                           label_width, label_title, final_delim);
         }
     }
@@ -855,17 +845,12 @@ printRangesIP(
         }
 
         do {
-            prefix =
-                prefix_adjust
-                + skCIDRComputePrefix(&addr_start, &addr_end, &new_addr_start);
-            skStreamPrint(stream_out, "%*s/%d%c%*s%s\n",
-                          (ip_width + ((prefix > 99)
-                                       ? 0
-                                       : cidr_extra + ((prefix > 9) ? 0 : 1))),
-                          skipaddrString(str_start, &addr_start, ip_format),
-                          prefix, delimiter,
-                          label_width, str_label, final_delim);
-            skipaddrCopy(&addr_start, &new_addr_start);
+            prefix = skCIDRComputePrefix(&addr_start, &addr_end, &next_addr);
+            skipaddrCidrString(str_start, &addr_start, prefix, ip_format),
+            skStreamPrint(stream_out, "%*s%c%*s%s\n",
+                          ip_width, str_start,
+                          delimiter, label_width, str_label, final_delim);
+            skipaddrCopy(&addr_start, &next_addr);
         } while (!skipaddrIsZero(&addr_start));
     }
 }

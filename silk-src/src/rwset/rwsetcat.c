@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsetcat.c 62a32b7637cc 2018-03-16 17:30:43Z mthomas $");
+RCSIDENT("$SiLK: rwsetcat.c be7b495f86b1 2018-07-13 20:24:28Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skipset.h>
@@ -527,38 +527,26 @@ printIPsCallback(
     uint32_t            prefix,
     void               *dummy)
 {
-    char ipbuf[SK_NUM2DOT_STRLEN+1];
+    char ipbuf[SKIPADDR_CIDR_STRLEN];
 
     SK_UNUSED_PARAM(dummy);
 
-    skipaddrString(ipbuf, ip, ip_format);
-
-    /* do not print prefix when it is 128 and this is an IPv6
-     * IPset or when it is 32 and this is an IPv4 IPset */
+    /* do not print the prefix when it represents a single IP */
+    if (
 #if SK_ENABLE_IPV6
-    if (skipaddrIsV6(ip)) {
-        if (prefix < 96) {
-            skStreamPrint(outstream, ("%s/%" PRIu32 "\n"), ipbuf, prefix);
-        } else if (128 == prefix) {
-            skStreamPrint(outstream, "%s\n", ipbuf);
-        } else {
-            if ((ip_format & SKIPADDR_UNMAP_V6) && skipaddrIsV4MappedV6(ip)) {
-                prefix -= 96;
-            }
-            skStreamPrint(outstream, ("%s/%" PRIu32 "\n"), ipbuf, prefix);
-        }
-    } else
-#endif  /* SK_ENABLE_IPV6 */
+        (128 == prefix || (32 == prefix && !skipaddrIsV6(ip)))
+#else
+        (32 == prefix)
+#endif
+        )
     {
-        if (32 == prefix) {
-            skStreamPrint(outstream, "%s\n", ipbuf);
-        } else {
-            if (ip_format & SKIPADDR_MAP_V4) {
-                prefix += 96;
-            }
-            skStreamPrint(outstream, ("%s/%" PRIu32 "\n"), ipbuf, prefix);
-        }
+        /* a single address */
+        skipaddrString(ipbuf, ip, ip_format);
+    } else {
+        /* a block */
+        skipaddrCidrString(ipbuf, ip, prefix, ip_format);
     }
+    skStreamPrint(outstream, "%s\n", ipbuf);
     return SKIPSET_OK;
 }
 

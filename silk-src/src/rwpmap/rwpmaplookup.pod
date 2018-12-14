@@ -246,7 +246,9 @@ C<42540766411282592856903984951653826561>, respectively.
 
 Print IP addresses as integers in hexadecimal format.  For example,
 print C<192.0.2.1> and C<2001:db8::1> as C<c00000201> and
-C<20010db8000000000000000000000001>, respectively.
+C<20010db8000000000000000000000001>, respectively.  B<Note:> This
+setting does not apply to CIDR prefix values which are printed as
+decimal.
 
 =item zero-padded
 
@@ -258,7 +260,8 @@ addresses, this setting implies C<no-mixed>, so that
 C<::ffff:192.0.2.1> is printed as
 C<0000:0000:0000:0000:0000:ffff:c000:0201>.  As of SiLK 3.17.0, may be
 combined with any of the above, including C<decimal> and
-C<hexadecimal>.
+C<hexadecimal>.  As of SiLK 3.18.0, the values of CIDR prefix are also
+zero-padded.
 
 =back
 
@@ -779,7 +782,7 @@ B<uniq(1)>
 
 =cut
 
-$SiLK: rwpmaplookup.pod 95aec76c40ea 2018-03-13 21:09:01Z mthomas $
+$SiLK: rwpmaplookup.pod eb16f7937853 2018-12-05 17:05:19Z mthomas $
 
 Local Variables:
 mode:text

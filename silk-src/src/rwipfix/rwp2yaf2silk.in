@@ -16,7 +16,7 @@
 #    Mark Thomas
 #    November 2006
 #
-#  RCSIDENT("$SiLK: rwp2yaf2silk.in 20999e3771e6 2018-02-19 22:20:48Z mthomas $")
+#  RCSIDENT("$SiLK: rwp2yaf2silk.in c749cf6c5e5a 2018-11-30 16:50:47Z mthomas $")
 #
 ##############################################################################
 
@@ -283,8 +283,8 @@ Read the pcap records from I<INPUT_SPEC>.  Often I<INPUT_SPEC> is the
 name of the pcap file to read or the string string C<-> or C<stdin> to
 read from standard input.  To process multiple pcap files, create a
 text file that lists the names of the pcap files.  Specify the text
-file as I<INPUT_SPEC> and use C<--yaf-args=caplist> to tell B<yaf> the
-I<INPUT_SPEC> contains the names of pcap files.
+file as I<INPUT_SPEC> and use C<--yaf-args=--caplist> to tell B<yaf>
+the I<INPUT_SPEC> contains the names of pcap files.
 
 =item B<--out>=I<FILE>
 
