@@ -40,7 +40,7 @@
 <pre><code> -- This is a comment.
  -- Anything not marked as Required is optional.
 
- -- The only required variables are &quot;input&quot; and &quot;output&quot;. 
+ -- The only required variables are &quot;input&quot; and &quot;output&quot;.
  -- All other variables are optional.
 
  -- A variable named &quot;input&quot; is required; its value must be a table.
@@ -51,16 +51,16 @@
 <pre><code> input = {
 
     -- The input table must have a key named &quot;type&quot;. The default
-    -- input &quot;type&quot; is &quot;file&quot;.  Valid values are &quot;pcap&quot;, &quot;dag&quot;, 
+    -- input &quot;type&quot; is &quot;file&quot;.  Valid values are &quot;pcap&quot;, &quot;dag&quot;,
     -- &quot;napatech&quot;, &quot;netronome&quot;, &quot;pfring&quot;, &quot;zc&quot;, &quot;file&quot;, and &quot;caplist&quot;.
 
     type=&quot;pcap&quot;,
 
     -- In &quot;pcap&quot;, &quot;dag&quot;, &quot;napatech&quot;, &quot;netronome&quot;, &quot;pfring&quot;, and &quot;zc&quot;,
     -- a &quot;inf&quot; field is required.  Its value is the name of the interface
-    -- that yaf will read. In the &quot;zc&quot; case, it is the cluster ID 
+    -- that yaf will read. In the &quot;zc&quot; case, it is the cluster ID
     -- that yaf should listen to.
-    inf=&quot;en0&quot;, 
+    inf=&quot;en0&quot;,
 
     -- Optional parameters for all input types
     -- are &quot;export_interface&quot; and &quot;force_read_all&quot;.
@@ -73,8 +73,8 @@
 <pre><code>  input = {
 
     type = &quot;file&quot;,
-    
-    -- If type is &quot;file&quot;, a &quot;file&quot; is expected with the 
+
+    -- If type is &quot;file&quot;, a &quot;file&quot; is expected with the
     -- full path to the PCAP file.
     file=&quot;/pcaps/mypcap.pcap&quot;}</code></pre>
 
@@ -82,8 +82,8 @@
 
 <pre><code>  input = {
     type = &quot;caplist&quot;,
- 
-   -- If type is &quot;caplist&quot;, a &quot;file&quot; is expected which is 
+
+   -- If type is &quot;caplist&quot;, a &quot;file&quot; is expected which is
    -- the full path to a text file that contains a list
    -- of PCAP files in the order that they will be processed.
     file = &quot;/data/pcapfile.txt&quot;,
@@ -106,7 +106,7 @@
 
     port = &quot;18000&quot;,
 
-    -- Acceptable protocol types are &quot;tcp&quot;, &quot;udp&quot;, &quot;sctp&quot;, and &quot;spread&quot;. 
+    -- Acceptable protocol types are &quot;tcp&quot;, &quot;udp&quot;, &quot;sctp&quot;, and &quot;spread&quot;.
     -- If protocol is &quot;udp&quot;, the optional &quot;udp_temp_timeout&quot; key is
     -- also available.
     protocol = &quot;tcp&quot;}</code></pre>
@@ -133,7 +133,7 @@
   output = {
 
      protocol = &quot;spread&quot;,
-  
+
    -- The &quot;daemon&quot; key expects the name of the Spread daemon running.
      daemon = &quot;4804&quot;,
 
@@ -164,7 +164,7 @@
     nofrag = false}
 
   -- The &quot;export&quot; variable is optional. Its value must be a table.
-  -- All keywords within the &quot;export&quot; variable 
+  -- All keywords within the &quot;export&quot; variable
   -- expect a boolean response (true/false).
 
   export = {
@@ -178,7 +178,7 @@
 
   -- The &quot;log&quot; variable is optional. Its value must be a table.
   log = {
-    -- The &quot;spec&quot; keyword may be set to a syslog facility name, 
+    -- The &quot;spec&quot; keyword may be set to a syslog facility name,
     -- stderr, or the absolute path to a file for file logging.
     -- Default is stderr.
     spec = &quot;/var/log/yaf/yaf.log&quot;,
@@ -189,16 +189,16 @@
     level = &quot;debug&quot;}
 
   -- The plugin variable is optional. Its value must be a table of tables.
-  -- See the yafdpi and yafdhcp man pages for the plugins that 
+  -- See the yafdpi and yafdhcp man pages for the plugins that
   -- are provided with yaf.
 
   -- To make configuration easier, specify Lua variables that hold
   -- the information for each plugin.
-  DPI_PLUGIN = {  
+  DPI_PLUGIN = {
       -- The &quot;name&quot; keyword specifies the full path to the plugin
       -- library name to load.
       name = &quot;/usr/local/lib/yaf/dpacketplugin.la&quot;,
-     
+
       -- The &quot;options&quot; keyword specifies the arguments given to the
       -- plugin.
       options = &quot;53&quot;,
@@ -217,11 +217,11 @@
   pcap = {
     -- The &quot;path&quot; keyword specifies where yaf will write PCAP files.
     path = &quot;/data/pcap/yafpcap&quot;,
-   
+
     -- The &quot;maxpcap&quot; keyword specifies the maximum file size of a yaf PCAP file.
     maxpcap = 100,
 
-    -- The &quot;pcap_timer&quot; keyword specifies how often the PCAP file 
+    -- The &quot;pcap_timer&quot; keyword specifies how often the PCAP file
     -- should be rotated.
     pcap_timer = 300,
 
@@ -233,104 +233,106 @@
 <pre><code> -- idle_timeout = IDLE_TIMEOUT (integer)
  -- Set flow idle timeout in seconds.  Default is 300 seconds (5 min)
  -- Setting IDLE_TIMEOUT to 0 creates a flow for each packet.
- 
+
    idle_timeout = 300
- 
+
  -- active_timeout = ACTIVE_TIMEOUT (integer)
  -- Set flow active timeout in seconds.  Default is 1800 seconds (30 min)
- 
+
    active_timeout = 1800
- 
+
  -- filter = BPF_FILTER
  -- Set Berkeley Packet Filtering (BPF) in YAF with BPF_FILTER.
- 
+
    filter = &quot;port 53&quot;
- 
+
  -- APPLICATION LABELING OPTIONS
  -- Turn on application labeling by setting applabel = true
  -- Read the application labeler rules file from applabel_rules=
- 
+
    applabel = true
- 
+
    applabel_rules = &quot;/usr/local/etc/yafApplabelRules.conf&quot;
- 
+
  -- maxpayload = PAYLOAD_OCTETS (integer)
  -- Capture at most PAYLOAD_OCTETS octets from the start of each direction
  -- of each flow.  Default is 0.
- 
+
    maxpayload = 1024
- 
+
  -- maxexport = MAX_PAY_OCTETS (integer)
  -- Export at most MAX_PAY_OCTETS octets from the start of each direction
  -- of each flow from the PAYLOAD_OCTETS given to maxpayload.
  -- Default is PAYLOAD_OCTETS if export_payload=true
- 
+
    maxexport = 1024
- 
+
  -- export_payload = true/false
  -- If true, export at most PAYLOAD_OCTETS or MAX_PAY_OCTETS given to
  -- maxpayload or maxexport for each direction of the flow. Default is false.
-     
+
    export_payload = false
- 
+
  -- udp_payload = true/false
  -- If true, capture at most PAYLOAD_OCTETS octets from the start of
- -- each UDP flow, where PAYLOAD_OCTETS is set using the maxpayload option  
- 
+ -- each UDP flow, where PAYLOAD_OCTETS is set using the maxpayload option
+
    udp_payload = true
- 
+
  -- stats = INTERVAL (integer)
  -- If present, yaf will export process statistics every INTERVAL seconds.
  -- If stats is set to 0, no stats records will be exported.
  -- default is 300
- 
+
    stats = 300
- 
+
  -- ingress = ingressInterface (integer)
  -- egress = egressInterface (integer)
  -- use the above options to manually set the ingressInterface or
  -- egressInterface in the exported flow record. Default is 0.
- 
+
    ingress = 0
-  
+
    egress = 0
- 
+
  -- obdomain = DOMAIN_ID (integer)
  -- Set the othe observationDomainID on each exported IPFIX message to
  -- DOMAIN_ID.  Default is 0.
- 
+
    obdomain = 0
- 
+
  -- maxflows = FLOW_TABLE_MAX (integer)
  -- Limit the number of open flows to FLOW_TABLE_MAX. Default is no limit.
- 
- -- maxflows = 
- 
+
+ -- maxflows =
+
  -- maxfrags = FRAG_TABLE_MAX (integer)
  -- Limit the number of fragments to FRAG_TABLE_MAX. Default is no limit.
- 
- -- maxfrags = 
- 
+
+ -- maxfrags =
+
  -- udp_uniflow = PORT (integer)
  -- If set, export each UDP packet on the given PORT (or 1 for all ports)
  -- as a single flow. Default is 0 (off).
- 
+
     udp-uniflow = 0
- 
+
+ -- Turn on entropy output by setting entropy = true
+
+    entropy = true
+
  The following options configure the passive OS fingerprinting capabilities
  in B&lt;yaf&gt;.
- 
+
   -- p0fprint = true/false
   -- p0f-fingerprints = &quot;/usr/local/etc/p0f.fp&quot;
   -- fpexport = true/false
   -- See the yaf man page for more information. YAF must be configured
   -- appropriately to use the following options.
- 
+
   -- p0fprint = true
   -- fpexport = true
-  -- p0f_fingerprints = &quot;/usr/local/etc/p0f.fp&quot;  
- 
- </code></pre>
+  -- p0f_fingerprints = &quot;/usr/local/etc/p0f.fp&quot;</code></pre>
 
 <h1 id="AUTHORS">AUTHORS</h1>
 
@@ -341,7 +343,7 @@
 <p><b>yaf(1)</b>, <b>yafdpi(1)</b>, <b>yafdhcp(1)</b>, <b>applabel(1)</b></p>
 
       </div><!-- l-content -->
-      <div id="l-footer">&copy; 2006-2016 Carnegie Mellon University</div>
+      <div id="l-footer">&copy; 2006-2018 Carnegie Mellon University</div>
     </div><!-- p-body -->
 </body>
 

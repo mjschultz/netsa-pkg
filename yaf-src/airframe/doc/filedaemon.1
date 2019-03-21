@@ -129,7 +129,7 @@
 .\" ========================================================================
 .\"
 .IX Title "FILEDAEMON 1"
-.TH FILEDAEMON 1 "%v" "2.9.4" "airframe"
+.TH FILEDAEMON 1 "%v" "2.11.0" "airframe"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -184,29 +184,29 @@ These options control what is done with processed input files, file locking,
 and other options to facilitate operation as a file daemon.
 .IP "\fB\-\-nextdir\fR \fI\s-1PROCESSED_INPUT_DIRECTORY\s0\fR" 4
 .IX Item "--nextdir PROCESSED_INPUT_DIRECTORY"
-When reading from files, if this option is present, input files will be 
-moved to \fI\s-1PROCESSED_INPUT_DIRECTORY\s0\fR after they are successfully processed. 
-The special string \fBdelete\fR will cause successfully processed input to be 
+When reading from files, if this option is present, input files will be
+moved to \fI\s-1PROCESSED_INPUT_DIRECTORY\s0\fR after they are successfully processed.
+The special string \fBdelete\fR will cause successfully processed input to be
 removed instead. This option is required.
 .IP "\fB\-\-faildir\fR \fI\s-1FAILED_INPUT_DIRECTORY\s0\fR" 4
 .IX Item "--faildir FAILED_INPUT_DIRECTORY"
-When reading from files, if this option is present, input files will be 
-moved to \fI\s-1FAILED_INPUT_DIRECTORY\s0\fR if processing failed. 
-The special string \fBdelete\fR will cause failed input to be 
+When reading from files, if this option is present, input files will be
+moved to \fI\s-1FAILED_INPUT_DIRECTORY\s0\fR if processing failed.
+The special string \fBdelete\fR will cause failed input to be
 removed instead. This option is required.
 .IP "\fB\-\-extension\fR \fI\s-1OUTPUT_EXTENSION\s0\fR" 4
 .IX Item "--extension OUTPUT_EXTENSION"
 Replace the input file's extension with \fI\s-1OUTPUT_EXTENSION\s0\fR.  For
 example, if an input file is named \*(L"foo.txt\*(R", and this option is \*(L"out\*(R",
 then the output file will be named \*(L"foo.out\*(R".  If the input file has no
-extension, then this option's value will be appended to the filename. 
+extension, then this option's value will be appended to the filename.
 If this option is not specified, output files will have the same name
 as input files, except in the case when the \fB\-\-out\fR option is also not
 specified, in which case output files will be given a .out extension to
 avoid clobbering input files.
 .IP "\fB\-\-poll\fR \fI\s-1POLLING_DELAY\s0\fR" 4
 .IX Item "--poll POLLING_DELAY"
-\&\fI\s-1POLLING_DELAY\s0\fR is the polling delay in seconds; how long filedaemon will 
+\&\fI\s-1POLLING_DELAY\s0\fR is the polling delay in seconds; how long filedaemon will
 wait for new input when none is available. The default is 30 seconds.
 .IP "\fB\-\-lock\fR" 4
 .IX Item "--lock"
@@ -217,7 +217,7 @@ input file, and the filename is the input filename (including any extensions)
 with \*(L".lock\*(R" appended.
 .IP "\fB\-\-pidfile\fR=\fI\s-1PIDFILE\s0\fR" 4
 .IX Item "--pidfile=PIDFILE"
-Write the process identifier of the filedaemon process to \fI\s-1PIDFILE\s0\fR. 
+Write the process identifier of the filedaemon process to \fI\s-1PIDFILE\s0\fR.
 This option exists to facilitate the termination of the forked
 filedaemon process by shutdown scripts.
 .IP "\fB\-\-no\-daemon\fR" 4
@@ -225,19 +225,19 @@ filedaemon process by shutdown scripts.
 Do not actually daemonize.  Mainly useful for testing/debugging.
 .SS "Logging Options"
 .IX Subsection "Logging Options"
-These options are used to specify how log messages are routed.  filedaemon can 
+These options are used to specify how log messages are routed.  filedaemon can
 log to standard error, regular files, or the \s-1UNIX\s0 syslog facility.
 .IP "\fB\-\-log\fR \fI\s-1LOG_SPECIFIER\s0\fR" 4
 .IX Item "--log LOG_SPECIFIER"
 Specifies destination for log messages. \fI\s-1LOG_SPECIFIER\s0\fR can be a \fIsyslog\fR\|(3)
-facility name, the special value \fBstderr\fR for standard error, or the 
-\&\fIabsolute\fR path to a file for file logging. Standard error logging is only 
-available in \fB\-\-daemon\fR mode if \fB\-\-foreground\fR is present. The default log 
+facility name, the special value \fBstderr\fR for standard error, or the
+\&\fIabsolute\fR path to a file for file logging. Standard error logging is only
+available in \fB\-\-daemon\fR mode if \fB\-\-foreground\fR is present. The default log
 specifier is \fBstderr\fR if available, \fBuser\fR otherwise.
 .IP "\fB\-\-loglevel\fR \fI\s-1LOG_LEVEL\s0\fR" 4
 .IX Item "--loglevel LOG_LEVEL"
-Specify minimum level for logged messages. In increasing levels of verbosity, 
-the supported log levels are \fBquiet\fR, \fBerror\fR, \fBcritical\fR, \fBwarning\fR, 
+Specify minimum level for logged messages. In increasing levels of verbosity,
+the supported log levels are \fBquiet\fR, \fBerror\fR, \fBcritical\fR, \fBwarning\fR,
 \&\fBmessage\fR, \fBinfo\fR, and \fBdebug\fR. The default logging level is \fBwarning\fR.
 .IP "\fB\-\-verbose\fR" 4
 .IX Item "--verbose"
@@ -275,15 +275,15 @@ yaf:
 .Ve
 .SH "BUGS"
 .IX Header "BUGS"
-Known issues are listed in the \fB\s-1README\s0\fR file in the Airframe source 
+Known issues are listed in the \fB\s-1README\s0\fR file in the Airframe source
 distribution. Note that Airframe should be considered alpha-quality software;
-not  every concievable input and aggregation is exhaustively tested at each 
-release, and specific features may be completely untested. Please be mindful 
-of this before deploying Airframe in production environments. Bug reports and 
+not  every concievable input and aggregation is exhaustively tested at each
+release, and specific features may be completely untested. Please be mindful
+of this before deploying Airframe in production environments. Bug reports and
 feature requests may be sent via email to <netsa\-help@cert.org>.
 .SH "AUTHORS"
 .IX Header "AUTHORS"
-Tony Cebzanov and  Brian Trammell for 
+Tony Cebzanov and  Brian Trammell for
 the \s-1CERT\s0 Network Situational  Awareness
 Group, http://www.cert.org/netsa
 .SH "SEE ALSO"

@@ -1,5 +1,5 @@
 %define name libfixbuf
-%define version 2.1.0
+%define version 2.3.0
 %define release 1
 
 Summary: Fixbuf IPFIX implementation library
@@ -8,19 +8,19 @@ Version: %{version}
 Release: %{release}%{?dist}
 Group: Applications/System
 License: LGPLv3
-Source: http://tools.netsa.cert.org/releases/%{name}-%{version}.tar.gz
+Source: https://tools.netsa.cert.org/releases/%{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}
-Vendor: http://tools.netsa.cert.org/
-URL: http://tools.netsa.cert.org/fixbuf/
+Vendor: https://tools.netsa.cert.org/
+URL: https://tools.netsa.cert.org/fixbuf/
 
 Requires: glib2 >= 2.18
 %if "x" == "x1"
 Requires: libsctp
 %endif
-%if "x" == "x1"
+%if "x1" == "x1"
 Requires: libspread
 %endif
-%if "x" == "x1"
+%if "x1" == "x1"
 Requires: openssl
 %endif
 BuildRequires: glib2-devel >= 2.18
@@ -28,10 +28,10 @@ BuildRequires: pkgconfig >= 0.8
 %if "x" == "x1"
 BuildRequires: libsctp-devel
 %endif
-%if "x" == "x1"
+%if "x1" == "x1"
 BuildRequires: libspread-devel
 %endif
-%if "x" == "x1"
+%if "x1" == "x1"
 BuildRequires: openssl-devel
 %endif
 
@@ -50,11 +50,20 @@ Requires: pkgconfig >= 0.8
 %description devel
 Static libraries and C header files for libfixbuf.
 
+%package ipfixDump
+Group: Applications/System
+Summary: Prints the contents of an IPFIX file as text
+Requires: %{name} = %{version}
+
+%description ipfixDump
+ipfixDump is a libfixbuf-related utility that reads an IPFIX file and
+prints its contents as human-readable text.
+
 %prep
 %setup -q -n %{name}-%{version}
 
 %build
-./configure 
+./configure  --with-openssl=/opt/local --with-spread=/Users/netsa
 %{__make}
 
 %install
@@ -81,5 +90,11 @@ rm -rf $RPM_BUILD_ROOT
 %doc doc/html
 %{_includedir}/*
 %{_libdir}/pkgconfig/*
+
+%files ipfixDump
+%defattr(-,root,root)
+%{_bindir}/ipfixDump
+%{_mandir}/man1/ipfixDump.1*
+%{_datadir}/%{name}/cert_ipfix.xml
 
 %changelog

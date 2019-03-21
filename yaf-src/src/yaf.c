@@ -3,7 +3,7 @@
  ** Yet Another Flow generator
  * **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2016 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2019 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell
  ** ------------------------------------------------------------------------
@@ -364,7 +364,7 @@ AirOptionEntry yaf_optent_exp[] = {
                THE_LAME_80COL_FORMATTER_STRING"Set egressInterface field in "
                "flow template", NULL),
 #if YAF_ENABLE_METADATA_EXPORT
-    AF_OPTION( "template-info", (char)0, 0, AF_OPT_TYPE_NONE,
+    AF_OPTION( "metadata-export", (char)0, 0, AF_OPT_TYPE_NONE,
                &yaf_config.tmpl_metadata,
                THE_LAME_80COL_FORMATTER_STRING"Export template and information"
                " element metadata before data", NULL),
@@ -1863,10 +1863,6 @@ int main (
 
     /* Set up quit handler */
     yfQuitInit();
-
-    /* Initialize random number generator using the system time */
-    srand((unsigned) time(NULL));
-    ctx.cfg->tombstone_unique_id = rand(); 
 
     /* open interface if we're doing live capture */
     if (yaf_liveopen_fn) {

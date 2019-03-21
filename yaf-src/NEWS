@@ -1,3 +1,16 @@
+Version 2.11.0: 2019-03-18
+==========================
+
+Support for FixBuf 2.3.0 added, and is now required.
+Added support for nDPI 2.0.
+CERT Info Model support added.
+More strict DNS applabel.
+Initial NTP Mode 7 applabel supprt.
+Improved POSIX compliance for init script.
+Removed ipfixDump; it is now distributed with libfixbuf.
+DNS DPI free segfault fix.
+New YAF stats and tombstone format.
+
 Version 2.10.0: 2018-04-30
 ==========================
 
@@ -29,7 +42,7 @@ nDPI library suppport added
 
 Added NTP applabel
 
-Added RFC5610 template metadata (name and description) record output.
+Added RFC5610 template metadata (name and description) record output (libfixbuf 1.8.0 or greater required).
 
 Add option --no-vlan-in-key to drop VLAN ID from hash calculation
 

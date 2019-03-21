@@ -135,14 +135,14 @@
 
 <pre><code> $ yaf --in /data/some_large_file.pcap --out /data/ipfix.yaf \
       --pcap-meta-file /tmp/pcap-info
- 
+
  $ getFlowKeyHash --sip4 10.10.25.11 --dip4 10.10.26.12 --sport 1586 \
                 --dport 80 --protocol 6 --vlan 3  --date 2011-03-21 \
                 --time 16:15:54.256
- 
+
              sIP|            dIP|sPort|dPort|pro| vlan|      hash|                  ms
      10.10.25.11|    10.10.26.12| 1586|   80|  6|    3| 100819735|       1300724154256
- 
+
  FILE PATH: 256/100819735-2011321161554_0.pcap
 
  $ yafMeta2Pcap --pcap-meta-file /tmp/pcap-info20150107141533_00000.meta \
@@ -196,11 +196,11 @@
 
 <pre><code> $ yaf --in /tmp/caplist.txt --out /tmp/yaffile.yaf \
        --pcap-meta-file /tmp/pcap-info --caplist
-    
+
  $ yafMeta2Pcap --caplist /tmp/caplist.txt -o flow.pcap \
                 --hash 100819735 --time 1300724154 \
                 --pcap-meta-file &quot;/tmp/pcap-info*&quot; -v
-    
+
  Found 1 packets that match criteria.</code></pre>
 
 </ul>
@@ -224,7 +224,7 @@
 <p>yaf(1), getFlowKeyHash(1)</p>
 
       </div><!-- l-content -->
-      <div id="l-footer">&copy; 2006-2016 Carnegie Mellon University</div>
+      <div id="l-footer">&copy; 2006-2018 Carnegie Mellon University</div>
     </div><!-- p-body -->
 </body>
 

@@ -3,14 +3,14 @@
  ** IPFIX Information Model and IE storage management
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2018-2019 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Michael Duggan
  ** ------------------------------------------------------------------------
  ** @OPENSOURCE_LICENSE_START@
  ** libfixbuf 2.0
  **
- ** Copyright 2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
  **
  ** NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
  ** ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -37,8 +37,13 @@
  ** ------------------------------------------------------------------------
  */
 #include <fixbuf/public.h>
-#include <glib.h>
-#include <string.h>
+
+
+/* for silencing unused parameter warnings */
+#define UNUSED1(_x1)                 (void)_x1
+#define UNUSED2(_x1, _x2)            (void)_x1;(void)_x2
+#define UNUSED3(_x1, _x2, _x3)       (void)_x1;(void)_x2;(void)_x3
+#define UNUSED4(_x1, _x2, _x3, _x4)  (void)_x1;(void)_x2;(void)_x3;(void)_x4
 
 #define MP_FLAGS (G_MARKUP_TREAT_CDATA_AS_TEXT          \
                   | G_MARKUP_PREFIX_ERROR_POSITION)
@@ -87,7 +92,7 @@ static void init_datatype_mapping(
     };
     create_mapping(&datatype_mapping,
                    strings, sizeof(strings) / sizeof(const gchar *));
-};
+}
 
 #define SEMANTIC_REGISTRY_ID "ipfix-information-element-semantics"
 static GHashTable *semantic_mapping;
@@ -107,7 +112,7 @@ static void init_semantic_mapping(
     };
     create_mapping(&semantic_mapping,
                    strings, sizeof(strings) / sizeof(const gchar *));
-};
+}
 
 #define UNIT_REGISTRY_ID "ipfix-information-element-units"
 static GHashTable *unit_mapping;
@@ -132,9 +137,9 @@ static void init_unit_mapping(
         "ports",
         "inferred"
     };
-    return create_mapping(&unit_mapping,
-                          strings, sizeof(strings) / sizeof(const gchar *));
-};
+    create_mapping(&unit_mapping,
+                   strings, sizeof(strings) / sizeof(const gchar *));
+}
 
 static void init_mappings(
     void)
@@ -203,9 +208,10 @@ static void parse_valdesc_text(
     const gchar          *text,
     gsize                 len,
     gpointer              user_data,
-    GError              **err)
+    GError              **error)
 {
     valdesc_data_t *data = (valdesc_data_t *)user_data;
+    UNUSED2(ctx, error);
     if (data->state == GATHER_TEXT) {
         g_string_append_len(data->text, text, len);
     }
@@ -220,6 +226,7 @@ static void parse_valdesc_start(
     GError              **error)
 {
     valdesc_data_t *data = (valdesc_data_t *)user_data;
+    UNUSED4(ctx, error, attribute_names, attribute_values);
     element_name = ename(element_name);
     if (strcmp(element_name, "record") == 0) {
         data->value = G_MAXUINT64;
@@ -240,8 +247,9 @@ static void parse_valdesc_end(
     gpointer              user_data,
     GError              **error)
 {
-    element_name = ename(element_name);
     valdesc_data_t *data = (valdesc_data_t *)user_data;
+    UNUSED2(ctx, error);
+    element_name = ename(element_name);
     if (strcmp(element_name, "record") == 0) {
         if (data->value != G_MAXUINT64 && data->description) {
 
@@ -272,6 +280,7 @@ static void parse_valdesc_error(
     GError              *error,
     gpointer             user_data)
 {
+    UNUSED2(ctx, error);
     destroy_valdesc_data(user_data);
 }
 
@@ -293,6 +302,7 @@ static void ipfix_mappings_locator_start(
     GError              **error)
 {
     element_name = ename(element_name);
+    UNUSED1(error);
     if (strcmp(element_name, "registry") == 0) {
         while (*attribute_names) {
             if (strcmp(*attribute_names, "id") == 0) {
@@ -326,6 +336,7 @@ static void ipfix_mappings_locator_end(
     GError              **error)
 {
     element_name = ename(element_name);
+    UNUSED1(error);
     if (strcmp(element_name, "registry") == 0) {
         if (*(parse_state_t *)user_data == PARSING_REGISTRY) {
             destroy_valdesc_data(g_markup_parse_context_pop(ctx));
@@ -420,9 +431,10 @@ static void parse_element_text(
     const gchar          *text,
     gsize                 len,
     gpointer              user_data,
-    GError              **err)
+    GError              **error)
 {
     element_data_t *data = (element_data_t *)user_data;
+    UNUSED2(ctx, error);
     if (data->state == GATHER_TEXT) {
         g_string_append_len(data->text, text, len);
     }
@@ -436,8 +448,9 @@ static void parse_element_start(
     gpointer              user_data,
     GError              **error)
 {
-    element_name = ename(element_name);
     element_data_t *data = (element_data_t *)user_data;
+    UNUSED4(ctx, error, attribute_names, attribute_values);
+    element_name = ename(element_name);
     if (strcmp(element_name, "record") == 0) {
         fbInfoModel_t *model = data->model;
         GString *text = data->text;
@@ -626,6 +639,7 @@ static void parse_element_end(
 {
     guint64 val;
     element_data_t *data = (element_data_t *)user_data;
+    UNUSED1(error);
     element_name = ename(element_name);
     if (strcmp(element_name, "record") == 0) {
         if (data->dataType_validity.validity != NOT_FOUND) {
@@ -639,8 +653,8 @@ static void parse_element_end(
                 warn_invalid(&data->range_validity);
                 warn_invalid(&data->reversible_validity);
                 warn_invalid(&data->reversible_validity);
-                g_debug("%s: Adding info element %s",
-                        __FILE__, data->ie.ref.name);
+                /*g_debug("%s: Adding info element %s",
+                        __FILE__, data->ie.ref.name);*/
                 update_ie(data);
                 fbInfoModelAddElement(data->model, &data->ie);
             }
@@ -782,6 +796,7 @@ gboolean fbInfoModelReadXMLData(
     gssize          xml_data_len,
     GError        **error)
 {
+    g_assert(xml_data);
     if (ipfix_mappings_parse(xml_data, xml_data_len, error)) {
         return ipfix_elements_parse(model, xml_data, xml_data_len, error);
     }
@@ -795,6 +810,8 @@ gboolean fbInfoModelReadXMLFile(
 {
     gchar *buffer;
     gsize len;
+
+    g_assert(filename);
     if (g_file_get_contents(filename, &buffer, &len, error)) {
         gboolean rv = fbInfoModelReadXMLData(model, buffer, len, error);
         g_free(buffer);

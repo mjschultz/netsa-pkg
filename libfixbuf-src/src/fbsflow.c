@@ -7,14 +7,14 @@
  * within the fixbuf structure
  *
  * ------------------------------------------------------------------------
- * Copyright (C) 2008-2018 Carnegie Mellon University. All Rights Reserved.
+ * Copyright (C) 2008-2019 Carnegie Mellon University. All Rights Reserved.
  * ------------------------------------------------------------------------
  * Authors: Emily Sarneso <ecoff@cert.org>
  * ------------------------------------------------------------------------
  * @OPENSOURCE_LICENSE_START@
  * libfixbuf 2.0
  *
- * Copyright 2018 Carnegie Mellon University. All Rights Reserved.
+ * Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
  *
  * NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
  * ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -753,9 +753,11 @@ static void sflowDecodeFlowHeaders(
     uint16_t                format,
     GError                  **err)
 {
-
     uint8_t *data = header;
     uint32_t sp, dp, proto, flags, tos;
+
+    (void)headerlen;
+    (void)err;
 
     if (format == 2) {
         /* Ethernet header */
@@ -845,6 +847,10 @@ static gboolean     fbCollectorDecodeSFlowMsgVL(
      uint16_t                    *m_len,
      GError                      **err)
 {
+    (void)collector;
+    (void)hdr;
+    (void)b_len;
+    (void)err;
     *m_len = 0;
     return TRUE;
 }
@@ -1645,7 +1651,6 @@ static void fbCollectorTimeOutSessionSFlow(
     fbCollector_t *collector,
     fbSession_t   *session)
 {
-
     struct fbCollectorSFlowState_st     *transState =
         (struct fbCollectorSFlowState_st *)collector->translatorState;
     fbCollectorSFlowSession_t           *sfsession = NULL;
@@ -1698,7 +1703,7 @@ gboolean    fbCollectorSetSFlowTranslator(
     GError                      **err)
 {
     struct fbCollectorSFlowState_st *sflowState =
-        g_slice_alloc0(sizeof(struct fbCollectorSFlowState_st));
+        g_slice_new0(struct fbCollectorSFlowState_st);
     GHashTable    *hashTable = NULL;
     fbInfoModel_t *model = fbInfoModelAlloc();
     fbTemplate_t  *sftmpl = NULL;

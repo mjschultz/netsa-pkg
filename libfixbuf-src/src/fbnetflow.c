@@ -7,14 +7,14 @@
  * within the fixbuf structure
  *
  * ------------------------------------------------------------------------
- * Copyright (C) 2008-2018 Carnegie Mellon University. All Rights Reserved.
+ * Copyright (C) 2008-2019 Carnegie Mellon University. All Rights Reserved.
  * ------------------------------------------------------------------------
  * Authors: Chris Inacio <inacio@cert.org>, Emily Sarneso <ecoff@cert.org>
  * ------------------------------------------------------------------------
  * @OPENSOURCE_LICENSE_START@
  * libfixbuf 2.0
  *
- * Copyright 2018 Carnegie Mellon University. All Rights Reserved.
+ * Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
  *
  * NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
  * ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -267,7 +267,7 @@ struct fbCollectorNetflowV9State_st {
  * @param datum pointer to the structure to be destroyed
  *
  */
-static void         templateHashDestroyHelper (
+static void         templateHashDestroyHelper(
     gpointer datum)
 {
     g_slice_free(fbCollectorNetflowV9TemplateHash_t, datum);
@@ -280,26 +280,6 @@ static void         domainHashDestroyHelper(
         g_hash_table_destroy(((fbCollectorNetflowV9Session_t *)datum)->templateHash);
     }
     g_slice_free(fbCollectorNetflowV9Session_t, datum);
-}
-
-static guint        fooHash (
-    gconstpointer   key)
-{
-    return (guint)((uintptr_t)key);
-}
-
-static gboolean     fooEqual (
-    gconstpointer   alpha,
-    gconstpointer   beta)
-{
-    uintptr_t   alphaInt = (uintptr_t)alpha;
-    uintptr_t   betaInt = (uintptr_t)beta;
-
-    if (alphaInt == betaInt) {
-        return TRUE;
-    }
-
-    return FALSE;
 }
 
 
@@ -585,7 +565,6 @@ static int netflowDataTemplateParse (
     uint16_t        recLength = g_ntohs(*recordLength);
     uint16_t        lengthParsed = 4; /* to account for set header */
     uint8_t         *fieldCountPtr;
-    uintptr_t       bigTemplateId;
     unsigned int    loop;
     uint16_t        temp;
     int             tmplcount = 0;
@@ -593,7 +572,6 @@ static int netflowDataTemplateParse (
     uint8_t         addReversePenFix = 0;
 #endif
     gboolean        addSysUpTime = FALSE;
-    gpointer        hashResult = NULL;
     struct fbCollectorNetflowV9State_st     *transState =
         (struct fbCollectorNetflowV9State_st *)collector->translatorState;
     struct fbCollectorNetflowV9TemplateHash_st *newTemplate = NULL;
@@ -790,7 +768,7 @@ static int netflowDataTemplateParse (
            that is there if this template number already exists */
         if (currentSession->templateHash == NULL) {
             currentSession->templateHash =
-                g_hash_table_new_full(fooHash, fooEqual,
+                g_hash_table_new_full(g_direct_hash, NULL,
                                       NULL, templateHashDestroyHelper);
 
             if (NULL == currentSession->templateHash) {
@@ -801,17 +779,8 @@ static int netflowDataTemplateParse (
             }
         }
 
-        bigTemplateId = (uintptr_t)templateId;
-        hashResult = g_hash_table_lookup(currentSession->templateHash,
-                                         (gconstpointer)bigTemplateId);
-        if (NULL != hashResult) {
-            g_hash_table_replace(currentSession->templateHash,
-                                 (gpointer)bigTemplateId, newTemplate);
-        } else {
-            g_hash_table_insert(currentSession->templateHash,
-                                (gpointer)bigTemplateId, newTemplate);
-        }
-
+        g_hash_table_insert(currentSession->templateHash,
+                            GUINT_TO_POINTER(templateId), newTemplate);
         tmplcount++;
 
 #if FB_NETFLOW_DEBUG == 1
@@ -861,11 +830,9 @@ static int netflowOptionsTemplateParse (
     uint16_t        lengthParsed = 4; /* for set header */
     uint16_t        optScopeLen, optLen, type, fieldLen;
     uint16_t        templateLength = 0;
-    uintptr_t       bigTemplateId;
     uint16_t        recLength = g_ntohs(*recordLength);
     unsigned int    loop;
     unsigned int    fieldCount;
-    gpointer        hashResult = NULL;
     int             tmplcount = 0;
     struct fbCollectorNetflowV9State_st     *transState =
         (struct fbCollectorNetflowV9State_st *)collector->translatorState;
@@ -981,7 +948,7 @@ static int netflowOptionsTemplateParse (
         if (currentSession->templateHash == NULL) {
 
             currentSession->templateHash =
-                g_hash_table_new_full(fooHash, fooEqual,
+                g_hash_table_new_full(g_direct_hash, NULL,
                                       NULL, templateHashDestroyHelper);
 
             if (NULL == currentSession->templateHash) {
@@ -992,26 +959,15 @@ static int netflowOptionsTemplateParse (
             }
         }
 
-        /* put the template into the hash, check/replace the template
-           that is there if this template number already exists */
-
-        bigTemplateId = (uintptr_t)templateId;
-        hashResult = g_hash_table_lookup(currentSession->templateHash,
-                                         (gconstpointer)bigTemplateId);
-        if (NULL != hashResult) {
-            g_hash_table_replace(currentSession->templateHash,
-                                 (gpointer)bigTemplateId, newTemplate);
-        } else {
-            g_hash_table_insert(currentSession->templateHash,
-                                (gpointer)bigTemplateId, newTemplate);
-        }
+        g_hash_table_insert(currentSession->templateHash,
+                            GUINT_TO_POINTER(templateId), newTemplate);
 
 #if FB_NETFLOW_DEBUG == 1
-    fprintf(stderr, "Options template inserted into hash: templateId %d,"
+        fprintf(stderr, "Options template inserted into hash: templateId %d,"
                 " templateSize: %d, Domain: %04x, SysUpTime %d, "
-            "fieldCount: %u \n",
-            templateId, templateLength, transState->observation_id,
-            newTemplate->addSysUpTime, fieldCount);
+                "fieldCount: %u \n",
+                templateId, templateLength, transState->observation_id,
+                newTemplate->addSysUpTime, fieldCount);
 #endif
 
         templateLength = 0; /* reset to 0 after each tmpl */
@@ -1469,7 +1425,6 @@ static void fbCollectorTimeOutSessionV9(
     fbCollector_t *collector,
     fbSession_t   *session)
 {
-
     struct fbCollectorNetflowV9State_st     *transState =
         (struct fbCollectorNetflowV9State_st *)collector->translatorState;
     fbCollectorNetflowV9Session_t           *nfsession = NULL;
@@ -1531,8 +1486,7 @@ gboolean    fbCollectorSetNetflowV9Translator(
     }
 
 
-    hashTable = g_hash_table_new_full(g_direct_hash,
-                                      g_direct_equal, NULL,
+    hashTable = g_hash_table_new_full(g_direct_hash, NULL, NULL,
                                       domainHashDestroyHelper);
 
     if (NULL == hashTable) {

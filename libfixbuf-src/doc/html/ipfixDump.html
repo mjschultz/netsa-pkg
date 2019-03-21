@@ -1,0 +1,212 @@
+<head>
+<title>fixbuf - Documentation - ipfixDump</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+<link rel="stylesheet" type="text/css" href="../site/style.css" />
+</head>
+<body>
+  <div id="p-body">
+    <div id="l-header">
+      <img src="../site/sei-logo.png" id="l-sei-logo"
+        alt="Software Engineering Institute | Carnegie Mellon&copy;" />
+      <div id="l-netsa-logo"><a id="l-netsa-name" href="../index.html"><b>CERT NetSA Security Suite</b></a></div>
+      <div id="l-netsa-motto">Monitoring for Large-Scale Networks</div>
+      <h1 class="l-page-title">fixbuf</h1>
+      <span id="l-subtitle">Documentation</span>
+    </div><!-- l-header -->
+    <div id="l-content">
+      <div id="l-sidebar">
+        <div class="p-sidebar-section">
+          <h1><a href="index.html">fixbuf</a></h1>
+          <ul>
+            <li><a href="libfixbuf/index.html">Documentation</a></li>
+            <li><a href="../download.html">Downloads</a></li>
+            <li><a href="../../pyfixbuf/index.html">pyfixbuf</a></li>
+          </ul>
+        </div><!-- p-sidebar-section -->
+      </div><!-- l-sidebar -->
+<h1><a name="name">NAME</a></h1><p><b>ipfixDump</b> - Print contents of an IPFIX file as human-readable text</p>
+
+<h1 id="SYNOPSIS">SYNOPSIS</h1>
+
+<pre><code> ipfixDump [--in FILE_NAME] [--out FILE_NAME]
+           [--rfc5610] [--element-file FILE_NAME] [--yaf]
+           [--templates] [--data] [--stats]
+           [--hexdump[=LEN]]
+
+ ipfixDump [--version]
+
+ ipfixDump [--help]</code></pre>
+
+<h1 id="DESCRIPTION">DESCRIPTION</h1>
+
+<p><b>ipfixDump</b> is a tool to read an IPFIX file and print its contents as human-readable ASCII to assist the user in analyzing the file. <b>ipfixDump</b> prints all message headers, templates, data records, options templates, and options records to the output, plus a one line summary of the file&#39;s content.</p>
+
+<p><b>ipfixDump</b> supports IPFIX structured data in the form of basicLists, subTemplateLists, and subTemplateMultiLists.</p>
+
+<p>By default, <b>ipfixDump</b> reads the IPFIX file from the standard input and writes the text to the standard output. To specify the input or output file&#39;s location, use the <b>--in</b> or <b>--out</b> option, respectively.</p>
+
+<p><b>ipfixDump</b> requires the input file to contain the IPFIX templates that describe the data records within the file, and the template must appear before the records that use it. Any records that do not have a corresponding template are ignored.</p>
+
+<p>The default information model used by <b>ipfixDump</b> includes only the standard information elements defined by <a href="https://www.iana.org/assignments/ipfix/ipfix.xhtml">IANA</a> and provided by libfixbuf. There are three ways to augment the set of elements:</p>
+
+<ol>
+
+<li><p>The <b>--rfc5610</b> option instructs <b>ipfixDump</b> to watch the input for options records that define private enterprise information elements (as defined by <a href="https://tools.ietf.org/html/rfc5610.html">RFC5610</a>) and to add those elements to the information model.</p>
+
+</li>
+<li><p>The <b>--element-file=<i>FILE_NAME</i></b> option tells <b>ipfixDump</b> to parse the contents of <i>FILE_NAME</i> and add those information elements to the information model. The argument is an XML file whose schema is that used by IANA&#39;s <a href="https://www.iana.org/assignments/ipfix/ipfix.xml">XML Information Element Registry</a>, with the following additions:</p>
+
+<dl>
+
+<dt id="cert:enterpriseId">cert:enterpriseId</dt>
+<dd>
+
+<p>A number representing the Private Enterprise Number of the element</p>
+
+</dd>
+<dt id="cert:reversible">cert:reversible</dt>
+<dd>
+
+<p>A boolean value (<code>true</code>, <code>yes</code>, or <code>1</code> for true; <code>false</code>, <code>no</code>, or <code>0</code> for false) that specifies whether the element may have a separate identity in a reverse flow.</p>
+
+</dd>
+</dl>
+
+<p>The <b>--element-file</b> option may be used multiple times to load multiple files, and the loaded elements replace existing elements with the same identifier.</p>
+
+</li>
+<li><p>The <b>--yaf</b> option loads the CERT private enterprise information elements into the information model. These elements are used by the NetSA tools <b>yaf(1)</b>, <b>pipeline(8)</b>, <b>super_mediator(1)</b>, and <b>rwsilk2ipfix(1)</b>. This option is implemented as a wrapper over the <b>--element-file</b> option where the file name is <i>cert_ipfix.xml</i> and <b>ipfixDump</b> checks several directories to attempt to find this file, stopping once it finds the first file. The list of directories, in search order, is</p>
+
+<ul>
+
+<li><p>the directory <i>../share/libfixbuf</i> relative to the directory containing the application</p>
+
+</li>
+<li><p>the <i>libfixbuf</i> subdirectory of the <code>datadir</code> directory specified when <b>ipfixDump</b> was configured (defaults to <i>$prefix/share</i>)</p>
+
+</li>
+<li><p>the <i>share/libfixbuf</i> subdirectory installation folder for the GLib-2 library</p>
+
+</li>
+<li><p>the <i>libfixbuf</i> subdirectory of the directories specified by the $XDG_DATA_DIRS environment variable, or <i>/usr/local/share</i> and <i>/usr/share/libfixbuf</i> when that variable is empty</p>
+
+</li>
+</ul>
+
+<p><b>ipfixDump</b> exits with an error if it is unable to find the <i>cert_ipfix.xml</i> file. See <a href="https://tools.netsa.cert.org/cert-ipfix-registry/">https://tools.netsa.cert.org/cert-ipfix-registry/</a> for additional information about this file.</p>
+
+</li>
+</ol>
+
+<h1 id="OPTIONS">OPTIONS</h1>
+
+<p>The following options are available for <b>ipfixDump</b>:</p>
+
+<dl>
+
+<dt id="in-FILE_NAME"><b>--in</b> <i>FILE_NAME</i></dt>
+<dd>
+
+<p>Sets the input file name to <i>FILE_NAME</i>. When the option is not specified, <b>ipfixDump</b> reads from the standard input or exits with an error when the standard input is a terminal. <b>ipfixDump</b> reads from the standard input if <i>FILE_NAME</i> is &#39;<code>-</code>&#39;.</p>
+
+</dd>
+<dt id="out-FILE_NAME"><b>--out</b> <i>FILE_NAME</i></dt>
+<dd>
+
+<p>Sets the output file name to <i>FILE_NAME</i>. If <i>FILE_NAME</i> exists, it is overwritten. The string &#39;<code>-</code>&#39; may be used to write to standard output (the default).</p>
+
+</dd>
+<dt id="rfc5610"><b>--rfc5610</b></dt>
+<dd>
+
+<p>Tells <b>ipfixDump</b> to scan the IPFIX input file for options records that define private enterprise information elements and to add those elements to the information model.</p>
+
+</dd>
+<dt id="element-file-FILE_NAME"><b>--element-file</b> <i>FILE_NAME</i></dt>
+<dd>
+
+<p>Loads the XML file <i>FILE_NAME</i> and incorporates information element information found in it. The format of the file is described above. The option may be used multiple times to load multiple files, and later elements replace existing elements when they have the same identifier.</p>
+
+</dd>
+<dt id="yaf"><b>--yaf</b></dt>
+<dd>
+
+<p>Searches for a file named <i>cert_ipfix.xml</i> in several locations and loads that file as if it was an argument to <b>--element-file</b>. <b>ipfixDump</b> exits with an error if it is unable to find the <i>cert_ipfix.xml</i> file.</p>
+
+</dd>
+<dt id="templates"><b>--templates</b></dt>
+<dd>
+
+<p>Suppresses the printing of records, causing the output to contain only message headers, templates, and a summary line.</p>
+
+</dd>
+<dt id="data"><b>--data</b></dt>
+<dd>
+
+<p>Suppresses the printing of templates, causing the output to contain only message headers, records, and a summary line.</p>
+
+</dd>
+<dt id="stats"><b>--stats</b></dt>
+<dd>
+
+<p>Suppresses the printing of all message headers, templates, and records. The output consists of the number of messages, templates, and records present in the input, and a two-column list showing template IDs found in the input and a count of the number of records that used that template.</p>
+
+</dd>
+<dt id="hexdump"><b>--hexdump</b></dt>
+<dd>
+
+<p>For data record elements whose type is octetArray, prints each octet as a 2-digit hexadecimal value with a no separator between the values. The length of the element precedes the hexadecimal output. <b>ipfixDump</b> uses this display for octetArray elements that are variable length or whose length is greater than eight. Without this option, only the length of the octetArray elements are printed. Note that fixed-width octetArray elements whose length is less than or equal to eight are always printed as a decimal number regardless of this option.</p>
+
+</dd>
+<dt id="hexdump-LEN"><b>--hexdump=<i>LEN</i></b></dt>
+<dd>
+
+<p>When the optional parameter <i>LEN</i> is provided to <b>--hexdump</b>, only the first <i>LEN</i> octets of the value are printed. If <i>LEN</i> is zero, only the length of octetArray values is printed. A <i>LEN</i> that is negative or larger than 65535 is treated as the maximum, 65535.</p>
+
+</dd>
+<dt id="version"><b>--version</b></dt>
+<dd>
+
+<p>Prints version and copyright information to standard error and exits.</p>
+
+</dd>
+<dt id="help"><b>--help</b></dt>
+<dd>
+
+<p>Prints a brief usage message to the standard output and exits.</p>
+
+</dd>
+</dl>
+
+<h1 id="Examples">Examples</h1>
+
+<p>In the following examples, the dollar sign (&quot;$&quot;) represents the shell prompt. The text after the dollar sign represents the command line.</p>
+
+<ul>
+
+<pre><code> $ ipfixDump --in - --out -
+
+ $ ipfixDump --in /data/ipfix.ipfix --out /data/text.txt --yaf</code></pre>
+
+</ul>
+
+<h1 id="Known-Issues">Known Issues</h1>
+
+<p>Bug reports may be sent directly to the Network Situational Awareness team at &lt;netsa-help@cert.org&gt;.</p>
+
+<h1 id="AUTHORS">AUTHORS</h1>
+
+<p>Emily Sarneso and the CERT Network Situational Awareness Group Engineering Team, &lt;http://www.cert.org/netsa&gt;.</p>
+
+<h1 id="SEE-ALSO">SEE ALSO</h1>
+
+<p><b>yaf(1)</b>, <b>yafscii(1)</b>, <b>yafdpi(1)</b>, <b>super_mediator(1)</b>, <b>pipeline(8)</b>, <b>rwsilk2ipfix(1)</b>, <a href="https://tools.netsa.cert.org/cert-ipfix-registry/">https://tools.netsa.cert.org/cert-ipfix-registry/</a>, <a href="https://www.iana.org/assignments/ipfix/ipfix.xhtml">https://www.iana.org/assignments/ipfix/ipfix.xhtml</a></p>
+
+    </div><!-- l-content -->
+    <div id="l-footer">&copy; 2006-2019 Carnegie Mellon University</div>
+  </div><!-- p-body -->
+</body>
+
+
+</html>
+

@@ -7,7 +7,7 @@
  * in ipfix template format.  See yafdpi(1)
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2019 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso
  ** ------------------------------------------------------------------------
@@ -1272,6 +1272,8 @@ gboolean ypInitializeProtocolRules(
     pcre_free(newRuleScanner);
     pcre_free(totalScanner);
     pcre_free(fieldScanner);
+    pcre_free(certExpScanner);
+    pcre_free(certHashScanner);
 
     return TRUE;
 }
@@ -4103,6 +4105,8 @@ void ypFreeDNSRec(
     yfDNSFlow_t *rec = (yfDNSFlow_t *)flowContext->rec;
     yfDNSQRFlow_t *dns = NULL;
 
+    if (rec == NULL)  /* Possibly a non-dns flow, or malformed dns that caused a failure during allocation of the QR stl. */
+            return;
     while ((dns = fbSubTemplateListGetNextPtr(&(rec->dnsQRList), dns))) {
         fbSubTemplateListClear(&(dns->dnsRRList));
     }
@@ -4136,7 +4140,6 @@ void ypFreeSSLRec(
     yfSSLCertFlow_t *cert = NULL;
     yfSSLFullCert_t *fullrec = (yfSSLFullCert_t *)flowContext->full_ssl_cert;
 
-
     while ((cert = fbSubTemplateListGetNextPtr(&(rec->sslCertList), cert))) {
         fbSubTemplateListClear(&(cert->issuer));
         fbSubTemplateListClear(&(cert->subject));
@@ -4144,6 +4147,7 @@ void ypFreeSSLRec(
     }
 
     fbSubTemplateListClear(&(rec->sslCertList));
+
     fbBasicListClear(&(rec->sslCipherList));
 
     if (fullrec) {

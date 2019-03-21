@@ -62,16 +62,16 @@ and other options to facilitate operation as a file daemon.
 
 =item B<--nextdir> I<PROCESSED_INPUT_DIRECTORY>
 
-When reading from files, if this option is present, input files will be 
-moved to I<PROCESSED_INPUT_DIRECTORY> after they are successfully processed. 
-The special string B<delete> will cause successfully processed input to be 
+When reading from files, if this option is present, input files will be
+moved to I<PROCESSED_INPUT_DIRECTORY> after they are successfully processed.
+The special string B<delete> will cause successfully processed input to be
 removed instead. This option is required.
 
 =item B<--faildir> I<FAILED_INPUT_DIRECTORY>
 
-When reading from files, if this option is present, input files will be 
-moved to I<FAILED_INPUT_DIRECTORY> if processing failed. 
-The special string B<delete> will cause failed input to be 
+When reading from files, if this option is present, input files will be
+moved to I<FAILED_INPUT_DIRECTORY> if processing failed.
+The special string B<delete> will cause failed input to be
 removed instead. This option is required.
 
 =item B<--extension> I<OUTPUT_EXTENSION>
@@ -79,7 +79,7 @@ removed instead. This option is required.
 Replace the input file's extension with I<OUTPUT_EXTENSION>.  For
 example, if an input file is named "foo.txt", and this option is "out",
 then the output file will be named "foo.out".  If the input file has no
-extension, then this option's value will be appended to the filename. 
+extension, then this option's value will be appended to the filename.
 If this option is not specified, output files will have the same name
 as input files, except in the case when the B<--out> option is also not
 specified, in which case output files will be given a .out extension to
@@ -87,7 +87,7 @@ avoid clobbering input files.
 
 =item B<--poll> I<POLLING_DELAY>
 
-I<POLLING_DELAY> is the polling delay in seconds; how long filedaemon will 
+I<POLLING_DELAY> is the polling delay in seconds; how long filedaemon will
 wait for new input when none is available. The default is 30 seconds.
 
 =item B<--lock>
@@ -100,7 +100,7 @@ with ".lock" appended.
 
 =item B<--pidfile>=I<PIDFILE>
 
-Write the process identifier of the filedaemon process to I<PIDFILE>. 
+Write the process identifier of the filedaemon process to I<PIDFILE>.
 This option exists to facilitate the termination of the forked
 filedaemon process by shutdown scripts.
 
@@ -112,7 +112,7 @@ Do not actually daemonize.  Mainly useful for testing/debugging.
 
 =head2 Logging Options
 
-These options are used to specify how log messages are routed.  filedaemon can 
+These options are used to specify how log messages are routed.  filedaemon can
 log to standard error, regular files, or the UNIX syslog facility.
 
 =over 4
@@ -120,15 +120,15 @@ log to standard error, regular files, or the UNIX syslog facility.
 =item B<--log> I<LOG_SPECIFIER>
 
 Specifies destination for log messages. I<LOG_SPECIFIER> can be a syslog(3)
-facility name, the special value B<stderr> for standard error, or the 
-I<absolute> path to a file for file logging. Standard error logging is only 
-available in B<--daemon> mode if B<--foreground> is present. The default log 
+facility name, the special value B<stderr> for standard error, or the
+I<absolute> path to a file for file logging. Standard error logging is only
+available in B<--daemon> mode if B<--foreground> is present. The default log
 specifier is B<stderr> if available, B<user> otherwise.
 
 =item B<--loglevel> I<LOG_LEVEL>
 
-Specify minimum level for logged messages. In increasing levels of verbosity, 
-the supported log levels are B<quiet>, B<error>, B<critical>, B<warning>, 
+Specify minimum level for logged messages. In increasing levels of verbosity,
+the supported log levels are B<quiet>, B<error>, B<critical>, B<warning>,
 B<message>, B<info>, and B<debug>. The default logging level is B<warning>.
 
 =item B<--verbose>
@@ -167,16 +167,16 @@ yaf:
 
 =head1 BUGS
 
-Known issues are listed in the B<README> file in the Airframe source 
+Known issues are listed in the B<README> file in the Airframe source
 distribution. Note that Airframe should be considered alpha-quality software;
-not  every concievable input and aggregation is exhaustively tested at each 
-release, and specific features may be completely untested. Please be mindful 
-of this before deploying Airframe in production environments. Bug reports and 
+not  every concievable input and aggregation is exhaustively tested at each
+release, and specific features may be completely untested. Please be mindful
+of this before deploying Airframe in production environments. Bug reports and
 feature requests may be sent via email to E<lt>netsa-help@cert.orgE<gt>.
 
 =head1 AUTHORS
 
-Tony Cebzanov and  Brian Trammell for 
+Tony Cebzanov and  Brian Trammell for
 the CERT Network Situational  Awareness
 Group, http://www.cert.org/netsa
 
@@ -185,4 +185,3 @@ Group, http://www.cert.org/netsa
 glob(3), airdaemon(1)
 
 =cut
-

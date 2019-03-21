@@ -3,7 +3,7 @@ dnl ------------------------------------------------------------------------
 dnl configure.in
 dnl autotools build system for YAF applications
 dnl ------------------------------------------------------------------------
-dnl Copyright (C) 2005-2018 Carnegie Mellon University. All Rights Reserved.
+dnl Copyright (C) 2005-2019 Carnegie Mellon University. All Rights Reserved.
 dnl ------------------------------------------------------------------------
 dnl Authors: Brian Trammell
 dnl ------------------------------------------------------------------------
@@ -13,9 +13,9 @@ dnl ------------------------------------------------------------------------
 
 dnl RCSIDENT("$Id$")
 
-AC_INIT([yaf], [2.10.0], [netsa-help@cert.org],[yaf])
+AC_INIT([yaf], [2.11.0], [netsa-help@cert.org],[yaf])
 AC_CONFIG_AUX_DIR([autoconf])
-AC_COPYRIGHT([Copyright (C) 2006-2017 by Carnegie Mellon University
+AC_COPYRIGHT([Copyright (C) 2006-2019 by Carnegie Mellon University
 GNU Public License (GPL) Rights pursuant to Version 2, June 1991
 Government Purpose License Rights (GPLR) pursuant to DFARS 252.227-7013])
 AC_CANONICAL_BUILD
@@ -263,14 +263,14 @@ dnl Check for libfixbuf
 dnl when changing the version number required, do both the subst, and
 dnl package lines!
 dnl ----------------------------------------------------------------------
-AC_SUBST(YAF_REQ_FIXBUF_VER, [2.0.0])
-PKG_CHECK_MODULES(libfixbuf, [libfixbuf >= 2.0.0 libfixbuf < 3.0.0],
+AC_SUBST(YAF_REQ_FIXBUF_VER, [2.3.0])
+PKG_CHECK_MODULES(libfixbuf, [libfixbuf >= 2.3.0 libfixbuf < 3.0.0],
                   [
                     YF_PKGCONFIG_VERSION(libfixbuf)
                     YF_PKGCONFIG_LPATH(libfixbuf)
                     OPTION_CONFIG_STRING=${OPTION_CONFIG_STRING}"fixbuf "${yfpkg_ver}" "${yfpkg_lpath}"|"
                   ],
-                  [AC_MSG_ERROR([Cannot find a suitable libfixbuf (>= 2.0.0) (Try setting PKG_CONFIG_PATH): $libfixbuf_PKG_ERRORS])
+                  [AC_MSG_ERROR([Cannot find a suitable libfixbuf (>= 2.3.0) (Try setting PKG_CONFIG_PATH): $libfixbuf_PKG_ERRORS])
 ])
 YF_PKGCONFIG_VERSION(libfixbuf)
 fixbuf_install_loc=`$PKG_CONFIG --variable=prefix libfixbuf`
@@ -282,7 +282,7 @@ fixbuf_version=$yfpkg_ver
 
 AC_ARG_ENABLE(ndpi,
         AS_HELP_STRING([--enable-ndpi], [Enable NDPI application labeling]),[
-        PKG_CHECK_MODULES(libndpi, [libndpi >= 1.7.0 libndpi < 1.8.0],
+        PKG_CHECK_MODULES(libndpi, [libndpi >= 2.0 ],
         [
         YF_PKGCONFIG_VERSION(libndpi)
         YF_PKGCONFIG_LPATH(libndpi)
@@ -290,7 +290,7 @@ AC_ARG_ENABLE(ndpi,
         AC_DEFINE(YAF_ENABLE_NDPI, 1, [Define to 1 to enable ndpi])
         ],
         [
-        AC_MSG_ERROR([Cannot find a suitable libndpi (>= 1.7.0 and < 1.8.0) (Try setting PKG_CONFIG_PATH): $libndpi_PKG_ERRORS])
+        AC_MSG_ERROR([Cannot find a suitable libndpi (>= 2.0 ) (Try setting PKG_CONFIG_PATH): $libndpi_PKG_ERRORS])
 ])])
 
 dnl ----------------------------------------------------------------------

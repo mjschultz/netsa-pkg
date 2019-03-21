@@ -3,14 +3,14 @@
  ** Autotools-happy standard library include file
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2005-2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2005-2019 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell
  ** ------------------------------------------------------------------------
  ** @OPENSOURCE_LICENSE_START@
  ** libfixbuf 2.0
  **
- ** Copyright 2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
  **
  ** NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
  ** ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -46,7 +46,7 @@
 
 #ifdef _FIXBUF_SOURCE_
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include <fixbuf/config.h>
 #endif
 #endif
 
@@ -68,24 +68,7 @@
 #include <netdb.h>
 
 #include <glib.h>
-#if GLIB_CHECK_VERSION(2,6,0)
-#  include <glib/gstdio.h>
-#else
-#define g_debug(...)    g_log (G_LOG_DOMAIN,         \
-                               G_LOG_LEVEL_DEBUG,    \
-                               __VA_ARGS__)
-#endif
-
-#ifdef _FIXBUF_SOURCE_
-#if !GLIB_CHECK_VERSION(2,10,0)
-#define g_slice_new0(_t_) g_new0(_t_, 1)
-#define g_slice_alloc0(_s_) g_malloc0(_s_)
-#define g_slice_alloc(_s_) g_malloc(_s_)
-#define g_slice_new(_t_) g_new(_t_, 1)
-#define g_slice_free(_t_, _p_) g_free(_p_)
-#define g_slice_free1(_s_, _p_) g_free(_p_)
-#endif
-#endif
+#include <glib/gstdio.h>
 
 #if HAVE_OPENSSL
 #include <openssl/bio.h>

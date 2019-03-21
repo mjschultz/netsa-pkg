@@ -3,14 +3,14 @@
  ** fixbuf IPFIX Implementation Public Interface
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2019 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell, Dan Ruef
  ** ------------------------------------------------------------------------
  ** @OPENSOURCE_LICENSE_START@
  ** libfixbuf 2.0
  **
- ** Copyright 2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
  **
  ** NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
  ** ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -51,48 +51,59 @@
  * defined in "Information Model for IP Flow Information Export"
  * ([RFC 7012][]), extended as proposed by "Bidirectional Flow Export using
  * IPFIX" ([RFC 5103][]) to support information elements for representing
- * biflows.
+ * biflows.  libfixbuf supports structured data elements as described
+ * in "Export of Structured Data in IPFIX" ([RFC 6313][]), which adds the
+ * ability to export basicLists, subTemplateLists, and subTemplateMultiLists.
+ * libfixbuf can export type information for IPFIX
+ * elements as described in "Exporting Type Information for IPFIX Information
+ * Elements" ([RFC 5610][]), and it supports reading this information.
  *
  * libfixbuf supports UDP, TCP, SCTP, TLS over TCP, and Spread as transport
  * protocols. Support for DTLS over UDP and DTLS over SCTP is forthcoming.
  * It also supports operation as an IPFIX File Writer or IPFIX File Reader as
- * defined in "An IPFIX-Based File Format" (draft-trammell-ipfix-file, current
- * revision -05).
- *
- * As of version 1.0, libfixbuf supports structured data elements as described
- * in "Export of Structured Data in IPFIX" ([RFC 6313][]).  This adds the
- * ability to export basicLists, subTemplateLists, and subTemplateMultiLists.
- *
- * libfixbuf version 1.4 adds support for exporting type information for IPFIX
- * elements as described in "Exporting Type Information for IPFIX Information
- * Elements" ([RFC 5610][]).  This expands the definition of an Information
- * Element in the Information Model.  In addition to the PEN, length, name,
- * and ID, an Information Element can also have a data type, description,
- * range, semantics, and units.
+ * defined in "Specification of the IPFIX File Format" ([RFC 5655][]).
  *
  * libfixbuf's public API is defined in public.h; see the \ref How-To section
  * or public.h for general documentation on getting started with libfixbuf, as
  * well as detailed documentation on the public API calls and data types.
  *
- * [RFC 7011]: https://tools.ietf.org/html/rfc7011
- * [RFC 7012]: https://tools.ietf.org/html/rfc7012
- * [RFC 5103]: https://tools.ietf.org/html/rfc5103
- * [RFC 6313]: https://tools.ietf.org/html/rfc6313
- * [RFC 5610]: https://tools.ietf.org/html/rfc5610
+ * [ipfixDump][] is a command line tool for printing the contents of
+ * an IPFIX file as text.  As of libfixbuf-2.3.0, ipfixDump is
+ * distributed with libfixbuf.  (Previously it was distributed with
+ * [YAF][].)
+ *
+ * A Python API to libfixbuf is available in the [pyfixbuf][] package,
+ * distributed separately.
+ *
+ * [RFC 5103]:  https://tools.ietf.org/html/rfc5103
+ * [RFC 5610]:  https://tools.ietf.org/html/rfc5610
+ * [RFC 5655]:  https://tools.ietf.org/html/rfc5655
+ * [RFC 6313]:  https://tools.ietf.org/html/rfc6313
+ * [RFC 7011]:  https://tools.ietf.org/html/rfc7011
+ * [RFC 7012]:  https://tools.ietf.org/html/rfc7012
+ * [YAF]:       https://tools.netsa.cert.org/YAF/index.html
+ * [ipfixDump]: https://tools.netsa.cert.org/fixbuf/ipfixDump.html
+ * [pyfixbuf]:  https://tools.netsa.cert.org/pyfixbuf/index.html
  *
  * @section Downloading
  *
- * libfixbuf is distributed from http://tools.netsa.cert.org/fixbuf
+ * libfixbuf is distributed from
+ * https://tools.netsa.cert.org/fixbuf/download.html
  *
  * @section Building
  *
  * libfixbuf uses a reasonably standard autotools-based build system.
- * The customary build procedure (<tt>./configure && make
- * && make install</tt>) should work in most environments.
+ * The customary build procedure (`./configure && make && make install`)
+ * should work in most environments.
  *
- * libfixbuf requires glib-2.0 version 2.18 or later. glib is available on
- * most modern Linux distributions and BSD ports collections, or in source
- * form from <a href="http://www.gtk.org">http://www.gtk.org</a>.
+ * The ipfixDump application, its manual page, and a support file
+ * (`cert_ipfix.xml`) are built and installed by default (as of
+ * libfixbuf-2.3.0).  Use --disable-tools to bulid and install the libfixbuf
+ * library only.
+ *
+ * libfixbuf requires [GLib-2.0][] version 2.18 or later. GLib is available on
+ * most modern Linux distributions and BSD ports collections or in
+ * [source form][].
  *
  * libfixbuf automatically uses the getaddrinfo(3) facility and the
  * accompanying dual IPv4/IPv6 stack support if present. getaddrinfo(3)
@@ -108,34 +119,34 @@
  * option must be given to the libfixbuf ./configure script to include TLS
  * support.
  *
- * Spread support requires <a href="http://www.spread.org">Spread</a> 4.1 or
+ * Spread support requires [Spread][] 4.1 or
  * later. libfixbuf does not build with Spread support by default.
  * The --with-spread option must be given to libfixbuf ./configure script to
  * include Spread support.
+ *
+ * [GLib-2.0]:     https://developer.gnome.org/glib/stable/
+ * [Spread]:       http://www.spread.org/
+ * [source form]:  https://download.gnome.org/sources/glib/
  *
  * @section Known Issues
  *
  * The following are known issues with libfixbuf as of version 1.0.0:
  *
- * <ul>
- * <li>There is no support for DTLS over UDP or DTLS over SCTP transport.</li>
- * <li>There is no support for application-selectable SCTP stream assignment
+ *   - There is no support for DTLS over UDP or DTLS over SCTP transport.
+ *   - There is no support for application-selectable SCTP stream assignment
  *     or SCTP partial reliability. Templates are sent reliably on stream 0,
  *     and data sets are sent reliably on stream 1.
- * </li>
- * <li>There is no automatic support for periodic template retransmission
+ *   - There is no automatic support for periodic template retransmission
  *     or periodic template expiration as required when transporting IPFIX
  *     over UDP. Applications using libfixbuf to transport IPFIX messages
  *     over UDP must maintain these timeouts and manually manage the session.
  *     However, inactive UDP collector sessions are timed out after 30 minutes,
  *     at which time the session is freed and all templates associated with the
  *     session are removed.
- * </li>
- * </ul>
  *
  * @section Copyright
  *
- * libfixbuf is copyright 2005-2018 Carnegie Mellon University, and is released
+ * libfixbuf is copyright 2005-2019 Carnegie Mellon University, and is released
  * under the GNU Lesser General Public License (LGPL) Version 3.
  * See the LICENSE.txt file in the distribution for details.
  *
@@ -152,7 +163,7 @@
  * Include fixbuf/public.h
  * in order to use the public fixbuf API.
  *
- * This documentation uses IPFIX terminology as defined in RFC 7011,
+ * This documentation uses IPFIX terminology as defined in [RFC 7011][],
  * "Specification of the IPFIX Protocol for the Exchange of Flow
  * Information"
  *
@@ -175,18 +186,18 @@
  * Exporting Process and IPFIX Collecting Process creation. Each data type is
  * manipulated primarily by routines named "fb" followed by the type name
  * (e.g., "Session", "Collector") followed by a description of the routine's
- * action. The routines operating on the fBuf_t IPFIX Mesaage buffer type are
+ * action. The routines operating on the fBuf_t IPFIX Message buffer type are
  * named beginning with "fBuf".
  *
- * The fBuf_t opaque type implements a transcoding IPFIX Message buffer for
- * both export and collection, and is the "core" interface to the fixbuf
+ * The @ref fBuf_t opaque type implements a transcoding IPFIX Message buffer
+ * for both export and collection, and is the "core" interface to the fixbuf
  * library.
  *
- * The fbInfoModel_t opaque type implements an IPFIX Information Model,
- * including both IANA managed Information Elements and vendor-specific
- * Information Elements. The fbTemplate_t opaque type implements an IPFIX
+ * The @ref fbInfoModel_t opaque type implements an IPFIX Information Model,
+ * including both [IANA managed][] Information Elements and vendor-specific
+ * Information Elements. The @ref fbTemplate_t opaque type implements an IPFIX
  * Template or an IPFIX Options Template. Both are defined in terms of
- * Information Elements, represented by the fbInfoElement_t public type.
+ * Information Elements, represented by the @ref fbInfoElement_t public type.
  * An fBuf_t message buffer maintains internal Templates, which represent
  * records within the fixbuf application client, and external Templates,
  * which represent records as they appear on the wire, for use during
@@ -195,25 +206,28 @@
  *
  * The state of an IPFIX Transport Session, including IPFIX Message Sequence
  * Number tracking and the internal and external Templates in use within the
- * Session, are maintained by the fbSession_t opaque type.
+ * Session, are maintained by the @ref fbSession_t opaque type.
  *
- * An Exporting Process' connection to its corresponding Collecting Process
- * is encapsulated by the fbExporter_t opaque type. Exporters may be created
+ * An Exporting Process' connection to its corresponding Collecting Process is
+ * encapsulated by the @ref fbExporter_t opaque type. Exporters may be created
  * to connect via the network using one of the supported IPFIX transport
  * protocols, or to write to IPFIX Files specified by name or by open ANSI C
  * file pointer.
  *
  * A Collecting Process' connection to a corresponding Exporting Process is
- * encapsulated by the fbCollector_t opaque type. The passive connection used
- * to listen for connections from Exporting Processes is managed by the
- * fbListener_t opaque type; Collectors can be made to read from IPFIX Files
- * specified directly by name or by open ANSI C file pointer, as well.
+ * encapsulated by the @ref fbCollector_t opaque type. The passive connection
+ * used to listen for connections from Exporting Processes is managed by the
+ * @ref fbListener_t opaque type; Collectors can be made to read from IPFIX
+ * Files specified directly by name or by open ANSI C file pointer, as well.
  *
  * Network addresses are specified for Exporters, Collectors, and Listeners
- * using the fbConnSpec_t and fbTransport_t public types.
+ * using the @ref fbConnSpec_t and @ref fbTransport_t public types.
  *
  * This file also defines the GError error codes used by all the fixbuf types
  * and routines within the FB_ERROR_DOMAIN domain.
+ *
+ * [IANA managed]: https://www.iana.org/assignments/ipfix/ipfix.xhtml
+ * [RFC 7011]:     https://tools.ietf.org/html/rfc7011
  *
  * @page export Exporter Usage
  *
@@ -304,7 +318,7 @@
  *
  * Listening over the Network - TCP Recommended:
  *
- * An additional type, fbListener_t, is used to build Collecting Processes
+ * An additional type, @ref fbListener_t, is used to build Collecting Processes
  * to listen for connections from IPFIX Exporting Processes via the network.
  * To use a listener, first create an fbInfoModel_t using fbInfoModelAlloc()
  * and any additional, vendor-specific information elements using
@@ -331,7 +345,8 @@
  * again.  If the application is expecting multiple connections or IPFIX
  * records from multiple IPFIX (UDP) exporters, then the application should
  * put the fBuf_t returned from fbListenerWait() into to manual mode by
- * calling fBufSetAutomaticMode(fbuf, FALSE) and handle FB_ERROR_EOM errors
+ * calling fBufSetAutomaticMode() with FALSE as the second argument and
+ * handle FB_ERROR_EOM errors
  * returned from fBufNext() by calling fbListenerWait() again.
  *
  * Each listener tracks every active collector/buffer (i.e., each active
@@ -365,15 +380,15 @@
  * one for it.
  *
  * To reject incoming connections, the application should use the
- * fbListenerAppInit function callback.  This will be called right after
- * accept() is called (in the TCP case).  The application can veto the
+ * @ref fbListenerAppInit_fn function callback.  This will be called right
+ * after accept() is called (in the TCP case).  The application can veto the
  * connection by returning FALSE.  Once the connection is vetoed, fixbuf
  * will not listen on that socket descriptor.
  * If the appinit() function should reject a connection the application
  * should set the error code to FB_ERROR_NLREAD and the application should
  * ignore FB_ERROR_NLREAD error codes.  The appinit() function works slightly
- * different for UDP.  See the udp instructions for how to use appinit() for
- * collecting IPFIX over UDP.
+ * different for UDP.  See the @ref udp "UDP instructions" for how to use
+ * appinit() for collecting IPFIX over UDP.
  *
  * @page udp UDP Collectors
  *
@@ -382,7 +397,7 @@
  * It is not recommended to use UDP for IPFIX transport, since
  * UDP is not a reliable transport protocol, and therefore cannot guarantee
  * the delivery of messages.  libfixbuf stores sequence numbers and reports
- * protential loss of messages.  Templates over UDP must be re-sent at regular
+ * potential loss of messages.  Templates over UDP must be re-sent at regular
  * intervals.  Fixbuf does not automatically retransmit messages at regular
  * intervals, it is left to the application author to call
  * fbSessionExportTemplates().  In accordance with RFC 7011, the templates
@@ -398,10 +413,11 @@
  * are unique per UDP session (IP and Observation Domain.) Once
  * templates are refreshed, old templates may not be used or referenced by
  * the collecting session.  A UDP collector manages multiple sessions on
- * one collector and fbuf.  If the application is using the fbListenerAppInit
- * and fbListenerAppFree functions to maintain context per session, it is
+ * one collector and fBuf.  If the application is using the @ref
+ * fbListenerAppInit_fn and @ref fbListenerAppFree_fn functions to maintain
+ * context per session, it is
  * necessary to call fbCollectorGetContext() after each call to fBufNext() to
- * receive the correct ctx pointer (as opposed to calling it after
+ * receive the correct context pointer (as opposed to calling it after
  * fbListenerWait() returns in the TCP case).  If the application needs to
  * manage context PER SESSION, the application must turn on multi-session mode
  * w/ fbCollectorSetUDPMultiSession() (this allows for backwards compatibility
@@ -413,7 +429,7 @@
  * veto power over session creation.  If the application does not call
  * fbCollectorSetUDPMultiSession(), the application will not receive the
  * callback to it's appinit() function, which only allows the application
- * to set one ctx pointer on all sessions.  Likewise, appfree() is only
+ * to set one context pointer on all sessions.  Likewise, appfree() is only
  * called once, when the collector is freed, if not in multi-session mode.
  * If the application is in multi-session mode, appfree() will be called
  * once for each session when the collector is freed AND anytime a session
@@ -440,8 +456,9 @@
  *
  * How-To use libfixbuf as a NetFlow v9 Collector:
  *
- * libfixbuf can be used as a NetFlow v9 collector and convert NetFlow to
- * IPFIX.  Follow the steps above to create an fbListener.  After creating
+ * libfixbuf can be used as a [NetFlow v9][] collector and convert NetFlow to
+ * IPFIX.  Follow the @ref udp "steps above" to create an fbListener.
+ * After creating
  * the listener, retrieve the collector by calling fbListenerGetCollector()
  * before calling fbCollectorSetNetflowV9Translator().  Fixbuf can decode all
  * NetFlow v9 information elements up to 346.  Since fixbuf removes the
@@ -471,7 +488,7 @@
  * should use the messageScope Information Element and use the length
  * override (the default length for messageScope is 1).
  *
- * libfixbuf differentiates Netflow v9 streams by IP and observation domain.
+ * libfixbuf differentiates NetFlow v9 streams by IP and observation domain.
  * If no activity is seen from a NetFlow v9 exporter within 30 minutes, the
  * session and all the templates associated with it will be freed. It is best
  * to set the template timeout period on the device to under 30 minutes.
@@ -489,12 +506,15 @@
  * messages, run `make clean`, `CFLAGS="-DFB_SUPPRESS_LOGS=1" make -e`,
  * `make install` when installing libfixbuf.
  *
+ * [NetFlow v9]: https://tools.ietf.org/html/rfc3954
+ *
  * @page sflow sFlow Collectors
  *
  * How to use libfixbuf to collect sFlow v5
  *
  * libfixbuf can be used to collect sFlow and convert sFlow to
- * IPFIX.  Follow the steps above to create an fbListener.  After creating
+ * IPFIX.  Follow the @ref udp "steps above" to create an fbListener.
+ * After creating
  * the listener, retrieve the collector by calling fbListenerGetCollector()
  * before calling fbCollectorSetSFlowTranslator().  Essentially, the libfixbuf
  * translator is an IPFIX mediator which converts sFlow to IPFIX.  sFlow v5 is
@@ -606,24 +626,25 @@
  * selectorId | Message Header Data | 4
  *
  *
- * fbCollectorSFlowMissed() can be used to retrieve the number of
+ * fbCollectorGetSFlowMissed() can be used to retrieve the number of
  * potential missed export packets.  This is not the number of FLOW samples
  * that the collector has missed.  Fixbuf
  * tries to account for any reboot of the device and not count large
  * sequence number discrepancies in it's missed count.
  *
  * Fixbuf will return FB_ERROR_SFLOW if it tries to process any
- *  malformed samples.
+ * malformed samples.
  *
  * @page spread Spread Collectors
  *
  * How-To use the Spread Protocol:
  *
- * The instructions for using Spread in libfixbuf are similar to the
- * setup for reading from IPFIX files.  As described above in the Exporters
+ * The instructions for using [Spread][] in libfixbuf are similar to the
+ * setup for reading from IPFIX files.  As described above in the @ref export
+ * "Exporters"
  * section, the first step is to create an fbInfoModel_t and fbSession_t.
  * Next, create the internal template(s) and add it to the fbSession_t.
- * Define an fbSpreadParams_t and set the session, groups to subscribe to,
+ * Define an @ref fbSpreadParams_t and set the session, groups to subscribe to,
  * and Spread Daemon name.
  *     Example usage:
  *     \code{.c}
@@ -640,13 +661,15 @@
  * Then create an fbCollector_t to connect and listen to the Spread Daemon
  * using fbCollectorAllocSpread().
  *
- * With an fbSession_t and fbcollector_t available, create a buffer for
+ * With an fbSession_t and fbCollector_t available, create a buffer for
  * writing via fBufAllocForCollection().  Set the internal template ID with
  * fBufSetInternalTemplate(), and use fBufNext() to read records from IPFIX
  * Messages published to the group your collector is subscribing to.
  *
  * To view all the Spread Groups that were sent the incoming record, call
  * fbCollectorGetSpreadReturnGroups() on the collector.
+ *
+ * [Spread]:  http://www.spread.org/
  *
  * @page noconnect Connection-less Collector
  *
@@ -678,7 +701,7 @@
  * calling fBufSetBuffer(). The application will continue to call fBufNext()
  * to receive the data records until fBufNext() returns FALSE with error
  * code FB_ERROR_BUFSZ.  However, if the fBuf is in manual mode
- * fbufSetAutomaticMode(buf, FALSE) AND the application was reading the
+ * (see fBufSetAutomaticMode()) AND the application was reading the
  * message length, fixbuf will first return an FB_ERROR_EOM which will
  * signal to the application to perform another read (if the application
  * ignores FB_ERROR_EOM errors and calls fBufNext(), fBufNext() will then
@@ -705,7 +728,7 @@
  *     - If the length in the header < 16
  *  - FB_ERROR_EOM
  *     - If the application read only the message length and the application
- *       called fBufSetAutomatic(fbuf, FALSE) (the fBuf is in manual mode).
+ *       called fBufSetAutomaticMode(fbuf, FALSE) (the fBuf is in manual mode).
  *       This means the remaining buffer length == 0 and the application
  *       should clear the error and perform another read
  *  - FB_ERROR_BUFSZ
@@ -720,15 +743,14 @@
  *        FILE *fp;
  *        uint8_t buf[65535];
  *        ...
- *        rc = fread(buf, 1, 4, fp);
- *        if (rc > 0) {
+ *        while (fread(buf, 1, 4, fp) == 4) {
  *           len = ntohs(*((uint16_t *)(buf+2)));
  *           rc = fread(buf+4, 1, len-4, fp);
  *           if (rc > 0) {
  *               fBufSetBuffer(fbuf, buf, rc+4);
  *           } else if (feof(fp))
  *           ....
- *           while (1) {
+ *           for (;;) {
  *               ret = fBufNext(fbuf, (uint8_t *)rec, &len, &err);
  *               if (FALSE == ret) {
  *                  if (g_error_matches(err, FB_ERROR_DOMAIN, FB_ERROR_BUFSZ)){
@@ -738,6 +760,7 @@
  *                  }
  *               }
  *            }
+ *        }
  *      \endcode
  *
  * @page lists Lists in IPFIX
@@ -754,7 +777,7 @@
  * template.  Each of the templates in the list are treated as equals.
  *
  * The collector does not learn which template or information element is nested
- * until the data arrives.  This requires flexbility in the collectors to
+ * until the data arrives.  This requires flexibility in the collectors to
  * handle each of the possible results.
  *
  * @subsection internalTemplates Internal Templates for Sub Templates
@@ -775,11 +798,14 @@
  * Because the external template IDs are only unique for that session, the
  * collector must know the IDs of the templates that are collected in order to
  * pair an internal template with the external template.  As a result, callback
- * functionality has been added to fixbuf to alert the user when a new external
+ * functionality may be enabled (via  fbSessionAddNewTemplateCallback())
+ * to alert the user when a new external
  * template has arrived.  The callback functions are stored in the session
- * structure, which manages the templates.  fbNewTemplateCallback_fn gives the
- * application the session pointer, the template, the template ID, as well as a
- * context variable that is stored for the application in the template.  The
+ * structure, which manages the templates.  The callback function,
+ * @ref fbNewTemplateCallback_fn, receives the session
+ * pointer, the template, the template ID, a context pointer for the
+ * application to use, and the location in which to store the template's
+ * context variable.  The
  * callback also gives the user another callback that can be used to free the
  * context variable upon template deletion.  This information is sufficient for
  * the application to successfully add template pairs to the session for sub
@@ -818,25 +844,27 @@
  *
  *
  * @subsection iterating Iterating Over the Lists
- * There are four scenerios in which the user needs to iterate through the
+ * There are four scenarios in which the user needs to iterate through the
  * elements in a list, whether to fill in, or process the data:
  *  -#  Iterating over the repeated information element data in a basic list
  *  -#  Iterating over the decoded data elements in a sub template list
  *  -#  Iterating over the entries that make up a sub template multi list
- *  -#  Iterating over the docoded data elements in an entry of a sub template
+ *  -#  Iterating over the decoded data elements in an entry of a sub template
  *      multi list
  * The two iterating mechanisms are the same in each case:
  * Each of the function names start with the structure being iterated over,
  * e.g., fbBasicList, or fbSubTemplateMultiListEntry
- *  -#  Indexing
- *      The function used here is (structName)GetIndexed(dataPtr or entry)()
- *      It takes a pointer to the struct, and the index to be retrieved.
- *      Example usage:
+ *  -# Indexing
+ *     The function used here is (structName)GetIndexed(dataPtr or entry)()
+ *     It takes a pointer to the struct, and the index to be retrieved.
+ *     Example usage:
+ *     \code{.c}
  *          for(i = 0; myStructPtr = ...GetIndexedDataPtr(listPtr, i); i++) {
  *              process the data that myStructPtr points to.
  *          }
- *          The loop will end because when i is passed the bounds of the list
- *          the GetIndexedDataPtr() returns NULL.
+ *      \endcode
+ *     The loop will end when the function returns NULL because
+ *     i is beyond the end of the list.
  *
  *  -# Incrementing
  *     The function used here is (structName)GetNext(dataPtr or entry)()
@@ -844,14 +872,14 @@
  *     list.  Pass in NULL at the beginning to get the first element back.
  *     Example usage:
  *     \code{.c}
- *       myStructPtr = NULL;
+ *          myStructPtr = NULL;
  *          while(myStructPtr = ...GetNextPtr(listPtr, myStructPtr)) {
  *              process the data that myStructPtr points to.
  *          }
  *      \endcode
- *     The loop will end because the function will return NULL when
+ *     The loop will end when the function returns NULL because
  *     it gets passed the end of the list.  A key part here is
- *     initializing myStructPtr to NULL at the beginning!
+ *     initializing myStructPtr to NULL at the beginning.
  *
  * @page rfc_5610 RFC 5610
  *
@@ -884,7 +912,7 @@
  * two ways to export that information.  The simplest way is to
  * configure automated enterprise-specific information element
  * information export.  This is done by calling
- * fbSessionEnableTypeMetadata() with the `enabled` parameter set to
+ * fbSessionSetMetadataExportElements() with the `enabled` parameter set to
  * `TRUE`.  Once this has been set, the full set of information
  * elements in the information model that have a non-zero Private
  * Enterprise Number will be exported every time template records are
@@ -896,14 +924,13 @@
  * option template that contains all of the necessary properties to
  * define an Information Element:
  *
- * - informationElementRangeBegin
- * - informationElementRangeEnd
  * - privateEnterpriseNumber
- * - informationElementUnits
  * - informationElementId
  * - informationElementDataType
  * - informationElementSemantics
- * - paddingOctets
+ * - informationElementUnits
+ * - informationElementRangeBegin
+ * - informationElementRangeEnd
  * - informationElementName
  * - informationElementDescription
  *
@@ -925,14 +952,16 @@
  * @section col RFC 5610 - Collector Usage
  *
  * In order to collect the above Options records, the collecting
- * process can manually define the above Options Template and
- * provide a template callback function to collect and add
- * each element to the Information Model using
- * fbInfoElementAddOptRecElement() and fbInfoModelTypeInfoRecord().
- *
- * OR - the collector can simply use fBufSetAutomaticInsert()
+ * process may use fBufSetAutomaticInsert()
  * after creating an fBuf to automatically insert any information
  * elements into the Information Model.
+ *
+ * Alternatively, the collecting process may manually define the above Options
+ * Template and provide a template callback function (via
+ * fbSessionAddNewTemplateCallback()) to collect and add each element to the
+ * Information Model using fbInfoElementAddOptRecElement() and
+ * fbInfoModelTypeInfoRecord().
+ *
  *
  */
 
@@ -946,7 +975,7 @@
 #ifndef _FB_PUBLIC_H_
 #define _FB_PUBLIC_H_
 #include <fixbuf/autoinc.h>
-#include "version.h"
+#include <fixbuf/version.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -983,7 +1012,7 @@ extern "C" {
  */
 #define FB_ERROR_EOF                3
 /**
- * Illegal IPFIX mesaage content on read. The input stream is malformed, or
+ * Illegal IPFIX message content on read. The input stream is malformed, or
  * is not an IPFIX Message after all.
  */
 #define FB_ERROR_IPFIX              4
@@ -1042,7 +1071,6 @@ extern "C" {
  * Public Datatypes and Constants
  */
 
-struct fBuf_st;
 /**
  * An IPFIX message buffer. Used to encode and decode records from
  * IPFIX Messages. The internals of this structure are private to
@@ -1069,7 +1097,6 @@ typedef struct fbVarfield_st {
 } fbVarfield_t;
 
 
-struct fbInfoModel_st;
 /**
  * An IPFIX information model. Contains information element definitions.
  * The internals of this structure are private to libfixbuf.
@@ -1079,36 +1106,28 @@ typedef struct fbInfoModel_st fbInfoModel_t;
 /**
  * An iterator over the information elements in an information model.
  */
-typedef struct fbInfoModelIter_st {
-    /**
-     * information Model
-     */
-    const fbInfoModel_t *model;
-    /**
-     * iterator index
-     */
-    guint                index;
-} fbInfoModelIter_t;
+typedef GHashTableIter fbInfoModelIter_t;
 
 /**
- * Convenience macro for creating full fbInfoElement_t static initializers.
- * Used for creating information element arrays suitable for passing to
- * fbInfoModelAddElementArray().
+ * Convenience macro for creating full @ref fbInfoElement_t static
+ * initializers.  Used for creating information element arrays suitable for
+ * passing to fbInfoModelAddElementArray().
  */
 #define FB_IE_INIT_FULL(_name_, _ent_, _num_, _len_, _flags_, _min_, _max_, _type_, _desc_)\
     { {(const struct fbInfoElement_st*)_name_}, 0, _ent_, _num_, _len_, _flags_, _min_, _max_, _type_, _desc_ }
 
 /**
- * @deprecated Convenience macro for creating default fbInfoElement_t
+ * Convenience macro for creating default @ref fbInfoElement_t
  * static initializers.  Used for creating information element arrays
  * suitable for passing to fbInfoModelAddElementArray().
+ * @deprecated Use @ref FB_IE_INIT_FULL instead.
  */
 #define FB_IE_INIT(_name_, _ent_, _num_, _len_, _flags_) \
     FB_IE_INIT_FULL(_name_, _ent_, _num_, _len_, _flags_, 0, 0, 0, (char*)NULL)
 
 
 /**
- * Convenience macro defining a null information element initializer to
+ * Convenience macro defining a null @ref fbInfoElement_t initializer to
  * terminate a constant information element array for passing to
  * fbInfoModelAddElementArray().
  */
@@ -1116,15 +1135,16 @@ typedef struct fbInfoModelIter_st {
 
 /**
  * Convenience macro for extracting the information element
- * semantic value from the flags variable in the fbInfoElement_t struct
+ * semantic value from the flags member of the @ref fbInfoElement_t struct.
+ * See https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-information-element-semantics
  *
  */
 #define FB_IE_SEMANTIC(flags) ((flags & 0x0000ff00) >> 8)
 
 /**
  * Convenience macro for extracting the information element
- * units value from the flags variable in the fbInfoElement_t struct
- *
+ * units value from the flags member of the @ref fbInfoElement_t struct.
+ * See https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-information-element-units.
  */
 #define FB_IE_UNITS(flags) ((flags & 0xFFFF0000) >> 16)
 
@@ -1135,29 +1155,32 @@ typedef struct fbInfoModelIter_st {
 #define FB_IE_F_NONE                            0x00000000
 
 /**
- * Information element endian conversion flag. If set, IE is an integer and
- * will be endian-converted on transcode.
+ * Information element endian conversion bit in the flags member of @ref
+ * fbInfoElement_t. If set, IE is an integer and will be endian-converted on
+ * transcode.
  */
 #define FB_IE_F_ENDIAN                          0x00000001
 
 /**
- * Information element reversible flag.  Adding the information
+ * Information element reversible bit in the flags member of @ref
+ * fbInfoElement_t.  Adding the information
  * element via fbInfoModelAddElement() or fbInfoModelAddElementArray()
  * will cause a second, reverse information element to be added to the
  * model following the conventions in IETF RFC 5103.  This means that,
- * it there is no enterprise number, the reverse element will get an
- * enterprise number of FB_IE_PEN_REVERSE, and if there is an
+ * if there is no enterprise number, the reverse element will get an
+ * enterprise number of @ref FB_IE_PEN_REVERSE, and if there is an
  * enterprise number, the reverse element's numeric identifier will
- * get the FB_IE_VENDOR_BIT_REVERSE bit set.
+ * have its @ref FB_IE_VENDOR_BIT_REVERSE bit set.
  */
 #define FB_IE_F_REVERSIBLE                      0x00000040
 
 /**
- * Information element alien flag. If set, IE is enterprise-specific and was
- * recieved via an external template at a Collecting Process. It is therefore
- * subject to semantic typing via options (not yet implemented). Do not set this
- * flag on information elements added programmatically to an information model
- * via fbInfoModelAddElement() or fbInfoModelAddElementArray().
+ * Information element alien bit in the flags member of @ref
+ * fbInfoElement_t. If set, IE is enterprise-specific and was recieved via an
+ * external template at a Collecting Process. It is therefore subject to
+ * semantic typing via options (not yet implemented). Do not set this flag on
+ * information elements added programmatically to an information model via
+ * fbInfoModelAddElement() or fbInfoModelAddElementArray().
  */
 #define FB_IE_F_ALIEN                           0x00000080
 
@@ -1322,25 +1345,37 @@ typedef struct fbInfoModelIter_st {
 #define FB_IE_VARLEN                            65535
 
 /**
- * Information element number constant for basic lists
- * This will change upon updates to the specification.
+ * Information element number constant for basic lists.
+ * This may change upon updates to the specification.
+ * @deprecated Collectors should use the `type` member of the
+ * @ref fbInfoElement_t or use fbInfoModelGetElementByName() to query the
+ * @ref fbInfoModel_t, and libfixbuf will remove this value in a future
+ * release.
  */
 #define FB_IE_BASIC_LIST                        291
 /**
- * Information element number constant for sub template lists
- * This will change upon updates to the IPFIX lists specification
+ * Information element number constant for sub template lists.
+ * This may change upon updates to the IPFIX lists specification.
+ * @deprecated Collectors should use the `type` member of the
+ * @ref fbInfoElement_t or use fbInfoModelGetElementByName() to query the
+ * @ref fbInfoModel_t, and libfixbuf will remove this value in a future
+ * release.
  */
 #define FB_IE_SUBTEMPLATE_LIST                  292
 /**
- * Information element number constant for sub template multi lists
- * This will change upon updates to the IPFIX lists specification
+ * Information element number constant for sub template multi lists.
+ * This may change upon updates to the IPFIX lists specification.
+ * @deprecated Collectors should use the `type` member of the
+ * @ref fbInfoElement_t or use fbInfoModelGetElementByName() to query the
+ * @ref fbInfoModel_t, and libfixbuf will remove this value in a future
+ * release.
 */
 #define FB_IE_SUBTEMPLATE_MULTILIST             293
 
 /**
  * Private enterprise number for reverse information elements (see RFC
  * 5103 section 6.1).  If an information element with
- * FB_IE_F_REVERSIBLE and a zero enterprise number (i.e., an
+ * @ref FB_IE_F_REVERSIBLE and a zero enterprise number (i.e., an
  * IANA-assigned information element) is added to a model, the reverse
  * IE will be generated by setting the enterprise number to this
  * constant.
@@ -1349,11 +1384,11 @@ typedef struct fbInfoModelIter_st {
 
 /**
  * Reverse information element bit for vendor-specific information elements
- * (see RFC 5103 section 6.2). If an information element with
- * FB_IE_F_REVERSIBLE and a non-zero enterprise number (i.e., a vendor-specific
- * information element) is added to a model, the reverse IE number will be
- * generated by ORing this bit with the given forward information element
- * number.
+ * (see RFC 5103 section 6.2). If an information element with @ref
+ * FB_IE_F_REVERSIBLE and a non-zero enterprise number (i.e., a
+ * vendor-specific information element) is added to a model, the reverse IE
+ * number will be generated by ORing this bit with the given forward
+ * information element number.
  */
 #define FB_IE_VENDOR_BIT_REVERSE                0x4000
 
@@ -1395,23 +1430,24 @@ typedef struct fbInfoModelIter_st {
  * From RFC 5610: A description of the abstract data type of an IPFIX
  * information element as registered in the IANA IPFIX IE Data Type
  * subregistry.
+ * https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-information-element-data-types
  */
 typedef enum fbInfoElementDataType_en {
     /** The "octetArray" data type: A finite-length string of
      *  octets. */
     FB_OCTET_ARRAY,
     /** The "unsigned8" data type: A non-negative integer value in the
-     *  range of 0 to 255 (0xff). */
+     *  range of 0 to 255 (0xFF). */
     FB_UINT_8,
     /** The "unsigned16" data type: A non-negative integer value in
-     *  the range of 0 to 65535 (0xffff). */
+     *  the range of 0 to 65535 (0xFFFF). */
     FB_UINT_16,
     /** The "unsigned32" data type: A non-negative integer value in
-     *  the range of 0 to 4_294_967_295 (0xffffffff). */
+     *  the range of 0 to 4_294_967_295 (0xFFFFFFFF). */
     FB_UINT_32,
     /** The "unsigned64" data type: A non-negative integer value in
-     *  the range of 0 to 1_844_674_407_370_955_161
-     *  (0xffffffffffffffff). */
+     *  the range of 0 to 18_446_744_073_709_551_615
+     *  (0xFFFFFFFFFFFFFFFF). */
     FB_UINT_64,
     /** The "signed8" data type: An integer value in the range of -128
      *  to 127. */
@@ -1475,10 +1511,10 @@ typedef enum fbInfoElementDataType_en {
 /**
  * A single IPFIX Information Element definition.
  * An Information Element defines the type of data in each field of
- * a record. This structure may be contained in an fbInfoModel_t,
+ * a record. This structure may be contained in an @ref fbInfoModel_t,
  * in which case the name field contians the information element name,
- * or an an fbTemplate_t, in which case the canon field references the
- * fbInfoElement_t contained within the Information Model.
+ * or an an @ref fbTemplate_t, in which case the canon field references the
+ * @ref fbInfoElement_t contained within the Information Model.
  */
 typedef struct fbInfoElement_st {
     /** Information element name. */
@@ -1525,9 +1561,27 @@ typedef struct fbInfoElement_st {
 } fbInfoElement_t;
 
 /**
- * The corresponding struct to the Information Element Type Options Template.
- * If collecting this element, use the function fbInfoElementAddOptRecElement()
- * to add this element to the info model.
+ * The corresponding C struct for a record whose template is the
+ * RFC5610 Information Element Type Options Template.
+ *
+ * If collecting this record, use the function fbInfoElementAddOptRecElement()
+ * to add the @ref fbInfoElement_t it describes to the @ref fbInfoModel_t.
+ *
+ * To export RFC5610 elements, use fbSessionSetMetadataExportElements().
+ *
+ * fbInfoElementSpec_t rfc5610_spec[] = {
+ *     {"privateEnterpriseNumber",         4, 0 },
+ *     {"informationElementId",            2, 0 },
+ *     {"informationElementDataType",      1, 0 },
+ *     {"informationElementSemantics",     1, 0 },
+ *     {"informationElementUnits",         2, 0 },
+ *     {"paddingOctets",                   6, 0 },
+ *     {"informationElementRangeBegin",    8, 0 },
+ *     {"informationElementRangeEnd",      8, 0 },
+ *     {"informationElementName",          FB_IE_VARLEN, 0 },
+ *     {"informationElementDescription",   FB_IE_VARLEN, 0 },
+ *     FB_IESPEC_NULL
+ * };
  *
  */
 typedef struct fbInfoElementOptRec_st {
@@ -1555,27 +1609,34 @@ typedef struct fbInfoElementOptRec_st {
 
 
 /**
- * Template ID argument to pass to fbSessionAddTemplate to automatically
- * assign a template ID.
+ * Template ID argument used when adding an @ref fbTemplate_t to an @ref
+ * fbSession_t that automatically assigns a template ID.
+ *
+ * Functions that accept this value include fbSessionAddTemplate(),
+ * fbSessionAddTemplatesMulticast(), and others.
+ *
+ * For internal templates, FB_TID_AUTO starts from 65535 and decrements.  For
+ * external templates, FB_TID_AUTO starts from 256 and increments.  This is to
+ * avoid inadvertant unrelated external and internal templates having the same
+ * ID.
  */
 #define FB_TID_AUTO         0
 
 /**
- * Reserved set ID for template sets.
+ * Reserved set ID for template sets, per RFC 7011.
  */
 #define FB_TID_TS           2
 
 /**
- * Reserved set ID for options template sets.
+ * Reserved set ID for options template sets, per RFC 7011.
  */
 #define FB_TID_OTS          3
 
 /**
- * Minimum non-reserved template ID available for data sets.
+ * Minimum non-reserved template ID available for data sets, per RFC 7011.
  */
 #define FB_TID_MIN_DATA     256
 
-struct fbTemplate_st;
 /**
  * An IPFIX Template or Options Template. Templates define the structure of
  * data records and options records within an IPFIX Message.
@@ -1585,15 +1646,16 @@ typedef struct fbTemplate_st fbTemplate_t;
 
 /**
  * Convenience macro defining a null information element specification
- * initializer to terminate a constant information element specifier array
- * for passing to fbTemplateAppendSpecArray().
+ * initializer (@ref fbInfoElementSpec_t) to terminate a constant information
+ * element specifier array for passing to fbTemplateAppendSpecArray().
  */
 #define FB_IESPEC_NULL { NULL, 0, 0 }
 
 /**
- * A single IPFIX Information Element specification.
- * Used to name an information element for inclusion in a template by
- * fbTemplateAppendSpecArray().
+ * A single IPFIX Information Element specification.  Used to name an
+ * information element (@ref fbInfoElement_t) for inclusion in an @ref
+ * fbTemplate_t by fbTemplateAppendSpecArray() and for querying whether a
+ * template contains an element via fbTemplateContainsElementByName().
  */
 typedef struct fbInfoElementSpec_st {
     /** Information element name */
@@ -1612,19 +1674,18 @@ typedef struct fbInfoElementSpec_st {
     uint16_t            len_override;
     /**
      * Application flags word. If nonzero, then the flags argument to
-     * fbTemplateAppendSpec() or fbTemplateAppendSpecArray() MUST match at
-     * least one bit of this flags word in order for the information element
-     * to be appended.
+     * fbTemplateAppendSpec(), fbTemplateAppendSpecArray(), or
+     * fbTemplateContainsAllFlaggedElementsByName() MUST match ALL the bits of
+     * this flags word in order for the information element to be considered.
      */
     uint32_t            flags;
 } fbInfoElementSpec_t;
 
-struct fbSession_st;
 /**
  * An IPFIX Transport Session state container. Though Session creation and
- * lifetime are managed by the fbCollector_t and fbExporter_t types, each
- * fBuf_t buffer uses this type to store session state, including internal
- * and external Templates and Message Sequence Number information.
+ * lifetime are managed by the @ref fbCollector_t and @ref fbExporter_t types,
+ * each @ref fBuf_t buffer uses this type to store session state, including
+ * internal and external Templates and Message Sequence Number information.
  */
 typedef struct fbSession_st fbSession_t;
 
@@ -1655,12 +1716,12 @@ typedef enum fbTransport_en {
      * Only available if fixbuf was built with OpenSSL support.
      * Requires OpenSSL 0.9.8 or later with DTLS support.
      */
-    FB_DTLS_UDP,
+    FB_DTLS_UDP
 } fbTransport_t;
 
 /**
- * Connection specifier. Used to define a peer address for fbExporter_t, or a
- * passive address for fbListener_t.
+ * Connection specifier. Used to define a peer address for @ref
+ * fbExporter_t, or a passive address for @ref fbListener_t.
  */
 typedef struct fbConnSpec_st {
     /** Transport protocol to use */
@@ -1690,26 +1751,30 @@ typedef struct fbConnSpec_st {
 } fbConnSpec_t;
 
 /**
- * Convenience macro defining a null static fbConnSpec_t.
+ * Convenience macro defining a null static @ref fbConnSpec_t.
  */
 #define FB_CONNSPEC_INIT { FB_SCTP, NULL, NULL,         \
                            NULL, NULL, NULL, NULL,      \
                            NULL, NULL }
 
 #if HAVE_SPREAD
+
+/**
+ * Initialization macro for @ref fbSpreadParams_t.
+ */
+#define FB_SPREADPARAMS_INIT { 0, 0, 0 }
+
 /**
  * Spread connection parameters. Used to define a spread daemon and group
  * or list of groups for spread.
  */
 
-#define FB_SPREADPARAMS_INIT { 0, 0, 0 }
-
 typedef struct fbSpreadParams_st {
     /** pointer to the session, this MUST be set to a valid session before
-    *   the spec is passed to fbExporterAllocSpread. */
+    *   the spec is passed to fbExporterAllocSpread(). */
     fbSession_t * session;
     /** pointer to the daemon host address, in Spread format.  Must be set
-    *   before the spec is passed to fbExporterAllocSpread */
+    *   before the spec is passed to fbExporterAllocSpread() */
     char *          daemon;
     /** pointer to array of group names, must have at least one, and must
     *   be null term array */
@@ -1718,7 +1783,6 @@ typedef struct fbSpreadParams_st {
 
 #endif /* HAVE_SPREAD */
 
-struct fbExporter_st;
 /**
  * IPFIX Exporting Process endpoint. Used to export messages from an associated
  * IPFIX Message Buffer to a remote Collecting Process, or to an IPFIX File.
@@ -1726,17 +1790,15 @@ struct fbExporter_st;
  */
 typedef struct fbExporter_st fbExporter_t;
 
-struct fbCollector_st;
 /**
  * IPFIX Collecting Process endpoint. Used to collect messages into an
  * associated IPFIX Message Buffer from a remote Exporting Process, or from
- * an IPFIX File. Use this with the fbListener_t structure to implement a full
- * Collecting Process, including Transport Session setup. The internals of
- * this structure are private to libfixbuf.
+ * an IPFIX File. Use this with the @ref fbListener_t structure to
+ * implement a full Collecting Process, including Transport Session
+ * setup. The internals of this structure are private to libfixbuf.
  */
 typedef struct fbCollector_st fbCollector_t;
 
-struct fbListener_st;
 /**
  * IPFIX Collecting Process session listener. Used to wait for connections
  * from IPFIX Exporting Processes, and to manage open connections via a
@@ -1745,57 +1807,50 @@ struct fbListener_st;
  */
 typedef struct fbListener_st fbListener_t;
 
-/**
+/*
  *  ListenerGroup and associated data type definitions
  */
-typedef struct fbListenerEntry_st fbListenerEntry_t;
 
 /**
- *  ListenerEntry's make up a listener group as a linked list
- */
-struct fbListenerEntry_st
-{
-    /** pointer to the next listener entry in the linked list */
-    fbListenerEntry_t  *next;
-    /** pointer to the previous listener entry in the linked list */
-    fbListenerEntry_t  *prev;
-    /** pointer to the listener to add to the list */
-    fbListener_t       *listener;
-};
-
-/**
- * typedef for listener group result
- */
-typedef struct fbListenerGroupResult_st fbListenerGroupResult_t;
-
-/**
- * ListenerGroupResult's contain the listener who's listening socket got a new
- * connection.  It is tied to the fBuf_t that is produced for the connection
- * These make up a linked list as well
- */
-struct fbListenerGroupResult_st
-{
-    /** Pointer to the next listener group result */
-    fbListenerGroupResult_t *next;
-    /** pointer to the listener that received a new connection */
-    fbListener_t    *listener;
-    /** pointer to the fbuf created for that new connection */
-    fBuf_t          *fbuf;
-};
-
-struct fbListenerGroup_st;
-/**
- * Structure that holds the listeners that are added to the group.
+ * Structure that represents a group of listeners.
  */
 typedef struct fbListenerGroup_st fbListenerGroup_t;
 
 /**
- * A callback function that is called when a template is freed.  The free
- * function should be set during the fbNewTemplateCtxCallback.
+ *  ListenerEntry's make up an @ref fbListenerGroup_t as a linked list
+ */
+typedef struct fbListenerEntry_st {
+    /** pointer to the next listener entry in the linked list */
+    struct fbListenerEntry_st  *next;
+    /** pointer to the previous listener entry in the linked list */
+    struct fbListenerEntry_st  *prev;
+    /** pointer to the listener to add to the list */
+    fbListener_t               *listener;
+} fbListenerEntry_t;
+
+/**
+ * A ListenerGroupResult contains the fbListener whose listening socket got a
+ * new connection (cf. fbListenerGroupWait()).  It is tied to the @ref fBuf_t
+ * that is produced for the connection.  These comprise a linked list.
+ */
+typedef struct fbListenerGroupResult_st {
+    /** Pointer to the next listener group result */
+    struct fbListenerGroupResult_st *next;
+    /** pointer to the listener that received a new connection */
+    fbListener_t                    *listener;
+    /** pointer to the fbuf created for that new connection */
+    fBuf_t                          *fbuf;
+} fbListenerGroupResult_t;
+
+/**
+ * A callback function that is called when a template is freed.  This
+ * function should be set during the @ref fbNewTemplateCallback_fn.
  *
  * @param tmpl_ctx a pointer to the ctx that is stored within the fbTemplate.
+ *                 This is the context to be cleaned up.
  * @param app_ctx the app_ctx pointer that was passed to the
- *                fbSessionAddNewTemplateCallback() call
+ *                fbSessionAddNewTemplateCallback() call.  This is for
+ *                context only and should not be cleaned up.
  * @return NO return value
  */
 typedef void (*fbTemplateCtxFree_fn)(
@@ -1821,22 +1876,22 @@ typedef void (*fbTemplateCtxFree_fn)(
  * @param app_ctx the app_ctx pointer that was passed to the
  *                fbSessionAddNewTemplateCallback() call
  * @param tmpl_ctx pointer that is stored in the fbTemplate structure.
- * @param fn a callback function that should be called to free the ctx
- *                when the template is freed/replaced.
+ * @param tmpl_ctx_free_fn a callback function that should be called to
+ *                 free the tmpl_ctx when the template is freed/replaced.
  * @return NO return value
- **/
+ */
 typedef void (*fbNewTemplateCallback_fn) (
     fbSession_t           *session,
     uint16_t              tid,
     fbTemplate_t          *tmpl,
     void                  *app_ctx,
     void                  **tmpl_ctx,
-    fbTemplateCtxFree_fn  *fn);
+    fbTemplateCtxFree_fn  *tmpl_ctx_free_fn);
 
 
 /**
  * The following Semantic values are for use in the structured Data Types:
- *  basicLists, subTemplateLists, and subTemplateMultiLists.
+ * basicLists, subTemplateLists, and subTemplateMultiLists.
  */
 /**
  * Semantic field for indicating the value has not been set
@@ -1864,10 +1919,11 @@ typedef void (*fbNewTemplateCallback_fn) (
 #define FB_LIST_SEM_ORDERED         0x04
 
 /**
- *   validates the value of the semantic field,
+ * Validates the value of a structured data types semantic field, as defined
+ * in RFC 6313 and listed at IANA.
  *
- * @param semantic The value of the semantic field to be validated  *
- * @return TRUE is valid {0xFF, 0x00-0x04}, FALSE if not
+ * @param semantic The value of the semantic field to be checked
+ * @return TRUE if valid (0xFF, 0x00-0x04), FALSE otherwise
  */
 gboolean fbListValidSemantic(
     uint8_t semantic);
@@ -1893,9 +1949,9 @@ typedef struct fbBasicList_st {
 
 
 /**
- *  allocates a Basic List Structure
+ * Allocates and returns an empty Basic List Structure.
  *
- * @return a pointer a to the allocated basic list in memory
+ * @return a pointer to the allocated basic list in memory
  */
 fbBasicList_t*  fbBasicListAlloc(
     void);
@@ -1905,7 +1961,7 @@ fbBasicList_t*  fbBasicListAlloc(
  * This function allocates a buffer large enough to hold
  * num elements amount of the infoElements.
  *
- * @param basicListPtr a pointer to the basic list structure to fill
+ * @param basicList a pointer to the basic list structure to fill
  * @param semantic the semantic value to be used in the basic list
  * @param infoElement a pointer to the info element to be used in the list
  * @param numElements number of elements in the list
@@ -1913,7 +1969,7 @@ fbBasicList_t*  fbBasicListAlloc(
  */
 
 void* fbBasicListInit(
-    fbBasicList_t          *basicListPtr,
+    fbBasicList_t          *basicList,
     uint8_t                 semantic,
     const fbInfoElement_t  *infoElement,
     uint16_t                numElements);
@@ -1924,7 +1980,7 @@ void* fbBasicListInit(
  *  This will generally be used by a collector that does not want to
  *  free and allocate new buffers for each incoming message
  *
- * @param basicListPtr a pointer to the basic list structure to fill
+ * @param basicList a pointer to the basic list structure to fill
  * @param semantic the semantic value to be used in the basic list
  * @param infoElement a pointer to the info element to be used in the list
  * @param numElements number of elements in the list
@@ -1933,7 +1989,7 @@ void* fbBasicListInit(
  * @return a pointer to the beginning of the buffer on success, NULL on failure
  */
 void* fbBasicListInitWithOwnBuffer(
-    fbBasicList_t          *basicListPtr,
+    fbBasicList_t          *basicList,
     uint8_t                 semantic,
     const fbInfoElement_t  *infoElement,
     uint16_t                numElements,
@@ -1941,121 +1997,140 @@ void* fbBasicListInitWithOwnBuffer(
     uint8_t                *dataPtr);
 
 /**
- *   This initializes a basic list structure for collection.  The key
- *   part of this function is it sets the dataPtr to NULL.
- *   If your basic list is declared as a pointer, then allocated using
- *   something like g_slice_alloc0 which sets it all to zero, you do not
- *   need to call this function.  But if your basic list struct isn't
- *   a pointer, there dataPtr parameter will be set to garbage, which will
- *   break other fixbuf calls, so this function is required
+ * Initializes a basic list structure for collection.  The key
+ * part of this function is it sets the dataPtr to NULL.
+ * If your basic list is declared as a pointer, then allocated using
+ * something like g_slice_alloc0 which sets it all to zero, you do not
+ * need to call this function.  But if your basic list struct isn't
+ * a pointer, there dataPtr parameter will be set to garbage, which will
+ * break other fixbuf calls, so this function is required
  *
- * @param basicListPtr pointer to the basic list to be initialized
+ * @param basicList pointer to the basic list to be initialized
  * @return NONE
  */
 void fbBasicListCollectorInit(
-    fbBasicList_t  *basicListPtr);
-
+    fbBasicList_t  *basicList);
 
 /**
- *  Get Semantic field for Basic List
+ * Returns the number of elements the basic list is capable of holding.
+ * @param basicList pointer to the basic list
+ * @return the number of elements on the basic list
+ * @since libfixbuf 2.3.0
+ */
+uint16_t fbBasicListCountElements(
+    const fbBasicList_t    *basicList);
+
+/**
+ *  Gets the Semantic field for Basic List.
  *  presumably used in collectors after decoding
  *
- *  @param basicListPtr pointer to the basic list to retrieve the semantic from
+ *  @param basicList pointer to the basic list to retrieve the semantic from
  *  @return the 8-bit semantic value describing the basic list
  */
 uint8_t fbBasicListGetSemantic(
-    fbBasicList_t  *basicListPtr);
+    fbBasicList_t  *basicList);
 
 /**
- *  Sets the semantic for describing a basic list
+ *  Sets the semantic for describing a basic list.
  *  generally used in exporters before decoding
  *
- *  @param basicListPtr pointer to the basic list to set the semantic
+ *  @param basicList pointer to the basic list to set the semantic
  *  @param semantic value to set the semantic field to
  *  @return NONE
  */
 void fbBasicListSetSemantic(
-    fbBasicList_t  *basicListPtr,
+    fbBasicList_t  *basicList,
     uint8_t         semantic);
 
-
 /**
- * This function returns a pointer to the information element used in the list
- * it is mainly used in collectors to retrieve information
+ * Returns a pointer to the information element used in the basic list.
+ * It is mainly used in an @ref fbCollector_t to retrieve information.
  *
- * @param basicListPtr pointer to the basic list to get the infoElement from
+ * @param basicList pointer to the basic list to get the infoElement from
  * @return pointer to the information element from the list
  */
 const fbInfoElement_t*  fbBasicListGetInfoElement(
-     fbBasicList_t  *basicListPtr);
+     fbBasicList_t  *basicList);
 
 /**
- *
- * @param basicListPtr pointer to the basic list to get the data pointer from
+ * Gets a pointer to the data buffer for the basic list.
+ * @param basicList pointer to the basic list to get the data pointer from
  * @return the pointer to the data held by the basic list
  */
 void* fbBasicListGetDataPtr(
-    fbBasicList_t   *basicListPtr);
+    fbBasicList_t   *basicList);
 
 /**
- * Function retrieves the index'th element in the list
- * index is 0-based.  Goes from 0 - (numElements-1)
- * @param basicListPtr pointer to the basic list to retrieve the dataPtr
- * @param bl_index the index of the element to retrieve
- * @return a pointer to the data in the index'th slot in the list, NULL
+ * Retrieves the element at position `index` in the basic list or returns NULL
+ * if `index` is out of range.  The first element is at index 0, and the last
+ * at fbBasicListCountElements()-1.
+ * @param basicList pointer to the basic list to retrieve the dataPtr
+ * @param index the index of the element to retrieve (0-based)
+ * @return a pointer to the data in the index'th slot in the list, or NULL
  * if the index is past the bounds of the list
  */
 void* fbBasicListGetIndexedDataPtr(
-    fbBasicList_t   *basicListPtr,
-    uint16_t         bl_index);
+    fbBasicList_t   *basicList,
+    uint16_t         index);
 
 /**
- * Function returns the next element in the list based on the currentPtr
- * @param basicListPtr pointer to the basic list
+ * Retrieves a pointer to the data element in the basicList that follows the
+ * one at `currentPtr`.  Retrieves the first element if `currentPtr` is NULL.
+ * Returns NULL when there are no more elements or when `currentPtr` is
+ * outside the buffer used by the basic list.
+ * @param basicList pointer to the basic list
  * @param currentPtr pointer to the current element being used.  Set to NULL
  * to retrieve the first element.
  * @return a pointer to the next data slot, based on the current pointer.
  * NULL if the new pointer is passed the end of the buffer
  */
 void* fbBasicListGetNextPtr(
-    fbBasicList_t   *basicListPtr,
+    fbBasicList_t   *basicList,
     void            *currentPtr);
 
 /**
- * Free the current data pointer, allocating a new buffer to accomodate
- * the new number of elements.  The remaining parameters are unchanged.
- * If the number of elements hasn't changed
- * the original buffer is used and its pointer is returned
+ * Potentially reallocates the list's internal buffer and returns a handle to
+ * it.  Specifically, when `newNumElements` differs from
+ * fbBasicListCountElements(), frees the current buffer that holds the
+ * elements, allocates a new buffer to accomodate `newNumElements` elements,
+ * and returns the buffer.  The remaining parameters or the list are
+ * unchanged.  If the number of elements are the same, the existing buffer is
+ * returned.
  * @param basicList pointer to the basic list to realloc
  * @param newNumElements new number of elements to allocate for the list
  * @return pointer to the data pointer for the list after realloc
+ * @see fbBasicListAddNewElements() to add elements to an existing list.
  */
 void* fbBasicListRealloc(
     fbBasicList_t  *basicList,
     uint16_t        newNumElements);
 
 /**
- *  Allocates an additional elememnt into the basic list
- *  must be called after calling BasicListInit
+ *  Allocates `numNewElements` additional element(s) into the basic list.
+ *  May only be called after calling fbBasicListInit().
  * @param basicList pointer to the basic list to add elements to
  * @param numNewElements number of elements to add to the list
  * @return a pointer to the newly allocated element(s)
-*/
+ */
 void* fbBasicListAddNewElements(
     fbBasicList_t  *basicList,
     uint16_t        numNewElements);
 
 /**
- * Clear the parameters of the basic list and free the data buffer
- * @param basicListPtr pointer to the basic list to clear
+ * Clears the parameters of the basic list and frees the data buffer.  To
+ * re-use the basicList after this call, it must be re-initialized via
+ * fbBasicListInit() or fbBasicListCollectorInit().
+ * @param basicList pointer to the basic list to clear
  * @return NONE
+ * @see fBufListFree()
  */
 void fbBasicListClear(
-    fbBasicList_t  *basicListPtr);
+    fbBasicList_t  *basicList);
 
 /**
- * Clear the parameters of the basic list, but do not free the buffer.
+ * Clears the parameters of the basic list, but does not free the buffer.
  * This should get used when the user provides their own buffer
+ * (fbBasicListInitWithOwnBuffer()).
  * @param basicList pointer to the basic list to clear without freeing
  * @return NONE
  */
@@ -2063,12 +2138,14 @@ void fbBasicListClearWithoutFree(
     fbBasicList_t  *basicList);
 
 /**
- * Clear the basic list, then free the basic list pointer
- * @param basicListPtr pointer to the basic list to free
+ * Clears the basic list (fbBasicListClear()), then frees the basic list
+ * itself.  This is typically paired with fbBasicListAlloc(), and it not
+ * normally needed.
+ * @param basicList pointer to the basic list to free
  * @return NONE
  */
 void fbBasicListFree(
-    fbBasicList_t  *basicListPtr);
+    fbBasicList_t  *basicList);
 
 
 /******* END OF BASICLIST ********/
@@ -2104,18 +2181,22 @@ typedef struct fbSubTemplateList_st {
 } fbSubTemplateList_t;
 
 /**
- *  Allocates a subTemplateList_t
+ *  Allocates and returns an empty subTemplateList structure.
  *  Based on how subTemplateLists will be used and set up amidst data
- *  structures, this function may never be used
+ *  structures, this function may never be used.
  * @return pointer to the new sub template list
  */
 fbSubTemplateList_t* fbSubTemplateListAlloc(
     void);
 
 /**
- *  Initializes a subTemplateList structure and alloc's the dataPtr
- *  to get a buffer able to hold numElements in the template
- *  This will mainly be used in exporters preparing to encode
+ *  Initializes a subTemplateList structure and allocates the internal buffer
+ *  to a size capable of holding `numElements` records matching the template.
+ *  This is mainly used when preparing to encode data for output by an @ref
+ *  fbExporter_t.  When reading data, use fbSubTemplateListCollectorInit() to
+ *  initialize the subTemplateList.  The `tmpl` should exist on the @ref
+ *  fbSession_t that will be used when exporting the record holding this
+ *  subTemplateList.
  *
  * @param sTL pointer to the sub template list to initialize
  * @param semantic the semantic value used to describe the list contents
@@ -2123,8 +2204,9 @@ fbSubTemplateList_t* fbSubTemplateListAlloc(
  * @param tmpl pointer to the template struct used for encoding the list data
  * @param numElements number of elements in the list
  * @return a pointer to the allocated buffer (location of first element)
+ * @see fbSubTemplateListInitWithOwnBuffer() to manage the memory yourself.
  */
-void*  fbSubTemplateListInit(
+void* fbSubTemplateListInit(
     fbSubTemplateList_t    *sTL,
     uint8_t                 semantic,
     uint16_t                tmplID,
@@ -2144,7 +2226,8 @@ void*  fbSubTemplateListInit(
  * @param dataLength length of the data buffer
  * @param dataPtr pointer to the previously allocated data buffer
  * @returns a pointer to that buffer
-*/
+ * @see fbSubTemplateListInit() to have libfixbuf manage the memory.
+ */
 void* fbSubTemplateListInitWithOwnBuffer(
     fbSubTemplateList_t    *subTemplateList,
     uint8_t                 semantic,
@@ -2155,12 +2238,16 @@ void* fbSubTemplateListInitWithOwnBuffer(
     uint8_t                *dataPtr);
 
 /**
- * Initializes a sub template list variable on a collector.  If the
+ * Initializes a sub template list variable on a @ref fbCollector_t.  If the
  * fbSubTemplateList variable is in a struct, it will likely not be set to 0's
  * If not, the dataPtr will not be NULL, so the transcoder will not allocate
  * the right memory for it, as it will assuming it's set up.  This will break.
  * Call this function right after declaring the struct variable that contains
- * the fbSubTemplateList.  It only needs to be called once for each STL
+ * the fbSubTemplateList.  It only needs to be called once for each STL.
+ *
+ * When using an @ref fbExporter_t, use fbSubTemplateListInit() to initialize
+ * the subTemplateList.
+ *
  * @param STL pointer to the sub template list to initialize for collection
  * @return NONE
  */
@@ -2169,89 +2256,106 @@ void fbSubTemplateListCollectorInit(
 
 /**
  * Returns a pointer to the buffer that contains the data for the list
- * @param subTemplateListPtr pointer to the STL to get the pointer from
+ * @param subTemplateList pointer to the STL to get the pointer from
  * @return a pointer to the data buffer used by the sub template list
  */
 void* fbSubTemplateListGetDataPtr(
-    const fbSubTemplateList_t  *subTemplateListPtr);
+    const fbSubTemplateList_t  *subTemplateList);
 
 /**
- * This function is used to iterate over the elements in the list by
- * passing in a counter to indicate which element is to be returned
- * @param subTemplateListPtr pointer to the STL
+ * Returns the data for the record at position `index` in the sub template
+ * list, or returns NULL if `index` is out of range.  The first element is at
+ * index 0, the last at fbSubTemplateListCountElements()-1.
+ *
+ * @param subTemplateList pointer to the STL
  * @param index The index of the element to be retrieved (0-based)
- * @return a pointer to the desired element.  NULL if index >= numElements
+ * @return a pointer to the desired element, or NULL when out of range
  */
 void* fbSubTemplateListGetIndexedDataPtr(
-    const fbSubTemplateList_t  *subTemplateListPtr,
+    const fbSubTemplateList_t  *subTemplateList,
     uint16_t                    index);
 
 /**
- * This function also traverses the elements in the list by accepting
- * a pointer to the last element the user accessed, moves it to the next
- * element and returns a pointer to the next element.  A current element of
- * NULL tells the function to return the first element in the list.
- * @param subTemplateListPtr pointer to the STL to get data from
+ * Retrieves a pointer to the data record in the sub template list that
+ * follows the one at `currentPtr`.  Retrieves the first record if
+ * `currentPtr` is NULL.  Returns NULL when there are no more records or when
+ * `currentPtr` is outside the buffer used by the sub template list.
+ * @param subTemplateList pointer to the STL to get data from
  * @param currentPtr pointer to the last element accessed.  NULL causes the
  *                   pointer to the first element to be returned
  * @return the pointer to the next element in the list.  Returns NULL if
  *         currentPtr points to the last element in the list.
  */
 void* fbSubTemplateListGetNextPtr(
-    const fbSubTemplateList_t  *subTemplateListPtr,
+    const fbSubTemplateList_t  *subTemplateList,
     void                       *currentPtr);
 
 /**
+ * Returns the number of elements the sub template list is capable of holding.
+ * @param subTemplateList pointer to the sub template list
+ * @return the number of records on the sub template list
+ * @since libfixbuf 2.3.0
+ */
+uint16_t fbSubTemplateListCountElements(
+    const fbSubTemplateList_t  *subTemplateList);
+
+/**
  * Sets the semantic parameter of a subTemplateList
- * @param subTemplateListPtr pointer to the sub template list
+ * @param subTemplateList pointer to the sub template list
  * @param semantic Semantic value for the list
  * @return NONE
  */
 void fbSubTemplateListSetSemantic(
-    fbSubTemplateList_t    *subTemplateListPtr,
+    fbSubTemplateList_t    *subTemplateList,
     uint8_t                 semantic);
 
 /**
  * Gets the semantic value from a sub template list
- * @param subTemplateListPtr pointer to the sub template list
+ * @param subTemplateList pointer to the sub template list
  * @return the semantic field from the list
  */
 uint8_t fbSubTemplateListGetSemantic(
-    fbSubTemplateList_t    *subTemplateListPtr);
+    fbSubTemplateList_t    *subTemplateList);
 
 /**
  * Gets the template pointer from the list structure
- * @param subTemplateListPtr pointer to the sub template list
+ * @param subTemplateList pointer to the sub template list
  * @return a pointer to the template used by the sub template list
  */
 const fbTemplate_t* fbSubTemplateListGetTemplate(
-    fbSubTemplateList_t    *subTemplateListPtr);
+    fbSubTemplateList_t    *subTemplateList);
 
 /**
  * Gets the template ID for the template used by the list
- * @param subTemplateListPtr pointer to the sub template list
+ * @param subTemplateList pointer to the sub template list
  * @return the template ID used by the sub template list
  */
 uint16_t fbSubTemplateListGetTemplateID(
-    fbSubTemplateList_t    *subTemplateListPtr);
+    fbSubTemplateList_t    *subTemplateList);
 
 /**
- *  Free the current data pointer, allocating a new buffer to accomodate
- *  the new number of elements.  The remaining parameters are unchanged.
- *  If the number of elements hasn't changed
- *  the original buffer is used and its pointer is returned
+ * Potentially reallocates the list's internal buffer and returns a handle to
+ * it.  Specifically, when `newNumElements` differs from
+ * fbSubTemplateListCountElements(), frees the sub template list's internal
+ * data-record buffer, allocates a new buffer to accomodate `newNumElements`
+ * elements, and returns the buffer.  The remaining parameters of the sub
+ * template list are unchanged.  If the number of elements are the same, the
+ * existing buffer is returned.  This function does not free any recursive
+ * structured-data records used by the existing buffer before reallocating it.
  *
  * @param subTemplateList pointer to the sub template list to realloc
  * @param newNumElements value for the new number of elements for the list
  * @return pointer to the data buffer after realloc
+ * @see fbSubTemplateListAddNewElements() to add elements to an existing list.
  */
 void* fbSubTemplateListRealloc(
     fbSubTemplateList_t    *subTemplateList,
     uint16_t                newNumElements);
 
 /**
- *  Allocates space for a number of additional element in the sub template list
- *  must be called after the list has been fbSubTemplateListInit()'d
+ * Allocates space for `numNewElements` additional element in the
+ * subTemplateList.  May only be called after the list has been initialized
+ * with fbSubTemplateListInit().
  *
  * @param subTemplateList pointer to the sub template list
  * @param numNewElements number of new elements to add to the list
@@ -2262,41 +2366,44 @@ void* fbSubTemplateListAddNewElements(
     uint16_t                numNewElements);
 
 /**
- *  Clears a subtemplate list struct, notably freeing the dataPtr and setting
- *  it to NULL.
- *  This should be used after each call to fBufNext:
- *  If the dataPtr is not NULL in DecodeSubTemplateList, it will not allocate
- *  new memory for the new record, which could cause a buffer overflow if the
- *  new record has a longer list than the current one.
- *  An alternative is to allocate a large buffer and assign it to dataPtr
- *  on your own, then never clear it with this.  Be certain this buffer is
- *  longer than needed for all possible lists
- * @param subTemplateListPtr pointer to the sub template list to clear
+ * Clears a subTemplateList structure, notably freeing the internal buffer and
+ * setting it to NULL.
+ *
+ * This should be used after each call to fBufNext():
+ * If the dataPtr is not NULL in DecodeSubTemplateList, it will not allocate
+ * new memory for the new record, which could cause a buffer overflow if the
+ * new record has a longer list than the current one.
+ * An alternative is to allocate a large buffer and assign it to dataPtr
+ * on your own, then never clear it with this.  Be certain this buffer is
+ * longer than needed for all possible lists
+ * @param subTemplateList pointer to the sub template list to clear
  * @return NONE
+ * @see fBufListFree()
  */
 void fbSubTemplateListClear(
-    fbSubTemplateList_t    *subTemplateListPtr);
+    fbSubTemplateList_t    *subTemplateList);
 
 /**
  *  Clears the sub template list parameters but does not free the data ptr.
- *  This is used in conjuction with STLInitOwnBuffer because that buffer
- *  is allocated at the beginning by the user and will be freed at the end
- *  by the user, outside of fixbuf api calls
- * @param subTemplateListPtr pointer to the sub template list to clear
+ *  This is used in conjuction with fbSubTemplateListInitWithOwnBuffer()
+ *  because that buffer is allocated at the beginning by the user and will be
+ *  freed at the end by the user, outside of fixbuf api calls
+ * @param subTemplateList pointer to the sub template list to clear
  * @return NONE
-*/
+ */
 void fbSubTemplateListClearWithoutFree(
-    fbSubTemplateList_t    *subTemplateListPtr);
+    fbSubTemplateList_t    *subTemplateList);
 
 /**
- *  Frees and clears a subTemplateList struct.  This frees the dataPtr AND
- *  frees the memory pointed to by the subTemplateListPtr
- * Used in conjunction with subTemplateListAlloc(), unlikely to be used
- * @param subTemplateListPtr pointer to the sub template list to free
+ *  Clears the sub template list (fbSubTemplateListClear()) then frees the
+ *  subTemplateList itself.  This is typically paired with
+ *  subTemplateListAlloc(), and it is unlikely to be used.
+ *
+ * @param subTemplateList pointer to the sub template list to free
  * @return NONE
  */
 void fbSubTemplateListFree(
-    fbSubTemplateList_t    *subTemplateListPtr);
+    fbSubTemplateList_t    *subTemplateList);
 
 /********* END OF SUBTEMPLATELIST **********/
 /**
@@ -2308,7 +2415,7 @@ void fbSubTemplateListFree(
  * At a high level, they are a list of sub template lists.
  * The first level is a list of fbSubTemplateMultiListEntry_t's, which each
  * contain the information that describes the data contained in them.
- * Initializing a fbSubTemplateMultiList_t with a semantic and number of
+ * Initializing a @ref fbSubTemplateMultiList_t with a semantic and number of
  * elements returns memory that contains numElements blocks of memory
  * containing fbSubTemplateMultiListEntry_t's.  It is not ready to accept
  * data.  Each of the fbSubTemplateMultiListEntry_t's needed to be set up
@@ -2332,7 +2439,7 @@ typedef struct fbSubTemplateMultiListEntry_st {
 /**
  * Multilists just contain the semantic to describe the sub lists,
  * the number of sub lists, and a pointer to the first entry
-*/
+ */
 typedef struct fbSubTemplateMultiList_st {
     /** pointer to the first entry in the multi list */
     fbSubTemplateMultiListEntry_t  *firstEntry;
@@ -2344,9 +2451,9 @@ typedef struct fbSubTemplateMultiList_st {
 
 
 /**
- *  Allocates a subTemplateMultiList_t
+ *  Allocates and returns an empty subTemplateMultiList structure.
  *  Based on how subTemplateMultiLists will be used and
- *  set up amidst data structures, this function may never be used
+ *  set up amidst data structures, this function may never be used.
  *
  *  @return pointer to the new sub template multi list
  */
@@ -2355,8 +2462,8 @@ fbSubTemplateMultiList_t* fbSubTemplateMultiListAlloc(
 
 
 /**
- *  Initializes the multi list with semantic, numbers of elements,
- *  and allocates memory to store numElements worth of entries
+ *  Initializes the multi list with the list semantic and allocates memory to
+ *  store `numElements` entries.
  *
  * @param STML pointer to the sub template multi list to initialize
  * @param semantic value used to describe the entries in the multi list
@@ -2369,17 +2476,27 @@ fbSubTemplateMultiListEntry_t* fbSubTemplateMultiListInit(
     uint16_t                    numElements);
 
 /**
+ * Returns the number of entries the sub template multi list is capable of
+ * holding.
+ * @param STML pointer to the sub template multi list
+ * @return the number of entries on the sub template multi list
+ * @since libfixbuf 2.3.0
+ */
+uint16_t fbSubTemplateMultiListCountElements(
+    const fbSubTemplateMultiList_t *STML);
+
+/**
  * Sets the semantic field for the multi list
  * @param STML pointer to the sub template multi list
  * @param semantic Value for the semantic field of the sub template multi list
  * @return NONE
-*/
+ */
 void fbSubTemplateMultiListSetSemantic(
     fbSubTemplateMultiList_t   *STML,
     uint8_t                     semantic);
 
 /**
- * Get the semantic paramter from the multi list
+ * Gets the semantic paramter from the multi list
  * @param STML pointer to the sub template multi list
  * @return semantic parameter describing the contents of the multi list
  */
@@ -2387,20 +2504,27 @@ uint8_t fbSubTemplateMultiListGetSemantic(
     fbSubTemplateMultiList_t   *STML);
 
 /**
- *  Clears all of the entries (frees their data pointers), then frees the
- *  memory containing the entries
+ * Clears all of the @ref fbSubTemplateMultiListEntry_t objects on this STML
+ * (see fbSubTemplateMultiListClearEntries()), then frees the memory
+ * containing the entries.
  * @param STML pointer to the sub template mutli list to clear
  * @return NONE
+ * @see fBufListFree()
  */
 void fbSubTemplateMultiListClear(
     fbSubTemplateMultiList_t   *STML);
 
 /**
- * Clears the memory used by the entries of a sub template multi list
- * NOTE: if any of those entries contain another layer of structures, that
- * second layer must be freed by the user, this function cannot do that.
- * example: an entry's template contains an element of type basicList.  The
- * memory used by that basicList isn't freed by this function
+ * Clears the memory used by all the entries of a sub template multi list.
+ * That is, it calls fbSubTemplateMultiListEntryClear() for each entry.  To
+ * free the memory in the STML that holds these entries, call
+ * fbSubTemplateMultiListClear().
+ *
+ * @note If any of the entries contain another layer of structures, that
+ * second layer must be freed by the user, as this function cannot do that.
+ * For example, if an entry's template contains an element of type basicList,
+ * the memory used by that basicList is not freed by this function.
+ *
  * @param STML pointer to the sub template multi list
  * @return NONE
  */
@@ -2408,7 +2532,9 @@ void fbSubTemplateMultiListClearEntries(
     fbSubTemplateMultiList_t   *STML);
 
 /**
- * Clears the multi list, then frees the memory pointed to by STML
+ * Clears the multi list (fbSubTemplateMultiListClear()), then frees the STML
+ * itself.  This is typically paired with fbSubTemplateMultiListAlloc(), and
+ * it not normally needed.
  * @param STML pointer to the sub template multi list
  * @return NONE
  */
@@ -2416,21 +2542,26 @@ void fbSubTemplateMultiListFree(
     fbSubTemplateMultiList_t   *STML);
 
 /**
- *  Clears the entries used by the multi list, then if newNumElements
- *  is different than numElements, frees the entries buffer and allocates
- *  a new one.
+ *  Potentially reallocates the list's internal buffer for entries and returns
+ *  a handle to it.  Specifically, calls fbSubTemplateMultiListClearEntries(),
+ *  then if `newNumElements` differs from
+ *  fbSubTemplateMultiListCountElements(), frees the entries buffer, allocates
+ *  a new one to accomodate `newNumElements` entries, and returns the buffer.
+ *  If the number of elements are the same, the existing buffer is returned.
  *
  * @param STML pointer to the sub template mutli list
  * @param newNumEntries the new number of entries for the STML
  * @return pointer to the first entry
-*/
+ * @see fbSubTemplateMultiListAddNewEntries() to add additional entries to an
+ * existing STML.
+ */
 fbSubTemplateMultiListEntry_t* fbSubTemplateMultiListRealloc(
     fbSubTemplateMultiList_t   *STML,
     uint16_t                    newNumEntries);
 
 /**
- *  Adds entries to the multi list of entries
- *  can only be run after the list has been initialized
+ *  Adds `numNewElements` entries to the multi list of entries.  May only
+ *  be used after the list has been initialized.
  *
  * @param STML pointer to the sub template multi list
  * @param numNewEntries number of entries to add to the list
@@ -2441,7 +2572,7 @@ fbSubTemplateMultiListEntry_t* fbSubTemplateMultiListAddNewEntries(
     uint16_t                    numNewEntries);
 
 /**
- * Retrieve the first entry in the multi list
+ * Retrieves the first entry in the multi list.
  * @param STML pointer to the sub template multi list
  * @return pointer to the first entry used by the list
  */
@@ -2449,21 +2580,22 @@ fbSubTemplateMultiListEntry_t* fbSubTemplateMultiListGetFirstEntry(
     fbSubTemplateMultiList_t   *STML);
 
 /**
- * Retrieve a pointer to the entry of a specific index.  The entry indexes
- * are zero based.  NULL is returned if the index requested is too high
+ * Retrieves a pointer to the entry at a specific index, or returns NULL if
+ * `index` is out of range.  The first entry is at index 0, the last at
+ * fbSubTemplateMultiListCountElements()-1.
  * @param STML pointer to the sub template mutli list
- * @param index index of the entry to be returned
- * @return the index'th entry used by the list.  NULL If index >= numElements
+ * @param index index of the entry to be returned (0-based)
+ * @return the index'th entry used by the list, or NULL if out of range
  */
 fbSubTemplateMultiListEntry_t* fbSubTemplateMultiListGetIndexedEntry(
     fbSubTemplateMultiList_t   *STML,
     uint16_t                    index);
 
 /**
- * This function also traverses the elements in the list by accepting
- * a pointer to the last element the user accessed, moves it to the next
- * element and returns a pointer to the next element.  A current element of
- * NULL tells the function to return the first element in the list.
+ * Retrieves a pointer to the entry in the mutli list that follows the one at
+ * `currentEntry`.  Retrieves the first entry if `currentEntry` is NULL.
+ * Returns NULL when there are no more entries or when `currentEntry` is
+ * outside the buffer used by the multi list.
  * @param STML pointer to the sub template multi list to get data from
  * @param currentEntry pointer to the last element accessed.
  *                     NULL means none have been accessed yet
@@ -2475,8 +2607,11 @@ fbSubTemplateMultiListEntry_t* fbSubTemplateMultiListGetNextEntry(
     fbSubTemplateMultiListEntry_t  *currentEntry);
 
 /**
- *  Initializes the multi list entry with the template values,
- *  and allocates the memory used by the entry to hold the data.
+ *  Initializes the multi list entry with the template values, and allocates
+ *  the memory used by the entry to hold the data.  This is mainly used when
+ *  preparing to encode data for output by an @ref fbExporter_t.  The `tmpl`
+ *  should exist on the @ref fbSession_t that will be used when exporting the
+ *  record holding the subTemplateMultiList.
  *
  *  @param entry pointer to the entry to initialize
  *  @param tmplID ID of the template used to structure the data elements
@@ -2484,7 +2619,7 @@ fbSubTemplateMultiListEntry_t* fbSubTemplateMultiListGetNextEntry(
  *  @param numElements number of data elements in the entry
  *
  *  @return pointer to the data buffer to be filled in
-*/
+ */
 void* fbSubTemplateMultiListEntryInit(
     fbSubTemplateMultiListEntry_t  *entry,
     uint16_t                        tmplID,
@@ -2492,21 +2627,28 @@ void* fbSubTemplateMultiListEntryInit(
     uint16_t                        numElements);
 
 /**
- *  Frees the memory for the data used by the entry, then allocates
- *  a new buffer based on the size of the template and newNumElements.
- *  (if numElements doesn't change, the pointer is returned without freeing
- *  and allocating)
+ *  Potentially reallocates the entry's internal buffer and returns a handle
+ *  to it.  Specifically, when `newNumEntries` differs from
+ *  fbSubTemplateMultiListEntryCountElements(), frees the buffer used to store
+ *  the entry's data records, allocates a new buffer based on the size of the
+ *  template and `newNumElements`, and returns a handle to that buffer.  The
+ *  template of the entry is unchanged.  If the number of elements are the
+ *  same, the existing buffer is returned.  This function does not free any
+ *  recursive structured-data records used by the existing buffer before
+ *  reallocating it.
  *
  *  @param entry pointer to the entry to realloc
  *  @param newNumElements the new number of elements for the entry
  *  @return pointer to buffer to write data to
+ *  @see fbSubTemplateMultiListEntryAddNewElements() to add additional
+ *  elements to an existing sub template multi list entry.
  */
-void *fbSubTemplateMultiListEntryRealloc(
+void* fbSubTemplateMultiListEntryRealloc(
     fbSubTemplateMultiListEntry_t  *entry,
     uint16_t                        newNumElements);
 
 /**
- *  Allocates space for a number of additional elements in the sub
+ *  Allocates space for `numNewEntries` additional elements in the sub
  *  template multi list entry.  May only be called after the STML entry
  *  has been initialized with fbSubTemplateMultiListEntryInit().
  *
@@ -2519,7 +2661,10 @@ void* fbSubTemplateMultiListEntryAddNewElements(
     uint16_t                         numNewElements);
 
 /**
- *  Frees the memory pointed to by the data buffer holding the data elements
+ *  Frees the memory holding the records' data used by this entry.  Use @ref
+ *  fbSubTemplateMultiListClearEntries() to clear all entries in an @ref
+ *  fbSubTemplateMultiList_t, and fbSubTemplateMultiListClear() to clear the
+ *  entire sub template multi list.
  *
  *  @param entry pointer to the entry to clear the contents of.
  *  @return NONE
@@ -2528,7 +2673,7 @@ void fbSubTemplateMultiListEntryClear(
     fbSubTemplateMultiListEntry_t   *entry);
 
 /**
- * Retrieves the data pointer for this entry
+ * Retrieves the data pointer for this entry.
  *
  * @param entry pointer to the entry to get the data pointer from
  * @return pointer to the buffer used to store data for this entry
@@ -2537,10 +2682,10 @@ void* fbSubTemplateMultiListEntryGetDataPtr(
     fbSubTemplateMultiListEntry_t   *entry);
 
 /**
- * This function traverses the elements in the entry by accepting
- * a pointer to the last element the user accessed, moves it to the next
- * element and returns a pointer to the next element.  A current element of
- * NULL tells the function to return the first element in the list.
+ * Retrieves a pointer to the data record in this entry that follows the one
+ * at `currentPtr`.  Retrieves the first record if `currentPtr` is NULL.
+ * Returns NULL when there are no more records or when `currentPtr` is outside
+ * the buffer used by the multi list entry.
  * @param entry pointer to the entry to get the next element from
  * @param currentPtr pointer to the last element accessed.  NULL means return
                      a pointer to the first element.
@@ -2552,21 +2697,31 @@ void* fbSubTemplateMultiListEntryNextDataPtr(
     void                            *currentPtr);
 
 /**
- * Returns a pointer to a data element in the entry based on the index.
- * If the index is >= to the number of elements in the list, NULL is returned.
- * The elements are 0-based, so index = 0 is returns the first elements.
+ * Retrieves a pointer to the data element in the entry at position `index`,
+ * or returns NULL when `index` is out of range.  The first element is at
+ * index 0, the last at fbSubTemplateMultiListEntryCountElements()-1.
  *
  * @param entry pointer to the entry to get a data pointer from.
  * @param index the number of the element in the list to return
- * @return the pointer to the index'th element used by the entry
- *         NULL if the index is >= numElements
+ * @return the pointer to the index'th element used by the entry, or NULL when
+ *         out of range
  */
 void* fbSubTemplateMultiListEntryGetIndexedPtr(
     fbSubTemplateMultiListEntry_t   *entry,
     uint16_t                         index);
 
 /**
- * Retrieve the template pointer used to structure the data elements
+ * Returns the number of entries the sub template multi list entry is capable
+ * of holding.
+ * @param entry pointer to the sub template multi list entry
+ * @return the number of records on the sub template multi list entry
+ * @since libfixbuf 2.3.0
+ */
+uint16_t fbSubTemplateMultiListEntryCountElements(
+    const fbSubTemplateMultiListEntry_t  *entry);
+
+/**
+ * Retrieves the template pointer used to structure the data elements.
  *
  * @param entry pointer to the entry to get the template from
  * @return the template pointer used to describe the contents of the entry
@@ -2575,7 +2730,7 @@ const fbTemplate_t* fbSubTemplateMultiListEntryGetTemplate(
     fbSubTemplateMultiListEntry_t   *entry);
 
 /**
- * Retrieve the template ID for the template used to structure the data
+ * Retrieves the template ID for the template used to structure the data.
  *
  * @param entry pointer to the entry to get the template ID from
  * @returns the template ID for template that describes the data
@@ -2586,10 +2741,11 @@ uint16_t fbSubTemplateMultiListEntryGetTemplateID(
 /************** END OF STML FUNCTIONS *********** */
 
 /**
- * Clear all of the memory that fixbuf allocated during
- * transcode of this record.  This will free all of the memory
- * allocated for list structures when fixbuf was encoding or
- * decoding the record.  The template provided is the internal
+ * Clears all of the memory that fixbuf allocated during transcode of this
+ * record.  This frees all of the memory allocated for list structures,
+ * recursively, when fixbuf was encoding or decoding the record.
+ *
+ * The template provided is the internal
  * template that was set on the fBuf before fBufNext() or
  * fBufAppend() was called with the data.  The template MUST
  * match the record or bad things WILL happen without indication.
@@ -2606,7 +2762,10 @@ void fBufListFree(
 
 
 /**
- * Allocates and returns a fbListenerGroup with no entries
+ * Allocates and returns an empty listenerGroup.  Use
+ * fbListenerGroupAddListener() to populate the listenerGroup,
+ * fbListenerGroupWait() to wait for connections on those listeners, and
+ * fbListenerGroupFree() when the group is no longer needed.
  *
  * @return a pointer to the created fbListenerGroup_t, or NULL on error
  */
@@ -2614,7 +2773,7 @@ fbListenerGroup_t* fbListenerGroupAlloc(
     void);
 
 /**
- * frees a listener group
+ * Frees a listener group
  *
  * @param group fbListenerGroup
  * @return nothing
@@ -2649,10 +2808,12 @@ int fbListenerGroupDeleteListener(
     const fbListener_t         *listener);
 
 /**
- *  Similar to fbListenerWait, except that is looks for connections for
- *  multiple listeners.  It takes a previously allocated and filled
- *  listener group.  It returns a pointer to the head of a list of
- *  listenerGroupResults.
+ *  Accepts connections for multiple listeners.  Works similarly to
+ *  fbListenerWait(), except that is looks for connections for any listener
+ *  that is part of a previously allocated and filled listener group.  It
+ *  returns a pointer to the head of a list of listenerGroupResults.  The
+ *  caller is responsible for freeing the listenerGroupResult
+ *  (fbListenerFreeGroupResult()).
  *  @param group pointer to the group of listeners to wait on
  *  @param err error string structure seen throughout fixbuf
  *  @return pointer to the head of the listener group result list
@@ -2662,12 +2823,10 @@ fbListenerGroupResult_t* fbListenerGroupWait(
     fbListenerGroup_t          *group,
     GError                     **err);
 
-
 /**
- * Free the fbListenerGroupResult_t returned from fbListenerGroupWait
+ * Frees the listener group result returned from fbListenerGroupWait().
  *
- * @param result fbListenerGroupResult_t
- * @return nothing
+ * @param result    A listener group result
  */
 void fbListenerFreeGroupResult(
     fbListenerGroupResult_t *result);
@@ -2690,7 +2849,7 @@ fBuf_t  *fbListenerOwnSocketCollectorTCP(
     GError        **err);
 
 /**
- *  Same as fbListenerOwnSocketCollectorTCP but for TLS (not tested)
+ *  Same as fbListenerOwnSocketCollectorTCP() but for TLS (not tested)
  *
  *  @param listener pointer to the listener to wait on
  *  @param sock independently managed socket descriptor
@@ -2705,7 +2864,7 @@ fBuf_t  *fbListenerOwnSocketCollectorTLS(
 
 /**
  *  Interrupts the select call of a specific collector by way of its fBuf.
- *  This is mainly used by fbListenerInterrupt to interrupt all of the
+ *  This is mainly used by fbListenerInterrupt() to interrupt all of the
  *  collector sockets well.
  */
 void    fBufInterruptSocket(
@@ -2714,13 +2873,14 @@ void    fBufInterruptSocket(
 
 /**
  * Application context initialization function type for fbListener_t.
+ * Set this function when creating the fbListener_t with fbListenerAlloc().
  * This function is called after accept(2) for TCP or SCTP with the peer
  * address in the peer argument. For UDP, it is called during fbListener_t
  * initialization and the peer address will be NULL.  If the Collector is in
  * multi-session mode, the appinit function will be called when a new UDP
  * connection occurs with the peer address, similiar to the TCP case.  Use
  * fbCollectorSetUDPMultiSession() to turn on multi-session mode
- * (off by default).  The application may veto fbCollector_t creation by
+ * (off by default).  The application may veto @ref fbCollector_t creation by
  * returning FALSE. In multi-session mode, if the connection is to be ignored,
  * the application should set error code FB_ERROR_NLREAD on the err and return
  * FALSE.  If the application returns FALSE, fixbuf will maintain information
@@ -2741,11 +2901,13 @@ typedef gboolean        (*fbListenerAppInit_fn) (
     GError                      **err);
 
 /**
- * Application context free function type for fbListener_t.
- * If the Collector is in multi-session mode (see appinit fn), then the
- * appfree function will be called if a session is timed out (does not receive
- * a UDP message for more than 30 minutes.)
- * Called during fbCollector_t cleanup.
+ * Application context free function type for @ref fbListener_t.
+ * Set this function when creating the fbListener_t with fbListenerAlloc().
+ * For TCP and SCTP collectors, this is called when the connection is closed.
+ * If a UDP Collector is in multi-session mode (see appinit fn), then the
+ * appfree function is called if a session is timed out (does not receive
+ * a UDP message for more than 30 minutes.)  Called during @ref fbCollector_t
+ * cleanup.
  */
 typedef void            (*fbListenerAppFree_fn) (
     void                        *ctx);
@@ -2757,7 +2919,7 @@ typedef void            (*fbListenerAppFree_fn) (
 
 
 /**
- * Set the internal template on a buffer to the given template ID. The internal
+ * Sets the internal template on a buffer to the given template ID. The internal
  * template describes the format of the record pointed to by the recbase
  * parameter to fBufAppend() (for export) and fBufNext() (for collection). The
  * given template ID must identify a current internal template in the buffer's
@@ -2778,7 +2940,7 @@ gboolean            fBufSetInternalTemplate(
     GError              **err);
 
 /**
- * Set the external template for export on a buffer to the given template ID.
+ * Sets the external template for export on a buffer to the given template ID.
  * The external template describes the record that will be written to the
  * IPFIX message. The buffer must be initialized for export. The given ID is
  * scoped to the observation domain of the associated session
@@ -2801,8 +2963,6 @@ gboolean            fBufSetExportTemplate(
 
 #if HAVE_SPREAD
 /**
- * fBufSetSpreadExportGroup
- *
  * This function checks to see if the groups you are setting on the buffer
  * are different than the groups previously set.  If so, it will emit the
  * buffer, set the first group on the session (to get templates & sequence
@@ -2822,17 +2982,24 @@ void                 fBufSetSpreadExportGroup(
     char               **groups,
     int                num_groups,
     GError             **err);
-#endif
+#endif  /* HAVE_SPREAD */
 
 /**
- * Set the automatic mode flag on a buffer. In automatic mode, a call to
- * fBufAppend() or fbSessionExportTemplates() that overruns the available space
- * in the buffer will cause a call to fBufEmit() to emit the message in the
- * buffer to the exporter before starting a new message; and a call to
- * fBufNext() that overruns the buffer will cause a call to fBufNextMessage()
- * to read another message from the collector before attempting to read a
- * record. In manual mode, end of message on any buffer read/write call
- * results in FB_ERROR_EOM. Buffers are created in automatic mode by default.
+ * Sets the automatic (read/write) mode flag on a buffer.
+ *
+ * In automatic write mode, a call to fBufAppend() or
+ * fbSessionExportTemplates() that overruns the available space in the buffer
+ * will cause a call to fBufEmit() to emit the message in the buffer to the
+ * exporter before starting a new message.
+ *
+ * In automatic read mode, a call to fBufNext() that overruns the buffer will
+ * cause a call to fBufNextMessage() to read another message from the
+ * collector before attempting to read a record.
+ *
+ * In manual mode, the end of message on any buffer read/write call results in
+ * the call returning an error with a GError code of FB_ERROR_EOM.
+ *
+ * Buffers are created in automatic mode by default.
  *
  * @param fbuf      an IPFIX message buffer
  * @param automatic TRUE for this buffer to be automatic, FALSE for manual.
@@ -2843,18 +3010,24 @@ void                fBufSetAutomaticMode(
     gboolean            automatic);
 
 /**
- * Set the automatic insert flag on a buffer.  In automatic insert mode,
- * any information element type records that are collected, will automatically
- * be inserted into the information model that is set on the fbuf's session.
- * This allows an application to retrieve information about a non-standard
- * information.  This should be called after the fbuf is created.  This
- * function creates the internal template for the Info Element Type Record
- * and adds it to the session.
+ * Enables automatic insertion of RFC 5610 elements on a buffer.
+ *
+ * In automatic insertion mode, information element type records that are
+ * collected by the buffer create an information element (@ref
+ * fbInfoElement_t) if the record's privateEnterpriseNumber is non-zero.  That
+ * element is inserted into the information model (@ref fbInfoModel_t) that is
+ * set on the fbuf's session.  This allows an application to retrieve
+ * information about a non-standard information elements.  This function
+ * should be called after the fbuf is created.  This function creates the
+ * internal template for the Info Element Type Record (@ref
+ * fbInfoElementOptRec_t) and adds it to the fbuf's session.
+ *
+ * For export of RFC 5610 elements, use fbSessionSetMetadataExportElements().
  *
  * @param fbuf        an IPFIX message buffer
  * @param err         Gerror pointer
- * @return            TRUE or FALSE if the internal template could not be
- *                    created
+ * @return            TRUE on success, FALSE if the internal template could
+ *                    not be created
  */
 gboolean         fBufSetAutomaticInsert(
     fBuf_t             *fbuf,
@@ -2862,7 +3035,7 @@ gboolean         fBufSetAutomaticInsert(
 
 
 /**
- * Retrieve the session associated with a buffer.
+ * Retrieves the session associated with a buffer.
  *
  * @param fbuf      an IPFIX message buffer
  * @return the associated session
@@ -2872,7 +3045,7 @@ fbSession_t         *fBufGetSession(
     fBuf_t              *fbuf);
 
 /**
- * Free a buffer. Also frees any associated session, exporter, or collector,
+ * Frees a buffer. Also frees any associated session, exporter, or collector,
  * closing exporting process or collecting process endpoint connections
  * and removing collecting process endpoints from any listeners, as necessary.
  *
@@ -2883,9 +3056,9 @@ void                fBufFree(
     fBuf_t              *fbuf);
 
 /**
- * Allocate a new buffer for export. Associates the buffer with a given
+ * Allocates a new buffer for export. Associates the buffer with a given
  * session and exporting process endpoint; these become owned by the buffer.
- * Session and exporter are freed by fBufFree.  Must never be freed by user
+ * Session and exporter are freed by fBufFree().  Must never be freed by user
  *
  * @param session   a session initialized with appropriate
  *                  internal and external templates
@@ -2899,7 +3072,7 @@ fBuf_t              *fBufAllocForExport(
     fbExporter_t        *exporter);
 
 /**
- * Retrieve the exporting process endpoint associated with a buffer.
+ * Retrieves the exporting process endpoint associated with a buffer.
  * The buffer must have been allocated with fBufAllocForExport();
  * otherwise, returns NULL.
  *
@@ -2911,7 +3084,7 @@ fbExporter_t        *fBufGetExporter(
     fBuf_t              *fbuf);
 
 /**
- * Associate an exporting process endpoint with a buffer.
+ * Associates an exporting process endpoint with a buffer.
  * The exporter will be used to write IPFIX messgaes to a transport.
  * The exporter becomes owned by the buffer; any previous exporter
  * associated with the buffer is closed if necessary and freed.
@@ -2926,11 +3099,11 @@ void                fBufSetExporter(
 
 
 /**
- * Retrieve the length of the buffer that is remaining after
+ * Retrieves the length of the buffer that is remaining after
  * processing.  An IPFIX collector that is not using fixbuf to
  * handle connections would use this function upon receiving an
  * FB_ERROR_BUFSZ error to determine how many bytes are left in the
- * buffer (set by fBufSetBuffer) that are not processed.
+ * buffer (set by fBufSetBuffer()) that are not processed.
  *
  * @param fbuf an IPFIX message buffer
  * @return length of buffer not read
@@ -2941,16 +3114,16 @@ size_t fBufRemaining(
 
 
 /**
- * Set a buffer on an fBuf for collection.  This can be used
+ * Sets a buffer on an fBuf for collection.  This can be used
  * by applications that want to handle their own connections, file reading,
  * etc.  This call should be made after the call to read and before
- * calling fBufNext.  fBufNext will return FB_ERROR_BUFSZ when there is not
+ * calling fBufNext.  fBufNext() will return FB_ERROR_BUFSZ when there is not
  * enough buffer space to read a full IPFIX message.
  *
  * @param fbuf an IPFIX message buffer
  * @param buf the data buffer to use for processing IPFIX
  * @param buflen the length of IPFIX data in buf
- *
+ * @see @ref noconnect Connection-less collector
  */
 void fBufSetBuffer(
     fBuf_t         *fbuf,
@@ -2959,7 +3132,7 @@ void fBufSetBuffer(
 
 
 /**
- * Append a record to a buffer. Uses the present internal template set via
+ * Appends a record to a buffer. Uses the present internal template set via
  * fBufSetInternalTemplate() to describe the record of size recsize located
  * in memory at recbase.  Uses the present export template set via
  * fBufSetExportTemplate() to describe the record structure to be written to
@@ -2970,7 +3143,7 @@ void fBufSetBuffer(
  * the record.
  *
  * If the internal template contains any variable length Information Elements,
- * those must be represented in the record by fbVarfield_t structures.
+ * those must be represented in the record by @ref fbVarfield_t structures.
  *
  * @param fbuf      an IPFIX message buffer
  * @param recbase   pointer to internal record
@@ -2988,7 +3161,7 @@ gboolean            fBufAppend(
     GError              **err);
 
 /**
- * Emit the message currently in a buffer using the associated exporting
+ * Emits the message currently in a buffer using the associated exporting
  * process endpoint.
  *
  * @param fbuf      an IPFIX message buffer
@@ -3001,7 +3174,7 @@ gboolean            fBufEmit(
     GError              **err);
 
 /**
- * Set the export time on the message currently in a buffer. This will be used
+ * Sets the export time on the message currently in a buffer. This will be used
  * as the export time of the message created by the first call to fBufAppend()
  * after the current message, if any, is emitted. Use 0 for the export time
  * to cause the export time to be taken from the system clock at message
@@ -3016,9 +3189,13 @@ void                fBufSetExportTime(
     uint32_t            extime);
 
 /**
- * Allocate a new buffer for collection. Associates the buffer with a given
- * session and collecting process endpoint; these become owned by the buffer.
- * Session and collector are freed by fBufFree.  Must not be freed by user
+ * Allocates a new buffer for collection. Associates the buffer with a given
+ * session and collecting process endpoint; these become owned by the buffer
+ * and must not be freed by the user.  The session and collector are freed by
+ * fBufFree().
+ *
+ * When using libfixbuf to process a buffer of IPFIX data (see
+ * fBufSetBuffer()), invoke this function with a NULL collector.
  *
  * @param session   a session initialized with appropriate
  *                  internal templates
@@ -3032,7 +3209,7 @@ fBuf_t              *fBufAllocForCollection(
     fbCollector_t       *collector);
 
 /**
- * Retrieve the collecting process endpoint associated with a buffer.
+ * Retrieves the collecting process endpoint associated with a buffer.
  * The buffer must have been allocated with fBufAllocForCollection();
  * otherwise, returns NULL.
  *
@@ -3044,7 +3221,7 @@ fbCollector_t       *fBufGetCollector(
     fBuf_t              *fbuf);
 
 /**
- * Associate an collecting process endpoint with a buffer.
+ * Associates an collecting process endpoint with a buffer.
  * The collector will be used to read IPFIX messgaes from a transport.
  * The collector becomes owned by the buffer; any previous collector
  * associated with the buffer is closed if necessary and freed.
@@ -3058,7 +3235,7 @@ void                fBufSetCollector(
     fbCollector_t       *collector);
 
 /**
- * Retrieve a record from a buffer. Uses the external template taken from
+ * Retrieves a record from a buffer. Uses the external template taken from
  * the message to read the next record available from a data set in the message.
  * Copies the record to a buffer at recbase, with a maximum record size
  * pointed to by recsize, described by the present internal template set via
@@ -3071,7 +3248,7 @@ void                fBufSetCollector(
  * available in the message buffer.
  *
  * If the internal template contains any variable length Information Elements,
- * those must be represented in the record at recbase by fbVarfield_t
+ * those must be represented in the record at recbase by @ref fbVarfield_t
  * structures.
  *
  * @param fbuf      an IPFIX message buffer
@@ -3093,9 +3270,9 @@ gboolean            fBufNext(
     GError              **err);
 
 /**
- * Read a new message into a buffer using the associated collecting
+ * Reads a new message into a buffer using the associated collecting
  * process endpoint. Called by fBufNext() on end of message in automatic
- * mode; should be called after an FB_ERROR_EOM return from fBufNext in
+ * mode; should be called after an FB_ERROR_EOM return from fBufNext() in
  * manual mode, or to skip the current message and go on to the next
  * in the stream.
  *
@@ -3104,13 +3281,12 @@ gboolean            fBufNext(
  * @return TRUE on success, FALSE on failure.
  */
 
-
 gboolean            fBufNextMessage(
     fBuf_t              *fbuf,
     GError              **err);
 
 /**
- * Retrieve the export time on the message currently in a buffer.
+ * Retrieves the export time on the message currently in a buffer.
  *
  * @param fbuf      an IPFIX message buffer
  * @return the export time in epoch seconds.
@@ -3120,7 +3296,7 @@ uint32_t            fBufGetExportTime(
     fBuf_t              *fbuf);
 
 /**
- * Retrieve the external template used to read the last record from the buffer.
+ * Retrieves the external template used to read the last record from the buffer.
  * If no record has been read, returns NULL. Stores the external template ID
  * within the current domain in ext_tid, if not NULL.
  *
@@ -3143,7 +3319,7 @@ fbTemplate_t    *fBufGetCollectionTemplate(
     uint16_t        *ext_tid);
 
 /**
- * Retrieve the external template that will be used to read the next record
+ * Retrieves the external template that will be used to read the next record
  * from the buffer. If no next record is available, returns NULL. Stores the
  * external template ID within the current domain in ext_tid, if not NULL.
  * Reads and processes any templates and options
@@ -3166,8 +3342,8 @@ fbTemplate_t    *fBufNextCollectionTemplate(
     GError          **err);
 
 /**
- * Allocate a new information model. The information model will contain all
- * the default information elements in the IANA-managed number space, and may
+ * Allocates a new information model. The information model contains all the
+ * default information elements in the [IANA-managed][] number space, and may
  * be extended via fbInfoModelAddElement(), fbInfoModelAddElementArray(),
  * fbInfoModelReadXMLFile(), and fbInfoModelReadXMLData().
  *
@@ -3175,12 +3351,15 @@ fbTemplate_t    *fBufNextCollectionTemplate(
  * application should have only one Information Model.
  *
  * @return a new Information Model
+ *
+ * [IANA-managed]: https://www.iana.org/assignments/ipfix/ipfix.xhtml
  */
 
-fbInfoModel_t       *fbInfoModelAlloc(void);
+fbInfoModel_t       *fbInfoModelAlloc(
+    void);
 
 /**
- * Free an information model. Must not be called until all sessions and
+ * Frees an information model. Must not be called until all sessions and
  * templates depending on the information model have also been freed; i.e.,
  * at application cleanup time.
  *
@@ -3191,7 +3370,7 @@ void                fbInfoModelFree(
     fbInfoModel_t       *model);
 
 /**
- * Add a single information element to an information
+ * Adds a single information element to an information
  * model. The information element is assumed to be in "canonical" form; that
  * is, its ref.name field should contain the information element name. The
  * information element and its name are copied into the model; the caller may
@@ -3209,21 +3388,21 @@ void                fbInfoModelAddElement(
     fbInfoElement_t     *ie);
 
 /**
- * Add multiple information elements in an array to an information
+ * Adds multiple information elements in an array to an information
  * model. The information elements are assumed to be in "canonical" form; that
  * is, their ref.name fields should contain the information element name. Each
  * information element and its name are copied into the model; the caller may
  * free or reuse its storage after this call.
  *
  * The ie parameter points to the first information element in an array,
- * usually statically initialized with an array of FB_IE_INIT macros followed
- * by an FB_IE_NULL macro.
- *
- * See also fbInfoModelReadXMLFile() and fbInfoModelReadXMLData() for
- * alternate ways to add information elements to information models.
+ * usually statically initialized with an array of @ref FB_IE_INIT_FULL macros
+ * followed by an @ref FB_IE_NULL macro.
  *
  * @param model     An information model
  * @param ie        Pointer to an IE array to copy into the model
+ *
+ * @see fbInfoModelReadXMLFile() and fbInfoModelReadXMLData() for
+ * alternate ways to add information elements to information models.
  */
 
 void                fbInfoModelAddElementArray(
@@ -3231,15 +3410,15 @@ void                fbInfoModelAddElementArray(
     fbInfoElement_t     *ie);
 
 /**
- * Add information specified in the given XML file to the information
+ * Adds information specified in the given XML file to the information
  * model. The XML file is expected to be in the format used by the
  * [IANA IPFIX Entities registry][IPFIX XML], with the following two
  * additions:
  *
- * - An `<enterpriseId>` field can be used to mark the enterprise ID for
+ * - A `<cert:enterpriseId>` field may be used to mark the enterprise ID for
  *   an element.
  *
- * - A `<reversible>` field can be used to mark an element as
+ * - A `<cert:reversible>` field may be used to mark an element as
  *   reversible (as per [RFC 5103][]).  Valid values for this field are
  *   true, false, yes, no, 1, and 0.
  *
@@ -3252,9 +3431,10 @@ void                fbInfoModelAddElementArray(
  * replace the existing element.
  * @param model     An information model
  * @param filename  The file containing the XML description
- * @param error     Return location for a GError
+ * @param err       Return location for a GError
  * @return `FALSE` if an error occurred, TRUE on success
  * @since libfixbuf 2.1.0
+ * @see fbInfoModelReadXMLData()
  *
  * [IPFIX XML]: https://www.iana.org/assignments/ipfix/ipfix.xml
  * [RFC 5103]: https://tools.ietf.org/html/rfc5103
@@ -3263,18 +3443,18 @@ void                fbInfoModelAddElementArray(
 gboolean fbInfoModelReadXMLFile(
     fbInfoModel_t       *model,
     const gchar         *filename,
-    GError             **error);
+    GError             **err);
 
 /**
- * Add information specified in the given XML data to the information
+ * Adds information specified in the given XML data to the information
  * model. The XML data is expected to be in the format used by the
  * [IANA IPFIX Entities registry][IPFIX XML], with the following two
  * additions:
  *
- * - An `<enterpriseId>` field can be used to mark the enterprise ID for
+ * - A `<cert:enterpriseId>` field may be used to mark the enterprise ID for
  *   an element.
  *
- * - A `<reversible>` field can be used to mark an element as
+ * - A `<cert:reversible>` field may be used to mark an element as
  *   reversible (as per [RFC 5103][]).  Valid values for this field are
  *   true, false, yes, no, 1, and 0.
  *
@@ -3288,9 +3468,10 @@ gboolean fbInfoModelReadXMLFile(
  * @param model         An information model
  * @param xml_data      A pointer to the XML data
  * @param xml_data_len  The length of `xml_data` in bytes
- * @param error         Return location for a GError
+ * @param err           Return location for a GError
  * @return `FALSE` if an error occurred, TRUE on success
  * @since libfixbuf 2.1.0
+ * @see fbInfoModelReadXMLFile()
  *
  * [IPFIX XML]: https://www.iana.org/assignments/ipfix/ipfix.xml
  * [RFC 5103]: https://tools.ietf.org/html/rfc5103
@@ -3300,10 +3481,10 @@ gboolean fbInfoModelReadXMLData(
     fbInfoModel_t       *model,
     const gchar         *xml_data,
     gssize               xml_data_len,
-    GError             **error);
+    GError             **err);
 
 /**
- * Return a pointer to the canonical information element within an information
+ * Returns a pointer to the canonical information element within an information
  * model given the information element name. The returned information element
  * is owned by the information model and must not be modified.
  *
@@ -3318,10 +3499,10 @@ const fbInfoElement_t     *fbInfoModelGetElementByName(
     const char          *name);
 
 /**
- * Return a pointer to the canonical information element within an information
- * model given the information element ID and enterprise ID.  The returned
- * information element is owned by the information model and must not be
- * modified.
+ * Returns a pointer to the canonical information element within an
+ * information model given the information element ID and enterprise ID.  The
+ * returned information element is owned by the information model and must not
+ * be modified.
  *
  * @param model     An information model
  * @param id        An information element id
@@ -3336,7 +3517,7 @@ const fbInfoElement_t    *fbInfoModelGetElementByID(
     uint32_t            ent);
 
 /**
- * Return the number of information elements in the information model.
+ * Returns the number of information elements in the information model.
  *
  * @param model     An information model
  * @return          The number of information elements in the
@@ -3346,7 +3527,9 @@ guint fbInfoModelCountElements(
     const fbInfoModel_t *model);
 
 /**
- * Initialize an information model iterator for iteration.
+ * Initializes an information model iterator for iteration over the
+ * information elements (@ref fbInfoElement_t) in the model.  The caller uses
+ * fbInfoModelIterNext() to visit the elements.
  *
  * @param iter      A pointer to the iterator to initialize
  * @param model     An information model
@@ -3357,7 +3540,7 @@ void fbInfoModelIterInit(
     const fbInfoModel_t *model);
 
 /**
- * Return a pointer to the next information element in the information
+ * Returns a pointer to the next information element in the information
  * model.  Returns NULL once all information elements have been
  * returned.
  *
@@ -3370,9 +3553,9 @@ const fbInfoElement_t *fbInfoModelIterNext(
     fbInfoModelIter_t *iter);
 
 /**
- * Allocate the Options Template that will be used to define Information
- * Element Type Records.  This function does not add the template to the
- * session or fbuf.  This function allocates the template, appends the
+ * Allocates and returns the Options Template that will be used to define
+ * Information Element Type Records.  This function does not add the template
+ * to the session or fbuf.  This function allocates the template, appends the
  * appropriate elements to the template, and sets the scope on the template.
  * See RFC 5610 for more info.
  *
@@ -3387,7 +3570,7 @@ fbTemplate_t *fbInfoElementAllocTypeTemplate(
     GError                 **err);
 
 /**
- * Export an options record to the given fbuf with information element type
+ * Exports an options record to the given fbuf with information element type
  * information about the given information element.  See RFC 5610 for details.
  * Use fbInfoElementAllocTypeTemplate() and add the returned template
  * to the session,  before calling this function.
@@ -3408,10 +3591,10 @@ gboolean fbInfoElementWriteOptionsRecord(
     GError                  **err);
 
 /**
- * Add an element that we received via an Options Record to the given info
- * model.  Returns True if the element was successfully added.  False, if
- * it couldn't be added.  This function will not add elements that have a
- * private enterprise number of 0, for security reasons.
+ * Adds an element that we received via an RFC 5610 Options Record to the
+ * given info model.  Returns True if the element was successfully added.
+ * False, if it couldn't be added.  This function does not add elements that
+ * have a private enterprise number of 0, for security reasons.
  *
  * @param model        An information model
  * @param rec          A pointer to the received fbInfoElementOptRec.
@@ -3423,19 +3606,18 @@ gboolean fbInfoElementAddOptRecElement(
     fbInfoElementOptRec_t   *rec);
 
 /**
- * Checks to see if the template contains all of the elements the RFC 5610
- * info element type record should contain.  If so, and the fbuf is in
- * "automatic insert" mode, we'll insert the elements in our own info model.
+ * Checks to see if a template contains all of the elements required
+ * by RFC 5610 for describing an information element type (type metadata).
  *
  * @param tmpl         A pointer to the template
  * @return             TRUE if template contains all the info elements
- *
+ * @see fbInfoElementAddOptRecElement()
  */
 gboolean fbInfoModelTypeInfoRecord(
     fbTemplate_t            *tmpl);
 
 /**
- * Allocate a new empty template. The template will be associated with the
+ * Allocates a new empty template. The template will be associated with the
  * given Information Model, and only able to use Information Elements defined
  * within that Information Model. Templates may be associated with multiple
  * sessions, with different template IDs each time, and as such are
@@ -3455,14 +3637,15 @@ fbTemplate_t        *fbTemplateAlloc(
     fbInfoModel_t       *model);
 
 /**
- * Append an information element to a template. The information element is taken
- * to be an example; the canonical element from the template's associated model
- * is looked up by enterprise and element number and copied. If no information
- * element exists in the model with the given enterprise and element number,
- * it is copied to the model with the name "_alienInformationElement".
+ * Appends an information element to a template. The information element is
+ * taken to be an example; the canonical element from the template's
+ * associated model is looked up by enterprise and element number and
+ * copied. If no information element exists in the model with the given
+ * enterprise and element number, it is copied to the model with the name
+ * "_alienInformationElement".
  *
- * This call is intended primarily for use by fBuf_t's template reader, but can
- * also be useful to simulate receipt of templates over the wire.
+ * This call is intended primarily for use by @ref fBuf_t's template reader,
+ * but can also be useful to simulate receipt of templates over the wire.
  *
  * @param tmpl      Template to append information element to
  * @param ex_ie     Example IE to add to the template
@@ -3476,18 +3659,20 @@ gboolean            fbTemplateAppend(
     GError              **err);
 
 /**
- * Append an information element described by specifier to a template.
- * The information element named by the specifier is copied from the template's
- * associated model, and the length and flags are overriden from the specifier.
+ * Appends an information element described by specifier to a template.
+ * The @ref fbInfoElement_t named by the specifier is copied from the
+ * template's associated @ref fbInfoModel_t, and the length and flags are
+ * overriden from the specifier.
  *
  * @param tmpl      Template to append information element to.
  * @param spec      Specifier describing information element to append.
- * @param flags     Application flags. Must match one bit of spec flags word
+ * @param flags     Application flags. Must contain all bits of spec flags word
  *                  or the append will be silently skipped. Used for
  *                  building multiple templates with different information
  *                  element features from a single specifier.
  * @param err       an error description, set on failure.
  * @return TRUE on success, FALSE on failure.
+ * @see fbTemplateAppendSpecArray()
  */
 
 gboolean            fbTemplateAppendSpec(
@@ -3497,11 +3682,9 @@ gboolean            fbTemplateAppendSpec(
     GError              **err);
 
 /**
- * Append information elements described by a specifier array to a template.
- * The information elements named by the specifiers are copied from the
- * template's associated model, and the length and flags are overriden from
- * each specifier. The array is read until the FB_IESPEC_NULL convenience macro
- * is encountered.
+ * Appends information elements described by a specifier array to a template.
+ * Calls fbTemplateAppendSpec() for each member of the array until the
+ * @ref FB_IESPEC_NULL convenience macro is encountered.
  *
  * @param tmpl      Template to append information element to.
  * @param spec      Pointer to first specifier in specifier array to append.
@@ -3520,7 +3703,7 @@ gboolean            fbTemplateAppendSpecArray(
     GError              **err);
 
 /**
- * Determine number of information elements in a template.
+ * Determines number of information elements in a template.
  *
  * @param tmpl      A template
  * @return information element count
@@ -3530,9 +3713,14 @@ uint32_t            fbTemplateCountElements(
     fbTemplate_t        *tmpl);
 
 /**
- * Set the number of information elements in a template that are scope. This
+ * Sets the number of information elements in a template that are scope. This
  * causes the template to become an options template, and must be called after
  * all the scope information elements have been appended to the template.
+ *
+ * The scope count may not be greater than the number of IEs in the template.
+ * A scope_count argument of zero sets the scope count to the number of IEs.
+ *
+ * It is expected that this function is only called once per template.
  *
  * @param tmpl          Template to set scope on
  * @param scope_count   Number of scope information elements
@@ -3543,7 +3731,7 @@ void                fbTemplateSetOptionsScope(
     uint16_t            scope_count);
 
 /**
- * Determine number of scope information elements in a template. The template
+ * Determines number of scope information elements in a template. The template
  * is an options template if nonzero.
  *
  * @param tmpl      A template
@@ -3553,14 +3741,16 @@ uint32_t            fbTemplateGetOptionsScope(
     fbTemplate_t        *tmpl);
 
 /**
- * Determine if a template contains a given information element. Matches against
- * information element private enterprise number, number, and multiple-IE index
- * (i.e., to determine if a given template contains six instances of a given
- * information element, set ex_ie->midx = 5 before this call).
+ * Determines if a template contains a given information element. Matches
+ * against information element private enterprise number, number, and
+ * multiple-IE index (i.e., to determine if a given template contains six
+ * instances of a given information element, set ex_ie->midx = 5 before this
+ * call).
  *
  * @param tmpl      Template to search
  * @param ex_ie     Pointer to an information element to search for
  * @return          TRUE if the template contains the given IE
+ * @see fbTemplateContainsElementByName()
  */
 
 gboolean           fbTemplateContainsElement(
@@ -3568,12 +3758,14 @@ gboolean           fbTemplateContainsElement(
     const fbInfoElement_t   *ex_ie);
 
 /**
- * Determine if a template contains at least one instance of a given
+ * Determines if a template contains at least one instance of a given
  * information element, specified by name in the template's information model.
  *
  * @param tmpl      Template to search
  * @param spec      Specifier of information element to search for
  * @return          TRUE if the template contains the given IE
+ * @see fbTemplateContainsElement(), fbTemplateContainsAllElementsByName(),
+ * fbTemplateContainsAllFlaggedElementsByName()
  */
 
 gboolean           fbTemplateContainsElementByName(
@@ -3581,12 +3773,14 @@ gboolean           fbTemplateContainsElementByName(
     fbInfoElementSpec_t *spec);
 
 /**
- * Determine if a template contains at least one instance of each
- * information element in a given information element specifier array.
+ * Determines if a template contains at least one instance of each
+ * @ref fbInfoElement_t in a given information element specifier array.
  *
  * @param tmpl      Template to search
  * @param spec      Pointer to specifier array to search for
  * @return          TRUE if the template contains all the given IEs
+ * @see fbTemplateContainsElementsByName(),
+ * fbTemplateContainsAllFlaggedElementsByName()
  */
 
 gboolean           fbTemplateContainsAllElementsByName(
@@ -3594,14 +3788,18 @@ gboolean           fbTemplateContainsAllElementsByName(
     fbInfoElementSpec_t *spec);
 
 /**
- * Determine if a template contains at least one instance of each
+ * Determines if a template contains at least one instance of each
  * information element in a given information element specifier array that
  * match the given flags argument.
  *
  * @param tmpl      Template to search
  * @param spec      Pointer to specifier array to search for
- * @param flags     Flags to match info elements
+ * @param flags     Flags to match info elements. Specifier elements whose
+ *                  flags member is non-zero and do not match all the bits of
+ *                  the flags parameter are not checked.
  * @return          TRUE if the template contains all the given IEs
+ * @see fbTemplateContainsElementByName(),
+ * fbTemplateContainsAllElementsByName()
  */
 gboolean            fbTemplateContainsAllFlaggedElementsByName(
     fbTemplate_t        *tmpl,
@@ -3609,7 +3807,7 @@ gboolean            fbTemplateContainsAllFlaggedElementsByName(
     uint32_t             flags);
 
 /**
- * Return the information element in the template referenced by the index
+ * Returns the information element in the template referenced by the index
  *
  * @param tmpl      Pointer to the template
  * @param IEindex   index of the information element to return
@@ -3622,7 +3820,7 @@ fbInfoElement_t*    fbTemplateGetIndexedIE(
 
 
 /**
- * Return the information model, as understood by the template.
+ * Returns the information model, as understood by the template.
  * @param tmpl Template Pointer
  * @return The information model
  * @since libfixbuf 2.1.0
@@ -3632,7 +3830,7 @@ fbInfoModel_t *     fbTemplateGetInfoModel(
     fbTemplate_t        *tmpl);
 
 /**
- * Free a template if it is not currently in use by any Session. Use this
+ * Frees a template if it is not currently in use by any Session. Use this
  * to clean up while creating templates in case of error.
  *
  * @param tmpl template to free
@@ -3642,8 +3840,8 @@ void                fbTemplateFreeUnused(
     fbTemplate_t        *tmpl);
 
 /**
- * Get the ctx pointer associated with a Template.  The ctx pointer
- * is typically set during the template callback when the new template
+ * Gets the ctx pointer associated with a Template.  The ctx pointer
+ * is set during the @ref fbNewTemplateCallback_fn when the new template
  * is received.
  * @param tmpl Template Pointer
  * @return ctx The application Context Pointer
@@ -3652,12 +3850,21 @@ void               *fbTemplateGetContext(
     fbTemplate_t         *tmpl);
 
 /**
- * Allocate a transport session state container. The new session is associated
+ * Gets the length required for a buffer to store a data record
+ * described by this template. Another way to think about it is this is the
+ * length of the record when this template is used as an internal template
+ * @since libfixbuf 2.2.0
+ */
+uint16_t            fbTemplateGetIELenOfMemBuffer(
+    fbTemplate_t         *tmpl);
+
+/**
+ * Allocates a transport session state container. The new session is associated
  * with the given information model, contains no templates, and is usable
  * either for collection or export.
  *
- * Each fbExporter_t, fbListener_t, and fbCollector_t must have its own
- * session; session state cannot be shared.
+ * Each @ref fbExporter_t, @ref fbListener_t, and @ref fbCollector_t must have
+ * its own session; session state cannot be shared.
  *
  * The fbSession_t returned by this function is not freed by calling
  * fBufFree() or fbListenerFree().  It should be freed by the application
@@ -3672,46 +3879,106 @@ fbSession_t         *fbSessionAlloc(
     fbInfoModel_t       *model);
 
 /**
- * Configure a session to export type information for enterprise-specific
- * information elements as options records according to RFC 5610
+ * Configures a session to export type information for enterprise-specific
+ * information elements as options records according to RFC 5610.  This
+ * function is a wrapper over fbSessionSetMetadataExportElements() with `tid`
+ * set to FB_TID_AUTO.
  *
  * @param session pointer
  * @param enabled TRUE to enable type metadata export, FALSE to disable
  * @param err error mesasge
- * @return NONE
+ * @return TRUE on success, FALSE on failure
+ * @deprecated Use fbSessionSetMetadataExportElements() instead.
  */
+
 gboolean fbSessionEnableTypeMetadata(
     fbSession_t                *session,
     gboolean                    enabled,
     GError                    **err);
 
 /**
- * Configure a session to export template metadata as options records
+ * Configures a session to export type information for enterprise-specific
+ * information elements as options records according to RFC 5610.  Regardless
+ * of the `enabled` value, this function creates the type information template
+ * and adds it to the session with the template ID `tid` or an arbitrary ID
+ * when `tid` is @ref FB_TID_AUTO.
+ *
+ * When collecting, use fBufSetAutomaticInsert() to automatically update the
+ * information model with these RFC 5610 elements.
+ *
+ * @param session pointer
+ * @param enabled TRUE to enable type metadata export, FALSE to disable
+ * @param tid the template id to use for type-information records
+ * @param err error mesasge
+ * @return the template id for type-information records or 0 if the template
+ * could not be added to the session.
+ * @since libfixbuf 2.3.0
+ */
+
+uint16_t fbSessionSetMetadataExportElements(
+    fbSession_t                *session,
+    gboolean                    enabled,
+    uint16_t                    tid,
+    GError                    **err);
+
+/**
+ * Configures a session to export template metadata as options records.  This
+ * function is a wrapper over fbSessionSetMetadataExportTemplates() with
+ * `tid` set to FB_TID_AUTO.
  *
  * @param session pointer
  * @param enabled TRUE to enable template metadata export, FALSE to disable
  * @param err error mesasge
- * @return NONE
+ * @return TRUE on success, FALSE on failure
+ * @see fbSessionSetMetadataExportTemplates(),
+ * fbSessionAddTemplateWithMetadata()
+ * @deprecated Use fbSessionSetMetadataExportTemplates() instead.
  */
+
 gboolean fbSessionEnableTemplateMetadata(
     fbSession_t                *session,
     gboolean                    enabled,
     GError                    **err);
 
 /**
- * Add a template to the session with the provided metadata.
- * This function appends the metadata to the buffer as well
- * as the template.
+ * Configures a session to export template metadata as options records.
+ * Template metadata is the name and description specified by
+ * fbSessionAddTemplateWithMetadata().  Regardless of the `enabled` value,
+ * this function creates the template-metadata template and adds it to the
+ * session with the template ID `tid` or an arbitrary ID when `tid` is
+ * @ref FB_TID_AUTO.
+ *
+ * @param session pointer
+ * @param enabled TRUE to enable template metadata export, FALSE to disable
+ * @param tid the template id to use for template metadata records
+ * @param err error mesasge
+ * @return the template id for template-metadata records or 0 if the template
+ * could not be added to the session.
+ * @since libfixbuf 2.3.0
+ */
+
+uint16_t fbSessionSetMetadataExportTemplates(
+    fbSession_t                *session,
+    gboolean                    enabled,
+    uint16_t                    tid,
+    GError                    **err);
+
+/**
+ * Adds a template to the session, as fbSessionAddTemplate(), with the
+ * provided metadata.  This function appends the template's metadata to the
+ * buffer (if currently enabled; c.f. fbSessionSetMetadataExportTemplates())
+ * as well as the template.
  *
  * @param session   A session state container
  * @param internal  TRUE if the template is internal, FALSE if external.
  * @param tid       Template ID to assign, replacing any current template
  *                  in case of collision; or FB_TID_AUTO to assign a new tId.
  * @param tmpl      Template to add
- * @param name      Template name
- * @param description Template description
+ * @param name      Template name, may not be NULL
+ * @param description Template description, may be NULL
  * @param err       error message
- * @return template id of newly added template
+ * @return template id of newly added template, 0 on error
+ * @see fbSessionAddTemplate() for additional information.
  */
 uint16_t fbSessionAddTemplateWithMetadata(
     fbSession_t         *session,
@@ -3723,29 +3990,10 @@ uint16_t fbSessionAddTemplateWithMetadata(
     GError              **err);
 
 /**
- * Add template metadata for a given template
- *
- * @param session pointer
- * @param tid template id
- * @param name template name
- * @param description template description
- * @param err error mesasge
- * @return NONE
- */
-gboolean fbSessionSetTemplateMetadata(
-    fbSession_t         *session,
-    uint16_t             tid,
-    const char          *name,
-    const char          *description,
-    GError             **err);
-
-/**
- * fbSessionGetInfoModel
+ * Gets the info model for the session.
  *
  * @param session
  * @return a pointer to the info model for the session
- *
- *
  */
 fbInfoModel_t       *fbSessionGetInfoModel(
     fbSession_t         *session);
@@ -3774,7 +4022,9 @@ fbInfoModel_t       *fbSessionGetInfoModel(
  * @param session pointer session to assign the callback to
  * @param callback the function that should be called when a new template
  *                 is received
- * @param app_ctx parameter that gets passed onto the callback function
+ * @param app_ctx parameter that gets passed into the callback function.
+ *                This can be used to pass session-specific information
+ *                state information to the callback function.
  * @return NONE
  */
 void fbSessionAddNewTemplateCallback(
@@ -3811,7 +4061,7 @@ void fbSessionAddTemplatePair(
     uint16_t        int_tid);
 
 /**
- * remove a template pair from the list
+ * Removes a template pair from the list
  * this is called by fixbuf when a template is revoked from the session by
  * the node on the other end of the connection
  *
@@ -3836,7 +4086,7 @@ uint16_t    fbSessionLookupTemplatePair(
     uint16_t        ext_tid);
 
 /**
- * Free a transport session state container. This is done automatically when
+ * Frees a transport session state container. This is done automatically when
  * freeing the listener or buffer with which the session is
  * associated. Use this call if a session needs to be destroyed before it
  * is associated.
@@ -3848,7 +4098,7 @@ void                fbSessionFree(
     fbSession_t         *session);
 
 /**
- * Reset the external state (sequence numbers and templates) in a session
+ * Resets the external state (sequence numbers and templates) in a session
  * state container.
  *
  * FIXME: Verify that this call actually makes sense; either that a session
@@ -3863,7 +4113,7 @@ void                fbSessionResetExternal(
     fbSession_t         *session);
 
 /**
- * Set the current observation domain on a session. The domain
+ * Sets the current observation domain on a session. The domain
  * is used to scope sequence numbers and external templates. This is called
  * automatically during collection, but must be called to set the domain
  * for export before adding external templates or writing records.
@@ -3882,7 +4132,7 @@ void                fbSessionSetDomain(
     uint32_t            domain);
 
 /**
- * Retrieve the current domain on a session.
+ * Retrieves the current domain on a session.
  *
  * @param session a session state container
  * @return the ID of the session's current observation domain
@@ -3892,7 +4142,20 @@ uint32_t            fbSessionGetDomain(
     fbSession_t         *session);
 
 /**
- * Retrieve collector that was created with the session
+ * Gets the largest decoded size of an internal template in the session.
+ * This is the number of bytes needed by store the largest record described
+ * by an internal template in the session.
+ * @param session a session
+ * @return The number of bytes needed to store the largest record described
+ *  by an internal template in the session
+ * @since libfixbuf 2.2.0
+ */
+
+uint16_t            fbSessionGetLargestInternalTemplateSize(
+    fbSession_t        *session);
+
+/**
+ * Retrieves the collector that was created with the session.
  *
  * @param session a session state container
  * @return fbCollector_t the collector that was created with the session
@@ -3903,9 +4166,7 @@ fbCollector_t *fbSessionGetCollector(
 
 #if HAVE_SPREAD
 /**
- * fbSessionAddTemplatesMulticast
- *
- * Set and send templates for 1 or more groups.
+ * Sets and sends templates for 1 or more groups.
  * This loops through the groups and adds the template to each
  * group's session and adds the template to the buffer.
  * This function is really meant for external templates, since
@@ -3917,12 +4178,14 @@ fbCollector_t *fbSessionGetCollector(
  * you to send a tmpl(s) to more than 1 group.
  *
  * @param session    a session state container
- * @param group      group names
+ * @param groups     group names
  * @param internal   TRUE for internal tmpl, FALSE for external
- * @param tid        template id
+ * @param tid        template id, or @ref FB_TID_AUTO for an arbitrary ID
  * @param tmpl       pointer to template with template id tid
  * @param err        error mesasge
- * @return           template ID
+ * @return           template ID or 0 on failure
+ * @see fbSessionAddTemplatesMulticastWithMetadata(), fbSessionAddTemplate()
+ * for additional information
  */
 uint16_t        fbSessionAddTemplatesMulticast(
     fbSession_t      *session,
@@ -3933,9 +4196,7 @@ uint16_t        fbSessionAddTemplatesMulticast(
     GError           **err);
 
 /**
- * fbSessionAddTemplatesMulticastWithMetadata
- *
- * Set and send templates for 1 or more groups.
+ * Sets and sends templates for 1 or more groups.
  * This loops through the groups and adds the template to each
  * group's session and adds the template to the buffer.
  * This function is really meant for external templates, since
@@ -3947,16 +4208,17 @@ uint16_t        fbSessionAddTemplatesMulticast(
  * you to send a tmpl(s) to more than 1 group.
  *
  * @param session    a session state container
- * @param group      group names
+ * @param groups     group names
  * @param internal   TRUE for internal tmpl, FALSE for external
  * @param tid        template id
  * @param tmpl       pointer to template with template id tid
  * @param name       name of template (required)
  * @param description description of template (optional)
  * @param err        error mesasge
- * @return           template ID
+ * @return           template ID, or 0 on error
  */
-uint16_t        fbSessionAddTemplatesMulticastWithMetadata(
+
+uint16_t fbSessionAddTemplatesMulticastWithMetadata(
     fbSession_t      *session,
     char             **groups,
     gboolean         internal,
@@ -3966,19 +4228,20 @@ uint16_t        fbSessionAddTemplatesMulticastWithMetadata(
     char             *description,
     GError           **err);
 
+
 /**
- * fbSessionSpreadEnableTemplateMetadata
- *
- * Enable template metadata export for Spread Sessions.
- * This will configure a session to send option records
- * that describe templates.
+ * Enables template metadata export for Spread Sessions.  This function is a
+ * wrapper over fbSessionSpreadSetMetadataExportTemplates() with `tid` set
+ * to FB_TID_AUTO.
  *
  * @param session pointer
  * @param groups spread groups to enable
  * @param enabled TRUE to enable template metadata export, FALSE to disable
  * @param err error message
- * @return TRUE/FALSE (False only if templates could not be added to the session).
- *
+ * @return TRUE on sucess, FALSE if IE template-metadata template could not be
+ * added to the session.
+ * @see fbSessionAddTemplatesMulticastWithMetadata()
+ * @deprecated Use fbSessionSpreadSetMetadataExportTemplates() instead.
  */
 
 gboolean fbSessionSpreadEnableTemplateMetadata(
@@ -3988,29 +4251,81 @@ gboolean fbSessionSpreadEnableTemplateMetadata(
     GError                     **err);
 
 /**
- * fbSessionSpreadEnableTypeMetadata
- *
- * Enable information element metadata export for Spread Sessions.
- * This will configure a session to send option records for
- * each private enterprise element added to the information model.
+ * Enables template metadata export for Spread Sessions.  Template metadata is
+ * the name and description specified by
+ * fbSessionAddTemplatesMulticastWithMetadata().  When `enabled` is TRUE,
+ * configures a session to send option records that describe templates.
+ * Regardless of the `enabled` value, this function creates the
+ * template-metadata template and adds it to the session with the template ID
+ * `tid` or an arbitrary ID when `tid` is FB_TID_AUTO.
  *
  * @param session pointer
  * @param groups spread groups to enable
- * @param enable TRUE to eanble metadata export, FALSE to disable
+ * @param enabled TRUE to enable template metadata export, FALSE to disable
+ * @param tid the template id to use for template-metadata records
  * @param err error message
- * @return TRUE/FALSE (False only if IE type template could not be added to the session).
+ * @return the template id for template-metadata records or 0 if the template
+ * could not be added to the session.
  *
  */
+
+uint16_t fbSessionSpreadSetMetadataExportTemplates(
+    fbSession_t                *session,
+    char                       **groups,
+    gboolean                   enabled,
+    uint16_t                   tid,
+    GError                     **err);
+
+/**
+ * Enables RFC 5610 information element metadata export for Spread Sessions.
+ * When `enabled` is TRUE, configures the session to send option records for
+ * each private enterprise element added to the information model.  This
+ * function is a wrapper over fbSessionSpreadSetMetadataExportElements() with
+ * `tid` set to FB_TID_AUTO.
+ *
+ * @param session pointer
+ * @param groups spread groups to enable
+ * @param enabled TRUE to enable metadata export, FALSE to disable
+ * @param err error message
+ * @return TRUE on sucess, FALSE if IE type template could not be added to
+ * the session.
+ * @deprecated Use fbSessionSpreadSetMetadataExportElements() instead.
+ */
+
 gboolean fbSessionSpreadEnableTypeMetadata(
     fbSession_t                *session,
     char                       **groups,
     gboolean                   enabled,
     GError                     **err);
 
-#endif
+/**
+ * Enables RFC 5610 information element metadata export for Spread Sessions.
+ * When `enabled` is TRUE, configures a session to send option records for
+ * each private enterprise element added to the information model.  Regardless
+ * of the `enabled` value, this function creates the type information template
+ * and adds it to the session with the template ID `tid` or an arbitrary ID
+ * when `tid` is FB_TID_AUTO.
+ *
+ * @param session pointer
+ * @param groups spread groups to enable
+ * @param enabled TRUE to enable metadata export, FALSE to disable
+ * @param tid the template id to use for type metadata records
+ * @param err error message
+ * @return the template id for type-information records or 0 if the template
+ * could not be added to the session.
+ * @since libfixbuf 2.3.0
+ */
+
+uint16_t fbSessionSpreadSetMetadataExportElements(
+    fbSession_t                *session,
+    char                       **groups,
+    gboolean                   enabled,
+    uint16_t                   tid,
+    GError                     **err);
+#endif  /* HAVE_SPREAD */
 
 /**
- * Export a single external template in the current domain of a given session.
+ * Exports a single external template in the current domain of a given session.
  * Writes the template to the associated export buffer. May cause a message to
  * be emitted if the associated export buffer is in automatic mode, or return
  * with FB_ERROR_EOM if the associated export buffer is not in automatic mode.
@@ -4027,7 +4342,7 @@ gboolean            fbSessionExportTemplate(
     GError              **err);
 
 /**
- * Export all external templates in the current domain of a given session.
+ * Exports all external templates in the current domain of a given session.
  * Writes templates to the associated export buffer. May cause a message to
  * be emitted if the associated export buffer is in automatic mode, or return
  * with FB_ERROR_EOM if the associated export buffer is not in automatic mode.
@@ -4042,13 +4357,15 @@ gboolean            fbSessionExportTemplates(
     GError              **err);
 
 /**
- * Add a template to a session. If external, adds the template to the current
+ * Adds a template to a session. If external, adds the template to the current
  * domain, and exports the template if the session is associated with an export
  * buffer. Assigns the template ID given in tid, or assigns a template ID if
- * tid is FB_TID_AUTO.
- * If using FB_TID_AUTO, external templates start at 256 and count up, internal
- * templates start at 65535 and count down. This is to avoid inadvertant
- * unrelated external and internal templates having the same ID
+ * tid is @ref FB_TID_AUTO.
+ *
+ * Calling this function twice with the same parameters may cause the template
+ * to be freed and the session to keep a handle to the invalid template.  If
+ * necessary, first use fbSessionGetTemplate() to check for the presence of
+ * the template on the session.
  *
  * @param session   A session state container
  * @param internal  TRUE if the template is internal, FALSE if external.
@@ -4057,8 +4374,8 @@ gboolean            fbSessionExportTemplates(
  * @param tmpl      Template to add
  * @param err       An error description, set on failure
  * @return the template ID of the added template, or 0 on failure.
+ * @see fbSessionAddTemplateWithMetadata()
  */
-
 uint16_t            fbSessionAddTemplate(
     fbSession_t         *session,
     gboolean            internal,
@@ -4067,7 +4384,7 @@ uint16_t            fbSessionAddTemplate(
     GError              **err);
 
 /**
- * Remove a template from a session.  If external, removes the template from
+ * Removes a template from a session.  If external, removes the template from
  * the current domain, and exports a template revocation set if the session is
  * associated with an export buffer.
  *
@@ -4085,7 +4402,7 @@ gboolean            fbSessionRemoveTemplate(
     GError              **err);
 
 /**
- * Retrieve a template from a session by ID. If external, retrieves the
+ * Retrieves a template from a session by ID. If external, retrieves the
  * template within the current domain.
  *
  * @param session   A session state container
@@ -4102,7 +4419,7 @@ fbTemplate_t        *fbSessionGetTemplate(
     GError              **err);
 
 /**
- * Allocate an exporting process endpoint for a network connection.
+ * Allocates an exporting process endpoint for a network connection.
  * The remote collecting process is specified by the given connection specifier.
  * The underlying socket connection will not be opened until the first message
  * is emitted from the buffer associated with the exporter.
@@ -4118,14 +4435,12 @@ fbExporter_t        *fbExporterAllocNet(
 
 #if HAVE_SPREAD
 /**
- * fbCollectorGetSpreadReturnGroups
- *
  * This function is useful if need to know what groups were set on the message.
  * Also useful if you are subscribed to more than 1 group, or want to know
  * what other groups the message published to.
  *
  * @param collector
- * @param array of groups
+ * @param groups of groups
  * @return number in the array of groups
  */
 int fbCollectorGetSpreadReturnGroups(
@@ -4133,7 +4448,7 @@ int fbCollectorGetSpreadReturnGroups(
     char *groups[]);
 
 /**
- *  Allocate an exporting process endpoint for a Spread connection.
+ *  Allocates an exporting process endpoint for a Spread connection.
  *  This connection will use the Spread toolkit for exporting and collecting
  *  IPFIX records.  Note that the connection to the Spread daemon will not
  *  take place until the first message is emitted from the buffer.
@@ -4146,12 +4461,12 @@ int fbCollectorGetSpreadReturnGroups(
  */
 
 fbExporter_t        *fbExporterAllocSpread(
-    fbSpreadParams_t      *params );
+    fbSpreadParams_t      *params);
 
 #endif /* HAVE_SPREAD */
 
 /**
- * Allocate an exporting process endpoint for a named file. The underlying
+ * Allocates an exporting process endpoint for a named file. The underlying
  * file will not be opened until the first message is emitted from the
  * buffer associated with the exporter.
  *
@@ -4165,7 +4480,7 @@ fbExporter_t        *fbExporterAllocFile(
     const char          *path);
 
 /**
- * Allocate an exporting process for a buffer. The underlying
+ * Allocates an exporting process for a buffer. The underlying
  * buffer will be allocated to the given size.
  *
  * @param buf       buffer that will be allocated and used to copy IPFIX to.
@@ -4179,7 +4494,7 @@ fbExporter_t        *fbExporterAllocBuffer(
 
 
 /**
- * Allocate an exporting process endpoint for an opened ANSI C file pointer.
+ * Allocates an exporting process endpoint for an opened ANSI C file pointer.
  *
  * @param fp        open file pointer to write to.  File pointer is created
                     and freed outside of the Exporter functions.
@@ -4190,7 +4505,7 @@ fbExporter_t        *fbExporterAllocFP(
     FILE                *fp);
 
 /**
- * Set the SCTP stream for the next message exported. To change the SCTP
+ * Sets the SCTP stream for the next message exported. To change the SCTP
  * stream used for export, first emit any message in the exporter's associated
  * buffer with fbufEmit(), then use this call to set the stream for the next
  * message. This call cancels automatic stream selection, use
@@ -4206,7 +4521,7 @@ void                fbExporterSetStream(
     int                 sctp_stream);
 
 /**
- * Enable automatic SCTP stream selection for the next message exported.
+ * Enables automatic SCTP stream selection for the next message exported.
  * Automatic stream selection is the default; use this call to re-enable it
  * on a given exporter after using fbExporterSetStream(). With automatic
  * stream selection, the minimal behavior specified in the original IPFIX
@@ -4221,7 +4536,7 @@ void                fbExporterAutoStream(
     fbExporter_t        *exporter);
 
 /**
- * Force the file or socket underlying an exporting process endpoint to close.
+ * Forces the file or socket underlying an exporting process endpoint to close.
  * No effect on open file endpoints. The file or socket may be reopened on a
  * subsequent message emission from the associated buffer.
  *
@@ -4231,7 +4546,7 @@ void                fbExporterClose(
     fbExporter_t       *exporter);
 
 /**
- * Get the (transcoded) message length that was copied to the
+ * Gets the (transcoded) message length that was copied to the
  * exporting buffer upon fBufEmit().
  *
  * @param exporter an exporting process endpoint.
@@ -4240,11 +4555,11 @@ size_t fbExporterGetMsgLen(
     fbExporter_t   *exporter);
 
 /**
- * Allocate a collecting process endpoint for a named file. The underlying
+ * Allocates a collecting process endpoint for a named file. The underlying
  * file will be opened immediately.
  *
  * @param ctx       application context; for application use, retrievable
- *                  by fbCollectorGetContext
+ *                  by fbCollectorGetContext()
  * @param path      path of file to read, or "-" to read standard input.
                     Used to get fp, user creates and frees.
  * @param err       An error description, set on failure.
@@ -4257,11 +4572,11 @@ fbCollector_t       *fbCollectorAllocFile(
     GError              **err);
 
 /**
- * Allocate a collecting process endpoint for an open file.
+ * Allocates a collecting process endpoint for an open file.
  *
  * @param ctx       application context; for application use, retrievable
- *                  by fbCollectorGetContext
- * @param fp      file pointer to file to read.  Created and freed by user.
+ *                  by fbCollectorGetContext()
+ * @param fp        file pointer to file to read.  Created and freed by user.
                     Must be kept around for the life of the collector.
  * @return a collecting process endpoint.
  */
@@ -4273,27 +4588,27 @@ fbCollector_t       *fbCollectorAllocFP(
 
 #if HAVE_SPREAD
 /**
-*   Allocate a collecting process endpoint for the Spread transport.
-*
-*   @param ctx      application context
-*   @param params   point to fbSpreadSpec_t containing Spread params
-*   @param err      error description, set on failure
-*
-*   @return         a collecting endpoint, or null on failure
-*/
+ *   Allocates a collecting process endpoint for the Spread transport.
+ *
+ *   @param ctx      application context
+ *   @param params   point to fbSpreadSpec_t containing Spread params
+ *   @param err      error description, set on failure
+ *
+ *   @return         a collecting endpoint, or null on failure
+ */
 
 fbCollector_t       *fbCollectorAllocSpread(
     void                *ctx,
     fbSpreadParams_t    *params,
-    GError              **err );
+    GError              **err);
 
 #endif /* HAVE_SPREAD */
 
 /**
- * Retrieve the application context associated with a collector. This context
- * is taken from the ctx argument of fbCollectorAllocFile() or
- * fbCollectorAllocFP(), or passed out via the ctx argument to the
- * appinit function argument to fbListenerAlloc().
+ * Retrieves the application context associated with a collector. This context
+ * is taken from the `ctx` argument of fbCollectorAllocFile() or
+ * fbCollectorAllocFP(), or passed out via the `ctx` argument of the `appinit`
+ * function argument (@ref fbListenerAppInit_fn) to fbListenerAlloc().
  *
  * @param collector a collecting process endpoint.
  * @return the application context
@@ -4303,7 +4618,7 @@ void                *fbCollectorGetContext(
     fbCollector_t       *collector);
 
 /**
- * Close the file or socket underlying a collecting process endpoint.
+ * Closes the file or socket underlying a collecting process endpoint.
  * No effect on open file endpoints. If the collector is attached to a
  * buffer managed by a listener, the buffer will be removed from the
  * listener (that is, it will not be returned by subsequent fbListenerWait()
@@ -4317,7 +4632,7 @@ void                fbCollectorClose(
 
 
 /**
- * Set the collector to only receive from the given IP address over UDP.
+ * Sets the collector to only receive from the given IP address over UDP.
  * The port will be ignored.  Use fbListenerGetCollector() to get the pointer
  * to the collector after calling fbListenerAlloc(). ONLY valid for UDP.
  * Set the address family in address.
@@ -4333,7 +4648,7 @@ void                fbCollectorSetAcceptOnly(
     size_t              address_length);
 
 /**
- * Allocate a listener. The listener will listen on a specified local endpoint,
+ * Allocates a listener. The listener will listen on a specified local endpoint,
  * and create a new collecting process endpoint and collection buffer for each
  * incoming connection. Each new buffer will be associated with a clone of
  * a given session state container.
@@ -4368,7 +4683,7 @@ fbListener_t        *fbListenerAlloc(
     GError                  **err);
 
 /**
- * Free a listener. Stops listening on the local endpoint, and frees any
+ * Frees a listener. Stops listening on the local endpoint, and frees any
  * open buffers still managed by the listener.
  *
  * @param listener a listener
@@ -4378,7 +4693,7 @@ void                fbListenerFree(
     fbListener_t            *listener);
 
 /**
- * Wait on a listener. Accepts pending connections from exporting processes.
+ * Waits on a listener. Accepts pending connections from exporting processes.
  * Returns the next collection buffer with available data to read; if the
  * collection buffer returned by the last call to fbListenerWait() is available,
  * it is preferred. Blocks forever (or until fbListenerInterrupt() is called)
@@ -4404,7 +4719,7 @@ fBuf_t              *fbListenerWait(
     GError                  **err);
 
 /**
- * Waits for an incoming connection, just like fbListenerWait, except that
+ * Waits for an incoming connection, just like fbListenerWait(), except that
  * this function doesn't monitor active collectors.  This allows for a
  * multi threaded application to have one thread monitoring the listeners,
  * and one keeping track of collectors
@@ -4418,7 +4733,7 @@ fBuf_t              *fbListenerWaitNoCollectors(
     GError                  **err);
 
 /**
- * Cause the current or next call to fbListenerWait to unblock and return.
+ * Causes the current or next call to fbListenerWait() to unblock and return.
  * Use this from a thread or a signal handler to interrupt a blocked listener.
  *
  * @param listener listener to interrupt.
@@ -4429,19 +4744,14 @@ void                fbListenerInterrupt(
 
 
 /**
- *fbListenerGetCollector
- *
  * If a collector is associated with the listener class, this will return a
  * handle to the collector state structure.
  *
  * @param listener handle to the listener state
  * @param collector pointer to a collector state pointer, set on return
  *        if there is no error
- *
  * @param err a GError structure holding an error message on error
- *
  * @return FALSE on error, check err, TRUE on success
- *
  */
 gboolean            fbListenerGetCollector(
     fbListener_t        *listener,
@@ -4452,16 +4762,12 @@ gboolean            fbListenerGetCollector(
 
 
 /**
- * fbCollectorClearTranslator
- *
- * this removes an input translator from a given
- * collector such that it will operate on IPFIX
- * protocol again
+ * Removes an input translator from a given collector such that it
+ * will operate on IPFIX protocol again.
  *
  * @param collector the collector on which to remove
  *        the translator
- *
- * @param err when an error occurs, a Glib GError
+ * @param err when an error occurs, a GLib GError
  *        structure is set with an error description
  *
  * @return TRUE on success, FALSE on failure
@@ -4472,17 +4778,13 @@ gboolean    fbCollectorClearTranslator(
 
 
 /**
- *fbCollectorSetNetflowV9Translator
- *
- * this sets the collector input translator
- * to convert NetFlowV9 into IPFIX for the
- * given collector
+ * Sets the collector input translator to convert NetFlowV9 into IPFIX
+ * for the given collector.
  *
  * @param collector pointer to the collector state
  *        to perform Netflow V9 conversion on
  * @param err GError structure that holds the error
  *        message if an error occurs
- *
  *
  * @return TRUE on success, FALSE on error
  */
@@ -4492,17 +4794,13 @@ gboolean    fbCollectorSetNetflowV9Translator(
 
 
 /**
- *fbCollectorSetSFlowTranslator
- *
- * this sets the collector input translator
- * to convert SFlow into IPFIX for the
- * given collector
+ * Sets the collector input translator to convert SFlow into IPFIX for
+ * the given collector.
  *
  * @param collector pointer to the collector state
  *        to perform SFlow conversion on
  * @param err GError structure that holds the error
  *        message if an error occurs
- *
  *
  * @return TRUE on success, FALSE on error
  */
@@ -4511,8 +4809,6 @@ gboolean    fbCollectorSetSFlowTranslator(
     GError                      **err);
 
 /**
- * fbCollectorGetNetflowMissed
- *
  * Returns the number of potential missed export packets of the Netflow
  * v9 session that is currently set on the collector (the session is set on
  * the collector when an export packet is received) if peer is NULL.  If peer
@@ -4537,8 +4833,6 @@ uint32_t fbCollectorGetNetflowMissed(
     uint32_t               obdomain);
 
 /**
- * fbCollectorGetSFlowMissed
- *
  * Returns the number of potential missed export packets of the
  * SFlow session that is identified with the given ip/agentID. The agent
  * ID is a field that is in the sFlow header and is sent with every
@@ -4581,16 +4875,26 @@ uint32_t fbCollectorGetObservationDomain(
     fbCollector_t  *collector);
 
 /**
- * Attempt to maintain backwards compatibility with UDP.  As of version 1.2,
- * fixbuf calls the appinit functions when a new UDP connection occurs, as
- * opposed to calling it during fbListenerAlloc.  To maintain compatibility,
- * with old applications, fixbuf will still call appinit in fbListenerAlloc
- * with a null peer address.  If UDP multi session is turned on, it will ALSO
- * call appinit() when a new UDP connection occurs.  Likewise with appfree().
- * Call fbListenerGetCollector() to obtain collector.
+ * Enables or disables multi-session mode for a @ref fbCollector_t associated
+ * with a UDP @ref fbListener_t.  The default setting is that multi-session
+ * mode is disabled.
+ *
+ * When multi-session mode is enabled, libfixbuf invokes the `appinit`
+ * callback (@ref fbListenerAppInit_fn) set on fbListenerAlloc() when a new
+ * UDP connection occurs, allowing the callback to examine the peer address
+ * and set a context for that UDP address.  In addition, the `appfree`
+ * callback (@ref fbListenerAppFree_fn) is invoked when the @ref fbSession_t
+ * for that collector times-out.
+ *
+ * Regardless of the multi-session mode setting, libfixbuf always calls the
+ * `appinit` function when a UDP listener is created, passing NULL as the peer
+ * address.
+ *
+ * The caller may use fbListenerGetCollector() to get the collector given a
+ * listener.
  *
  * @param collector     pointer to collector associated with listener.
- * @param multi_session TRUE if multi-session enabled, FALSE by default.
+ * @param multi_session TRUE to enable multi-session, FALSE to disable
  */
 void fbCollectorSetUDPMultiSession(
     fbCollector_t *collector,
@@ -4601,4 +4905,4 @@ void fbCollectorSetUDPMultiSession(
 } /* extern "C" */
 #endif
 
-#endif
+#endif /* _FB_PUBLIC_H_ */

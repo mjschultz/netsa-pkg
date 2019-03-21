@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- This file was generated using the maint/update-cert-ies.sh script -->
-<?xml-stylesheet type="text/xsl" href="ipfix.xsl"?><registry xmlns="http://www.iana.org/assignments" xmlns:cert="http://www.cert.org/ipfix" id="cert-ipfix">
+<?xml-stylesheet type="text/xsl" href="ipfix.xsl"?><registry xmlns="http://www.iana.org/assignments" xmlns:cert="http://www.cert.org/ipfix" id="cert_ipfix">
   <title>CERT IPFIX Registry</title>
   <created>2017-11-28</created>
-  <updated>2018-01-11</updated>
+  <updated>2019-02-20</updated>
   <registry id="cert-information-elements">
     <title>CERT Enterprise IPFIX Elements (PEN 6871)</title>
     <record>
@@ -35,6 +35,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>14</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          TCP flags on the initial packet in the forward direction of
+          the flow.
+        </paragraph>
+      </description>
       <revision>1</revision>
       <date>2017-12-19</date>
     </record>
@@ -47,6 +53,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>15</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Union of TCP flags of all packets other than the initial
+          packet in the forward direction of the flow.
+        </paragraph>
+      </description>
       <revision>1</revision>
       <date>2017-12-19</date>
     </record>
@@ -78,6 +90,11 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>18</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Initial bytes of flow payload in the forward direction.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
     <record>
@@ -106,6 +123,13 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>21</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Difference in milliseconds between the times of the first
+          packet in forward direction and the first packet in the
+          reverse direction.
+        </paragraph>
+      </description>
       <units>milliseconds</units>
       <revision>0</revision>
     </record>
@@ -157,6 +181,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>33</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Application label, defined as the primary well-known port
+          associated with a given application.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
     <record>
@@ -177,6 +207,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>36</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          p0f OS Name for the forward flow based on the SYN packet and
+          p0f SYN Fingerprints.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
     <record>
@@ -187,6 +223,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>37</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          p0f OS Version for the forward flow based on the SYN packet
+          and p0f SYN Fingerprints.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
     <record>
@@ -197,6 +239,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>38</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          IP and transport headers for first packet in forward
+          direction to be used for external OS Fingerprinters.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
     <record>
@@ -207,6 +255,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>39</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          IP and transport headers for first packet in forward
+          direction to be used for external OS Fingerprinters.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
     <record>
@@ -218,6 +272,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>40</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Miscellaneous flow attributes for the forward direction of
+          the flow.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
     <record>
@@ -228,6 +288,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>100</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Total number of packet fragments that have been expired
+          since yaf start time.
+        </paragraph>
+      </description>
       <units>packets</units>
       <revision>0</revision>
     </record>
@@ -239,6 +305,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>101</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Total number of packets that been assembled from a series of
+          fragments since yaf start time.
+        </paragraph>
+      </description>
       <units>packets</units>
       <revision>0</revision>
     </record>
@@ -249,6 +321,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>102</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The mean flow rate of the yaf flow sensor since yaf start
+          time, rounded to the nearest integer.
+        </paragraph>
+      </description>
       <units>flows</units>
       <revision>0</revision>
     </record>
@@ -259,6 +337,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>103</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The mean packet rate of the yaf flow sensor since yaf start
+          time, rounded to the nearest integer.
+        </paragraph>
+      </description>
       <units>packets</units>
       <revision>0</revision>
     </record>
@@ -270,6 +354,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>104</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Total number of times the yaf flow table has been flushed
+          since yaf start time.
+        </paragraph>
+      </description>
       <units>flows</units>
       <revision>0</revision>
     </record>
@@ -280,6 +370,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>105</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The maximum number of flows in the yaf flow table at any one
+          time since yaf start time.
+        </paragraph>
+      </description>
       <units>flows</units>
       <revision>0</revision>
     </record>
@@ -291,6 +387,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>106</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The 32 bit hash of the 5-tuple and VLAN that is used as they
+          key to YAF's internal flow table.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
     <record>
@@ -301,6 +403,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>107</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          p0f OS Fingerprint for the forward flow based on the SYN
+          packet and p0f SYN fingerprints.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
     <record>
@@ -390,6 +498,102 @@
       <revision>0</revision>
     </record>
     <record>
+      <name>rrIPv4</name>
+      <dataType>ipv4Address</dataType>
+      <group>analysis-pipeline</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>302</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          IPv4 address than a dns query resolved to in a resource record. It is
+          from the yaf-DNS template. Called rrIPv4 instead of sourceIPv4Address
+           for disambiguation purposes.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+    </record>
+    <record>
+      <name>rrIPv6</name>
+      <dataType>ipv6Address</dataType>
+      <group>analysis-pipeline</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>303</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          IPv6 address than a dns query resolved to in a resource record. It is
+          from the yaf-DNS template. Called rrIPv4 instead of sourceIPv4Address            for disambiguation purposes.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+    </record>
+    <record>
+      <name>DNSKEY_protocolIdentifier</name>
+      <dataType>unsigned8</dataType>
+      <group>analysis-pipeline</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>304</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Protocol from a DNS-KEY record out of YAF.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+    </record>
+    <record>
+      <name>DNS_A_RECORD</name>
+      <dataType>subTemplateList</dataType>
+      <group>analysis-pipeline</group>
+      <dataTypeSemantics>list</dataTypeSemantics>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>305</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Element holding an entire DNS A record, which is a sub template list
+          when emitted from YAF. This is used in Analysis Pipeline for fast
+          flux.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+    </record>
+    <record>
+      <name>DNS_AAAA_RECORD</name>
+      <dataType>subTemplateList</dataType>
+      <group>analysis-pipeline</group>
+      <dataTypeSemantics>list</dataTypeSemantics>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>306</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Element holding an entire DNS AAAA record, which is a sub template
+          list when emitted from YAF. This is used in Analysis Pipeline for
+          fast flux.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+    </record>
+    <record>
+      <name>DNS_RESOURCE_RECORD</name>
+      <dataType>subTemplateList</dataType>
+      <group>analysis-pipeline</group>
+      <dataTypeSemantics>list</dataTypeSemantics>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>307</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Element holding an entire DNS resource record, which is a sub template
+          list when emitted from YAF. This is used in Analysis Pipeline.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2018-11-29</date>
+    </record>
+    <record>
       <name>smallPacketCount</name>
       <dataType>unsigned32</dataType>
       <group>yaf</group>
@@ -398,6 +602,11 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>500</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The number of packets that contain less than 60 bytes of payload.
+        </paragraph>
+      </description>
       <units>packets</units>
       <revision>0</revision>
     </record>
@@ -410,6 +619,11 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>501</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The number of packets that contain at least 1 byte of payload.
+        </paragraph>
+      </description>
       <units>packets</units>
       <revision>0</revision>
     </record>
@@ -422,6 +636,11 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>502</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Total bytes transferred as payload.
+        </paragraph>
+      </description>
       <units>octets</units>
       <revision>0</revision>
     </record>
@@ -433,6 +652,11 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>503</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Average number of milliseconds between packets.
+        </paragraph>
+      </description>
       <units>milliseconds</units>
       <revision>0</revision>
     </record>
@@ -444,6 +668,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>504</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Standard deviation of the interarrival time for up to the
+          first ten packets.
+        </paragraph>
+      </description>
       <units>milliseconds</units>
       <revision>0</revision>
     </record>
@@ -456,6 +686,11 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>505</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Payload length of the first non-empty packet.
+        </paragraph>
+      </description>
       <units>octets</units>
       <revision>0</revision>
     </record>
@@ -468,6 +703,11 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>506</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The largest payload length transferred in the flow.
+        </paragraph>
+      </description>
       <units>octets</units>
       <revision>0</revision>
     </record>
@@ -480,6 +720,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>507</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          Represents directionality for the first 8 non-empty
+          packets. 0 for forward direction, 1 for reverse direction.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
     <record>
@@ -490,6 +736,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>508</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The standard deviation of the payload length for up to the
+          first 10 non empty packets.
+        </paragraph>
+      </description>
       <units>octets</units>
       <revision>0</revision>
     </record>
@@ -502,6 +754,11 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>509</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The number of TCP packets that have the URGENT Flag set.
+        </paragraph>
+      </description>
       <units>packets</units>
       <revision>0</revision>
     </record>
@@ -514,6 +771,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>510</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          The number of packets that contain at least 220 bytes of
+          payload.
+        </paragraph>
+      </description>
       <units>packets</units>
       <revision>0</revision>
     </record>
@@ -525,6 +788,12 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>550</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          An identifier of a tombstone record that is unique within the
+          process that initially generates the record.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
     <record>
@@ -535,6 +804,11 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>551</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          An identifier for this process chosen by the user.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
     <record>
@@ -545,7 +819,54 @@
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>552</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          A pseudo-random number to identify this exporting process.
+        </paragraph>
+      </description>
       <revision>0</revision>
+    </record>
+    <record>
+      <name>certToolId</name>
+      <dataType>unsigned32</dataType>
+      <group>tombstone</group>
+      <dataTypeSemantics>identifier</dataTypeSemantics>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>553</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          An identifier for each CERT tool.
+        </paragraph>
+        <artwork>
+1 - YAF
+2 - super_mediator
+3 - SiLK rwflowpack
+4 - SiLK rwflowappend
+5 - Mothra IPFIX Packer
+6 - Analysis Pipeline
+        </artwork>
+      </description>
+      <range>1-6</range>
+      <revision>0</revision>
+      <date>2019-02-20</date>
+    </record>
+    <record>
+      <name>tombstoneAccessList</name>
+      <dataType>subTemplateList</dataType>
+      <group>tombstone</group>
+      <dataTypeSemantics>list</dataTypeSemantics>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>554</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          A list containing a certToolId and the time when that tool accessed
+          the tombstone record.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-02-20</date>
     </record>
     <record>
       <name>dnsRName</name>
@@ -604,10 +925,10 @@
     </record>
   </registry>
   <people>
-    <person id="Michael_Duggan">
-      <name>Michael Duggan</name>
-      <uri>mailto:mwd@cert.org</uri>
-      <updated>2017-11-28</updated>
+    <person id="Netsa_Tools">
+      <name>Netsa Tools Help</name>
+      <uri>mailto:netsa-help@cert.org</uri>
+      <updated>2018-05-01</updated>
     </person>
   </people>
 </registry>

@@ -1,0 +1,81 @@
+/*
+ *
+ ** @file ipfixDumpPrint.h
+ ** ------------------------------------------------------------------------
+ ** Copyright (C) 2006-2019 Carnegie Mellon University. All Rights Reserved.
+ ** ------------------------------------------------------------------------
+ ** Authors: Emily Sarneso <netsa-help@cert.org>
+ ** ------------------------------------------------------------------------
+ ** @OPENSOURCE_LICENSE_START@
+ ** libfixbuf 2.0
+ **
+ ** Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
+ **
+ ** NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
+ ** ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
+ ** BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY KIND,
+ ** EITHER EXPRESSED OR IMPLIED, AS TO ANY MATTER INCLUDING, BUT NOT
+ ** LIMITED TO, WARRANTY OF FITNESS FOR PURPOSE OR MERCHANTABILITY,
+ ** EXCLUSIVITY, OR RESULTS OBTAINED FROM USE OF THE
+ ** MATERIAL. CARNEGIE MELLON UNIVERSITY DOES NOT MAKE ANY WARRANTY OF
+ ** ANY KIND WITH RESPECT TO FREEDOM FROM PATENT, TRADEMARK, OR
+ ** COPYRIGHT INFRINGEMENT.
+ **
+ ** Released under a GNU-Lesser GPL 3.0-style license, please see
+ ** LICENSE.txt or contact permission@sei.cmu.edu for full terms.
+ **
+ ** [DISTRIBUTION STATEMENT A] This material has been approved for
+ ** public release and unlimited distribution.  Please see Copyright
+ ** notice for non-US Government use and distribution.
+ **
+ ** Carnegie Mellon(R) and CERT(R) are registered in the U.S. Patent
+ ** and Trademark Office by Carnegie Mellon University.
+ **
+ ** DM18-0325
+ ** @OPENSOURCE_LICENSE_END@
+ ** ------------------------------------------------------------------------
+ */
+
+#include <fixbuf/public.h>
+
+#define FIXBUF_PACKAGE_NAME    "@FIXBUF_PACKAGE_NAME@"
+#define FIXBUF_PACKAGE_VERISON "@FIXBUF_PACKAGE_VERSION@"
+#define FIXBUF_PACKAGE_DATADIR "@FIXBUF_PACKAGE_DATADIR@"
+
+#define CERT_IPFIX_BASENAME    "cert_ipfix.xml"
+
+typedef struct tmplContext_st {
+    uint32_t           count;
+    uint16_t           len;
+    uint16_t           tid;
+    gboolean           is_meta_template;
+    gboolean           is_meta_element;
+} tmplContext_t;
+
+
+void idPrintHeader(
+    FILE              *outfile,
+    fBuf_t            *fbuf);
+
+uint16_t idPrintTemplate(
+    FILE              *fp,
+    fbTemplate_t      *tmpl,
+    void              **ctx,
+    uint16_t          tid,
+    gboolean          noprint);
+
+void idPrintDataRecord(
+    FILE         *fp,
+    fbTemplate_t *tmpl,
+    uint8_t      *buffer,
+    size_t       buf_len,
+    int          rec_count,
+    char         *str_prefix);
+
+extern int id_tmpl_stats[];
+extern gboolean only_stats;
+extern GHashTable *template_names;
+extern uint32_t hexdump;
+extern uint32_t sequence_number;
+extern size_t msglen;
+

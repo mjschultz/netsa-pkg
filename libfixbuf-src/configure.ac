@@ -6,7 +6,7 @@ dnl ------------------------------------------------------------------------
 dnl @OPENSOURCE_LICENSE_START@
 dnl libfixbuf 2.0
 dnl
-dnl Copyright 2018 Carnegie Mellon University. All Rights Reserved.
+dnl Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
 dnl
 dnl NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
 dnl ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -35,20 +35,21 @@ dnl Authors: Brian Trammell, Dan Ruef <druef@cert.org>, Chris Inacio
 dnl <inacio@cert.org>
 dnl ------------------------------------------------------------------------
 
-AC_INIT([libfixbuf], [2.1.0], [netsa-help@cert.org], [libfixbuf], [http://tools.netsa.cert.org/fixbuf/])
+AC_INIT([libfixbuf], [2.3.0], [netsa-help@cert.org], [libfixbuf], [http://tools.netsa.cert.org/fixbuf/])
 AC_CONFIG_AUX_DIR([autoconf])
-AC_COPYRIGHT([Copyright (C) 2006-2018 by Carnegie Mellon University
+AC_COPYRIGHT([Copyright (C) 2006-2019 by Carnegie Mellon University
 GNU Public License (GPL) Rights pursuant to Version 3, June 2007])
 
-AM_INIT_AUTOMAKE([1.6.3 foreign])
+AM_INIT_AUTOMAKE([1.6.3 foreign nostdinc])
 
 dnl change this version number every new release. (1:0:0 starts at 1.3.0)
 dnl the first number should be changed if the interface has changed
 dnl the second number should be changed for bug fixes, small changes
 dnl the third number should be changed if the first number changes and
 dnl the release is backwards compatible with the previous release.
+dnl https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
 
-LIBCOMPAT="7:0:1"
+LIBCOMPAT="9:0:0"
 
 AM_CONFIG_HEADER(include/fixbuf/config.h)
 AC_CONFIG_MACRO_DIR([m4])
@@ -60,11 +61,11 @@ AM_MISSING_PROG(XSLTPROC, xsltproc)
 AC_PROG_CC
 AC_PROG_CXX
 AC_PROG_INSTALL
+AC_PROG_LN_S
 AC_PROG_MAKE_SET
+AC_PROG_MKDIR_P
 AC_HEADER_STDC
 AC_LANG_C
-
-AC_SUBST([AM_CPPFLAGS], ['-I$(top_builddir)/include -I$(top_srcdir)/include'])
 
 AC_HEADER_STDC
 AC_CHECK_HEADERS([unistd.h stdint.h errno.h netinet/in.h sys/errno.h sys/socket.h pthread.h])
@@ -72,6 +73,13 @@ AC_CHECK_HEADERS([unistd.h stdint.h errno.h netinet/in.h sys/errno.h sys/socket.
 AM_WITH_DMALLOC
 
 AC_DEBUG
+
+if test "X${srcdir}" = "X." ; then
+    # building in place
+    AC_SUBST([AM_CPPFLAGS], ['-I. -I$(top_srcdir)/include'])
+else
+    AC_SUBST([AM_CPPFLAGS], ['-I. -I$(srcdir) -I$(top_builddir)/include -I$(top_srcdir)/include'])
+fi
 
 RPM_CONFIG_FLAGS=""
 
@@ -160,6 +168,7 @@ AC_ARG_ENABLE([abort-on-default-sizespec],
         if test "x$enableval" = "xno"
         then
           fb_abort_on_default_sizespec=0
+          RPM_CONFIG_FLAGS="${RPM_CONFIG_FLAGS} --disable-abort-on-default-sizespec"
         fi
     ])
 AC_DEFINE_UNQUOTED([FB_ABORT_ON_DEFAULTED_LENGTH],
@@ -176,7 +185,7 @@ if test "x$withval" != "xno"; then
 
   if test -d ${withval}; then
     LDFLAGS="-L${withval}/lib ${LDFLAGS}"
-    CFLAGS="-I{withval}/include ${CFLAGS}"
+    CPPFLAGS="-I${withval}/include ${CPPFLAGS}"
     RPM_CONFIG_FLAGS="${RPM_CONFIG_FLAGS} --with-sctp=${withval}"
   else
     RPM_CONFIG_FLAGS="${RPM_CONFIG_FLAGS} --with-sctp"
@@ -221,7 +230,7 @@ AC_ARG_WITH(openssl,
 AC_HELP_STRING([--with-openssl=prefix], [Use OpenSSL for TLS/DTLS support]),[
 if test -d ${withval}; then
     LDFLAGS="-L${withval}/lib ${LDFLAGS}"
-    CFLAGS="-I{withval}/include ${CFLAGS}"
+    CPPFLAGS="-I${withval}/include ${CPPFLAGS}"
     RPM_CONFIG_FLAGS="${RPM_CONFIG_FLAGS} --with-openssl=${withval}"
 else
     RPM_CONFIG_FLAGS="${RPM_CONFIG_FLAGS} --with-openssl"
@@ -270,6 +279,30 @@ dnl automake 1.9 doesn't substitute these automatically, so we do it ourselves
 dnl just in case
 AC_SUBST([abs_top_srcdir])
 AC_SUBST([abs_top_builddir])
+
+dnl ----------------------------------------------------------------------
+dnl Make installation of ipfixDump optional
+dnl ----------------------------------------------------------------------
+
+AC_ARG_ENABLE([tools],
+    [AS_HELP_STRING([--disable-tools],
+        [do not build or install ipfixDump and cert_ipfix.xml])[]dnl
+    ],[
+        # value of argument to --enable-tools
+        enable_tools=${enableval}
+    ],[
+        # the --enable-tools switch was not given; enable them
+        enable_tools=yes
+    ])
+AM_CONDITIONAL([ENABLE_TOOLS], [test "x${enable_tools}" = "xyes"])
+
+dnl ----------------------------------------------------------------------
+dnl Miscellaneous checks
+dnl ----------------------------------------------------------------------
+
+AC_PATH_PROG([POD2MAN],  [pod2man])
+AC_PATH_PROG([POD2HTML], [pod2html])
+AC_SUBST([BUILD_DATE], ["`date +'%v'`"])
 
 PACKAGE_VERSION_SPLIT
 
