@@ -842,7 +842,7 @@ char *probeconfscan_text;
 #line 1 "probeconfscan.l"
 #line 2 "probeconfscan.l"
 /*
-** Copyright (C) 2005-2018 by Carnegie Mellon University.
+** Copyright (C) 2005-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -856,7 +856,7 @@ char *probeconfscan_text;
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconfscan.l 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: probeconfscan.l 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include "probeconfscan.h"
 #include "probeconfparse.h"

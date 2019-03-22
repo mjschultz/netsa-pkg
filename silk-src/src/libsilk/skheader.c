@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2018 by Carnegie Mellon University.
+** Copyright (C) 2006-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -22,7 +22,7 @@
 #define  SKHEADER_SOURCE    1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skheader.c 06ffa717c9e8 2018-01-31 21:31:26Z mthomas $");
+RCSIDENT("$SiLK: skheader.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include "skheader_priv.h"
 #include "skstream_priv.h"

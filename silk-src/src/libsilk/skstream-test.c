@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2018 by Carnegie Mellon University.
+** Copyright (C) 2007-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skstream-test.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: skstream-test.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include <silk/sksite.h>
 #include <silk/utils.h>

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2018 by Carnegie Mellon University.
+** Copyright (C) 2006-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -17,7 +17,7 @@
 #define SKFILEFORMAT_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skfileformat.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: skfileformat.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include <silk/silk_files.h>
 #include <silk/utils.h>

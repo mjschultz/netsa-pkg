@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2018 by Carnegie Mellon University.
+** Copyright (C) 2006-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skmsg.c 953c7660de6a 2018-12-12 17:28:55Z mthomas $");
+RCSIDENT("$SiLK: skmsg.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include "intdict.h"
 #include "multiqueue.h"

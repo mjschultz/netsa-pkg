@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2018 by Carnegie Mellon University.
+** Copyright (C) 2006-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsender.c 6523223c4e2c 2018-10-31 21:41:01Z mthomas $");
+RCSIDENT("$SiLK: rwsender.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skdaemon.h>

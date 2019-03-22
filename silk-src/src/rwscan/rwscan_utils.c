@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2018 by Carnegie Mellon University.
+** Copyright (C) 2006-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwscan_utils.c e69deb81239c 2018-03-13 14:56:37Z mthomas $");
+RCSIDENT("$SiLK: rwscan_utils.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include "rwscan.h"
 

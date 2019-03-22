@@ -1,5 +1,5 @@
 #######################################################################
-# Copyright (C) 2009-2018 by Carnegie Mellon University.
+# Copyright (C) 2009-2019 by Carnegie Mellon University.
 #
 # @OPENSOURCE_LICENSE_START@
 # See license information in ../../../LICENSE.txt
@@ -8,7 +8,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: gencerts.py a8e9e7fea4ad 2018-11-15 23:04:00Z mthomas $
+# $SiLK: gencerts.py 945cf5167607 2019-01-07 18:54:17Z mthomas $
 #######################################################################
 
 import sys

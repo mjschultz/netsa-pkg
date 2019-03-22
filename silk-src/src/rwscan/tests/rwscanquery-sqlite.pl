@@ -1,7 +1,7 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: rwscanquery-sqlite.pl e3e3e6e795a9 2018-03-15 19:45:45Z mthomas $")
+# RCSIDENT("$SiLK: rwscanquery-sqlite.pl 68480e7248a5 2018-12-21 18:02:37Z mthomas $")
 
 use strict;
 use SiLKTests;
@@ -24,6 +24,7 @@ my $rwsort = check_silk_app('rwsort');
 my %file;
 $file{data} = get_data_or_exit77('data');
 $file{scandata} = get_data_or_exit77('scandata');
+
 
 # the SQLite command
 my $sqlite = 'sqlite3';

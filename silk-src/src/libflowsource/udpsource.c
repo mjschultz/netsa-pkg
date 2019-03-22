@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2018 by Carnegie Mellon University.
+** Copyright (C) 2004-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: udpsource.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
+RCSIDENT("$SiLK: udpsource.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #if SK_ENABLE_ZLIB
 #include <zlib.h>

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #######################################################################
-# Copyright (C) 2009-2018 by Carnegie Mellon University.
+# Copyright (C) 2009-2019 by Carnegie Mellon University.
 #
 # @OPENSOURCE_LICENSE_START@
 # See license information in ../../../LICENSE.txt
@@ -9,7 +9,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: rwflowpack-daemon.py 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $
+# $SiLK: rwflowpack-daemon.py 945cf5167607 2019-01-07 18:54:17Z mthomas $
 #######################################################################
 from __future__ import print_function
 import optparse

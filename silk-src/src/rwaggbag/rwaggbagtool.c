@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2017-2018 by Carnegie Mellon University.
+** Copyright (C) 2017-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaggbagtool.c 7964448c3555 2018-12-12 17:39:37Z mthomas $");
+RCSIDENT("$SiLK: rwaggbagtool.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include <silk/skaggbag.h>
 #include <silk/skbag.h>

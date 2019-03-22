@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2018 by Carnegie Mellon University.
+** Copyright (C) 2005-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -59,7 +59,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwresolve.c 9dfb5116673a 2018-04-02 19:18:40Z mthomas $");
+RCSIDENT("$SiLK: rwresolve.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include <silk/hashlib.h>
 #include <silk/skipaddr.h>

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2010-2018 by Carnegie Mellon University.
+** Copyright (C) 2010-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skplugin-simple.c 7148c54d9884 2018-03-13 19:30:21Z mthomas $");
+RCSIDENT("$SiLK: skplugin-simple.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skdllist.h>

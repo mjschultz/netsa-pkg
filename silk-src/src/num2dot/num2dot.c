@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2018 by Carnegie Mellon University.
+** Copyright (C) 2001-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -21,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: num2dot.c 7148c54d9884 2018-03-13 19:30:21Z mthomas $");
+RCSIDENT("$SiLK: num2dot.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skstream.h>

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2018 by Carnegie Mellon University.
+** Copyright (C) 2005-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sknetstruct.c be7b495f86b1 2018-07-13 20:24:28Z mthomas $");
+RCSIDENT("$SiLK: sknetstruct.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>

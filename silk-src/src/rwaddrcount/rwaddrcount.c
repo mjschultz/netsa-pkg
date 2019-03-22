@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2018 by Carnegie Mellon University.
+** Copyright (C) 2001-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -27,7 +27,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaddrcount.c 71a35cb80036 2018-05-30 20:18:35Z mthomas $");
+RCSIDENT("$SiLK: rwaddrcount.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include <silk/iptree.h>
 #include <silk/rwrec.h>

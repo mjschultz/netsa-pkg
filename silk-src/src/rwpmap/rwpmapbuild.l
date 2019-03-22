@@ -1,6 +1,6 @@
 %{
 /*
-** Copyright (C) 2007-2018 by Carnegie Mellon University.
+** Copyright (C) 2007-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -19,7 +19,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmapbuild.l c6181353fab0 2018-04-05 20:48:33Z mthomas $");
+RCSIDENT("$SiLK: rwpmapbuild.l 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skprefixmap.h>

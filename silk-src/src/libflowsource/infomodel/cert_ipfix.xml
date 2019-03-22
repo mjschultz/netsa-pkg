@@ -6,7 +6,7 @@
 
   <title>CERT IPFIX Registry</title>
   <created>2017-11-28</created>
-  <updated>2018-11-29</updated>
+  <updated>2019-02-20</updated>
 
   <registry id="cert-information-elements">
     <title>CERT Enterprise IPFIX Elements (PEN 6871)</title>
@@ -3494,7 +3494,7 @@ id-at-name                   {id-at 41}
     <record>
       <name>Unassigned</name>
       <cert:enterpriseId>6871</cert:enterpriseId>
-      <elementId>307-499</elementId>
+      <elementId>308-499</elementId>
     </record>
 
     <record>
@@ -3710,6 +3710,12 @@ id-at-name                   {id-at 41}
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>550</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          An identifier of a tombstone record that is unique within the
+          process that initially generates the record.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
 
@@ -3721,6 +3727,11 @@ id-at-name                   {id-at 41}
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>551</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          An identifier for this process chosen by the user.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
 
@@ -3732,14 +3743,63 @@ id-at-name                   {id-at 41}
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>552</elementId>
       <status>current</status>
+      <description>
+        <paragraph>
+          A pseudo-random number to identify this exporting process.
+        </paragraph>
+      </description>
       <revision>0</revision>
     </record>
 
-    <!-- 553-926 unassigned -->
+    <record>
+      <name>certToolId</name>
+      <dataType>unsigned32</dataType>
+      <group>tombstone</group>
+      <dataTypeSemantics>identifier</dataTypeSemantics>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>553</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          An identifier for each CERT tool.
+        </paragraph>
+        <artwork>
+1 - YAF
+2 - super_mediator
+3 - SiLK rwflowpack
+4 - SiLK rwflowappend
+5 - Mothra IPFIX Packer
+6 - Analysis Pipeline
+        </artwork>
+      </description>
+      <range>1-6</range>
+      <revision>0</revision>
+      <date>2019-02-20</date>
+    </record>
+
+    <record>
+      <name>tombstoneAccessList</name>
+      <dataType>subTemplateList</dataType>
+      <group>tombstone</group>
+      <dataTypeSemantics>list</dataTypeSemantics>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>554</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          A list containing a certToolId and the time when that tool accessed
+          the tombstone record.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-02-20</date>
+    </record>
+
+    <!-- 555-926 unassigned -->
     <record>
       <name>Unassigned</name>
       <cert:enterpriseId>6871</cert:enterpriseId>
-      <elementId>553-926</elementId>
+      <elementId>555-926</elementId>
     </record>
 
     <record>

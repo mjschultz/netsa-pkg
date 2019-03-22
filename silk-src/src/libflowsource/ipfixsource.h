@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2018 by Carnegie Mellon University.
+** Copyright (C) 2006-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -31,7 +31,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_IPFIXSOURCE_H, "$SiLK: ipfixsource.h f7a89df0ba0f 2018-03-15 22:06:43Z mthomas $");
+RCSIDENTVAR(rcsID_IPFIXSOURCE_H, "$SiLK: ipfixsource.h 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/skipfix.h>
