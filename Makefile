@@ -12,7 +12,7 @@ libfixbuf:
 	(cd libfixbuf-src; \
 		autoreconf -if; \
 		./configure --prefix="${LIBFIXBUF_PREFIX}")
-	make -C libfixbuf-src
+	make -j -C libfixbuf-src
 	make -C libfixbuf-src install
 
 yaf:
@@ -21,7 +21,7 @@ yaf:
 		autoreconf -if; \
 		PKG_CONFIG_PATH="${LIBFIXBUF_PREFIX}/lib/pkgconfig" ./configure \
 			--prefix="${YAF_PREFIX}")
-	make -C yaf-src
+	make -j -C yaf-src
 	make -C yaf-src install
 
 silk:
@@ -32,7 +32,7 @@ silk:
 			--with-libfixbuf="${LIBFIXBUF_PREFIX}/lib/pkgconfig" \
 			--enable-ipv6 \
 			--prefix="${SILK_PREFIX}")
-	make -C silk-src
+	make -j -C silk-src
 	make -C silk-src install
 
 deb:
@@ -87,7 +87,7 @@ build_deb: libfixbuf yaf silk deb
 build_rpm: libfixbuf yaf silk rpm
 
 build_ubuntu:
-	$(eval IMAGE_ID = $(shell docker build --force-rm -q -f "packaging/scripts/buildimage_ubuntu-12.04/Dockerfile" .))
+	$(eval IMAGE_ID = $(shell docker build --force-rm -q -f "packaging/scripts/buildimage_ubuntu-16.04/Dockerfile" .))
 	docker run -v "${OUTPUT_DIR}:/netsa-pkg/packaging/output" $(IMAGE_ID) /usr/bin/make build_deb
 	chmod -R 776 ${OUTPUT_DIR}/*
 
