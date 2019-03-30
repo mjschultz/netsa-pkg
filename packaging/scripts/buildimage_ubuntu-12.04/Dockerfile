@@ -1,4 +1,4 @@
-FROM ubuntu:12.04
+FROM ubuntu:16.04
 MAINTAINER Bo Bayles <bbayles@gmail.com>
 
 RUN apt-get update && apt-get install -y \
@@ -15,12 +15,13 @@ RUN apt-get update && apt-get install -y \
     rpm \
     ruby \
     ruby-dev \
-    rubygems \
+    xsltproc \
     zlib1g \
     zlib1g-dev
 
 RUN gem install json -v 1.8.3
 RUN gem install ffi -v 1.9.18
+RUN gem install rake -v 10.5.0
 RUN gem install fpm -v 1.4.0
 
 ADD ["./libfixbuf-src/", "/netsa-pkg/libfixbuf-src/"]
