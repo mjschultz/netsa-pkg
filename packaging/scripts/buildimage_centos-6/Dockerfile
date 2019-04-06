@@ -10,7 +10,7 @@ RUN yum install -y \
     libpcap-devel \
     libtool \
     libtool-ltdl-devel \
-    libxstl \
+    libxslt \
     lzo-devel \
     make \
     rpm-build \
