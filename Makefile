@@ -1,5 +1,5 @@
 MAINTAINER = "Bo Bayles <bbayles+netsa@gmail.com>"
-VERSION = 20181214
+VERSION = 20190405
 PROC_ARCH ?= amd64
 TARGET_ROOT = $(shell pwd)/packaging/root
 YAF_PREFIX = ${TARGET_ROOT}/opt/yaf
