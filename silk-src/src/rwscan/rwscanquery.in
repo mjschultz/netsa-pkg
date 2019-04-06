@@ -1,13 +1,13 @@
 #! @PERL@
 #######################################################################
-# Copyright (C) 2006-2018 by Carnegie Mellon University.
+# Copyright (C) 2006-2019 by Carnegie Mellon University.
 #
 # @OPENSOURCE_LICENSE_START@
 # See license information in ../../LICENSE.txt
 # @OPENSOURCE_LICENSE_END@
 #
 #######################################################################
-# $SiLK: rwscanquery.in 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $
+# $SiLK: rwscanquery.in 945cf5167607 2019-01-07 18:54:17Z mthomas $
 #######################################################################
 # rwscanquery
 #
@@ -1106,7 +1106,7 @@ sub tool_version_exit()
 
     print <<EOF;
 $appname: Part of $pkg
-Copyright (C) 2001-2018 by Carnegie Mellon University
+Copyright (C) 2001-2019 by Carnegie Mellon University
 GNU General Public License (GPL) Rights pursuant to Version 2, June 1991.
 Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013.
 Send bug reports, feature requests, and comments to $bugs.

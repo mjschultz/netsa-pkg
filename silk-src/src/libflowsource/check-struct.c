@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2008-2018 by Carnegie Mellon University.
+** Copyright (C) 2008-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -21,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcs_CHECK_STRUCT_C, "$SiLK: check-struct.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENTVAR(rcs_CHECK_STRUCT_C, "$SiLK: check-struct.c ed0d50d01fa4 2019-03-01 19:40:55Z mthomas $");
 
 
 /*
@@ -290,17 +290,25 @@ skiCheckDataStructure(
     if (!tmpl) { goto END; }
     RESET_COUNTERS();
     PRINT_TITLE(ski_tombstone_t);
+    PRINT_OFFSET(pos, ski_tombstone_t, observationDomainId);
+    PRINT_OFFSET(pos, ski_tombstone_t, exportingProcessId);
     PRINT_OFFSET(pos, ski_tombstone_t, exporterConfiguredId);
     PRINT_OFFSET(pos, ski_tombstone_t, exporterUniqueId);
+    PRINT_OFFSET(pos, ski_tombstone_t, paddingOctets);
     PRINT_OFFSET(pos, ski_tombstone_t, tombstoneId);
+    PRINT_OFFSET(pos, ski_tombstone_t, observationTimeSeconds);
 #if SKIPFIX_ENABLE_TOMBSTONE_TIMES
     PRINT_OFFSET(pos, ski_tombstone_t, stl);
+#if FIXBUF_CHECK_VERSION(2,3,0)
+    PRINT_OFFSET(pos, ski_tombstone_t, tombstoneAccessList);
 #endif
+#endif  /* SKIPFIX_ENABLE_TOMBSTONE_TIMES */
 
     tmpl = checkDataStructPrepTemplate(ski_tombstone_access_spec, 0, session);
     if (!tmpl) { goto END; }
     RESET_COUNTERS();
     PRINT_TITLE(ski_tombstone_access_t);
+    PRINT_OFFSET(pos, ski_tombstone_access_t, certToolId);
     PRINT_OFFSET(pos, ski_tombstone_access_t, exportingProcessId);
     PRINT_OFFSET(pos, ski_tombstone_access_t, observationTimeSeconds);
 

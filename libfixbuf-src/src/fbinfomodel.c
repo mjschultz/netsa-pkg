@@ -3,14 +3,14 @@
  ** IPFIX Information Model and IE storage management
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2019 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell
  ** ------------------------------------------------------------------------
  ** @OPENSOURCE_LICENSE_START@
  ** libfixbuf 2.0
  **
- ** Copyright 2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
  **
  ** NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
  ** ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -48,7 +48,6 @@ struct fbInfoModel_st {
     GHashTable          *ie_byname;
     GStringChunk        *ie_names;
     GStringChunk        *ie_desc;
-    GPtrArray           *ie_list;
 };
 
 
@@ -118,8 +117,6 @@ fbInfoModel_t       *fbInfoModelAlloc()
 
     model->ie_byname = g_hash_table_new(g_str_hash, g_str_equal);
 
-    model->ie_list = g_ptr_array_new();
-
     /* Allocate information element name chunk */
     model->ie_names = g_string_chunk_new(64);
     model->ie_desc = g_string_chunk_new(128);
@@ -134,11 +131,13 @@ fbInfoModel_t       *fbInfoModelAlloc()
 void                fbInfoModelFree(
     fbInfoModel_t       *model)
 {
+    if (NULL == model) {
+        return;
+    }
     g_hash_table_destroy(model->ie_byname);
     g_string_chunk_free(model->ie_names);
     g_string_chunk_free(model->ie_desc);
     g_hash_table_destroy(model->ie_table);
-    g_ptr_array_free(model->ie_list, TRUE);
     g_slice_free(fbInfoModel_t, model);
 }
 
@@ -168,6 +167,8 @@ void                fbInfoModelAddElement(
     fbInfoElement_t     *found;
     char                revname[FB_IE_REVERSE_BUFSZ];
 
+    g_assert(ie);
+
     /* Allocate a new information element */
     model_ie = g_slice_new0(fbInfoElement_t);
 
@@ -189,20 +190,24 @@ void                fbInfoModelAddElement(
 
     /* Insert model IE into tables */
     if ((found = g_hash_table_lookup(model->ie_table, model_ie))) {
-        /* replace it if already exists */
-        /* insert will replace but only will replace the value, not the key */
-        /* since insert frees the value and the key and the value are the */
-        /* same - this creates a problem.  g_hash_table_replace replaces */
-        /* the key and the value */
+        /* use g_hash_table_replace() if the ent/num already exists.
+         * insert() will replace but it only replaces the value, not
+         * the key.  since insert() frees the value and the key and
+         * the value are the same - this creates a problem.  replace()
+         * replaces the key and the value. */
+
+        /* since it is possible that 'found' has a different name than
+         * 'model_ie', we need to remove 'found' from the ie_byname
+         * table to avoid having a reference to freed memory.  it's
+         * also possible that 'found' is only in the ie_table. */
+        if (g_hash_table_lookup(model->ie_byname, found->ref.name) == found) {
+            g_hash_table_remove(model->ie_byname, found->ref.name);
+        }
         g_hash_table_replace(model->ie_table, model_ie, model_ie);
     } else {
         g_hash_table_insert(model->ie_table, model_ie, model_ie);
     }
 
-    if ((found = g_hash_table_lookup(model->ie_byname, model_ie->ref.name))) {
-        g_ptr_array_remove(model->ie_list, found);
-    }
-    g_ptr_array_add(model->ie_list, model_ie);
     g_hash_table_insert(model->ie_byname, (char *)model_ie->ref.name,model_ie);
 
     /* Short circuit if not reversible */
@@ -228,11 +233,14 @@ void                fbInfoModelAddElement(
     model_ie->type = ie->type;
 
     /* Insert model IE into tables */
-    g_hash_table_insert(model->ie_table, model_ie, model_ie);
-    if ((found = g_hash_table_lookup(model->ie_byname, model_ie->ref.name))) {
-        g_ptr_array_remove(model->ie_list, found);
+    if ((found = g_hash_table_lookup(model->ie_table, model_ie))) {
+        if (g_hash_table_lookup(model->ie_byname, found->ref.name) == found) {
+            g_hash_table_remove(model->ie_byname, found->ref.name);
+        }
+        g_hash_table_replace(model->ie_table, model_ie, model_ie);
+    } else {
+        g_hash_table_insert(model->ie_table, model_ie, model_ie);
     }
-    g_ptr_array_add(model->ie_list, model_ie);
     g_hash_table_insert(model->ie_byname, (char *)model_ie->ref.name,model_ie);
 }
 
@@ -240,6 +248,7 @@ void                fbInfoModelAddElementArray(
     fbInfoModel_t       *model,
     fbInfoElement_t     *ie)
 {
+    g_assert(ie);
     for (; ie->ref.name; ie++) fbInfoModelAddElement(model, ie);
 }
 
@@ -291,6 +300,7 @@ const fbInfoElement_t     *fbInfoModelGetElementByName(
     fbInfoModel_t       *model,
     const char          *name)
 {
+    g_assert(name);
     return g_hash_table_lookup(model->ie_byname, name);
 }
 
@@ -299,7 +309,6 @@ const fbInfoElement_t    *fbInfoModelGetElementByID(
     uint16_t           id,
     uint32_t           ent)
 {
-
     fbInfoElement_t tempElement;
 
     tempElement.midx = 0;
@@ -343,17 +352,26 @@ fbTemplate_t *fbInfoElementAllocTypeTemplate(
     fbInfoModel_t          *model,
     GError                 **err)
 {
-    fbTemplate_t *tmpl = NULL;
+    return fbInfoElementAllocTypeTemplate2(model, TRUE, err);
+}
+
+fbTemplate_t *fbInfoElementAllocTypeTemplate2(
+    fbInfoModel_t          *model,
+    gboolean                internal,
+    GError                 **err)
+{
+    fbTemplate_t *tmpl;
+    uint32_t flags;
+
+    flags = internal ? ~0 : 0;
 
     tmpl = fbTemplateAlloc(model);
-
-    if (!fbTemplateAppendSpecArray(tmpl, ie_type_spec, 0xffffffff, err))
+    if (!fbTemplateAppendSpecArray(tmpl, ie_type_spec, flags, err)) {
+        fbTemplateFreeUnused(tmpl);
         return NULL;
-
+    }
     fbTemplateSetOptionsScope(tmpl, 2);
-
     return tmpl;
-
 }
 
 gboolean fbInfoElementWriteOptionsRecord(
@@ -363,9 +381,9 @@ gboolean fbInfoElementWriteOptionsRecord(
     uint16_t                etid,
     GError                  **err)
 {
-
     fbInfoElementOptRec_t   rec;
 
+    g_assert(model_ie);
     if (model_ie == NULL) {
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_NOELEMENT,
                     "Invalid [NULL] Information Element");
@@ -503,24 +521,26 @@ gboolean fbInfoModelTypeInfoRecord(
 guint fbInfoModelCountElements(
     const fbInfoModel_t *model)
 {
-    return model->ie_list->len;
+    return g_hash_table_size(model->ie_table);
 }
 
 void fbInfoModelIterInit(
     fbInfoModelIter_t   *iter,
     const fbInfoModel_t *model)
 {
-    iter->model = model;
-    iter->index = 0;
+    g_assert(iter);
+    g_hash_table_iter_init(iter, model->ie_table);
 }
 
 const fbInfoElement_t *fbInfoModelIterNext(
     fbInfoModelIter_t *iter)
 {
-    if (iter->index >= iter->model->ie_list->len) {
-        return NULL;
+    const fbInfoElement_t *ie;
+    g_assert(iter);
+    if (g_hash_table_iter_next(iter, NULL, (gpointer *)&ie)) {
+        return ie;
     }
-    return g_ptr_array_index(iter->model->ie_list, iter->index++);
+    return NULL;
 }
 
 const fbInfoElement_t     *fbInfoModelAddAlienElement(

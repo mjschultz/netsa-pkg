@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2018 by Carnegie Mellon University.
+** Copyright (C) 2005-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_STRINGMAP_H, "$SiLK: skstringmap.h ebac5d25b6ab 2018-04-13 20:35:03Z mthomas $");
+RCSIDENTVAR(rcsID_STRINGMAP_H, "$SiLK: skstringmap.h 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include <silk/silk_types.h>
 

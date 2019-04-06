@@ -1,5 +1,5 @@
 #######################################################################
-## Copyright (C) 2008-2018 by Carnegie Mellon University.
+## Copyright (C) 2008-2019 by Carnegie Mellon University.
 ##
 ## @OPENSOURCE_LICENSE_START@
 ## See license information in ../LICENSE.txt
@@ -8,7 +8,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: silk-python-info.py 1b62aa0bd784 2018-02-15 22:09:29Z mthomas $
+# $SiLK: silk-python-info.py 945cf5167607 2019-01-07 18:54:17Z mthomas $
 #######################################################################
 
 import sys

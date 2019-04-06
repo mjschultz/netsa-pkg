@@ -129,7 +129,7 @@
 .\" ========================================================================
 .\"
 .IX Title "AIRDAEMON 1"
-.TH AIRDAEMON 1 "%v" "2.9.4" "airframe"
+.TH AIRDAEMON 1 "%v" "2.11.0" "airframe"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -140,7 +140,7 @@ airdaemon \- Run a program as a daemon process, restarting it if it dies
 .IX Header "SYNOPSIS"
 .Vb 5
 \&    airdaemon   [\-\-retry RETRY_DELAY] [\-\-retry\-max RETRY_MAX_DELAY]
-\&                [\-\-pidfile PID_FILE] [\-\-airdaemon\-pidfile PID_FILE] 
+\&                [\-\-pidfile PID_FILE] [\-\-airdaemon\-pidfile PID_FILE]
 \&                [\-\-log LOG_SPECIFIER] [\-\-loglevel LOG_LEVEL]
 \&                [\-\-verbose] [\-\-version] [\-\-no\-daemon]
 \&                \-\- PROGRAM [PROGRAM_ARGS]
@@ -167,7 +167,7 @@ to restart the child process.  See also \fB\-\-retry\-max\fR
 .IP "\fB\-\-retry\-max\fR=\fI\s-1RETRY_MAX_DELAY\s0\fR" 4
 .IX Item "--retry-max=RETRY_MAX_DELAY"
 This parameter, combined with the \fB\-\-retry\fR parameter, facilitates truncated
-binary exponential backoff of the retry logic.	The first retry attempt will
+binary exponential backoff of the retry logic.  The first retry attempt will
 be delayed by the value of the \fB\-\-retry\fR parameter.  If the child process
 exits abnormally within this time period, the delay is doubled.  Once the
 child process survives longer than the value of the \fB\-\-retry\fR parameter, the
@@ -191,7 +191,7 @@ normally during shutdown, airdaemon will terminate normally as well, so it
 is usually sufficient just to kill the pid in this file at shutdown.
 .IP "\fB\-\-airdaemon\-pidfile\fR=\fI\s-1PID_FILE\s0\fR" 4
 .IX Item "--airdaemon-pidfile=PID_FILE"
-Write the process identifier of the airdaemon process to \fI\s-1PID_FILE\s0\fR. 
+Write the process identifier of the airdaemon process to \fI\s-1PID_FILE\s0\fR.
 This option exists to facilitate the termination of the forked
 airdaemon process by shutdown scripts.
 .IP "\fB\-\-no\-daemon\fR" 4
@@ -199,19 +199,19 @@ airdaemon process by shutdown scripts.
 Do not actually daemonize.  Mainly useful for testing/debugging.
 .SS "Logging Options"
 .IX Subsection "Logging Options"
-These options are used to specify how log messages are routed.  airdaemon can 
+These options are used to specify how log messages are routed.  airdaemon can
 log to standard error, regular files, or the \s-1UNIX\s0 syslog facility.
 .IP "\fB\-\-log\fR \fI\s-1LOG_SPECIFIER\s0\fR" 4
 .IX Item "--log LOG_SPECIFIER"
 Specifies destination for log messages. \fI\s-1LOG_SPECIFIER\s0\fR can be a \fIsyslog\fR\|(3)
-facility name, the special value \fBstderr\fR for standard error, or the 
-\&\fIabsolute\fR path to a file for file logging. Standard error logging is only 
-available in \fB\-\-daemon\fR mode if \fB\-\-foreground\fR is present. The default log 
+facility name, the special value \fBstderr\fR for standard error, or the
+\&\fIabsolute\fR path to a file for file logging. Standard error logging is only
+available in \fB\-\-daemon\fR mode if \fB\-\-foreground\fR is present. The default log
 specifier is \fBstderr\fR if available, \fBuser\fR otherwise.
 .IP "\fB\-\-loglevel\fR \fI\s-1LOG_LEVEL\s0\fR" 4
 .IX Item "--loglevel LOG_LEVEL"
-Specify minimum level for logged messages. In increasing levels of verbosity, 
-the supported log levels are \fBquiet\fR, \fBerror\fR, \fBcritical\fR, \fBwarning\fR, 
+Specify minimum level for logged messages. In increasing levels of verbosity,
+the supported log levels are \fBquiet\fR, \fBerror\fR, \fBcritical\fR, \fBwarning\fR,
 \&\fBmessage\fR, \fBinfo\fR, and \fBdebug\fR. The default logging level is \fBwarning\fR.
 .IP "\fB\-\-verbose\fR" 4
 .IX Item "--verbose"
@@ -236,15 +236,15 @@ minutes:
 .Ve
 .SH "BUGS"
 .IX Header "BUGS"
-Known issues are listed in the \fB\s-1README\s0\fR file in the Airframe source 
+Known issues are listed in the \fB\s-1README\s0\fR file in the Airframe source
 distribution. Note that airdaemon should be considered alpha-quality software;
-not every concievable input and aggregation is exhaustively tested at each 
-release, and specific features may be completely untested. Please be mindful 
-of this before deploying airdaemon in production environments. Bug reports and 
+not every concievable input and aggregation is exhaustively tested at each
+release, and specific features may be completely untested. Please be mindful
+of this before deploying airdaemon in production environments. Bug reports and
 feature requests may be sent via email to <netsa\-help@cert.org>.
 .SH "AUTHORS"
 .IX Header "AUTHORS"
-Tony Cebzanov and  Brian Trammell for the 
+Tony Cebzanov and  Brian Trammell for the
 \&\s-1CERT\s0 Network Situational Awareness
 Group, http://www.cert.org/netsa
 .SH "SEE ALSO"

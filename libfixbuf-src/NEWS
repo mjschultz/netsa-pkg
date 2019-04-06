@@ -1,12 +1,37 @@
+Version 2.3.0: 2019-03-18
+=========================
+
+Added the ipfixDump application which used to be included with YAF, and made
+many changes to the application.  Use configure --disable-tools to prevent
+building and installing ipfixDump.
+
+Fixed bugs in reading and writing information elements whose type was list and
+elementId was a value other than 291, 292, or 293.
+
+Changed the layout of the options templates used for exporting RFC 5610
+information element type information and exporting template metadata.
+
+Version 2.2.0: 2018-11-29
+=========================
+
+Added functions to return the buffer size required to read a template and the
+maximum buffer size to process all known templates in a session.
+
+Modified library to return an error when a user attempts to use a reserved
+template ID.
+
+Fixed a potential use-after-free bug triggered by pyfixbuf.
+
 Version 2.1.0: 2018-07-12
 =========================
 
-Add functions to update the Information Model with Information Elements read
-from a file or a string containing XML data
+Added functions to update the Information Model with Information Elements read
+from a file or a string containing XML data.
 
-Set an element's endian flag when incorporating elements from options records
+Ensured that an element's endian flag is properly set when incorporating
+elements from options records.
 
-GLib 2.18 or later is now required
+Made GLib 2.18 or later a requirement.
 
 Version 2.0.0: 2018-05-02
 =========================
@@ -16,22 +41,22 @@ This version is not backwards-compatible with fixbuf 1.x.
 There are no functional differences between this release and the 1.8
 release. All the changes are API changes and internal cleanups.
 
-Change source for infomodel to the IANA XML version of the IPFIX Information
-Elements
+Changed the source for the Information Model to the IANA XML version of the
+IPFIX Information Elements.
 
-Require information element specifications for internal records to have
-non-defaulted (non-zero) sizes
+Added a requirement for internal templates that their information element
+specifications have non-defaulted (non-zero) sizes.
 
-Simplify new template callbacks, subsuming the three variants with one:
+Simplified the new template callbacks, subsuming the three variants with one:
 fbSessionAddNewTemplateCallback()
 
-The default is now to consider the source port when separating incoming UDP
+Made it the default to consider the source port when separating incoming UDP
 streams.  The function fbCollectorManageUDPStreamByPort() has been removed.
 
-Change fbInfoElementWriteOptionsRecord() to take both the internal and
-external template id
+Changed fbInfoElementWriteOptionsRecord() to take both the internal and
+external template id.
 
-Update to LGPL 3.
+Updated license to LGPL 3.
 
 Version 1.8.0: 2017-11-07
 =========================

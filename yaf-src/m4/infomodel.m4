@@ -1,10 +1,10 @@
-dnl Copyright (C) 2018 by Carnegie Mellon University.
+dnl Copyright (C) 2018-2019 by Carnegie Mellon University.
 
 # ---------------------------------------------------------------------------
-# INFOMODEL_AC_COLLECT_REGISTRIES(srcdir, infomodel_dir)
+# INFOMODEL_AC_COLLECT_REGISTRIES(infomodel_dir)
 #
 #    Create a list of infomodel IE registries located in
-#    $srcdir/$infomodel_dir.  Place the list of registry names in
+#    $(top_srcdir)/$infomodel_dir.  Place the list of registry names in
 #    INFOMODEL_REGISTRIES.  Place a list of registry names in
 #    INFOMODEL_REGISTRY_PREFIXES.  Place a list of registry include
 #    files in INFOMODEL_REGISTRY_INCLUDE_FILES.  Place a list of

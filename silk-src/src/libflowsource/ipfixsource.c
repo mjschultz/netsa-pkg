@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2018 by Carnegie Mellon University.
+** Copyright (C) 2006-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -21,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: ipfixsource.c e96145253857 2018-12-05 16:51:41Z mthomas $");
+RCSIDENT("$SiLK: ipfixsource.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/redblack.h>

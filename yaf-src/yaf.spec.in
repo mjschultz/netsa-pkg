@@ -1,6 +1,6 @@
 %define name yaf
 %define version @PACKAGE_VERSION@
-%define release 2
+%define release 1
 
 Summary: Yet Another Flow sensor
 Name: %{name}
@@ -80,7 +80,6 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/filedaemon
 %{_bindir}/getFlowKeyHash
 %{_bindir}/yafMeta2Pcap
-%{_bindir}/ipfixDump
 %{_libdir}/*.so.*
 %if "x@YAF_REQ_PCRE@" == "x1"
 %{_libdir}/yaf/*.so*

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2018 by Carnegie Mellon University.
+** Copyright (C) 2005-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skvector.c a66db06a0b1e 2018-03-01 19:00:06Z mthomas $");
+RCSIDENT("$SiLK: skvector.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include <silk/skvector.h>
 

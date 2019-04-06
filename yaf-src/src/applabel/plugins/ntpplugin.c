@@ -24,27 +24,22 @@
  *
  * @return 1 if this is an NTP packet
  */
-uint16_t ntpplugin_LTX_ycNTP (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+
+uint16_t validate_NTP( uint8_t *payload, unsigned int payloadSize)
 {
-    /* supress compiler warnings about unused arguments */
-    (void) argc;
-    (void) argv;
-
-    if (flow->key.proto == YF_PROTO_TCP) /*  must be UDP */
-        return 0;
-
-    /* g_debug("NTP: payload size: 0x%x",payloadSize); */
+    /*char hexbuf[21];
+    for (int mfci = 0; mfci<10;mfci++)
+        sprintf(&(hexbuf[mfci*2]),"%02x",payload[mfci]);
+    hexbuf[20]='\0';
+    g_debug("NTP payload: %s",hexbuf);
+    g_debug("NTP: payload size: 0x%x",payloadSize);*/
     if (payload == NULL || payloadSize < 48) /* minimum NTP size = 48 bytes */
         return 0;
    
+
     uint8_t ntp_version = (payload[0] & (uint8_t)0x38) >> 3;
-    /* g_debug("NTP version %d",ntp_version); */
+    uint8_t ntp_mode = (payload[0] & (uint8_t)0x7);
+    /* g_debug("NTP version %d, mode %d",ntp_version,ntp_mode); */
     if (ntp_version == 0 || ntp_version > 4) /* NTP is at version 4 */
     	return 0;
 
@@ -59,9 +54,37 @@ uint16_t ntpplugin_LTX_ycNTP (
     if (ntp_version == 2 && payloadSize == 60) /* 12 bytes for Authenticator (optional) */
         return 1;
     
-    int consumed = 48;
-    uint16_t extension_field_len;
 
+    int consumed = 0;
+
+    uint16_t data_item_size;
+    uint16_t data_item_count;
+    int i;
+
+    if (ntp_mode ==  7)
+    {
+        uint8_t ntp_response = payload[0] & (uint8_t)0x80 ? 1:0;
+        uint8_t ntp_authenticated = payload[1] & 0x80 ? 1:0;
+        uint8_t ntp_request_code = (uint8_t)payload[3];
+        /* g_debug("NTP mode 7 with request code %d",ntp_request_code); */
+
+        if (ntp_request_code == 42)
+        {
+            consumed = 8;
+            data_item_count = ((uint16_t)payload[4])>>8 | payload[5];
+            data_item_size = ((uint16_t)payload[6])>>8 | payload[7];
+            /* g_debug("NTP mode 7 request 42 with %d data items, size: 0x%x",data_item_count,data_item_size); */
+            if (data_item_size > 500) /* cannot exceede 500 bytes */
+                return 0;
+            consumed += (data_item_count *data_item_size);
+            if (ntp_authenticated)
+                consumed += 20;
+            /* g_debug("consumed: 0x%x, size: 0x%x\n",consumed,payloadSize); */
+        }
+    }
+
+    consumed = 48;
+    uint16_t extension_field_len;
     if (ntp_version == 4)
     {
         while (consumed < (payloadSize-20))
@@ -87,4 +110,36 @@ uint16_t ntpplugin_LTX_ycNTP (
             ;/* g_debug("Not enough space for key and MAC (0x%x bytes), invalid NTP.",payloadSize-consumed); */
     }
     return 0;
+}
+uint16_t ntpplugin_LTX_ycNTP (
+    int argc,
+    char *argv[],
+    uint8_t * payload,
+    unsigned int payloadSize,
+    yfFlow_t * flow,
+    yfFlowVal_t * val)
+{
+    /* supress compiler warnings about unused arguments */
+    (void) argc;
+    (void) argv;
+    int packet_n = 0;
+    size_t packet_payload_len;
+    uint8_t *end_payload = payload+payloadSize;
+    if (flow->key.proto == YF_PROTO_TCP) /*  must be UDP */
+        return 0;
+    return validate_NTP(payload, payloadSize);
+    /*  Not ready yet
+    g_debug("checking NTP packet count: %d, payload size: %d",val->pkt,payloadSize);
+    while(packet_n < val->pkt && packet_n < YAF_MAX_PKT_BOUNDARY && payload < end_payload)
+    {
+
+        packet_payload_len = val->paybounds[packet_n];
+        g_debug(" packet %d len: %d",packet_n,packet_payload_len);
+        if (packet_payload_len!= 0)
+          if (validate_NTP(payload, packet_payload_len))
+              return 1;
+        payload += packet_payload_len;
+        packet_n++;
+    }
+    */
 }

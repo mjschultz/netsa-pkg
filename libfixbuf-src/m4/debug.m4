@@ -14,7 +14,7 @@ AC_DEFUN([AC_DEBUG],[dnl
   if test "$debug" = true; then
     AC_SUBST([DEBUG_CFLAGS],["-DDEBUG -ggdb -O0"])
   else
-    AC_SUBST([DEBUG_CFLAGS],["-DNDEBUG"])
+    AC_SUBST([DEBUG_CFLAGS],["-DNDEBUG -DG_DISABLE_ASSERT"])
   fi
 ])
 

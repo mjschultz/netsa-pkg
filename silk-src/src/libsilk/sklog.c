@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2018 by Carnegie Mellon University.
+** Copyright (C) 2001-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sklog.c 41f8cc3fd54d 2018-04-27 22:01:51Z mthomas $");
+RCSIDENT("$SiLK: sklog.c f3ffa2abcd66 2019-03-01 19:45:24Z mthomas $");
 
 #include <silk/sklog.h>
 #include <silk/skstringmap.h>
@@ -574,6 +574,8 @@ logRotatedLog(
     va_list             args)
 {
     char msgbuf[MSGBUF_SIZE];
+    char timebuf[SKTIMESTAMP_STRLEN];
+    uint32_t timeflags = SKTIMESTAMP_NOMSEC|SKTIMESTAMP_UTC|SKTIMESTAMP_ISO;
     FILE *rotated_fp = NULL;
     char *rotated_path = NULL;
     int rv;
@@ -586,6 +588,7 @@ logRotatedLog(
             rotated_fp = logctx->l_sim.fp;
             rotated_path = strdup(logctx->l_sim.path);
             if (!rotated_path) {
+                (void)logctx->l_sim.stamp_fn(msgbuf, sizeof(msgbuf));
                 fprintf(rotated_fp,
                         "%sLog not rotated--Unable to allocate pathname\n",
                         msgbuf);
@@ -599,7 +602,11 @@ logRotatedLog(
 
             /* Open the new log file */
             rv = logRotatedOpen();
-            if (rv) {
+            if (0 == rv) {
+                (void)logctx->l_sim.stamp_fn(msgbuf, sizeof(msgbuf));
+                fprintf(logctx->l_sim.fp, "%sRotated log file at %s",
+                        msgbuf, sktimestamp_r(timebuf, sktimeNow(), timeflags));
+            } else {
                 /* Could not open new file.  Continue to use existing
                  * log file. */
                 (void)logctx->l_sim.stamp_fn(msgbuf, sizeof(msgbuf));

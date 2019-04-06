@@ -7,7 +7,7 @@
  * have a function to be called to process those rules
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2016 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2019 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Chris Inacio <inacio@cert.org>
  ** ------------------------------------------------------------------------
@@ -776,7 +776,7 @@ ycScanPayload (
                 }
             }
         }
-
+    /* ycPortHashSearch returns MAX_PAYLOAD+RULES+1 when the port is not found */
     } else if ((MAX_PAYLOAD_RULES + 1) != (loop = ycPortHashSearch (dstPort)))
     {
         if (REGEX == ruleTable[loop].ruleType) {

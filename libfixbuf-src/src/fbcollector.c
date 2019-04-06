@@ -5,14 +5,14 @@
  ** IPFIX Collecting Process single transport session implementation
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2019 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell
  ** ------------------------------------------------------------------------
  ** @OPENSOURCE_LICENSE_START@
  ** libfixbuf 2.0
  **
- ** Copyright 2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
  **
  ** NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
  ** ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -399,6 +399,8 @@ fbCollector_t *fbCollectorAllocFP(
 {
     fbCollector_t   *collector = NULL;
 
+    g_assert(fp);
+
     /* Create a new collector */
     collector = g_slice_new0(fbCollector_t);
 
@@ -678,7 +680,6 @@ static void fbCollectorSetUDPSpec(
     fbCollector_t         *collector,
     fbUDPConnSpec_t       *spec)
 {
-
     if (collector->udp_head == NULL) {
         collector->udp_head = spec;
         collector->udp_tail = spec;
@@ -954,7 +955,8 @@ fbCollector_t *fbCollectorAllocSocket(
     void            *ctx,
     int             fd,
     struct sockaddr *peer,
-    size_t          peerlen)
+    size_t          peerlen,
+    GError          **err)
 {
     fbCollector_t  *collector   = NULL;
     fbConnSpec_t   *spec        = fbListenerGetConnSpec(listener);
@@ -980,6 +982,9 @@ fbCollector_t *fbCollectorAllocSocket(
 
     /* Create interrupt pipe */
     if (pipe(pfd)) {
+        g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_CONN,
+                    "Unable to create pipe on collector: %s", strerror(errno));
+        g_slice_free(fbCollector_t, collector);
         return NULL;
     }
     collector->rip = pfd[0];
@@ -1381,7 +1386,7 @@ static gboolean fbCollectorSpreadOpen(
         return FALSE;
     }
 
-    // mark it active here, fbCollectorFree() will need to disconnect
+    /* mark it active here, fbCollectorFree() will need to disconnect */
     collector->active = TRUE;
 
     for (i = 0; i < spread->num_groups; ++i)
@@ -1397,8 +1402,8 @@ static gboolean fbCollectorSpreadOpen(
     }
 
     /* now that we have joined the data plane group, join the
-     control/template plane group to signal exporters that
-     we need the templates for this group. */
+     * control/template plane group to signal exporters that
+     * we need the templates for this group. */
 
     for (i = 0; i < spread->num_groups; ++i)
     {
@@ -1430,7 +1435,6 @@ static gboolean fbCollectorSpreadPostProc(
     size_t        *b_len,
     GError        **err)
 {
-
     if (fbCollectorTestGroupMembership(collector, 0)) {
         return TRUE;
     }
@@ -1487,7 +1491,6 @@ static gboolean fbCollectorSpreadRead(
         }
 
         if (ret < 0) {
-
             if (ret == GROUPS_TOO_SHORT) {
                 g_free(spread->recv_groups);
                 spread->recv_max_groups = -spread->recv_num_groups;
@@ -1495,8 +1498,8 @@ static gboolean fbCollectorSpreadRead(
                                               spread->recv_max_groups );
             } else if (ret == BUFFER_TOO_SHORT) {
                 *msglen = -endian_mismatch;
-                g_set_error( err, FB_ERROR_DOMAIN, FB_ERROR_EOM,
-                             "msglen too small (%zd required)", *msglen );
+                g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_EOM,
+                            "msglen too small (%zd required)", *msglen);
                 return FALSE;
             } else if ((ret == CONNECTION_CLOSED) || (ret == ILLEGAL_SESSION))
             {
@@ -1609,7 +1612,11 @@ gboolean        fbCollectMessage(
     GError          **err)
 {
     /* Ensure stream is open */
-    if (!collector->active) return FALSE;
+    if (!collector->active) {
+        g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_CONN,
+                    "Collector not active");
+        return FALSE;
+    }
 
     /* Attempt to read message */
     if (collector->coread(collector, msgbase, msglen, err)) return TRUE;
@@ -1686,7 +1693,6 @@ void             fbCollectorSetFD(
 void            fbCollectorClose(
     fbCollector_t   *collector)
 {
-
     if (collector->active && collector->coclose) collector->coclose(collector);
 
     if (collector->listener) {
@@ -1845,6 +1851,7 @@ void fbCollectorSetAcceptOnly(
     struct sockaddr *address,
     size_t           address_length)
 {
+    g_assert(address);
     collector->accept_only = TRUE;
 
     memcpy(&(collector->peer.so), address,

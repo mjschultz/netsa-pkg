@@ -1,0 +1,234 @@
+=pod
+
+=head1 NAME
+
+B<ipfixDump> - Print contents of an IPFIX file as human-readable text
+
+=head1 SYNOPSIS
+
+ ipfixDump [--in FILE_NAME] [--out FILE_NAME]
+           [--rfc5610] [--element-file FILE_NAME] [--yaf]
+           [--templates] [--data] [--stats]
+           [--hexdump[=LEN]]
+
+ ipfixDump [--version]
+
+ ipfixDump [--help]
+
+=head1 DESCRIPTION
+
+B<ipfixDump> is a tool to read an IPFIX file and print its contents as
+human-readable ASCII to assist the user in analyzing the file.  B<ipfixDump>
+prints all message headers, templates, data records, options templates, and
+options records to the output, plus a one line summary of the file's content.
+
+B<ipfixDump> supports IPFIX structured data in the form of basicLists,
+subTemplateLists, and subTemplateMultiLists.
+
+By default, B<ipfixDump> reads the IPFIX file from the standard input and
+writes the text to the standard output.  To specify the input or output file's
+location, use the B<--in> or B<--out> option, respectively.
+
+B<ipfixDump> requires the input file to contain the IPFIX templates that
+describe the data records within the file, and the template must appear before
+the records that use it.  Any records that do not have a corresponding template
+are ignored.
+
+The default information model used by B<ipfixDump> includes only the standard
+information elements defined by
+L<IANA|https://www.iana.org/assignments/ipfix/ipfix.xhtml> and provided by
+libfixbuf.  There are three ways to augment the set of elements:
+
+=over 4
+
+=item 1
+
+The B<--rfc5610> option instructs B<ipfixDump> to watch the input for options
+records that define private enterprise information elements (as defined by
+L<RFC5610|https://tools.ietf.org/html/rfc5610.html>) and to add those elements
+to the information model.
+
+=item 2
+
+The B<--element-file=I<FILE_NAME>> option tells B<ipfixDump> to parse the
+contents of I<FILE_NAME> and add those information elements to the information
+model.  The argument is an XML file whose schema is that used by IANA's L<XML
+Information Element Registry|https://www.iana.org/assignments/ipfix/ipfix.xml>,
+with the following additions:
+
+=over 4
+
+=item cert:enterpriseId
+
+A number representing the Private Enterprise Number of the element
+
+=item cert:reversible
+
+A boolean value (C<true>, C<yes>, or C<1> for true; C<false>, C<no>, or C<0>
+for false) that specifies whether the element may have a separate identity in a
+reverse flow.
+
+=back
+
+The B<--element-file> option may be used multiple times to load multiple files,
+and the loaded elements replace existing elements with the same identifier.
+
+=item 3
+
+The B<--yaf> option loads the CERT private enterprise information elements into
+the information model.  These elements are used by the NetSA tools B<yaf(1)>,
+B<pipeline(8)>, B<super_mediator(1)>, and B<rwsilk2ipfix(1)>.  This option is
+implemented as a wrapper over the B<--element-file> option where the file name
+is F<cert_ipfix.xml> and B<ipfixDump> checks several directories to attempt to
+find this file, stopping once it finds the first file.  The list of
+directories, in search order, is
+
+=over 4
+
+=item *
+
+the directory F<../share/libfixbuf> relative to the directory containing the
+application
+
+=item *
+
+the F<libfixbuf> subdirectory of the C<datadir> directory specified when
+B<ipfixDump> was configured (defaults to F<$prefix/share>)
+
+=item *
+
+the F<share/libfixbuf> subdirectory installation folder for the GLib-2 library
+
+=item *
+
+the F<libfixbuf> subdirectory of the directories specified by the
+$XDG_DATA_DIRS environment variable, or F</usr/local/share> and
+F</usr/share/libfixbuf> when that variable is empty
+
+=back
+
+B<ipfixDump> exits with an error if it is unable to find the F<cert_ipfix.xml>
+file.  See L<https://tools.netsa.cert.org/cert-ipfix-registry/> for additional
+information about this file.
+
+=back
+
+=head1 OPTIONS
+
+The following options are available for B<ipfixDump>:
+
+=over 4
+
+=item B<--in> I<FILE_NAME>
+
+Sets the input file name to I<FILE_NAME>.  When the option is not specified,
+B<ipfixDump> reads from the standard input or exits with an error when the
+standard input is a terminal.  B<ipfixDump> reads from the standard input if
+I<FILE_NAME> is 'C<->'.
+
+=item B<--out> I<FILE_NAME>
+
+Sets the output file name to I<FILE_NAME>.  If I<FILE_NAME> exists, it is
+overwritten.  The string 'C<->' may be used to write to standard output (the
+default).
+
+=item B<--rfc5610>
+
+Tells B<ipfixDump> to scan the IPFIX input file for options records that define
+private enterprise information elements and to add those elements to the
+information model.
+
+=item B<--element-file> I<FILE_NAME>
+
+Loads the XML file I<FILE_NAME> and incorporates information element
+information found in it.  The format of the file is described above.  The
+option may be used multiple times to load multiple files, and later elements
+replace existing elements when they have the same identifier.
+
+=item B<--yaf>
+
+Searches for a file named F<cert_ipfix.xml> in several locations and loads that
+file as if it was an argument to B<--element-file>.  B<ipfixDump> exits with an
+error if it is unable to find the F<cert_ipfix.xml> file.
+
+=item B<--templates>
+
+Suppresses the printing of records, causing the output to contain only message
+headers, templates, and a summary line.
+
+=item B<--data>
+
+Suppresses the printing of templates, causing the output to contain only
+message headers, records, and a summary line.
+
+=item B<--stats>
+
+Suppresses the printing of all message headers, templates, and records.  The
+output consists of the number of messages, templates, and records present in
+the input, and a two-column list showing template IDs found in the input and a
+count of the number of records that used that template.
+
+=item B<--hexdump>
+
+For data record elements whose type is octetArray, prints each octet as a
+2-digit hexadecimal value with a no separator between the values.  The length
+of the element precedes the hexadecimal output.  B<ipfixDump> uses this display
+for octetArray elements that are variable length or whose length is greater
+than eight.  Without this option, only the length of the octetArray elements
+are printed.  Note that fixed-width octetArray elements whose length is less
+than or equal to eight are always printed as a decimal number regardless of
+this option.
+
+=item B<--hexdump=I<LEN>>
+
+When the optional parameter I<LEN> is provided to B<--hexdump>, only the first
+I<LEN> octets of the value are printed.  If I<LEN> is zero, only the length of
+octetArray values is printed.  A I<LEN> that is negative or larger than 65535
+is treated as the maximum, 65535.
+
+=item B<--version>
+
+Prints version and copyright information to standard error and exits.
+
+=item B<--help>
+
+Prints a brief usage message to the standard output and exits.
+
+=back
+
+=head1 Examples
+
+In the following examples, the dollar sign ("$") represents the shell
+prompt.  The text after the dollar sign represents the command line.
+
+=over 1
+
+ $ ipfixDump --in - --out -
+
+ $ ipfixDump --in /data/ipfix.ipfix --out /data/text.txt --yaf
+
+=back
+
+=head1 Known Issues
+
+Bug reports may be sent directly to the Network Situational Awareness team at
+E<lt>netsa-help@cert.orgE<gt>.
+
+=head1 AUTHORS
+
+Emily Sarneso and the CERT Network Situational Awareness Group Engineering
+Team, E<lt>http://www.cert.org/netsaE<gt>.
+
+=head1 SEE ALSO
+
+B<yaf(1)>, B<yafscii(1)>, B<yafdpi(1)>, B<super_mediator(1)>, B<pipeline(8)>,
+B<rwsilk2ipfix(1)>, L<https://tools.netsa.cert.org/cert-ipfix-registry/>,
+L<https://www.iana.org/assignments/ipfix/ipfix.xhtml>
+
+=cut
+
+Local Variables:
+mode:text
+indent-tabs-mode:nil
+fill-column:79
+End:

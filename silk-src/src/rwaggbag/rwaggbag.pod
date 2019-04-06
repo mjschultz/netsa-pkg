@@ -388,7 +388,7 @@ flow records
 To count the number of records seen for each unique source port,
 destination port, and protocol:
 
- $ rwaggbag --key=source,dport,proto --counter=records data.rw  \
+ $ rwaggbag --key=sport,dport,proto --counter=records data.rw   \
    | rwaggbagcat
 
 =head1 ENVIRONMENT
@@ -462,7 +462,7 @@ B<zlib(3)>
 
 =cut
 
-$SiLK: rwaggbag.pod b0e7e8c70cb5 2017-12-15 19:38:06Z mthomas $
+$SiLK: rwaggbag.pod 106ed13c5128 2019-02-13 23:05:04Z mthomas $
 
 Local Variables:
 mode:text

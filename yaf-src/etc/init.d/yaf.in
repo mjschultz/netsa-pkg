@@ -202,7 +202,7 @@ start() {
     if [ "x${PID}" != "x" ]; then 
        echo ""
        echo "${MYNAME} is already running.  PID: ${PID}"
-       return 1
+       return 0
     fi
 
     $YAFBIN $YAFARGS
@@ -229,7 +229,7 @@ stop() {
     PID=`getPid`
     if [ "x${PID}" = "x" ] ; then
         echo "${MYNAME} not running"
-        return 1
+        return 0
     fi
     /bin/echo -n "Stopping ${MYNAME}:	"
     /bin/kill -s INT $PID
@@ -241,7 +241,14 @@ stop() {
     done
     (checkpid $PID)
     RETVAL=$?
-    [ "$RETVAL" -eq "1" ] && echo '[OK]' || echo '[Failed]'
+    if [ "$RETVAL" -eq "1" ] 
+    then
+	echo '[OK]'
+        RETVAL=0
+    else
+        echo '[Failed]'
+        RETVAL=1
+    fi
 # yaf removes pidfile upon closing
 #    /bin/rm -f ${YAF_PIDFILE} 2> /dev/null
     rm -f $lockfile
@@ -333,7 +340,7 @@ exit $RETVAL
 ## yaf
 ## YAF daemon startup script
 ## ------------------------------------------------------------------------
-## Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+## Copyright (C) 2007-2019 Carnegie Mellon University. All Rights Reserved.
 ## ------------------------------------------------------------------------
 ## Authors: Brian Trammell
 ## ------------------------------------------------------------------------

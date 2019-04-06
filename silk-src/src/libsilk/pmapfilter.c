@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2018 by Carnegie Mellon University.
+** Copyright (C) 2004-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pmapfilter.c 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $");
+RCSIDENT("$SiLK: pmapfilter.c e332f6e2f890 2019-03-07 22:56:15Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skplugin.h>
@@ -156,7 +156,6 @@ static const char *pmap_title_dval = "dval";
 static const char    src_dir_name[] = "src-";
 static const char    dst_dir_name[] = "dst-";
 static const char    any_dir_name[] = "any-";
-static const size_t  dir_name_len   = sizeof(src_dir_name) - 1;
 
 /* Option naming prefix */
 static const char   pmap_prefix[]   = "pmap-";
@@ -517,10 +516,10 @@ pmapfile_handler(
     const char          *filename;
     const char          *sep;
     const char          *mapname           = NULL;
-    char                *prefixed_name     = NULL;
-    char                *short_prefixed_name;
     size_t               namelen           = 0;
+    char                 prefixed_name[PATH_MAX];
     size_t               i;
+    ssize_t              sz;
     int                  rv                = SKPLUGIN_ERR;
     skplugin_callbacks_t regdata;
 
@@ -692,39 +691,26 @@ pmapfile_handler(
 
     } else { /* if (mapname == NULL) */
 
-        /* Create the field names*/
-        pmap_data->mapname = (char*)malloc(namelen + 1);
+        /* Create the field names */
+        pmap_data->mapname = (char *)malloc(namelen + 1);
         if (NULL == pmap_data->mapname) {
             ERR_NO_MEM(pmap_data->mapname);
             rv = SKPLUGIN_ERR_FATAL;
             goto END;
         }
-        strncpy(pmap_data->mapname, mapname, namelen);
+        strncpy(pmap_data->mapname, mapname, namelen + 1);
         pmap_data->mapname[namelen] = '\0';
 
-        /* Allocate space for the [pmap-]{src-,dst-}<mapname> string */
-        prefixed_name
-            = (char*)malloc(namelen + pmap_prefix_len + dir_name_len + 1);
-        if (NULL == prefixed_name) {
-            ERR_NO_MEM(prefixed_name);
+        /* Create the destination-themed names */
+        sz = snprintf(prefixed_name, sizeof(prefixed_name), "%s%s%s",
+                      pmap_prefix, src_dir_name, pmap_data->mapname);
+        if ((size_t)sz >= sizeof(prefixed_name)) {
+            skAppPrintErr("mapname is too long\n");
             rv = SKPLUGIN_ERR_FATAL;
             goto END;
         }
-
-        /* Copy in the pmap- prefix */
-        strncpy(prefixed_name, pmap_prefix, pmap_prefix_len);
-
-        /* short name (for fields) starts at the {src-,dst-} */
-        short_prefixed_name = prefixed_name + pmap_prefix_len;
-
-        /* add in the actual field name, and zero terminate it */
-        strncpy(short_prefixed_name + dir_name_len, mapname, namelen);
-        short_prefixed_name[namelen + dir_name_len] = '\0';
-
-        /* Create the destination-themed names */
-        strncpy(short_prefixed_name, src_dir_name, dir_name_len);
         pmap_data->sdir.filter_option = strdup(prefixed_name);
-        pmap_data->sdir.field_name = strdup(short_prefixed_name);
+        pmap_data->sdir.field_name = strdup(prefixed_name + pmap_prefix_len);
         if ((pmap_data->sdir.filter_option == NULL)
             || (pmap_data->sdir.field_name == NULL))
         {
@@ -732,9 +718,16 @@ pmapfile_handler(
             rv = SKPLUGIN_ERR_FATAL;
             goto END;
         }
-        strncpy(short_prefixed_name, dst_dir_name, dir_name_len);
+
+        sz = snprintf(prefixed_name, sizeof(prefixed_name), "%s%s%s",
+                      pmap_prefix, dst_dir_name, pmap_data->mapname);
+        if ((size_t)sz >= sizeof(prefixed_name)) {
+            skAppPrintErr("mapname is too long\n");
+            rv = SKPLUGIN_ERR_FATAL;
+            goto END;
+        }
         pmap_data->ddir.filter_option = strdup(prefixed_name);
-        pmap_data->ddir.field_name = strdup(short_prefixed_name);
+        pmap_data->ddir.field_name = strdup(prefixed_name + pmap_prefix_len);
         if ((pmap_data->ddir.filter_option == NULL)
             || (pmap_data->ddir.field_name == NULL))
         {
@@ -742,17 +735,20 @@ pmapfile_handler(
             rv = SKPLUGIN_ERR_FATAL;
             goto END;
         }
-        strncpy(short_prefixed_name, any_dir_name, dir_name_len);
-        pmap_data->adir.filter_option = strdup(prefixed_name);
-        if (pmap_data->adir.filter_option == NULL) {
-            ERR_NO_MEM(pmap_data->adir);
+
+        sz = snprintf(prefixed_name, sizeof(prefixed_name), "%s%s%s",
+                      pmap_prefix, any_dir_name, pmap_data->mapname);
+        if ((size_t)sz >= sizeof(prefixed_name)) {
+            skAppPrintErr("mapname is too long\n");
             rv = SKPLUGIN_ERR_FATAL;
             goto END;
         }
-
-        /* Free the temporary name buffer */
-        free(prefixed_name);
-        prefixed_name = NULL;
+        pmap_data->adir.filter_option = strdup(prefixed_name);
+        if (pmap_data->adir.filter_option == NULL) {
+            ERR_NO_MEM(pmap_data->ddir);
+            rv = SKPLUGIN_ERR_FATAL;
+            goto END;
+        }
 
     } /* if (mapname == NULL) */
 
@@ -813,10 +809,6 @@ pmapfile_handler(
     rv = SKPLUGIN_OK;
 
   END:
-    /* Free the temporary name buffer */
-    if (prefixed_name) {
-        free(prefixed_name);
-    }
     if (rv != SKPLUGIN_OK) {
         if (prefix_map) {
             skPrefixMapDelete(prefix_map);

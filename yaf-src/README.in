@@ -52,9 +52,6 @@ YAF requires libfixbuf version @YAF_REQ_FIXBUF_VER@ or later; libfixbuf is avail
 http://tools.netsa.cert.org/fixbuf. Build and install libfixbuf before
 building YAF. 
 
-ipfixDump is a tool for dumping the contents of an IPFIX file to a text file.
-ipfixDump is automatically installed with YAF.
-
 Spread support requires Spread 4.1 or later.  Build and install Spread before 
 building YAF. YAF requires libfixbuf version 0.9.0 or later if YAF is compiled
 with Spread support.

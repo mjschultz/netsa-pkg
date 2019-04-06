@@ -1,3 +1,11 @@
+SiLK-3.18.1 Release, 2019-Mar-21
+
+* rwflowpack, flowcap
+  -- Support logging of tombstone records created by YAF 2.11.
+  -- Use a template's contents instead of its ID when processing list
+     entries.
+
+
 SiLK-3.18.0 Release, 2018-Dec-13
 
 * rwsetcat

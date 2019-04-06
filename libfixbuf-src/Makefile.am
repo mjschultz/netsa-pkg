@@ -7,7 +7,7 @@
 ## @OPENSOURCE_LICENSE_START@
 ## libfixbuf 2.0
 ##
-## Copyright 2018 Carnegie Mellon University. All Rights Reserved.
+## Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
 ##
 ## NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
 ## ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -35,6 +35,8 @@
 ## Authors: Brian Trammell
 ## ------------------------------------------------------------------------
 
+ACLOCAL_AMFLAGS = -I m4
+
 SUBDIRS = src include
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libfixbuf.pc
@@ -42,25 +44,35 @@ pkgconfig_DATA = libfixbuf.pc
 include doxygen.am
 
 MOSTLYCLEANFILES = $(DX_CLEANFILES)
+DISTCLEANFILES = $(RELEASES_XML)
 
-ACLOCAL_AMFLAGS = -I m4
+RELEASES_XML = doc/releases.xml
 
-release-note-doc: NEWS
-	$(top_srcdir)/doc/news2xhtml.pl ${PACKAGE_TARNAME} < $(top_srcdir)/NEWS > doc/releases.xml
-
-make-doc-path:
-	mkdir -p $(top_builddir)/doc/html
-
-copy-doxygen-doc:
-	cp -pr doc/html $(distdir)/doc
 
 dist-hook: docs copy-doxygen-doc
-	find $(distdir) -name .svn -type d -prune -exec rm -rf '{}' ';'
 
-distclean-local:
-	rm -f $(top_builddir)/doc/releases.xml
+docs: make-doc-path doxygen-doc subdir-docs $(RELEASES_XML)
 
-docs: make-doc-path doxygen-doc release-note-doc
+make-doc-path:
+	test -d $(top_builddir)/doc/html || $(MKDIR_P) $(top_builddir)/doc/html
+
+subdir-docs:
+	cd $(top_builddir)/src && $(MAKE) docs
+
+copy-doxygen-doc:
+	cp -pR doc/html $(distdir)/doc
+
+RUN_NEWS2XHTML = \
+ srcdir='' ; \
+ test -f ./doc/news2xhtml.pl || srcdir=$(srcdir)/ ; \
+ if $(AM_V_P) ; then \
+ echo "$(PERL) $${srcdir}doc/news2xhtml.pl $(PACKAGE_TARNAME) < '$<' > '$@'" ; \
+ else echo "  GEN     " $@ ; fi ; \
+ $(PERL) $${srcdir}doc/news2xhtml.pl $(PACKAGE_TARNAME) < "$<" > "$@" || \
+ { rm "$@" ; exit 1 ; }
+
+$(RELEASES_XML): NEWS
+	@$(RUN_NEWS2XHTML)
 
 EXTRA_DIST = \
      Doxyfile.in \
@@ -69,5 +81,7 @@ EXTRA_DIST = \
      LICENSE.txt \
      doc/Doxyhead.html \
      doc/Doxyfoot.html \
+     doc/DoxygenLayout.xml \
+     doc/add-header.pl \
      doc/doxygen.css \
      doc/news2xhtml.pl

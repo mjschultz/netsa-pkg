@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2018 by Carnegie Mellon University.
+** Copyright (C) 2007-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -22,7 +22,7 @@
 #define SKIPFIX_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipfix.c 6a79ffaa4702 2018-05-30 21:45:15Z mthomas $");
+RCSIDENT("$SiLK: skipfix.c ed0d50d01fa4 2019-03-01 19:40:55Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/skipaddr.h>
@@ -269,6 +269,11 @@ RCSIDENT("$SiLK: skipfix.c 6a79ffaa4702 2018-05-30 21:45:15Z mthomas $");
 #define TMPL_BIT_postOctetDeltaCount            (UINT64_C(1) << 42)
 /*  either postOctetTotalCount or postPacketTotalCount */
 #define TMPL_BIT_postOctetTotalCount            (UINT64_C(1) << 43)
+/*  certToolId (YAF 2.11) */
+#define TMPL_BIT_certToolId                     (UINT64_C(1) << 44)
+/*  exportingProcessId and observationTimeSeconds are the
+ *  tombstone_access values for YAF 2.10 */
+#define TMPL_BIT_exportingProcessId             (UINT64_C(1) << 45)
 
 /* The following are only checked in options templates, so the bit
  * position here can repeat those above */
@@ -1098,35 +1103,54 @@ typedef struct ski_nf9rec_st {
 /* the external template id for the timestamp list */
 #define SKI_YAF_TOMBSTONE_ACCESS    0xD002
 
-
+/* tombstoneId, exporterConfiguredId, exporterUniqueId, certToolId,
+ * and tombstoneAccessList are CERT_PEN elements, IDs 550-554 */
 static fbInfoElementSpec_t ski_tombstone_spec[] = {
+    { (char*)"observationDomainId",       4, 0 },    /* 149 */
+    { (char*)"exportingProcessId",        4, 0 },    /* 144 */
     { (char*)"exporterConfiguredId",      2, 0 },    /* CERT_PEN, 551 */
     { (char*)"exporterUniqueId",          2, 0 },    /* CERT_PEN, 552 */
+    { (char*)"paddingOctets",             4, 0 },    /* 210 */
     { (char*)"tombstoneId",               4, 0 },    /* CERT_PEN, 550 */
+    { (char*)"observationTimeSeconds",    4, 0 },    /* 322 */
 #if SKIPFIX_ENABLE_TOMBSTONE_TIMES
-    { (char*)"subTemplateList",           0, 0 },
+    { (char*)"subTemplateList",           0, 0 },    /* 292 */
+#if FIXBUF_CHECK_VERSION(2,3,0)
+    /* because fixbuf < 2.3.0 does not decode list-type elements
+     * correctly, only use the element with fixbuf >= 2.3.0. */
+    { (char*)"tombstoneAccessList",       0, 0 },    /* CERT_PEN, 554 */
 #endif
+#endif  /* SKIPFIX_ENABLE_TOMBSTONE_TIMES */
     FB_IESPEC_NULL
 };
 
 typedef struct ski_tombstone_st {
-    uint16_t    exporterConfiguredId;           /*  0 -  1 */
-    uint16_t    exporterUniqueId;               /*  2 -  3 */
-    uint32_t    tombstoneId;                    /*  4 -  7 */
+    uint32_t    observationDomainId;            /*  0 -  3 */
+    uint32_t    exportingProcessId;             /*  4 -  7 */
+    uint16_t    exporterConfiguredId;           /*  8 -  9 */
+    uint16_t    exporterUniqueId;               /* 10 - 11 */
+    uint32_t    paddingOctets;                  /* 12 - 15 */
+    uint32_t    tombstoneId;                    /* 16 - 19 */
+    uint32_t    observationTimeSeconds;         /* 20 - 23 */
 #if SKIPFIX_ENABLE_TOMBSTONE_TIMES
-    fbSubTemplateList_t stl;                    /*  8...   */
+    fbSubTemplateList_t stl;                    /* 24...   */
+#if FIXBUF_CHECK_VERSION(2,3,0)
+    fbSubTemplateList_t tombstoneAccessList;    /* ...     */
 #endif
+#endif  /* SKIPFIX_ENABLE_TOMBSTONE_TIMES */
 } ski_tombstone_t;
 
 
 /* The template used by the subTemplateList */
 static fbInfoElementSpec_t ski_tombstone_access_spec[] = {
+    { (char*)"certToolId",                4, 0 },    /* CERT_PEN, 553 */
     { (char*)"exportingProcessId",        4, 0 },    /* 144 */
     { (char*)"observationTimeSeconds",    4, 0 },    /* 322 */
     FB_IESPEC_NULL
 };
 
 typedef struct ski_tombstone_access_st {
+    uint32_t certToolId;
     uint32_t exportingProcessId;
     uint32_t observationTimeSeconds;
 } ski_tombstone_access_t;
@@ -1309,6 +1333,7 @@ skiTemplateCallbackCtx(
     uint32_t domain;
     uint32_t count;
     uint32_t i;
+    int known_id;
 
     TRACE_ENTRY;
     SK_UNUSED_PARAM(app_ctx);
@@ -1409,25 +1434,6 @@ skiTemplateCallbackCtx(
         }
 
     } else {
-        /* tell fixbuf how to transcode templates that appear in lists */
-        if (SKI_YAF_TCP_FLOW_TID == (tid & ~SKI_YAF_REVERSE_BIT)) {
-            /* the template ID matches the ID for the YAF template
-             * that contains TCP flags */
-            fbSessionAddTemplatePair(session, tid, SKI_TCP_STML_TID);
-            TRACEMSG(3, ("%s, Added template pair for YAF TCP flags", prefix));
-#if SKIPFIX_ENABLE_TOMBSTONE_TIMES
-        } else if (SKI_YAF_TOMBSTONE_ACCESS == tid) {
-            /* the template ID matches the ID for the template that
-             * contains tombstone timestamps */
-            fbSessionAddTemplatePair(session, tid, SKI_TOMBSTONE_ACCESS_TID);
-            TRACEMSG(3,
-                    ("%s, Added template pair for tombstone access", prefix));
-#endif  /* SKIPFIX_ENABLE_TOMBSTONE_TIMES */
-        } else {
-            /* do not define any template pairs for this template */
-            fbSessionAddTemplatePair(session, tid, 0);
-        }
-
         /* populate the bitmap */
         for (i = 0; i < count && (ie = fbTemplateGetIndexedIE(tmpl, i)); ++i) {
             if (ie->ent == 0) {
@@ -1500,6 +1506,10 @@ skiTemplateCallbackCtx(
                   case  59:
                     ASSERT_IE_NAME_IS(ie, postVlanId);
                     bmap |= TMPL_BIT_postVlanId;
+                    break;
+                  case 144:
+                    ASSERT_IE_NAME_IS(ie, exportingProcessId);
+                    bmap |= TMPL_BIT_exportingProcessId;
                     break;
                   case 150:
                     ASSERT_IE_NAME_IS(ie, flowStartSeconds);
@@ -1626,6 +1636,10 @@ skiTemplateCallbackCtx(
                     ASSERT_IE_NAME_IS(ie, reverseFlowDeltaMilliseconds);
                     bmap |= TMPL_BIT_reverseFlowDeltaMilliseconds;
                     break;
+                  case 553:
+                    ASSERT_IE_NAME_IS(ie, certToolId);
+                    bmap |= TMPL_BIT_certToolId;
+                    break;
                 }
             }
             TRACEMSG(
@@ -1636,11 +1650,45 @@ skiTemplateCallbackCtx(
         /* now that the bitmap is populated, see if it matches some
          * expected patterns */
 
+        /* tell fixbuf how to transcode templates that appear in lists */
+        if (bmap == TMPL_BIT_initialTCPFlags
+            || bmap == (TMPL_BIT_initialTCPFlags
+                        | TMPL_BIT_reverseInitialTCPFlags))
+        {
+            /* the template ID matches the ID for the YAF template
+             * that contains TCP flags */
+            fbSessionAddTemplatePair(session, tid, SKI_TCP_STML_TID);
+            DEBUGMSG("Will process template %#06x as YAF TCP flags list entry",
+                     tid);
+            known_id = 1;
+#if SKIPFIX_ENABLE_TOMBSTONE_TIMES
+        } else if ((bmap & TMPL_BIT_certToolId)
+                   || ((bmap == (TMPL_BIT_exportingProcessId
+                                 | TMPL_BIT_observationTimeSeconds)
+                        && count == 2)))
+        {
+            /* the template ID matches the ID for the template that
+             * contains tombstone timestamps */
+            fbSessionAddTemplatePair(session, tid, SKI_TOMBSTONE_ACCESS_TID);
+            DEBUGMSG("Will process template %#06x as tombsone access entry",
+                     tid);
+            known_id = 1;
+#endif  /* SKIPFIX_ENABLE_TOMBSTONE_TIMES */
+        } else {
+            /* do not define any template pairs for this template */
+            fbSessionAddTemplatePair(session, tid, 0);
+            known_id = 0;
+            /* clear the exportingProcessId bit */
+            bmap &= ~TMPL_BIT_exportingProcessId;
+        }
+
         /* check whether the template may be processed by the YAF
          * template by: not using any IEs outside of those defined the
          * YAF template, by having IP addresses, by using millisecond
          * times, and by having consistent IEs for volume */
-        if (0 == (bmap & ~TMPL_MASK_YAFREC)
+        if (known_id) {
+            /* no more tests are needed */
+        } else if (0 == (bmap & ~TMPL_MASK_YAFREC)
             && (bmap & TMPL_MASK_IPADDRESS)
             && (bmap & TMPL_MASK_TIME_MILLI_YAF)
             && (((bmap & TMPL_MASK_VOLUME_YAF)
@@ -1695,7 +1743,7 @@ skiTemplateCallbackCtx(
         } else if ((0 == (bmap & ~TMPL_MASK_NF9REC))
                    && (bmap & TMPL_MASK_IPADDRESS))
         {
-            /* this do{}while is not a loop, it is just something that
+            /* this do{}while(0) is not a loop, it is just something that
              * "break;" works with */
             do {
                 /* Which IP addresses are present? */
@@ -1778,10 +1826,15 @@ skiTemplateCallbackCtx(
             } while (0);
         }
 
-        if (*ctx == NULL && bmap) {
+        if (*ctx != NULL || known_id != 0) {
+            /* template is already handled */
+        } else if (bmap) {
             out = 1 | (BMAP_TYPE)bmap;
             BMAP_TMPL_CTX_SET(ctx, ctx_free_fn, out);
             DEBUGMSG("Will process template %#06x with the generic template",
+                     tid);
+        } else {
+            DEBUGMSG("Will process template %#06x with the ignore template",
                      tid);
         }
     }
@@ -1963,7 +2016,7 @@ skiSessionInitReader(
     if (!fbTemplateAppendSpecArray(tmpl, ski_ignore_spec, 0, err)) {
         goto ERROR;
     }
-    ASSERT_NO_TMPL(session, SKI_IGNORE_TID,err);
+    ASSERT_NO_TMPL(session, SKI_IGNORE_TID, err);
     if (!fbSessionAddTemplate(session, TRUE, SKI_IGNORE_TID, tmpl, err)) {
         goto ERROR;
     }
@@ -2163,6 +2216,35 @@ ski_yafstats_update_source(
 }
 
 
+#if SKIPFIX_ENABLE_TOMBSTONE_TIMES
+/**
+ *    Add the access time 'seconds' for tool 'tool_id' to 'buffer'.
+ */
+static ssize_t
+ski_tombstone_add_access(
+    char               *buffer,
+    size_t              length,
+    uint32_t            seconds,
+    uint32_t            tool_id)
+{
+    static const char *tool[] = {
+        "unknown(0)", "yaf", "super_mediator", "rwflowpack", "rwflowappend",
+        "mothra-packer", "pipeline"
+    };
+    char stime_buf[SKTIMESTAMP_STRLEN];
+
+fprintf(stderr, "len: %zu, sec: %u, buf: %s\n", length, seconds, buffer);
+    sktimestamp_r(stime_buf, sktimeCreate(seconds, 0),
+                  SKTIMESTAMP_UTC | SKTIMESTAMP_NOMSEC);
+    if (tool_id < sizeof(tool)/sizeof(tool[0])) {
+        return snprintf(buffer, length, "; process: %s, time: %sZ",
+                        tool[tool_id], stime_buf);
+    }
+    return snprintf(buffer,length,"; process: unknown(%" PRIu32 "), time: %sZ",
+                    tool_id, stime_buf);
+}
+#endif  /* SKIPFIX_ENABLE_TOMBSTONE_TIMES */
+
 /**
  *    Read a YAF Options Record containing the tombstone counter and
  *    print a log message.
@@ -2174,8 +2256,15 @@ ski_tombstone_next(
     const skpc_probe_t     *probe,
     GError                **err)
 {
+#if SKIPFIX_ENABLE_TOMBSTONE_TIMES
+    const ski_tombstone_access_t *ts_access;
+    void *stl;
+#endif
     const ski_tombstone_t *ts;
+    char buf[1024];
+    char *b;
     size_t len;
+    ssize_t sz;
 
     TRACEMSG(2, (("Domain %#06X, TemplateID %#06X [%p], bmap " BMAP_PRI
                   ", read by ski_tombstone_next()"),
@@ -2189,7 +2278,10 @@ ski_tombstone_next(
     }
 #if SKIPFIX_ENABLE_TOMBSTONE_TIMES
     fbSubTemplateListCollectorInit(&record->data.tombstone.stl);
+#if FIXBUF_CHECK_VERSION(2,3,0)
+    fbSubTemplateListCollectorInit(&record->data.tombstone.tombstoneAccessList);
 #endif
+#endif  /* SKIPFIX_ENABLE_TOMBSTONE_TIMES */
 
     len = sizeof(record->data.tombstone);
     if (!fBufNext(fbuf, (uint8_t *)&record->data.tombstone, &len, err)) {
@@ -2198,16 +2290,12 @@ ski_tombstone_next(
     assert(len == sizeof(ski_tombstone_t));
     ts = &record->data.tombstone;
 
-#if SKIPFIX_ENABLE_TOMBSTONE_TIMES
-    if (sklogCheckLevel(LOG_DEBUG)) {
-        const ski_tombstone_access_t *ts_access;
-        void *stl;
-        char stime_buf[SKTIMESTAMP_STRLEN];
-        char buf[1024];
-        char *b = buf;
-        ssize_t sz;
+    len = sizeof(buf);
+    b = buf;
 
-        len = sizeof(buf);
+    if (ts->stl.numElements) {
+        /* This tombstone record pre-dates YAF 2.11 */
+        assert(0 == ts->exportingProcessId);
         sz = snprintf(b, len, ("'%s': Received tombstone record:"
                                " exporterId: %u:%u, tombstoneId: %u"),
                       skpcProbeGetName(probe), ts->exporterConfiguredId,
@@ -2218,49 +2306,65 @@ ski_tombstone_next(
         b += sz;
         len -= sz;
 
+#if SKIPFIX_ENABLE_TOMBSTONE_TIMES
         stl = NULL;
         while ((stl = fbSubTemplateListGetNextPtr(&ts->stl, stl))) {
             ts_access = (ski_tombstone_access_t *)stl;
-
-            sktimestamp_r(
-                stime_buf, sktimeCreate(ts_access->observationTimeSeconds, 0),
-                SKTIMESTAMP_UTC | SKTIMESTAMP_NOMSEC);
-            switch (ts_access->exportingProcessId) {
-              case 1:
-                sz = snprintf(b, len, "; process: yaf, time: %sZ", stime_buf);
-                break;
-              case 2:
-                sz = snprintf(b, len, "; process: super_mediator, time: %sZ",
-                              stime_buf);
-                break;
-              default:
-                sz = snprintf(b, len,
-                              "; process: unknown(%" PRIu32 "), time: %sZ",
-                              ts_access->exportingProcessId, stime_buf);
-                break;
-            }
+            sz = ski_tombstone_add_access(b, len,
+                                          ts_access->observationTimeSeconds,
+                                          ts_access->exportingProcessId);
             if (len < (size_t)sz) {
                 goto WRITEMSG;
             }
             b += sz;
             len -= sz;
         }
-
-      WRITEMSG:
-        buf[sizeof(buf)-1] = '\0';
-        DEBUGMSG("%s", buf);
-    } else
 #endif  /* SKIPFIX_ENABLE_TOMBSTONE_TIMES */
-    {
-        INFOMSG(("'%s': Received tombstone record:"
-                 " exporterId: %u:%u, tombstoneId: %u"),
-                skpcProbeGetName(probe), ts->exporterConfiguredId,
-                ts->exporterUniqueId, ts->tombstoneId);
+    } else {
+        /* This tombstone record is from YAF 2.11 or later */
+        assert(0 == ts->exporterUniqueId);
+        sz = snprintf(b, len, ("'%s': Received Tombstone record:"
+                               " observationDomain:%u,"
+                               " exporterId:%u:%u, tombstoneId: %u"),
+                      skpcProbeGetName(probe), ts->observationDomainId,
+                      ts->exporterConfiguredId, ts->exportingProcessId,
+                      ts->tombstoneId);
+fprintf(stderr, "len: %zu, remlen: %zd, buf: %s\n", len, len - sz, buf);
+        if (len < (size_t)sz) {
+            goto WRITEMSG;
+        }
+        b += sz;
+        len -= sz;
+
+#if SKIPFIX_ENABLE_TOMBSTONE_TIMES && FIXBUF_CHECK_VERSION(2,3,0)
+        stl = NULL;
+        while ((stl = fbSubTemplateListGetNextPtr(&ts->tombstoneAccessList,
+                                                  stl)))
+        {
+            ts_access = (ski_tombstone_access_t *)stl;
+            sz = ski_tombstone_add_access(b, len,
+                                          ts_access->observationTimeSeconds,
+                                          ts_access->certToolId);
+fprintf(stderr, "len: %zu, remlen: %zd, buf: %s\n", len, len - sz, buf);
+            if (len < (size_t)sz) {
+                goto WRITEMSG;
+            }
+            b += sz;
+            len -= sz;
+        }
+#endif  /* SKIPFIX_ENABLE_TOMBSTONE_TIMES */
     }
+
+  WRITEMSG:
+    buf[sizeof(buf)-1] = '\0';
+    DEBUGMSG("%s", buf);
 
 #if SKIPFIX_ENABLE_TOMBSTONE_TIMES
     fbSubTemplateListClear((fbSubTemplateList_t *)&ts->stl);
+#if FIXBUF_CHECK_VERSION(2,3,0)
+    fbSubTemplateListClear((fbSubTemplateList_t *)&ts->tombstoneAccessList);
 #endif
+#endif  /* SKIPFIX_ENABLE_TOMBSTONE_TIMES */
 
     return TRUE;
 }

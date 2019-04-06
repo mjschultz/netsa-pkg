@@ -5,14 +5,14 @@
  ** fixbuf IPFIX Implementation Private Interface
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2019 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell
  ** ------------------------------------------------------------------------
  ** @OPENSOURCE_LICENSE_START@
  ** libfixbuf 2.0
  **
- ** Copyright 2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
  **
  ** NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
  ** ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -69,14 +69,23 @@
 
 #if HAVE_SPREAD
 
+/**
+ * sp_groupname_t
+ */
 typedef struct sp_groupname_st
 {
     char    name[MAX_GROUP_NAME];
 } sp_groupname_t;
 
+/** maximum number of groups supported */
 #define FB_SPREAD_NUM_GROUPS    16
+
+/** maximum size of expected message */
 #define FB_SPREAD_MTU           8192
 
+/**
+ * fbSpreadSpec_t
+ */
 typedef struct fbSpreadSpec_st {
     /** pointer to the session, this MUST be set to a valid session before
     *   the spec is passed to fbExporterAllocSpread. */
@@ -84,7 +93,8 @@ typedef struct fbSpreadSpec_st {
     /** pointer to the daemon host address, in Spread format.  Must be set
     *   before the spec is passed to fbExporterAllocSpread */
     char *          daemon;
-    /** pointer to array of group names, must have at least one, and must be null term array */
+    /** pointer to array of group names, must have at least one, and
+     * must be null term array */
     sp_groupname_t  *groups;
     /** number of groups in groups */
     int             num_groups;
@@ -156,10 +166,11 @@ typedef struct fbUDPConnSpec_st {
 #ifdef DEFINE_TEMPLATE_METADATA_SPEC
 /* Template metadata template */
 static fbInfoElementSpec_t template_metadata_spec[] = {
-    /* {"templateInformationElementList",         FB_IE_VARLEN, 0 }, */
+    {"templateId",                             2, 0 },
+    {"paddingOctets",                          6, 1 },
     {"templateName",                           FB_IE_VARLEN, 0 },
     {"templateDescription",                    FB_IE_VARLEN, 0 },
-    {"templateId",                             2, 0 },
+    /* {"templateInformationElementList",         FB_IE_VARLEN, 0 }, */
     FB_IESPEC_NULL
 };
 #endif
@@ -169,14 +180,15 @@ static fbInfoElementSpec_t template_metadata_spec[] = {
  *
  */
 typedef struct fbTemplateOptRec_st {
-    /** List of PEN, IE num pairs */
-    /* fbSubTemplateList_t info_element_list; */
+    /** Template ID */
+    uint16_t       template_id;
+    uint8_t        template_padding[6];
     /** Template name */
     fbVarfield_t   template_name;
     /** Template description (optional) */
     fbVarfield_t   template_description;
-    /** Template ID */
-    uint16_t       template_id;
+    /** List of PEN, IE num pairs */
+    /* fbSubTemplateList_t info_element_list; */
 } fbTemplateOptRec_t;
 
 /**
@@ -204,7 +216,7 @@ struct fbTemplate_st {
      */
     uint16_t            ie_len;
     /**
-     * Total length required to store this template in a data structure.
+     * Total length required to store this template in memory.
      * Uses sizeof(fbVarfield_t), sizeof(fbBasicList_t), etc instead of 0
      * as done with ie_len
      */
@@ -407,6 +419,19 @@ const fbInfoElement_t     *fbInfoModelAddAlienElement(
     fbInfoElement_t     *ex_ie);
 
 /**
+ * fbInfoElementAllocTypeTemplate2
+ *
+ * @param model
+ * @param internal
+ * @param err
+ * @return tmpl
+ */
+fbTemplate_t        *fbInfoElementAllocTypeTemplate2(
+    fbInfoModel_t       *model,
+    gboolean            internal,
+    GError              **err);
+
+/**
  * fbTemplateRetain
  *
  * @param tmpl
@@ -448,6 +473,40 @@ void                fbTemplateDebug(
     const char          *label,
     uint16_t            tid,
     fbTemplate_t        *tmpl);
+
+/**
+ * Allocates a new Template to describe a record that holds Template Metadata.
+ * This is, the template_metadata_spec.
+ *
+ * When `internal` is TRUE the padding is included; otherwise it is not.
+ *
+ * @param model
+ * @param internal
+ * @param err
+ * @returns The new template or NULL.
+ */
+fbTemplate_t        *fbTemplateAllocTemplateMetadataTmpl(
+    fbInfoModel_t      *model,
+    gboolean            internal,
+    GError            **err);
+
+/**
+ * Sets the metadata_rec member of `tmpl` to a newly allocated
+ * fbTemplateOptRec_t, and sets its template ID, name, and description to the
+ * given parameters.
+ *
+ * Frees any metadata_rec that already existed on the template.
+ *
+ * @param tmpl
+ * @param tid
+ * @param name          Should not be NULL
+ * @param description   May be NULL
+ */
+void                fbTemplateAddMetadataRecord(
+    fbTemplate_t        *tmpl,
+    uint16_t             tid,
+    const char          *name,
+    const char          *description);
 
 /**
  * Returns the callback function for a given session
@@ -528,7 +587,7 @@ void fbSessionSetCollector(
 void fbSessionSetGroupParams(
     fbSession_t     *session,
     sp_groupname_t  *groups,
-    int              num_groups);
+    unsigned int     num_groups);
 
 /**
  * fbSessionSetPrivateGroup
@@ -559,22 +618,49 @@ unsigned int fbSessionGetGroupOffset(
 /**
  * fbSessionGetGroup
  *
+ * @param session
+ *
  */
 unsigned int       fbSessionGetGroup(
     fbSession_t      *session);
 #endif
 
+/**
+ * fbSessionClearIntTmplTableFlag
+ *
+ * @param session
+ *
+ */
 void fbSessionClearIntTmplTableFlag(
     fbSession_t        *session);
 
+/**
+ * fbSessionClearExtTmplTableFlag
+ *
+ * @param session
+ *
+ */
 void fbSessionClearExtTmplTableFlag(
     fbSession_t        *session);
 
+/**
+ * fbSessionIntTmplTableFlagIsSet
+ *
+ * @param session
+ *
+ */
 int fbSessionIntTmplTableFlagIsSet(
     fbSession_t        *session);
 
+/**
+ * fbSessionExtTmplTableFlagIsSet
+ *
+ * @param session
+ *
+ */
 int fbSessionExtTmplTableFlagIsSet(
     fbSession_t        *session);
+
 /**
  * fbConnSpecLookupAI
  *
@@ -659,7 +745,7 @@ const char * fbConnSpreadError(
  *
  * @param exporter
  * @param groups
- * @param number of groups in above group list
+ * @param num_groups of groups in above group list
  *
  */
 
@@ -674,7 +760,7 @@ void fbExporterSetGroupsToSend(
  *
  * @param exporter
  * @param groups
- * @param number of groups in above group list
+ * @param num_groups of groups in above group list
  * @return TRUE if group is in subscribed group list
  *
  */
@@ -740,6 +826,7 @@ void fbCollectorRemoveListenerLastBuf(
  * @param fd
  * @param peer
  * @param peerlen
+ * @param err
  *
  */
 fbCollector_t       *fbCollectorAllocSocket(
@@ -747,7 +834,8 @@ fbCollector_t       *fbCollectorAllocSocket(
     void                *ctx,
     int                 fd,
     struct sockaddr     *peer,
-    size_t              peerlen);
+    size_t              peerlen,
+    GError              **err);
 
 /**
  * fbCollectorAllocTLS

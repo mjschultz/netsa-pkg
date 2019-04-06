@@ -2,12 +2,12 @@
  ** version.h.in
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2015-2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2015-2019 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** @OPENSOURCE_LICENSE_START@
  ** libfixbuf 2.0
  **
- ** Copyright 2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
  **
  ** NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
  ** ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -47,7 +47,7 @@
 /** The first number of libfixbuf's version number. */
 #define FIXBUF_VERSION_MAJOR 2
 /** The second number of libfixbuf's version number. */
-#define FIXBUF_VERSION_MINOR 1
+#define FIXBUF_VERSION_MINOR 3
 /** The third number of libfixbuf's version number. */
 #define FIXBUF_VERSION_RELEASE 0
 /** The fourth number of libfixbuf's version number or zero if none. */

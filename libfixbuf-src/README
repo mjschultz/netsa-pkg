@@ -53,15 +53,6 @@ messages and record count discrepancy
 messages, run `make clean`, `CFLAGS="-DFB_SUPPRESS_LOGS=1" make -e`,
 `make install` when installing libfixbuf.
 
-Version 1.4 also adds a Python API for libfixbuf, pyfixbuf.  pyfixbuf
-can be used to write applications, often called mediators, that collect
-and/or export IPFIX. pyfixbuf supports UDP and TCP as transport protocols, 
-as well as file writing and reading.  pyfixbuf requires netsa-python
-version 1.4 or later and should be installed before building and installing
-pyfixbuf.  pyfixbuf does not automatically install when installing
-libfixbuf.  Building and installing pyfixbuf is done using the standard
-setup.py mechanism.  See pyfixbuf/README.txt for more information.
-
 Version 1.6 adds support for translating sFlow into IPFIX.  libfixbuf
 only supports sFlow v5. libfixbuf will process Flow Samples (1), 
 Extended Flow Samples (3), Counter Samples (2), and 
@@ -75,6 +66,13 @@ that file for general documentation on getting started with libfixbuf, as
 well as detailed documentation on the public API calls and data types.
 
 libfixbuf API documentation is available in doc/html.
+
+ipfixDump is a command line tool for printing the contents of an IPFIX
+file as text.  As of libfixbuf-2.3.0, ipfixDump is distributed with
+libfixbuf.  (Previously, it was distributed with YAF.)
+
+A Python API to libfixbuf is available in the pyfixbuf package, distributed
+separately (http://tools.netsa.cert.org/pyfixbuf/).
 
 Building
 --------

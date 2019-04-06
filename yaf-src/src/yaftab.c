@@ -5,7 +5,7 @@
  ** YAF Active Flow Table
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2016 Carnegie Mellon University.
+ ** Copyright (C) 2006-2019 Carnegie Mellon University.
  ** All Rights Reserved.
  **
  ** ------------------------------------------------------------------------
@@ -1320,10 +1320,9 @@ yfFlowTab_t *yfFlowTabAlloc(
 #if YAF_ENABLE_NDPI
     if (ndpi) {
         NDPI_PROTOCOL_BITMASK all;
-        flowtab->ndpi_struct = ndpi_init_detection_module(1000,
-                                                          yf_malloc,
-                                                          yf_free,
-                                                          NULL);
+	set_ndpi_malloc(yf_malloc);
+	set_ndpi_free(yf_free);
+        flowtab->ndpi_struct = ndpi_init_detection_module();
         if (flowtab->ndpi_struct == NULL) {
             g_warning("Could not initialize NDPI");
             return NULL;
@@ -1381,7 +1380,7 @@ void yfFlowTabFree(
     g_hash_table_destroy(flowtab->table);
 
 #if YAF_ENABLE_NDPI
-    ndpi_exit_detection_module(flowtab->ndpi_struct, yf_free);
+    ndpi_exit_detection_module(flowtab->ndpi_struct);
 #endif
 
     /* now free the flow table */
@@ -2504,7 +2503,7 @@ static void yfNDPIApplabel(
     proto = ndpi_detection_process_packet(flowtab->ndpi_struct, nflow, payload,
                                           paylen, flow->etime, &src, &dst);
     flow->ndpi_master = proto.master_protocol;
-    flow->ndpi_sub = proto.protocol;
+    flow->ndpi_sub = proto.app_protocol;
 
     /* g_debug("proto is %d other is %d", proto.master_protocol, proto.protocol); */
     ndpi_free_flow(nflow);

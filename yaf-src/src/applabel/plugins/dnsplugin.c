@@ -17,7 +17,7 @@
  * @Version $Revision$
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2019 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Chris Inacio <inacio@cert.org>
  ** ------------------------------------------------------------------------
@@ -234,10 +234,21 @@ dnsplugin_LTX_ycDnsScanScan (
     if (header.qdcount == 0 && header.ancount == 0 && header.nscount == 0
         && header.arcount == 0)
     {
-        if (header.rcode == 0) {
+        if (! (header.rcode > 0 && header.qr == 1)) {
             /* DNS responses that are not errors will have something in them*/
             return 0;
         }
+    }
+
+    /* query validation */
+    if (header.qr == 0 )
+    {
+        if ((header.rcode > 0 || header.aa != 0 || header.ra != 0 || header.ad != 0))
+            /* queries should not have an rcode, an authoritative answer, recursion available, or authenticated data */
+            return 0;
+        if (!(header.qdcount > 0))
+            /* queries should have at least one question */
+            return 0;
     }
 
 #ifdef PAYLOAD_INSPECTION
@@ -249,6 +260,7 @@ dnsplugin_LTX_ycDnsScanScan (
     if (payloadOffset >= payloadSize) {
         return 0;
     }
+    /*fprintf(stderr,"dns qdcount %d, ancount %d, nscount %d, arcount %d\n",header.qdcount,header.ancount,header.nscount, header.arcount);*/
 
     for (loop = 0; loop < header.qdcount; loop++) {
         uint8_t             sizeOct = *(payload + payloadOffset);
@@ -373,7 +385,6 @@ dnsplugin_LTX_ycDnsScanScan (
 
     }
 
-
     /* check each record for the name server resource record count */
     for (loop = 0; loop < header.nscount; loop++) {
         uint16_t            rc;
@@ -399,7 +410,6 @@ dnsplugin_LTX_ycDnsScanScan (
 #endif
 
     }
-
     /* check each record for the additional record count */
     for (loop = 0; loop < header.arcount; loop++) {
         uint16_t            rc;
@@ -476,9 +486,9 @@ dnsplugin_LTX_ycDnsScanScan (
 #endif
 
 #endif
+
     /* this is the DNS port code */
     /* fprintf(stderr, " <dns exit 11 match> ");*/
-
     return DNS_PORT_NUMBER;
 }
 

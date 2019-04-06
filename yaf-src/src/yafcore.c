@@ -4,7 +4,7 @@
  ** YAF core I/O routines
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2019 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell, Chris Inacio, Emily Ecoff <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -89,15 +89,18 @@
 #define YAF_FLOW_FULL_TID   0xB800 /* base no internal*/
 #define YAF_FLOW_EXT_TID    0xB7FF /* everything except internal */
 
-#define YAF_STAT_OPTN_FLOW_TID  0xD000
-#define YAF_TOMBSTONE_FLOW_TID  0xD001
-#define YAF_TOMBSTONE_ACCESS_TID  0xD002
+#define YAF_PROCESS_STATS_TID     0xD003
+#define YAF_TOMBSTONE_TID         0xD004
+#define YAF_TOMBSTONE_ACCESS_TID  0xD005
+#define YAF_TYPE_METADATA_TID     0xD006
+#define YAF_TEMPLATE_METADATA_TID 0xD007
+
 
 #define YAF_FLOW_BASE_NAME "yaf_flow_base"
 #define YAF_FLOW_FULL_NAME "yaf_flow_full"
 #define YAF_FLOW_EXT_NAME  "yaf_flow_ext"
 
-#define YAF_STATS_OPTION_NAME       "yaf_process_stats"
+#define YAF_PROCESS_STATS_NAME      "yaf_process_stats"
 #define YAF_TOMBSTONE_NAME          "tombstone_record"
 #define YAF_TOMBSTONE_ACCESS_NAME   "tombstone_access"
 
@@ -333,7 +336,11 @@ static fbInfoElementSpec_t yaf_extime_spec[] = {
     FB_IESPEC_NULL
 };
 
-static fbInfoElementSpec_t yaf_stats_option_spec[] = {
+static fbInfoElementSpec_t yaf_process_stats_spec[] = {
+    { "observationDomainId",                4, 0 },
+    { "exportingProcessId",                 4, 0 },
+    { "exporterIPv4Address",                4, 0 },
+    { "observationTimeSeconds",             4, 0 },
     { "systemInitTimeMilliseconds",         8, 0 },
     { "exportedFlowRecordTotalCount",       8, 0 },
     { "packetTotalCount",                   8, 0 },
@@ -344,23 +351,24 @@ static fbInfoElementSpec_t yaf_stats_option_spec[] = {
     { "assembledFragmentCount",             4, 0 },
     { "flowTableFlushEventCount",           4, 0 },
     { "flowTablePeakCount",                 4, 0 },
-    { "exporterIPv4Address",                4, 0 },
-    { "exportingProcessId",                 4, 0 },
     { "meanFlowRate",                       4, 0 },
     { "meanPacketRate",                     4, 0 },
     FB_IESPEC_NULL
 };
 
-static fbInfoElementSpec_t yaf_tombstone_option_spec[] = {
+static fbInfoElementSpec_t yaf_tombstone_spec[] = {
+    { "observationDomainId",                4, 0 },
+    { "exportingProcessId",                 4, 0 },
     { "exporterConfiguredId",               2, 0 },
-    { "exporterUniqueId",                   2, 0 },
+    { "paddingOctets",                      6, 0 },
     { "tombstoneId",                        4, 0 },
-    { "subTemplateList",                    FB_IE_VARLEN, 0 },
+    { "observationTimeSeconds",             4, 0 },
+    { "tombstoneAccessList",                FB_IE_VARLEN, 0 },
     FB_IESPEC_NULL
 };
 
 static fbInfoElementSpec_t yaf_tombstone_access_spec[] = {
-    { "exportingProcessId",                 4, 0 },
+    { "certToolId",                         4, 0 },
     { "observationTimeSeconds",             4, 0 },
     FB_IESPEC_NULL
 };
@@ -571,6 +579,10 @@ typedef struct yfIpfixExtFlow_st {
 } yfIpfixExtFlow_t;
 
 typedef struct yfIpfixStats_st {
+    uint32_t    observationDomainId;
+    uint32_t    exportingProcessId;
+    uint32_t    exporterIPv4Address;
+    uint32_t    observationTimeSeconds;
     uint64_t    systemInitTimeMilliseconds;
     uint64_t    exportedFlowTotalCount;
     uint64_t    packetTotalCount;
@@ -581,21 +593,22 @@ typedef struct yfIpfixStats_st {
     uint32_t    assembledFragmentCount;
     uint32_t    flowTableFlushEvents;
     uint32_t    flowTablePeakCount;
-    uint32_t    exporterIPv4Address;
-    uint32_t    exportingProcessId;
     uint32_t    meanFlowRate;
     uint32_t    meanPacketRate;
 } yfIpfixStats_t;
 
 typedef struct yfTombstoneRecord_st {
+    uint32_t            observationDomainId;
+    uint32_t            exportingProcessId;
     uint16_t            exporterConfiguredId;
-    uint16_t            exporterUniqueId;
+    uint8_t             paddingOctets[6];
     uint32_t            tombstoneId;
+    uint32_t            observationTimeSeconds;
     fbSubTemplateList_t accessList;
 } yfTombstoneRecord_t;
 
 typedef struct yfTombstoneAccess_st {
-    uint32_t    exportingProcessId;
+    uint32_t    certToolId;
     uint32_t    observationTimeSeconds;
 } yfTombstoneAccess_t;
 
@@ -716,6 +729,10 @@ void yfAlignmentCheck()
     prevOffset = 0;
     prevSize = 0;
 
+    RUN_CHECKS(yfIpfixStats_t, observationDomainId, 1);
+    RUN_CHECKS(yfIpfixStats_t, exportingProcessId, 1);
+    RUN_CHECKS(yfIpfixStats_t, exporterIPv4Address,1);
+    RUN_CHECKS(yfIpfixStats_t, observationTimeSeconds, 1);
     RUN_CHECKS(yfIpfixStats_t, systemInitTimeMilliseconds,1);
     RUN_CHECKS(yfIpfixStats_t, exportedFlowTotalCount,1);
     RUN_CHECKS(yfIpfixStats_t, packetTotalCount, 1);
@@ -726,22 +743,23 @@ void yfAlignmentCheck()
     RUN_CHECKS(yfIpfixStats_t, assembledFragmentCount,1);
     RUN_CHECKS(yfIpfixStats_t, flowTableFlushEvents,1);
     RUN_CHECKS(yfIpfixStats_t, flowTablePeakCount,1);
-    RUN_CHECKS(yfIpfixStats_t, exporterIPv4Address,1);
-    RUN_CHECKS(yfIpfixStats_t, exportingProcessId, 1);
     RUN_CHECKS(yfIpfixStats_t, meanFlowRate, 1);
     RUN_CHECKS(yfIpfixStats_t, meanPacketRate, 1);
 
     prevOffset = 0;
     prevSize = 0;
 
+    RUN_CHECKS(yfTombstoneRecord_t, observationDomainId, 1);
+    RUN_CHECKS(yfTombstoneRecord_t, exportingProcessId, 1);
     RUN_CHECKS(yfTombstoneRecord_t, exporterConfiguredId, 1);
-    RUN_CHECKS(yfTombstoneRecord_t, exporterUniqueId, 1);
+    RUN_CHECKS(yfTombstoneRecord_t, paddingOctets, 0);
     RUN_CHECKS(yfTombstoneRecord_t, tombstoneId, 1);
+    RUN_CHECKS(yfTombstoneRecord_t, observationTimeSeconds, 1);
 
     prevOffset = 0;
     prevSize = 0;
 
-    RUN_CHECKS(yfTombstoneAccess_t, exportingProcessId, 1);
+    RUN_CHECKS(yfTombstoneAccess_t, certToolId, 1);
     RUN_CHECKS(yfTombstoneAccess_t, observationTimeSeconds, 1);
 
     prevOffset = 0;
@@ -984,11 +1002,15 @@ static fbSession_t *yfInitExporterSession(
 
     if (export_meta) {
 #if YAF_ENABLE_METADATA_EXPORT
-        if (!fbSessionEnableTypeMetadata(session, TRUE, err)) {
+        if (!fbSessionSetMetadataExportElements(
+                session, TRUE, YAF_TYPE_METADATA_TID, err))
+        {
             return NULL;
         }
 
-        if (!fbSessionEnableTemplateMetadata(session, TRUE, err)) {
+        if (!fbSessionSetMetadataExportTemplates(
+                session, TRUE, YAF_TEMPLATE_METADATA_TID, err))
+        {
             return NULL;
         }
 #endif
@@ -1015,28 +1037,29 @@ static fbSession_t *yfInitExporterSession(
     /* Create the Options Template */
     yaf_tmpl.ipfixStatsTemplate = fbTemplateAlloc(model);
     if (!fbTemplateAppendSpecArray(yaf_tmpl.ipfixStatsTemplate,
-                                   yaf_stats_option_spec, 0, err))
+                                   yaf_process_stats_spec, 0, err))
     {
         return NULL;
     }
 
-    /* Scope fields are exporterIPv4Address and exportingProcessID */
-    fbTemplateSetOptionsScope(yaf_tmpl.ipfixStatsTemplate, 2);
+    /* Scope fields are exporterIPv4Address, observationDomainId,
+       and exportingProcessID */
+    fbTemplateSetOptionsScope(yaf_tmpl.ipfixStatsTemplate, 3);
 #if YAF_ENABLE_METADATA_EXPORT
-    if (!fbSessionAddTemplateWithMetadata(session, FALSE, YAF_STAT_OPTN_FLOW_TID,
+    if (!fbSessionAddTemplateWithMetadata(session, FALSE, YAF_PROCESS_STATS_TID,
                                           yaf_tmpl.ipfixStatsTemplate,
-                                          YAF_STATS_OPTION_NAME, NULL, err))
+                                          YAF_PROCESS_STATS_NAME, NULL, err))
     {
         return NULL;
     }
 #else
-    if (!fbSessionAddTemplate(session, FALSE, YAF_STAT_OPTN_FLOW_TID,
+    if (!fbSessionAddTemplate(session, FALSE, YAF_PROCESS_STATS_TID,
                               yaf_tmpl.ipfixStatsTemplate, err))
     {
         return NULL;
     }
 #endif
-    if (!fbSessionAddTemplate(session, TRUE, YAF_STAT_OPTN_FLOW_TID,
+    if (!fbSessionAddTemplate(session, TRUE, YAF_PROCESS_STATS_TID,
                               yaf_tmpl.ipfixStatsTemplate, err))
     {
         return NULL;
@@ -1045,26 +1068,28 @@ static fbSession_t *yfInitExporterSession(
     /* Create the Tombstone record Template */
     yaf_tmpl.tombstoneRecordTemplate = fbTemplateAlloc(model);
     if (!fbTemplateAppendSpecArray(yaf_tmpl.tombstoneRecordTemplate,
-                                   yaf_tombstone_option_spec, 0, err))
+                                   yaf_tombstone_spec, 0, err))
     {
         return NULL;
     }
-    fbTemplateSetOptionsScope(yaf_tmpl.tombstoneRecordTemplate, 2);
+    /* Scope fields are exportingProcessID, observationDomainId,
+       and exporterConfiguredId */
+    fbTemplateSetOptionsScope(yaf_tmpl.tombstoneRecordTemplate, 3);
 #if YAF_ENABLE_METADATA_EXPORT
-    if (!fbSessionAddTemplateWithMetadata(session, FALSE, YAF_TOMBSTONE_FLOW_TID,
+    if (!fbSessionAddTemplateWithMetadata(session, FALSE, YAF_TOMBSTONE_TID,
                                           yaf_tmpl.tombstoneRecordTemplate,
                                           YAF_TOMBSTONE_NAME, NULL, err))
     {
         return NULL;
     }
 #else
-    if (!fbSessionAddTemplate(session, FALSE, YAF_TOMBSTONE_FLOW_TID,
+    if (!fbSessionAddTemplate(session, FALSE, YAF_TOMBSTONE_TID,
                               yaf_tmpl.tombstoneRecordTemplate, err))
     {
         return NULL;
     }
 #endif
-    if (!fbSessionAddTemplate(session, TRUE, YAF_TOMBSTONE_FLOW_TID,
+    if (!fbSessionAddTemplate(session, TRUE, YAF_TOMBSTONE_TID,
                               yaf_tmpl.tombstoneRecordTemplate, err))
     {
         return NULL;
@@ -1324,11 +1349,15 @@ static fbSession_t *yfInitExporterSpreadSession(
 
     if (export_meta) {
 #if YAF_ENABLE_METADATA_EXPORT
-        if (!fbSessionSpreadEnableTypeMetadata(session, spread->groups, TRUE, err)) {
+        if (!fbSessionSpreadSetMetadataExportElements(
+                session, spread->groups, TRUE, YAF_TYPE_METADATA_TID, err))
+        {
             return NULL;
         }
 
-        if (!fbSessionSpreadEnableTemplateMetadata(session, spread->groups, TRUE, err)) {
+        if (!fbSessionSpreadSetMetadataExportTemplates(
+                session, spread->groups, TRUE, YAF_TEMPLATE_METADATA_TID, err))
+        {
             return NULL;
         }
 #endif
@@ -1344,15 +1373,15 @@ static fbSession_t *yfInitExporterSpreadSession(
         return NULL;
     }
 #if YAF_ENABLE_METADATA_EXPORT
-    if (!fbSessionAddTemplatesMulticastWithMetadata(session, spread->groups, FALSE,
-                                                    YAF_FLOW_FULL_TID, tmpl,
-                                                    YAF_FLOW_FULL_NAME, NULL, err))
+    if (!fbSessionAddTemplatesMulticastWithMetadata(
+            session, spread->groups, FALSE, YAF_FLOW_FULL_TID, tmpl,
+            YAF_FLOW_FULL_NAME, NULL, err))
     {
         return NULL;
     }
 #else
-    if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
-                                        YAF_FLOW_FULL_TID, tmpl, err))
+    if (!fbSessionAddTemplatesMulticast(
+            session, spread->groups, FALSE, YAF_FLOW_FULL_TID, tmpl, err))
     {
         return NULL;
     }
@@ -1361,14 +1390,15 @@ static fbSession_t *yfInitExporterSpreadSession(
     /* Create the Options Template */
     yaf_tmpl.ipfixStatsTemplate = fbTemplateAlloc(model);
     if (!fbTemplateAppendSpecArray(yaf_tmpl.ipfixStatsTemplate,
-                                   yaf_stats_option_spec, 0, err))
+                                   yaf_process_stats_spec, 0, err))
     {
         return NULL;
     }
 
-    /* Scope fields are exporterIPv4Address and exportingProcessID */
-    fbTemplateSetOptionsScope(yaf_tmpl.ipfixStatsTemplate, 2);
-    if (!fbSessionAddTemplate(session, TRUE, YAF_STAT_OPTN_FLOW_TID,
+    /* Scope fields are exporterIPv4Address, observationDomainId,
+       and exportingProcessID */
+    fbTemplateSetOptionsScope(yaf_tmpl.ipfixStatsTemplate, 3);
+    if (!fbSessionAddTemplate(session, TRUE, YAF_PROCESS_STATS_TID,
                               yaf_tmpl.ipfixStatsTemplate, err))
     {
         return NULL;
@@ -1376,15 +1406,15 @@ static fbSession_t *yfInitExporterSpreadSession(
 
 #if YAF_ENABLE_METADATA_EXPORT
     if (!fbSessionAddTemplatesMulticastWithMetadata(session, spread->groups, FALSE,
-                                        YAF_STAT_OPTN_FLOW_TID,
+                                        YAF_PROCESS_STATS_TID,
                                         yaf_tmpl.ipfixStatsTemplate,
-                                        YAF_STATS_OPTION_NAME, NULL, err))
+                                        YAF_PROCESS_STATS_NAME, NULL, err))
     {
         return NULL;
     }
 #else
     if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
-                                        YAF_STAT_OPTN_FLOW_TID,
+                                        YAF_PROCESS_STATS_TID,
                                         yaf_tmpl.ipfixStatsTemplate, err))
     {
         return NULL;
@@ -1394,12 +1424,15 @@ static fbSession_t *yfInitExporterSpreadSession(
     /* Create the Tombstone Record Template */
     yaf_tmpl.tombstoneRecordTemplate = fbTemplateAlloc(model);
     if (!fbTemplateAppendSpecArray(yaf_tmpl.tombstoneRecordTemplate,
-                                   yaf_tombstone_option_spec, 0, err))
+                                   yaf_tombstone_spec, 0, err))
     {
         return NULL;
     }
-    fbTemplateSetOptionsScope(yaf_tmpl.tombstoneRecordTemplate, 2);
-    if (!fbSessionAddTemplate(session, TRUE, YAF_TOMBSTONE_FLOW_TID,
+
+    /* Scope fields are exportingProcessID, observationDomainId,
+       and exporterConfiguredId */
+    fbTemplateSetOptionsScope(yaf_tmpl.tombstoneRecordTemplate, 3);
+    if (!fbSessionAddTemplate(session, TRUE, YAF_TOMBSTONE_TID,
                               yaf_tmpl.tombstoneRecordTemplate, err))
     {
         return NULL;
@@ -1407,7 +1440,7 @@ static fbSession_t *yfInitExporterSpreadSession(
 
 #if YAF_ENABLE_METADATA_EXPORT
     if (!fbSessionAddTemplatesMulticastWithMetadata(session, spread->groups, FALSE,
-                                        YAF_TOMBSTONE_FLOW_TID,
+                                        YAF_TOMBSTONE_TID,
                                         yaf_tmpl.tombstoneRecordTemplate,
                                         YAF_TOMBSTONE_NAME, NULL, err))
     {
@@ -1415,7 +1448,7 @@ static fbSession_t *yfInitExporterSpreadSession(
     }
 #else
     if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
-                                        YAF_TOMBSTONE_FLOW_TID,
+                                        YAF_TOMBSTONE_TID,
                                         yaf_tmpl.tombstoneRecordTemplate, err))
     {
         return NULL;
@@ -1436,7 +1469,7 @@ static fbSession_t *yfInitExporterSpreadSession(
         return NULL;
     }
 #if YAF_ENABLE_METADATA_EXPORT
-    if (!fbSessionAddTemplatesMulticastWithMetadata(session, spread->groups, FALSE, 
+    if (!fbSessionAddTemplatesMulticastWithMetadata(session, spread->groups, FALSE,
                                         YAF_TOMBSTONE_ACCESS_TID,
                                         yaf_tmpl.tombstoneAccessTemplate,
                                         YAF_TOMBSTONE_ACCESS_NAME, NULL, err))
@@ -1444,7 +1477,7 @@ static fbSession_t *yfInitExporterSpreadSession(
         return NULL;
     }
 #else
-    if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE, 
+    if (!fbSessionAddTemplatesMulticast(session, spread->groups, FALSE,
                                         YAF_TOMBSTONE_ACCESS_TID,
                                         yaf_tmpl.tombstoneAccessTemplate, err))
     {
@@ -1780,7 +1813,6 @@ static gboolean yfSetExportTemplate(
 {
     fbSession_t         *session = NULL;
     fbTemplate_t        *tmpl = NULL;
-
     GString             *template_name = NULL;
 
     /* Try to set export template */
@@ -1852,15 +1884,21 @@ static gboolean yfSetExportTemplate(
     if (!fbSessionAddTemplateWithMetadata(session, FALSE, tid, tmpl,
                                           template_name->str, NULL, err))
     {
-        g_error("error setting template metadata\n");
+        g_error("error setting template metadata: tid: %x, name: %s\n",
+                tid, template_name->str);
+        g_string_free(template_name, TRUE);
         return FALSE;
     }
 #else
     if (!fbSessionAddTemplate(session, FALSE, tid, tmpl, err)) {
+        g_string_free(template_name, TRUE);
         return FALSE;
     }
 #endif
-    g_debug("adding new template?!?!!? %02x", tid);
+
+    /*g_debug("adding new template %02x", tid);*/
+    g_string_free(template_name, TRUE);
+
     /* Template should be loaded. Try setting the template again. */
     return fBufSetExportTemplate(fbuf, tid, err);
 }
@@ -2069,8 +2107,9 @@ gboolean yfWriteStatsFlow(
     rec.droppedPacketTotalCount = pcap_drop;
     rec.exporterIPv4Address = host_ip;
 
-    /* Use Observation ID as exporting Process ID */
-    rec.exportingProcessId = ctx->cfg->odid;
+    rec.observationDomainId = ctx->cfg->odid;
+    rec.exportingProcessId = getpid();
+    rec.observationTimeSeconds = (int)time(NULL);
 
     rec.meanFlowRate = rec.exportedFlowTotalCount/g_timer_elapsed(timer, NULL);
     rec.meanPacketRate = rec.packetTotalCount / g_timer_elapsed(timer, NULL);
@@ -2086,7 +2125,7 @@ gboolean yfWriteStatsFlow(
             rec.assembledFragmentCount);
 
     /* Set Internal Template for Buffer to Options TID */
-    if (!fBufSetInternalTemplate(fbuf, YAF_STAT_OPTN_FLOW_TID, err))
+    if (!fBufSetInternalTemplate(fbuf, YAF_PROCESS_STATS_TID, err))
         return FALSE;
 
 #if HAVE_SPREAD
@@ -2097,7 +2136,7 @@ gboolean yfWriteStatsFlow(
 #endif
 
     /* Set Export Template for Buffer to Options TMPL */
-    if (!yfSetExportTemplate(fbuf, YAF_STAT_OPTN_FLOW_TID, err)) {
+    if (!yfSetExportTemplate(fbuf, YAF_PROCESS_STATS_TID, err)) {
         return FALSE;
     }
 
@@ -2132,6 +2171,7 @@ gboolean yfWriteTombstoneFlow(
     yfContext_t             *ctx = (yfContext_t *)yfContext;
     fBuf_t                  *fbuf = ctx->fbuf;
     static uint32_t         tombstoneId = 0;
+    uint32_t                currentTime;
     yfTombstoneAccess_t     *accessListPtr;
 
 
@@ -2146,7 +2186,7 @@ gboolean yfWriteTombstoneFlow(
     }
 
     /* Set Internal Template for Buffer to Options TID */
-    if (!fBufSetInternalTemplate(fbuf, YAF_TOMBSTONE_FLOW_TID, err))
+    if (!fBufSetInternalTemplate(fbuf, YAF_TOMBSTONE_TID, err))
         return FALSE;
 
 #if HAVE_SPREAD
@@ -2157,20 +2197,24 @@ gboolean yfWriteTombstoneFlow(
 #endif
 
     /* Set Export Template for Buffer to Options TMPL */
-    if (!yfSetExportTemplate(fbuf, YAF_TOMBSTONE_FLOW_TID, err)) {
+    if (!yfSetExportTemplate(fbuf, YAF_TOMBSTONE_TID, err)) {
         return FALSE;
     }
 
+    memset(rec.paddingOctets, 0, sizeof(rec.paddingOctets));
+    currentTime = (uint32_t)time(NULL);
     rec.tombstoneId = tombstoneId++;
     rec.exporterConfiguredId = ctx->cfg->tombstone_configured_id;
-    rec.exporterUniqueId = ctx->cfg->tombstone_unique_id;
+    rec.exportingProcessId = getpid();
+    rec.observationTimeSeconds = currentTime;
+    rec.observationDomainId = ctx->cfg->odid;
     accessListPtr = (yfTombstoneAccess_t *)fbSubTemplateListInit(
-                                    &(rec.accessList), 0, 
-                                    YAF_TOMBSTONE_ACCESS_TID, 
+                                    &(rec.accessList), 0,
+                                    YAF_TOMBSTONE_ACCESS_TID,
                                     yaf_tmpl.tombstoneAccessTemplate, 1);
 
-    accessListPtr->exportingProcessId = 1;
-    accessListPtr->observationTimeSeconds = (int)time(NULL);
+    accessListPtr->certToolId = 1;
+    accessListPtr->observationTimeSeconds = currentTime;
 
     /* Append Record */
     if (!fBufAppend(fbuf, (uint8_t *)&rec, sizeof(rec), err)) {
@@ -2182,9 +2226,10 @@ gboolean yfWriteTombstoneFlow(
         return FALSE;
     }
 
-    g_debug("Sent Tombstone record: exporterId: %d:%d, tombstoneId: %d", 
-        rec.exporterConfiguredId, rec.exporterUniqueId, 
-        rec.tombstoneId);
+    g_message("Sent Tombstone record: observationDomain:%d, "
+            "exporterId:%d:%d, tombstoneId: %d",
+            rec.observationDomainId, rec.exporterConfiguredId,
+            rec.exportingProcessId, rec.tombstoneId);
 
     fbSubTemplateListClear(&(rec.accessList));
 

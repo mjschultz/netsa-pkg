@@ -60,7 +60,7 @@ label <N> element <N2> <element-rule>
 
 where <N> is the application label (usually the well-known port) found in the yafApplabelRules.conf file (an unsigned 16-bit decimal integer in the range 0 to 65535), <N2> is the Information Element ID found in the F<@prefix@/yaf/CERT_IE.h> and below, and <element-rule> is a PCRE regular expression and will be stored and associated with the ID number preceding it.  There can be multiple lines for a single application label, however each should have a different <N2>.  There should be parentheses around the substring you want to capture and store.  If there is more than 1 set of parentheses in the regular expression, the most outer set is the substring captured.  (See PCRE documentation for details on regular expressions and substring matching.)
 
-=head3 User Defined Elements
+=head2 User Defined Elements
 
 To define your own information elements, use the following form:
 
@@ -110,7 +110,7 @@ cert_export_enabled = 1
 
 =back
 
-B<yaf> will export the full X.509 certificate in the format described below under 
+B<yaf> will export the full X.509 certificate in the format described below under
 Full Certificate Export.  Setting
 this variable to 1 disables the traditional SSL certificate decode and export.  If the second
 configuration variable is present:
@@ -121,7 +121,7 @@ cert_hash_enabled = 1
 
 =back
 
-B<yaf> will export the hash of the X.509 certificate as found in the certificate. 
+B<yaf> will export the hash of the X.509 certificate as found in the certificate.
 This is typically the SHA-256 hash of the binary certificate but it can vary
 on the hashing algorithm used.  The hashing algorithm can be identified by the sslCertSignature
 field.  If both cert_export_enabled and cert_hash_enabled are set to 1, B<yaf>
@@ -1115,7 +1115,7 @@ The bit strings associated with the below attribute types.
 
 Above lists the extension types that B<yaf> will export.  For the Issuer and
 Subject subTemplateLists, B<yaf> only parses objects that are members
-of the id-at arc {joint-iso-ccitt(2) ds(5) 4}, pkcs-9 {iso(1) member-body (2) us(840) rsadsi(113459) pkcs(1) 9}, and LDAP dc 0.9.2342.19200300.100.1.25.  
+of the id-at arc {joint-iso-ccitt(2) ds(5) 4}, pkcs-9 {iso(1) member-body (2) us(840) rsadsi(113459) pkcs(1) 9}, and LDAP dc 0.9.2342.19200300.100.1.25.
 This field will not contain the
 full object identfier, it will just contain the member id. For example, for
 an issuer common name, B<sslObjectType> will contain 3.
@@ -1154,7 +1154,7 @@ Sequence for X.509 Certificates:
 
 =head3 Full Certificate Template
 
-B<yaf> will export the full X.509 certificate if the I<cert_export_enabled> variable is present 
+B<yaf> will export the full X.509 certificate if the I<cert_export_enabled> variable is present
 and set to 1 in the configuration file.  The following information is exported as an extra entry
 in the subTemplateMultiList as a basicList:
 
@@ -1286,9 +1286,9 @@ information elements in the following order:
 =item B<subTemplateList> IE 292, variable length
 
 An IPFIX SubTemplateList. This type represents a list of zero or more instances
-of a structured data type, where the data type of each list element is the 
+of a structured data type, where the data type of each list element is the
 same and corresponds with a single Template Record.  There will be one element
-in the list for each DNP3 packet that matches one of the DNP3 regular 
+in the list for each DNP3 packet that matches one of the DNP3 regular
 expressions found in the yafDPIRules.conf file.
 
 =over 6
@@ -1316,12 +1316,12 @@ The pattern captured from the DNP3 regular expression in yafDPIRules.conf
 =head2 Modbus
 
 Modbus DPI is similar to DNP3 DPI.  YAF will export any patterns matched by
-the regular expressions labeled with the ID 502 found in the 
-yafDPIRules.conf file.  The regular expressions are compared against the 
+the regular expressions labeled with the ID 502 found in the
+yafDPIRules.conf file.  The regular expressions are compared against the
 payload of all valid Modbus packets starting right after the MBAP header
 (offset 7), beginning with the Modbus function code.  The information
 is exported as variable length fields in a single BasicList.  All regular
-expressions for Modbus should use the label 502.  No user-defined 
+expressions for Modbus should use the label 502.  No user-defined
 information elements will be accepted for Modbus.
 
 =over 2
@@ -1338,8 +1338,8 @@ Ethernet/IP DPI is similar to Modbus DPI.  YAF will export any patterns
 matched by the regular expressions labeled with the ID 44818 in the
 yafDPIRules.conf file.  The regular expressions are compared against
 the start of the payload of all valid Ethernet/IP packets (Command in
-the Encapsulation Header is the first byte).  The 
-matched patterns are exported as variable length fields in a single 
+the Encapsulation Header is the first byte).  The
+matched patterns are exported as variable length fields in a single
 BasicList. All regular expressions for Ethernet/IP should use the label
 44818.  No user-defined information elements will be accepted for
 Ethernet/IP.
@@ -1356,7 +1356,7 @@ The pattern captured from the Ethernet/IP regular expressions in yafDPIRules.con
 
 YAF will export the Payload Type in the Real-time Transport Protocol (RTP)
 header if RTP DPI is enabled (yes by default).  The Payload Type indicates
-the format of the payload and how it should be interpreted by the 
+the format of the payload and how it should be interpreted by the
 receiving application.  The following two elements will be exported for
 each flow labeled as RTP.  If the flow is a uniflow, the reverse element
 will be exported but will contain the value of 0.
@@ -1365,7 +1365,7 @@ will be exported but will contain the value of 0.
 
 =item B<rtpPayloadType> CERT (PEN 6871), IE 287, 1 octet, unsigned
 
-The payload type in the RTP header of the first payload in the 
+The payload type in the RTP header of the first payload in the
 forward direction.
 
 =item B<reverseRtpPayloadType> CERT (PEN 6871), IE 288, 1 octet, unsigned
@@ -1385,5 +1385,3 @@ Emily Sarneso <ecoff@cert.org> and the CERT Network Situational Awareness Group 
 B<yaf(1)>, B<yafscii(1)>, PCRE Documentation
 
 =cut
-
-

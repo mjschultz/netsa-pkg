@@ -2,7 +2,7 @@
 #
 
 #######################################################################
-## Copyright (C) 2009-2018 by Carnegie Mellon University.
+## Copyright (C) 2009-2019 by Carnegie Mellon University.
 ##
 ## @OPENSOURCE_LICENSE_START@
 ## See license information in ../LICENSE.txt
@@ -23,7 +23,7 @@
 #  Mark Thomas
 #  March 2009
 #######################################################################
-#  RCSIDENT("$SiLK: make-scandata.pl 2e9b8964a7da 2017-12-22 18:13:18Z mthomas $")
+#  RCSIDENT("$SiLK: make-scandata.pl 945cf5167607 2019-01-07 18:54:17Z mthomas $")
 #######################################################################
 
 

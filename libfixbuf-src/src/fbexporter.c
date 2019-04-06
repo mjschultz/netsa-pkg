@@ -6,14 +6,14 @@
  * IPFIX Exporting Process single transport session implementation
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2019 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell
  ** ------------------------------------------------------------------------
  ** @OPENSOURCE_LICENSE_START@
  ** libfixbuf 2.0
  **
- ** Copyright 2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
  **
  ** NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
  ** ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -244,6 +244,7 @@ static gboolean fbExporterOpenBuffer(
     fbExporter_t                *exporter,
     GError                      **err)
 {
+    (void)err;
     /* set active flag */
     exporter->active = TRUE;
 
@@ -269,9 +270,8 @@ static gboolean fbExporterWriteBuffer(
     size_t                   msglen,
     GError                   **err)
 {
-
+    (void)err;
     memcpy(exporter->stream.buffer, msgbase, msglen);
-
     exporter->msg_len = msglen;
 
     return TRUE;
@@ -1226,7 +1226,6 @@ fbExporter_t *fbExporterAllocSpread(
     g_assert(params->groups[0]);
 
     exporter = g_slice_new0(fbExporter_t);
-    memset(exporter, 0, sizeof(fbExporter_t));
 
     exporter->spec.spread = fbConnSpreadCopy(params);
 

@@ -5,7 +5,7 @@
  ** YAF libpcap input support
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2016 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2019 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell
  ** ------------------------------------------------------------------------
@@ -439,6 +439,7 @@ yfCapSource_t *yfCapOpenFile(
     cs->last_filename = g_strdup(path);
 
     if (!cs->pcap) {
+        g_free(cs->last_filename);
         g_free(cs);
         cs = NULL;
     } else {
@@ -657,6 +658,7 @@ void yfCapClose(
     if (cs->lfp) {
         fclose(cs->lfp);
     }
+    g_free(cs->last_filename);
     g_free(cs);
 }
 

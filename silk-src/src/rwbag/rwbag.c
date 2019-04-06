@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2018 by Carnegie Mellon University.
+** Copyright (C) 2004-2019 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbag.c f9d6dfd21826 2018-03-07 21:48:09Z mthomas $");
+RCSIDENT("$SiLK: rwbag.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skbag.h>

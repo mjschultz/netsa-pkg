@@ -13,7 +13,7 @@
  *
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2019 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -351,7 +351,8 @@ ycRtpScanRebuildHeader (
 
     header->ssrc = ntohl(*((uint32_t *)(payload + 8)));
 
-    /*    g_debug("header->version %d", header->version);
+    /*
+    g_debug("header->version %d", header->version);
     g_debug("header->padding %d", header->padding);
     g_debug("header->extension %d", header->extension);
     g_debug("header->csrc %d", header->csrc);
@@ -359,7 +360,8 @@ ycRtpScanRebuildHeader (
     g_debug("header->paytype %d", header->paytype);
     g_debug("header->sequence %d", header->sequence);
     g_debug("header->timestamp %d", header->timestamp);
-    g_debug("header->ssrc %d", header->ssrc);*/
+    g_debug("header->ssrc %d", header->ssrc);
+    */
 }
 
 
