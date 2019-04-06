@@ -46,7 +46,6 @@ deb:
 		--maintainer ${MAINTAINER} \
 		--category admin \
 		--force \
-		--deb-compression bzip2 \
 		--description "YAF and SiLK from CERT NetSA Security Suite" \
 		--license "GPL version 2, LGPL version 2.1" \
 		--depends libglib2.0-0 \
@@ -70,7 +69,6 @@ rpm:
 		--maintainer ${MAINTAINER} \
 		--category admin \
 		--force \
-		--rpm-compression bzip2 \
 		--description "YAF and SiLK from CERT NetSA Security Suite" \
 		--license "GPL version 2, LGPL version 2.1" \
 		--depends glib2 \
