@@ -1488,7 +1488,7 @@ Data Structures</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<b>Value:</b><div class="fragment"><div class="line">{ <a class="code" href="public_8h.html#a42b75e3dc15f6c6ebb447598eb7d9338a7e8c8d5180377a3e0c466dd421a5b541">FB_SCTP</a>, NULL, NULL,         \</div><div class="line">                           NULL, NULL, NULL, NULL,      \</div><div class="line">                           NULL, NULL }</div><div class="ttc" id="public_8h_html_a42b75e3dc15f6c6ebb447598eb7d9338a7e8c8d5180377a3e0c466dd421a5b541"><div class="ttname"><a href="public_8h.html#a42b75e3dc15f6c6ebb447598eb7d9338a7e8c8d5180377a3e0c466dd421a5b541">FB_SCTP</a></div><div class="ttdoc">Partially reliable datagram transport via SCTP. </div><div class="ttdef"><b>Definition:</b> public.h:1698</div></div>
+<b>Value:</b><div class="fragment"><div class="line">{ <a class="code" href="public_8h.html#a42b75e3dc15f6c6ebb447598eb7d9338a7e8c8d5180377a3e0c466dd421a5b541">FB_SCTP</a>, NULL, NULL,         \</div><div class="line">                           NULL, NULL, NULL, NULL,      \</div><div class="line">                           NULL, NULL }</div><div class="ttc" id="public_8h_html_a42b75e3dc15f6c6ebb447598eb7d9338a7e8c8d5180377a3e0c466dd421a5b541"><div class="ttname"><a href="public_8h.html#a42b75e3dc15f6c6ebb447598eb7d9338a7e8c8d5180377a3e0c466dd421a5b541">FB_SCTP</a></div><div class="ttdoc">Partially reliable datagram transport via SCTP. </div><div class="ttdef"><b>Definition:</b> public.h:1711</div></div>
 </div><!-- fragment -->
 <p>Convenience macro defining a null static <a class="el" href="public_8h.html#abbc3c1c84682e0e8d89280fbe828b392">fbConnSpec_t</a>. </p>
 
@@ -5086,7 +5086,7 @@ Data Structures</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Adds a template to a session. </p>
-<p>If external, adds the template to the current domain, and exports the template if the session is associated with an export buffer. Assigns the template ID given in tid, or assigns a template ID if tid is <a class="el" href="public_8h.html#a243165c146a8fbda7e0902a06abce6a4">FB_TID_AUTO</a>.</p>
+<p>If external, adds the template to the current domain, and exports the template if the session is associated with an export buffer. Gives the template the ID specified in tid, or assigns the template an arbitrary ID if tid is <a class="el" href="public_8h.html#a243165c146a8fbda7e0902a06abce6a4">FB_TID_AUTO</a>.</p>
 <p>Calling this function twice with the same parameters may cause the template to be freed and the session to keep a handle to the invalid template. If necessary, first use <a class="el" href="public_8h.html#a0bf0ea7e68b9e58aa3fe8e0fbdc1e713" title="Retrieves a template from a session by ID. ">fbSessionGetTemplate()</a> to check for the presence of the template on the session.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -5534,6 +5534,7 @@ Data Structures</h2></td></tr>
 
 <p>Exports a single external template in the current domain of a given session. </p>
 <p>Writes the template to the associated export buffer. May cause a message to be emitted if the associated export buffer is in automatic mode, or return with FB_ERROR_EOM if the associated export buffer is not in automatic mode.</p>
+<p>Also exports an options record containing the template's name and description if they were specified (<a class="el" href="public_8h.html#a818c3ca59f631a80062a8ccc20748c2a" title="Adds a template to the session, as fbSessionAddTemplate(), with the provided metadata. ">fbSessionAddTemplateWithMetadata()</a>) and metadata export is enabled (<a class="el" href="public_8h.html#a8c074192377fd4089feef07f52183449" title="Configures a session to export template metadata as options records. ">fbSessionSetMetadataExportTemplates()</a>).</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">session</td><td>a session state container associated with an export buffer </td></tr>
@@ -5574,6 +5575,8 @@ Data Structures</h2></td></tr>
 
 <p>Exports all external templates in the current domain of a given session. </p>
 <p>Writes templates to the associated export buffer. May cause a message to be emitted if the associated export buffer is in automatic mode, or return with FB_ERROR_EOM if the associated export buffer is not in automatic mode.</p>
+<p>When template and/or information element metadata is enabled, those options records are also exported.</p>
+<p>All external templates are exported each time this function is called.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">session</td><td>a session state container associated with an export buffer </td></tr>
@@ -5582,6 +5585,7 @@ Data Structures</h2></td></tr>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>TRUE on success, FALSE on failure. </dd></dl>
+<dl class="section see"><dt>See also</dt><dd><a class="el" href="public_8h.html#a8c074192377fd4089feef07f52183449" title="Configures a session to export template metadata as options records. ">fbSessionSetMetadataExportTemplates()</a> to enable template metadata, <a class="el" href="public_8h.html#a2e729b270df473a1f32f519ed184a259" title="Configures a session to export type information for enterprise-specific information elements as optio...">fbSessionSetMetadataExportElements()</a> to enable information element metadata </dd></dl>
 
 </div>
 </div>
@@ -6009,6 +6013,7 @@ Data Structures</h2></td></tr>
 
 <p>Configures a session to export type information for enterprise-specific information elements as options records according to RFC 5610. </p>
 <p>Regardless of the <code>enabled</code> value, this function creates the type information template and adds it to the session with the template ID <code>tid</code> or an arbitrary ID when <code>tid</code> is <a class="el" href="public_8h.html#a243165c146a8fbda7e0902a06abce6a4">FB_TID_AUTO</a>.</p>
+<p>If <code>enabled</code> is TRUE, the information metadata is exported each time <a class="el" href="public_8h.html#a4e0c42fc80985c048190203257697ab6" title="Exports all external templates in the current domain of a given session. ">fbSessionExportTemplates()</a> is called.</p>
 <p>When collecting, use <a class="el" href="public_8h.html#ad4eccf26f7c201064a730728e9a5f9bc" title="Enables automatic insertion of RFC 5610 elements on a buffer. ">fBufSetAutomaticInsert()</a> to automatically update the information model with these RFC 5610 elements.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
@@ -6063,7 +6068,9 @@ Data Structures</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Configures a session to export template metadata as options records. </p>
-<p>Template metadata is the name and description specified by <a class="el" href="public_8h.html#a818c3ca59f631a80062a8ccc20748c2a" title="Adds a template to the session, as fbSessionAddTemplate(), with the provided metadata. ">fbSessionAddTemplateWithMetadata()</a>. Regardless of the <code>enabled</code> value, this function creates the template-metadata template and adds it to the session with the template ID <code>tid</code> or an arbitrary ID when <code>tid</code> is <a class="el" href="public_8h.html#a243165c146a8fbda7e0902a06abce6a4">FB_TID_AUTO</a>.</p>
+<p>Template metadata is the name and description specified by <a class="el" href="public_8h.html#a818c3ca59f631a80062a8ccc20748c2a" title="Adds a template to the session, as fbSessionAddTemplate(), with the provided metadata. ">fbSessionAddTemplateWithMetadata()</a>.</p>
+<p>If enabled, the metadata is exported each time <a class="el" href="public_8h.html#a4e0c42fc80985c048190203257697ab6" title="Exports all external templates in the current domain of a given session. ">fbSessionExportTemplates()</a> or <a class="el" href="public_8h.html#a9236bdb53a94cd19bad3fef2c9bfb947" title="Exports a single external template in the current domain of a given session. ">fbSessionExportTemplate()</a> is called. In addition, the metadata is exported when <a class="el" href="public_8h.html#a818c3ca59f631a80062a8ccc20748c2a" title="Adds a template to the session, as fbSessionAddTemplate(), with the provided metadata. ">fbSessionAddTemplateWithMetadata()</a> is called if the session is associated with an <a class="el" href="public_8h.html#a054d6ae24ecc9fbc2e38e683d8a5481a">fbExporter_t</a>.</p>
+<p>Regardless of the <code>enabled</code> value, this function creates the template-metadata template and adds it to the session with the template ID <code>tid</code> or an arbitrary ID when <code>tid</code> is <a class="el" href="public_8h.html#a243165c146a8fbda7e0902a06abce6a4">FB_TID_AUTO</a>.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">session</td><td>pointer </td></tr>
@@ -8906,7 +8913,7 @@ Data Structures</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Sets the automatic (read/write) mode flag on a buffer. </p>
-<p>In automatic write mode, a call to <a class="el" href="public_8h.html#ad3fdaa8626ff753c5b617707698c22b6" title="Appends a record to a buffer. ">fBufAppend()</a> or <a class="el" href="public_8h.html#a4e0c42fc80985c048190203257697ab6" title="Exports all external templates in the current domain of a given session. ">fbSessionExportTemplates()</a> that overruns the available space in the buffer will cause a call to <a class="el" href="public_8h.html#a3def007c235fd0dccb7a2293b23341e1" title="Emits the message currently in a buffer using the associated exporting process endpoint. ">fBufEmit()</a> to emit the message in the buffer to the exporter before starting a new message.</p>
+<p>In automatic write mode, a call to <a class="el" href="public_8h.html#ad3fdaa8626ff753c5b617707698c22b6" title="Appends a record to a buffer. ">fBufAppend()</a>, <a class="el" href="public_8h.html#a2e4baf6d2142eca4cb526b1e80628bf8" title="Adds a template to a session. ">fbSessionAddTemplate()</a>, or <a class="el" href="public_8h.html#a4e0c42fc80985c048190203257697ab6" title="Exports all external templates in the current domain of a given session. ">fbSessionExportTemplates()</a> that overruns the available space in the buffer will cause a call to <a class="el" href="public_8h.html#a3def007c235fd0dccb7a2293b23341e1" title="Emits the message currently in a buffer using the associated exporting process endpoint. ">fBufEmit()</a> to emit the message in the buffer to the exporter before starting a new message.</p>
 <p>In automatic read mode, a call to <a class="el" href="public_8h.html#a11c40f1d55e2d4b29b40eb4c07ce5ee7" title="Retrieves a record from a buffer. ">fBufNext()</a> that overruns the buffer will cause a call to <a class="el" href="public_8h.html#a7c89ee8cc9d536e1ceafb371513a6479" title="Reads a new message into a buffer using the associated collecting process endpoint. ">fBufNextMessage()</a> to read another message from the collector before attempting to read a record.</p>
 <p>In manual mode, the end of message on any buffer read/write call results in the call returning an error with a GError code of FB_ERROR_EOM.</p>
 <p>Buffers are created in automatic mode by default.</p>

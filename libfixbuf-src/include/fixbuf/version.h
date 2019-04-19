@@ -49,7 +49,7 @@
 /** The second number of libfixbuf's version number. */
 #define FIXBUF_VERSION_MINOR 3
 /** The third number of libfixbuf's version number. */
-#define FIXBUF_VERSION_RELEASE 0
+#define FIXBUF_VERSION_RELEASE 1
 /** The fourth number of libfixbuf's version number or zero if none. */
 #define FIXBUF_VERSION_BUILD 0
 

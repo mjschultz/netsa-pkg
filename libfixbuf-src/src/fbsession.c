@@ -41,6 +41,11 @@
 #include <fixbuf/private.h>
 
 
+/* whether to debug writing of InfoElement and Template metadata */
+#ifndef FB_DEBUG_MD
+#define FB_DEBUG_MD 0
+#endif
+
 /** Size of the tmpl_pair_array */
 #define TMPL_PAIR_ARRAY_SIZE    (sizeof(uint16_t) * (1 << 16))
 
@@ -111,13 +116,13 @@ struct fbSession_st {
      */
     uint32_t                    sequence;
     /**
-     * Buffer instance to write template dynamics to.
-     */
-    fBuf_t                      *tdyn_buf;
-    /**
      * Pointer to collector that was created with session
      */
     fbCollector_t               *collector;
+    /**
+     * Buffer instance to write template dynamics to.
+     */
+    fBuf_t                      *tdyn_buf;
     /**
      * Error description for fbSessionExportTemplates()
      */
@@ -320,6 +325,13 @@ uint16_t fbSessionSetMetadataExportElements(
 }
 
 
+/*
+ *  Writes the info element type metadata for all non-standard
+ *  elements in the info model to the template dynamics buffer of
+ *  'session'.
+ *
+ *  Does NOT restore the internal and external templates of the fBuf.
+ */
 static gboolean fbSessionWriteTypeMetadata(
     fbSession_t                *session,
     GError                    **err)
@@ -329,14 +341,26 @@ static gboolean fbSessionWriteTypeMetadata(
     GError *child_err = NULL;
 
     if (!session->export_info_element_metadata) {
-        g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_TMPL,
-                    "Session is not configured to write type metadata");
-        return FALSE;
+#if FB_DEBUG_MD
+        fprintf(stderr, "Called fbSessionWriteTypeMetadata on a session"
+                " that is not configured for element metadata\n");
+#endif
+        return TRUE;
     }
 
+#if FB_DEBUG_MD
+    fprintf(stderr, "Writing info element metadata tmpl %#x to fbuf %p\n",
+            session->info_element_metadata_tid, (void *)session->tdyn_buf);
+#endif
+
     if (!fBufSetInternalTemplate(
-            session->tdyn_buf, session->info_element_metadata_tid, err))
+            session->tdyn_buf, session->info_element_metadata_tid, &child_err))
     {
+#if FB_DEBUG_MD
+        fprintf(stderr, "fBufSetInternalTemplate(%#x) failed: %s\n",
+                session->info_element_metadata_tid, child_err->message);
+#endif
+        g_propagate_error(err, child_err);
         return FALSE;
     }
 
@@ -344,9 +368,17 @@ static gboolean fbSessionWriteTypeMetadata(
             session->tdyn_buf, session->info_element_metadata_tid, &child_err))
     {
         if (g_error_matches(child_err, FB_ERROR_DOMAIN, FB_ERROR_TMPL)) {
+#if FB_DEBUG_MD
+            fprintf(stderr,"Ignoring failed fBufSetExternalTemplate(%#x): %s\n",
+                    session->info_element_metadata_tid, child_err->message);
+#endif
             g_clear_error(&child_err);
             return TRUE;
         }
+#if FB_DEBUG_MD
+        fprintf(stderr, "fBufSetExternalTemplate(%#x) failed: %s\n",
+                session->info_element_metadata_tid, child_err->message);
+#endif
         g_propagate_error(err, child_err);
         return FALSE;
     }
@@ -363,11 +395,18 @@ static gboolean fbSessionWriteTypeMetadata(
             session->tdyn_buf, ie, session->info_element_metadata_tid,
             session->info_element_metadata_tid, &child_err))
         {
+#if FB_DEBUG_MD
+            fprintf(stderr,"fbInfoElementWriteOptionsRecord(%s) failed: %s\n",
+                    ie->ref.name, child_err->message);
+#endif
             g_propagate_error(err, child_err);
             return FALSE;
         }
     }
 
+#if FB_DEBUG_MD
+    fprintf(stderr, "Finished writing info element type metadata\n");
+#endif
     return TRUE;
 }
 
@@ -525,49 +564,95 @@ uint16_t fbSessionSpreadSetMetadataExportElements(
 #endif  /* HAVE_SPREAD */
 
 
+/* Writes the metadata for 'tmpl' to 'session'. */
 static gboolean fbSessionWriteTemplateMetadata(
     fbSession_t    *session,
     fbTemplate_t   *tmpl,
     GError         **err)
 {
-    uint16_t old_tid_int, old_tid_ext;
+    uint16_t int_tid, ext_tid;
+    GError *child_err = NULL;
+    gboolean ret = TRUE;
 
-    if (session->export_template_metadata && tmpl->metadata_rec) {
-        /*printf("writing metadata for : %p (%x)\n", tmpl, session->tdyn_buf);*/
+    if (!session->export_template_metadata || !tmpl->metadata_rec) {
+        return TRUE;
+    }
+#if FB_DEBUG_MD
+    fprintf(stderr, "writing metadata for template %p to fBuf %p\n",
+            (void *)tmpl, (void *)session->tdyn_buf);
+#endif
 
-        old_tid_int = fBufGetInternalTemplate(session->tdyn_buf);
-        old_tid_ext = fBufGetExportTemplate(session->tdyn_buf);
+    int_tid = fBufGetInternalTemplate(session->tdyn_buf);
+    ext_tid = fBufGetExportTemplate(session->tdyn_buf);
 
-        if (!fBufSetInternalTemplate(
-                session->tdyn_buf, session->template_metadata_tid, err))
-        {
-            /*printf("fBufSetInternalTemplate failed\n");*/
-            return FALSE;
-        }
-        if (!fBufSetExportTemplate(
-                session->tdyn_buf, session->template_metadata_tid, err))
-        {
-            /*printf("fBufSetExportTemplate failed\n");*/
-            return FALSE;
-        }
-        if (!fBufAppend(session->tdyn_buf, (uint8_t *)tmpl->metadata_rec,
-                        sizeof(fbTemplateOptRec_t), err))
-        {
-            /*printf("BufAppend failed\n");*/
-            return FALSE;
-        }
-        /* if (!fBufEmit(session->tdyn_buf, err)) return FALSE; */
+    if (!fBufSetInternalTemplate(
+            session->tdyn_buf, session->template_metadata_tid, err))
+    {
+#if FB_DEBUG_MD
+        fprintf(stderr, "fBufSetInternalTemplate(%#x) failed: %s\n",
+                session->template_metadata_tid, (err ? (*err)->message : ""));
+#endif
+        ret = FALSE;
+        goto RESET_INT;
+    }
+    if (!fBufSetExportTemplate(
+            session->tdyn_buf, session->template_metadata_tid, err))
+    {
+#if FB_DEBUG_MD
+        fprintf(stderr, "fBufSetExportTemplate(%#x) failed: %s\n",
+                session->template_metadata_tid, (err ? (*err)->message : ""));
+#endif
+        ret = FALSE;
+        goto RESET_EXT;
+    }
+    if (!fBufAppend(session->tdyn_buf, (uint8_t *)tmpl->metadata_rec,
+                    sizeof(fbTemplateOptRec_t), err))
+    {
+#if FB_DEBUG_MD
+        fprintf(stderr, "fBufAppend(%p) failed: %s\n",
+                (void *)tmpl->metadata_rec, (err ? (*err)->message : ""));
+#endif
+        ret = FALSE;
+        goto RESET_EXT;
+    }
+    /* if (!fBufEmit(session->tdyn_buf, err)) goto END; */
 
-        if (!fBufSetInternalTemplate(session->tdyn_buf, old_tid_int, err)) {
-            /*printf("fBufSetInternalTemplate failed\n");*/
-            return FALSE;
-        }
-        if (!fBufSetExportTemplate(session->tdyn_buf, old_tid_ext, err)) {
-            /*printf("restore BufSetExportTemplate failed %s\n", (*err)->message);*/
-            return FALSE;
+  RESET_EXT:
+    if (ext_tid
+        && !fBufSetExportTemplate(session->tdyn_buf, ext_tid, &child_err))
+    {
+#if FB_DEBUG_MD
+        fprintf(stderr, "restore fBufSetExportTemplate(%#x) failed: %s\n",
+                ext_tid, child_err->message);
+#endif
+        if (!ret || g_error_matches(child_err, FB_ERROR_DOMAIN, FB_ERROR_TMPL)){
+            /* ignore this error if either an error is already set or
+             * this error is an unknown template error */
+            g_clear_error(&child_err);
+        } else {
+            g_propagate_error(err, child_err);
+            child_err = NULL;
+            ret = FALSE;
         }
     }
-    return TRUE;
+  RESET_INT:
+    if (int_tid
+        && !fBufSetInternalTemplate(session->tdyn_buf, int_tid, &child_err))
+    {
+#if FB_DEBUG_MD
+        fprintf(stderr, "restore fBufSetInternalTemplate(%#x) failed: %s\n",
+                int_tid, child_err->message);
+#endif
+        if (!ret || g_error_matches(child_err, FB_ERROR_DOMAIN, FB_ERROR_TMPL)){
+            g_clear_error(&child_err);
+        } else {
+            g_propagate_error(err, child_err);
+            child_err = NULL;
+            ret = FALSE;
+        }
+    }
+
+    return ret;
 }
 
 
@@ -585,7 +670,6 @@ uint16_t fbSessionAddTemplateWithMetadata(
                     "Template name must be specified");
         return 0;
     }
-
     return fbSessionAddTemplateHelper(session, internal, tid, tmpl,
                                       name, description, err);
 }
@@ -886,7 +970,7 @@ void            fbSessionSetPrivateGroup(
 {
     unsigned int loop, group_offset = 0;
     char **g;
-    GError **err = NULL;
+    GError *err = NULL;
 
     if (group == NULL || privgroup == NULL) {
         return;
@@ -906,9 +990,9 @@ void            fbSessionSetPrivateGroup(
     }
 
     if (fBufGetExporter(session->tdyn_buf) && session->group > 0) {
-        if (!fBufEmit(session->tdyn_buf, err)) {
-            g_warning("Could not emit buffer %s", (*err)->message);
-            g_clear_error(err);
+        if (!fBufEmit(session->tdyn_buf, &err)) {
+            g_warning("Could not emit buffer %s", err->message);
+            g_clear_error(&err);
         }
     }
 
@@ -938,10 +1022,12 @@ void            fbSessionSetPrivateGroup(
     g = &privgroup;
 
     if (fBufGetExporter(session->tdyn_buf)) {
-        fBufSetExportGroups(session->tdyn_buf, g, 1, err);
+        fBufSetExportGroups(session->tdyn_buf, g, 1, NULL);
     }
 
-    fbSessionExportTemplates(session, err);
+    if (!fbSessionExportTemplates(session, &err)) {
+        g_clear_error(&err);
+    }
 }
 
 
@@ -971,6 +1057,7 @@ static uint16_t fbSessionSpreadAddTemplatesHelper(
     g_assert(tmpl);
     g_assert(tid == FB_TID_AUTO || tid >= FB_TID_MIN_DATA);
     g_assert(groups);
+    g_assert(err);
     if (groups == NULL) {
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_SETUP,
                     "No groups provided");
@@ -1088,16 +1175,14 @@ static uint16_t fbSessionSpreadAddTemplatesHelper(
     }
 
     if (fBufGetExporter(session->tdyn_buf)) {
-        fBufSetExportGroups(session->tdyn_buf, groups, n, err);
-
+        fBufSetExportGroups(session->tdyn_buf, groups, n, NULL);
         if (name && !fbSessionWriteTemplateMetadata(session, tmpl, err)) {
-            if (g_error_matches(*err, FB_ERROR_DOMAIN, FB_ERROR_TMPL)) {
+            if (err && g_error_matches(*err, FB_ERROR_DOMAIN, FB_ERROR_TMPL)) {
                 g_clear_error(err);
             } else {
                 return 0;
             }
         }
-
         if (!fBufAppendTemplate(session->tdyn_buf, tid, tmpl, FALSE, err))
             return 0;
     }
@@ -1143,7 +1228,6 @@ uint16_t        fbSessionAddTemplatesMulticastWithMetadata(
                     "Template name must be specified");
         return 0;
     }
-
     return fbSessionSpreadAddTemplatesHelper(
         session, groups, internal, tid, tmpl, name, description, err);
 }
@@ -1159,7 +1243,7 @@ void            fbSessionSetGroup(
     char             *group)
 {
     unsigned int group_offset;
-    GError **err = NULL;
+    GError *err = NULL;
 
     if (group == NULL && session->ext_ttab) {
         /* ext_ttab should already be setup and we are multicasting
@@ -1179,10 +1263,10 @@ void            fbSessionSetGroup(
 
     if (fBufGetExporter(session->tdyn_buf) && session->group > 0) {
         /* Group is changing - meaning tmpls changing - emit now */
-        if (!fBufEmit(session->tdyn_buf, err)) {
+        if (!fBufEmit(session->tdyn_buf, &err)) {
             g_warning("Could not emit buffer before setting group: %s",
-                      (*err)->message);
-            g_clear_error(err);
+                      err->message);
+            g_clear_error(&err);
         }
     }
     /*Update external template table; create if necessary. */
@@ -1262,6 +1346,7 @@ static uint16_t fbSessionAddTemplateHelper(
 
     g_assert(tmpl);
     g_assert(tid == FB_TID_AUTO || tid >= FB_TID_MIN_DATA);
+    g_assert(err);
 
     /* Select a template table to add the template to */
     ttab = internal ? session->int_ttab : session->ext_ttab;
@@ -1297,7 +1382,7 @@ static uint16_t fbSessionAddTemplateHelper(
     /* Write template to dynamics buffer */
     if (fBufGetExporter(session->tdyn_buf) && !internal) {
         if (name && !fbSessionWriteTemplateMetadata(session, tmpl, err)) {
-            if (g_error_matches(*err, FB_ERROR_DOMAIN, FB_ERROR_TMPL)) {
+            if (err && g_error_matches(*err, FB_ERROR_DOMAIN, FB_ERROR_TMPL)) {
                 g_clear_error(err);
             } else {
                 return 0;
@@ -1435,6 +1520,7 @@ gboolean        fbSessionExportTemplate(
     GError          **err)
 {
     fbTemplate_t    *tmpl = NULL;
+    GError          *child_err = NULL;
 
     /* short-circuit on no template dynamics buffer */
     if (!fBufGetExporter(session->tdyn_buf))
@@ -1444,17 +1530,40 @@ gboolean        fbSessionExportTemplate(
     if (!(tmpl = fbSessionGetTemplate(session, FALSE, tid, err)))
         return FALSE;
 
-    fbSessionWriteTemplateMetadata(session, tmpl, err);
+    if (!fbSessionWriteTemplateMetadata(session, tmpl, &child_err)) {
+        if (g_error_matches(child_err, FB_ERROR_DOMAIN, FB_ERROR_TMPL)) {
+            g_clear_error(&child_err);
+        } else {
+            g_propagate_error(err, child_err);
+            return FALSE;
+        }
+    }
+
     /* export it */
     return fBufAppendTemplate(session->tdyn_buf, tid, tmpl, FALSE, err);
 }
 
+
+/*
+ *  Appends a single template metadata options record for 'tmpl' to
+ *  the template dynamics buffer for 'session'.
+ *
+ *  This is a callback for g_hash_table_foreach() and is invoked by
+ *  fbSessionExportTemplates().
+ *
+ *  This function assumes the internal and external template for the
+ *  fBuf have been set to template_metadata_tid.
+ */
 static void fbSessionExportOneTemplateMetadataRecord(
     void            *vtid,
     fbTemplate_t    *tmpl,
     fbSession_t     *session)
 {
     uint16_t        tid = (uint16_t)GPOINTER_TO_UINT(vtid);
+
+    if (!tmpl->metadata_rec) {
+        return;
+    }
 
     /* The type/template metadata templates should have already been exported */
     if (tid == session->info_element_metadata_tid
@@ -1463,21 +1572,33 @@ static void fbSessionExportOneTemplateMetadataRecord(
         return;
     }
 
-    if (!tmpl->metadata_rec) {
-        return;
-    }
-
-    /* the internal and external template must be set on the fBuf before
-       using this function or everything will go to crap */
-
-    if (!fBufAppend(session->tdyn_buf, (uint8_t *) tmpl->metadata_rec,
-                    sizeof(fbTemplateOptRec_t), &session->tdyn_err)) {
-        /* printf("BufAppend failed\n"); */
-        return;
+    if (fBufGetExporter(session->tdyn_buf) && !session->tdyn_err) {
+        /* the internal and external template must be set on the fBuf
+         * before using this function or everything will go to crap */
+        if (!fBufAppend(session->tdyn_buf, (uint8_t *)tmpl->metadata_rec,
+                        sizeof(fbTemplateOptRec_t), &session->tdyn_err))
+        {
+#if FB_DEBUG_MD
+            fprintf(stderr, "fBufAppend(%p) failed: %s\n",
+                    (void *)tmpl->metadata_rec,
+                    (session->tdyn_err ? session->tdyn_err->message : ""));
+#endif
+            if (!session->tdyn_err) {
+                g_set_error(&session->tdyn_err, FB_ERROR_DOMAIN, FB_ERROR_IO,
+                            "Unspecified template export error");
+            }
+        }
     }
 }
 
 
+/*
+ *  Appends a single template record for 'tmpl' to the template
+ *  dynamics buffer for 'session'.
+ *
+ *  This is a callback for g_hash_table_foreach() and is invoked by
+ *  fbSessionExportTemplates().
+ */
 static void     fbSessionExportOneTemplate(
     void            *vtid,
     fbTemplate_t    *tmpl,
@@ -1492,12 +1613,11 @@ static void     fbSessionExportOneTemplate(
         return;
     }
 
-    /* printf("fbSessionExportOneTemplate: %x\n", tid); */
-    if (fBufGetExporter(session->tdyn_buf)) {
-        if (session->tdyn_err) return;
-
+    /* fprintf(stderr, "fbSessionExportOneTemplate(%#x, %p)\n", tid, tmpl); */
+    if (fBufGetExporter(session->tdyn_buf) && !session->tdyn_err) {
         if (!fBufAppendTemplate(session->tdyn_buf, tid, tmpl,
-                                FALSE, &session->tdyn_err)) {
+                                FALSE, &session->tdyn_err))
+        {
             if (!session->tdyn_err) {
                 g_set_error(&session->tdyn_err, FB_ERROR_DOMAIN, FB_ERROR_IO,
                             "Unspecified template export error");
@@ -1510,81 +1630,135 @@ gboolean        fbSessionExportTemplates(
     fbSession_t     *session,
     GError          **err)
 {
-    gboolean ret = FALSE;
-    uint16_t int_tid = fBufGetInternalTemplate(session->tdyn_buf);
-    uint16_t ext_tid = fBufGetExportTemplate(session->tdyn_buf);
+    uint16_t int_tid;
+    uint16_t ext_tid;
+    GError *child_err = NULL;
+    gboolean ret = TRUE;
 
-    g_clear_error(&session->tdyn_err);
+    /* require an exporter */
+    if (!fBufGetExporter(session->tdyn_buf))
+        return TRUE;
+
+    int_tid = fBufGetInternalTemplate(session->tdyn_buf);
+    ext_tid = fBufGetExportTemplate(session->tdyn_buf);
 
     if (session->export_info_element_metadata) {
-        if (!fbSessionExportTemplate(session,
-                                     session->info_element_metadata_tid,
-                                     &session->tdyn_err))
+#if FB_DEBUG_MD
+        fprintf(stderr, "Exporting info element metadata; template %#x\n",
+                session->info_element_metadata_tid);
+#endif
+        if (!fbSessionExportTemplate(
+                session, session->info_element_metadata_tid, err))
         {
-            g_propagate_error(err, session->tdyn_err);
-            goto err;
+#if FB_DEBUG_MD
+            fprintf(stderr, "fbSessionExportTemplate(%#x) failed: %s\n",
+                    session->info_element_metadata_tid,
+                    (err ? (*err)->message : ""));
+#endif
+            ret = FALSE;
+            goto END;
         }
-        if (!fbSessionWriteTypeMetadata(session, &session->tdyn_err)) {
-            g_propagate_error(err, session->tdyn_err);
-            goto err;
+        if (!fbSessionWriteTypeMetadata(session, err)) {
+            ret = FALSE;
+            goto END;
         }
     }
 
     if (session->export_template_metadata) {
-        if (!fbSessionExportTemplate(session, session->template_metadata_tid,
-                                     &session->tdyn_err))
+#if FB_DEBUG_MD
+        fprintf(stderr, "Exporting template metadata; template %#x\n",
+                session->template_metadata_tid);
+#endif
+        if (!fbSessionExportTemplate(
+                session, session->template_metadata_tid, err))
         {
-            g_propagate_error(err, session->tdyn_err);
-            goto err;
+#if FB_DEBUG_MD
+            fprintf(stderr, "fbSessionExportTemplate(%#x) failed: %s\n",
+                    session->template_metadata_tid,
+                    (err ? (*err)->message : ""));
+#endif
+            ret = FALSE;
+            goto END;
         }
         if (session->ext_ttab && fBufGetExporter(session->tdyn_buf)) {
-            if (session->tdyn_err) {
-                return FALSE;
-            }
             if (!fBufSetInternalTemplate(session->tdyn_buf,
                                          session->template_metadata_tid,
-                                         &session->tdyn_err))
+                                         &child_err))
             {
-                return FALSE;
-            }
-            if (!fBufSetExportTemplate(session->tdyn_buf,
-                                       session->template_metadata_tid,
-                                       &session->tdyn_err))
+#if FB_DEBUG_MD
+                fprintf(stderr, "fBufSetInternalTemplate(%#x) failed: %s\n",
+                        session->template_metadata_tid, child_err->message);
+#endif
+                if (g_error_matches(child_err, FB_ERROR_DOMAIN,FB_ERROR_TMPL)){
+                    g_clear_error(&child_err);
+                }
+            } else if (!fBufSetExportTemplate(session->tdyn_buf,
+                                              session->template_metadata_tid,
+                                              &child_err))
             {
-                return FALSE;
+#if FB_DEBUG_MD
+                fprintf(stderr, "fBufSetExportTemplate(%#x) failed: %s\n",
+                        session->template_metadata_tid, child_err->message);
+#endif
+                if (g_error_matches(child_err, FB_ERROR_DOMAIN,FB_ERROR_TMPL)){
+                    g_clear_error(&child_err);
+                }
+            } else {
+                FB_SPREAD_MUTEX_LOCK(session);
+                /* the fbufsetinternal/fbufsetexport template functions
+                 * can't occur in the GHFunc since pthread_mutex_lock has
+                 * already been called and fBufSetExportTemplate will call
+                 * fbSessionGetTemplate which will try to acquire lock */
+                g_clear_error(&session->tdyn_err);
+                g_hash_table_foreach(
+                    session->ext_ttab,
+                    (GHFunc)fbSessionExportOneTemplateMetadataRecord, session);
+                if (session->tdyn_err) {
+                    g_propagate_error(&child_err, session->tdyn_err);
+                    session->tdyn_err = NULL;
+                }
+                FB_SPREAD_MUTEX_UNLOCK(session);
             }
-
-            FB_SPREAD_MUTEX_LOCK(session);
-            /* the fbufsetinternal/fbufsetexport template functions
-             * can't occur in the GHFunc since pthread_mutex_lock has
-             * already been called and fBufSetExportTemplate will call
-             * fbSessionGetTemplate which will try to acquire lock */
-            g_hash_table_foreach(
-                session->ext_ttab,
-                (GHFunc)fbSessionExportOneTemplateMetadataRecord, session);
-            FB_SPREAD_MUTEX_UNLOCK(session);
+            if (child_err) {
+                g_propagate_error(err, child_err);
+                child_err = NULL;
+                ret = FALSE;
+                goto END;
+            }
         }
     }
 
     FB_SPREAD_MUTEX_LOCK(session);
     if (session->ext_ttab) {
+        g_clear_error(&session->tdyn_err);
         g_hash_table_foreach(session->ext_ttab,
                              (GHFunc)fbSessionExportOneTemplate, session);
         if (session->tdyn_err) {
             g_propagate_error(err, session->tdyn_err);
-            FB_SPREAD_MUTEX_UNLOCK(session);
-            goto err;
+            session->tdyn_err = NULL;
+            ret = FALSE;
         }
     }
     FB_SPREAD_MUTEX_UNLOCK(session);
 
-    ret = TRUE;
-  err:
-    if (int_tid) {
-        fBufSetInternalTemplate(session->tdyn_buf, int_tid, err);
+  END:
+    if (int_tid
+        && !fBufSetInternalTemplate(session->tdyn_buf, int_tid, &child_err))
+    {
+#if FB_DEBUG_MD
+        fprintf(stderr, "restore fBufSetInternalTemplate(%#x) failed: %s\n",
+                int_tid, child_err->message);
+#endif
+        g_clear_error(&child_err);
     }
-    if (ext_tid) {
-        fBufSetExportTemplate(session->tdyn_buf, ext_tid, err);
+    if (ext_tid
+        && !fBufSetExportTemplate(session->tdyn_buf, ext_tid, &child_err))
+    {
+#if FB_DEBUG_MD
+        fprintf(stderr, "restore fBufSetExportTemplate(%#x) failed: %s\n",
+                ext_tid, child_err->message);
+#endif
+        g_clear_error(&child_err);
     }
     return ret;
 }

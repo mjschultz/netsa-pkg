@@ -191,7 +191,7 @@ typedef void        (*fbCollectorTransClose_fn)(
  * @param session pointer to session that is being timed out
  *
 */
-typedef void (*fbCollectorSessionTimeout_fn) (
+typedef void (*fbCollectorSessionTimeout_fn)(
     fbCollector_t                *collector,
     fbSession_t                  *session);
 
@@ -255,7 +255,7 @@ gboolean    fbCollectorSetTranslator(
  * @return TRUE on success, FALSE on error
  *
  */
-typedef gboolean    (*fbCollectorRead_fn) (
+typedef gboolean    (*fbCollectorRead_fn)(
     fbCollector_t               *collector,
     uint8_t                     *msgbase,
     size_t                      *msglen,

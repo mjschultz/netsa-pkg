@@ -120,7 +120,7 @@ gboolean fbConnSpecLookupAI(
     }
 
     /* get addrinfo for host/port */
-    if ((ai_err = getaddrinfo(spec->host, spec->svc, &hints, &tempaddr) )) {
+    if ((ai_err = getaddrinfo(spec->host, spec->svc, &hints, &tempaddr))) {
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_CONN,
                     "error looking up address %s:%s: %s",
                     spec->host ? spec->host : "*", spec->svc,
@@ -441,7 +441,7 @@ void fbConnSpecFree(
 #if HAVE_SPREAD
 
 fbSpreadSpec_t *fbConnSpreadCopy(
-    fbSpreadParams_t *params )
+    fbSpreadParams_t *params)
 {
     int n = 0;
     char **g = 0;
@@ -478,7 +478,7 @@ fbSpreadSpec_t *fbConnSpreadCopy(
 }
 
 void fbConnSpreadFree(
-    fbSpreadSpec_t *spec )
+    fbSpreadSpec_t *spec)
 {
     if (spec->daemon)
         g_free(spec->daemon);
@@ -495,7 +495,7 @@ void fbConnSpreadFree(
 }
 
 const char * fbConnSpreadError(
-    int err )
+    int err)
 {
     switch (err)
     {

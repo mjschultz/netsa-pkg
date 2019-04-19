@@ -240,13 +240,13 @@
  * with fbInfoModelAddElement(), fbInfoModelAddElementArray(),
  * fbInfoModelReadXMLFile(), and fbInfoModelReadXMLData().
  *
- * To create an Exporter, first create an fbSession_t attached to the
- * application's fbInfoModel_t to hold the Exporter's Transport Session
+ * To create an Exporter, first create an @ref fbSession_t attached to the
+ * application's @ref fbInfoModel_t to hold the Exporter's Transport Session
  * state using fbSessionAlloc(). If exporting via the Spread protocol, create
- * an fbSpreadParams_t and set its session to your newly defined session,
+ * an @ref fbSpreadParams_t and set its session to your newly defined session,
  * group names (a null terminated array), and Spread daemon name.
  *
- * Then create an fbExporter_t to encapsulate the connection to the
+ * Then create an @ref fbExporter_t to encapsulate the connection to the
  * Collecting Process or the file on disk, using the fbExporterAllocFP(),
  * fbExporterAllocFile(), fbExporterAllocNet(), fbExporterAllocBuffer(),
  * or fbExporterAllocSpread() calls.
@@ -255,7 +255,8 @@
  * writing via fBufAllocForExport().
  *
  * Create and populate templates for addition to this session using the
- * fbTemplate calls, then add them to the session via fbSessionAddTemplate().
+ * fbTemplate calls, then add them to the session via fbSessionAddTemplate()
+ * or fbSessionAddTemplateWithMetadata().
  *
  * If exporting via Spread, before calling fbSessionAddTemplate(), set the
  * group that should receive this template with the fBufSetSpreadExportGroup()
@@ -270,6 +271,9 @@
  * and fBufSetExportTemplate().  You can then use fBufAppend() to write
  * records into IPFIX Messages and Messages to the output stream.
  *
+ * If using Spread, call fBufSetSpreadExportGroup() to set the groups to
+ * export to on the buffer before calling fBufAppend().
+ *
  * Note that Templates use internal reference counting, so they may be added
  * to multiple sessions, or to the same session using multiple template IDs or
  * multiple domains, or as both an internal and an external template on the
@@ -280,9 +284,18 @@
  * fBufSetAutomaticMode() call can be used to modify this behavior,
  * causing fBufAppend() to return FB_ERROR_EOM when at end of message. Use
  * this if your application requires manual control of message export. In this
- * case, fBufEmit() will emit a Message to the output stream.  If using Spread,
- * call fBufSetSpreadExportGroup() to set the groups to export to on the
- * buffer before calling fBufAppend().
+ * case, fBufEmit() will emit a Message to the output stream.
+ *
+ * If not in automatic mode and a session's templates do not fit into a single
+ * message, use fbSessionExportTemplate() to export each template individually
+ * instead of relying on fbSessionExportTemplates().
+ *
+ * Manual control of message export is incompatible with template and
+ * information element metadata (fbSessionSetMetadataExportTemplates() and
+ * fbSessionSetMetadataExportElements()).  There are several functions that
+ * can cause the metadata options records to be exported, and the session must
+ * be free to create a new record set or template set as needed.
+ *
  *
  * @page read IPFIX File Collectors
  *
@@ -916,7 +929,7 @@
  * `TRUE`.  Once this has been set, the full set of information
  * elements in the information model that have a non-zero Private
  * Enterprise Number will be exported every time template records are
- * exported.
+ * exported (fbSessionExportTemplates()).
  *
  * The other option is to export the information element options
  * records manually. An information element options template can then
@@ -2987,7 +3000,7 @@ void                 fBufSetSpreadExportGroup(
 /**
  * Sets the automatic (read/write) mode flag on a buffer.
  *
- * In automatic write mode, a call to fBufAppend() or
+ * In automatic write mode, a call to fBufAppend(), fbSessionAddTemplate(), or
  * fbSessionExportTemplates() that overruns the available space in the buffer
  * will cause a call to fBufEmit() to emit the message in the buffer to the
  * exporter before starting a new message.
@@ -3898,10 +3911,14 @@ gboolean fbSessionEnableTypeMetadata(
 
 /**
  * Configures a session to export type information for enterprise-specific
- * information elements as options records according to RFC 5610.  Regardless
- * of the `enabled` value, this function creates the type information template
- * and adds it to the session with the template ID `tid` or an arbitrary ID
- * when `tid` is @ref FB_TID_AUTO.
+ * information elements as options records according to RFC 5610.
+ *
+ * Regardless of the `enabled` value, this function creates the type
+ * information template and adds it to the session with the template ID `tid`
+ * or an arbitrary ID when `tid` is @ref FB_TID_AUTO.
+ *
+ * If `enabled` is TRUE, the information metadata is exported each time
+ * fbSessionExportTemplates() is called.
  *
  * When collecting, use fBufSetAutomaticInsert() to automatically update the
  * information model with these RFC 5610 elements.
@@ -3943,10 +3960,16 @@ gboolean fbSessionEnableTemplateMetadata(
 /**
  * Configures a session to export template metadata as options records.
  * Template metadata is the name and description specified by
- * fbSessionAddTemplateWithMetadata().  Regardless of the `enabled` value,
- * this function creates the template-metadata template and adds it to the
- * session with the template ID `tid` or an arbitrary ID when `tid` is
- * @ref FB_TID_AUTO.
+ * fbSessionAddTemplateWithMetadata().
+ *
+ * If enabled, the metadata is exported each time fbSessionExportTemplates()
+ * or fbSessionExportTemplate() is called.  In addition, the metadata is
+ * exported when fbSessionAddTemplateWithMetadata() is called if the session
+ * is associated with an @ref fbExporter_t.
+ *
+ * Regardless of the `enabled` value, this function creates the
+ * template-metadata template and adds it to the session with the template ID
+ * `tid` or an arbitrary ID when `tid` is @ref FB_TID_AUTO.
  *
  * @param session pointer
  * @param enabled TRUE to enable template metadata export, FALSE to disable
@@ -4330,6 +4353,10 @@ uint16_t fbSessionSpreadSetMetadataExportElements(
  * be emitted if the associated export buffer is in automatic mode, or return
  * with FB_ERROR_EOM if the associated export buffer is not in automatic mode.
  *
+ * Also exports an options record containing the template's name and
+ * description if they were specified (fbSessionAddTemplateWithMetadata()) and
+ * metadata export is enabled (fbSessionSetMetadataExportTemplates()).
+ *
  * @param session   a session state container associated with an export buffer
  * @param tid       template ID within current domain to export
  * @param err       an error description, set on failure.
@@ -4347,9 +4374,16 @@ gboolean            fbSessionExportTemplate(
  * be emitted if the associated export buffer is in automatic mode, or return
  * with FB_ERROR_EOM if the associated export buffer is not in automatic mode.
  *
+ * When template and/or information element metadata is enabled, those options
+ * records are also exported.
+ *
+ * All external templates are exported each time this function is called.
+ *
  * @param session   a session state container associated with an export buffer
  * @param err       an error description, set on failure.
  * @return TRUE on success, FALSE on failure.
+ * @see fbSessionSetMetadataExportTemplates() to enable template metadata,
+ * fbSessionSetMetadataExportElements() to enable information element metadata
  */
 
 gboolean            fbSessionExportTemplates(
@@ -4358,9 +4392,9 @@ gboolean            fbSessionExportTemplates(
 
 /**
  * Adds a template to a session. If external, adds the template to the current
- * domain, and exports the template if the session is associated with an export
- * buffer. Assigns the template ID given in tid, or assigns a template ID if
- * tid is @ref FB_TID_AUTO.
+ * domain, and exports the template if the session is associated with an
+ * export buffer. Gives the template the ID specified in tid, or assigns the
+ * template an arbitrary ID if tid is @ref FB_TID_AUTO.
  *
  * Calling this function twice with the same parameters may cause the template
  * to be freed and the session to keep a handle to the invalid template.  If
