@@ -63,7 +63,7 @@ typedef gboolean    (*fbExporterOpen_fn)(
     fbExporter_t                *exporter,
     GError                      **err);
 
-typedef gboolean    (*fbExporterWrite_fn) (
+typedef gboolean    (*fbExporterWrite_fn)(
     fbExporter_t                *exporter,
     uint8_t                     *msgbase,
     size_t                      msglen,
@@ -120,7 +120,7 @@ struct fbExporter_st {
  *
  * @return
  */
-static gboolean fbExporterOpenFile (
+static gboolean fbExporterOpenFile(
     fbExporter_t                *exporter,
     GError                      **err)
 {
@@ -194,7 +194,7 @@ static gboolean fbExporterWriteFile(
  * @param exporter
  *
  */
-static void fbExporterCloseFile (
+static void fbExporterCloseFile(
     fbExporter_t                *exporter)
 {
     if (exporter->stream.fp == stdout) {
@@ -258,7 +258,7 @@ static gboolean fbExporterOpenBuffer(
  * @param exporter
  *
  */
-static void fbExporterCloseBuffer (
+static void fbExporterCloseBuffer(
     fbExporter_t              *exporter)
 {
     exporter->active = FALSE;
@@ -336,7 +336,8 @@ fbExporter_t    *fbExporterAllocFP(
  *
  *
  */
-static void fbExporterIgnoreSigpipe()
+static void fbExporterIgnoreSigpipe(
+    void)
 {
     static gboolean ignored = FALSE;
     struct sigaction sa, osa;
@@ -473,7 +474,7 @@ static gboolean fbExporterOpenSocket(
  *
  * @return
  */
-static gboolean fbExporterWriteSCTP (
+static gboolean fbExporterWriteSCTP(
     fbExporter_t                *exporter,
     uint8_t                     *msgbase,
     size_t                      msglen,
@@ -549,7 +550,7 @@ static gboolean fbExporterWriteSCTP (
  *
  * @return
  */
-static gboolean fbExporterWriteTCP (
+static gboolean fbExporterWriteTCP(
     fbExporter_t                *exporter,
     uint8_t                     *msgbase,
     size_t                      msglen,
@@ -588,7 +589,7 @@ static gboolean fbExporterWriteTCP (
  *
  * @return
  */
-static gboolean fbExporterWriteUDP (
+static gboolean fbExporterWriteUDP(
     fbExporter_t                *exporter,
     uint8_t                     *msgbase,
     size_t                      msglen,
@@ -628,7 +629,7 @@ static gboolean fbExporterWriteUDP (
  * @param exporter
  *
  */
-static void fbExporterCloseSocket (
+static void fbExporterCloseSocket(
     fbExporter_t                *exporter)
 {
     close(exporter->stream.fd);
@@ -646,7 +647,7 @@ static void fbExporterCloseSocket (
  *
  * @return
  */
-static gboolean fbExporterOpenTLS (
+static gboolean fbExporterOpenTLS(
     fbExporter_t                *exporter,
     GError                      **err)
 {
@@ -722,7 +723,7 @@ end:
  * @return
  *
  */
-static gboolean fbExporterOpenDTLS (
+static gboolean fbExporterOpenDTLS(
     fbExporter_t                *exporter,
     GError                      **err)
 {
@@ -805,7 +806,7 @@ end:
  *
  * @return
  */
-static gboolean fbExporterWriteTLS (
+static gboolean fbExporterWriteTLS(
     fbExporter_t                *exporter,
     uint8_t                     *msgbase,
     size_t                      msglen,
@@ -838,7 +839,7 @@ static gboolean fbExporterWriteTLS (
  * @param exporter
  *
  */
-static void fbExporterCloseTLS (
+static void fbExporterCloseTLS(
     fbExporter_t                *exporter)
 {
     SSL_shutdown(exporter->ssl);
@@ -958,7 +959,7 @@ fbExporter_t    *fbExporterAllocNet(
  */
 
 static void * fbExporterSpreadReceiver(
-    void *arg )
+    void *arg)
 {
     int             i = 0;
     char            grp[MAX_GROUP_NAME];
@@ -1150,10 +1151,10 @@ static gboolean fbExporterSpreadOpen(
  * @param err
  */
 static gboolean fbExporterSpreadWrite(
-    fbExporter_t *exporter,
-    uint8_t *msgbase,
-    size_t msglen,
-    GError **err )
+    fbExporter_t  *exporter,
+    uint8_t       *msgbase,
+    size_t         msglen,
+    GError       **err)
 {
     int ret = 0;
     fbSpreadSpec_t *spread;
@@ -1201,7 +1202,7 @@ static gboolean fbExporterSpreadWrite(
  */
 
 static void fbExporterSpreadClose(
-    fbExporter_t *exporter )
+    fbExporter_t *exporter)
 {
     if (exporter->active) {
         pthread_cancel(exporter->spec.spread->recv_thread);
@@ -1217,7 +1218,7 @@ static void fbExporterSpreadClose(
  * @param Spread_params
  */
 fbExporter_t *fbExporterAllocSpread(
-    fbSpreadParams_t *params )
+    fbSpreadParams_t *params)
 {
     fbExporter_t    *exporter = NULL;
 

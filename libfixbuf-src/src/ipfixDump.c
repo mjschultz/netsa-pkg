@@ -108,7 +108,9 @@ static GOptionEntry id_core_option[] = {
 };
 
 
-static void idPrintVersion() {
+static void idPrintVersion(
+    void)
+{
     fprintf(stderr,"ipfixDump version %s (c) 2018-2019 Carnegie Mellon "
           "University.\n", FIXBUF_PACKAGE_VERISON);
     fprintf(stderr,"GNU Lesser General Public License (LGPL) Rights "

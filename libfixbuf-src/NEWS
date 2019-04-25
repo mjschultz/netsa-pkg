@@ -1,3 +1,9 @@
+Version 2.3.1: 2019-04-18
+=========================
+
+Fixed a double-freeing of memory and memory leaks in some of the error
+handling code.
+
 Version 2.3.0: 2019-03-18
 =========================
 

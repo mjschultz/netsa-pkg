@@ -193,7 +193,7 @@ gboolean fbCollectMessageBuffer(
  * @return TRUE (this always works)
  *
  */
-static gboolean    fbCollectorMessageHeaderNull (
+static gboolean    fbCollectorMessageHeaderNull(
     fbCollector_t               *collector __attribute__((unused)),
     uint8_t                     *buffer __attribute__((unused)),
     size_t                      b_len,
@@ -221,7 +221,7 @@ static gboolean    fbCollectorMessageHeaderNull (
  * @return TRUE (this always works)
  *
  */
-static gboolean    fbCollectorUDPMessageHeader (
+static gboolean    fbCollectorUDPMessageHeader(
     fbCollector_t               *collector,
     uint8_t                     *buffer,
     size_t                      b_len,
@@ -1329,8 +1329,8 @@ fbCollector_t *fbCollectorAllocTLS(
 #if HAVE_SPREAD
 
 static gboolean fbCollectorSpreadOpen(
-    fbCollector_t *collector,
-    GError **err )
+    fbCollector_t  *collector,
+    GError        **err)
 {
     int ret;
     int i = 0;
@@ -1448,7 +1448,7 @@ static gboolean fbCollectorSpreadPostProc(
 
 int fbCollectorGetSpreadReturnGroups(
     fbCollector_t *collector,
-    char *groups[] )
+    char *groups[])
 {
     int loop = 0;
     fbSpreadSpec_t *spread = collector->stream.spread;
@@ -1461,10 +1461,10 @@ int fbCollectorGetSpreadReturnGroups(
 }
 
 static gboolean fbCollectorSpreadRead(
-    fbCollector_t *collector,
-    uint8_t *msgbase,
-    size_t *msglen,
-    GError **err )
+    fbCollector_t  *collector,
+    uint8_t        *msgbase,
+    size_t         *msglen,
+    GError        **err)
 {
     fbSpreadSpec_t *spread = collector->stream.spread;
 
@@ -1527,7 +1527,7 @@ static gboolean fbCollectorSpreadRead(
 
 
 static void fbCollectorSpreadClose(
-    fbCollector_t *collector )
+    fbCollector_t *collector)
 {
     if (collector->active) {
         SP_disconnect( collector->stream.spread->recv_mbox );
@@ -1536,12 +1536,11 @@ static void fbCollectorSpreadClose(
 }
 
 fbCollector_t *fbCollectorAllocSpread(
-    void *ctx,
-    fbSpreadParams_t *params,
-    GError **err )
+    void              *ctx,
+    fbSpreadParams_t  *params,
+    GError           **err)
 {
-    fbCollector_t *collector = g_slice_new( fbCollector_t );
-    memset( collector, 0, sizeof( fbCollector_t ) );
+    fbCollector_t *collector = g_slice_new0( fbCollector_t );
 
     collector->ctx = ctx;
     collector->stream.spread = fbConnSpreadCopy( params );

@@ -103,7 +103,8 @@ static void         fbInfoElementFree(
     g_slice_free(fbInfoElement_t, ie);
 }
 
-fbInfoModel_t       *fbInfoModelAlloc()
+fbInfoModel_t       *fbInfoModelAlloc(
+    void)
 {
     fbInfoModel_t       *model = NULL;
 

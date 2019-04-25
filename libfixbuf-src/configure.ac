@@ -35,7 +35,7 @@ dnl Authors: Brian Trammell, Dan Ruef <druef@cert.org>, Chris Inacio
 dnl <inacio@cert.org>
 dnl ------------------------------------------------------------------------
 
-AC_INIT([libfixbuf], [2.3.0], [netsa-help@cert.org], [libfixbuf], [http://tools.netsa.cert.org/fixbuf/])
+AC_INIT([libfixbuf], [2.3.1], [netsa-help@cert.org], [libfixbuf], [http://tools.netsa.cert.org/fixbuf/])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_COPYRIGHT([Copyright (C) 2006-2019 by Carnegie Mellon University
 GNU Public License (GPL) Rights pursuant to Version 3, June 2007])
@@ -49,7 +49,8 @@ dnl the third number should be changed if the first number changes and
 dnl the release is backwards compatible with the previous release.
 dnl https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
 
-LIBCOMPAT="9:0:0"
+# Previous release: 2.3.0, LIBCOMPAT 9:0:0
+LIBCOMPAT="9:1:0"
 
 AM_CONFIG_HEADER(include/fixbuf/config.h)
 AC_CONFIG_MACRO_DIR([m4])

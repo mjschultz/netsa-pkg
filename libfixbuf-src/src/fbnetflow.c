@@ -479,7 +479,7 @@ static gboolean     fbCollectorDecodeV9MsgVL(
  *
  * @return TRUE on success, FALSE on error
  */
-static gboolean    fbCollectorMessageHeaderV9 (
+static gboolean    fbCollectorMessageHeaderV9(
     fbCollector_t               *collector,
     uint8_t                     *buffer,
     size_t                      b_len,
@@ -550,7 +550,7 @@ static gboolean    fbCollectorMessageHeaderV9 (
  * @return Number of Templates Parsed
  *
  */
-static int netflowDataTemplateParse (
+static int netflowDataTemplateParse(
     fbCollector_t   *collector,
     uint8_t         *dataBuf,
     uint16_t        *recordLength,
@@ -817,7 +817,7 @@ static int netflowDataTemplateParse (
  * @return number of templates parsed
  *
  */
-static int netflowOptionsTemplateParse (
+static int netflowOptionsTemplateParse(
     fbCollector_t   *collector,
     uint8_t         *dataBuf,
     uint16_t        *recordLength,
@@ -1248,7 +1248,7 @@ static gboolean     fbCollectorPostProcV9(
                 if ((dataBuf + *bufLen) <= (msgOsetPtr - 4 + recordLength)) {
                     /* return if this is the last FlowSet in the packet */
                     g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_NETFLOWV9,
-                                "No Template 0x%02x Present for this Session."
+                                "No Template %#06x Present for this Session."
                                 " %u Flows Lost.", setId,
                                 (recordCount-recordCounter));
                     currentSession->netflowSeqNum++;
@@ -1261,7 +1261,7 @@ static gboolean     fbCollectorPostProcV9(
 #endif
 
                 g_log(G_LOG_DOMAIN, G_LOG_LEVEL_WARNING,
-                      "No Template 0x%02x Present for Session", setId);
+                      "No Template %#06x Present for Session", setId);
 
                 msgOsetPtr -= 4;
                 memmove((msgOsetPtr), (msgOsetPtr + recordLength),
@@ -1277,7 +1277,7 @@ static gboolean     fbCollectorPostProcV9(
 
 #if FB_NETFLOW_DEBUG == 1
                 fprintf(stderr,
-                        "number of data records in set %02x is %d (0x%x)\n",
+                        "number of data records in set %#06x is %d (%#x)\n",
                         setId, numberRecordsInSet, numberRecordsInSet);
 #endif
                 if (numberRecordsInSet == 0) {

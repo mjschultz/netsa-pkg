@@ -717,7 +717,8 @@ static gboolean sflowDecodeRawHeader(
         READU16INC(data, sflowrec->tcpControlBits);
         sflowrec->tcpControlBits = sflowrec->tcpControlBits & 0x0FFF;
 #if FB_SFLOW_DEBUG
-        fprintf(stderr, "TCP sp %d, dp %d, flags %02x\n", sflowrec->sourceTransportPort,
+        fprintf(stderr, "TCP sp %d, dp %d, flags %02x\n",
+                sflowrec->sourceTransportPort,
                 sflowrec->destinationTransportPort, sflowrec->tcpControlBits);
 #endif
     } else if (sflowrec->protocolIdentifier == 17) {
@@ -869,7 +870,7 @@ static gboolean     fbCollectorDecodeSFlowMsgVL(
  *
  * @return TRUE on success, FALSE on error
  */
-static gboolean    fbCollectorMessageHeaderSFlow (
+static gboolean    fbCollectorMessageHeaderSFlow(
     fbCollector_t               *collector,
     uint8_t                     *buffer,
     size_t                      b_len,
@@ -941,7 +942,7 @@ static gboolean    fbCollectorMessageHeaderSFlow (
  * @return Number of Templates Parsed
  *
  */
-static int sflowFlowSampleParse (
+static int sflowFlowSampleParse(
     fbCollector_t   *collector,
     uint8_t         **data,
     size_t          *datalen,
@@ -998,7 +999,8 @@ static int sflowFlowSampleParse (
     READU32INC(dataBuf, numrecs);
 
 #if FB_SFLOW_DEBUG == 1
-    fprintf(stderr, "Internal %u, Egress %u, Expanded %d, numrecs %u, datalen %zu\n",
+    fprintf(stderr,
+            "Internal %u, Egress %u, Expanded %d, numrecs %u, datalen %zu\n",
             sflowrec->ingressInterface, sflowrec->egressInterface,
             expanded, numrecs, *datalen);
 #endif
@@ -1046,9 +1048,12 @@ static int sflowFlowSampleParse (
             /* after framelen is removed payload and length of header */
             /* raw packet header */
 
-            if (!sflowDecodeRawHeader(sflowrec, dataBuf+16, flowlength-16, protocol, err)) {
+            if (!sflowDecodeRawHeader(sflowrec, dataBuf+16, flowlength-16,
+                                      protocol, err))
+            {
 #if FB_SFLOW_DEBUG
-                fprintf(stderr, "RAW HEADER DECODE Error: %s\n", (*err)->message);
+                fprintf(stderr, "RAW HEADER DECODE Error: %s\n",
+                        (err ? (*err)->message : ""));
 #endif
                 g_clear_error(err);
             }
@@ -1057,7 +1062,7 @@ static int sflowFlowSampleParse (
           case 2:
           case 3:
           case 4:
-            sflowDecodeFlowHeaders(sflowrec, dataBuf, flowlength, format, err);
+            sflowDecodeFlowHeaders(sflowrec, dataBuf, flowlength, format, NULL);
             break;
           case 1001:
             READU32(dataBuf, var32);
@@ -1138,7 +1143,7 @@ static int sflowFlowSampleParse (
     return numrecs;
 }
 
-static int sflowCounterSampleParse (
+static int sflowCounterSampleParse(
     fbCollector_t          *collector,
     uint8_t                **data,
     size_t                 *datalen,
@@ -1311,7 +1316,6 @@ static gboolean     fbCollectorPostProcSFlow(
     }
 
     sfexp = sflowAllocExporter(transState->ipfixBuffer, transState->fbuf, err);
-
     if (!sfexp) {
         pthread_mutex_unlock(&transState->ts_lock);
         return FALSE;
@@ -1367,6 +1371,7 @@ static gboolean     fbCollectorPostProcSFlow(
 
         /*fBufSetAutomaticMode(transState->fbuf, FALSE);*/
         fBufEmit(transState->fbuf, err);
+        g_clear_error(err);
         msglen = fbExporterGetMsgLen(sfexp);
 
 #if FB_SFLOW_DEBUG == 1
@@ -1431,7 +1436,7 @@ static gboolean     fbCollectorPostProcSFlow(
     READU32INC(msgOsetPtr, numSamples);
     msgParsed -= 16;
 
-    while (sampleCount < numSamples ) {
+    while (sampleCount < numSamples) {
         if (msgParsed < 8) {
             g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_SFLOW,
                         "Buffer too small for Sample Header");
@@ -1577,6 +1582,7 @@ static gboolean     fbCollectorPostProcSFlow(
     currentSession->sflowSeqNum++;
 
     fBufEmit(transState->fbuf, err);
+    g_clear_error(err);
 
     msglen = fbExporterGetMsgLen(sfexp);
 

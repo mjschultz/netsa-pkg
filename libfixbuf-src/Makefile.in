@@ -236,8 +236,8 @@ am__DIST_COMMON = $(srcdir)/Doxyfile.in $(srcdir)/Makefile.in \
 	$(top_srcdir)/include/fixbuf/config.h.in \
 	$(top_srcdir)/include/fixbuf/version.h.in AUTHORS INSTALL NEWS \
 	README autoconf/compile autoconf/config.guess \
-	autoconf/config.sub autoconf/depcomp autoconf/install-sh \
-	autoconf/ltmain.sh autoconf/missing
+	autoconf/config.sub autoconf/install-sh autoconf/ltmain.sh \
+	autoconf/missing
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)

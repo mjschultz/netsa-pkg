@@ -1718,12 +1718,12 @@ static gboolean fbEncodeSubTemplateList(
     size_t                  srcLen          = 0;
     size_t                  dstLen          = 0;
     uint8_t                *lenPtr          = NULL;
-    gboolean                rv              = TRUE;
     uint16_t                tempIntID;
     uint16_t                tempExtID;
     uint16_t                dataPtrOffset   = 0;
     size_t                  srcRem          = 0;
     gboolean                retval          = FALSE;
+    GError                 *child_err       = NULL;
 #if HAVE_ALIGNED_ACCESS_REQUIRED
     fbSubTemplateList_t     subTemplateList_local;
     subTemplateList = &subTemplateList_local;
@@ -1760,7 +1760,7 @@ static gboolean fbEncodeSubTemplateList(
 
     /* set the templates to that used for this subTemplateList */
     if (!fBufSetEncodeSubTemplates(fbuf, subTemplateList->tmplID,
-                             subTemplateList->tmplID, err))
+                                   subTemplateList->tmplID, err))
     {
         goto err;
     }
@@ -1769,26 +1769,24 @@ static gboolean fbEncodeSubTemplateList(
     /* max source length is length of dataPtr */
     srcRem = subTemplateList->dataLength.length;
 
-    for (i = 0; i < subTemplateList->numElements && rv; i++) {
+    for (i = 0; i < subTemplateList->numElements; i++) {
         srcLen = srcRem;
         dstLen = *d_rem;
 
         /* transcode the sub template multi list*/
-        rv = fbTranscode(fbuf, FALSE, subTemplateList->dataPtr + dataPtrOffset,
-                         *dst, &srcLen, &dstLen, err);
-
-        if (rv) {
-            /* move up the dst pointer by how much we used in transcode */
-            (*dst) += dstLen;
-            /* subtract from d_rem the number of dst bytes used in transcode */
-            *d_rem -= dstLen;
-            /* more the src offset for the next transcode by src bytes used */
-            dataPtrOffset += srcLen;
-            /* subtract from the original data len for new max value */
-            srcRem -= srcLen;
-        } else {
+        if (!fbTranscode(fbuf, FALSE, subTemplateList->dataPtr + dataPtrOffset,
+                         *dst, &srcLen, &dstLen, err))
+        {
             goto err;
         }
+        /* move up the dst pointer by how much we used in transcode */
+        (*dst) += dstLen;
+        /* subtract from d_rem the number of dst bytes used in transcode */
+        *d_rem -= dstLen;
+        /* more the src offset for the next transcode by src bytes used */
+        dataPtrOffset += srcLen;
+        /* subtract from the original data len for new max value */
+        srcRem -= srcLen;
     }
 
     retval = TRUE;
@@ -1802,12 +1800,22 @@ static gboolean fbEncodeSubTemplateList(
     if (tempIntID == tempExtID) {
         /* if equal tempIntID is an external template */
         /* so calling setInternalTemplate with tempIntID won't find tmpl */
-        fBufSetEncodeSubTemplates(fbuf, tempExtID, tempIntID, err);
+        fBufSetEncodeSubTemplates(fbuf, tempExtID, tempIntID, NULL);
     } else {
-        if (!fBufSetInternalTemplate(fbuf, tempIntID, err)) {
+        if (!fBufSetInternalTemplate(fbuf, tempIntID, &child_err)) {
+            if (retval) {
+                g_propagate_error(err, child_err);
+            } else {
+                g_clear_error(&child_err);
+            }
             return FALSE;
         }
-        if (!fBufResetExportTemplate(fbuf, tempExtID, err)) {
+        if (!fBufResetExportTemplate(fbuf, tempExtID, &child_err)) {
+            if (retval) {
+                g_propagate_error(err, child_err);
+            } else {
+                g_clear_error(&child_err);
+            }
             return FALSE;
         }
     }
@@ -1894,13 +1902,13 @@ static gboolean fbDecodeSubTemplateList(
         /* we need both to continue on this item*/
         if (!extTemplate) {
             g_clear_error(err);
-            g_warning("Skipping SubTemplateList.  No Template 0x%02x Present.",
+            g_warning("Skipping SubTemplateList.  No Template %#06x Present.",
                       ext_tid);
         }
         /*    if (!(extTemplate)) {
               g_clear_error(err);
               g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_IPFIX,
-              "Template does not exist for template ID: %02x",
+              "Template does not exist for template ID: %#06x",
               ext_tid);
               return FALSE;
               }
@@ -1990,7 +1998,7 @@ static gboolean fbDecodeSubTemplateList(
     tempExtPtr = fbuf->ext_tmpl;
     tempIntPtr = fbuf->int_tmpl;
 
-    fBufSetDecodeSubTemplates(fbuf, ext_tid, int_tid, err);
+    fBufSetDecodeSubTemplates(fbuf, ext_tid, int_tid, NULL);
 
     subTemplateDst = subTemplateList->dataPtr;
     srcRem = srcLen;
@@ -2006,16 +2014,14 @@ static gboolean fbDecodeSubTemplateList(
             srcRem          -= srcLen;
             offset          += srcLen;
         } else {
-            g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_IPFIX,
-                        "Error Decoding SubTemplateList: %s\n",
-                        (*err)->message);
+            g_prefix_error(err, "Error Decoding SubTemplateList:");
             return FALSE;
         }
         /* transcode numElements number of records */
     }
 
     if (tempIntPtr == tempExtPtr) {
-        fBufSetDecodeSubTemplates(fbuf, tempExtID, tempIntID, err);
+        fBufSetDecodeSubTemplates(fbuf, tempExtID, tempIntID, NULL);
     } else {
         if (!fBufSetInternalTemplate(fbuf, tempIntID, err)) {
             return FALSE;
@@ -2056,6 +2062,7 @@ static gboolean fbEncodeSubTemplateMultiList(
     uint16_t                srcPtrOffset = 0;
     size_t                  srcRem = 0;
     gboolean                retval = FALSE;
+    GError                 *child_err = NULL;
 #if HAVE_ALIGNED_ACCESS_REQUIRED
     fbSubTemplateMultiList_t multiList_local;
     multiList = &multiList_local;
@@ -2141,12 +2148,22 @@ static gboolean fbEncodeSubTemplateMultiList(
 
     /* Put templates back */
     if (tempIntID == tempExtID) {
-        fBufSetEncodeSubTemplates(fbuf, tempExtID, tempIntID, err);
+        fBufSetEncodeSubTemplates(fbuf, tempExtID, tempIntID, NULL);
     } else {
-        if (!fBufSetInternalTemplate(fbuf, tempIntID, err)) {
+        if (!fBufSetInternalTemplate(fbuf, tempIntID, &child_err)) {
+            if (retval) {
+                g_propagate_error(err, child_err);
+            } else {
+                g_clear_error(&child_err);
+            }
             return FALSE;
         }
-        if (!fBufResetExportTemplate(fbuf, tempExtID, err)) {
+        if (!fBufResetExportTemplate(fbuf, tempExtID, &child_err)) {
+            if (retval) {
+                g_propagate_error(err, child_err);
+            } else {
+                g_clear_error(&child_err);
+            }
             return FALSE;
         }
     }
@@ -2294,7 +2311,7 @@ static gboolean fbDecodeSubTemplateMultiList(
             /* we need both to continue on this item*/
             if (!extTemplate) {
                 g_clear_error(err);
-                g_warning("Skipping STML Item.  No Template %02x Present.",
+                g_warning("Skipping STML Item.  No Template %#06x Present.",
                           ext_tid);
             }
             entry->tmpl = NULL;
@@ -2344,7 +2361,7 @@ static gboolean fbDecodeSubTemplateMultiList(
         dstLen = dstRem;
         srcRem = thisTemplateLength;
 
-        fBufSetDecodeSubTemplates(fbuf, ext_tid, int_tid, err);
+        fBufSetDecodeSubTemplates(fbuf, ext_tid, int_tid, NULL);
 
         thisTemplateDst = entry->dataPtr;
         for (j = 0; j < entry->numElements; j++) {
@@ -2359,10 +2376,10 @@ static gboolean fbDecodeSubTemplateMultiList(
                 dstRem -= dstLen;
             } else {
                 if (tempIntPtr == tempExtPtr) {
-                    fBufSetDecodeSubTemplates(fbuf, tempExtID, tempIntID, err);
+                    fBufSetDecodeSubTemplates(fbuf, tempExtID, tempIntID, NULL);
                 } else {
-                    fBufSetInternalTemplate(fbuf, tempIntID, err);
-                    fBufResetExportTemplate(fbuf, tempExtID, err);
+                    fBufSetInternalTemplate(fbuf, tempIntID, NULL);
+                    fBufResetExportTemplate(fbuf, tempExtID, NULL);
                 }
                 return FALSE;
             }
@@ -2371,7 +2388,7 @@ static gboolean fbDecodeSubTemplateMultiList(
     }
 
     if (tempIntPtr == tempExtPtr) {
-        fBufSetDecodeSubTemplates(fbuf, tempExtID, tempIntID, err);
+        fBufSetDecodeSubTemplates(fbuf, tempExtID, tempIntID, NULL);
     } else {
         if (!fBufSetInternalTemplate(fbuf, tempIntID, err)) {
             return FALSE;
@@ -2696,8 +2713,8 @@ gboolean        fBufSetInternalTemplate(
              * compatibility with respect to default element size
              * changes. */
 #if FB_ABORT_ON_DEFAULTED_LENGTH
-            g_error(("ERROR: Attempt to set internal template %#04"
-                     PRIx16 ", which has a defaulted length\n"), int_tid);
+            g_error(("ERROR: Attempt to set internal template %#06" PRIx16
+                     ", which has a defaulted length\n"), int_tid);
 #endif
             g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_LAXSIZE,
                         "Attempt to set internal template with"
@@ -2741,7 +2758,6 @@ gboolean         fBufSetAutomaticInsert(
     fbTemplate_t *tmpl = NULL;
 
     tmpl = fbInfoElementAllocTypeTemplate(fbSessionGetInfoModel(session), err);
-
     if (!tmpl) {
         return FALSE;
     }
@@ -2964,10 +2980,11 @@ void       fBufSetSpreadExportGroup(
         /* need to set to 0 bc if the same tmpl_id is used between groups
          * it won't get set to the new group before using */
         fBufEmit(fbuf, err);
+        g_clear_error(err);
         fbuf->ext_tid = 0;
     }
     fbSessionSetGroup(fbuf->session, (char *)groups[0]);
-    fBufSetExportGroups(fbuf, groups, num_groups, err);
+    fBufSetExportGroups(fbuf, groups, num_groups, NULL);
 }
 
 /**
@@ -3281,6 +3298,8 @@ gboolean        fBufAppendTemplate(
     gboolean        revoked,
     GError          **err)
 {
+    g_assert(err);
+
     /* printf("fBufAppendTemplate: %x\n", tmpl_id); */
     /* Attempt single append */
     if (fBufAppendTemplateSingle(fbuf, tmpl_id, tmpl, revoked, err)) {
@@ -3383,6 +3402,7 @@ gboolean        fBufAppend(
     GError          **err)
 {
     g_assert(recbase);
+    g_assert(err);
 
     /* Attempt single append */
     if (fBufAppendSingle(fbuf, recbase, recsize, err)) return TRUE;
@@ -3743,6 +3763,8 @@ static gboolean fBufNextSetHeader(
 {
     uint16_t        set_id, setlen;
 
+    g_assert(err);
+
     /* May loop over sets if we're missing templates */
     while (1) {
         /* Make sure we have at least a set header */
@@ -3950,7 +3972,7 @@ static gboolean fBufConsumeInfoElementTypeRecord(
         ++(fbuf->rc);
     }
 
-    if (tid ) {
+    if (tid) {
         if (!fBufSetInternalTemplate(fbuf, tid, err)) {
             return FALSE;
         }
@@ -4080,6 +4102,8 @@ fbTemplate_t    *fBufNextCollectionTemplate(
 {
     fbTemplate_t    *tmpl;
 
+    g_assert(err);
+
     while (1) {
         /* Attempt single record read */
         if ((tmpl = fBufNextCollectionTemplateSingle(fbuf, ext_tid, err)))
@@ -4191,6 +4215,7 @@ gboolean        fBufNext(
 {
     g_assert(recbase);
     g_assert(recsize);
+    g_assert(err);
 
     for (;;) {
         /* Attempt single record read */
