@@ -6,7 +6,7 @@ tools [YAF](https://tools.netsa.cert.org/yaf/index.html) and [SiLK](https://tool
 ## Quick build
 
 If you have [Docker 1.10.2 or later](https://docs.docker.com/engine/installation/linux/ubuntulinux/) installed then you can easily generate a .deb or a .rpm package. From the source directory:
-* `make build_ubuntu` will generate a .deb using a Ubuntu 12.04 container
+* `make build_ubuntu` will generate a .deb using a Ubuntu 16.04 container
 * `make build_centos` will generate a .rpm using a CentOS 6 contianer
 
 The package files will go to the `packaging/output/` directory. You should be able to distribute them to other machines with compatible libraries.
