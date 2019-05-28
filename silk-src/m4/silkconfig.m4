@@ -4,7 +4,7 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in ../LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: silkconfig.m4 4a9a1c769146 2019-01-31 19:26:37Z mthomas $")
+dnl RCSIDENT("$SiLK: silkconfig.m4 daebcf133fc8 2019-05-23 22:16:37Z mthomas $")
 
 # ---------------------------------------------------------------------------
 # SILK_AC_COMPILER
@@ -744,7 +744,7 @@ AC_DEFUN([SILK_AC_ARG_ENABLE_IPSET_COMPATIBILITY],[
     SK_IPSET_DEFAULT_VERSION=2
 
     AC_ARG_ENABLE([ipset-compatibility],
-        [AS_HELP_STRING([--enable-ipset-compatibilty],
+        [AS_HELP_STRING([--enable-ipset-compatibility],
             [select release of SiLK that the default output from IPset tools is compatible with (changes at 3.7.0, 3.14.0) [1.0.0]])[]dnl
         ],[],[
             enableval="yes"

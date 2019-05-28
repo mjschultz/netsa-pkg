@@ -20,7 +20,7 @@ B<rwrandomizeip> - Randomize the IP addresses in a SiLK Flow file
 
 Read SiLK Flow records from I<INPUT_FILE>, substitute a pseudo-random
 IP address for the source and destination IP addresses, and write the
-result to I<OUTPUT_FILE>.  
+result to I<OUTPUT_FILE>.
 
 B<rwrandomizeip> reads its input from the standard input either when
 no non-switch arguments are given or when I<INPUT_FILE> is the string
@@ -218,7 +218,7 @@ the input file and the output file.
 
 =cut
 
-$SiLK: rwrandomizeip.pod 89b3ca5a7207 2017-06-01 19:19:24Z mthomas $
+$SiLK: rwrandomizeip.pod 051cadca977b 2019-04-16 18:12:18Z mthomas $
 
 Local Variables:
 mode:text

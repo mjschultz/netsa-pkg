@@ -1775,7 +1775,7 @@ plug-in follows the code.
  import silk, silk.plugin
  import os, struct
  from netsa.data.format import num_prefix, num_fixed
- 
+
  # Whether the use Base-2 (True) or Base-10 (False) values for
  # Kibi/Mebi/Gibi/Tebi/... vs Kilo/Mega/Giga/Tera/...
  use_binary = True
@@ -1785,86 +1785,86 @@ plug-in follows the code.
          use_binary = False
      else:
          use_binary = True
- 
+
  # Character to use for Thousands separator
  thousands_sep = ','
  if (os.getenv("HUMAN_THOUSANDS_SEP")):
      thousands_sep = os.getenv("HUMAN_THOUSANDS_SEP")
- 
+
  # Number of significant digits
  sig_fig=5
- 
+
  # Use a 64-bit number for packing the bytes or packets data
  fmt = struct.Struct("Q")
  initial = fmt.pack(0)
- 
+
  ### Bytes functions
  # add_rec_to_bin
  def hu_ar2b_bytes(rec, current):
      global fmt
      (cur,) = fmt.unpack(current)
      return fmt.pack(cur + rec.bytes)
- 
+
  # rec_to_binary
  def hu_r2b_bytes(rec):
      global fmt
      return fmt.pack(rec.bytes)
- 
+
  # bin_to_text
  def hu_b2t_bytes(current):
      global use_binary, sig_fig, fmt
      (cur,) = fmt.unpack(current)
      return num_prefix(cur, use_binary=use_binary, sig_fig=sig_fig)
- 
+
  # rec_to_text
  def hu_r2t_bytes(rec):
      global use_binary, sig_fig
      return num_prefix(rec.bytes, use_binary=use_binary, sig_fig=sig_fig)
- 
+
  ### Packets functions
  # add_rec_to_bin
  def hu_ar2b_packets(rec, current):
      global fmt
      (cur,) = fmt.unpack(current)
      return fmt.pack(cur + rec.packets)
- 
+
  # rec_to_binary
  def hu_r2b_packets(rec):
      global fmt
      return fmt.pack(rec.packets)
- 
+
  # bin_to_text
  def hu_b2t_packets(current):
      global thousands_sep, fmt
      (cur,) = fmt.unpack(current)
      return num_fixed(cur, dec_fig=0, thousands_sep=thousands_sep)
- 
+
  # rec_to_text
  def hu_r2t_packets(rec):
      global thousands_sep
      return num_fixed(rec.packets, dec_fig=0, thousands_sep=thousands_sep)
- 
+
  ### Non-specific functions
  # bin_compare
  def hu_bin_compare(cur1, cur2):
      if (cur1 < cur2):
          return -1
      return (cur1 > cur2)
- 
+
  # bin_merge
  def hu_bin_merge(current1, current2):
      global fmt
      (cur1,) = fmt.unpack(current1)
      (cur2,) = fmt.unpack(current2)
      return fmt.pack(cur1 + cur2)
- 
+
  ### Register the fields
  register_field("hu-bytes", column_width=10, bin_bytes=fmt.size,
                 rec_to_text=hu_r2t_bytes, rec_to_bin=hu_r2b_bytes,
                 bin_to_text=hu_b2t_bytes, add_rec_to_bin=hu_ar2b_bytes,
                 bin_merge=hu_bin_merge, bin_compare=hu_bin_compare,
                 initial_value=initial)
- 
+
  register_field("hu-packets", column_width=10, bin_bytes=fmt.size,
                 rec_to_text=hu_r2t_packets, rec_to_bin=hu_r2b_packets,
                 bin_to_text=hu_b2t_packets, add_rec_to_bin=hu_ar2b_packets,
@@ -1885,6 +1885,115 @@ code below is stored in the file F<human.py>.
    1|       840|        10|      5895|    4.72Mi|    58,950|
   17|      68.0|         1|      4249|     282Ki|     4,249|
   17|      67.0|         1|      4203|     275Ki|     4,203|
+
+
+=head2 Identifying SMTP Servers
+
+To demonstrate the use of B<--python-file> in B<rwfilter(1)>, we walk
+through a Python plug-in script that evaluates the behavior of a set
+of IP addresses and determines if the host is likely to be an SMTP
+server or relay. We expect (based on traffic studies) that more than
+85% of a legitimate SMTP server's activity is devoted to sending or
+providing mail. If we find that the host exhibits this behavior, we
+include the IP address in a set called F<SMTP.set>. Regardless of if
+the IP address is included in the set, we pass all records that appear
+to be legitimate mail flows.
+
+We run the rwfilter command as follows:
+
+ $ rwfilter --start-date=2008/4/21 --end-date=2008/4/21       \
+        --type=out,outweb --sipset=possible_SMTP_servers.set  \
+        --python-file=SMTP.py --print-statistics
+
+This command first collects all records of type C<out> and C<outweb>
+that have a start date on April 21, 2008. Since there are no
+additional command line options to filter records, all records are
+passed to the C<rwfilter(rec)> function in F<SMTP.py>. C<rec> is an
+instance of the object C<RWRec>, which represent the record being
+passed.
+
+The function C<rwfilter(rec)> in F<SMTP.py> begins by importing the
+global variable C<counts> and C<smtpports>. C<counts> is a dictionary
+indexed by source IP address and contains an array of size two, where
+the first element is the total number of bytes that the IP address has
+transferred and the second element is the number of bytes that the
+source address has transferred that are likely to be related to mail
+delivery.
+
+Using the source IP address from the record, the function retrieves
+the current byte counts from the C<counts> dictionary. If this is the
+first occurrence of the IP address, a new entry is added. The function
+then adds the byte count of this record to the total byte count and
+determines if the record is a mail delivery message. If it is a mail
+message, the function adds the bytes to the total of bytes transferred
+as mail and returns B<True>. Otherwise, a value of B<False> is
+returned.
+
+After B<rwfilter> processes all records it calls the C<finalize()>
+function, which evaluates the collection of IP addresses. If the
+percentage of bytes that the host transferred in mail operations is
+greater than 85% of the total bytes transferred, the IP address is
+added to a final set of SMTP servers. The final set of SMTP servers is
+then saved to the F<SMTP.set> file, and B<rwfilter> exits.
+
+ from silk import *
+
+ # Collection of ports commonly used by SMTP servers
+ smtpports = set([25, 109, 110, 143, 220, 273, 993, 995, 113])
+
+ # Minimum percentage of mail traffic before being considered a mail server
+ threshold = 0.85
+
+ # Collection of byte counts
+ counts = dict()
+
+ # This function is run over all records.
+ # Input:  An instance of the RWRec class representing the
+ #         current record being processesed
+ # Output: True or false value indicating if the record passes
+ #         or fails the filter
+ def rwfilter(rec):
+     # Import the global variables needed for processing the record
+     global smtpports, counts
+
+     # Pull data from the record
+     sip = rec.sip
+     bytes = rec.bytes
+
+     # Get a reference to the current data on the IP address in question
+     data = counts.setdefault(sip, [0, 0])
+
+     # Update the total byte count for the IP address
+     data[0] += bytes
+
+     # Is the flow mail related?  If so add the byte count to the mail bytes
+     if (rec.protocol == 6 and rec.sport in smtpports and
+         rec.packets > 3 and rec.bytes > 120):
+         data[1] += bytes
+         return True
+
+     # If not mail related, fail the record
+     return False
+
+ # This is run after all records have been processed
+ def finalize():
+     # Import the global vriables needed to evaluate the results
+     global counts, threshold
+
+     # The IP set of SMTP servers
+     smtp = IPSet()
+
+     # Iterate through all of the IP addresses.
+     for ip, data in counts.iteritems():
+         if (float(data[1]) / data[0]) > threshold:
+             smtp.add(ip)
+
+     # Generate the IPset of all smtp servers.
+     smtp.save('smtp.set')
+
+ # Register these functions with rwfilter
+ register_filter(rwfilter, finalize=finalize)
+
 
 =head1 UPGRADING LEGACY PLUGINS
 
@@ -1956,7 +2065,7 @@ B<silk(7)>, B<python(1)>, L<http://docs.python.org/>
 
 =cut
 
-$SiLK: silkpython.pod 3cddb6030400 2016-04-20 19:08:48Z mthomas $
+$SiLK: silkpython.pod 051cadca977b 2019-04-16 18:12:18Z mthomas $
 
 Local Variables:
 mode:text

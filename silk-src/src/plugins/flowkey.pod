@@ -247,7 +247,7 @@ B<rwfilter(1)>:
  $ yaf < vlan.pcap                                              \
    | rwipfix2silk --interface-values=vlan                       \
    | rwfilter --plugin=flowkey.so --flowkey=2148415270,15775704 \
-        --pass=stdout - 
+        --pass=stdout -                                         \
    | rwcut --plugin=flowkey.so --fields=1-5,in,flowkey,stime    \
         --ipv6=ignore --timestamp=epoch --num-rec=9
            sIP|          dIP|sPort|dPort|pro|   in|   flowkey|         sTime|
@@ -326,7 +326,7 @@ The B<flowkey> plug-in was added in SiLK 3.15.0.
 
 =cut
 
-$SiLK: flowkey.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
+$SiLK: flowkey.pod 051cadca977b 2019-04-16 18:12:18Z mthomas $
 
 Local Variables:
 mode:text

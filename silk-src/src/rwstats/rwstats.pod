@@ -136,7 +136,7 @@ aggregate value is compared with those of the current Top-N (or
 Bottom-N) to see if the new bin is a closer to the top (or bottom).
 For the output to be meaningful, B<rwsort> and B<rwstats> I<must> be
 invoked with the same B<--fields> value.  When multiple input files
-are specified and B<--presorted-input> is given, B<rwstats> 
+are specified and B<--presorted-input> is given, B<rwstats>
 merge-sorts the flow records from the input files.  B<rwstats>
 usually runs faster if you do I<not> include the B<--presorted-input>
 switch when counting distinct IP addresses, even when reading sorted
@@ -1601,7 +1601,7 @@ B<dlopen(3)>, B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwstats.pod c95fb6174130 2018-04-13 20:33:46Z mthomas $
+$SiLK: rwstats.pod 051cadca977b 2019-04-16 18:12:18Z mthomas $
 
 Local Variables:
 mode:text

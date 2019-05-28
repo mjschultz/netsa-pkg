@@ -223,7 +223,7 @@ am__can_run_installinfo = \
   esac
 am__py_compile = PYTHON=$(PYTHON) $(SHELL) $(py_compile)
 am__pep3147_tweak = \
-  sed -e 's|\.py$$||' -e 's|[^/]*$$|&.*.pyc &.*.pyo|'
+  sed -e 's|\.py$$||' -e 's|[^/]*$$|&.*.pyc\n&.*.pyo|'
 py_compile = $(top_srcdir)/autoconf/py-compile
 man3dir = $(mandir)/man3
 NROFF = nroff

@@ -22,7 +22,7 @@
 #define SKIPFIX_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipfix.c ed0d50d01fa4 2019-03-01 19:40:55Z mthomas $");
+RCSIDENT("$SiLK: skipfix.c a7852cf93d57 2019-05-23 19:17:54Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/skipaddr.h>
@@ -2233,7 +2233,6 @@ ski_tombstone_add_access(
     };
     char stime_buf[SKTIMESTAMP_STRLEN];
 
-fprintf(stderr, "len: %zu, sec: %u, buf: %s\n", length, seconds, buffer);
     sktimestamp_r(stime_buf, sktimeCreate(seconds, 0),
                   SKTIMESTAMP_UTC | SKTIMESTAMP_NOMSEC);
     if (tool_id < sizeof(tool)/sizeof(tool[0])) {
@@ -2329,7 +2328,6 @@ ski_tombstone_next(
                       skpcProbeGetName(probe), ts->observationDomainId,
                       ts->exporterConfiguredId, ts->exportingProcessId,
                       ts->tombstoneId);
-fprintf(stderr, "len: %zu, remlen: %zd, buf: %s\n", len, len - sz, buf);
         if (len < (size_t)sz) {
             goto WRITEMSG;
         }
@@ -2345,7 +2343,6 @@ fprintf(stderr, "len: %zu, remlen: %zd, buf: %s\n", len, len - sz, buf);
             sz = ski_tombstone_add_access(b, len,
                                           ts_access->observationTimeSeconds,
                                           ts_access->certToolId);
-fprintf(stderr, "len: %zu, remlen: %zd, buf: %s\n", len, len - sz, buf);
             if (len < (size_t)sz) {
                 goto WRITEMSG;
             }

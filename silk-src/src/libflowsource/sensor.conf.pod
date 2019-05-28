@@ -1387,7 +1387,8 @@ records.
 
 =head2 Repacking of SiLK Flows by IP Address
 
-A SiLK probe must get its flows by polling a directory of SiLK Flow
+A probe whose type is C<silk> must get its flows by polling a directory of
+SiLK Flow
 files.  The flows can be re-categorized based on the IP addresses or
 based on the SNMP interfaces (beware: often the SNMP interface values
 are 0 in SiLK Flow data).  In this example, the files in the directory
@@ -1455,7 +1456,7 @@ The B<quirks> command was introduced in SiLK 3.8.0.
 
 =cut
 
-$SiLK: sensor.conf.pod 04bb49edf544 2018-05-31 18:25:33Z mthomas $
+$SiLK: sensor.conf.pod 051cadca977b 2019-04-16 18:12:18Z mthomas $
 
 Local Variables:
 mode:text

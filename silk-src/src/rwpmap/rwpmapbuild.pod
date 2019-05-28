@@ -17,11 +17,18 @@ B<rwpmapbuild> - Create a binary prefix map from a text file
 
 =head1 DESCRIPTION
 
+B<rwpmapbuild> reads a white-space-delimited stream of text and writes
+a binary output stream representing a prefix map.  The syntax of this
+input is described in the L</INPUT FILE FORMAT> section below.
+
+The textual input is read from the file specified by B<--input-path>
+or from the standard input when the switch is not provided.  The
+binary output is written to the location named by B<--output-path> or
+to the standard output when the switch is not provided and the
+standard output is not connected to a terminal.
+
 A prefix map file is a binary file that maps a value (specifically
 either an IP addresses or a protocol-port pair) to a string label.
-B<rwpmapbuild> reads textual input to create a binary prefix map file.
-The syntax of this input is described in the L</INPUT FILE FORMAT>
-section below.
 
 Once you have created a prefix map file, you may use the file in
 B<rwfilter(1)>, B<rwstats(1)>, B<rwuniq(1)>, B<rwgroup(1)>,
@@ -31,16 +38,11 @@ map.  See the B<pmapfilter(3)> manual page for details.  To view the
 contents of a prefix map file, use B<rwpmapcat(1)>.  To query the
 contents of a prefix map, use B<rwpmaplookup(1)>.
 
-The textual input is read from the file specified by B<--input-path>
-or from the standard input when the switch is not provided.  The
-binary output is written to the location named by B<--output-path> or
-to the standard output when the switch is not provided and the
-standard output is not connected to a terminal.
-
-The remainder of this section provides three example files that could
-be used as input to B<rwpmapbuild>.  For details on the syntax of the
-input, see the L</INPUT FILE FORMAT> section that follows the
-description of the command line L</OPTIONS>.
+The remainder of this section provides example files that could be
+used as input to B<rwpmapbuild>, and a note on the proper ordering of
+the input.  For details on the syntax of the input, see the
+L</INPUT FILE FORMAT> section that follows the description of the
+command line L</OPTIONS>.
 
 =head2 Sample IPv4 input file
 
@@ -175,6 +177,197 @@ listed first, followed by the narrower or more specific ranges.
  1/769  1/769       ICMP/Host Unreachable
  1/770  1/770       ICMP/Protocol Unreachable
  1/771  1/771       ICMP/Port Unreachable
+
+=head2 Complete ICMPv4 Prefix Map
+
+An ideal candidate for port-based prefix maps is for decoding ICMP
+types and codes.  Although most SiLK commands support a form of ICMP
+type and code options, these are all based on the actual number
+values.  However, a prefix map may be useful to decode the noun-name
+of the ICMP types and codes. The following prefix map can be used for
+that purpose.  (Note that ICMP type and code is always in the
+destination port field, regardless of the traffic direction.)
+
+ # Identify this as a protocol-port prefix map, rather than an IP-range map
+ mode proto-port
+
+ # Set a default value for all records
+ 0 255 Other
+
+ # Set the default value for all ICMP records
+ 1 1 ICMP/Undefined
+
+ # ICMP specific entries
+ 1/0 1/255 ICMP/Echo Reply
+ 1/768 1/768 ICMP/Destination Unreachable/Net Unreachable
+ 1/769 1/769 ICMP/Destination Unreachable/Host Unreachable
+ 1/770 1/770 ICMP/Destination Unreachable/Protocol Unreachable
+ 1/771 1/771 ICMP/Destination Unreachable/Port Unreachable
+ 1/772 1/772 ICMP/Destination Unreachable/Fragmentation Needed and Don't Fragment was Set
+ 1/773 1/773 ICMP/Destination Unreachable/Source Route Failed
+ 1/774 1/774 ICMP/Destination Unreachable/Destination Network Unknown
+ 1/775 1/775 ICMP/Destination Unreachable/Destination Host Unknown
+ 1/776 1/776 ICMP/Destination Unreachable/Source Host Isolated
+ 1/777 1/777 ICMP/Destination Unreachable/Communication with Destination Network is Administratively Prohibited
+ 1/778 1/778 ICMP/Administratively Prohibited/Communication with Destination Host is Administratively Prohibited
+ 1/779 1/779 ICMP/Administratively Prohibited/Destination Network Unreachable for Type of Service
+ 1/780 1/780 ICMP/Administratively Prohibited/Destination Host Unreachable for Type of Service
+ 1/781 1/781 ICMP/Administratively Prohibited/Communication Administratively Prohibited
+ 1/782 1/782 ICMP/Administratively Prohibited/Host Precedence Violation
+ 1/783 1/783 ICMP/Administratively Prohibited/Precedence cutoff in effect
+ 1/1024 1/1279 ICMP/Source Quench
+ 1/1280 1/1280 ICMP/Redirect/Redirect Datagram for the Network (or subnet)
+ 1/1281 1/1281 ICMP/Redirect/Redirect Datagram for the Host
+ 1/1282 1/1282 ICMP/Redirect/Redirect Datagram for the Type of Service and Network
+ 1/1283 1/1283 ICMP/Redirect/Redirect Datagram for the Type of Service and Host
+ 1/1536 1/1536 ICMP/Alternate Host Address/Alternate Address for Host
+ 1/2048 1/2303 ICMP/Echo
+ 1/2304 1/2304 ICMP/Router Advertisement/Normal router advertisement
+ 1/2320 1/2320 ICMP/Router Advertisement/Does not route common traffic
+ 1/2560 1/2815 ICMP/Router Selection
+ 1/2816 1/2816 ICMP/Time Exceeded/Time to Live exceeded in Transit
+ 1/2817 1/2817 ICMP/Time Exceeded/Fragment Reassembly Time Exceeded
+ 1/3072 1/3072 ICMP/Parameter Problem/Pointer indicates the error
+ 1/3073 1/3073 ICMP/Parameter Problem/Missing a Required Option
+ 1/3074 1/3074 ICMP/Parameter Problem/Bad Length
+ 1/3328 1/3583 ICMP/Timestamp
+ 1/3584 1/3839 ICMP/Timestamp Reply
+ 1/3840 1/4095 ICMP/Information Request
+ 1/4096 1/4351 ICMP/Information Reply
+ 1/4352 1/4607 ICMP/Address Mask Request
+ 1/4608 1/4863 ICMP/Address Mask Reply
+ 1/7680 1/7935 ICMP/Traceroute
+ 1/7936 1/8191 ICMP/Datagram Conversion Error
+ 1/8192 1/8447 ICMP/Mobile Host Redirect
+ 1/8448 1/8703 ICMP/IPv6 Where-Are-You
+ 1/8704 1/8959 ICMP/IPv6 I-Am-Here
+ 1/8960 1/9215 ICMP/Mobile Registration Request
+ 1/9216 1/9471 ICMP/Mobile Registration Reply
+ 1/9984 1/10239 ICMP/SKIP
+ 1/10240 1/10240 ICMP/Photuris/Bad SPI
+ 1/10241 1/10241 ICMP/Photuris/Authentication Failed
+ 1/10242 1/10242 ICMP/Photuris/Decompression Failed
+ 1/10243 1/10243 ICMP/Photuris/Decryption Failed
+ 1/10244 1/10244 ICMP/Photuris/Need Authentication
+ 1/10245 1/10245 ICMP/Photuris/Need Authorization
+
+ # A few other well-known protocols
+ 6 6 TCP
+ 17 17 UDP
+ 50 50 ESP
+ 51 51 AH
+
+
+=head2 Proper Ordering of rwpmapbuild Input
+
+When creating the textual input for B<rwmpabuild>, be sure to put the
+most general attributes first in the list.
+
+For example, suppose we administer the address block 12.0.0.0/8, and
+would like to report on address ranges delegated within the
+organization,  A prefix map can be used as follows to show utilization
+for each address block, as well as unallocated (and presumably
+unauthorized) usage.
+
+Display the contents of input file:
+
+ $ cat network.pmap.txt
+ 12.0.0.0/8 Assigned, Unallocated
+ 12.1.0.0/16 RESERVED
+ 12.38.0.0/16 Client Network 1
+ 12.127.0.0/16 Data Center (Primary)
+ 12.130.0.0/16 Client Network 2
+ 12.154.0.0/16 Client Network 3
+ 12.186.0.0/16 Data Center (Secondary)
+ 12.210.0.0/16 RESERVED
+
+Create the binary prefix map:
+
+ $ rwpmapbuild --input=network.pmap.txt --output=network.pmap
+
+Use B<rwfilter(1)> to select IPs in the 12.0.0.0/8 netblock, and use
+B<rwuniq(1)> to bin the results according to the prefix map:
+
+ $ rwfilter --start=2007/07/30:00 --saddr=12.x.x.x --pass=stdout  \
+   | rwuniq --pmap-file=network.pmap --field=sval --value=bytes
+
+                    sval|               Bytes|
+                RESERVED|               39749|
+   Data Center (Primary)|               87621|
+   Assigned, Unallocated|             4296212|
+        Client Network 2|              545848|
+ Data Center (Secondary)|               18228|
+        Client Network 1|              112404|
+        Client Network 3|               68820|
+
+Suppose the input file had placed the most general entry at the
+bottom, like so:
+
+ $ cat network.pmap.txt
+ 12.1.0.0/16 RESERVED
+ 12.38.0.0/16 Client Network 1
+ 12.127.0.0/16 Data Center (Primary)
+ 12.130.0.0/16 Client Network 2
+ 12.154.0.0/16 Client Network 3
+ 12.186.0.0/16 Data Center (Secondary)
+ 12.210.0.0/16 RESERVED
+ 12.0.0.0/8 Assigned, Unallocated
+
+The general entry would overwrite the other entries:
+
+ $ rwpmapbuild --input=network.pmap.txt --output=network.pmap
+ $ rwfilter --start=2007/07/30:00 --saddr=12.x.x.x --pass=stdout \
+   | rwuniq --pmap-file=network.pmap --fields=sval --bytes
+                    sval|               Bytes|
+   Assigned, Unallocated|             5168882|
+
+This is easy to see by using B<rwpmapcat(1)> to print the contents of
+the prefix map:
+
+ $ rwpmapcat --map-file=network.pmap
+          ipBlock|                  label|
+        0.0.0.0/5|                UNKNOWN|
+        8.0.0.0/6|                UNKNOWN|
+       12.0.0.0/8|  Assigned, Unallocated|
+       13.0.0.0/8|                UNKNOWN|
+       14.0.0.0/7|                UNKNOWN|
+       16.0.0.0/4|                UNKNOWN|
+       32.0.0.0/3|                UNKNOWN|
+       64.0.0.0/2|                UNKNOWN|
+      128.0.0.0/1|                UNKNOWN|
+
+(B<rwpmapcat> lists all possible addresses from 0.0.0.0 to
+255.255.255.255 and their labels.  The default label is C<UNKNOWN>
+unless the default is set to something else.)
+
+The best way to make sure your entries are properly ordered is to
+explicitly order them before compiling the prefix map. When the data
+uses the CIDR-block format, the UNIX B<sort(1)> command often produces
+the proper output.
+
+ $ cat network.pmap.txt
+ 12.1.0.0/16 RESERVED
+ 12.38.0.0/16 Client Network 1
+ 12.127.0.0/16 Data Center (Primary)
+ 12.130.0.0/16 Client Network 2
+ 12.154.0.0/16 Client Network 3
+ 12.186.0.0/16 Data Center (Secondary)
+ 12.210.0.0/16 RESERVED
+ 12.0.0.0/8 Assigned, Unallocated
+
+Split the input at the C</> and sort the input numerically by the
+bitmask size.  (A small bitmask represents a large netblock.)
+
+ $ sort -n -k 2 -t "/" network.pmap.txt
+ 12.0.0.0/8 Assigned, Unallocated
+ 12.1.0.0/16 RESERVED
+ 12.127.0.0/16 Data Center (Primary)
+ 12.130.0.0/16 Client Network 2
+ 12.154.0.0/16 Client Network 3
+ 12.186.0.0/16 Data Center (Secondary)
+ 12.210.0.0/16 RESERVED
+ 12.38.0.0/16 Client Network 1
+
 
 =head1 OPTIONS
 
@@ -505,7 +698,7 @@ B<rwstats(1)>, B<rwuniq(1)>, B<silk(7)>
 
 =cut
 
-$SiLK: rwpmapbuild.pod 814fc64df055 2018-04-02 19:15:45Z mthomas $
+$SiLK: rwpmapbuild.pod 051cadca977b 2019-04-16 18:12:18Z mthomas $
 
 Local Variables:
 mode:text

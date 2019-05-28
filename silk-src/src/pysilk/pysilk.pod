@@ -741,7 +741,7 @@ L<B<silk.site> module|/silk.site Module>
 causes the
 L<silk.site.B<init_site()>|/silk.site.B<init_site(>I<siteconf>=B<None>B<,> I<rootdir>=B<None>B<)>>
 function to be called with no argument if it has not yet been called
-successfully---that is, if 
+successfully---that is, if
 L<silk.site.B<have_site_config()>|/silk.site.B<have_site_config(>I<>B<)>>
 returns B<False>.
 
@@ -920,7 +920,7 @@ unknown, I<rec> is unchanged and B<ValueError> is thrown.
 The ID of the sensor where the flow I<rec> was collected, a 16-bit
 integer.  The default sensor_id value is 65535.  Changes to this value
 are reflected in the L</I<rec>.sensor> attribute.  The sensor_id
-attribute may be set to a value that is considered invalid by 
+attribute may be set to a value that is considered invalid by
 L<B<silk.site>|/silk.site Module>.
 
 =item I<rec>.session_tcpflags
@@ -2582,15 +2582,24 @@ minimum unsigned integer value.
 
 =head1 EXAMPLE
 
+=head2 Using PySiLK
+
 The following is an example using the PySiLK bindings.  The code is
 meant to show some standard PySiLK techniques, but is not otherwise
-meant to be useful.  Explanations for the code can be found in-line in
-the comments.
+meant to be useful.
 
- #!/usr/bin/env python
+The code reads each record in a SiLK flow file, checks whether the
+record's source port is 80/tcp or 8080/tcp and its volume is larger
+than 3 packets and 120 bytes, stores the destination IP of matching
+records in an IPset, and writes the IPset to a destination file.  In
+addition, it prints the number of unique destination addresses and the
+addresses themselves to the standard output.  Additional explanations
+can be found in-line in the comments.
+
+ #! /usr/bin/python
 
  # Use print functions (Compatible with Python 3.0; Requires 2.6+)
- from __future__ import print_function
+ from __future__ import print_function #Python2.6 or later required
 
  # Import the PySiLK bindings
  from silk import *
@@ -2600,12 +2609,11 @@ the comments.
 
  # Main function
  def main():
-
      if len(sys.argv) != 3:
          print ("Usage: %s infile outset" % sys.argv[0])
          sys.exit(1)
 
-     # Open an silk file for reading
+     # Open a silk flow file for reading
      infile = silkfile_open(sys.argv[1], READ)
 
      # Create an empty IPset
@@ -2614,7 +2622,7 @@ the comments.
      # Loop over the records in the file
      for rec in infile:
 
-       # Do comparisons based on rwrec field value
+       # Do comparisons based on rwrec field values
        if (rec.protocol == 6 and rec.sport in [80, 8080] and
            rec.packets > 3 and rec.bytes > 120):
 
@@ -2644,6 +2652,220 @@ the comments.
  # Call the main() function when this program is started
  if __name__ == '__main__':
      main()
+
+=head2 Adjusting the Class and Type Fields of a Flow File
+
+Normally SiLK flow records get stamped with a class as flow records
+are recorded in the repository. However, if you are importing raw
+packet data or need to change some records that inadvertantly have the
+wrong class/type, PySiLK makes it easy to fix.
+
+The example below sets the class to "all" and assigns a type of "in",
+"inweb", "out", or "outweb" to each record in an input file. The
+direction (in or out) is defined by an IPset that represents the
+internal network (traffic that neither comes from nor goes to the
+internal network is discarded in this example). Web/non-web flows are
+separated based on port.
+
+ #! /usr/bin/python
+
+ from __future__ import print_function #Python2.6 or later required
+ from silk import *
+ import silk.site
+ import sys                              # for command line args
+ from datetime import timedelta          # for date math
+
+ webports    = (80,443,8080)
+ inwebtype   = ("all","inweb")
+ intype      = ("all","in")
+ outwebtype  = ("all","outweb")
+ outtype     = ("all","out")
+
+ def main():
+     if len(sys.argv) != 4:
+         print("Usage:  %s infile setfile outfile" % sys.argv[0])
+         sys.exit(1)
+
+     #  open the SiLK file for reading
+     infile = silkfile_open(sys.argv[1], READ)
+
+     #  open the set file which represents my internal network
+     #print(sys.argv[2])
+     setfile = IPSet.load (sys.argv[2])
+
+     # open the modified output file
+     outfile = silkfile.open(sys.argv[3], WRITE)
+
+     #  loop over the records in the file, shift time and write the update:
+     for rec in infile:
+         #
+         #  If the src ip is in the set, it's going out.
+         #  If the dst ip is in the set, it's coming in.
+         #  If neither IP is in the set, discard the record.
+         #
+         if (rec.sport in webports) or (rec.dport in webports):
+             if rec.sip in setfile:
+                 rec.classtype = outwebtype
+                 outfile.write(rec)
+             elif rec.dip in setfile:
+                 rec.classtype = inwebtype
+                 outfile.write(rec)
+         else:
+             if rec.sip in setfile:
+                 rec.classtype = outtype
+                 outfile.write(rec)
+             elif rec.dip in setfile:
+                 rec.classtype = intype
+                 outfile.write(rec)
+
+     # clean up
+     outfile.close()
+     infile.close()
+
+ if __name__ == '__main__':
+     main()
+
+
+=head2 Changing Timestamps in a Flow File
+
+On occasion you may find that you need to adjust all the timestamps
+for a SiLK flow file.  For example, the flow file came from a packet
+capture file that was collected in a different time zone and had to be
+shifted a number of hours.  Another possibility is if you need to
+adjust files because you determine the clock time was off.
+
+It is relatively simple to change the timestamps using PySiLK. The
+sample code for changing data to another time zone is shown below; a
+minor change would shift the data by seconds instead of hours.
+
+ #! /usr/bin/python
+
+ from __future__ import print_function #Python2.6 or later required
+ from silk import *
+ import sys                              # for command line args
+ from datetime import timedelta          # for date math
+
+ def main():
+     if len(sys.argv) != 4:
+         print ("Usage:  %s infile offset-hours outfile" % sys.argv[0])
+         sys.exit(1)
+
+     #  open the SiLK file for reading
+     infile = silkfile_open(sys.argv[1], READ)
+
+     #  create the time offset object
+     offset = timedelta(hours=int(sys.argv[2]))
+
+     # open the modified output file
+     outfile = silkfile_open(sys.argv[3], WRITE)
+
+     #  loop over the records in the file, shift time and write the update:
+     for rec in infile:
+         rec.stime = rec.stime + offset
+         outfile.write(rec)
+
+     # clean up
+     outfile.close()
+     infile.close()
+
+ if __name__ == '__main__':
+     main()
+
+
+=head2 Grouping FTP Flow Records
+
+The following script attempts to group all flows representing one
+direction of an FTP session and print them together. It takes as an
+argument the name of a file containing raw SiLK records sorted by
+start time and port number (C<rwsort --fields=stime,sport>). The
+script extracts from the file all flows that potentially represent FTP
+traffic. We define a possible FTP flow as any flow where:
+
+=over 4
+
+=item *
+
+the source port is 21 (FTP control channel)
+
+=item *
+
+the source port is 20 (FTP data transfer port )
+
+=item *
+
+both the source port and destination port are ephemeral (data transfer)
+
+=back
+
+If a flow record has a source port of 21, the script adds the source
+and destination address to the list of possible FTP groups. The script
+categorizes each data transfer flow (source port 20 or ephemeral to
+ephemeral) according to its source and destination IP address pair. If
+a flow from the control channel with the same source and destination
+IP address exists the source and destination ports in the flow are
+added to the list of ports associated with the control channel
+interaction, otherwise the script lists the data transfer as being
+unclassified. After the entire file is processed, all FTP sessions
+that have been grouped are displayed.
+
+ #! /usr/bin/python
+
+ from __future__ import print_function #Python2.6 or later required
+ # import the necessary modules
+ import silk
+ import sys
+
+ # Test that the argument number is correct
+ if (len(sys.argv) != 2):
+     print("Must supply a SiLK data file.")
+     sys.exit()
+
+ # open the SiLK file for reading
+ rawFile=silk.silkfile_open(sys.argv[1], silk.READ)
+
+ # Initialize the record structure
+ # Unclassified will be the record ephemeral to ephemeral
+ # connections that don't appear to have a control channel
+ interactions = {"Unclassified":[]}
+
+ # Count of records processed
+ count = 0
+
+ # Process the input file
+ for rec in rawFile:
+     count += 1
+     key="%15s <--> %15s"%(rec.sip,rec.dip)
+     if (rec.sport==21):
+         if not key in interactions:
+             interactions[key] = []
+     else:
+         if key in interactions:
+             interactions[key].append("%5d <--> %5d"%(rec.sport,rec.dport))
+         else:
+             interactions["Unclassified"].append(
+                 "%15s:%5d <--> %15s:%5d"%(rec.sip,rec.sport,rec.dip,rec.dport))
+
+ # Print the count of all records
+ print(str(count) + " records processed")
+
+ # Print the groups of FTP flows
+ keyList = sorted(interactions.keys())
+ for key in keyList:
+     print("\n" + key + " " + str(len(interactions[key])))
+     if (key != "Unclassified"):
+         for line in interactions[key]:
+             print("   " + line)
+
+Example output of the script:
+
+ 184 records processed
+
+ xxx.xxx.xxx.236 <--> yyy.yyy.yyy.231 3
+       20 <--> 56180
+       20 <--> 56180
+       20 <--> 58354
+
+ Unclassified 158
 
 
 =for comment
@@ -2795,7 +3017,7 @@ L<http://docs.python.org/>
 
 =cut
 
-$SiLK: pysilk.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
+$SiLK: pysilk.pod 051cadca977b 2019-04-16 18:12:18Z mthomas $
 
 Local Variables:
 mode:text
