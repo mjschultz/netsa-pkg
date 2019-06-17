@@ -401,10 +401,10 @@ prompt.  The text after the dollar sign represents the command line.
 Lines have been wrapped for improved readability, and the back slash
 (C<\>) is used to indicate a wrapped line.
 
-To print out a set of IP's with exactly one tcp record during the time
-period, use:
+To print a list of source IP addresses that appeared in exactly one
+TCP record during the first 12 hours of 2003-Sep-01, use:
 
- $ rwfilter --start-date=2003/09/01:00 --end-date=2003/09/01:12     \
+ $ rwfilter --start-date=2003/09/01:00 --end-date=2003/09/01:11     \
         --proto=6 --pass=stdout                                     \
    | rwaddrcount --max-records=1 --print-ips
 
@@ -418,6 +418,139 @@ with B<--print-recs>
   10.10.10.1|  65792| 147|  21| 2003/01/17T00:19:01| 2003/01/17T02:00:13|
   10.10.10.2| 110744|  89|   7| 2003/01/17T01:21:42| 2003/01/17T01:39:21|
   10.10.10.3|    864|  18|   6| 2003/01/17T00:20:33| 2003/01/17T01:25:38|
+
+=head2 Replacements for rwaddrcount
+
+We note some overlapping features between B<rwaddrcount> and
+B<rwuniq(1)>. There is often more than one way to perform the same
+task in the SiLK tool set.
+
+Here's a guide to replacing each of the outputs of B<rwaddrcount>:
+
+The B<--print-recs> switch prints five pieces of information for each
+source or destination address:
+
+ $ rwaddrcount --print-recs data.rw
+           sIP|Bytes|Packets|Records|         Start_Time|           End_Time|
+    10.0.0.144| 1646|      4|      1|2007/05/09T18:01:41|2007/05/09T18:01:41|
+ 10.14.203.121|   40|      1|      1|2007/05/09T18:31:54|2007/05/09T18:31:54|
+ 10.14.203.122|   40|      1|      1|2007/05/09T18:32:43|2007/05/09T18:32:43|
+    10.15.6.14|  539|      3|      3|2007/05/09T18:03:05|2007/05/09T18:08:07|
+   12.0.101.22| 4365|     23|      2|2007/05/09T18:26:43|2007/05/09T18:43:46|
+
+To do the same in B<rwuniq>, specify either C<sip> in B<--fields> and
+the B<--values> shown here:
+
+ $ rwuniq --fields=sip --values=bytes,packets,flows,stime,etime data.rw
+           sIP|Bytes|Packets|Records|          min_sTime|          max_eTime|
+    10.0.0.144| 1646|      4|      1|2007/05/09T18:01:41|2007/05/09T18:01:41|
+ 10.14.203.121|   40|      1|      1|2007/05/09T18:31:54|2007/05/09T18:31:54|
+ 10.14.203.122|   40|      1|      1|2007/05/09T18:32:43|2007/05/09T18:32:43|
+    10.15.6.14|  539|      3|      3|2007/05/09T18:03:05|2007/05/09T18:08:07|
+   12.0.101.22| 4365|     23|      2|2007/05/09T18:26:43|2007/05/09T18:43:46|
+
+When B<rwaddrcount> includes B<--use-dest>, change the B<--fields>
+switch of B<rwuniq> to C<dip>.  Replace the B<--sort-ips> switch of
+B<rwaddrcount> with B<--sort-output> in B<rwuniq>.
+
+The B<--print-stat> switch in B<rwaddrcount> prints a one-line summary
+of the data:
+
+ $ rwaddrcount --print-stat data.rw
+           |  sIP_Uniq|         Bytes|    Packets|   Records|
+      Total|     57727|     948620676|    2026581|    382578|
+
+This is difficult to produce with B<rwuniq>.  If there is a field that
+you know is either empty or constant across all records (such as
+C<nhip> or C<in>), you can use that as the key field in B<rwuniq>.
+
+ $ rwuniq --fields=nhIP --values=distinct:sip,bytes,packets,flows data.rw
+            nhIP|sIP-Distinct|        Bytes|   Packets|   Records|
+         0.0.0.0|       57727|    948620676|   2026581|    382578|
+
+Note that C<class> generally does not work since each type within a
+class produces its own row:
+
+ $ rwuniq --fields=class --values=distinct:sip,bytes,packets,flows data.rw
+ class|sIP-Distinct|        Bytes|   Packets|   Records|
+   all|        8674|    260143344|    964621|    151447|
+   all|       55540|    688477332|   1061960|   6184399|
+
+One trick is to use C<stime> as the key with a very large
+B<--bin-time>:
+
+ $ rwuniq --fields=stime --bin-time=2147483647             \
+        --values=distinct:sip,bytes,packets,flows data.rw
+               sTime|sIP-Distinct|        Bytes|   Packets|   Records|
+ 1970/01/01T00:00:00|       57727|    948620676|   2026581|    382578|
+
+Finally, you can use separate invocations of B<rwfilter(1)>,
+B<rwset(1)>, and B<rwsetcat(1)>:
+
+ $ rwfilter --print-volume --all=stdout data.rw  \
+   | rwset --sip=stdout                          \
+   | rwsetcat --count-ips
+      |      Recs|   Packets|        Bytes|     Files|
+ Total|    382578|   2026581|    948620676|         1|
+  Pass|    382578|   2026581|    948620676|          |
+  Fail|         0|         0|            0|          |
+ 57727
+
+B<rwaddrcount>'s B<--print-ips> switch prints the IP addresses as text:
+
+ $ rwaddrcount --print-ips data.rw
+             sIP
+      10.0.0.144
+   10.14.203.121
+   10.14.203.122
+      10.15.6.14
+     12.0.101.22
+
+A combination of B<rwset> and B<rwsetcat> is the best way to handle
+this:
+
+ $ rwset --sip-file=stdout data.rw | rwsetcat --print-ips
+ 10.0.0.144
+ 10.14.203.121
+ 10.14.203.122
+ 10.15.6.14
+ 12.0.101.22
+
+Alternatively, use B<rwuniq> and the UNIX tool B<cut(1)> to only print
+the first column:
+
+ $ rwuniq --fields=sIP data.rw  \
+   | cut -d '|' -f 1
+             sIP
+      10.0.0.144
+   10.14.203.121
+   10.14.203.122
+      10.15.6.14
+     12.0.101.22
+
+B<rwaddrcount> allows you to restrict the output to bins that have a
+certain minimum or maximum count of bytes, packets, or flows via
+B<--min-bytes>, B<--max-bytes>, B<--min-packets>, B<--max-packets>,
+B<--min-records>, and B<--max-records>:
+
+ $ rwaddrcount --print-recs --min-byte=1024 --max-byte=2048 \
+        --max-records=1 data.rw
+           sIP|Bytes|Packets|Records|         Start_Time|           End_Time|
+    10.0.0.144| 1646|      4|      1|2007/05/09T18:01:41|2007/05/09T18:01:41|
+ 10.14.203.121|   40|      1|      1|2007/05/09T18:31:54|2007/05/09T18:31:54|
+ 10.14.203.122|   40|      1|      1|2007/05/09T18:32:43|2007/05/09T18:32:43|
+
+B<rwuniq> supports the same operations using the B<--bytes>,
+B<--packets>, and B<--flows> switches, each of which allows you to
+define a desired minimum and maximum value.
+
+ $ rwuniq --fields=sip --values=bytes,packets,records,stime,etime \
+        --bytes=1024-2048 --flows=1-1 data.rw
+          sIP|Bytes|Packets|Records|          min_sTime|          max_eTime|
+    10.0.0.144| 1646|      4|      1|2007/05/09T18:01:41|2007/05/09T18:01:41|
+ 10.14.203.121|   40|      1|      1|2007/05/09T18:31:54|2007/05/09T18:31:54|
+ 10.14.203.122|   40|      1|      1|2007/05/09T18:32:43|2007/05/09T18:32:43|
+
 
 =head1 ENVIRONMENT
 
@@ -537,7 +670,7 @@ B<rwset(1)>.
 
 =cut
 
-$SiLK: rwaddrcount.pod 95aec76c40ea 2018-03-13 21:09:01Z mthomas $
+$SiLK: rwaddrcount.pod 051cadca977b 2019-04-16 18:12:18Z mthomas $
 
 Local Variables:
 mode:text

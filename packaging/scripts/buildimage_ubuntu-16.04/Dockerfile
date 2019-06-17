@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     git \
     libglib2.0-dev \
     libpcap0.8-dev \
+    libsnappy-dev \
     libtool \
     libltdl-dev \
     liblzo2-dev \

@@ -1,5 +1,5 @@
 MAINTAINER = "Bo Bayles <bbayles+netsa@gmail.com>"
-VERSION = 20190419
+VERSION = 20190527
 PROC_ARCH ?= amd64
 TARGET_ROOT = $(shell pwd)/packaging/root
 YAF_PREFIX = ${TARGET_ROOT}/opt/yaf
@@ -52,6 +52,7 @@ deb:
 		--depends liblzo2-2 \
 		--depends libltdl7 \
 		--depends libpcap0.8 \
+		--depends libsnappy1v5 \
 		--depends zlib1g \
 		--after-install packaging/scripts/postinst.sh \
 		--after-remove packaging/scripts/postrm.sh \
@@ -75,6 +76,7 @@ rpm:
 		--depends libpcap \
 		--depends libtool-ltdl \
 		--depends lzo \
+		--depends snappy \
 		--depends zlib \
 		--after-install packaging/scripts/postinst.sh \
 		--after-remove packaging/scripts/postrm.sh \

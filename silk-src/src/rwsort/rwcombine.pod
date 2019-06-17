@@ -443,7 +443,7 @@ Use B<rwfilter(1)> to find B<ssh> flow records that involve the host
 split this long-lived B<ssh> session into multiple flow records:
 
  $ rwfilter --saddr=192.168.126.252 --dport=22 --pass=- data.rw \
-   | rwcut --fields=flags,attributes,stime,etime 
+   | rwcut --fields=flags,attributes,stime,etime
     flags|attribut|                  sTime|                  eTime|
   S PA   |T       |2009/02/13T00:29:59.563|2009/02/13T00:59:39.668|
     PA   |TC      |2009/02/13T00:59:39.668|2009/02/13T01:29:19.478|
@@ -598,7 +598,7 @@ The first release of B<rwcombine> occurred in SiLK 3.9.0.
 
 =cut
 
-$SiLK: rwcombine.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
+$SiLK: rwcombine.pod 051cadca977b 2019-04-16 18:12:18Z mthomas $
 
 Local Variables:
 mode:text

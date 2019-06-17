@@ -17,6 +17,7 @@ RUN yum install -y \
     ruby \
     ruby-devel \
     rubygems \
+    snappy-devel \
     zlib-devel
 
 RUN gem install json -v 1.8.3
