@@ -22,6 +22,7 @@ automake | automake
 build-essential | gcc
 libglib2.0-dev | glib2-devel
 libpcap-dev | libpcap-devel
+libsnappy-dev | snappy-devel
 libtool | libtool
 libltdl-dev | libtool-ltdl-devel
 liblzo2-dev | lzo-devel
