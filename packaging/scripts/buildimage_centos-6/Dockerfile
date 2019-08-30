@@ -20,6 +20,7 @@ RUN yum install -y \
     snappy-devel \
     zlib-devel
 
+RUN gem install childprocess -v 1.0.1
 RUN gem install json -v 1.8.3
 RUN gem install ffi -v 1.9.18
 RUN gem install rake -v 10.5.0
