@@ -63,7 +63,7 @@ prints its contents as human-readable text.
 %setup -q -n %{name}-%{version}
 
 %build
-./configure @RPM_CONFIG_FLAGS@
+%configure @RPM_CONFIG_FLAGS@
 %{__make}
 
 %install

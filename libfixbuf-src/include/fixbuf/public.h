@@ -169,16 +169,17 @@
  *
  * The following sections provide information on specific libfixbuf usage:
  *
- * - \ref export Exporters
- * - \ref read  IPFIX File Collectors
- * - \ref collect Network Collectors
- * - \ref udp UDP Collectors
- * - \ref v9 NetFlow v9 Collectors
- * - \ref sflow sFlow Collectors
- * - \ref spread Spread Collectors
- * - \ref noconnect Connection-less collector
- * - \ref lists BasicLists, SubTemplateLists, SubTemplateMultiLists
- * - \ref rfc_5610 RFC 5610
+ * - \ref export       How-To Export IPFIX
+ * - \ref read         How-To Read IPFIX Files
+ * - \ref collect      How-To Listen Over the Network Using TCP (Recommended)
+ * - \ref udp          How-To Collect IPFIX over UDP
+ * - \ref v9           How-To Use libfixbuf as a NetFlow v9 Collector
+ * - \ref sflow        How-To Use libfixbuf to Collect sFlow v5
+ * - \ref spread       How-To Use the Spread Protocol
+ * - \ref noconnect    How-To Use libfixbuf with a Data Buffer
+ * - \ref lists        How-To Handle BasicLists, SubTemplateLists, & SubTemplateMultiLists
+ * - \ref rfc_5610     How-To Export and Read Enterprise Element Definitions
+ * - \ref sample_progs Complete Programs that Use libfixbuf
  *
  * @section types Data Types
  *
@@ -231,8 +232,9 @@
  *
  * @page export Exporter Usage
  *
- * How-To Export IPFIX:
- * Each fixbuf application must have a single fbInfoModel_t instance that
+ * How-To Export IPFIX
+ *
+ * Each fixbuf application must have a single @ref fbInfoModel_t instance that
  * represents the Information Elements that the application understands.
  * The fbInfoModelAlloc() call allocates a new Information Model with the
  * IANA-managed information elements (current as of the fixbuf release date)
@@ -243,20 +245,58 @@
  * To create an Exporter, first create an @ref fbSession_t attached to the
  * application's @ref fbInfoModel_t to hold the Exporter's Transport Session
  * state using fbSessionAlloc(). If exporting via the Spread protocol, create
- * an @ref fbSpreadParams_t and set its session to your newly defined session,
- * group names (a null terminated array), and Spread daemon name.
+ * an @ref fbSpreadParams_t and set its `session` member to your newly defined
+ * fbSession_t, group names (a null terminated array), and Spread daemon name.
  *
  * Then create an @ref fbExporter_t to encapsulate the connection to the
  * Collecting Process or the file on disk, using the fbExporterAllocFP(),
  * fbExporterAllocFile(), fbExporterAllocNet(), fbExporterAllocBuffer(),
  * or fbExporterAllocSpread() calls.
  *
- * With an fbSession_t and an fbExporter_t available, create a buffer for
- * writing via fBufAllocForExport().
+ * With an fbSession_t and an fbExporter_t available, create a buffer (@ref
+ * fBuf_t) for writing via fBufAllocForExport().
  *
- * Create and populate templates for addition to this session using the
- * fbTemplate calls, then add them to the session via fbSessionAddTemplate()
- * or fbSessionAddTemplateWithMetadata().
+ * Create and populate templates for addition to this session using
+ * fbTemplateAlloc() and fbTemplateAppendSpecArray(), fbTemplateAppendSpec(),
+ * or fbTemplateAppend()).  The layout of the template usually matches the C
+ * `struct` that holds the record.  Any gaps (due to alignment) in the C
+ * `struct` must be noted in both the data structure and the template.
+ *
+ * Example code:
+ * @code
+ *    static fbInfoElementSpec_t exportTemplate[] = {
+ *        {"flowStartMilliseconds",               8, 0 },
+ *        {"flowEndMilliseconds",                 8, 0 },
+ *        {"octetTotalCount",                     8, 0 },
+ *        {"packetTotalCount",                    8, 0 },
+ *        {"sourceIPv4Address",                   4, 0 },
+ *        {"destinationIPv4Address",              4, 0 },
+ *        {"sourceTransportPort",                 2, 0 },
+ *        {"destinationTransportPort",            2, 0 },
+ *        {"protocolIdentifier",                  1, 0 },
+ *        {"paddingOctets",                       3, 0 },
+ *        {"payload",                             0, 0 },
+ *        FB_IESPEC_NULL
+ *    };
+ *    typedef struct exportRecord_st {
+ *        uint64_t      flowStartMilliseconds;
+ *        uint64_t      flowEndMilliseconds;
+ *        uint64_t      octetTotalCount;
+ *        uint64_t      packetTotalCount;
+ *        uint32_t      sourceIPv4Address;
+ *        uint32_t      destinationIPv4Address;
+ *        uint16_t      sourceTransportPort;
+ *        uint16_t      destinationTransportPort;
+ *        uint8_t       protocolIdentifier;
+ *        uint8_t       padding[3];
+ *        fbVarfield_t  payload;
+ *    } exportRecord_t;
+ *    fbTemplate_t *tmpl = fbTemplateAlloc(infoModel);
+ *    fbTemplateAppendSpecArray(tmpl, exportTemplate, UINT32_MAX, &err);
+ *  @endcode
+ *
+ * Add the templates to the session via fbSessionAddTemplate() or
+ * fbSessionAddTemplateWithMetadata().
  *
  * If exporting via Spread, before calling fbSessionAddTemplate(), set the
  * group that should receive this template with the fBufSetSpreadExportGroup()
@@ -264,6 +304,16 @@
  * fbSessionAddTemplatesMulticast() which will call fBufSetSpreadExportGroup()
  * on the given group(s) multicast the template to the given group(s).
  * For Spread, do not use fbSessionAddTemplate() to send to multiple groups.
+ *
+ * Typically each template is added to the session twice, once as an internal
+ * template\---which describes how the record appears in memory\---and again
+ * as an external template\---which describes how the record appears in the
+ * IPFIX message.
+ *
+ * Templates use internal reference counting, so they may be added to multiple
+ * sessions, or to the same session using multiple template IDs or multiple
+ * domains, or as both an internal and an external template on the same
+ * session.
  *
  * Once the templates have been added to the session, use
  * fbSessionExportTemplates() to add the templates to the buffer and then
@@ -274,17 +324,14 @@
  * If using Spread, call fBufSetSpreadExportGroup() to set the groups to
  * export to on the buffer before calling fBufAppend().
  *
- * Note that Templates use internal reference counting, so they may be added
- * to multiple sessions, or to the same session using multiple template IDs or
- * multiple domains, or as both an internal and an external template on the
- * same session.
- *
  * By default, fBufAppend() will emit an IPFIX Message to the output stream
  * when the end of the message buffer is reached on write. The
- * fBufSetAutomaticMode() call can be used to modify this behavior,
- * causing fBufAppend() to return FB_ERROR_EOM when at end of message. Use
- * this if your application requires manual control of message export. In this
- * case, fBufEmit() will emit a Message to the output stream.
+ * fBufSetAutomaticMode() call can be used to modify this behavior, causing
+ * fBufAppend() to return FB_ERROR_EOM when at end of message. Use this if
+ * your application requires manual control of message export. In this case,
+ * fBufEmit() will emit a Message to the output stream.  If your exporter was
+ * created via fbExporterAllocBuffer(), you may use fbExporterGetMsgLen() to
+ * get the message length.
  *
  * If not in automatic mode and a session's templates do not fit into a single
  * message, use fbSessionExportTemplate() to export each template individually
@@ -293,16 +340,17 @@
  * Manual control of message export is incompatible with template and
  * information element metadata (fbSessionSetMetadataExportTemplates() and
  * fbSessionSetMetadataExportElements()).  There are several functions that
- * can cause the metadata options records to be exported, and the session must
+ * may cause the metadata options records to be exported, and the session must
  * be free to create a new record set or template set as needed.
  *
  *
  * @page read IPFIX File Collectors
  *
- * How-To Read IPFIX Files:
+ * How-To Read IPFIX Files
  *
- * Using fixbuf to read from IPFIX Files as a Collecting Process is very
- * much like the Export case. Create an fbInfoModel_t using fbInfoModelAlloc()
+ * Using fixbuf to read from IPFIX Files as a Collecting Process is very much
+ * like the @ref export "Export case".
+ * Create an fbInfoModel_t using fbInfoModelAlloc()
  * and any additional, vendor-specific information elements using
  * fbInfoModelAddElement(), fbInfoModelAddElementArray(),
  * fbInfoModelReadXMLFile(), or fbInfoModelReadXMLData().  Next create
@@ -329,7 +377,7 @@
  *
  * @page collect Network Collectors
  *
- * Listening over the Network - TCP Recommended:
+ * How-To Listen Over the Network Using TCP (Recommended)
  *
  * An additional type, @ref fbListener_t, is used to build Collecting Processes
  * to listen for connections from IPFIX Exporting Processes via the network.
@@ -405,7 +453,7 @@
  *
  * @page udp UDP Collectors
  *
- * How-To Collect IPFIX over UDP:
+ * How-To Collect IPFIX over UDP
  *
  * It is not recommended to use UDP for IPFIX transport, since
  * UDP is not a reliable transport protocol, and therefore cannot guarantee
@@ -448,15 +496,14 @@
  * once for each session when the collector is freed AND anytime a session
  * is timed out.
 
- * Note: If the appinit() function returns FALSE, libfixbuf will
- * reject any subsequent messages from the
- * peer address, observation domain until the timeout period has expired.
- * If the appinit() function should reject a "connection" the application
- * should set the error code to FB_ERROR_NLREAD and return FALSE.
- *      Example usage:
- *     \code{.c}
- *         g_set_error(error, FB_ERROR_DOMAIN, FB_ERROR_NLREAD, "some msg");
- *      \endcode
+ * Note: If the appinit() function returns FALSE, libfixbuf will reject any
+ * subsequent messages from the peer address, observation domain until the
+ * timeout period has expired.  If the appinit() function should reject a
+ * "connection" the application should set the error code to FB_ERROR_NLREAD
+ * and return FALSE. Example usage:
+ * \code{.c}
+ *     g_set_error(error, FB_ERROR_DOMAIN, FB_ERROR_NLREAD, "some msg");
+ * \endcode
  *
  *
  * To only accept IPFIX from one host without using the appinit() and
@@ -467,7 +514,7 @@
  *
  * @page v9  NetFlow v9 Collectors
  *
- * How-To use libfixbuf as a NetFlow v9 Collector:
+ * How-To Use libfixbuf as a NetFlow v9 Collector
  *
  * libfixbuf can be used as a [NetFlow v9][] collector and convert NetFlow to
  * IPFIX.  Follow the @ref udp "steps above" to create an fbListener.
@@ -523,7 +570,7 @@
  *
  * @page sflow sFlow Collectors
  *
- * How to use libfixbuf to collect sFlow v5
+ * How-To Use libfixbuf to Collect sFlow v5
  *
  * libfixbuf can be used to collect sFlow and convert sFlow to
  * IPFIX.  Follow the @ref udp "steps above" to create an fbListener.
@@ -650,7 +697,7 @@
  *
  * @page spread Spread Collectors
  *
- * How-To use the Spread Protocol:
+ * How-To Use the Spread Protocol
  *
  * The instructions for using [Spread][] in libfixbuf are similar to the
  * setup for reading from IPFIX files.  As described above in the @ref export
@@ -658,8 +705,7 @@
  * section, the first step is to create an fbInfoModel_t and fbSession_t.
  * Next, create the internal template(s) and add it to the fbSession_t.
  * Define an @ref fbSpreadParams_t and set the session, groups to subscribe to,
- * and Spread Daemon name.
- *     Example usage:
+ * and Spread Daemon name.  Example usage:
  *     \code{.c}
  *       fbSpreadParams_t spread;
  *       char *groups[25];
@@ -669,7 +715,7 @@
  *       spread.groups = groups;
  *       spread.session = session;
  *       collector = fbCollectorAllocSpread(0, &spread, &err);
- *      \endcode
+ *     \endcode
  *
  * Then create an fbCollector_t to connect and listen to the Spread Daemon
  * using fbCollectorAllocSpread().
@@ -686,7 +732,7 @@
  *
  * @page noconnect Connection-less Collector
  *
- * How-To use libfixbuf with just a data buffer:
+ * How-To Use libfixbuf with a Data Buffer
  *
  * To use fixbuf independent of the transport mode, the application must
  * create an fbInfoModel_t using fbInfoModelAlloc()
@@ -751,43 +797,47 @@
  *     - If buffer length == 0
  *
  *
- *     Example usage:
- *     \code{.c}
- *        FILE *fp;
- *        uint8_t buf[65535];
- *        ...
- *        while (fread(buf, 1, 4, fp) == 4) {
- *           len = ntohs(*((uint16_t *)(buf+2)));
- *           rc = fread(buf+4, 1, len-4, fp);
- *           if (rc > 0) {
- *               fBufSetBuffer(fbuf, buf, rc+4);
- *           } else if (feof(fp))
- *           ....
- *           for (;;) {
- *               ret = fBufNext(fbuf, (uint8_t *)rec, &len, &err);
- *               if (FALSE == ret) {
- *                  if (g_error_matches(err, FB_ERROR_DOMAIN, FB_ERROR_BUFSZ)){
- *                     rem = fBufRemaining(fbuf);
- *                     g_clear_error(&err);
- *                     break;
- *                  }
- *               }
- *            }
+ * Example usage:
+ * \code{.c}
+ *    FILE *fp;
+ *    uint8_t buf[65535];
+ *    ...
+ *    while (fread(buf, 1, 4, fp) == 4) {
+ *       len = ntohs(*((uint16_t *)(buf+2)));
+ *       rc = fread(buf+4, 1, len-4, fp);
+ *       if (rc > 0) {
+ *           fBufSetBuffer(fbuf, buf, rc+4);
+ *       } else if (feof(fp))
+ *       ....
+ *       for (;;) {
+ *           ret = fBufNext(fbuf, (uint8_t *)rec, &len, &err);
+ *           if (FALSE == ret) {
+ *              if (g_error_matches(err, FB_ERROR_DOMAIN, FB_ERROR_BUFSZ)){
+ *                 rem = fBufRemaining(fbuf);
+ *                 g_clear_error(&err);
+ *                 break;
+ *              }
+ *           }
  *        }
- *      \endcode
+ *    }
+ * \endcode
  *
  * @page lists Lists in IPFIX
  *
- * How-To deal with BasicLists, SubTemplateLists, & SubTemplateMultiLists:
+ * How-To Handle BasicLists, SubTemplateLists, & SubTemplateMultiLists
  *
  * @section general General Information
- * Each of the list structures uses a nested list of data.
+ *
+ * Background on the list types is in "Export of Structured Data in IPFIX"
+ * ([RFC 6313][]).  Each of the list structures uses a nested list of data.
  * The basic list nests a single information element, while the others use a
  * nested template.  The template used for nesting is part of the listed
  * templates sent to the collector when the connection is made, or when the
  * data transfer begins.  There is no way to mark a template from this list as
  * one that will be nested, or one that will be used as the highest level
  * template.  Each of the templates in the list are treated as equals.
+ *
+ * [RFC 6313]:  https://tools.ietf.org/html/rfc6313
  *
  * The collector does not learn which template or information element is nested
  * until the data arrives.  This requires flexibility in the collectors to
@@ -896,7 +946,9 @@
  *
  * @page rfc_5610 RFC 5610
  *
- * What is RFC 5610?
+ * How-To Export and Read Enterprise Element Definitions
+ *
+ * @section what_5610 What is RFC 5610?
  *
  * [RFC 5610][] provides a mechanism to export full type information for
  * Information Elements from the IPFIX Information Model.  Libfixbuf
@@ -974,6 +1026,34 @@
  * fbSessionAddNewTemplateCallback()) to collect and add each element to the
  * Information Model using fbInfoElementAddOptRecElement() and
  * fbInfoModelTypeInfoRecord().
+ *
+ *
+ * @page sample_progs Complete Programs
+ *
+ * Complete Programs that Use libfixbuf
+ *
+ * To see a complete program that uses the fixbuf library, look at the
+ * ipfixDump program bundled with the libfixbuf source code. In addition, two
+ * sample programs are available as separate bundles.  These are designed to
+ * read IPFIX data that matches the templates used by YAF:
+ *
+ * - [yaf_file_mediator][] Reads IPFIX records from a file and writes the records as text.
+ * - [yaf_silk_mysql_mediator][] Reads IPFIX records from a file or a TCP socket and stores the records in a MySQL database and/or forwards the records to SiLK.
+ *
+ * For larger programs, see the applications on the
+ * https://tools.netsa.cert.org/ web site:
+ *
+ * - [YAF][]
+ * - [super_mediator][]
+ * - [SiLK][]
+ * - [Analysis Pipeline][analysis_pipeline]
+ *
+ * [SiLK]:                    https://tools.netsa.cert.org/silk/index.html
+ * [YAF]:                     https://tools.netsa.cert.org/yaf/index.html
+ * [analysis_pipeline]:       https://tools.netsa.cert.org/analysis-pipeline5/index.html
+ * [super_mediator]:          https://tools.netsa.cert.org/super_mediator/index.html
+ * [yaf_file_mediator]:       https://tools.netsa.cert.org/fixbuf/file_mediator.html
+ * [yaf_silk_mysql_mediator]: https://tools.netsa.cert.org/fixbuf/mysql_mediator.html
  *
  *
  */
@@ -1582,6 +1662,7 @@ typedef struct fbInfoElement_st {
  *
  * To export RFC5610 elements, use fbSessionSetMetadataExportElements().
  *
+ * @code{.c}
  * fbInfoElementSpec_t rfc5610_spec[] = {
  *     {"privateEnterpriseNumber",         4, 0 },
  *     {"informationElementId",            2, 0 },
@@ -1595,7 +1676,7 @@ typedef struct fbInfoElement_st {
  *     {"informationElementDescription",   FB_IE_VARLEN, 0 },
  *     FB_IESPEC_NULL
  * };
- *
+ * @endcode
  */
 typedef struct fbInfoElementOptRec_st {
     /** private enterprise number */
@@ -3636,7 +3717,8 @@ gboolean fbInfoModelTypeInfoRecord(
  * sessions, with different template IDs each time, and as such are
  * reference counted and owned by sessions. A template must be associated
  * with at least one session or it will be leaked; each template is freed
- * after its last associated session is freed.
+ * after its last associated session is freed.  To free a template that has
+ * not yet been added to a session, use fbTemplateFreeUnused().
  *
  * Use fbTemplateAppend(), fbTemplateAppendSpec(), and
  * fbTemplateAppendSpecArray() to "fill in" a template after creating it,
@@ -4514,14 +4596,16 @@ fbExporter_t        *fbExporterAllocFile(
     const char          *path);
 
 /**
- * Allocates an exporting process for a buffer. The underlying
- * buffer will be allocated to the given size.
+ * Allocates an exporting process to use the existing buffer `buf` having the
+ * specified size.  Each call to fBufEmit() copies data into `buf` starting at
+ * `buf[0]`; use fbExporterGetMsgLen() to get the number of bytes copied into
+ * `buf`.
  *
- * @param buf       buffer that will be allocated and used to copy IPFIX to.
- * @param bufsize   size of buffer that will be allocated.
- *
+ * @param buf       existing buffer that IPFIX messages are copied to
+ * @param bufsize   size of the buffer
  * @return a new exporting process endpoint
  */
+
 fbExporter_t        *fbExporterAllocBuffer(
     uint8_t                  *buf,
     uint16_t                  bufsize);
@@ -4580,8 +4664,8 @@ void                fbExporterClose(
     fbExporter_t       *exporter);
 
 /**
- * Gets the (transcoded) message length that was copied to the
- * exporting buffer upon fBufEmit().
+ * Gets the (transcoded) message length that was copied to the exporting
+ * buffer upon fBufEmit() when using fbExporterAllocBuffer().
  *
  * @param exporter an exporting process endpoint.
  */

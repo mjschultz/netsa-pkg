@@ -42,7 +42,6 @@
  */
 
 #define _FIXBUF_SOURCE_
-/*#define _GNU_SOURCE*/
 #include <fixbuf/private.h>
 
 

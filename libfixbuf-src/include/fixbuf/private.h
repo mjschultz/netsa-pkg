@@ -383,12 +383,14 @@ const fbInfoElement_t     *fbInfoModelGetElement(
  * @param model
  * @param ex_ie
  * @param tmpl_ie
+ * @param err
  *
  */
 gboolean            fbInfoElementCopyToTemplate(
     fbInfoModel_t       *model,
     fbInfoElement_t     *ex_ie,
-    fbInfoElement_t     *tmpl_ie);
+    fbInfoElement_t     *tmpl_ie,
+    GError             **err);
 
 /**
  * fbInfoElementCopyToTemplateByName
@@ -397,6 +399,7 @@ gboolean            fbInfoElementCopyToTemplate(
  * @param name
  * @param len_override
  * @param tmpl_ie
+ * @param err
  *
  *
  */
@@ -404,7 +407,8 @@ gboolean            fbInfoElementCopyToTemplateByName(
     fbInfoModel_t       *model,
     const char          *name,
     uint16_t            len_override,
-    fbInfoElement_t     *tmpl_ie);
+    fbInfoElement_t     *tmpl_ie,
+    GError             **err);
 
 /**
  * fbInfoModelAddAlienElement

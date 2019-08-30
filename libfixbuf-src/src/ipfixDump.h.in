@@ -48,6 +48,7 @@ typedef struct tmplContext_st {
     uint32_t           count;
     uint16_t           len;
     uint16_t           tid;
+    uint16_t           scope;
     gboolean           is_meta_template;
     gboolean           is_meta_element;
 } tmplContext_t;
@@ -60,7 +61,7 @@ void idPrintHeader(
 uint16_t idPrintTemplate(
     FILE              *fp,
     fbTemplate_t      *tmpl,
-    void              **ctx,
+    tmplContext_t     *ctx,
     uint16_t          tid,
     gboolean          noprint);
 

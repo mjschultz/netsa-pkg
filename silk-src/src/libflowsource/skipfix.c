@@ -22,7 +22,7 @@
 #define SKIPFIX_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipfix.c a7852cf93d57 2019-05-23 19:17:54Z mthomas $");
+RCSIDENT("$SiLK: skipfix.c 00be7e2fb135 2019-08-26 15:26:09Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/skipaddr.h>
@@ -1170,7 +1170,7 @@ typedef struct ski_tombstone_access_st {
 
 #define SKI_NF9SAMPLING_TID     0xAFEF
 
-#define SKI_NF9SAMPLING_PADDING 4
+#define SKI_NF9SAMPLING_PADDING 5
 
 static fbInfoElementSpec_t ski_nf9sampling_spec[] = {
     { (char*)"samplingInterval",          4, 0 },    /* 34 */
@@ -1183,8 +1183,8 @@ static fbInfoElementSpec_t ski_nf9sampling_spec[] = {
     { (char*)"flowSamplerMode",           1, 1 },    /* 49, current fixbuf */
     { (char*)"samplerMode",               1, 2 },    /* 49, future fixbuf */
 
-    { (char*)"flowSamplerID",             2, 1 },    /* 48, current fixbuf */
-    { (char*)"samplerId",                 2, 2 },    /* 48, future fixbuf */
+    { (char*)"flowSamplerID",             1, 1 },    /* 48, current fixbuf */
+    { (char*)"samplerId",                 1, 2 },    /* 48, future fixbuf */
 
 #if SKI_NF9SAMPLING_PADDING != 0
     { (char*)"paddingOctets",             SKI_NF9SAMPLING_PADDING, 0 },
@@ -1197,7 +1197,7 @@ typedef struct ski_nf9sampling_st {
     uint32_t    samplerRandomInterval;
     uint8_t     samplingAlgorithm;
     uint8_t     samplerMode;
-    uint16_t    samplerId;
+    uint8_t     samplerId;
 #if SKI_NF9SAMPLING_PADDING != 0
     uint8_t     paddingOctets[SKI_NF9SAMPLING_PADDING];
 #endif

@@ -40,8 +40,15 @@
 #define _FIXBUF_SOURCE_
 #include <fixbuf/private.h>
 
-
-#define CERT_PEN 6871
+/*
+ *  This determines the behavior of fbInfoElementCheckTypesSize().  If the
+ *  value is true, failing the template check causes the template to be
+ *  rejected.  If the value is false, failing the check produces a non-fatal
+ *  g_message() but accepts the template.
+ */
+#ifndef FIXBUF_FATAL_TYPE_LEN_MISMATCH
+#define FIXBUF_FATAL_TYPE_LEN_MISMATCH  0
+#endif
 
 struct fbInfoModel_st {
     GHashTable          *ie_table;
@@ -160,12 +167,50 @@ static void         fbInfoModelReversifyName(
 
 #define FB_IE_REVERSE_BUFSZ 256
 
+/**
+ *  Updates the two hash tables of 'model' with the data in 'model_ie'.  A
+ *  helper function for fbInfoModelAddElement().
+ */
+static void         fbInfoModelInsertElement(
+    fbInfoModel_t       *model,
+    fbInfoElement_t     *model_ie)
+{
+    fbInfoElement_t     *found;
+
+    /* Check for an existing element with same ID.  If it is not known, add it
+     * to both tables. */
+    found = g_hash_table_lookup(model->ie_table, model_ie);
+    if (found == NULL) {
+        g_hash_table_insert(model->ie_table, model_ie, model_ie);
+        g_hash_table_insert(model->ie_byname,
+                            (char *)model_ie->ref.name, model_ie);
+        return;
+    }
+
+    /* If 'found' has a different name than 'model_ie', remove found from the
+     * model->ie_byname table if it is present.  We can compare name pointers
+     * since we use g_string_chunk_insert_const(). */
+    if (found->ref.name != model_ie->ref.name) {
+        if (g_hash_table_lookup(model->ie_byname, found->ref.name) == found) {
+            g_hash_table_remove(model->ie_byname, found->ref.name);
+        }
+    }
+
+    /* Update the existing element in place */
+    memcpy(found, model_ie, sizeof(*found));
+
+    /* (Re)add found to the ie_byname table */
+    g_hash_table_insert(model->ie_byname, (char *)found->ref.name, found);
+
+    /* Free unused model_ie */
+    g_slice_free(fbInfoElement_t, model_ie);
+}
+
 void                fbInfoModelAddElement(
     fbInfoModel_t       *model,
     fbInfoElement_t     *ie)
 {
     fbInfoElement_t     *model_ie = NULL;
-    fbInfoElement_t     *found;
     char                revname[FB_IE_REVERSE_BUFSZ];
 
     g_assert(ie);
@@ -174,8 +219,8 @@ void                fbInfoModelAddElement(
     model_ie = g_slice_new0(fbInfoElement_t);
 
     /* Copy external IE to model IE */
-
-    model_ie->ref.name = g_string_chunk_insert(model->ie_names, ie->ref.name);
+    model_ie->ref.name = g_string_chunk_insert_const(model->ie_names,
+                                                     ie->ref.name);
     model_ie->midx = 0;
     model_ie->ent = ie->ent;
     model_ie->num = ie->num;
@@ -185,31 +230,11 @@ void                fbInfoModelAddElement(
     model_ie->max = ie->max;
     model_ie->type = ie->type;
     if (ie->description) {
-        model_ie->description = g_string_chunk_insert(model->ie_desc,
-                                                      ie->description);
+        model_ie->description = (g_string_chunk_insert_const(
+                                     model->ie_desc, ie->description));
     }
 
-    /* Insert model IE into tables */
-    if ((found = g_hash_table_lookup(model->ie_table, model_ie))) {
-        /* use g_hash_table_replace() if the ent/num already exists.
-         * insert() will replace but it only replaces the value, not
-         * the key.  since insert() frees the value and the key and
-         * the value are the same - this creates a problem.  replace()
-         * replaces the key and the value. */
-
-        /* since it is possible that 'found' has a different name than
-         * 'model_ie', we need to remove 'found' from the ie_byname
-         * table to avoid having a reference to freed memory.  it's
-         * also possible that 'found' is only in the ie_table. */
-        if (g_hash_table_lookup(model->ie_byname, found->ref.name) == found) {
-            g_hash_table_remove(model->ie_byname, found->ref.name);
-        }
-        g_hash_table_replace(model->ie_table, model_ie, model_ie);
-    } else {
-        g_hash_table_insert(model->ie_table, model_ie, model_ie);
-    }
-
-    g_hash_table_insert(model->ie_byname, (char *)model_ie->ref.name,model_ie);
+    fbInfoModelInsertElement(model, model_ie);
 
     /* Short circuit if not reversible */
     if (!(ie->flags & FB_IE_F_REVERSIBLE)) {
@@ -223,7 +248,7 @@ void                fbInfoModelAddElement(
     fbInfoModelReversifyName(ie->ref.name, revname, sizeof(revname));
 
     /* Copy external IE to reverse model IE */
-    model_ie->ref.name = g_string_chunk_insert(model->ie_names, revname);
+    model_ie->ref.name = g_string_chunk_insert_const(model->ie_names, revname);
     model_ie->midx = 0;
     model_ie->ent = ie->ent ? ie->ent : FB_IE_PEN_REVERSE;
     model_ie->num = ie->ent ? ie->num | FB_IE_VENDOR_BIT_REVERSE : ie->num;
@@ -233,16 +258,7 @@ void                fbInfoModelAddElement(
     model_ie->max = ie->max;
     model_ie->type = ie->type;
 
-    /* Insert model IE into tables */
-    if ((found = g_hash_table_lookup(model->ie_table, model_ie))) {
-        if (g_hash_table_lookup(model->ie_byname, found->ref.name) == found) {
-            g_hash_table_remove(model->ie_byname, found->ref.name);
-        }
-        g_hash_table_replace(model->ie_table, model_ie, model_ie);
-    } else {
-        g_hash_table_insert(model->ie_table, model_ie, model_ie);
-    }
-    g_hash_table_insert(model->ie_byname, (char *)model_ie->ref.name,model_ie);
+    fbInfoModelInsertElement(model, model_ie);
 }
 
 void                fbInfoModelAddElementArray(
@@ -260,10 +276,100 @@ const fbInfoElement_t     *fbInfoModelGetElement(
     return g_hash_table_lookup(model->ie_table, ex_ie);
 }
 
+/*
+ *  Checks if the specified size 'len' of the element 'model_ie' is valid
+ *  given the element's type.  Returns TRUE if valid.  Sets 'err' and returns
+ *  FALSE if not.  The list of things that are check are:
+ *
+ *  -- Whether a fixed size element (e.g., IP address, datetime) uses an
+ *     different size.
+ *  -- Whether a float64 uses a size other than 4 or 8.
+ *  -- Whether an integer uses a size larger than the natural size of the
+ *     integer (e.g., attempting to use 4 bytes for a unsigned16).
+ *  -- Whether VARLEN is used for anything other than strings, octetArrays,
+ *     and structed data (lists).
+ *  -- Whether a size of 0 is used for anything other than string or
+ *     octetArray.
+ */
+static gboolean     fbInfoElementCheckTypesSize(
+    const fbInfoElement_t   *model_ie,
+    const uint16_t           len,
+    GError                 **err)
+{
+    switch (model_ie->type) {
+      case FB_BOOL:
+      case FB_DT_MICROSEC:
+      case FB_DT_MILSEC:
+      case FB_DT_NANOSEC:
+      case FB_DT_SEC:
+      case FB_FLOAT_32:
+      case FB_INT_8:
+      case FB_IP4_ADDR:
+      case FB_IP6_ADDR:
+      case FB_MAC_ADDR:
+      case FB_UINT_8:
+        /* fixed size */
+        if (len == model_ie->len) {
+            return TRUE;
+        }
+        break;
+      case FB_FLOAT_64:
+        /* may be either 4 or 8 octets */
+        if (len == 4 || len == 8) {
+            return TRUE;
+        }
+        break;
+      case FB_INT_16:
+      case FB_INT_32:
+      case FB_INT_64:
+      case FB_UINT_16:
+      case FB_UINT_32:
+      case FB_UINT_64:
+        /* these support reduced length encoding */
+        if (len <= model_ie->len && len > 0) {
+            return TRUE;
+        }
+        break;
+      case FB_BASIC_LIST:
+      case FB_SUB_TMPL_LIST:
+      case FB_SUB_TMPL_MULTI_LIST:
+        if (len > 0) {
+            return TRUE;
+        }
+        break;
+      case FB_OCTET_ARRAY:
+      case FB_STRING:
+      default:
+        /* may be any size */
+        return TRUE;
+    }
+
+    if (len == FB_IE_VARLEN) {
+        g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_IPFIX,
+                    "Template warning: Information element %s"
+                    " may not be variable length",
+                    model_ie->ref.name);
+    } else {
+        g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_IPFIX,
+                    "Template warning: Illegal length %d"
+                    " for information element %s",
+                    len, model_ie->ref.name);
+    }
+#if FIXBUF_FATAL_TYPE_LEN_MISMATCH
+    return FALSE;
+#else
+    g_message("%s", (*err)->message);
+    g_clear_error(err);
+    return TRUE;
+#endif
+}
+
+
 gboolean            fbInfoElementCopyToTemplate(
     fbInfoModel_t       *model,
     fbInfoElement_t     *ex_ie,
-    fbInfoElement_t     *tmpl_ie)
+    fbInfoElement_t     *tmpl_ie,
+    GError             **err)
 {
     const fbInfoElement_t     *model_ie = NULL;
 
@@ -271,12 +377,11 @@ gboolean            fbInfoElementCopyToTemplate(
     model_ie = fbInfoModelGetElement(model, ex_ie);
     if (!model_ie) {
         /* Information element not in model. Note it's alien and add it. */
-        ex_ie->ref.name = g_string_chunk_insert(model->ie_names,
-                                                "_alienInformationElement");
-        ex_ie->flags |= FB_IE_F_ALIEN;
-        fbInfoModelAddElement(model, ex_ie);
-        model_ie = fbInfoModelGetElement(model, ex_ie);
-        g_assert(model_ie);
+        model_ie = fbInfoModelAddAlienElement(model, ex_ie);
+    }
+
+    if (!fbInfoElementCheckTypesSize(model_ie, ex_ie->len, err)) {
+        return FALSE;
     }
 
     /* Refer to canonical IE in the model */
@@ -287,6 +392,46 @@ gboolean            fbInfoElementCopyToTemplate(
     tmpl_ie->ent = model_ie->ent;
     tmpl_ie->num = model_ie->num;
     tmpl_ie->len = ex_ie->len;
+    tmpl_ie->flags = model_ie->flags;
+    tmpl_ie->type = model_ie->type;
+    tmpl_ie->min = model_ie->min;
+    tmpl_ie->max = model_ie->max;
+    tmpl_ie->description = model_ie->description;
+
+    /* All done */
+    return TRUE;
+}
+
+gboolean            fbInfoElementCopyToTemplateByName(
+    fbInfoModel_t       *model,
+    const char          *name,
+    uint16_t            len_override,
+    fbInfoElement_t     *tmpl_ie,
+    GError             **err)
+{
+    const fbInfoElement_t     *model_ie = NULL;
+
+    /* Look up information element in the model */
+    model_ie = fbInfoModelGetElementByName(model, name);
+    if (!model_ie) {
+        g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_NOELEMENT,
+                    "No such information element %s", name);
+        return FALSE;
+    }
+    if (len_override) {
+        if (!fbInfoElementCheckTypesSize(model_ie, len_override, err)) {
+            return FALSE;
+        }
+    }
+
+    /* Refer to canonical IE in the model */
+    tmpl_ie->ref.canon = model_ie;
+
+    /* Copy model IE to template IE */
+    tmpl_ie->midx = 0;
+    tmpl_ie->ent = model_ie->ent;
+    tmpl_ie->num = model_ie->num;
+    tmpl_ie->len = len_override ? len_override : model_ie->len;
     tmpl_ie->flags = model_ie->flags;
     tmpl_ie->type = model_ie->type;
     tmpl_ie->min = model_ie->min;
@@ -317,36 +462,6 @@ const fbInfoElement_t    *fbInfoModelGetElementByID(
     tempElement.num = id;
 
     return fbInfoModelGetElement(model, &tempElement);
-}
-
-gboolean            fbInfoElementCopyToTemplateByName(
-    fbInfoModel_t       *model,
-    const char          *name,
-    uint16_t            len_override,
-    fbInfoElement_t     *tmpl_ie)
-{
-    const fbInfoElement_t     *model_ie = NULL;
-
-    /* Look up information element in the model */
-    model_ie = fbInfoModelGetElementByName(model, name);
-    if (!model_ie) return FALSE;
-
-    /* Refer to canonical IE in the model */
-    tmpl_ie->ref.canon = model_ie;
-
-    /* Copy model IE to template IE */
-    tmpl_ie->midx = 0;
-    tmpl_ie->ent = model_ie->ent;
-    tmpl_ie->num = model_ie->num;
-    tmpl_ie->len = len_override ? len_override : model_ie->len;
-    tmpl_ie->flags = model_ie->flags;
-    tmpl_ie->type = model_ie->type;
-    tmpl_ie->min = model_ie->min;
-    tmpl_ie->max = model_ie->max;
-    tmpl_ie->description = model_ie->description;
-
-    /* All done */
-    return TRUE;
 }
 
 fbTemplate_t *fbInfoElementAllocTypeTemplate(
@@ -554,8 +669,8 @@ const fbInfoElement_t     *fbInfoModelAddAlienElement(
         return NULL;
     }
     /* Information element not in model. Note it's alien and add it. */
-    ex_ie->ref.name = g_string_chunk_insert(model->ie_names,
-                                            "_alienInformationElement");
+    ex_ie->ref.name = (g_string_chunk_insert_const(
+                           model->ie_names, "_alienInformationElement"));
     ex_ie->flags |= FB_IE_F_ALIEN;
     fbInfoModelAddElement(model, ex_ie);
     model_ie = fbInfoModelGetElement(model, ex_ie);

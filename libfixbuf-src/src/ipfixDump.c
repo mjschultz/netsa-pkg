@@ -429,7 +429,11 @@ static void idTemplateCallback(
         idNewMessage((fBuf_t *)app_ctx);
     }
 
-    len = idPrintTemplate(outfile, tmpl, ctx, tid, only_data);
+    myctx->count = fbTemplateCountElements(tmpl);
+    myctx->scope = fbTemplateGetOptionsScope(tmpl);
+    myctx->tid = tid;
+
+    len = idPrintTemplate(outfile, tmpl, myctx, tid, only_data);
 
     ntid = fbSessionAddTemplate(session, TRUE, tid, tmpl, &err);
 
@@ -460,8 +464,6 @@ static void idTemplateCallback(
 
     ++msg_tmpl_count;
     myctx->len = len;
-    myctx->count = fbTemplateCountElements(tmpl);
-    myctx->tid = tid;
     *ctx = myctx;
     *fn = templateFree;
 }
@@ -779,7 +781,6 @@ main(int argc, char *argv[])
             idNewMessage(fbuf);
         }
 
-        ++id_tmpl_stats[ntid];
         rc = fBufSetInternalTemplate(fbuf, ntid, &err);
         if (!rc) {
             fprintf(stderr,
@@ -821,8 +822,9 @@ main(int argc, char *argv[])
             continue;
         }
 
-        rec_count++;
-        msg_rec_count++;
+        ++id_tmpl_stats[ntid];
+        ++rec_count;
+        ++msg_rec_count;
 
         /* NOTE: When record contains varlen or list elements,
          * 'reclen' is the size of the fbVarfield_t or fb*List_t
@@ -849,12 +851,27 @@ main(int argc, char *argv[])
     fprintf(outfile, "*** File Stats: %d Messages, %d Data Records, "
             "%d Template Records ***\n", msg_count, rec_count, tmpl_count);
 
-    if (only_stats) {
+    if (!only_stats) {
+        /* do not print stats */
+    } else if (g_hash_table_size(template_names) == 0) {
+        /* print the template usage counts without the names */
         fprintf(outfile, "  Template ID | Records\n");
         for (i = min_tmpl_id; i <= max_tmpl_id; i++) {
             if (id_tmpl_stats[i] > 0) {
                 fprintf(outfile, "%5d (%#06x)| %d \n",
                         i, i, id_tmpl_stats[i] - 1);
+            }
+        }
+    } else {
+        /* print the template usage counts with the names */
+        const char *name;
+        fprintf(outfile, "  Template ID |  Records  | Template Name\n");
+        for (i = min_tmpl_id; i <= max_tmpl_id; i++) {
+            if (id_tmpl_stats[i] > 0) {
+                name = (char *)g_hash_table_lookup(template_names,
+                                                   GINT_TO_POINTER(i));
+                fprintf(outfile, "%5d (%#06x)|%11d| %s\n",
+                        i, i, id_tmpl_stats[i] - 1, ((name) ? name : ""));
             }
         }
     }

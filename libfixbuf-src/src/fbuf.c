@@ -1112,7 +1112,7 @@ static gboolean fbEncodeVarlenToFixed(
 /*
  *  Returns the size of the memory needed to hold an info element.
  *
- *  For fixed-length elements, this is its length.  For variables
+ *  For fixed-length elements, this is its length.  For variable
  *  length elements, it is the size of a struct, either fbVarfield_t
  *  or one of the List structures.
  */
@@ -1381,7 +1381,7 @@ static gboolean fbEncodeBasicList(
 
     if (basicList->infoElement->ent) {
         enterprise = TRUE;
-        ie_num |= 0x8000;
+        ie_num |= IPFIX_ENTERPRISE_BIT;
         headerLength += 4;
     }
 
@@ -1541,16 +1541,21 @@ static gboolean fbDecodeBasicList(
 
     /* pull the element length */
     FB_READINCREM_U16(elementLen, src, srcLen);
+    if (!elementLen) {
+        g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_IPFIX,
+                    "Illegal basic list element length (0)");
+        return FALSE;
+    }
 
     /* if enterprise bit is set, pull this field */
-    if (tempElement.num & 0x8000) {
+    if (tempElement.num & IPFIX_ENTERPRISE_BIT) {
         if (srcLen < 4) {
             g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_EOM,
                     "Not enough bytes for basic list header enterprise no.");
             return FALSE;
         }
         FB_READINCREM_U32(tempElement.ent, src, srcLen);
-        tempElement.num &= 0x7fff;
+        tempElement.num &= ~IPFIX_ENTERPRISE_BIT;
     } else {
         tempElement.ent = 0;
     }
@@ -1558,7 +1563,7 @@ static gboolean fbDecodeBasicList(
     /* find the proper info element pointer based on what we built */
     basicList->infoElement = fbInfoModelGetElement(model, &tempElement);
     if (!basicList->infoElement) {
-        /* if infoElement does not exist - notes it's alien and add it */
+        /* if infoElement does not exist, note it's alien and add it */
         tempElement.len = elementLen;
         basicList->infoElement = fbInfoModelAddAlienElement(model,
                                                             &tempElement);
@@ -3660,7 +3665,7 @@ gboolean fBufNextMessage(
     FB_NEXT_U16(mh_version);
     if (mh_version != 0x000A) {
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_IPFIX,
-                    "Illegal IPFIX Message version 0x%04x; "
+                    "Illegal IPFIX Message version %#06x; "
                     "input is probably not an IPFIX Message stream.",
                     mh_version);
         return FALSE;
@@ -3709,7 +3714,7 @@ gboolean fBufNextMessage(
     if (ex_sequence != mh_sequence) {
         if (ex_sequence) {
             g_warning("IPFIX Message out of sequence "
-                      "(in domain %08x, expected %08x, got %08x)",
+                      "(in domain %#010x, expected %#010x, got %#010x)",
                       fbSessionGetDomain(fbuf->session), ex_sequence,
                       mh_sequence);
         }
@@ -3838,42 +3843,55 @@ static gboolean fBufConsumeTemplateSet(
     fBuf_t          *fbuf,
     GError          **err)
 {
-    uint16_t        mtl, tid, ie_count, scope_count;
-    fbTemplate_t    *tmpl;
+    unsigned int    required = 0;
+    uint16_t        tid = 0;
+    uint16_t        ie_count, scope_count;
+    fbTemplate_t    *tmpl = NULL;
     fbInfoElement_t ex_ie = FB_IE_NULL;
     int             i;
 
-    /* Calculate minimum template record length based on type */
-    /* FIXME handle revocation sets */
-    mtl = (fbuf->spec_tid == FB_TID_OTS) ? 6 : 4;
-
     /* Keep reading until the set contains only padding. */
-    while (FB_REM_SET(fbuf) >= mtl) {
-        /* Read template ID */
+    while (FB_REM_SET(fbuf) >= 4) {
+        /* Read the template ID and the IE count */
         FB_NEXT_U16(tid);
-        /* Read template IE count */
         FB_NEXT_U16(ie_count);
-        /* Read scope count if present */
-        if (fbuf->spec_tid == FB_TID_OTS) {
+
+        /* check for necessary length assuming no scope or enterprise
+         * numbers */
+        if ((required = 4 * ie_count) > FB_REM_SET(fbuf)) {
+            goto ERROR;
+        }
+
+        /* Allocate the template.  If we find an illegal value (eg, scope) in
+         * the template's definition, set 'tmpl' to NULL but continue to read
+         * the template's data, then move to the next template in the set. */
+        tmpl = fbTemplateAlloc(fbSessionGetInfoModel(fbuf->session));
+
+        /* Read scope count if present and not a withdrawal tmpl */
+        if (fbuf->spec_tid == FB_TID_OTS && ie_count > 0) {
             FB_NEXT_U16(scope_count);
             /* Check for illegal scope count */
-            if (scope_count == 0) {
-                g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_IPFIX,
-                            "Illegal IPFIX Options Template Scope Count 0");
-                return FALSE;
-            } else if (scope_count > ie_count) {
-                g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_IPFIX,
-                            "Illegal IPFIX Options Template Scope Count "
-                            "(scope count %hu, element count %hu)",
-                            scope_count, ie_count);
-                return FALSE;
+            if (scope_count == 0 || scope_count > ie_count) {
+                if (scope_count == 0) {
+                    g_warning("Ignoring template %#06x: "
+                              "Illegal IPFIX Options Template Scope Count 0",
+                              tid);
+                } else {
+                    g_warning("Ignoring template %#06x: "
+                              "Illegal IPFIX Options Template Scope Count "
+                              "(scope count %hu, element count %hu)",
+                              tid, scope_count, ie_count);
+                }
+                fbTemplateFreeUnused(tmpl);
+                tmpl = NULL;
+            }
+            /* check for required bytes again */
+            if (required > FB_REM_SET(fbuf)) {
+                goto ERROR;
             }
         } else {
             scope_count = 0;
         }
-
-        /* Allocate a new template */
-        tmpl = fbTemplateAlloc(fbSessionGetInfoModel(fbuf->session));
 
         /* Add information elements to the template */
         for (i = 0; i < ie_count; i++) {
@@ -3881,6 +3899,10 @@ static gboolean fBufConsumeTemplateSet(
             FB_NEXT_U16(ex_ie.num);
             FB_NEXT_U16(ex_ie.len);
             if (ex_ie.num & IPFIX_ENTERPRISE_BIT) {
+                /* Check required size for the remainder of the template */
+                if ((required = 4 * (ie_count - i)) > FB_REM_SET(fbuf)) {
+                    goto ERROR;
+                }
                 ex_ie.num &= ~IPFIX_ENTERPRISE_BIT;
                 FB_NEXT_U32(ex_ie.ent);
             } else {
@@ -3888,7 +3910,16 @@ static gboolean fBufConsumeTemplateSet(
             }
 
             /* Add information element to template */
-            if (!fbTemplateAppend(tmpl, &ex_ie, err)) return FALSE;
+            if (tmpl && !fbTemplateAppend(tmpl, &ex_ie, err)) {
+                g_warning("Ignoring template %#06x: %s", tid, (*err)->message);
+                g_clear_error(err);
+                fbTemplateFreeUnused(tmpl);
+                tmpl = NULL;
+            }
+        }
+
+        if (!tmpl) {
+            continue;
         }
 
         /* Set scope count in template */
@@ -3901,6 +3932,7 @@ static gboolean fBufConsumeTemplateSet(
             return FALSE;
         }
 
+        /* Invoke the received-new-template callback */
         if (fbSessionNewTemplateCallback(fbuf->session)) {
             g_assert(tmpl->app_ctx == NULL);
             (fbSessionNewTemplateCallback(fbuf->session))(
@@ -3913,8 +3945,8 @@ static gboolean fBufConsumeTemplateSet(
             }
         }
 
-        /* if the template set on the fbuf has the same tid, reset tmpl */
-        /* so we don't reference the old one if a data set follows */
+        /* if the template set on the fbuf has the same tid, reset tmpl
+         * so we don't reference the old one if a data set follows */
         if (fbuf->ext_tid == tid) {
             fbuf->ext_tmpl = NULL;
             fbuf->ext_tid = 0;
@@ -3932,6 +3964,16 @@ static gboolean fBufConsumeTemplateSet(
     fbuf->spec_tid = 0;
 
     /* All done */
+    return TRUE;
+
+  ERROR:
+    /* Not enough data in the template set. */
+    g_warning("End of set reading template record %#06x "
+              "(need %u bytes, %ld available)",
+              tid, required, FB_REM_SET(fbuf));
+    if (tmpl) { fbTemplateFreeUnused(tmpl); }
+    fBufSkipCurrentSet(fbuf);
+    fbuf->spec_tid = 0;
     return TRUE;
 }
 
@@ -4001,7 +4043,7 @@ static gboolean fBufNextDataSet(
     GError          **err)
 {
     /* May have to consume multiple template sets */
-    while (1) {
+    for (;;) {
         /* Read the next set header */
         if (!fBufNextSetHeader(fbuf, err)) {
             return FALSE;
