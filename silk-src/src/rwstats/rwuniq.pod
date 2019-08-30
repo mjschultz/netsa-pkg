@@ -7,7 +7,7 @@ B<rwuniq> - Bin SiLK Flow records by a key and print each bin's volume
 =head1 SYNOPSIS
 
   rwuniq --fields=KEY [--values=VALUES]
-        [--threshold=MIN-MAX --threshold=MIN]
+        [{--threshold=MIN-MAX | --threshold=MIN}]
         [--presorted-input] [--sort-output]
         [{--bin-time=SECONDS | --bin-time}]
         [--timestamp-format=FORMAT] [--epoch-time]
@@ -1565,7 +1565,7 @@ B<environ(7)>
 
 =cut
 
-$SiLK: rwuniq.pod c95fb6174130 2018-04-13 20:33:46Z mthomas $
+$SiLK: rwuniq.pod 86e0fbee974c 2019-08-26 15:35:19Z mthomas $
 
 Local Variables:
 mode:text

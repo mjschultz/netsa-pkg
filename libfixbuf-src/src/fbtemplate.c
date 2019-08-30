@@ -196,10 +196,7 @@ gboolean            fbTemplateAppend(
     tmpl_ie = fbTemplateExtendElements(tmpl);
 
     /* copy information element out of the info model */
-    if (!fbInfoElementCopyToTemplate(tmpl->model, ex_ie, tmpl_ie)) {
-        g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_NOELEMENT,
-                    "No such information element %08x:%04x",
-                    ex_ie->ent, ex_ie->num);
+    if (!fbInfoElementCopyToTemplate(tmpl->model, ex_ie, tmpl_ie, err)) {
         return FALSE;
     }
 
@@ -228,9 +225,8 @@ gboolean            fbTemplateAppendSpec(
     /* copy information element out of the info model */
 
     if (!fbInfoElementCopyToTemplateByName(tmpl->model, spec->name,
-                                           spec->len_override, tmpl_ie)) {
-        g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_NOELEMENT,
-                    "No such information element %s", spec->name);
+                                           spec->len_override, tmpl_ie, err))
+    {
         return FALSE;
     }
     if (spec->len_override == 0 && tmpl_ie->len != FB_IE_VARLEN) {

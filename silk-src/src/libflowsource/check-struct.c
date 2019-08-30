@@ -21,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcs_CHECK_STRUCT_C, "$SiLK: check-struct.c ed0d50d01fa4 2019-03-01 19:40:55Z mthomas $");
+RCSIDENTVAR(rcs_CHECK_STRUCT_C, "$SiLK: check-struct.c 00be7e2fb135 2019-08-26 15:26:09Z mthomas $");
 
 
 /*

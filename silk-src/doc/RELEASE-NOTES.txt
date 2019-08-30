@@ -1,3 +1,9 @@
+SiLK-3.18.3 Release, 2019-Aug-29
+
+* rwflowpack, flowcap, rwipfix2silk
+  -- Quiet a warning message when using libfixbuf-2.4.0.
+
+
 SiLK-3.18.2 Release, 2019-May-23
 
 * rwflowpack, flowcap, rwipfix2silk

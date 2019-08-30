@@ -48,6 +48,9 @@
 /* size of buffer to hold template ID and name */
 #define TMPL_NAME_BUFSIZ    128
 
+/* size of buffer to hold list semantic */
+#define SEMANTIC_BUFSIZ      32
+
 #ifdef __GNUC__
 static void idPrint(
     FILE *fp,
@@ -163,6 +166,37 @@ static void idFormatTemplateId(
 }
 
 
+static void idFormatListSemantic(
+    char       *sem_str,
+    int         semantic,
+    size_t      sem_str_bufsiz)
+{
+    switch (semantic) {
+      case 0:
+        snprintf(sem_str, sem_str_bufsiz, "0-noneOf");
+        break;
+      case 1:
+        snprintf(sem_str, sem_str_bufsiz, "1-exactlyOneOf");
+        break;
+      case 2:
+        snprintf(sem_str, sem_str_bufsiz, "2-oneOrMoreOf");
+        break;
+      case 3:
+        snprintf(sem_str, sem_str_bufsiz, "3-allOf");
+        break;
+      case 4:
+        snprintf(sem_str, sem_str_bufsiz, "4-ordered");
+        break;
+      case 0xFF:
+        snprintf(sem_str, sem_str_bufsiz, "255-undefined");
+        break;
+      default:
+        snprintf(sem_str, sem_str_bufsiz, "%u-unassigned", semantic);
+        break;
+    }
+}
+
+
 /**
  *    Puts textual information about the InfoElement 'ie' into into
  *    'elem_str'.  The information is the ID (and enterprise ID when
@@ -174,16 +208,19 @@ static void idFormatElement(
     char                   *elem_str,
     const fbInfoElement_t  *ie,
     size_t                  elem_str_bufsiz,
-    int                     in_basicList)
+    int                     in_basicList,
+    int                     is_scope)
 {
     const int element_width = 40;
     char buf[32];
     int len;
 
     if (0 == ie->ent) {
-        len = snprintf(buf, sizeof(buf), "(%d)", ie->num);
+        len = snprintf(buf, sizeof(buf), "(%d)%s",
+                       ie->num, (is_scope ? " (S)" : ""));
     } else {
-        len = snprintf(buf, sizeof(buf), "(%d/%d)", ie->ent, ie->num);
+        len = snprintf(buf, sizeof(buf), "(%d/%d)%s",
+                       ie->ent, ie->num, (is_scope ? " (S)" : ""));
     }
     if (in_basicList) {
         snprintf(elem_str, elem_str_bufsiz, "%s %s", buf, ie->ref.name);
@@ -345,18 +382,18 @@ void idPrintHeader(
 uint16_t idPrintTemplate(
     FILE              *fp,
     fbTemplate_t      *tmpl,
-    void              **ctx,
+    tmplContext_t     *ctx,
     uint16_t          tid,
     gboolean          noprint)
 {
-    uint32_t count = fbTemplateCountElements(tmpl);
+    uint32_t count = ctx->count;
+    uint16_t scope = ctx->scope;
     uint16_t length = 0;
     char dt_str[25];
     char prefix[PREFIX_BUFSIZ];
     fbInfoElement_t *ie = NULL;
+    const char *name;
     unsigned int i;
-
-    (void)ctx;
 
     idAddIndentLevel(prefix, "", sizeof(prefix));
 
@@ -368,21 +405,26 @@ uint16_t idPrintTemplate(
         }
         fprintf(fp, "header:\n");
         fprintf(fp, "%stid: %5u (%#06x)", prefix, tid, tid);
-        fprintf(fp, "%sfield count: %5u", prefix, count);
-        fprintf(fp, "%sscope: %5u\n", prefix, fbTemplateGetOptionsScope(tmpl));
-        fprintf(fp, "fields:\n");
+        fprintf(fp, "    field count: %5u", count);
+        fprintf(fp, "    scope: %5u", scope);
+        name = (char *)g_hash_table_lookup(template_names,GINT_TO_POINTER(tid));
+        if (name) {
+            fprintf(fp, "    name: %s", name);
+        }
+        fprintf(fp, "\nfields:\n");
     }
 
     for (i = 0; i < count; i++) {
         ie = fbTemplateGetIndexedIE(tmpl, i);
 
-        idFormatDataType(dt_str, ie->type, sizeof(dt_str));
         if (!noprint) {
+            idFormatDataType(dt_str, ie->type, sizeof(dt_str));
             fprintf(fp, "%sent: %5u", prefix, ie->ent);
             fprintf(fp, "  id: %5u", ie->num);
-            fprintf(fp, "  type: %-9s", dt_str);
-            fprintf(fp, "  length: %5u", ie->len);
-            fprintf(fp, "  %s\n", ie->ref.canon->ref.name);
+            fprintf(fp, "  type: %-8s", dt_str);
+            fprintf(fp, "  len: %5u", ie->len);
+            fprintf(fp, " %s", (i < scope) ? "(S)" : "   ");
+            fprintf(fp, " %s\n", ie->ref.canon->ref.name);
         }
 
         if (ie->len != FB_IE_VARLEN) {
@@ -449,6 +491,7 @@ static void idPrintSTL(
     char prefix[PREFIX_BUFSIZ];
     char str_prefix[PREFIX_BUFSIZ];
     char str_template[TMPL_NAME_BUFSIZ];
+    char str_semantic[SEMANTIC_BUFSIZ];
 
     (void)buf_len;
 
@@ -460,9 +503,11 @@ static void idPrintSTL(
     idFormatTemplateId(str_template, stl->tmplID, sizeof(str_template));
     ++id_tmpl_stats[stl->tmplID];
 
+    idFormatListSemantic(str_semantic, stl->semantic, sizeof(str_semantic));
+
     /* idPrint(fp, "%sheader:\n", prefix); */
     idPrint(fp, "%scount: %-4d", str_prefix, stl->numElements);
-    idPrint(fp, "    semantic: %-2d", stl->semantic);
+    idPrint(fp, "    semantic: %-14s", str_semantic);
     idPrint(fp, "    %s\n", str_template);
 
     while ((data = fbSubTemplateListGetNextPtr(stl, data))) {
@@ -485,6 +530,7 @@ static void idPrintSTML(
     fbSubTemplateMultiListEntry_t *entry = NULL;
     char prefix[PREFIX_BUFSIZ];
     char str_prefix[PREFIX_BUFSIZ];
+    char str_semantic[SEMANTIC_BUFSIZ];
     int i = 0;
 
     (void)buf_len;
@@ -494,9 +540,11 @@ static void idPrintSTML(
 
     idPrint(fp, "\n%s+++ subTemplateMultiList +++\n", prefix);
 
+    idFormatListSemantic(str_semantic, stml->semantic, sizeof(str_semantic));
+
     /* idPrint(fp, "%sheader:\n", prefix); */
     idPrint(fp, "%scount: %-4d", str_prefix, stml->numElements);
-    idPrint(fp, "    semantic: %d\n", stml->semantic);
+    idPrint(fp, "    semantic: %s\n", str_semantic);
 
     while ((entry = fbSubTemplateMultiListGetNextEntry(stml, entry))) {
         ++i;
@@ -520,21 +568,24 @@ static void idPrintBL(
     char                     prefix[PREFIX_BUFSIZ];
     char                     str_prefix[PREFIX_BUFSIZ];
     char                     str_elem[ELEMENT_BUFSIZ];
+    char                     str_semantic[SEMANTIC_BUFSIZ];
 
     idAddIndentLevel(prefix, parent_prefix, sizeof(prefix));
     idAddIndentLevel(str_prefix, prefix, sizeof(str_prefix));
 
     idPrint(fp, "\n%s+++ basicList +++\n", prefix);
 
+    idFormatListSemantic(str_semantic, bl->semantic, sizeof(str_semantic));
+
     /* idPrint(fp, "%sheader:\n", prefix); */
     idPrint(fp, "%scount: %-4d", str_prefix, bl->numElements);
-    idPrint(fp, "    semantic: %-2d", bl->semantic);
+    idPrint(fp, "    semantic: %-14s", str_semantic);
     idPrint(fp, "    ie: ");
     if (!ie) {
         idPrint(fp, "[Unknown]\n");
         return;
     }
-    idFormatElement(str_elem, ie, sizeof(str_elem), 1);
+    idFormatElement(str_elem, ie, sizeof(str_elem), 1, 0);
     idPrint(fp, "%s\n", str_elem);
 
     while ((data = fbBasicListGetNextPtr(bl, data))) {
@@ -774,6 +825,9 @@ void idPrintDataRecord(
     char str_prefix[PREFIX_BUFSIZ];
     char str_elem[ELEMENT_BUFSIZ];
     char str_tmpl[TMPL_NAME_BUFSIZ];
+    int top_level;
+
+    top_level = ('\0' == prefix[0]);
 
     idAddIndentLevel(str_prefix, prefix, sizeof(str_prefix));
 
@@ -789,7 +843,8 @@ void idPrintDataRecord(
 
     for (i = 0; i < tc->count; i++) {
         ie = fbTemplateGetIndexedIE(tmpl, i);
-        idFormatElement(str_elem, ie, sizeof(str_elem), 0);
+        idFormatElement(str_elem, ie, sizeof(str_elem), 0,
+                        (top_level && (i < tc->scope)));
         idPrint(fp, "%s%s : ", str_prefix, str_elem);
 
         /* if a padding element, print its length and continue */

@@ -1,3 +1,21 @@
+Version 2.4.0: 2019-08-28
+=========================
+
+Enhanced the output of ipfixDump by (1) including the template's name with its
+list of elements, (2) adding the templates' names to the stats output, (3)
+marking scope elements in templates and their corresponding values in data
+records, and (4) including the name for list semantics.
+
+Fixed an issue in the libfixbuf.spec.in file, and removed the generated
+libfixbuf.spec file from the distribution.
+
+Changed how the information model handles the re-insertion an existing
+element to reuse the existing element instead of using new memory.
+
+Added stricter checking of the elements lengths' specified in a template.
+Currently a log message is written for an invalid length; in the future, this
+may cause the template to be rejected.
+
 Version 2.3.1: 2019-04-18
 =========================
 

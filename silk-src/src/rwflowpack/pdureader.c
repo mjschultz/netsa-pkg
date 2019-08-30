@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pdureader.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: pdureader.c dfb505e34a31 2019-08-26 19:03:36Z mthomas $");
 
 #include "rwflowpack_priv.h"
 

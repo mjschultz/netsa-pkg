@@ -76,7 +76,6 @@ $(RELEASES_XML): NEWS
 
 EXTRA_DIST = \
      Doxyfile.in \
-     libfixbuf.spec \
      libfixbuf.spec.in \
      LICENSE.txt \
      doc/Doxyhead.html \

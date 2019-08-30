@@ -36,5 +36,6 @@
 
 nobase_include_HEADERS = fixbuf/autoinc.h   \
                          fixbuf/public.h    \
-                         fixbuf/private.h   \
-                         fixbuf/version.h
+                         fixbuf/private.h
+
+nobase_nodist_include_HEADERS = fixbuf/version.h
