@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwcompare.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: rwcompare.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/sksite.h>
@@ -215,8 +215,8 @@ appOptionsHandler(
 #ifdef RWCOMPARE_VERBOSE
 
 #define RWCOMPARE_BUFSIZ    64
-#if RWCOMPARE_BUFSIZ < SK_NUM2DOT_STRLEN
-#error "Buffer size is smaller than SK_NUM2DOT_STRLEN"
+#if RWCOMPARE_BUFSIZ < SKIPADDR_STRLEN
+#error "Buffer size is smaller than SKIPADDR_STRLEN"
 #endif
 #if RWCOMPARE_BUFSIZ < SKTIMESTAMP_STRLEN
 #error "Buffer size is smaller than SKTIMESTAMP_STRLEN"

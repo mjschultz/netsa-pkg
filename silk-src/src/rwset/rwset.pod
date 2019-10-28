@@ -369,6 +369,11 @@ This environment variable is used as the value for the
 B<--record-version> when that switch is not provided.
 I<Since SiLK 3.7.0.>
 
+=item SILK_IPV6_POLICY
+
+This environment variable is used as the value for B<--ipv6-policy>
+when that switch is not provided.
+
 =item SILK_CLOBBER
 
 The SiLK tools normally refuse to overwrite existing files.  Setting
@@ -440,7 +445,7 @@ environment variable.  Version 5 was added in S<SiLK 3.14>.
 
 =cut
 
-$SiLK: rwset.pod 4162e8e3f110 2018-02-26 19:01:54Z mthomas $
+$SiLK: rwset.pod 9e3cbf975420 2019-09-24 14:42:59Z mthomas $
 
 Local Variables:
 mode:text

@@ -652,6 +652,17 @@ field) with B<rwcut(1)>:
          3.4.5.6|        us| us|
          4.5.6.7|        us| us|
 
+=head1 ENVIRONMENT
+
+=over 4
+
+=item SILK_CLOBBER
+
+The SiLK tools normally refuse to overwrite existing files.  Setting
+SILK_CLOBBER to a non-empty value removes this restriction.
+
+=back
+
 =head1 SEE ALSO
 
 B<ccfilter(3)>, B<rwpmaplookup(1)>, B<rwfilter(1)>, B<rwcut(1)>,
@@ -675,7 +686,7 @@ Inc.
 
 =cut
 
-$SiLK: rwgeoip2ccmap.pod 72d71e7348ab 2018-06-28 16:04:44Z mthomas $
+$SiLK: rwgeoip2ccmap.pod 9e3cbf975420 2019-09-24 14:42:59Z mthomas $
 
 Local Variables:
 mode:text

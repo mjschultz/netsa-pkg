@@ -495,6 +495,33 @@ empty string, B<rwpmapcat> does not automatically page its output.
 When set and SILK_PAGER is not set, B<rwpmapcat> automatically invokes
 this program to display its output a screen at a time.
 
+=item SILK_COUNTRY_CODES
+
+This environment variable allows the user to specify the country code
+mapping file to use when the B<--country-codes> switch is specified
+without an argument.  The variable's value may be a complete path or a
+file relative to SILK_PATH.  See the L</FILES> section for standard
+locations of this file.
+
+=item SILK_ADDRESS_TYPES
+
+This environment variable allows the user to specify the address type
+mapping file to use when the B<--address-types> switch is specified
+without an argument.  The variable's value may be a complete path or a
+file relative to the SILK_PATH.  See the L</FILES> section for
+standard locations of this file.
+
+=item SILK_CLOBBER
+
+The SiLK tools normally refuse to overwrite existing files.  Setting
+SILK_CLOBBER to a non-empty value removes this restriction.
+
+=item SILK_PATH
+
+This environment variable gives the root of the install tree.  When
+searching for configuration files, B<rwpmapcat> may use this
+environment variable.  See the L</FILES> section for details.
+
 =back
 
 =head1 FILES
@@ -542,7 +569,7 @@ SiLK 3.8.0.
 
 =cut
 
-$SiLK: rwpmapcat.pod eb16f7937853 2018-12-05 17:05:19Z mthomas $
+$SiLK: rwpmapcat.pod 9e3cbf975420 2019-09-24 14:42:59Z mthomas $
 
 Local Variables:
 mode:text

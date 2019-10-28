@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwascii.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: rwascii.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
 
 #include <silk/rwascii.h>
 #include <silk/skipaddr.h>
@@ -863,7 +863,7 @@ rwAsciiPrintRecExtra(
 
     assert(astream);
     assert(rwrec);
-    assert(sizeof(buffer) > 1+SK_NUM2DOT_STRLEN);
+    assert(sizeof(buffer) > 1+SKIPADDR_STRLEN);
     assert(sizeof(buffer) > 1+SKTIMESTAMP_STRLEN);
 
     /* initialize */

@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-# RCSIDENT("$SiLK: Makefile.am 5387e157e7e1 2019-08-29 18:32:19Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 2c50d11b0aa9 2019-10-24 22:33:24Z mthomas $");
 
 # RCSIDENT("$SiLK: build.mk 9a4f4ca2d067 2017-06-21 17:41:59Z mthomas $")
 #
@@ -526,8 +526,8 @@ SUBDIRS = infomodel
 
 # Installed Targets
 lib_LTLIBRARIES = libflowsource.la
-libflowsource_version = 18:4:1
-# At previous release: libflowsource_version = 18:4:1
+libflowsource_version = 19:0:0
+# At previous release: libflowsource_version = 19:0:0
 
 # Support for getting IPFIX elements from XML file(s)
 EXTRA_DIST = sensor.conf.pod xml2fixbuf.xslt make-infomodel

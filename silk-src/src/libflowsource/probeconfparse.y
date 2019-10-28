@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconfparse.y 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: probeconfparse.y 48577f5787ed 2019-10-10 14:54:05Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/probeconf.h>
@@ -2455,8 +2455,9 @@ parse_ipset_filename(
 
 int
 yyerror(
-    char        UNUSED(*s))
+    char               *s)
 {
+    SK_UNUSED_PARAM(s);
     return 0;
 }
 

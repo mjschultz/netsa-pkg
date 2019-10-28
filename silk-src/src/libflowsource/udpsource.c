@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: udpsource.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: udpsource.c 48577f5787ed 2019-10-10 14:54:05Z mthomas $");
 
 #if SK_ENABLE_ZLIB
 #include <zlib.h>
@@ -192,10 +192,11 @@ static int
 peeraddr_compare(
     const void         *va,
     const void         *vb,
-    const void  UNUSED(*ctx))
+    const void         *ctx)
 {
     const sk_sockaddr_t *a = ((const peeraddr_source_t *)va)->addr;
     const sk_sockaddr_t *b = ((const peeraddr_source_t *)vb)->addr;
+    SK_UNUSED_PARAM(ctx);
 
     return skSockaddrCompare(a, b, SK_SOCKADDRCOMP_NOPORT);
 }
@@ -358,7 +359,7 @@ udp_reader(
                 } else {
                     /* first packet seen from unknown sender after
                      * receiving packet from valid sensder; log */
-                    char addr_buf[2 * SK_NUM2DOT_STRLEN];
+                    char addr_buf[2 * SKIPADDR_STRLEN];
                     base->unknown_host = 1;
                     pthread_mutex_unlock(&base->mutex);
                     skSockaddrString(addr_buf, sizeof(addr_buf), &addr);
@@ -711,7 +712,7 @@ updSourceBaseAddUDPSource(
 
 #if DEBUG_ACCEPT_FROM
         {
-            char addr_buf[2 * SK_NUM2DOT_STRLEN];
+            char addr_buf[2 * SKIPADDR_STRLEN];
             RBLIST *iter;
             peeraddr_source_t *addr;
 

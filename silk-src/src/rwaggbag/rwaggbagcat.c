@@ -17,10 +17,11 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaggbagcat.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: rwaggbagcat.c c56bd724bfc8 2019-10-11 19:38:12Z mthomas $");
 
 #include <silk/silk_files.h>
 #include <silk/skaggbag.h>
+#include <silk/skcountry.h>
 #include <silk/sksite.h>
 #include <silk/utils.h>
 
@@ -452,6 +453,11 @@ determineWidths(
           case SKAGGBAG_FIELD_FTYPE_TYPE:
             width[col] = (uint8_t)sksiteFlowtypeGetMaxTypeStrLen();
             break;
+          case SKAGGBAG_FIELD_SIP_COUNTRY:
+          case SKAGGBAG_FIELD_DIP_COUNTRY:
+          case SKAGGBAG_FIELD_ANY_COUNTRY:
+            width[col] = 2;
+            break;
           default:
             break;
         }
@@ -625,6 +631,14 @@ printAggBag(
                 skAggBagAggregateGetUnsigned(
                     &it->key, &it->key_field_iter, &number);
                 sksiteFlowtypeGetType(buf, sizeof(buf), number);
+                fprintf(fh, "%s%*s", delim, width[col], buf);
+                break;
+              case SKAGGBAG_FIELD_SIP_COUNTRY:
+              case SKAGGBAG_FIELD_DIP_COUNTRY:
+              case SKAGGBAG_FIELD_ANY_COUNTRY:
+                skAggBagAggregateGetUnsigned(
+                    &it->key, &it->key_field_iter, &number);
+                skCountryCodeToName(number, buf, sizeof(buf));
                 fprintf(fh, "%s%*s", delim, width[col], buf);
                 break;
               default:

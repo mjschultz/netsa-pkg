@@ -190,7 +190,7 @@ switch is not specified, the SILK_IP_FORMAT environment variable is
 checked for a value and that format is used if it is valid.  The
 default I<FORMAT> is C<canonical>,C<unmap-v6>.  (The default
 presentation of IPv4 addresses in a mixed IPv4-IPv6 IPset changed in
-SiLK 3.17.0 as described above in L<DESCRIPTION/>.)  I<Since SiLK
+SiLK 3.17.0 as described above in L</DESCRIPTION>.)  I<Since SiLK
 3.7.0.>
 
 =over 4
@@ -819,6 +819,11 @@ string, B<rwsetcat> does not automatically page its output.
 When set and SILK_PAGER is not set, B<rwsetcat> automatically invokes
 this program to display its output a screen at a time.
 
+=item SILK_CLOBBER
+
+The SiLK tools normally refuse to overwrite existing files.  Setting
+SILK_CLOBBER to a non-empty value removes this restriction.
+
 =back
 
 =head1 SEE ALSO
@@ -828,7 +833,7 @@ B<rwbagtool(1)>, B<rwcut(1)>, B<silk(7)>, B<cut(1)>
 
 =cut
 
-$SiLK: rwsetcat.pod eb16f7937853 2018-12-05 17:05:19Z mthomas $
+$SiLK: rwsetcat.pod 9e3cbf975420 2019-09-24 14:42:59Z mthomas $
 
 Local Variables:
 mode:text

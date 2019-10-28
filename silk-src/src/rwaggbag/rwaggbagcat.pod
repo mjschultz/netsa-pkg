@@ -311,6 +311,16 @@ To change the format of timestamps:
 
 =over 4
 
+=item SILK_IP_FORMAT
+
+This environment variable is used as the value for B<--ip-format> when
+that switch is not provided.
+
+=item SILK_TIMESTAMP_FORMAT
+
+This environment variable is used as the value for
+B<--timestamp-format> when that switch is not provided.
+
 =item SILK_CLOBBER
 
 The SiLK tools normally refuse to overwrite existing files.  Setting
@@ -396,7 +406,7 @@ B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwaggbagcat.pod 95aec76c40ea 2018-03-13 21:09:01Z mthomas $
+$SiLK: rwaggbagcat.pod 9e3cbf975420 2019-09-24 14:42:59Z mthomas $
 
 Local Variables:
 mode:text

@@ -861,6 +861,41 @@ This command prints the next to last record in the input stream:
 
  $ rwcut --no-title --tail-recs=2 --num-recs=1  data.rw
 
+Using the C<sIP> and C<dIP> fields can be confusing when the file you
+are examining contains both incoming and outgoing flow records.  To
+make the output more clear, consider using the B<int-ext-fields(3)>
+plug-in.  The plug-in defines four additional fields representing the
+external IP address, the external port, the internal IP address, and
+the internal port.  The plug-in requires the user to specify which
+class/type pairs are incoming and which are outgoing.  See
+its manual page for additional information.
+
+ $ rwcut --fields=sip,sport,dip,dport,proto,type \
+        --num-rec=8 data.rw
+             sIP|sPort|            dIP|dPort|pro|   type|
+ 192.168.111.201|29617|   172.24.2.123|   53| 17|    out|
+    172.24.2.123|   53|192.168.111.201|29617| 17|     in|
+ 192.168.111.201|29618|  10.252.217.50|   22|  6|    out|
+   10.252.217.50|   22|192.168.111.201|29618|  6|     in|
+ 192.168.204.193|   68|    172.30.2.67|   67| 17|    out|
+     172.30.2.67|   67|192.168.204.193|   68| 17|     in|
+   10.239.85.193|29897|192.168.228.153|   25|  6|     in|
+ 192.168.228.153|   25|  10.239.85.193|29897|  6|    out|
+
+ $ export INCOMING_FLOWTYPES=all/in,all/inweb
+ $ export OUTGOING_FLOWTYPES=all/out,all/outweb
+ $ rwcut --plugin=int-ext-fields.so                         \
+        --fields=int-ip,int-port,ext-ip,ext-port,proto,type \
+        --num-rec=8 data.rw
+          int-ip|int-p|         ext-ip|ext-p|pro|   type|
+ 192.168.111.201|29617|   172.24.2.123|   53| 17|    out|
+ 192.168.111.201|29617|   172.24.2.123|   53| 17|     in|
+ 192.168.111.201|29618|  10.252.217.50|   22|  6|    out|
+ 192.168.111.201|29618|  10.252.217.50|   22|  6|     in|
+ 192.168.204.193|   68|    172.30.2.67|   67| 17|    out|
+ 192.168.204.193|   68|    172.30.2.67|   67| 17|     in|
+ 192.168.228.153|   25|  10.239.85.193|29897|  6|     in|
+ 192.168.228.153|   25|  10.239.85.193|29897|  6|    out|
 
 =head1 ENVIRONMENT
 
@@ -1054,13 +1089,13 @@ using default values:
 =head1 SEE ALSO
 
 B<rwfilter(1)>, B<num2dot(1)>, B<rwpmapbuild(1)>, B<addrtype(3)>,
-B<ccfilter(3)>, B<pmapfilter(3)>, B<silk-plugin(3)>, B<silkpython(3)>,
-B<pysilk(3)>, B<sensor.conf(5)>, B<silk(7)>, B<yaf(1)>, B<dlopen(3)>,
-B<tzset(3)>, B<environ(7)>
+B<ccfilter(3)>, B<int-ext-fields(3)>, B<pmapfilter(3)>,
+B<silk-plugin(3)>, B<silkpython(3)>, B<pysilk(3)>, B<sensor.conf(5)>,
+B<silk(7)>, B<yaf(1)>, B<dlopen(3)>, B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwcut.pod c95fb6174130 2018-04-13 20:33:46Z mthomas $
+$SiLK: rwcut.pod 861b66f000c2 2019-09-24 22:01:14Z mthomas $
 
 Local Variables:
 mode:text

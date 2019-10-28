@@ -16,7 +16,7 @@
                                    headers */
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pysilk.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: pysilk.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skbag.h>
@@ -844,7 +844,7 @@ static PyObject *
 silkPyIPAddr_padded(
     silkPyIPAddr       *obj)
 {
-    char buf[SK_NUM2DOT_STRLEN];
+    char buf[SKIPADDR_STRLEN];
 
     skipaddrString(buf, &obj->addr, SKIPADDR_ZEROPAD);
     return PyUnicode_FromString(buf);
@@ -854,7 +854,7 @@ static PyObject *
 silkPyIPAddr_repr(
     silkPyIPAddr       *obj)
 {
-    char buf[SK_NUM2DOT_STRLEN];
+    char buf[SKIPADDR_STRLEN];
     PyTypeObject *type;
 
     type = Py_TYPE(obj);
@@ -913,7 +913,7 @@ static PyObject *
 silkPyIPAddr_str(
     silkPyIPAddr       *obj)
 {
-    char buf[SK_NUM2DOT_STRLEN];
+    char buf[SKIPADDR_STRLEN];
 
     skipaddrString(buf, &obj->addr, SKIPADDR_CANONICAL);
     return PyUnicode_FromString(buf);

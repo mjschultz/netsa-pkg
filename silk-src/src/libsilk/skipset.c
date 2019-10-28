@@ -24,7 +24,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipset.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: skipset.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>
@@ -6681,7 +6681,7 @@ ipsetPrintCallback(
     void               *v_print_state)
 {
     ipset_print_t *print_state = (ipset_print_t*)v_print_state;
-    char ipbuf[SK_NUM2DOT_STRLEN+1];
+    char ipbuf[SKIPADDR_STRLEN+1];
     int rv = SKIPSET_OK;
 
     /* print ip and its prefix, then return */

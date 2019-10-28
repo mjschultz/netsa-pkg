@@ -21,12 +21,13 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaggbag.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: rwaggbag.c c56bd724bfc8 2019-10-11 19:38:12Z mthomas $");
 
 #include <silk/rwascii.h>
 #include <silk/rwrec.h>
 #include <silk/silk_files.h>
 #include <silk/skaggbag.h>
+#include <silk/skcountry.h>
 #include <silk/sksite.h>
 #include <silk/skstream.h>
 #include <silk/skstringmap.h>
@@ -221,6 +222,7 @@ appTeardown(
     counter_name_map = NULL;
 
     skAggBagOptionsTeardown();
+    skCountryTeardown();
     skOptionsCtxDestroy(&optctx);
     skAppUnregister();
 }
@@ -476,6 +478,7 @@ createStringmaps(
     sk_aggbag_type_iter_t iter;
     sk_aggbag_type_t type;
     const char *names[] = {"key", "counter"};
+    unsigned int looping;
     unsigned int i;
 
     memset(&sm_entry, 0, sizeof(sm_entry));
@@ -494,11 +497,29 @@ createStringmaps(
             return -1;
         }
 
+        looping = 1;
         skAggBagFieldTypeIteratorBind(
             &iter, ((0 == i) ? SK_AGGBAG_KEY : SK_AGGBAG_COUNTER));
-        while ((sm_entry.name = skAggBagFieldTypeIteratorNext(&iter, &type))
-               != NULL)
+        while (looping && NULL !=
+               (sm_entry.name = skAggBagFieldTypeIteratorNext(&iter, &type)))
         {
+            /* skip unsupported/non-applicable fields */
+            switch (type) {
+              case SKAGGBAG_FIELD_ANY_COUNTRY:
+              case SKAGGBAG_FIELD_CUSTOM_COUNTER:
+                /* stop looping.  there are no more supported fields */
+                looping = 0;
+                continue;
+              case SKAGGBAG_FIELD_ANY_IPv4:
+              case SKAGGBAG_FIELD_ANY_IPv6:
+              case SKAGGBAG_FIELD_ANY_PORT:
+              case SKAGGBAG_FIELD_ANY_SNMP:
+              case SKAGGBAG_FIELD_ANY_TIME:
+              case SKAGGBAG_FIELD_CUSTOM_KEY:
+                continue;
+              default:
+                break;
+            }
             sm_entry.id = type;
             sm_err = skStringMapAddEntries(map, 1, &sm_entry);
             if (sm_err) {
@@ -506,11 +527,6 @@ createStringmaps(
                               names[i], sm_entry.name,
                               skStringMapStrerror(sm_err));
                 return -1;
-            }
-            if (SKAGGBAG_FIELD_NHIPv6 == type
-                || SKAGGBAG_FIELD_SUM_ELAPSED == type)
-            {
-                break;
             }
         }
     }
@@ -568,6 +584,12 @@ parseFields(
     while (skStringMapIterNext(sm_iter, &sm_entry, NULL) == SK_ITERATOR_OK) {
         assert(i < skStringMapIterCountMatches(sm_iter));
         fields[i] = (sk_aggbag_type_t)sm_entry->id;
+        if ((fields[i] == SKAGGBAG_FIELD_SIP_COUNTRY
+             || fields[i] == SKAGGBAG_FIELD_DIP_COUNTRY)
+            && skCountrySetup(NULL, &skAppPrintErr))
+        {
+            goto END;
+        }
         ++i;
     }
     assert(skStringMapIterCountMatches(sm_iter) == i);
@@ -732,6 +754,16 @@ processFile(
               case SKAGGBAG_FIELD_ENDTIME:
                 skAggBagAggregateSetUnsigned(
                     &key, &k_it, rwRecGetEndSeconds(&rwrec));
+                break;
+              case SKAGGBAG_FIELD_SIP_COUNTRY:
+                rwRecMemGetSIP(&rwrec, &ip);
+                skAggBagAggregateSetUnsigned(
+                    &key, &k_it, skCountryLookupCode(&ip));
+                break;
+              case SKAGGBAG_FIELD_DIP_COUNTRY:
+                rwRecMemGetDIP(&rwrec, &ip);
+                skAggBagAggregateSetUnsigned(
+                    &key, &k_it, skCountryLookupCode(&ip));
                 break;
               default:
                 break;

@@ -25,7 +25,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKCOUNTRY_H, "$SiLK: skcountry.h 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENTVAR(rcsID_SKCOUNTRY_H, "$SiLK: skcountry.h 2e336c0aa6c5 2019-10-11 20:30:00Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/skplugin.h>
@@ -74,8 +74,11 @@ skCountryGetMaxCode(
 /**
  *    Given a two letter Country Code in 'name', return the numerical
  *    value.  Returns SK_COUNTRYCODE_INVALID if 'name' is too long to
- *    be Country Code or contains illegal characters.  The returned
- *    value may not be a valid Country Code.
+ *    be Country Code or contains illegal characters.  Returns
+ *    SK_COUNTRYCODE_INVALID unless 'name' is ASCII and contains two
+ *    letters, a letter followed by a number, or the string "--".  The
+ *    'name' is not compared with the country code mapping file, so
+ *    returned value may not reflect a known Country Code.
  */
 sk_countrycode_t
 skCountryNameToCode(
@@ -87,8 +90,10 @@ skCountryNameToCode(
  *    letter representation of the code, where 'name_len' is the
  *    number of characters in 'name'.
  *
- *    Return NULL if 'name' is NULL.  If 'code' is not a possible
- *    Country Code, writes "??" to name.
+ *    Return NULL if 'name' is NULL or 'name_len' is zero.  If 'code'
+ *    is not a possible Country Code, writes "??" to name.  The 'code'
+ *    is not compared with the country code mapping file, so the
+ *    returned name may not reflect a known country.
  */
 char *
 skCountryCodeToName(
@@ -116,9 +121,9 @@ skCountryIsV6(
 
 
 /**
- *    Find the Country Code for the IP address 'ipaddr' and return
- *    the numerical value.  The caller must invoke skCountrySetup()
- *    prior to calling this function.
+ *    Find the Country Code for the IP address 'ipaddr' in the prefix
+ *    map file and return the numerical value.  The caller must invoke
+ *    skCountrySetup() prior to calling this function.
  *
  *    Return SK_INVALID_COUNTRY_CODE if the Country Code map has not
  *    been loaded or if the Country Code map contains only IPv4
@@ -132,13 +137,13 @@ skCountryLookupCode(
 
 
 /**
- *    Find the Country Code for the IP address 'ipaddr' and return the
- *    numerical value.  The caller must invoke skCountrySetup() prior
- *    to calling this function.
+ *    Find the Country Code for the IP address 'ipaddr' in the prefix
+ *    map file and return the numerical value.  The caller must invoke
+ *    skCountrySetup() prior to calling this function.
  *
- *    In addition, set the values pointed at by 'start_range' and
- *    'end_range' to the starting and ending IP addresses of the CIDR
- *    block in the Country Code mapping file that contains 'ipaddr'.
+ *    In addition, set the referents of 'start_range' and 'end_range'
+ *    to the starting and ending IP addresses of the CIDR block in the
+ *    Country Code mapping file that contains 'ipaddr'.
  *
  *    Return SK_INVALID_COUNTRY_CODE and leave 'start_range' and
  *    'end_range' unchanged if the Country Code map has not been
@@ -155,13 +160,15 @@ skCountryLookupCodeAndRange(
 
 
 /**
- *    Find the Country Code for the IP address 'ipaddr' and return
- *    the numerical value.  The caller must invoke skCountrySetup()
- *    prior to calling this function.
+ *    Find the Country Code for the IP address 'ipaddr' in the prefix
+ *    map file and fill the buffer 'name' with the two letter Country
+ *    Code.  The caller must invoke skCountrySetup() prior to calling
+ *    this function.
  *
- *    Return NULL if 'name' is NULL.  If the Country Code map contains
- *    only IPv4 addresses and 'ipaddr' is IPv6 or if the address
- *    cannot be mapped for any other reason, write "??" to name.
+ *    Return NULL if 'name' is NULL or 'name_len' is zero.  If the
+ *    Country Code map contains only IPv4 addresses and 'ipaddr' is
+ *    IPv6 or if the address cannot be mapped for any other reason,
+ *    write "??" to name.
  *
  *    See also skCountryLookupCode(), skCountryLookupCodeAndRange().
  */

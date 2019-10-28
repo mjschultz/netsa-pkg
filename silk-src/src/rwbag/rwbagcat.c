@@ -16,7 +16,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagcat.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: rwbagcat.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skcountry.h>
@@ -2335,7 +2335,7 @@ bagcatCheckKeyFormat(
 
     if (as_ipv4 || as_ipv6) {
         bc_key->key_type = SKBAG_KEY_IPADDR;
-        bc_key->buflen = 1 + SK_NUM2DOT_STRLEN;
+        bc_key->buflen = 1 + SKIPADDR_STRLEN;
         bc_key->formatter = BAGCAT_FMT_IPADDR;
         if (0 != key_format && !(key_format & KEY_FORMAT_IP)) {
             bad_format = 1;
@@ -2371,7 +2371,7 @@ bagcatCheckKeyFormat(
 
     if (as_integer) {
         bc_key->key_type = SKBAG_KEY_U32;
-        bc_key->buflen = 1 + SK_NUM2DOT_STRLEN;
+        bc_key->buflen = 1 + SKIPADDR_STRLEN;
         bc_key->formatter = BAGCAT_FMT_IPADDR;
         if (0 == key_format) {
             bc_key->formatter_flags = SKIPADDR_DECIMAL;

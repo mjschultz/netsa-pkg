@@ -158,6 +158,13 @@ This environment variable is used as the value for
 B<--compression-method> when that switch is not provided.  I<Since
 SiLK 3.13.0.>
 
+=item SILK_PATH
+
+This environment variable gives the root of the directory tree where
+the tools are installed.  When searching for the F<silk-ipa.conf>
+configuration file, B<rwipaexport> may use this environment variable.
+See the L</FILES> section for details.
+
 =back
 
 =head1 FILES
@@ -189,7 +196,7 @@ B<ipaimport(1)>, B<ipaexport(1)>, B<ipaquery(1)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwipaexport.pod b87f61575a2a 2016-09-22 18:42:02Z mthomas $
+$SiLK: rwipaexport.pod 9e3cbf975420 2019-09-24 14:42:59Z mthomas $
 
 Local Variables:
 mode:text

@@ -1208,6 +1208,44 @@ value is from PySiLK or a plug-in.
         values field is from a plug-in
  rwstats: Cannot add value field 'avg-bytes' from plugin
 
+When using B<rwstats> on input that contains both incoming and
+outgoing flow records, consider using the B<int-ext-fields(3)> plug-in
+which defines four additional fields representing the external IP
+address, the external port, the internal IP address, and the internal
+port.  The plug-in requires the user to specify which class/type pairs
+are incoming and which are outgoing.  See its manual page for
+additional information.  As an example, here we run B<rwstats> on a
+file containing incoming and outgoing web traffic.
+
+ $ rwstats --fields=sip,sport,dip,dport --values=bytes \
+        --count=6 data.rw
+ INPUT: 155140 Records for 155140 Bins and 59036553615 Total Bytes
+ OUTPUT: Top 6 Bins by Bytes
+             sIP|sPort|            dIP|dPort|   Bytes|    %Bytes|   cumul_%|
+   10.242.96.200|   80|192.168.234.203|29868| 2681287|  0.004542|  0.004542|
+ 192.168.211.200|   80|  10.253.27.160|25453| 2675740|  0.004532|  0.009074|
+ 192.168.233.168|   80|  10.247.60.163|29777| 2672196|  0.004526|  0.013600|
+ 192.168.229.229|  443|  10.250.19.210|27512| 2666647|  0.004517|  0.018117|
+  192.168.255.24| 8080|  10.240.75.236|29826| 2659828|  0.004505|  0.022623|
+ 192.168.241.247|   80|  10.216.173.77|26654| 2658141|  0.004503|  0.027125|
+
+Here the B<int-ext-fields> plug-in is used:
+
+ $ export INCOMING_FLOWTYPES=all/in,all/inweb
+ $ export OUTGOING_FLOWTYPES=all/out,all/outweb
+ $ rwstats --plugin=int-ext-fields.so                          \
+        --fields=ext-ip,ext-port,int-ip,int-port --value=bytes \
+        --count=6 data.rw
+ INPUT: 155140 Records for 77570 Bins and 59036553615 Total Bytes
+ OUTPUT: Top 6 Bins by Bytes
+          ext-ip|ext-p|         int-ip|int-p|   Bytes|    %Bytes|   cumul_%|
+   10.253.27.160|25453|192.168.211.200|   80| 2736332|  0.004635|  0.004635|
+   10.242.96.200|   80|192.168.234.203|29868| 2722619|  0.004612|  0.009247|
+   10.247.60.163|29777|192.168.233.168|   80| 2716749|  0.004602|  0.013849|
+   10.250.19.210|27512|192.168.229.229|  443| 2714974|  0.004599|  0.018447|
+   10.254.241.55|24206| 192.168.207.45|   80| 2713597|  0.004596|  0.023044|
+  10.226.206.118|29557|192.168.247.227| 8080| 2707265|  0.004586|  0.027630|
+
 =head2 Protocol Statistics Example
 
 Print the interval breakdowns for flow records, packets, and bytes
@@ -1595,13 +1633,14 @@ and values, use B<rwaggbag(1)>.
 
 B<rwcut(1)>, B<rwnetmask(1)>, B<rwsort(1)>, B<rwuniq(1)>, B<rwbag(1)>,
 B<rwaggbag(1)>, B<rwpmapbuild(1)>, B<addrtype(3)>, B<ccfilter(3)>,
-B<pmapfilter(3)>, B<pysilk(3)>, B<silkpython(3)>, B<silk-plugin(3)>,
-B<sensor.conf(5)>, B<rwflowpack(8)>, B<silk(7)>, B<yaf(1)>,
-B<dlopen(3)>, B<tzset(3)>, B<environ(7)>
+B<int-ext-fields(3)>, B<pmapfilter(3)>, B<pysilk(3)>,
+B<silkpython(3)>, B<silk-plugin(3)>, B<sensor.conf(5)>,
+B<rwflowpack(8)>, B<silk(7)>, B<yaf(1)>, B<dlopen(3)>, B<tzset(3)>,
+B<environ(7)>
 
 =cut
 
-$SiLK: rwstats.pod 051cadca977b 2019-04-16 18:12:18Z mthomas $
+$SiLK: rwstats.pod 861b66f000c2 2019-09-24 22:01:14Z mthomas $
 
 Local Variables:
 mode:text

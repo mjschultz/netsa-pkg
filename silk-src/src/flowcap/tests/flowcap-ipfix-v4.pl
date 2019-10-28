@@ -1,7 +1,7 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: flowcap-ipfix-v4.pl 90396a06eb67 2015-08-05 22:05:43Z mthomas $")
+# RCSIDENT("$SiLK: flowcap-ipfix-v4.pl c317db03ed37 2019-10-11 14:47:18Z mthomas $")
 
 use strict;
 use SiLKTests;
@@ -41,6 +41,7 @@ probe P0 ipfix
     protocol tcp
     listen-on-port $port
     listen-as-host $host
+    log-flags default show-templates
 end probe
 EOF
 make_config_file($sensor_conf, \$sensor_conf_text);

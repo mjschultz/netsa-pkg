@@ -27,7 +27,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaddrcount.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: rwaddrcount.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
 
 #include <silk/iptree.h>
 #include <silk/rwrec.h>
@@ -849,7 +849,7 @@ dumpRecords(
     int w[] = FMT_REC_WIDTH;
     uint32_t i;
     countRecord_t *bin;
-    char ip_st[SK_NUM2DOT_STRLEN];
+    char ip_st[SKIPADDR_STRLEN];
     char start_st[SKTIMESTAMP_STRLEN];
     char end_st[SKTIMESTAMP_STRLEN];
     skipaddr_t ipaddr;
@@ -915,7 +915,7 @@ dumpRecordsSorted(
     countRecord_t *bin;
     skIPTree_t *ipset;
     skIPTreeIterator_t iter;
-    char ip_st[SK_NUM2DOT_STRLEN];
+    char ip_st[SKIPADDR_STRLEN];
     char start_st[SKTIMESTAMP_STRLEN];
     char end_st[SKTIMESTAMP_STRLEN];
     skipaddr_t ipaddr;
@@ -994,7 +994,7 @@ dumpIPs(
 {
     uint32_t i;
     countRecord_t *bin;
-    char ip_st[SK_NUM2DOT_STRLEN];
+    char ip_st[SKIPADDR_STRLEN];
     skipaddr_t ipaddr;
     int w;
 
@@ -1034,7 +1034,7 @@ dumpIPsSorted(
     uint32_t ip;
     skIPTree_t *ipset;
     skIPTreeIterator_t iter;
-    char ip_st[SK_NUM2DOT_STRLEN];
+    char ip_st[SKIPADDR_STRLEN];
     skipaddr_t ipaddr;
     int w;
 

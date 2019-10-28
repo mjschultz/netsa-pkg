@@ -1,3 +1,12 @@
+SiLK-3.19.0 Release, 2019-Oct-28
+
+* rwaggbag, rwaggbagbuild, rwaggbagcat, rwaggbagtool
+  -- Support using country codes as key fields.
+* rwflowpack, flowcap
+  -- Support a show-templates log-flag value in the sensors.conf file
+     which enables printing of templates for specific probes.
+
+
 SiLK-3.18.3 Release, 2019-Aug-29
 
 * rwflowpack, flowcap, rwipfix2silk

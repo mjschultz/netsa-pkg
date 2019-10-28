@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwtransfer.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: rwtransfer.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/sklog.h>
@@ -1213,7 +1213,7 @@ startClientConnection(
     int waitsecs = 0;
     const char *connection_type = (tls_available ? "TCP, TLS" : "TCP");
     socklen_t addrlen;
-    char buf[SK_NUM2DOT_STRLEN];
+    char buf[SKIPADDR_STRLEN];
 
     item->thread_exists = 1;
 
