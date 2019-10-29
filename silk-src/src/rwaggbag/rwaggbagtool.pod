@@ -8,7 +8,7 @@ B<rwaggbagtool> - Manipulate binary Aggregate Bag files
 
   rwaggbagtool [{ --add | --subtract }]
         [--insert-field=FIELD=VALUE [--insert-field=FIELD2=VALUE2...]]
-        [{ --remove-fields=FIELD_LIST | --select-fields=FIELD_LIST
+        [{ --remove-fields=REMOVE_LIST | --select-fields=SELECT_LIST
            | --to-ipset=FIELD [--ipset-record-version=VERSION]
            | --to-bag=BAG_KEY,BAG_COUNTER }]
         [--min-field=FIELD=VALUE [--min-field=FIELD=VALUE...]]
@@ -74,7 +74,11 @@ appear in the resulting Aggregate Bag file.
 =head2 Field manipulation switches
 
 The following switches allow modification of the fields in the
-Aggregate Bag file.
+Aggregate Bag file.  The B<--remove-fields> and B<--select-fields>
+switches are mutually exclusive, and they reduce the number of fields
+in the Aggregate Bag input files.  The B<--insert-field> switch is
+applied after B<--remove-fields> or B<--select-fields>, and it adds a
+field unless that field is already present.
 
 =over 4
 
@@ -93,10 +97,10 @@ field's value as described in the description of the B<--fields>
 switch in the B<rwaggbagbuild(1)> tool.  This switch may be repeated
 in order to insert multiple fields.
 
-=item B<--remove-fields>=I<FIELD_LIST>
+=item B<--remove-fields>=I<REMOVE_LIST>
 
-Remove the fields specified in I<FIELD_LIST> from each of the
-Aggregate Bag input files, where I<FIELD_LIST> is a comma-separated
+Remove the fields specified in I<REMOVE_LIST> from each of the
+Aggregate Bag input files, where I<REMOVE_LIST> is a comma-separated
 list of field names.  This switch may include field names that are not
 in an Aggregate Bag input, and those field names are ignored.  If a
 field name is included in this list and in a B<--insert-field> switch,
@@ -107,12 +111,12 @@ counters of those keys are merged.  B<rwaggbagbuild> exits with an
 error when this switch is used with B<--select-fields>, B<--to-ipset>,
 or B<--to-bag>.
 
-=item B<--select-fields>=I<FIELD_LIST>
+=item B<--select-fields>=I<SELECT_LIST>
 
 For each Aggregate Bag input file, only use the fields in
-I<FIELD_LIST>, a comma-separated list of field names.  Alternatively,
+I<SELECT_LIST>, a comma-separated list of field names.  Alternatively,
 consider this switch as removing all fields that are not included in
-I<FIELD_LIST>.  This switch may include field names that are not in an
+I<SELECT_LIST>.  This switch may include field names that are not in an
 Aggregate Bag input, and those field names are ignored.  When a field
 name is included in this list and in a B<--insert-field> switch, the
 field uses its value from the input Aggregate Bag file if present, and
@@ -471,7 +475,7 @@ B<rwfilter(1)>, B<rwfileinfo(1)>, B<silk(7)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwaggbagtool.pod d39afdae1535 2018-03-01 20:50:10Z mthomas $
+$SiLK: rwaggbagtool.pod c56bd724bfc8 2019-10-11 19:38:12Z mthomas $
 
 Local Variables:
 mode:text

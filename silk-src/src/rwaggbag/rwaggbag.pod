@@ -163,7 +163,35 @@ flow attributes set by the flow generator
 
 =item application
 
-the content of the flow as reported in the applabel field of B<yaf>
+content of the flow as reported in the applabel field of B<yaf>
+
+=item class
+
+class of the sensor at the collection point
+
+=item type
+
+type of the sensor at the collection point
+
+=item icmpType
+
+ICMP type value for ICMP and ICMPv6 flows, 0 otherwise
+
+=item icmpCode
+
+ICMP code value for ICMP and ICMPv6 flows, 0 otherwise
+
+=item scc
+
+the country code of the source IP address.  Uses the mapping file
+specified by the SILK_COUNTRY_CODES environment variable or the
+F<country_codes.pmap> mapping file, as described in L</FILES>.  (See
+also B<ccfilter(3)>.)  I<Since SiLK 3.19.0.>
+
+=item dcc
+
+the country code of the destination IP address.  See C<scc>.
+I<Since SiLK 3.19.0.>
 
 =back
 
@@ -395,6 +423,19 @@ destination port, and protocol:
 
 =over 4
 
+=item SILK_COUNTRY_CODES
+
+This environment variable allows the user to specify the country code
+mapping file that B<rwaggbag> uses when mapping an IP to a country for
+the C<scc> and C<dcc> keys.  The value may be a complete path or a
+file relative to the SILK_PATH.  See the L</FILES> section for
+standard locations of this file.
+
+=item SILK_IPV6_POLICY
+
+This environment variable is used as the value for B<--ipv6-policy>
+when that switch is not provided.
+
 =item SILK_CLOBBER
 
 The SiLK tools normally refuse to overwrite existing files.  Setting
@@ -446,6 +487,19 @@ variable.  See the L</FILES> section for details.
 Possible locations for the SiLK site configuration file which are
 checked when the B<--site-config-file> switch is not provided.
 
+=item F<$SILK_COUNTRY_CODES>
+
+=item F<$SILK_PATH/share/silk/country_codes.pmap>
+
+=item F<$SILK_PATH/share/country_codes.pmap>
+
+=item F<@prefix@/share/silk/country_codes.pmap>
+
+=item F<@prefix@/share/country_codes.pmap>
+
+Possible locations for the country code mapping file required by the
+C<scc> and C<dcc> keys.
+
 =back
 
 =head1 NOTES
@@ -457,12 +511,12 @@ B<rwaggbag> and the other Aggregate Bag tools were introduced in SiLK
 
 B<rwaggbagbuild(1)>, B<rwaggbagcat(1)>, B<rwaggbagtool(1)>,
 B<rwbag(1)>, B<rwfileinfo(1)>, B<rwfilter(1)>, B<rwnetmask(1)>,
-B<rwset(1)>, B<rwuniq(1)>, B<sensor.conf(5)>, B<silk(7)>, B<yaf(1)>,
-B<zlib(3)>
+B<rwset(1)>, B<rwuniq(1)>, B<ccfilter(3)>, B<sensor.conf(5)>,
+B<silk(7)>, B<yaf(1)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwaggbag.pod 106ed13c5128 2019-02-13 23:05:04Z mthomas $
+$SiLK: rwaggbag.pod c56bd724bfc8 2019-10-11 19:38:12Z mthomas $
 
 Local Variables:
 mode:text

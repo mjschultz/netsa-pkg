@@ -1,7 +1,7 @@
 #! /usr/bin/perl -w
 #
 #
-# RCSIDENT("$SiLK: rwflowpack-pack-ipfix-ipv6.pl 40a363507ed0 2014-04-01 14:09:52Z mthomas $")
+# RCSIDENT("$SiLK: rwflowpack-pack-ipfix-ipv6.pl 288d52a2e0d1 2019-10-17 18:29:26Z mthomas $")
 
 use strict;
 use SiLKTests;

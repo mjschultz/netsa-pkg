@@ -13,7 +13,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwsetcat.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: rwsetcat.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skipset.h>
@@ -706,8 +706,8 @@ static void
 printRangesSingle(
     const setcat_range_state_t *state)
 {
-    char ip1[SK_NUM2DOT_STRLEN+1];
-    char ip2[SK_NUM2DOT_STRLEN+1];
+    char ip1[SKIPADDR_STRLEN+1];
+    char ip2[SKIPADDR_STRLEN+1];
 
 #if SK_ENABLE_IPV6
     if (state->count[0]) {
@@ -973,8 +973,8 @@ printStatisticsV6(
     uint8_t old_ip[16];
     uint8_t ipv6[16];
     uint32_t prefix;
-    char ip_str1[SK_NUM2DOT_STRLEN+1];
-    char ip_str2[SK_NUM2DOT_STRLEN+1];
+    char ip_str1[SKIPADDR_STRLEN+1];
+    char ip_str2[SKIPADDR_STRLEN+1];
     uint32_t local_fmt;
     int width;
     uint64_t tmp;
@@ -1108,8 +1108,8 @@ printStatisticsV4(
     uint32_t prefix;
     uint32_t old_addr;
     uint32_t xor_ips;
-    char ip_str1[SK_NUM2DOT_STRLEN+1];
-    char ip_str2[SK_NUM2DOT_STRLEN+1];
+    char ip_str1[SKIPADDR_STRLEN+1];
+    char ip_str2[SKIPADDR_STRLEN+1];
     uint32_t local_fmt;
     int width;
     int i;

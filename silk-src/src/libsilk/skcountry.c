@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skcountry.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: skcountry.c 2e336c0aa6c5 2019-10-11 20:30:00Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skcountry.h>
@@ -58,16 +58,19 @@ skCountryNameToCode(
 {
     sk_countrycode_t code;
 
-    if ('\0' == name[0] || '\0' == name[1] || '\0' != name[2]) {
-        return SK_COUNTRYCODE_INVALID;
+    /* a valid code contains two ascii characters, an alpha and an
+     * alpha-numeric, or the string "--" */
+    if ('\0' == name[2]
+        && ((isalpha((int)name[0]) && isalnum((int)name[1])
+             && isascii((int)name[0]) && isascii((int)name[1]))
+            || ('-' == name[0] && '-' == name[1])))
+    {
+        code = (sk_countrycode_t)((tolower(name[0]) << 8) | tolower(name[1]));
+        assert(code >= MIN_COUNTRY_CODE && code <= MAX_COUNTRY_CODE);
+        return code;
     }
 
-    code = (sk_countrycode_t)((tolower(name[0]) << 8) | tolower(name[1]));
-    if (code < MIN_COUNTRY_CODE || code > MAX_COUNTRY_CODE) {
-        return SK_COUNTRYCODE_INVALID;
-    }
-
-    return code;
+    return SK_COUNTRYCODE_INVALID;
 }
 
 

@@ -737,6 +737,11 @@ repository.  As described in the L</FILES> section, B<rwrecgenerator>
 may use this environment variable when searching for the SiLK site
 configuration file.
 
+=item SILK_CLOBBER
+
+The SiLK tools normally refuse to overwrite existing files.  Setting
+SILK_CLOBBER to a non-empty value removes this restriction.
+
 =item SILK_PATH
 
 This environment variable gives the root of the install tree.  When
@@ -792,7 +797,7 @@ B<syslog(3)>, B<zlib(3)>, B<tzset(3)>, B<environ(7)>
 
 =cut
 
-$SiLK: rwrecgenerator.pod 95aec76c40ea 2018-03-13 21:09:01Z mthomas $
+$SiLK: rwrecgenerator.pod 9e3cbf975420 2019-09-24 14:42:59Z mthomas $
 
 Local Variables:
 mode:text

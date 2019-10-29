@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am 227cef83a91e 2018-03-01 22:45:21Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am c56bd724bfc8 2019-10-11 19:38:12Z mthomas $");
 
 # Installed Targets
 
@@ -80,6 +80,10 @@ TESTS = \
 	tests/rwaggbag-icmpTypeCode.pl \
 	tests/rwaggbag-dport-icmp.pl \
 	tests/rwaggbag-icmp-dport.pl \
+	tests/rwaggbag-country-code-sip.pl \
+	tests/rwaggbag-country-code-dip.pl \
+	tests/rwaggbag-country-code-sip-v6.pl \
+	tests/rwaggbag-country-code-dip-v6.pl \
 	tests/rwaggbagbuild-no-switches.pl \
 	tests/rwaggbagbuild-null-input.pl \
 	tests/rwaggbagbuild-no-files.pl \
@@ -93,6 +97,9 @@ TESTS = \
 	tests/rwaggbagbuild-etime.pl \
 	tests/rwaggbagbuild-stime-proto.pl \
 	tests/rwaggbagbuild-collection-point.pl \
+	tests/rwaggbagbuild-country-code-sip.pl \
+	tests/rwaggbagbuild-country-code-dip.pl \
+	tests/rwaggbagbuild-country-code-aggbagcat.pl \
 	tests/rwaggbagcat-null-input.pl \
 	tests/rwaggbagtool-null-input.pl \
 	tests/rwaggbagtool-ports-proto-remove.pl \
@@ -112,4 +119,8 @@ TESTS = \
 	tests/rwaggbagtool-max-ports-1024.pl \
 	tests/rwaggbagtool-min-bytes-100000.pl \
 	tests/rwaggbagtool-sip-intersect-10.pl \
-	tests/rwaggbagtool-dip-complement-10.pl
+	tests/rwaggbagtool-dip-complement-10.pl \
+	tests/rwaggbagtool-country-code-sip-filter.pl \
+	tests/rwaggbagtool-country-code-dip.pl \
+	tests/rwaggbagtool-country-code-sip-v4v6.pl
+

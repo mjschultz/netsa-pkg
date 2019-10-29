@@ -19,10 +19,11 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaggbagbuild.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: rwaggbagbuild.c c56bd724bfc8 2019-10-11 19:38:12Z mthomas $");
 
 #include <silk/rwascii.h>
 #include <silk/skaggbag.h>
+#include <silk/skcountry.h>
 #include <silk/skipaddr.h>
 #include <silk/sksite.h>
 #include <silk/skstream.h>
@@ -697,7 +698,7 @@ createStringmap(
                               sm_entry.name, skStringMapStrerror(sm_err));
                 return -1;
             }
-            if (SKAGGBAG_FIELD_CUSTOM_KEY == type) {
+            if (SKAGGBAG_FIELD_ANY_COUNTRY == type) {
                 break;
             }
         }
@@ -1044,6 +1045,16 @@ parseSingleField(
                              str_value));
         break;
 
+      case SKAGGBAG_FIELD_SIP_COUNTRY:
+      case SKAGGBAG_FIELD_DIP_COUNTRY:
+      case SKAGGBAG_FIELD_ANY_COUNTRY:
+        if (NULL == str_value) {
+            pv->pv.pv_int = SK_COUNTRYCODE_INVALID;
+            break;
+        }
+        pv->pv.pv_int = skCountryNameToCode(str_value);
+        break;
+
       default:
         break;
     }
@@ -1205,6 +1216,7 @@ setAggBagFields(
     int have_type;
     uint32_t id;
     size_t i;
+    unsigned int j;
 
     assert(field_vec);
 
@@ -1319,10 +1331,14 @@ setAggBagFields(
         exit(EXIT_FAILURE);
     }
 
-    /* if any constant fields are set, add them to the key or counter
-     * vectors */
-    if (const_fields) {
-        for (i = 0; 0 == skVectorGetValue(&id, const_fields, i); ++i) {
+    /* add any constant fields, then the other fields, to the key or
+     * counter vectors */
+    for (j = 0; j < 2; ++j) {
+        const sk_vector_t *v = (0 == j) ? const_fields : field_vec;
+        if (NULL == v) {
+            continue;
+        }
+        for (i = 0; 0 == skVectorGetValue(&id, v, i); ++i) {
             if (SKAGGBAG_FIELD_FTYPE_TYPE == id) {
                 have_type = 1;
             } else if (skBitmapGetBit(key_bitmap, id) == 1) {
@@ -1331,26 +1347,10 @@ setAggBagFields(
             } else if (skBitmapGetBit(counter_bitmap, id) == 1) {
                 t = (sk_aggbag_type_t)id;
                 skVectorAppendValue(counter_vec, &t);
-            } else {
+            } else if (id != AGGBAGBUILD_FIELD_IGNORED || v != field_vec) {
                 skAppPrintErr("Unknown field id %u", id);
                 skAbort();
             }
-        }
-    }
-
-    /* add the other fields to the key and counter vectors */
-    for (i = 0; 0 == skVectorGetValue(&id, field_vec, i); ++i) {
-        if (SKAGGBAG_FIELD_FTYPE_TYPE == id) {
-            have_type = 1;
-        } else if (skBitmapGetBit(key_bitmap, id) == 1) {
-            t = (sk_aggbag_type_t)id;
-            skVectorAppendValue(key_vec, &t);
-        } else if (skBitmapGetBit(counter_bitmap, id) == 1) {
-            t = (sk_aggbag_type_t)id;
-            skVectorAppendValue(counter_vec, &t);
-        } else if (id != AGGBAGBUILD_FIELD_IGNORED) {
-            skAppPrintErr("Unknown field id %u", id);
-            skAbort();
         }
     }
 

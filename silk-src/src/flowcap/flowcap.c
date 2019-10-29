@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: flowcap.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: flowcap.c c317db03ed37 2019-10-11 14:47:18Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/rwrec.h>

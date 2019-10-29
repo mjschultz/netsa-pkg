@@ -29,7 +29,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmaplookup.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: rwpmaplookup.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
@@ -1266,7 +1266,7 @@ static int
 processIPSetFile(
     const char         *f_name)
 {
-    char buf[SK_NUM2DOT_STRLEN];
+    char buf[SKIPADDR_STRLEN];
     skstream_t *stream = NULL;
     skipset_iterator_t iter;
     skipset_t *ipset;

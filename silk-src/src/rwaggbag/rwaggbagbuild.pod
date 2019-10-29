@@ -284,6 +284,23 @@ ICMP type; an integer from 0 to 255 inclusive
 
 ICMP code; an integer from 0 to 255 inclusive
 
+=item scc
+
+the country code of the source; accepts a two character string to use
+as the country of the source IP.  The code is B<not> checked for
+validity against the F<country_codes.pmap> file.  The code must be
+ASCII and it may contain two letters, a letter followed by a number,
+or the string C<-->.  I<Since SiLK 3.19.0.>
+
+=item dcc
+
+the country code of the destination.  See C<scc>.
+I<Since SiLK 3.19.0.>
+
+=item any-cc
+
+a generic country code.  See C<scc>.  I<Since SiLK 3.19.0.>
+
 =item custom-key
 
 a generic key; an integer from 0 to 4294967295 inclusive
@@ -467,7 +484,7 @@ section.
 
 Read the names of the input files from I<FILENAME> or from the
 standard input if I<FILENAME> is not provided.  The input is expected
-to have one filename per line.  B<rwaggbagbuild>> opens each named
+to have one filename per line.  B<rwaggbagbuild> opens each named
 file in turn and reads text from it as if the filenames had been
 listed on the command line.
 
@@ -614,7 +631,8 @@ checked when the B<--site-config-file> switch is not provided.
 
 B<rwaggbag(1)>, B<rwaggbagcat(1)>, B<rwaggbagtool(1)>,
 B<rwfileinfo(1)>, B<rwset(1)>, B<rwsetbuild(1)>, B<rwsetcat(1)>,
-B<rwsettool(1)>, B<silk.conf(5)>, B<silk(7)>, B<zlib(3)>
+B<rwsettool(1)>, B<ccfilter(3)>, B<silk.conf(5)>, B<silk(7)>,
+B<zlib(3)>
 
 =head1 NOTES
 
@@ -623,7 +641,7 @@ SiLK 3.15.0.
 
 =cut
 
-$SiLK: rwaggbagbuild.pod 7a9876ac5e52 2017-05-23 22:09:29Z mthomas $
+$SiLK: rwaggbagbuild.pod c56bd724bfc8 2019-10-11 19:38:12Z mthomas $
 
 Local Variables:
 mode:text

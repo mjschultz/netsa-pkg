@@ -25,7 +25,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwip2cc.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: rwip2cc.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
@@ -395,7 +395,7 @@ processOneAddress(
 {
     char final_delim[] = {'\0', '\0'};
     char cc[16];
-    char ipbuf[SK_NUM2DOT_STRLEN];
+    char ipbuf[SKIPADDR_STRLEN];
     skipaddr_t ip;
     int rv;
 
@@ -458,7 +458,7 @@ processInputFile(
     int rv;
     int lc = 0;
     char cc[32];
-    char ipbuf[SK_NUM2DOT_STRLEN];
+    char ipbuf[SKIPADDR_STRLEN];
 
     if (!app_opt.no_final_delimiter) {
         final_delim[0] = app_opt.column_separator;

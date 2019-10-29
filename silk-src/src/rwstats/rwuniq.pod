@@ -1178,7 +1178,7 @@ back to IPv4 on output.  Given this input:
                               192.0.2.22|        87|
                     ::ffff:203.0.113.113|      2662|
                   2001:db8:54:32:ab:cd::|       345|
-c
+
 The B<rwuniq> tool produces:
 
  $ rwuniq --fields=sip --values=packets /tmp/v4v6.rw
@@ -1250,6 +1250,40 @@ where the packet count in that flow record is no more than 3.
 
 The B<silkpython(3)> manual page provides examples that use PySiLK to
 create arbitrary fields to use as part of the key for B<rwuniq>.
+
+When using B<rwuniq> on input that contains both incoming and outgoing
+flow records, consider using the B<int-ext-fields(3)> plug-in which
+defines four additional fields representing the external IP address,
+the external port, the internal IP address, and the internal port.
+The plug-in requires the user to specify which class/type pairs are
+incoming and which are outgoing.  See its manual page for additional
+information.  As an example, here we run B<rwuniq> on a file
+containing incoming and outgoing web traffic.
+
+ $ rwuniq --fields=sip,sport,dip,dport --values=bytes \
+        --sort-output data.rw | head -7
+             sIP|sPort|            dIP|dPort|               Bytes|
+     10.4.52.235|29631|192.168.233.171|   80|               18260|
+    10.5.231.251|   80|192.168.226.129|28770|              536169|
+     10.9.77.117|29906| 192.168.184.65|   80|               55386|
+     10.11.88.88|   80|192.168.251.222|28902|              433198|
+   10.14.110.214|29989| 192.168.249.96|   80|               25903|
+    10.15.224.27|  443| 192.168.231.49|29779|              163759|
+
+Here the B<int-ext-fields> plug-in is used:
+
+ $ export INCOMING_FLOWTYPES=all/in,all/inweb
+ $ export OUTGOING_FLOWTYPES=all/out,all/outweb
+ $ rwuniq --plugin=int-ext-fields.so \
+        --fields=ext-ip,ext-port,int-ip,int-port --value=bytes \
+        --sort-output data.rw | head -7
+          ext-ip|ext-p|         int-ip|int-p|               Bytes|
+     10.4.52.235|29631|192.168.233.171|   80|              726111|
+    10.5.231.251|   80|192.168.226.129|28770|              561654|
+     10.9.77.117|29906| 192.168.184.65|   80|             1811738|
+     10.11.88.88|   80|192.168.251.222|28902|              444277|
+   10.14.110.214|29989| 192.168.249.96|   80|              393068|
+    10.15.224.27|  443| 192.168.231.49|29779|              167696|
 
 =head1 ENVIRONMENT
 
@@ -1558,14 +1592,15 @@ B<rwfilter(1)>, B<rwbag(1)>, B<rwbagcat(1)>, B<rwaggbag(1)>,
 B<rwaggbagbuild(1)>, B<rwaggbagcat(1)>, B<rwcut(1)>, B<rwset(1)>,
 B<rwsetcat(1)>, B<rwaddrcount(1)>, B<rwgroup(1)>, B<rwstats(1)>,
 B<rwnetmask(1)>, B<rwsort(1)>, B<rwtotal(1)>, B<rwcount(1)>,
-B<rwpmapbuild(1)>, B<addrtype(3)>, B<ccfilter(3)>, B<pmapfilter(3)>,
-B<pysilk(3)>, B<silkpython(3)>, B<silk-plugin(3)>, B<sensor.conf(5)>,
+B<rwpmapbuild(1)>, B<addrtype(3)>, B<ccfilter(3)>,
+B<int-ext-fields(3)>, B<pmapfilter(3)>, B<pysilk(3)>,
+B<silkpython(3)>, B<silk-plugin(3)>, B<sensor.conf(5)>,
 B<rwflowpack(8)>, B<silk(7)>, B<yaf(1)>, B<dlopen(3)>, B<tzset(3)>,
 B<environ(7)>
 
 =cut
 
-$SiLK: rwuniq.pod 86e0fbee974c 2019-08-26 15:35:19Z mthomas $
+$SiLK: rwuniq.pod 861b66f000c2 2019-09-24 22:01:14Z mthomas $
 
 Local Variables:
 mode:text

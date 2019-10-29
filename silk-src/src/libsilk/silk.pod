@@ -460,7 +460,9 @@ categorizing flow records as incoming or output.
 =head1 ENVIRONMENT
 
 The following environment variables affect the tools in the SiLK tool
-suite.  The variables are listed alphabetically.
+suite.  The variables are listed alphabetically.  (Additional
+environment variables that are specific to a tool are documented on
+the tool's manual page.)
 
 =over 4
 
@@ -785,7 +787,7 @@ L<http://tools.netsa.cert.org/silk/>
 
 =cut
 
-$SiLK: silk.pod c95fb6174130 2018-04-13 20:33:46Z mthomas $
+$SiLK: silk.pod 9e3cbf975420 2019-09-24 14:42:59Z mthomas $
 
 Local Variables:
 mode:text

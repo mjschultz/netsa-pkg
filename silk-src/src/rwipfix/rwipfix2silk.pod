@@ -155,6 +155,17 @@ samplingInterval IEs are present) or flow sampler mode (when
 flowSamplerMode and flowSamplerRandomInterval IEs are
 present).
 
+=item I<show-templates>
+
+Write messages to the log describing each IPFIX template that is read.
+The message contains embedded new lines, with the template ID and
+domain on the first line, and each of the template's elements on the
+following lines.  Each element is described by its name, its IE number
+with the private enterprise number if any, and its length in the
+template.  The format is that described in Section 10.2 of
+L<RFC7013|https://tools.ietf.org/html/rfc7013>.
+I<Since SiLK 3.19.0.>
+
 =back
 
 =item B<--note-add>=I<TEXT>
@@ -288,19 +299,9 @@ identifiers when the B<--mac> switch was provided on the command line.
 
 =item SILK_IPFIX_PRINT_TEMPLATES
 
-When set to 1, B<rwipfix2silk> writes messages to the log file
-describing each IPFIX template it reads.  (Use B<--log-destination> to
-change the destination from its default of B<none>.)   The first
-message includes the domain, the template identifier, the number of
-information elements in the template, and the name of this environment
-variable.  Next, a message is printed for each information element in
-the template where the message contains the domain id, the template
-id, and the element's position in the template, length in octets,
-numeric information element identifier, and name.  For elements
-defined by a private enterprise, the IE number has two parts: the
-private enterprise number and the information element number,
-separated by a slash (/).  (Requires libfixbuf 1.4.0 or later.)
-I<Since SiLK 3.8.2.>
+When set to 1, B<rwipfix2silk> adds C<show-templates> to the
+B<--log-flags> switch.  See the description of that switch for
+additional information.
 
 =item SILK_LIBFIXBUF_SUPPRESS_WARNINGS
 
@@ -331,7 +332,7 @@ B<tcpdump(1)>, B<pcap(3)>, B<zlib(3)>
 
 =cut
 
-$SiLK: rwipfix2silk.pod 57cd46fed37f 2017-03-13 21:54:02Z mthomas $
+$SiLK: rwipfix2silk.pod c317db03ed37 2019-10-11 14:47:18Z mthomas $
 
 Local Variables:
 mode:text

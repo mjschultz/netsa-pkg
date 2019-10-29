@@ -18,7 +18,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmapcat.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: rwpmapcat.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
 
 #include <silk/skcountry.h>
 #include <silk/skipaddr.h>
@@ -874,8 +874,8 @@ printRangesProtoPort(
     int label_width = 0;
     int value_width = 0;
     char str_label[DICTIONARY_ENTRY_BUFLEN];
-    char str_start[SK_NUM2DOT_STRLEN];
-    char str_end[SK_NUM2DOT_STRLEN];
+    char str_start[SKIPADDR_STRLEN];
+    char str_end[SKIPADDR_STRLEN];
     char final_delim[] = {'\0', '\0'};
 
     if ( !opt_flags.no_final_delimiter) {

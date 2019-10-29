@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwbagtool.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: rwbagtool.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
 
 #include <silk/skbag.h>
 #include <silk/skipaddr.h>
@@ -155,8 +155,8 @@ static int arg_index = 0;
 static sk_compmethod_t comp_method;
 
 /* buffers for printing IPs */
-static char ipbuf1[SK_NUM2DOT_STRLEN];
-static char ipbuf2[SK_NUM2DOT_STRLEN];
+static char ipbuf1[SKIPADDR_STRLEN];
+static char ipbuf2[SKIPADDR_STRLEN];
 
 /* For scalar multiplication, the scalar */
 static uint64_t scalar_multiply = 1;

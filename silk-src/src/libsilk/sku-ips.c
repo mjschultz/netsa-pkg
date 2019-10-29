@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-ips.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: sku-ips.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/utils.h>
@@ -596,7 +596,7 @@ ipaddrString(
         unsigned int longest_zero_pos;
         unsigned int longest_zero_len;
         uint64_t tmp;
-        char tmpbuf[SK_NUM2DOT_STRLEN];
+        char tmpbuf[SKIPADDR_STRLEN];
         char *pos;
         unsigned int len;
         unsigned int i, j;
@@ -606,45 +606,45 @@ ipaddrString(
             switch (ip_flags) {
               case SKIPADDR_CANONICAL:
               case SKIPADDR_NO_MIXED:
-                snprintf(outbuf, SK_NUM2DOT_STRLEN, "::");
+                snprintf(outbuf, SKIPADDR_STRLEN, "::");
                 break;
 
               case SKIPADDR_DECIMAL:
               case SKIPADDR_HEXADECIMAL:
-                snprintf(outbuf, SK_NUM2DOT_STRLEN, "0");
+                snprintf(outbuf, SKIPADDR_STRLEN, "0");
                 break;
 
               case SKIPADDR_ZEROPAD | SKIPADDR_CANONICAL:
               case SKIPADDR_ZEROPAD | SKIPADDR_NO_MIXED:
-                snprintf(outbuf, SK_NUM2DOT_STRLEN,
+                snprintf(outbuf, SKIPADDR_STRLEN,
                          "0000:0000:0000:0000:0000:0000:0000:0000");
                 break;
 
               case SKIPADDR_ZEROPAD | SKIPADDR_DECIMAL:
-                snprintf(outbuf, SK_NUM2DOT_STRLEN,
+                snprintf(outbuf, SKIPADDR_STRLEN,
                          "000000000000000000000000000000000000000");
                 break;
 
               case SKIPADDR_ZEROPAD | SKIPADDR_HEXADECIMAL:
-                snprintf(outbuf, SK_NUM2DOT_STRLEN,
+                snprintf(outbuf, SKIPADDR_STRLEN,
                          "00000000000000000000000000000000");
                 break;
 
               default:
                 skAbortBadCase(ip_flags);
             }
-            outbuf[SK_NUM2DOT_STRLEN-1] = '\0';
+            outbuf[SKIPADDR_STRLEN-1] = '\0';
             return outbuf;
         }
 
         switch (ip_flags) {
           case SKIPADDR_CANONICAL:
 #ifdef SK_HAVE_INET_NTOP
-#  if    SK_NUM2DOT_STRLEN < INET6_ADDRSTRLEN
-#    error "SK_NUM2DOT_STRLEN is not big enough"
+#  if    SKIPADDR_STRLEN < INET6_ADDRSTRLEN
+#    error "SKIPADDR_STRLEN is not big enough"
 #  endif
             if (NULL == inet_ntop(AF_INET6, &(ipv6), outbuf,
-                                  SK_NUM2DOT_STRLEN))
+                                  SKIPADDR_STRLEN))
             {
                 outbuf[0] = '\0';
             }
@@ -686,13 +686,13 @@ ipaddrString(
             }
             /* print the ip; we build the result in pieces */
             if (0 == longest_zero_len) {
-                snprintf(outbuf, SK_NUM2DOT_STRLEN, "%x:%x:%x:%x:%x:%x:%x:%x",
+                snprintf(outbuf, SKIPADDR_STRLEN, "%x:%x:%x:%x:%x:%x:%x:%x",
                          hexdec[0], hexdec[1], hexdec[2], hexdec[3],
                          hexdec[4], hexdec[5], hexdec[6], hexdec[7]);
             } else {
                 i = 0;
                 pos = outbuf;
-                len = SK_NUM2DOT_STRLEN;
+                len = SKIPADDR_STRLEN;
                 while (i < 8) {
                     if (i == longest_zero_pos) {
                         i += longest_zero_len;
@@ -721,7 +721,7 @@ ipaddrString(
           case SKIPADDR_ZEROPAD | SKIPADDR_NO_MIXED:
             /* Convert integer 0 to string
                "0000:0000:0000:0000:0000:0000:0000:0000" */
-            snprintf(outbuf, SK_NUM2DOT_STRLEN,
+            snprintf(outbuf, SKIPADDR_STRLEN,
                      ("%02x%02x:%02x%02x:%02x%02x:%02x%02x"
                       ":%02x%02x:%02x%02x:%02x%02x:%02x%02x"),
                      ipv6[ 0], ipv6[ 1], ipv6[ 2], ipv6[ 3],
@@ -748,7 +748,7 @@ ipaddrString(
             /* checked for an IP of 0 above, so 'i' must be on some
              * non-zero hex-digit */
             assert('\0' != tmpbuf[i]);
-            strncpy(outbuf, &tmpbuf[i], SK_NUM2DOT_STRLEN);
+            strncpy(outbuf, &tmpbuf[i], SKIPADDR_STRLEN);
             break;
 
           case SKIPADDR_ZEROPAD | SKIPADDR_DECIMAL:
@@ -807,24 +807,24 @@ ipaddrString(
             }
             /* print the results */
             if (zero_pad) {
-                snprintf(outbuf, SK_NUM2DOT_STRLEN,
+                snprintf(outbuf, SKIPADDR_STRLEN,
                          "%09" PRIu64 "%010" PRIu64 "%010" PRIu64
                          "%010" PRIu64,
                          decimal[3], decimal[2], decimal[1], decimal[0]);
             } else if (decimal[3]) {
-                snprintf(outbuf, SK_NUM2DOT_STRLEN,
+                snprintf(outbuf, SKIPADDR_STRLEN,
                          "%" PRIu64 "%010" PRIu64 "%010" PRIu64 "%010" PRIu64,
                          decimal[3], decimal[2], decimal[1], decimal[0]);
             } else if (decimal[2]) {
-                snprintf(outbuf, SK_NUM2DOT_STRLEN,
+                snprintf(outbuf, SKIPADDR_STRLEN,
                          "%" PRIu64 "%010" PRIu64 "%010" PRIu64,
                          decimal[2], decimal[1], decimal[0]);
             } else if (decimal[1]) {
-                snprintf(outbuf, SK_NUM2DOT_STRLEN,
+                snprintf(outbuf, SKIPADDR_STRLEN,
                          "%" PRIu64 "%010" PRIu64,
                          decimal[1], decimal[0]);
             } else {
-                snprintf(outbuf, SK_NUM2DOT_STRLEN,
+                snprintf(outbuf, SKIPADDR_STRLEN,
                          "%" PRIu64, decimal[0]);
             }
             break;
@@ -838,7 +838,7 @@ ipaddrString(
           case SKIPADDR_CANONICAL:
           case SKIPADDR_NO_MIXED:
             /* Convert integer 0 to string "0.0.0.0" */
-            snprintf(outbuf, SK_NUM2DOT_STRLEN,
+            snprintf(outbuf, SKIPADDR_STRLEN,
                      "%" PRIu32 ".%" PRIu32 ".%" PRIu32 ".%" PRIu32,
                      ((ipv4 >> 24) & 0xFF),
                      ((ipv4 >> 16) & 0xFF),
@@ -847,16 +847,16 @@ ipaddrString(
             break;
 
           case SKIPADDR_DECIMAL:
-            snprintf(outbuf, SK_NUM2DOT_STRLEN, ("%" PRIu32), ipv4);
+            snprintf(outbuf, SKIPADDR_STRLEN, ("%" PRIu32), ipv4);
             break;
 
           case SKIPADDR_HEXADECIMAL:
-            snprintf(outbuf, SK_NUM2DOT_STRLEN, ("%" PRIx32), ipv4);
+            snprintf(outbuf, SKIPADDR_STRLEN, ("%" PRIx32), ipv4);
             break;
 
           case SKIPADDR_ZEROPAD | SKIPADDR_CANONICAL:
           case SKIPADDR_ZEROPAD | SKIPADDR_NO_MIXED:
-            snprintf(outbuf, SK_NUM2DOT_STRLEN,
+            snprintf(outbuf, SKIPADDR_STRLEN,
                      "%03" PRIu32 ".%03" PRIu32 ".%03" PRIu32 ".%03" PRIu32,
                      ((ipv4 >> 24) & 0xFF),
                      ((ipv4 >> 16) & 0xFF),
@@ -865,11 +865,11 @@ ipaddrString(
             break;
 
           case SKIPADDR_ZEROPAD | SKIPADDR_DECIMAL:
-            snprintf(outbuf, SK_NUM2DOT_STRLEN, ("%010" PRIu32), ipv4);
+            snprintf(outbuf, SKIPADDR_STRLEN, ("%010" PRIu32), ipv4);
             break;
 
           case SKIPADDR_ZEROPAD | SKIPADDR_HEXADECIMAL:
-            snprintf(outbuf, SK_NUM2DOT_STRLEN, ("%08" PRIx32), ipv4);
+            snprintf(outbuf, SKIPADDR_STRLEN, ("%08" PRIx32), ipv4);
             break;
 
           case SKIPADDR_FORCE_IPV6:
@@ -880,7 +880,7 @@ ipaddrString(
         }
     }
 
-    outbuf[SK_NUM2DOT_STRLEN-1] = '\0';
+    outbuf[SKIPADDR_STRLEN-1] = '\0';
     return outbuf;
 }
 

@@ -22,11 +22,11 @@ B<rwbagbuild> - Create a binary Bag from non-flow data
 =head1 DESCRIPTION
 
 B<rwbagbuild> builds a binary Bag file from an IPset file or from
-textual input.  A Bag is a set where each key is associated with a
-counter.  Usually the key is some aspect of a flow record (an IP
-address, a port, the protocol, et cetera), and the counter is a volume
-(such as the number of flow records or the sum or bytes or packets)
-for the flow records that match that key.
+textual input.  A Bag is a set of keys where each key is associated
+with a counter.  Usually the key is some aspect of a flow record (an
+IP address, a port, the protocol, et cetera), and the counter is a
+volume (such as the number of flow records or the sum or bytes or
+packets) for the flow records that match that key.
 
 Either B<--set-input> or B<--bag-input> must be provided to specify
 the type and the location of the input file.  To read from the
@@ -57,14 +57,102 @@ Any line that is blank or contains only whitespace is ignored.  All
 other lines must contain a valid key or key-counter pair; whitespace
 around the key and counter is ignored.
 
-The key is typically a 32-bit integer, an IP address, a CIDR block, or
-a SiLK IPWildcard.  When the B<--key-type> is C<sport-pmap>,
-C<dport-pmap>, or C<any-port-pmap>, the key is comprised of two
-numbers: a protocol (8-bit number) and a port (16-bit number).  The
-delimiter separating the protocol and port may be set by
+A line may contain only a key or it may contain a key and counter
+separated by a delimiter.  Use B<--delimiter> to specify the
+delimiter; the accepted formats of the key are described below.  If
+the delimiter character is not present on a line, the line must
+contain only a key, or a line may contain a key followed by a
+delimiter with no additional text on the line.  In both cases, the
+count is set to 1.  Otherwise, the line must contain a key before the
+delimiter and an integer counter after the delimiter.  These lines may
+have a delimiter after the counter; this delimiter and any text
+following it are ignored.
+
+The B<--default-count> switch B<overrides> any counter value present
+on the line, and any text appearing after the delimiter that follows
+the key is ignored.
+
+For each key-count pair, the key is inserted into Bag with its count
+or, if the key is already present in the Bag, its total count is
+incremented by the count from this line.  When using the
+B<--default-count> switch, the count for a key that appears in the
+input I<N> times is the product of I<N> and I<DEFAULTCOUNT>.
+
+B<rwbagbuild> prints an error and exits when a key or counter cannot
+be parsed.
+
+B<Format of the Key>
+
+The key is a 32-bit integer, an IP address, a CIDR block, a SiLK
+IPWildcard, or a pair of numbers when the key-type is a protocol-port
+prefix map file.
+
+For key-types that use fewer than 32-bits, B<rwbagbuild> does I<not>
+verify the validity of the key.  For example, it is possible to have
+257 as a key in Bag whose key-type is protocol.
+
+B<rwbagbuild> parses specific key-types as follows:
+
+=over 4
+
+=item sIPv4, dIPv4, nhIPv4, any-IPv4
+
+key is an IPv4 address or a 32-bit value; key-type set to
+corresponding IPv6 type when an IPv6 address is present.  A CIDR block
+or SiLK IPWildcard representing multiple addresses adds multiple
+entries to the Bag
+
+=item sIPv6, dIPv6, nhIPv6, any-IPv6
+
+key is an IPv6 address.  An IPv4 address is mapped into the
+::ffff:0:0/96 netblock.  All keys must be IP addresses.
+
+=item flags, initialFlags, sessionFlags
+
+key is the numeric value of the flags, 17 = FIN|ACK
+
+=item sTime, eTime, any-time
+
+key is seconds since the UNIX epoch
+
+=item duration
+
+key represents seconds
+
+=item sensor
+
+key is the numeric sensor ID
+
+=item sip-country, dip-country, any-country
+
+key is an IP address; the F<country_codes.pmap> prefix map file is
+used to map the IP to a country code that is stored in the Bag
+
+=item sip-pmap, dip-pmap, any-ip-pmap
+
+key is an IP address; the specified B<--prefix-map> file is used to
+map the IP to a value that is stored in the Bag
+
+=item sport-pmap, dport-pmap, any-port-pmap
+
+key is comprised of two numbers separated by a delimiter: a protocol
+(8-bit number) and a port (16-bit number).  Those values are looked up
+in the specified B<--prefix-map> file and the result is stored in the
+Bag.  The delimiter separating the protocol and port may be set by
 B<--proto-port-delimiter>.  If not explicitly set, it is the same as
 the delimiter specified to B<--delimiter>.  The default delimiter is
 'C<|>'.
+
+=item attributes
+
+these bits of the key are relevant, though any 32-bit value is
+accepted: 0x08=F, 0x10=S, 0x20=T, 0x40=C
+
+=item class, type
+
+key is treated as a number
+
+=back
 
 An IP address or integer key must be expressed in one of the following
 formats.  B<rwbagbuild> complains if the key field contains a mixture
@@ -117,28 +205,6 @@ notation.
  2001:db8:a:x::1-2:4,5
 
 =back
-
-A line may contain only a key or it may contain a key and counter.  If
-the delimiter character is not present on a line, the line must
-contain only a key.  If the delimiter is present, the line must
-contain key before the delimiter and an integer counter after the
-delimiter.  These lines may have a delimiter after the counter; this
-delimiter and any text following it are ignored.
-
-When the B<--default-count> switch is specified, its value is used as
-the count for each key, and any counter value present on the line is
-ignored.  Otherwise, the parsed count is used, or 1 is used as the
-counter if no delimiter was present.
-
-For each key-count pair, the key is inserted into Bag with its count
-or, if the key is already present in the Bag, its total count is
-incremented by the count from this line.  When using the
-B<--default-count> switch, the count for a key that appears in the
-input I<N> times is the product of I<N> and I<DEFAULTCOUNT>.
-
-B<rwbagbuild> prints an error and exits when a key or counter cannot
-be parsed or when a line contains a delimiter character after the key
-but has no count,
 
 =head1 OPTIONS
 
@@ -230,7 +296,7 @@ bytes, see also C<sum-bytes>
 
 =item flags
 
-bitwise OR of TCP flags
+an unsigned bitwise OR of TCP flags
 
 =item sTime
 
@@ -339,17 +405,13 @@ a generic time value, in seconds resolution
 
 =item sip-country
 
-the country code of the source IP.  Maps each IP address in the key
-column to a country code and stores the country code in the bag.  Uses
-the mapping file specified by the SILK_COUNTRY_CODES environment
-variable or the F<country_codes.pmap> mapping file, as described in
-L</FILES>.  (See also B<ccfilter(3)>.)  The abbreviations are those
-defined by ISO 3166-1 (see for example
-L<https://www.iso.org/iso-3166-country-codes.html> or
-L<https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2>) or the following
-special codes: B<--> N/A (e.g. private and experimental reserved
-addresses); B<a1> anonymous proxy; B<a2> satellite provider; B<o1>
-other I<Since SiLK 3.12.0.>
+the country code of the source IP addresss.  For textual input, the
+key column must contain an IP address or an integer.  B<rwbagbuild>
+maps the IP address to a country code and stores the country code in
+the bag.  Uses the mapping file specified by the SILK_COUNTRY_CODES
+environment variable or the F<country_codes.pmap> mapping file, as
+described in L</FILES>.  (See also B<ccfilter(3)>.)  I<Since SiLK
+3.12.0.>
 
 =item dip-country
 
@@ -767,6 +829,53 @@ two columns (protocol and port) which uses the B<--default-counter>.
   TCP/SMTP|                 800|
   TCP/HTTP|                5642|
 
+=head2 Delimiter examples
+
+A single value followed by an optional delimiter is treated as a key.
+The counter for those keys is set to 1.  A delimiter may follow the
+count, and any text after that delimiter is ignored.  When the counter
+is 0, the key is not inserted into the Bag.
+
+ $ cat sport.txt
+ 0
+ 1|
+ 2|3
+ 4|5|
+ 6|7|8|
+ 9|10|||||
+ 11|0
+ $ rwbagbuild --bag-input=sport.txt --key-type=sport \
+   | rwbagcat
+          0|                   1|
+          1|                   1|
+          2|                   3|
+          4|                   5|
+          6|                   7|
+          9|                  10|
+
+The B<--default-counter> switch overrides the count.
+
+ $ rwbagbuild --bag-input=sport.txt --key-type=sport --default-count=1 \
+   | rwbagcat
+          0|                   1|
+          1|                   1|
+          2|                   1|
+          4|                   1|
+          6|                   1|
+          9|                   1|
+         11|                   1|
+
+In fact, the B<--default-counter> switch causes B<rwbagbuild> to
+ignore all text after the delimiter that follows the key.
+
+ $ echo '12|13 14' | rwbagbuild --bag-input=- --output=/dev/null
+ rwbagbuild: Error parsing line 1: Extra text after count
+ rwbagbuild: Error creating bag from text bag
+
+ $ echo '12|13 14' | rwbagbuild --bag-input=- --default-count=1 \
+   | rwbagcat --key-format=decimal
+         12|                   1|
+
 =head1 ENVIRONMENT
 
 =over 4
@@ -825,11 +934,17 @@ B<rwsettool(1)>, B<ccfilter(3)>, B<silk(7)>, B<zlib(3)>, B<cat(1)>
 
 =head1 BUGS
 
+B<rwbagbuild> should verify the key's value is within the allowed
+range for the specified B<--key-type>.
+
+B<rwbagbuild> should accept non-numeric values for some fields, such
+as times and TCP flags.
+
 The B<--default-count> switch is poorly named.
 
 =cut
 
-$SiLK: rwbagbuild.pod c95fb6174130 2018-04-13 20:33:46Z mthomas $
+$SiLK: rwbagbuild.pod f040f1c10ff5 2019-10-11 20:00:55Z mthomas $
 
 Local Variables:
 mode:text

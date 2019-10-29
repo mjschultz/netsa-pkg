@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconf.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: probeconf.c 17d730af39a6 2019-10-28 15:44:53Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/probeconf.h>
@@ -17,6 +17,7 @@ RCSIDENT("$SiLK: probeconf.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
 #include <silk/skipset.h>
 #include <silk/sklog.h>
 #include <silk/sksite.h>
+#include "ipfixsource.h"    /* for show_templates */
 #include "probeconfscan.h"
 
 /*
@@ -100,9 +101,7 @@ static const struct skpc_log_flags_map_st {
     {"none",                SOURCE_LOG_NONE},
     {"record-timestamps",   SOURCE_LOG_TIMESTAMPS},
     {"sampling",            SOURCE_LOG_SAMPLING},
-#ifdef SOURCE_LOG_TEMPLATES
     {"show-templates",      SOURCE_LOG_TEMPLATES},
-#endif  /* SOURCE_LOG_TEMPLATES */
     {NULL,                  0}
 };
 
@@ -139,7 +138,7 @@ static sk_vector_t *skpc_groups = NULL;
 /* The IPWildcards that are added to the groups. */
 static sk_vector_t *skpc_wildcards = NULL;
 
-/* group containing the default non-routed NetFlow interface */
+/* Group containing the default non-routed NetFlow interface */
 static skpc_group_t *nonrouted_group = NULL;
 
 
@@ -805,6 +804,9 @@ skpcProbeAddLogFlag(
         return -2;
     }
     probe->log_flags |= skpc_log_flags_map[i].flag;
+    if (show_templates) {
+        probe->log_flags |= SOURCE_LOG_TEMPLATES;
+    }
     return 0;
 }
 
@@ -814,6 +816,9 @@ skpcProbeClearLogFlags(
 {
     assert(probe);
     probe->log_flags = SOURCE_LOG_NONE;
+    if (show_templates) {
+        probe->log_flags |= SOURCE_LOG_TEMPLATES;
+    }
     return 0;
 }
 

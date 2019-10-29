@@ -207,13 +207,7 @@ guess as to the content of the flow
 the country code of the source IP address.  Uses the mapping file
 specified by the SILK_COUNTRY_CODES environment variable or the
 F<country_codes.pmap> mapping file, as described in L</FILES>.  (See
-also B<ccfilter(3)>.)  The abbreviations are those defined by ISO
-3166-1 (see for example
-L<https://www.iso.org/iso-3166-country-codes.html> or
-L<https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2>) or the following
-special codes: B<--> N/A (e.g. private and experimental reserved
-addresses); B<a1> anonymous proxy; B<a2> satellite provider; B<o1>
-other I<Since SiLK 3.12.0.>
+also B<ccfilter(3)>.)  I<Since SiLK 3.12.0.>
 
 =item scc
 
@@ -772,6 +766,11 @@ the C<sip-country> and C<dip-country> keys.  The value may be a
 complete path or a file relative to the SILK_PATH.  See the L</FILES>
 section for standard locations of this file.
 
+=item SILK_IPV6_POLICY
+
+This environment variable is used as the value for B<--ipv6-policy>
+when that switch is not provided.
+
 =item SILK_CLOBBER
 
 The SiLK tools normally refuse to overwrite existing files.  Setting
@@ -848,7 +847,7 @@ B<zlib(3)>
 
 =cut
 
-$SiLK: rwbag.pod c95fb6174130 2018-04-13 20:33:46Z mthomas $
+$SiLK: rwbag.pod f040f1c10ff5 2019-10-11 20:00:55Z mthomas $
 
 Local Variables:
 mode:text

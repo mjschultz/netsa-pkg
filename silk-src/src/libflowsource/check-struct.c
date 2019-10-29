@@ -21,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcs_CHECK_STRUCT_C, "$SiLK: check-struct.c 00be7e2fb135 2019-08-26 15:26:09Z mthomas $");
+RCSIDENTVAR(rcs_CHECK_STRUCT_C, "$SiLK: check-struct.c 48577f5787ed 2019-10-10 14:54:05Z mthomas $");
 
 
 /*
@@ -439,9 +439,10 @@ skiCheckDataStructure(
 
 #include "ipfixsource.h"
 
-int main(int UNUSED(argc), char **argv)
+int main(int argc, char **argv)
 {
     SILK_FEATURES_DEFINE_STRUCT(features);
+    SK_UNUSED_PARAM(argc);
 
     skAppRegister(argv[0]);
     skAppVerifyFeatures(&features, NULL);

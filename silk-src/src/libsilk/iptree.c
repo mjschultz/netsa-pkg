@@ -26,7 +26,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: iptree.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: iptree.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
 
 #include <silk/iptree.h>
 #include <silk/rwrec.h>
@@ -626,7 +626,7 @@ skIPTreePrint(
     skipaddr_flags_t    ip_format,
     int                 as_cidr)
 {
-    char buf[SK_NUM2DOT_STRLEN+1];
+    char buf[SKIPADDR_STRLEN+1];
     skipaddr_t ipaddr;
 
     if (as_cidr) {

@@ -515,6 +515,12 @@ This environment variable is used as the value for
 B<--compression-method> when that switch is not provided.  I<Since
 SiLK 3.13.0.>
 
+=item SILK_PATH
+
+This environment variable gives the root of the install tree.  When
+searching for a plug-in, B<rwptoflow> may use this environment
+variable.
+
 =back
 
 =head1 SEE ALSO
@@ -535,7 +541,7 @@ flow file.
 
 =cut
 
-$SiLK: rwptoflow.pod 94bbee0e68ad 2017-05-23 18:39:19Z mthomas $
+$SiLK: rwptoflow.pod 9e3cbf975420 2019-09-24 14:42:59Z mthomas $
 
 Local Variables:
 mode:text

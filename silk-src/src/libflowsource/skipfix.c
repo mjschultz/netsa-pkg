@@ -22,7 +22,7 @@
 #define SKIPFIX_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipfix.c 00be7e2fb135 2019-08-26 15:26:09Z mthomas $");
+RCSIDENT("$SiLK: skipfix.c 17d730af39a6 2019-10-28 15:44:53Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/skipaddr.h>
@@ -1287,6 +1287,33 @@ typedef struct ski_record_st ski_record_t;
  *  **********  FUNCTION DEFINITIONS  **********
  */
 
+/*  Create macros to assist in creating TRACEMSG()s.  To avoid a C89
+ *  compiler warning, put DEFINE_PREFIX_BUF() after other variable
+ *  definitions but before any other code.  */
+#if TRACEMSG_LEVEL < 2
+#define DEFINE_PREFIX_BUF(varname)
+#define makeTracemsgPrefix(_a, _b, _c, _d, _e, _f)
+#else
+#define DEFINE_PREFIX_BUF(varname)    char varname [512]
+/*
+ *    Format the probe name, template id, domain, and template pointer
+ *    in a string buffer.
+ */
+static char *
+makeTracemsgPrefix(
+    char               *buf,
+    size_t              buflen,
+    const char         *probe_name,
+    uint32_t            domain,
+    uint16_t            tid,
+    const fbTemplate_t *tmpl)
+{
+    snprintf(buf, buflen, "'%s': Template %#06x, domain %#x, [%p]",
+             probe_name, tid, domain, (void *)tmpl);
+    return buf;
+}
+#endif  /* TRACEMSG_LEVEL */
+
 /*
  *    The skiTemplateCallbackCtx() callback is invoked whenever the
  *    session receives a new template.  This function must have the
@@ -1326,37 +1353,56 @@ skiTemplateCallbackCtx(
 #endif
     *ctx_free_fn)
 {
-    char prefix[36];
+#define TMPL_PROC_MSG2(is_option, wp2_tmpl_name)                        \
+    DEBUGMSG(("'%s': Processing " is_option "template %#06x (%u),"      \
+              " domain %#x, with the %s template"),                     \
+             name, tid, tid, domain, (wp2_tmpl_name))
+
+#define TMPL_PROC_MSG(wp_name)     TMPL_PROC_MSG2("", wp_name)
+#define TMPL_PROC_MSG_OPT(wp_name) TMPL_PROC_MSG2("options ", wp_name)
+
+    fbCollector_t *coll;
     const fbInfoElement_t *ie;
+    const char *name;
+    int show_tmpl;
     BMAP_TYPE out;
     uint64_t bmap;
     uint32_t domain;
     uint32_t count;
+    uint32_t scope;
     uint32_t i;
     int known_id;
+    DEFINE_PREFIX_BUF(prefix);
 
     TRACE_ENTRY;
     SK_UNUSED_PARAM(app_ctx);
 
-    domain = fbSessionGetDomain(session);
-    count = fbTemplateCountElements(tmpl);
-    bmap = 0;
-    out = 0;
-
     *ctx = NULL;
     *ctx_free_fn = NULL;
 
-#if TRACEMSG_LEVEL < 2
-    if (print_templates)
-#endif
-    {
-        snprintf(prefix, sizeof(prefix), "Domain %#06X, TemplateID %#06X",
-                 domain, tid);
+    domain = fbSessionGetDomain(session);
+    count = fbTemplateCountElements(tmpl);
+    scope = fbTemplateGetOptionsScope(tmpl);
+    bmap = 0;
+    out = 0;
+
+    coll = fbSessionGetCollector(session);
+    if (NULL == coll) {
+        name = "<udp>";
+        show_tmpl = show_templates;
+    } else {
+        const skIPFIXConnection_t *conn;
+        const skIPFIXSource_t *source;
+        conn = (skIPFIXConnection_t *)fbCollectorGetContext(coll);
+        source = conn->source;
+        name = source->name;
+        show_tmpl = skpcProbeGetLogFlags(source->probe) & SOURCE_LOG_TEMPLATES;
     }
 
-    TRACEMSG(2, ("%s [%p] skiTemplateCallbackCtx()", prefix, tmpl));
+    makeTracemsgPrefix(prefix, sizeof(prefix), name, domain, tid,tmpl);
+    TRACEMSG(2, ("%s skiTemplateCallbackCtx()", prefix));
 
-    if (fbTemplateGetOptionsScope(tmpl)) {
+    if (scope) {
         unsigned int samplingAlgorithm;
         unsigned int samplerMode;
 
@@ -1406,32 +1452,22 @@ skiTemplateCallbackCtx(
                 }
             }
             TRACEMSG(
-                3, ("%s, bmap %#010" PRIx64 ", IE %s (%u/%u)",
+                3, ("%s bmap %#012" PRIx64 ", IE %s (%u/%u)",
                     prefix, bmap, ie->ref.canon->ref.name, ie->ent, ie->num));
         }
         if (bmap) {
             out = (BMAP_TYPE)bmap;
             BMAP_TMPL_CTX_SET(ctx, ctx_free_fn, out);
         }
-        if (bmap & (TMPL_BIT_flowTableFlushEventCount
-                    | TMPL_BIT_flowTablePeakCount))
-        {
-            DEBUGMSG(("Will process options template %#06x with the"
-                      " YAFstats template"),
-                     tid);
-        } else if (bmap & (TMPL_BIT_tombstoneId)) {
-            DEBUGMSG(("Will process options template %#06x with the"
-                      " tombstone template"),
-                     tid);
-        } else if (bmap & (TMPL_BIT_samplingAlgorithm | TMPL_BIT_samplerMode)){
-            DEBUGMSG(("Will process options template %#06x with the"
-                      " sampling template"),
-                     tid);
-        } else {
-            DEBUGMSG(("Will process options template %#06x with the"
-                      " ignore template"),
-                     tid);
-        }
+        TMPL_PROC_MSG_OPT(((bmap & (TMPL_BIT_flowTableFlushEventCount
+                                    | TMPL_BIT_flowTablePeakCount))
+                           ? "YAFstats"
+                           : ((bmap & (TMPL_BIT_tombstoneId))
+                              ? "tombstone"
+                              : ((bmap & (TMPL_BIT_samplingAlgorithm
+                                          | TMPL_BIT_samplerMode))
+                                 ? "sampling"
+                                 : "ignore"))));
 
     } else {
         /* populate the bitmap */
@@ -1643,7 +1679,7 @@ skiTemplateCallbackCtx(
                 }
             }
             TRACEMSG(
-                3, ("%s, bmap %#012" PRIx64 ", IE %s (%u/%u)",
+                3, ("%s bmap %#012" PRIx64 ", IE %s (%u/%u)",
                     prefix, bmap, ie->ref.canon->ref.name, ie->ent, ie->num));
         }
 
@@ -1658,8 +1694,7 @@ skiTemplateCallbackCtx(
             /* the template ID matches the ID for the YAF template
              * that contains TCP flags */
             fbSessionAddTemplatePair(session, tid, SKI_TCP_STML_TID);
-            DEBUGMSG("Will process template %#06x as YAF TCP flags list entry",
-                     tid);
+            TMPL_PROC_MSG("YAF TCP flags list");
             known_id = 1;
 #if SKIPFIX_ENABLE_TOMBSTONE_TIMES
         } else if ((bmap & TMPL_BIT_certToolId)
@@ -1670,8 +1705,7 @@ skiTemplateCallbackCtx(
             /* the template ID matches the ID for the template that
              * contains tombstone timestamps */
             fbSessionAddTemplatePair(session, tid, SKI_TOMBSTONE_ACCESS_TID);
-            DEBUGMSG("Will process template %#06x as tombsone access entry",
-                     tid);
+            TMPL_PROC_MSG("tombstone access");
             known_id = 1;
 #endif  /* SKIPFIX_ENABLE_TOMBSTONE_TIMES */
         } else {
@@ -1735,8 +1769,7 @@ skiTemplateCallbackCtx(
                                TMPL_BIT_reverseInitialTCPFlags |
                                TMPL_BIT_icmpTypeCodeIPv4)));
             BMAP_TMPL_CTX_SET(ctx, ctx_free_fn, out);
-            DEBUGMSG("Will process template %#06x with the YAF template",
-                     tid);
+            TMPL_PROC_MSG("YAF");
 
         /* check whether the template may be processed by the NetFlow
          * v9 template by not having any IEs outside of that set */
@@ -1821,8 +1854,7 @@ skiTemplateCallbackCtx(
                                    TMPL_BIT_NF_F_FW_EVENT |
                                    TMPL_BIT_NF_F_FW_EXT_EVENT)));
                 BMAP_TMPL_CTX_SET(ctx, ctx_free_fn, out);
-                DEBUGMSG("Will process template %#06x with the NFv9 template",
-                         tid);
+                TMPL_PROC_MSG("NFv9");
             } while (0);
         }
 
@@ -1831,38 +1863,48 @@ skiTemplateCallbackCtx(
         } else if (bmap) {
             out = 1 | (BMAP_TYPE)bmap;
             BMAP_TMPL_CTX_SET(ctx, ctx_free_fn, out);
-            DEBUGMSG("Will process template %#06x with the generic template",
-                     tid);
+            TMPL_PROC_MSG("generic");
         } else {
-            DEBUGMSG("Will process template %#06x with the ignore template",
-                     tid);
+            TMPL_PROC_MSG("ignore");
         }
     }
 
 #if TRACEMSG_LEVEL >= 2
     if (*ctx) {
-        TRACEMSG(2, ("%s [%p], bmap " BMAP_PRI ", written",
-                     prefix, (void *)tmpl, out));
+        TRACEMSG(2, ("%s bmap " BMAP_PRI ", written", prefix, out));
     }
 #endif
 
-    if (print_templates) {
-        /* Print template if enabled by the environment variable named
-         * in SKI_ENV_PRINT_TEMPLATES */
-        INFOMSG(("%s, Contains %" PRIu32 " Elements, Enabled by %s"),
-                prefix, count, SK_ENV_PRINT_TEMPLATES);
+    if (show_tmpl) {
+        char buf[0x4000];
+        char *b = buf;
+        ssize_t rem = sizeof(buf);
+        ssize_t sz;
 
-        for (i = 0; i < count && (ie = fbTemplateGetIndexedIE(tmpl, i)); ++i) {
+        *b = '\0';
+        for (i = 0;
+             i < count && (ie = fbTemplateGetIndexedIE(tmpl, i)) && rem > 2;
+             ++i)
+        {
+            assert(b < (buf + sizeof(buf)));
             if (0 == ie->ent) {
-                INFOMSG("%s, Position %3u, Length %5u, IE %11u, Name %s",
-                        prefix, i, ie->len, ie->num,
-                        ie->ref.canon->ref.name);
+                sz = snprintf(b, rem, "%s %s(%u)[%u]%s",
+                              ((i > 0) ? "," : ""),
+                              ie->ref.canon->ref.name, ie->num, ie->len,
+                             ((i < scope) ? "{scope}" : ""));
             } else {
-                INFOMSG("%s, Position %3u, Length %5u, IE %5u/%5u, Name %s",
-                        prefix, i, ie->len, ie->ent, ie->num,
-                        ie->ref.canon->ref.name);
+                sz = snprintf(b, rem, "%s %s(%u/%u)[%u]%s",
+                              ((i > 0) ? "," : ""),
+                              ie->ref.canon->ref.name, ie->ent, ie->num,
+                              ie->len, ((i < scope) ? "{scope}" : ""));
             }
+            rem -= sz;
+            b += sz;
         }
+        INFOMSG(("'%s': Contents of %stemplate %#06x (%u),"
+                 " domain %#x, %" PRIu32 " elements:%s"),
+                name, ((scope) ? "options " : ""), tid, tid,
+                domain, count, buf);
     }
 }
 
@@ -2132,17 +2174,20 @@ ski_rectype_next(
  */
 static int
 ski_yafstats_next(
-    fBuf_t                     *fbuf,
-    ski_record_t               *record,
-    const skpc_probe_t  UNUSED(*probe),
-    GError                    **err)
+    fBuf_t                 *fbuf,
+    ski_record_t           *record,
+    const skpc_probe_t     *probe,
+    GError                **err)
 {
     size_t len;
+    DEFINE_PREFIX_BUF(prefix);
 
-    TRACEMSG(2, (("Domain %#06X, TemplateID %#06X [%p], bmap " BMAP_PRI
-                  ", read by ski_yafstats_next()"),
-                 fbSessionGetDomain(fBufGetSession(fbuf)), record->tid,
-                 (void *)record->tmpl, record->bmap));
+    SK_UNUSED_PARAM(probe);
+    makeTracemsgPrefix(prefix, sizeof(prefix), skpcProbeGetName(probe),
+                       fbSessionGetDomain(fBufGetSession(fbuf)),
+                       record->tid, record->tmpl);
+    TRACEMSG(2, (("%s bmap " BMAP_PRI ", read by ski_yafstats_next()"),
+                 prefix, record->bmap));
     assert(SKI_RECTYPE_YAFSTATS == record->rectype);
 
     /* Set internal template to read a yaf stats record */
@@ -2265,10 +2310,11 @@ ski_tombstone_next(
     size_t len;
     ssize_t sz;
 
-    TRACEMSG(2, (("Domain %#06X, TemplateID %#06X [%p], bmap " BMAP_PRI
-                  ", read by ski_tombstone_next()"),
-                 fbSessionGetDomain(fBufGetSession(fbuf)), record->tid,
-                 (void *)record->tmpl, record->bmap));
+    makeTracemsgPrefix(buf, sizeof(buf), skpcProbeGetName(probe),
+                       fbSessionGetDomain(fBufGetSession(fbuf)),
+                       record->tid, record->tmpl);
+    TRACEMSG(2, (("%s bmap " BMAP_PRI ", read by ski_tombstone_next()"),
+                 buf, record->bmap));
     assert(SKI_RECTYPE_TOMBSTONE == record->rectype);
 
     /* Set internal template to read the options record */
@@ -2418,10 +2464,12 @@ ski_nf9sampling_next(
 {
     size_t len;
 
-    TRACEMSG(2, (("Domain %#06X, TemplateID %#06X [%p], bmap " BMAP_PRI
-                  ", read by ski_nf9sampling_next()"),
-                 fbSessionGetDomain(fBufGetSession(fbuf)), record->tid,
-                 (void *)record->tmpl, record->bmap));
+    DEFINE_PREFIX_BUF(prefix);
+    makeTracemsgPrefix(prefix, sizeof(prefix), skpcProbeGetName(probe),
+                       fbSessionGetDomain(fBufGetSession(fbuf)),
+                       record->tid, record->tmpl);
+    TRACEMSG(2, (("%s bmap " BMAP_PRI ", read by ski_nf9sampling_next()"),
+                 prefix, record->bmap));
     assert(SKI_RECTYPE_NF9SAMPLING == record->rectype);
 
     /* Set internal template to read the options record */
@@ -2460,17 +2508,20 @@ ski_nf9sampling_next(
  */
 static int
 ski_ignore_next(
-    fBuf_t                     *fbuf,
-    ski_record_t               *record,
-    const skpc_probe_t  UNUSED(*probe),
-    GError                    **err)
+    fBuf_t                 *fbuf,
+    ski_record_t           *record,
+    const skpc_probe_t     *probe,
+    GError                **err)
 {
     size_t len;
+    DEFINE_PREFIX_BUF(prefix);
 
-    TRACEMSG(2, (("Domain %#06X, TemplateID %#06X [%p], bmap " BMAP_PRI
-                  ", read by ski_ignore_next()"),
-                 fbSessionGetDomain(fBufGetSession(fbuf)), record->tid,
-                 (void *)record->tmpl, record->bmap));
+    SK_UNUSED_PARAM(probe);
+    makeTracemsgPrefix(prefix, sizeof(prefix), skpcProbeGetName(probe),
+                       fbSessionGetDomain(fBufGetSession(fbuf)),
+                       record->tid, record->tmpl);
+    TRACEMSG(2, (("%s bmap " BMAP_PRI ", read by ski_ignore_next()"),
+                 prefix, record->bmap));
 
     if (!fBufSetInternalTemplate(fbuf, SKI_IGNORE_TID, err)) {
         return FALSE;
@@ -3173,10 +3224,12 @@ ski_fixrec_next(
     int have_tcp_stml = 0;
     rwRec *fwd_rec;
 
-    TRACEMSG(2, (("Domain %#06X, TemplateID %#06X [%p], bmap " BMAP_PRI
-                  ", read by ski_fixrec_next()"),
-                 fbSessionGetDomain(fBufGetSession(fbuf)), record->tid,
-                 (void *)record->tmpl, record->bmap));
+    DEFINE_PREFIX_BUF(prefix);
+    makeTracemsgPrefix(prefix, sizeof(prefix), skpcProbeGetName(probe),
+                       fbSessionGetDomain(fBufGetSession(fbuf)),
+                       record->tid, record->tmpl);
+    TRACEMSG(2, (("%s bmap " BMAP_PRI ", read by ski_fixrec_next()"),
+                 prefix, record->bmap));
     assert(SKI_RECTYPE_FIXREC == record->rectype);
 
     /* Get a local handle to the record and clear it */
@@ -3977,10 +4030,12 @@ ski_yafrec_next(
     rwRec *fwd_rec;
     rwRec *rev_rec;
 
-    TRACEMSG(2, (("Domain %#06X, TemplateID %#06X [%p], bmap " BMAP_PRI
-                  ", read by ski_yafrec_next()"),
-                 fbSessionGetDomain(fBufGetSession(fbuf)), record->tid,
-                 (void *)record->tmpl, record->bmap));
+    DEFINE_PREFIX_BUF(prefix);
+    makeTracemsgPrefix(prefix, sizeof(prefix), skpcProbeGetName(probe),
+                       fbSessionGetDomain(fBufGetSession(fbuf)),
+                       record->tid, record->tmpl);
+    TRACEMSG(2, (("%s bmap " BMAP_PRI ", read by ski_yafrec_next()"),
+                 prefix, record->bmap));
     assert(SKI_RECTYPE_YAFREC == record->rectype);
 
     /* Get a local handle to the record and clear it */
@@ -4440,10 +4495,12 @@ ski_nf9rec_next(
     rwRec *fwd_rec;
     rwRec *rev_rec;
 
-    TRACEMSG(2, (("Domain %#06X, TemplateID %#06X [%p], bmap " BMAP_PRI
-                  ", read by ski_nf9rec_next()"),
-                 fbSessionGetDomain(fBufGetSession(fbuf)), record->tid,
-                 (void *)record->tmpl, record->bmap));
+    DEFINE_PREFIX_BUF(prefix);
+    makeTracemsgPrefix(prefix, sizeof(prefix), skpcProbeGetName(probe),
+                       fbSessionGetDomain(fBufGetSession(fbuf)),
+                       record->tid, record->tmpl);
+    TRACEMSG(2, (("%s bmap " BMAP_PRI ", read by ski_nf9rec_next()"),
+                 prefix, record->bmap));
     assert(SKI_RECTYPE_NF9REC == record->rectype);
 
     /* Get a local handle to the record and clear it */
@@ -4486,7 +4543,7 @@ ski_nf9rec_next(
     if (skpcProbeGetQuirks(probe) & SKPC_QUIRK_NF9_OUT_IS_REVERSE) {
         TRACEMSG(2, (("Modifying record bmap from " BMAP_PRI " to " BMAP_PRI
                       " due to nf9-out-is-reverse"),
-                     record->bmap, record->bmap |= NF9REC_INITIATOR));
+                     record->bmap, record->bmap | NF9REC_INITIATOR));
         record->bmap |= NF9REC_INITIATOR;
     }
 

@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skaggbag.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: skaggbag.c c56bd724bfc8 2019-10-11 19:38:12Z mthomas $");
 
 #include <silk/skaggbag.h>
 #include <silk/skipaddr.h>
@@ -178,9 +178,9 @@ static const ab_type_info_t ab_type_info_key[] = {
     {"any-snmp",         2, SKAGGBAG_FIELD_ANY_SNMP,        SK_AGGBAG_KEY},
     {"any-time",         4, SKAGGBAG_FIELD_ANY_TIME,        SK_AGGBAG_KEY},
     {"custom-key",       8, SKAGGBAG_FIELD_CUSTOM_KEY,      SK_AGGBAG_KEY},
-    {"sip-country",      2, SKAGGBAG_FIELD_SIP_COUNTRY,     SK_AGGBAG_KEY},
-    {"dip-country",      2, SKAGGBAG_FIELD_DIP_COUNTRY,     SK_AGGBAG_KEY},
-    {"any-country",      2, SKAGGBAG_FIELD_ANY_COUNTRY,     SK_AGGBAG_KEY},
+    {"scc",              2, SKAGGBAG_FIELD_SIP_COUNTRY,     SK_AGGBAG_KEY},
+    {"dcc",              2, SKAGGBAG_FIELD_DIP_COUNTRY,     SK_AGGBAG_KEY},
+    {"any-cc",           2, SKAGGBAG_FIELD_ANY_COUNTRY,     SK_AGGBAG_KEY},
     {"sip-pmap",         4, SKAGGBAG_FIELD_SIP_PMAP,        SK_AGGBAG_KEY},
     {"dip-pmap",         4, SKAGGBAG_FIELD_DIP_PMAP,        SK_AGGBAG_KEY},
     {"any-ip-pmap",      4, SKAGGBAG_FIELD_ANY_IP_PMAP,     SK_AGGBAG_KEY},

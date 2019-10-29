@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sku-string.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: sku-string.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/skipaddr.h>
@@ -354,7 +354,7 @@ char *
 num2dot(
     uint32_t            ip)
 {
-    static char outbuf[SK_NUM2DOT_STRLEN];
+    static char outbuf[SKIPADDR_STRLEN];
     skipaddr_t ipaddr;
 
     skipaddrSetV4(&ipaddr, &ip);

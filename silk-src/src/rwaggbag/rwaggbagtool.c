@@ -20,10 +20,11 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwaggbagtool.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: rwaggbagtool.c c56bd724bfc8 2019-10-11 19:38:12Z mthomas $");
 
 #include <silk/skaggbag.h>
 #include <silk/skbag.h>
+#include <silk/skcountry.h>
 #include <silk/skipaddr.h>
 #include <silk/skipset.h>
 #include <silk/skstream.h>
@@ -613,6 +614,9 @@ createStringmap(
                               sm_entry.name, skStringMapStrerror(sm_err));
                 return -1;
             }
+            if (SKAGGBAG_FIELD_ANY_COUNTRY == type) {
+                break;
+            }
         }
     }
 
@@ -690,7 +694,7 @@ chooseAction(
  *    field of the 'pv' union is set to the value.
  *
  *    Return 0 on success; on error, print an error message and return
- *    -1.
+ *    non-zero.
  */
 static int
 parseSingleField(
@@ -881,6 +885,12 @@ parseSingleField(
         pv->pv.pv_int = (sksiteFlowtypeLookupByClassIDType(
                              parsed_value[SKAGGBAG_FIELD_FTYPE_CLASS].pv.pv_int,
                              str_value));
+        break;
+
+      case SKAGGBAG_FIELD_SIP_COUNTRY:
+      case SKAGGBAG_FIELD_DIP_COUNTRY:
+      case SKAGGBAG_FIELD_ANY_COUNTRY:
+        pv->pv.pv_int = skCountryNameToCode(str_value);
         break;
 
       default:
@@ -1783,6 +1793,15 @@ abtoolToBag(
         break;
       case SKAGGBAG_FIELD_CUSTOM_KEY:
         k_type = SKBAG_FIELD_CUSTOM;
+        break;
+      case SKAGGBAG_FIELD_SIP_COUNTRY:
+        k_type = SKBAG_FIELD_SIP_COUNTRY;
+        break;
+      case SKAGGBAG_FIELD_DIP_COUNTRY:
+        k_type = SKBAG_FIELD_DIP_COUNTRY;
+        break;
+      case SKAGGBAG_FIELD_ANY_COUNTRY:
+        k_type = SKBAG_FIELD_ANY_COUNTRY;
         break;
       default:
         k_type = SKBAG_FIELD_CUSTOM;

@@ -21,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: ipfixsource.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: ipfixsource.c 17d730af39a6 2019-10-28 15:44:53Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/redblack.h>
@@ -186,7 +186,7 @@ typedef struct peeraddr_source_st {
 
 /* whether to print templates to log file as they arrive
  * (SK_ENV_PRINT_TEMPLATES) */
-int print_templates = 0;
+int show_templates = 0;
 
 /* do the names of IE 48, 49, 50 follow fixbuf-1.x or 2.x? */
 uint32_t sampler_flags = 0;
@@ -237,10 +237,12 @@ static int
 listener_to_source_base_find(
     const void         *va,
     const void         *vb,
-    const void  UNUSED(*ctx))
+    const void         *ctx)
 {
     const fbListener_t *a = ((const skIPFIXSourceBase_t *)va)->listener;
     const fbListener_t *b = ((const skIPFIXSourceBase_t *)vb)->listener;
+    SK_UNUSED_PARAM(ctx);
+
     return ((a < b) ? -1 : (a > b));
 }
 
@@ -257,10 +259,11 @@ static int
 peeraddr_compare(
     const void         *va,
     const void         *vb,
-    const void  UNUSED(*ctx))
+    const void         *ctx)
 {
     const sk_sockaddr_t *a = ((const peeraddr_source_t *)va)->addr;
     const sk_sockaddr_t *b = ((const peeraddr_source_t *)vb)->addr;
+    SK_UNUSED_PARAM(ctx);
 
     return skSockaddrCompare(a, b, SK_SOCKADDRCOMP_NOPORT);
 }
@@ -275,8 +278,9 @@ static int
 pointer_cmp(
     const void         *va,
     const void         *vb,
-    const void  UNUSED(*ctx))
+    const void         *ctx)
 {
+    SK_UNUSED_PARAM(ctx);
     return ((va < vb) ? -1 : (va > vb));
 }
 
@@ -294,6 +298,7 @@ free_source(
     TRACE_ENTRY;
 
     if (source == NULL) {
+        TRACEMSG(3, ("source was null"));
         TRACE_RETURN;
     }
 
@@ -307,10 +312,17 @@ free_source(
         rbdestroy(source->connections);
     }
     if (source->readbuf) {
+        TRACEMSG(3, ("freeing fbuf"));
         fBufFree(source->readbuf);
     }
     if (source->fileptr.of_fp) {
+        TRACEMSG(3, ("closing file"));
         skFileptrClose(&source->fileptr, &WARNINGMSG);
+    }
+    if (source->file_conn) {
+        TRACEMSG(3, ("freeing file_conn (%zu bytes)",
+                     sizeof(source->file_conn)));
+        free(source->file_conn);
     }
 
     free(source);
@@ -320,8 +332,7 @@ free_source(
 
 /*
  *     The fixbufConnect() function is passed to fbListenerAlloc() as
- *     its 'appinit' callback (fbListenerAppInit_fn) for TCP sources
- *     and UDP sources if libfixbuf supports multi-UDP (v1.2.0 or later).
+ *     its 'appinit' callback (fbListenerAppInit_fn).
  *     This function is called from within the fbListenerWait() call
  *     when a new connection to the listening socket is made.  (In
  *     addition, for UDP sources, it is called directly by
@@ -335,15 +346,15 @@ free_source(
  */
 static gboolean
 fixbufConnect(
-    fbListener_t           *listener,
-    void                  **ctx,
-    int              UNUSED(fd),
-    struct sockaddr        *peer,
-    size_t                  peerlen,
-    GError                **err)
+    fbListener_t       *listener,
+    void              **ctx,
+    int                 fd,
+    struct sockaddr    *peer,
+    size_t              peerlen,
+    GError            **err)
 {
     fbCollector_t *collector;
-    char addr_buf[2 * SK_NUM2DOT_STRLEN];
+    char addr_buf[2 * SKIPADDR_STRLEN];
     skIPFIXSourceBase_t target_base;
     skIPFIXSourceBase_t *base;
     const peeraddr_source_t *found_peer;
@@ -354,6 +365,7 @@ fixbufConnect(
     gboolean retval = 0;
 
     TRACE_ENTRY;
+    SK_UNUSED_PARAM(fd);
 
     if (peer == NULL) {
         /* This function is being called for a UDP listener at init
@@ -528,7 +540,7 @@ fixbufDisconnect(
 
     /* For older fixbuf, only TCP connections contain the peer addr */
     if (conn->peer_len) {
-        char addr_buf[2 * SK_NUM2DOT_STRLEN];
+        char addr_buf[2 * SKIPADDR_STRLEN];
 
         skSockaddrString(addr_buf, sizeof(addr_buf), &conn->peer_addr);
         if (conn->ob_domain) {
@@ -562,6 +574,7 @@ skiInfoModel(
     fbInfoModel_t *m = ski_model;
 
     if (!m) {
+        TRACEMSG(4, ("Allocating an info model"));
         m = fbInfoModelAlloc();
         /* call a function in infomodel.c to update the info model
          * with the info elements defined in the .xml file(s) in the
@@ -583,6 +596,7 @@ skiInfoModelFree(
 
     ski_model = NULL;
     if (m) {
+        TRACEMSG(4, ("Freeing an info model"));
         fbInfoModelFree(m);
     }
 }
@@ -617,7 +631,7 @@ skiTeardown(
  */
 static fbListener_t *
 skiCreateListener(
-    fbConnSpec_t           *spec,
+    skIPFIXSourceBase_t    *base,
     GError                **err)
 {
     fbSession_t *session;
@@ -651,7 +665,7 @@ skiCreateListener(
     /* Allocate a listener.  'fixbufConnect' is called on each
      * collection attempt; vetoes connection attempts and creates
      * application context. */
-    listener = fbListenerAlloc(spec, session, fixbufConnect,
+    listener = fbListenerAlloc(base->connspec, session, fixbufConnect,
                                fixbufDisconnect, err);
     TRACE_RETURN(listener);
 
@@ -671,6 +685,7 @@ skiCreateListener(
  */
 static fBuf_t *
 skiCreateReadBufferForFP(
+    void               *ctx,
     FILE               *fp,
     GError            **err)
 {
@@ -688,7 +703,7 @@ skiCreateReadBufferForFP(
     }
 
     /* Create a buffer with the session and a collector */
-    fbuf = fBufAllocForCollection(session, fbCollectorAllocFP(NULL, fp));
+    fbuf = fBufAllocForCollection(session, fbCollectorAllocFP(ctx, fp));
 
     /* Make certain the fbuf has an internal template */
     if (!fBufSetInternalTemplate(fbuf, SKI_YAFSTATS_TID, err)) {
@@ -801,8 +816,18 @@ ipfixSourceCreateFromFile(
     source->probe = probe;
     source->name = skpcProbeGetName(probe);
 
+    /* Create a connection object that points to the source, and store
+     * it on the source */
+    source->file_conn =
+        (skIPFIXConnection_t *)calloc(1, sizeof(skIPFIXConnection_t));
+    if (NULL == source->file_conn) {
+        goto ERROR;
+    }
+    source->file_conn->source = source;
+
     /* Create a file-based fBuf_t for the source */
-    source->readbuf = skiCreateReadBufferForFP(source->fileptr.of_fp, &err);
+    source->readbuf = skiCreateReadBufferForFP((void *)source->file_conn,
+                                               source->fileptr.of_fp, &err);
     if (source->readbuf == NULL) {
         if (err) {
             ERRMSG("%s: %s", "skiCreateReadBufferForFP", err->message);
@@ -823,6 +848,7 @@ ipfixSourceCreateFromFile(
         if (source->readbuf) {
             fBufFree(source->readbuf);
         }
+        free(source->file_conn);
         free(source);
     }
     if (base) {
@@ -1266,7 +1292,7 @@ ipfixSourceCreateFromSockaddr(
 
         /* Create the listener */
         pthread_mutex_lock(&create_listener_mutex);
-        base->listener = skiCreateListener(base->connspec, &err);
+        base->listener = skiCreateListener(base, &err);
         if (NULL == base->listener) {
             pthread_mutex_unlock(&create_listener_mutex);
             goto ERROR;
@@ -1391,13 +1417,15 @@ ipfixSourceCreateFromSockaddr(
  */
 static void
 ipfixGLogHandler(
-    const gchar     UNUSED(*log_domain),
-    GLogLevelFlags          log_level,
-    const gchar            *message,
-    gpointer         UNUSED(user_data))
+    const gchar        *log_domain,
+    GLogLevelFlags      log_level,
+    const gchar        *message,
+    gpointer            user_data)
 {
     /* In syslog, CRIT is worse than ERR; in Glib2 ERROR is worse than
      * CRITICAL. */
+    SK_UNUSED_PARAM(log_domain);
+    SK_UNUSED_PARAM(user_data);
 
     switch (log_level & G_LOG_LEVEL_MASK) {
       case G_LOG_LEVEL_CRITICAL:
@@ -1426,11 +1454,15 @@ ipfixGLogHandler(
  */
 static void
 ipfixGLogHandlerVoid(
-    const gchar     UNUSED(*log_domain),
-    GLogLevelFlags   UNUSED(log_level),
-    const gchar     UNUSED(*message),
-    gpointer         UNUSED(user_data))
+    const gchar        *log_domain,
+    GLogLevelFlags      log_level,
+    const gchar        *message,
+    gpointer            user_data)
 {
+    SK_UNUSED_PARAM(*log_domain);
+    SK_UNUSED_PARAM(log_level);
+    SK_UNUSED_PARAM(*message);
+    SK_UNUSED_PARAM(user_data);
     return;
 }
 
@@ -1485,11 +1517,11 @@ skIPFIXSourcesSetup(
     }
 #endif
 
-    /* Determine whether to print templates to the log file as they
+    /* Determine whether to write templates to the log file as they
      * arrive. */
     env = getenv(SK_ENV_PRINT_TEMPLATES);
     if (NULL != env && *env && strcmp("0", env)) {
-        print_templates = 1;
+        show_templates = 1;
     }
 
     /* set a log handler for messages from glib, which we always want

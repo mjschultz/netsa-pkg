@@ -93,6 +93,19 @@ the characters C<...>):
 
  $ rwipaimport --catalog=testbag --start=... --end=... test.bag
 
+=head1 ENVIRONMENT
+
+=over 4
+
+=item SILK_PATH
+
+This environment variable gives the root of the directory tree where
+the tools are installed.  When searching for the F<silk-ipa.conf>
+configuration file, B<rwipaimport> may use this environment variable.
+See the L</FILES> section for details.
+
+=back
+
 =head1 FILES
 
 =over 4
@@ -122,7 +135,7 @@ B<ipaexport(1)>, B<ipaquery(1)>
 
 =cut
 
-$SiLK: rwipaimport.pod cd09f0a5fcc6 2014-06-14 15:43:33Z mthomas $
+$SiLK: rwipaimport.pod 9e3cbf975420 2019-09-24 14:42:59Z mthomas $
 
 Local Variables:
 mode:text

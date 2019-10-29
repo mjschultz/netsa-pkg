@@ -301,7 +301,7 @@ header and space for thirty 48-byte flow records, even if fewer
 NetFlow records are valid.  B<rwflowpack> will accept NetFlow v5 files
 that have been compressed with the B<gzip(1)> program.
 
-=item B<log-flags> { B<none> | { B<all> | B<bad> | B<default> | B<firewall-event> | B<missing> | B<record-timestamps> | B<sampling> | ... } }
+=item B<log-flags> { B<none> | { B<all> | B<bad> | B<default> | B<firewall-event> | B<missing> | B<record-timestamps> | B<sampling> | B<show-templates> | ... } }
 
 This optional command accepts a comma- and/or space-separated list of
 names that specify which messages to log for this probe.  If not
@@ -357,7 +357,20 @@ Write messages constructed by parsing the NetFlow v9 Options Templates
 that specify the sampling algorithm (when samplingAlgorithm and
 samplingInterval IEs are present) or flow sampler mode (when
 flowSamplerMode and flowSamplerRandomInterval IEs are present).
-Requires libfixbuf-1.4.0 or later.  I<Since SiLK 3.8.0>.
+I<Since SiLK 3.8.0>.
+
+=item I<show-templates>
+
+Write messages to the log file describing each IPFIX template that is
+read by this file-base or TCP probe.  (UDP probes must still rely on
+the SILK_IPFIX_PRINT_TEMPLATES environment variable.)  The message
+contains embedded new lines, with the template ID and domain on the
+first line, and each of the template's elements on the following
+lines.  Each element is described by its name, its IE number with the
+private enterprise number if any, and its length in the template.
+Scope elements in options templates are marked.  The format is that
+described in Section 10.2 of
+L<RFC7013|https://tools.ietf.org/html/rfc7013>.  I<Since SiLK 3.19.0.>
 
 =back
 
@@ -1456,7 +1469,7 @@ The B<quirks> command was introduced in SiLK 3.8.0.
 
 =cut
 
-$SiLK: sensor.conf.pod 051cadca977b 2019-04-16 18:12:18Z mthomas $
+$SiLK: sensor.conf.pod 17d730af39a6 2019-10-28 15:44:53Z mthomas $
 
 Local Variables:
 mode:text

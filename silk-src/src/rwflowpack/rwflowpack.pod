@@ -334,7 +334,7 @@ used to move the files between the machines.
 Additional reasons one may want to use C<incremental-files>
 output-mode are to support having multiple data repositories or to
 allow additional processing of the SiLK Flow records (such as by the
-Analysis Pipeline (L<http://tools.netsa.cert.org/analysis-pipeline/>).
+Analysis Pipeline (L<http://tools.netsa.cert.org/analysis-pipeline/>)).
 
 B<Note:> This output-mode was introduced in SiLK 3.6.0.  This mode is
 similar to the C<sending> output-mode and is meant to replace it.  In
@@ -975,16 +975,10 @@ configured, then exit the application.
 =item SILK_IPFIX_PRINT_TEMPLATES
 
 When set to 1, B<rwflowpack> writes messages to the log file
-describing each IPFIX and NetFlow v9 template it receives.  The first
-message includes the domain, the template identifier, the number of
-information elements in the template, and the name of this environment
-variable.  Next, a message is printed for each information element in
-the template where the message contains the domain id, the template
-id, and the element's position in the template, length in octets,
-numeric information element identifier, and name.  For elements
-defined by a private enterprise, the IE number has two parts: the
-private enterprise number and the information element number,
-separated by a slash (/).  (Requires libfixbuf 1.4.0 or later.)
+describing each IPFIX and NetFlow v9 template it receives.  This is
+equivalent to adding C<show-templates> to the C<log-flags> setting for
+each probe in the F<sensor.conf> file.  See the B<sensor.conf(5)>
+manual page for the format of these messages.
 I<Since SiLK 3.8.2.>
 
 =item SILK_LIBFIXBUF_SUPPRESS_WARNINGS
@@ -1124,7 +1118,7 @@ attempt to write to the same hourly file simultaneously.
 
 =cut
 
-$SiLK: rwflowpack.pod 6d21d1f3d455 2017-06-28 16:32:15Z mthomas $
+$SiLK: rwflowpack.pod c317db03ed37 2019-10-11 14:47:18Z mthomas $
 
 Local variables:
 mode:text

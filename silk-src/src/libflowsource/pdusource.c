@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pdusource.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: pdusource.c 48577f5787ed 2019-10-10 14:54:05Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/rwrec.h>
@@ -219,10 +219,11 @@ static int
 pdu_engine_compare(
     const void         *va,
     const void         *vb,
-    const void  UNUSED(*ctx))
+    const void         *ctx)
 {
     const pdu_engine_info_t *a = (const pdu_engine_info_t*)va;
     const pdu_engine_info_t *b = (const pdu_engine_info_t*)vb;
+    SK_UNUSED_PARAM(ctx);
 
     if (a->id < b->id) {
         return -1;

@@ -31,7 +31,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_IPFIXSOURCE_H, "$SiLK: ipfixsource.h 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENTVAR(rcsID_IPFIXSOURCE_H, "$SiLK: ipfixsource.h 17d730af39a6 2019-10-28 15:44:53Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/skipfix.h>
@@ -44,7 +44,9 @@ RCSIDENTVAR(rcsID_IPFIXSOURCE_H, "$SiLK: ipfixsource.h 945cf5167607 2019-01-07 1
 
 /*
  *    Name of environment variable that, when set, cause SiLK to print
- *    the templates that it receives to the log.
+ *    the templates that it receives to the log.  This adds
+ *    SOURCE_LOG_TEMPLATES to a probe's log_flags, but it also sets
+ *    the global show_templates variable used by UDP collectors.
  */
 #define SK_ENV_PRINT_TEMPLATES  "SILK_IPFIX_PRINT_TEMPLATES"
 
@@ -220,6 +222,9 @@ typedef struct ski_yafstats_st {
 struct skIPFIXSourceBase_st;
 typedef struct skIPFIXSourceBase_st skIPFIXSourceBase_t;
 
+struct skIPFIXConnection_st;
+typedef struct skIPFIXConnection_st skIPFIXConnection_t;
+
 /*
  *    skIPFIXSource_t object represents a single source, as mapped to
  *    a single probe.
@@ -286,6 +291,9 @@ struct skIPFIXSource_st {
 
     /* file for file-based reads */
     sk_fileptr_t            fileptr;
+
+    /* connection for file-based reads */
+    skIPFIXConnection_t    *file_conn;
 
     /* for NetFlowV9/sFlow sources, a red-black tree of
      * skIPFIXConnection_t objects that currently point to this
@@ -363,10 +371,16 @@ struct skIPFIXSourceBase_st {
 
 
 /*
- *    Data for "active" connections.  Used when multiple peers send
- *    data to a single port.
+ *    skIPFIXConnection_t holds data for "active" connections.  One of
+ *    these is set as the context pointer for an fbCollector_t, for
+ *    both network and file based collectors.
+ *
+ *    In the networking case, there is a separate skIPFIXConnection_t
+ *    for each peer that connects, even when they are connecting on
+ *    the same port (the same skIPFIXSource_t).  This permits
+ *    maintaining seprate statistics per peer.
  */
-typedef struct skIPFIXConnection_st {
+struct skIPFIXConnection_st {
     skIPFIXSource_t    *source;
     ski_yafstats_t      prev_yafstats;
     /* Address of the host that contacted us */
@@ -374,7 +388,7 @@ typedef struct skIPFIXConnection_st {
     size_t              peer_len;
     /* The observation domain id. */
     uint32_t            ob_domain;
-} skIPFIXConnection_t;
+};
 
 
 /* FUNCTION DECLARATIONS */
@@ -455,8 +469,13 @@ ipfixSourceGetRecordFromFile(
  *    If non-zero, print the templates when they arrive.  This can be
  *    set by defining the environment variable specified in
  *    SK_ENV_PRINT_TEMPLATES ("SILK_IPFIX_PRINT_TEMPLATES").
+ *
+ *    When this variable is true, the SOURCE_LOG_TEMPLATES bit is set
+ *    on a probe's flags.  The variable needs to be public since it is
+ *    required for UDP ipfix collectors due to the way that fixbuf
+ *    sets (or doesn't set) the context variables.
  */
-extern int print_templates;
+extern int show_templates;
 
 /**
  *    The names of IE 48, 49, 50 used by fixbuf-1.x (flowSamplerFOO)

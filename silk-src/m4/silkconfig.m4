@@ -4,7 +4,7 @@ dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in ../LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: silkconfig.m4 daebcf133fc8 2019-05-23 22:16:37Z mthomas $")
+dnl RCSIDENT("$SiLK: silkconfig.m4 288d52a2e0d1 2019-10-17 18:29:26Z mthomas $")
 
 # ---------------------------------------------------------------------------
 # SILK_AC_COMPILER
