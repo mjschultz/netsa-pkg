@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2019 by Carnegie Mellon University.
+** Copyright (C) 2001-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_INTERVAL_H, "$SiLK: interval.h 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENTVAR(rcsID_INTERVAL_H, "$SiLK: interval.h ef14e54179be 2020-04-14 21:57:45Z mthomas $");
 
 
 int

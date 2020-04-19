@@ -1,13 +1,13 @@
-dnl Copyright (C) 2003-2019 by Carnegie Mellon University.
+dnl Copyright (C) 2003-2020 by Carnegie Mellon University.
 dnl
 dnl @OPENSOURCE_LICENSE_START@
 dnl See license information in LICENSE.txt
 dnl @OPENSOURCE_LICENSE_END@
 
-dnl RCSIDENT("$SiLK: configure.ac 2c50d11b0aa9 2019-10-24 22:33:24Z mthomas $")
+dnl RCSIDENT("$SiLK: configure.ac 09f20fda742a 2020-04-16 20:58:11Z mthomas $")
 
 AC_PREREQ(2.64)
-AC_INIT([SiLK],[3.19.0],[netsa-help@cert.org],[silk],[http://tools.netsa.cert.org/silk/])
+AC_INIT([SiLK],[3.19.1],[netsa-help@cert.org],[silk],[http://tools.netsa.cert.org/silk/])
 AC_CONFIG_SRCDIR([src/libsilk/silk.h])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_CONFIG_MACRO_DIR([m4])
@@ -45,8 +45,8 @@ AH_TOP([/*
 ])
 AX_PREFIX_CONFIG_H([src/include/silk/silk_config.h], [SK], [src/include/silk/silk_config1.h])
 
-AC_REVISION($SiLK: configure.ac 2c50d11b0aa9 2019-10-24 22:33:24Z mthomas $)
-AC_COPYRIGHT([Copyright (C) 2001-2019 by Carnegie Mellon University
+AC_REVISION($SiLK: configure.ac 09f20fda742a 2020-04-16 20:58:11Z mthomas $)
+AC_COPYRIGHT([Copyright (C) 2001-2020 by Carnegie Mellon University
 GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
 Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013])
 

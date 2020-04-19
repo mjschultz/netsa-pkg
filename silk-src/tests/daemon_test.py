@@ -1,5 +1,5 @@
 #######################################################################
-# Copyright (C) 2009-2019 by Carnegie Mellon University.
+# Copyright (C) 2009-2020 by Carnegie Mellon University.
 #
 # @OPENSOURCE_LICENSE_START@
 # See license information in ../LICENSE.txt
@@ -8,7 +8,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: daemon_test.py 945cf5167607 2019-01-07 18:54:17Z mthomas $
+# $SiLK: daemon_test.py ef14e54179be 2020-04-14 21:57:45Z mthomas $
 #######################################################################
 from __future__ import print_function
 import numbers
@@ -18,8 +18,10 @@ import select
 import shutil
 import signal
 import socket
+import struct
 import subprocess
 import sys
+import time
 import tempfile
 import threading
 
@@ -197,6 +199,141 @@ class TcpSender(object):
 
     def stop(self):
         self._running = False
+
+
+class UdpSender(object):
+    def __init__(self, file, port, log, address="localhost"):
+        self._file = file
+        self._port = port
+        self._log = log
+        self._address = address
+        self._running = False
+
+    def start(self):
+        thread = threading.Thread(target = self.go)
+        thread.daemon = True
+        thread.start()
+
+    def go(self):
+        # Some log messages helpful for debugging are commented with "#|"
+        #
+        self._running = True
+        sock = None
+        # Try each address until we connect to one; no need to report
+        # errors here
+        for res in socket.getaddrinfo(self._address, self._port,
+                                      socket.AF_UNSPEC, socket.SOCK_DGRAM):
+            af, socktype, proto, canonname, sa = res
+            try:
+                sock = socket.socket(af, socktype, proto)
+            except socket.error:
+                sock = None
+                continue
+            try:
+                sock.connect(sa)
+            except socket.error:
+                sock.close()
+                sock = None
+                continue
+            break
+        if sock is None:
+            self._log("Could not open connection to [%s]:%d" %
+                      (self._address, self._port))
+            sys.exit(1)
+        self._log("Connected to [%s]:%d" % (self._address, self._port))
+        # seconds to sleep after sending a packet
+        sleeptime = 0.000200
+        # the loopback MTU
+        MTU = 4096
+        # mapping from Template IDs to lengths
+        tidtolength = {
+            0x9dd0 : 48,
+            0x9dd1 : 56,
+            0x9dd2 : 56,
+            0x9dd3 : 56,
+            0x9dd4 : 56,
+            0x9ed0 : 88,
+            0x9ed1 : 88,
+            0x9ed2 : 88,
+            0x9ed3 : 88,
+            0x9ed4 : 96,
+            # Template from SiLK 3.11.0 and earlier
+            0xafea : 120
+        }
+        # parsing an IPFIX msg header
+        hdrstruct = struct.Struct("!HHIII")
+        hdrlen = hdrstruct.size
+        # parsing an IPFIX set header
+        setstruct = struct.Struct("!HH")
+        setlen = setstruct.size
+        # to update the sequence number in a header
+        seqnumstruct = struct.Struct("!I")
+        # number of records, for handling sequence number
+        reccount = 0
+        while self._running:
+            hdr = self._file.read(hdrlen)
+            if len(hdr) != hdrlen:
+                self._running = False
+                continue
+            (vers, octets, exptime, count, domain) = hdrstruct.unpack(hdr)
+            #|self._log("Read a msg hdr ver=%d, oct=%d, tim=%d, cnt=%d, dom=%d"
+            #|          % (vers, octets, exptime, count, domain))
+            if vers != 10 or octets < hdrlen:
+                self._running = False
+                self._log("Bad IPFIX version (%d) or length (%d)" %
+                          (vers, octets))
+                continue
+            msg = self._file.read(octets - hdrlen)
+            if len(msg) != octets - hdrlen:
+                self._log("Short read (expected %d, got %d)" %
+                          (octets - hdrlen, len(msg)))
+                self._running = False
+                continue
+            while self._running and len(msg) > setlen:
+                # get next set from the message
+                (id, sz) = setstruct.unpack(msg[0:setlen])
+                #|self._log("Got set id=%d, sz=%d, remaing msg = %d" %
+                #|          (id, sz, len(msg) - sz))
+                if sz < setlen:
+                    self._log("Bad set length %d, id was %d" % (sz, id))
+                    msg = ""
+                    continue
+                setdata = msg[0:sz]
+                msg = msg[sz:]
+                # build the new single-set message
+                mysize = hdrlen + sz
+                if mysize > MTU:
+                    self._log("Not sending large packet (%d octets)" % mysize)
+                    continue
+                hdr = hdrstruct.pack(vers, mysize, exptime, reccount, domain)
+                #|self._log("Sending msg ver=%d, oct=%d, tim=%d, cnt=%d, dom=%d"
+                #|          % (vers, mysize, exptime, reccount, domain))
+                # update record count
+                if id >= 256:
+                    try:
+                        reclen = tidtolength[id]
+                        reccount = reccount + int((sz - setlen) / reclen)
+                    except KeyError:
+                        self._log("Set uses unknown id %d" % id)
+                # send it
+                try:
+                    sock.send(hdr + setdata)
+                except socket.error as err:
+                    if isinstance(err, tuple):
+                        errmsg = err[1]
+                    else:
+                        errmsg = err
+                    self._log("Error sending to [%s]:%d: %s" %
+                              (self._address, self._port, errmsg))
+                time.sleep(sleeptime)
+            #|self._log("At end of message, count = %d, reccount = %d" %
+            #|          (count, reccount))
+        # Done
+        sock.close()
+
+    def stop(self):
+        self._running = False
+
 
 def get_ephemeral_port():
     sock = socket.socket()

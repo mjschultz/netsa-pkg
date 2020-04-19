@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2019 by Carnegie Mellon University.
+** Copyright (C) 2004-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -21,7 +21,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_LIBFLOWSOURCE_H, "$SiLK: libflowsource.h c317db03ed37 2019-10-11 14:47:18Z mthomas $");
+RCSIDENTVAR(rcsID_LIBFLOWSOURCE_H, "$SiLK: libflowsource.h ef14e54179be 2020-04-14 21:57:45Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/rwrec.h>

@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2010-2019 by Carnegie Mellon University.
+** Copyright (C) 2010-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -15,7 +15,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcs_SKMEMPOOL_TEST, "$SiLK: skmempool-test.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENTVAR(rcs_SKMEMPOOL_TEST, "$SiLK: skmempool-test.c ef14e54179be 2020-04-14 21:57:45Z mthomas $");
 
 /* Note: including C file here */
 #include <skmempool.c>

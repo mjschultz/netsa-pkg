@@ -1,3 +1,12 @@
+SiLK-3.19.1 Release, 2020-Apr-16
+
+* PySiLK
+  -- Add the SilkFile.skip() method.
+  -- Fix compatibility with Python 3.7 and 3.8.
+* Building
+  -- Fix a compilation error when building SiLK without libfixbuf.
+
+
 SiLK-3.19.0 Release, 2019-Oct-28
 
 * rwaggbag, rwaggbagbuild, rwaggbagcat, rwaggbagtool

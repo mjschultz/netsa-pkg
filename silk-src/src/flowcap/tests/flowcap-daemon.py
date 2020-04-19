@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #######################################################################
-# Copyright (C) 2009-2019 by Carnegie Mellon University.
+# Copyright (C) 2009-2020 by Carnegie Mellon University.
 #
 # @OPENSOURCE_LICENSE_START@
 # See license information in ../../../LICENSE.txt
@@ -9,7 +9,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: flowcap-daemon.py 945cf5167607 2019-01-07 18:54:17Z mthomas $
+# $SiLK: flowcap-daemon.py ef14e54179be 2020-04-14 21:57:45Z mthomas $
 #######################################################################
 from __future__ import print_function
 import optparse
@@ -22,7 +22,7 @@ import sys
 import os
 import os.path
 
-from daemon_test import Dirobject, PduSender, TcpSender, TimedReadline, string_write
+from daemon_test import Dirobject, PduSender, TcpSender, TimedReadline, UdpSender, string_write
 
 VERBOSE = False
 logfile = None
@@ -58,6 +58,11 @@ def send_network_data(options):
     split = [x.split(',') for x in options.tcp]
     send_list += [TcpSender(open(fname, "rb"), int(port), address=addr, log=log)
                   for [fname, addr, port] in split]
+    # options.udp is empty or a list of strings of the form
+    # "<filename>,<address>,<port>"
+    split = [x.split(',') for x in options.udp]
+    send_list += [UdpSender(open(fname, "rb"), int(port), address=addr, log=log)
+                  for [fname, addr, port] in split]
     for x in send_list:
         x.start()
     return send_list
@@ -73,6 +78,9 @@ def main():
     parser.add_option("--pdu", action="append", type="string", dest="pdu",
                       default=[])
     parser.add_option("--tcp", action="append", type="string", dest="tcp",
+                      default=[])
+    # reads an IPFIX file and sends it over UDP
+    parser.add_option("--udp", action="append", type="string", dest="udp",
                       default=[])
     parser.add_option("--basedir", action="store", type="string",
                       dest="basedir")

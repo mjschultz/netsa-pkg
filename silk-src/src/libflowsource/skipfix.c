@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2019 by Carnegie Mellon University.
+** Copyright (C) 2007-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -22,7 +22,7 @@
 #define SKIPFIX_SOURCE 1
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipfix.c 17d730af39a6 2019-10-28 15:44:53Z mthomas $");
+RCSIDENT("$SiLK: skipfix.c 7af5eab585e4 2020-04-15 15:56:48Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/skipaddr.h>
@@ -1336,8 +1336,11 @@ makeTracemsgPrefix(
  *    elements.  See the detailed comment above the "struct elem_st"
  *    definition.
  *
- *    Finally, if the SKI_ENV_PRINT_TEMPLATES environment variable is
- *    true, the templates are printed to the log file.
+ *    Finally, if the probe has the SOURCE_LOG_TEMPLATES flag set or
+ *    the global `show_templates` is true (the environment variable
+ *    named by SKI_ENV_PRINT_TEMPLATES controls this), the templates
+ *    are printed to the log file.  (`show_templates` is defined in
+ *    probeconf.c.)
  */
 static void
 skiTemplateCallbackCtx(

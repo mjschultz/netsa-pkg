@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2019 by Carnegie Mellon University.
+** Copyright (C) 2004-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -14,7 +14,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pdusource.c 48577f5787ed 2019-10-10 14:54:05Z mthomas $");
+RCSIDENT("$SiLK: pdusource.c ef14e54179be 2020-04-14 21:57:45Z mthomas $");
 
 #include <silk/utils.h>
 #include <silk/rwrec.h>

@@ -1,4 +1,4 @@
-# RCSIDENT("$SiLK: Makefile.am f162742a8f51 2014-05-09 18:47:33Z mthomas $");
+# RCSIDENT("$SiLK: Makefile.am 8d30ceaa3c1f 2019-12-02 15:37:29Z mthomas $");
 
 # Installed Targets
 
@@ -69,5 +69,6 @@ TESTS += \
 	tests/flowcap-netflowv5-v6.pl \
 	tests/flowcap-ipfix-v4.pl \
 	tests/flowcap-ipfix-any-v4.pl \
+	tests/flowcap-ipfix-udp.pl \
 	tests/flowcap-ipfix-v6.pl \
 	tests/flowcap-ipfixv6-v6.pl

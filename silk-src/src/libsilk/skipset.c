@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2008-2019 by Carnegie Mellon University.
+** Copyright (C) 2008-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -24,7 +24,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skipset.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
+RCSIDENT("$SiLK: skipset.c ef14e54179be 2020-04-14 21:57:45Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skipaddr.h>

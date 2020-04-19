@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2019 by Carnegie Mellon University.
+** Copyright (C) 2004-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: probeconf.c 17d730af39a6 2019-10-28 15:44:53Z mthomas $");
+RCSIDENT("$SiLK: probeconf.c 7af5eab585e4 2020-04-15 15:56:48Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/probeconf.h>
@@ -17,8 +17,11 @@ RCSIDENT("$SiLK: probeconf.c 17d730af39a6 2019-10-28 15:44:53Z mthomas $");
 #include <silk/skipset.h>
 #include <silk/sklog.h>
 #include <silk/sksite.h>
-#include "ipfixsource.h"    /* for show_templates */
 #include "probeconfscan.h"
+
+#if  SK_ENABLE_IPFIX
+#include "ipfixsource.h"    /* for extern of show_templates */
+#endif
 
 /*
  *  *****  Flow Type  **************************************************
@@ -51,6 +54,12 @@ RCSIDENT("$SiLK: probeconf.c 17d730af39a6 2019-10-28 15:44:53Z mthomas $");
 
 /* Value to use for remaining IPs to say that it hasn't been set */
 #define REMAINDER_NOT_SET  INT8_MAX
+
+/* Name of environment variable that, when set, causes SiLK to print
+ * the templates that it receives to the log.  This adds
+ * SOURCE_LOG_TEMPLATES to a probe's log_flags, but it also sets the
+ * global `show_templates` variable used by UDP collectors. */
+#define SK_ENV_PRINT_TEMPLATES  "SILK_IPFIX_PRINT_TEMPLATES"
 
 
 /* a map between probe types and printable names */
@@ -121,6 +130,24 @@ static const struct skpc_quirks_map_st {
 
 
 
+/* EXPORTED VARIABLE DEFINITIONS */
+
+/*
+ *    If non-zero, print the templates when they arrive.  This can be
+ *    set by defining the environment variable specified in
+ *    SK_ENV_PRINT_TEMPLATES ("SILK_IPFIX_PRINT_TEMPLATES").
+ *
+ *    When this variable is true, the SOURCE_LOG_TEMPLATES bit is set
+ *    on a probe's flags.  The variable needs to be public since it is
+ *    required for UDP ipfix collectors due to the way that fixbuf
+ *    sets (or doesn't set) the context variables.
+ */
+#if !SK_ENABLE_IPFIX
+static
+#endif
+int show_templates = 0;
+
+
 /* LOCAL VARIABLES */
 
 /* The probes that have been created and verified */
@@ -176,6 +203,15 @@ int
 skpcSetup(
     void)
 {
+    const char *env;
+
+    /* Determine whether to write templates to the log file as they
+     * arrive. */
+    env = getenv(SK_ENV_PRINT_TEMPLATES);
+    if (NULL != env && *env && strcmp("0", env)) {
+        show_templates = 1;
+    }
+
     if (NULL == skpc_probes) {
         skpc_probes = skVectorNew(sizeof(skpc_probe_t*));
         if (NULL == skpc_probes) {

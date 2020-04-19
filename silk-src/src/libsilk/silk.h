@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2019 by Carnegie Mellon University.
+** Copyright (C) 2001-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -498,7 +498,7 @@ extern "C" {
 #define RCSIDENT(id) RCSIDENTVAR(_rcsID, (id))
 
 
-RCSIDENTVAR(rcsID_SILK_H, "$SiLK: silk.h 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENTVAR(rcsID_SILK_H, "$SiLK: silk.h ef14e54179be 2020-04-14 21:57:45Z mthomas $");
 
 
 /* Name of environment variable pointing to the root of install */

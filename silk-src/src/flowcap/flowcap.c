@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2003-2019 by Carnegie Mellon University.
+** Copyright (C) 2003-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -8,7 +8,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: flowcap.c c317db03ed37 2019-10-11 14:47:18Z mthomas $");
+RCSIDENT("$SiLK: flowcap.c ef14e54179be 2020-04-14 21:57:45Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/rwrec.h>

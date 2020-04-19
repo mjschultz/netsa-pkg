@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2019 by Carnegie Mellon University.
+** Copyright (C) 2006-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -21,7 +21,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: ipfixsource.c 17d730af39a6 2019-10-28 15:44:53Z mthomas $");
+RCSIDENT("$SiLK: ipfixsource.c 7af5eab585e4 2020-04-15 15:56:48Z mthomas $");
 
 #include "ipfixsource.h"
 #include <silk/redblack.h>
@@ -183,10 +183,6 @@ typedef struct peeraddr_source_st {
 /* EXPORTED VARIABLE DEFINITIONS */
 
 /* descriptions are in ipfixsource.h */
-
-/* whether to print templates to log file as they arrive
- * (SK_ENV_PRINT_TEMPLATES) */
-int show_templates = 0;
 
 /* do the names of IE 48, 49, 50 follow fixbuf-1.x or 2.x? */
 uint32_t sampler_flags = 0;
@@ -1516,13 +1512,6 @@ skIPFIXSourcesSetup(
         g_thread_init(NULL);
     }
 #endif
-
-    /* Determine whether to write templates to the log file as they
-     * arrive. */
-    env = getenv(SK_ENV_PRINT_TEMPLATES);
-    if (NULL != env && *env && strcmp("0", env)) {
-        show_templates = 1;
-    }
 
     /* set a log handler for messages from glib, which we always want
      * to include in our log file.

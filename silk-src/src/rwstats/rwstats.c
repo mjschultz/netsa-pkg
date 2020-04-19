@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2019 by Carnegie Mellon University.
+** Copyright (C) 2001-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -138,7 +138,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwstats.c 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: rwstats.c ef14e54179be 2020-04-14 21:57:45Z mthomas $");
 
 #include <silk/skheap.h>
 #include "rwstats.h"
