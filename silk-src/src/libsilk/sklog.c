@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2019 by Carnegie Mellon University.
+** Copyright (C) 2001-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: sklog.c f3ffa2abcd66 2019-03-01 19:45:24Z mthomas $");
+RCSIDENT("$SiLK: sklog.c ef14e54179be 2020-04-14 21:57:45Z mthomas $");
 
 #include <silk/sklog.h>
 #include <silk/skstringmap.h>

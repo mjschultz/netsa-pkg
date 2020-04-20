@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2019 by Carnegie Mellon University.
+** Copyright (C) 2004-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -25,7 +25,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_SKCOUNTRY_H, "$SiLK: skcountry.h 2e336c0aa6c5 2019-10-11 20:30:00Z mthomas $");
+RCSIDENTVAR(rcsID_SKCOUNTRY_H, "$SiLK: skcountry.h ef14e54179be 2020-04-14 21:57:45Z mthomas $");
 
 #include <silk/silk_types.h>
 #include <silk/skplugin.h>

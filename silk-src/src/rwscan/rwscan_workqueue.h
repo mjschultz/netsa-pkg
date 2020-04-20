@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2019 by Carnegie Mellon University.
+** Copyright (C) 2006-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWSCAN_WORKQUEUE_H, "$SiLK: rwscan_workqueue.h 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENTVAR(rcsID_RWSCAN_WORKQUEUE_H, "$SiLK: rwscan_workqueue.h ef14e54179be 2020-04-14 21:57:45Z mthomas $");
 
 
 typedef struct work_queue_node_st {

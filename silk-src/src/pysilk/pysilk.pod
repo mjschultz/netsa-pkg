@@ -1254,6 +1254,13 @@ iterator, the B<next()> method is called repeatedly.  This method
 returns the next record, or raises B<StopIteration> once the end of
 file is reached
 
+=item I<file>.skip(I<count>)
+
+Skip the next I<count> records in I<file> and return the number of
+records skipped.  If the return value is less than I<count>, the end
+of the file has been reached.  At end of file, return 0.
+I<Since SiLK 3.19.1.>
+
 =item I<file>.notes(I<>)
 
 Return the list of annotation headers for the file as a list of
@@ -3017,7 +3024,7 @@ L<http://docs.python.org/>
 
 =cut
 
-$SiLK: pysilk.pod 051cadca977b 2019-04-16 18:12:18Z mthomas $
+$SiLK: pysilk.pod 01d273aa43de 2020-04-16 15:57:54Z mthomas $
 
 Local Variables:
 mode:text

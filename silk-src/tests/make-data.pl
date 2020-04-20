@@ -1,7 +1,7 @@
 #! /usr/bin/perl -w
 #
 #######################################################################
-## Copyright (C) 2009-2019 by Carnegie Mellon University.
+## Copyright (C) 2009-2020 by Carnegie Mellon University.
 ##
 ## @OPENSOURCE_LICENSE_START@
 ## See license information in ../LICENSE.txt
@@ -41,7 +41,7 @@
 #  Mark Thomas
 #  March 2009
 #######################################################################
-#  RCSIDENT("$SiLK: make-data.pl 945cf5167607 2019-01-07 18:54:17Z mthomas $")
+#  RCSIDENT("$SiLK: make-data.pl ef14e54179be 2020-04-14 21:57:45Z mthomas $")
 #######################################################################
 
 use strict;

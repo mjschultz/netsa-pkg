@@ -1,5 +1,5 @@
 #######################################################################
-# Copyright (C) 2007-2019 by Carnegie Mellon University.
+# Copyright (C) 2007-2020 by Carnegie Mellon University.
 #
 # @OPENSOURCE_LICENSE_START@
 # See license information in ../../../LICENSE.txt
@@ -8,7 +8,7 @@
 #######################################################################
 
 #######################################################################
-# $SiLK: __init__.py 945cf5167607 2019-01-07 18:54:17Z mthomas $
+# $SiLK: __init__.py 17bf16f73b2e 2020-04-15 22:17:44Z mthomas $
 #######################################################################
 
 import sys
@@ -1046,16 +1046,16 @@ class Bag(pysilk.BagBase):
         try:
             ak, av = next(a)
         except StopIteration:
-            while True:
-                bk, bv = next(b)
+            for bk, bv in b:
                 yield (bk, None, bv)
+            return
         try:
             bk, bv = next(b)
         except StopIteration:
             yield (ak, av, None)
-            while True:
-                ak, av = next(a)
+            for ak, av in a:
                 yield (ak, av, None)
+            return
         while True:
             if ak < bk:
                 yield (ak, av, None)
@@ -1063,33 +1063,32 @@ class Bag(pysilk.BagBase):
                     ak, av = next(a)
                 except StopIteration:
                     yield (bk, None, bv)
-                    while True:
-                        bk, bv = next(b)
+                    for bk, bv in b:
                         yield (bk, None, bv)
+                    return
             elif bk < ak:
                 yield (bk, None, bv)
                 try:
                     bk, bv = next(b)
                 except StopIteration:
                     yield (ak, av, None)
-                    while True:
-                        ak, av = next(a)
+                    for ak, av in a:
                         yield (ak, av, None)
             else:
                 yield (ak, av, bv)
                 try:
                     ak, av = next(a)
                 except StopIteration:
-                    while True:
-                        bk, bv = next(b)
+                    for bk, bv in b:
                         yield (bk, None, bv)
+                    return
                 try:
                     bk, bv = next(b)
                 except StopIteration:
                     yield (ak, av, None)
-                    while True:
-                        ak, av = next(a)
+                    for ak, av in a:
                         yield (ak, av, None)
+                    return
 
     def min(self, other):
         """

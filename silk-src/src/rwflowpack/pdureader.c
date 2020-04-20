@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2003-2019 by Carnegie Mellon University.
+** Copyright (C) 2003-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -20,7 +20,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pdureader.c dfb505e34a31 2019-08-26 19:03:36Z mthomas $");
+RCSIDENT("$SiLK: pdureader.c ef14e54179be 2020-04-14 21:57:45Z mthomas $");
 
 #include "rwflowpack_priv.h"
 

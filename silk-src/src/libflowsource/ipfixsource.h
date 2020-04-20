@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2006-2019 by Carnegie Mellon University.
+** Copyright (C) 2006-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -31,7 +31,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_IPFIXSOURCE_H, "$SiLK: ipfixsource.h 17d730af39a6 2019-10-28 15:44:53Z mthomas $");
+RCSIDENTVAR(rcsID_IPFIXSOURCE_H, "$SiLK: ipfixsource.h 7af5eab585e4 2020-04-15 15:56:48Z mthomas $");
 
 #include <silk/libflowsource.h>
 #include <silk/skipfix.h>
@@ -41,15 +41,6 @@ RCSIDENTVAR(rcsID_IPFIXSOURCE_H, "$SiLK: ipfixsource.h 17d730af39a6 2019-10-28 1
 
 
 /* DEFINES AND TYPEDEFS */
-
-/*
- *    Name of environment variable that, when set, cause SiLK to print
- *    the templates that it receives to the log.  This adds
- *    SOURCE_LOG_TEMPLATES to a probe's log_flags, but it also sets
- *    the global show_templates variable used by UDP collectors.
- */
-#define SK_ENV_PRINT_TEMPLATES  "SILK_IPFIX_PRINT_TEMPLATES"
-
 
 /*
  *  Logging messages for function entry/return.
@@ -465,15 +456,11 @@ ipfixSourceGetRecordFromFile(
 
 /* VARIABLES */
 
-/**
- *    If non-zero, print the templates when they arrive.  This can be
- *    set by defining the environment variable specified in
- *    SK_ENV_PRINT_TEMPLATES ("SILK_IPFIX_PRINT_TEMPLATES").
- *
- *    When this variable is true, the SOURCE_LOG_TEMPLATES bit is set
- *    on a probe's flags.  The variable needs to be public since it is
- *    required for UDP ipfix collectors due to the way that fixbuf
- *    sets (or doesn't set) the context variables.
+/*
+ *    Provide an extern of `show_templates` (defined in probeconf.c)
+ *    that is visible to skipfix.c.  Since fixbuf does not set the
+ *    context variables for UDP probes, skipfix.c has no access to the
+ *    probe or its flags and must use this global variable instead.
  */
 extern int show_templates;
 

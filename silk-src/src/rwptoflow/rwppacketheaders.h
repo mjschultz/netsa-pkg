@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2005-2019 by Carnegie Mellon University.
+** Copyright (C) 2005-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -13,7 +13,7 @@ extern "C" {
 
 #include <silk/silk.h>
 
-RCSIDENTVAR(rcsID_RWPMATCH_H, "$SiLK: rwppacketheaders.h 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENTVAR(rcsID_RWPMATCH_H, "$SiLK: rwppacketheaders.h ef14e54179be 2020-04-14 21:57:45Z mthomas $");
 
 #ifdef SK_HAVE_PCAP_PCAP_H
 #include <pcap/pcap.h>

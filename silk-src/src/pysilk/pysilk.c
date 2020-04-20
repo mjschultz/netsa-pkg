@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2007-2019 by Carnegie Mellon University.
+** Copyright (C) 2007-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -11,12 +11,12 @@
 **
 */
 
-
+#define PY_SSIZE_T_CLEAN        /* "s#" "y#" formats must use ssize_t */
 #include <Python.h>             /* Must be included before any system
                                    headers */
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: pysilk.c fae3d8bfa7d4 2019-10-11 20:46:44Z mthomas $");
+RCSIDENT("$SiLK: pysilk.c 01d273aa43de 2020-04-16 15:57:54Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skbag.h>
@@ -366,10 +366,10 @@ static PyTypeObject silkPyIPAddrType = {
     sizeof(silkPyIPAddr),       /* tp_basicsize */
     0,                          /* tp_itemsize */
     obj_dealloc,                /* tp_dealloc */
-    0,                          /* tp_print */
+    0,                          /* tp_vectorcall_offset (Py 3.8) */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_as_async (tp_compare in Py2.x) */
     (reprfunc)silkPyIPAddr_repr, /* tp_repr */
     &silkPyIPAddr_number_methods, /* tp_as_number */
     0,                          /* tp_as_sequence */
@@ -416,6 +416,10 @@ static PyTypeObject silkPyIPAddrType = {
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
+#if PY_VERSION_HEX >= 0x03080000
+    ,0                          /* tp_vectorcall */
+    ,0                          /* tp_print */
+#endif
 };
 
 static PyTypeObject silkPyIPv4AddrType = {
@@ -424,10 +428,10 @@ static PyTypeObject silkPyIPv4AddrType = {
     0,                          /* tp_basicsize */
     0,                          /* tp_itemsize */
     0,                          /* tp_dealloc */
-    0,                          /* tp_print */
+    0,                          /* tp_vectorcall_offset (Py 3.8) */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_as_async (tp_compare in Py2.x) */
     0,                          /* tp_repr */
     0,                          /* tp_as_number */
     0,                          /* tp_as_sequence */
@@ -471,6 +475,10 @@ static PyTypeObject silkPyIPv4AddrType = {
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
+#if PY_VERSION_HEX >= 0x03080000
+    ,0                          /* tp_vectorcall */
+    ,0                          /* tp_print */
+#endif
 };
 
 static PyTypeObject silkPyIPv6AddrType = {
@@ -479,10 +487,10 @@ static PyTypeObject silkPyIPv6AddrType = {
     0,                          /* tp_basicsize */
     0,                          /* tp_itemsize */
     0,                          /* tp_dealloc */
-    0,                          /* tp_print */
+    0,                          /* tp_vectorcall_offset (Py 3.8) */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_as_async (tp_compare in Py2.x) */
     0,                          /* tp_repr */
     0,                          /* tp_as_number */
     0,                          /* tp_as_sequence */
@@ -529,6 +537,10 @@ static PyTypeObject silkPyIPv6AddrType = {
 #endif
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
+#endif
+#if PY_VERSION_HEX >= 0x03080000
+    ,0                          /* tp_vectorcall */
+    ,0                          /* tp_print */
 #endif
 };
 
@@ -1275,10 +1287,10 @@ static PyTypeObject silkPyIPWildcardType = {
     sizeof(silkPyIPWildcard),   /* tp_basicsize */
     0,                          /* tp_itemsize */
     (destructor)silkPyIPWildcard_dealloc, /* tp_dealloc */
-    0,                          /* tp_print */
+    0,                          /* tp_vectorcall_offset (Py 3.8) */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_as_async (tp_compare in Py2.x) */
     (reprfunc)silkPyIPWildcard_repr, /* tp_repr */
     0,                          /* tp_as_number */
     &silkPyIPWildcard_sequence_methods, /* tp_as_sequence */
@@ -1323,6 +1335,10 @@ static PyTypeObject silkPyIPWildcardType = {
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
+#if PY_VERSION_HEX >= 0x03080000
+    ,0                          /* tp_vectorcall */
+    ,0                          /* tp_print */
+#endif
 };
 
 static PyTypeObject silkPyIPWildcardIterType = {
@@ -1331,10 +1347,10 @@ static PyTypeObject silkPyIPWildcardIterType = {
     sizeof(silkPyIPWildcardIter), /* tp_basicsize */
     0,                          /* tp_itemsize */
     (destructor)silkPyIPWildcardIter_dealloc, /* tp_dealloc */
-    0,                          /* tp_print */
+    0,                          /* tp_vectorcall_offset (Py 3.8) */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_as_async (tp_compare in Py2.x) */
     0,                          /* tp_repr */
     0,                          /* tp_as_number */
     0,                          /* tp_as_sequence */
@@ -1377,6 +1393,10 @@ static PyTypeObject silkPyIPWildcardIterType = {
 #endif
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
+#endif
+#if PY_VERSION_HEX >= 0x03080000
+    ,0                          /* tp_vectorcall */
+    ,0                          /* tp_print */
 #endif
 };
 
@@ -1511,7 +1531,7 @@ silkPyIPWildcard_new(
 
     self = (silkPyIPWildcard*)type->tp_alloc(type, 0);
     if (self != NULL) {
-        int   len;
+        Py_ssize_t   len;
         const char  *wildcard;
         int          rv;
 
@@ -1742,10 +1762,10 @@ static PyTypeObject silkPyIPSetType = {
     sizeof(silkPyIPSet),        /* tp_basicsize */
     0,                          /* tp_itemsize */
     (destructor)silkPyIPSet_dealloc, /* tp_dealloc */
-    0,                          /* tp_print */
+    0,                          /* tp_vectorcall_offset (Py 3.8) */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_as_async (tp_compare in Py2.x) */
     0,                          /* tp_repr */
     0,                          /* tp_as_number */
     &silkPyIPSet_sequence_methods, /* tp_as_sequence */
@@ -1789,6 +1809,10 @@ static PyTypeObject silkPyIPSetType = {
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
+#if PY_VERSION_HEX >= 0x03080000
+    ,0                          /* tp_vectorcall */
+    ,0                          /* tp_print */
+#endif
 };
 
 static PyTypeObject silkPyIPSetIterType = {
@@ -1797,10 +1821,10 @@ static PyTypeObject silkPyIPSetIterType = {
     sizeof(silkPyIPSetIter),    /* tp_basicsize */
     0,                          /* tp_itemsize */
     (destructor)silkPyIPSetIter_dealloc, /* tp_dealloc */
-    0,                          /* tp_print */
+    0,                          /* tp_vectorcall_offset (Py 3.8) */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_as_async (tp_compare in Py2.x) */
     0,                          /* tp_repr */
     0,                          /* tp_as_number */
     0,                          /* tp_as_sequence */
@@ -1843,6 +1867,10 @@ static PyTypeObject silkPyIPSetIterType = {
 #endif
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
+#endif
+#if PY_VERSION_HEX >= 0x03080000
+    ,0                          /* tp_vectorcall */
+    ,0                          /* tp_print */
 #endif
 };
 
@@ -2454,10 +2482,10 @@ static PyTypeObject silkPyPmapType = {
     sizeof(silkPyPmap),         /* tp_basicsize */
     0,                          /* tp_itemsize */
     (destructor)silkPyPmap_dealloc, /* tp_dealloc */
-    0,                          /* tp_print */
+    0,                          /* tp_vectorcall_offset (Py 3.8) */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_as_async (tp_compare in Py2.x) */
     0,                          /* tp_repr */
     0,                          /* tp_as_number */
     0,                          /* tp_as_sequence */
@@ -2501,6 +2529,10 @@ static PyTypeObject silkPyPmapType = {
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
+#if PY_VERSION_HEX >= 0x03080000
+    ,0                          /* tp_vectorcall */
+    ,0                          /* tp_print */
+#endif
 };
 
 static PyTypeObject silkPyPmapIterType = {
@@ -2509,10 +2541,10 @@ static PyTypeObject silkPyPmapIterType = {
     sizeof(silkPyPmapIterType), /* tp_basicsize */
     0,                          /* tp_itemsize */
     (destructor)silkPyPmapIter_dealloc, /* tp_dealloc */
-    0,                          /* tp_print */
+    0,                          /* tp_vectorcall_offset (Py 3.8) */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_as_async (tp_compare in Py2.x) */
     0,                          /* tp_repr */
     0,                          /* tp_as_number */
     0,                          /* tp_as_sequence */
@@ -2555,6 +2587,10 @@ static PyTypeObject silkPyPmapIterType = {
 #endif
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
+#endif
+#if PY_VERSION_HEX >= 0x03080000
+    ,0                          /* tp_vectorcall */
+    ,0                          /* tp_print */
 #endif
 };
 
@@ -3021,10 +3057,10 @@ static PyTypeObject silkPyBagType = {
     sizeof(silkPyBag),          /* tp_basicsize */
     0,                          /* tp_itemsize */
     (destructor)silkPyBag_dealloc, /* tp_dealloc */
-    0,                          /* tp_print */
+    0,                          /* tp_vectorcall_offset (Py 3.8) */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_as_async (tp_compare in Py2.x) */
     0,                          /* tp_repr */
     &silkPyBag_number_methods,  /* tp_as_number */
     0,                          /* tp_as_sequence */
@@ -3071,6 +3107,10 @@ static PyTypeObject silkPyBagType = {
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
+#if PY_VERSION_HEX >= 0x03080000
+    ,0                          /* tp_vectorcall */
+    ,0                          /* tp_print */
+#endif
 };
 
 static PyTypeObject silkPyBagIterType = {
@@ -3079,10 +3119,10 @@ static PyTypeObject silkPyBagIterType = {
     sizeof(silkPyBagIterType),  /* tp_basicsize */
     0,                          /* tp_itemsize */
     (destructor)silkPyBagIter_dealloc, /* tp_dealloc */
-    0,                          /* tp_print */
+    0,                          /* tp_vectorcall_offset (Py 3.8) */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_as_async (tp_compare in Py2.x) */
     0,                          /* tp_repr */
     0,                          /* tp_as_number */
     0,                          /* tp_as_sequence */
@@ -3125,6 +3165,10 @@ static PyTypeObject silkPyBagIterType = {
 #endif
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
+#endif
+#if PY_VERSION_HEX >= 0x03080000
+    ,0                          /* tp_vectorcall */
+    ,0                          /* tp_print */
 #endif
 };
 
@@ -4039,10 +4083,10 @@ static PyTypeObject silkPyTCPFlagsType = {
     sizeof(silkPyTCPFlags),     /* tp_basicsize */
     0,                          /* tp_itemsize */
     obj_dealloc,                /* tp_dealloc */
-    0,                          /* tp_print */
+    0,                          /* tp_vectorcall_offset (Py 3.8) */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_as_async (tp_compare in Py2.x) */
     (reprfunc)silkPyTCPFlags_repr, /* tp_repr */
     &silkPyTCPFlags_number_methods, /* tp_as_number */
     0,                          /* tp_as_sequence */
@@ -4088,6 +4132,10 @@ static PyTypeObject silkPyTCPFlagsType = {
 #endif
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
+#endif
+#if PY_VERSION_HEX >= 0x03080000
+    ,0                          /* tp_vectorcall */
+    ,0                          /* tp_print */
 #endif
 };
 
@@ -4879,10 +4927,10 @@ static PyTypeObject silkPyRawRWRecType = {
     sizeof(silkPyRawRWRec),     /* tp_basicsize */
     0,                          /* tp_itemsize */
     obj_dealloc,                /* tp_dealloc */
-    0,                          /* tp_print */
+    0,                          /* tp_vectorcall_offset (Py 3.8) */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_as_async (tp_compare in Py2.x) */
     0,                          /* tp_repr */
     0,                          /* tp_as_number */
     0,                          /* tp_as_sequence */
@@ -4926,6 +4974,10 @@ static PyTypeObject silkPyRawRWRecType = {
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
 #endif
+#if PY_VERSION_HEX >= 0x03080000
+    ,0                          /* tp_vectorcall */
+    ,0                          /* tp_print */
+#endif
 };
 
 static PyTypeObject silkPyRWRecType = {
@@ -4934,10 +4986,10 @@ static PyTypeObject silkPyRWRecType = {
     sizeof(silkPyRWRec),        /* tp_basicsize */
     0,                          /* tp_itemsize */
     (destructor)silkPyRWRec_dealloc, /* tp_dealloc */
-    0,                          /* tp_print */
+    0,                          /* tp_vectorcall_offset (Py 3.8) */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_as_async (tp_compare in Py2.x) */
     0,                          /* tp_repr */
     0,                          /* tp_as_number */
     0,                          /* tp_as_sequence */
@@ -4983,6 +5035,10 @@ static PyTypeObject silkPyRWRecType = {
 #endif
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
+#endif
+#if PY_VERSION_HEX >= 0x03080000
+    ,0                          /* tp_vectorcall */
+    ,0                          /* tp_print */
 #endif
 };
 
@@ -6548,6 +6604,10 @@ static PyObject *
 silkPySilkFile_write(
     silkPySilkFile     *obj,
     PyObject           *rec);
+static PyObject *
+silkPySilkFile_skip(
+    silkPySilkFile     *obj,
+    PyObject           *value);
 
 /* define docs and methods */
 static PyMethodDef silkPySilkFile_methods[] = {
@@ -6556,8 +6616,11 @@ static PyMethodDef silkPySilkFile_methods[] = {
      "Read a RWRec from a RW File"},
     {"write", (PyCFunction)silkPySilkFile_write, METH_O,
      "Write a RWRec to a RW File"},
+    {"skip", (PyCFunction)silkPySilkFile_skip, METH_O,
+     "Skip some number of RWRecs in a RW File;"
+     " return number of records skipped"},
     {"close", (PyCFunction)silkPySilkFile_close, METH_NOARGS,
-     "Read a RWRec from a RW File"},
+     "Close an RW File"},
     {"notes", (PyCFunction)silkPySilkFile_notes, METH_NOARGS,
      "Get the file's annotations"},
     {"invocations", (PyCFunction)silkPySilkFile_invocations, METH_NOARGS,
@@ -6580,10 +6643,10 @@ static PyTypeObject silkPySilkFileType = {
     sizeof(silkPySilkFile),         /* tp_basicsize */
     0,                          /* tp_itemsize */
     (destructor)silkPySilkFile_dealloc, /* tp_dealloc */
-    0,                          /* tp_print */
+    0,                          /* tp_vectorcall_offset (Py 3.8) */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_as_async (tp_compare in Py2.x) */
     0,                          /* tp_repr */
     0,                          /* tp_as_number */
     0,                          /* tp_as_sequence */
@@ -6626,6 +6689,10 @@ static PyTypeObject silkPySilkFileType = {
 #endif
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
+#endif
+#if PY_VERSION_HEX >= 0x03080000
+    ,0                          /* tp_vectorcall */
+    ,0                          /* tp_print */
 #endif
 };
 
@@ -6987,6 +7054,33 @@ silkPySilkFile_write(
     return throw_ioerror(obj, rv);
 }
 
+static PyObject *
+silkPySilkFile_skip(
+    silkPySilkFile     *obj,
+    PyObject           *value)
+{
+    size_t skipped = 0;
+    uint64_t val;
+    int rv;
+
+    if (!IS_INT(value)) {
+        PyErr_SetString(PyExc_TypeError, "Expected an integer");
+        return NULL;
+    }
+
+    val = LONG_AS_UNSIGNED_LONGLONG(value);
+    if (PyErr_Occurred()) {
+        return NULL;
+    }
+
+    rv = skStreamSkipRecords(obj->io, val, &skipped);
+    if (rv == 0 || rv == SKSTREAM_ERR_EOF) {
+        return PyLong_FromUnsignedLongLong(skipped);
+    }
+
+    return throw_ioerror(obj, rv);
+}
+
 
 /*
  *************************************************************************
@@ -7019,10 +7113,10 @@ static PyTypeObject silkPyRepoIterType ={
     sizeof(silkPyRepoIterType), /* tp_basicsize */
     0,                          /* tp_itemsize */
     (destructor)silkPyRepoIter_dealloc, /* tp_dealloc */
-    0,                          /* tp_print */
+    0,                          /* tp_vectorcall_offset (Py 3.8) */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
-    0,                          /* tp_compare */
+    0,                          /* tp_as_async (tp_compare in Py2.x) */
     0,                          /* tp_repr */
     0,                          /* tp_as_number */
     0,                          /* tp_as_sequence */
@@ -7065,6 +7159,10 @@ static PyTypeObject silkPyRepoIterType ={
 #endif
 #if PY_VERSION_HEX >= 0x03040000
     ,0                          /* tp_finalize */
+#endif
+#if PY_VERSION_HEX >= 0x03080000
+    ,0                          /* tp_vectorcall */
+    ,0                          /* tp_print */
 #endif
 };
 

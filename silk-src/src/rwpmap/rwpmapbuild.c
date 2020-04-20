@@ -576,7 +576,7 @@ char *pmapbuild_text;
 #line 1 "rwpmapbuild.l"
 #line 2 "rwpmapbuild.l"
 /*
-** Copyright (C) 2007-2019 by Carnegie Mellon University.
+** Copyright (C) 2007-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -595,7 +595,7 @@ char *pmapbuild_text;
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: rwpmapbuild.l 945cf5167607 2019-01-07 18:54:17Z mthomas $");
+RCSIDENT("$SiLK: rwpmapbuild.l ef14e54179be 2020-04-14 21:57:45Z mthomas $");
 
 #include <silk/skipaddr.h>
 #include <silk/skprefixmap.h>

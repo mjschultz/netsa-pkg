@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2004-2019 by Carnegie Mellon University.
+** Copyright (C) 2004-2020 by Carnegie Mellon University.
 **
 ** @OPENSOURCE_LICENSE_START@
 ** See license information in ../../LICENSE.txt
@@ -17,7 +17,7 @@
 
 #include <silk/silk.h>
 
-RCSIDENT("$SiLK: skcountry.c 2e336c0aa6c5 2019-10-11 20:30:00Z mthomas $");
+RCSIDENT("$SiLK: skcountry.c ef14e54179be 2020-04-14 21:57:45Z mthomas $");
 
 #include <silk/rwrec.h>
 #include <silk/skcountry.h>
