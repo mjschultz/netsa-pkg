@@ -87,7 +87,7 @@
 #endif
 
 #if YAF_ENABLE_NDPI
-#include <libndpi/ndpi_main.h>
+#include <ndpi_main.h>
 #endif
 
 /**

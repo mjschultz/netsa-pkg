@@ -71,8 +71,8 @@ uint16_t validate_NTP( uint8_t *payload, unsigned int payloadSize)
         if (ntp_request_code == 42)
         {
             consumed = 8;
-            data_item_count = ((uint16_t)payload[4])>>8 | payload[5];
-            data_item_size = ((uint16_t)payload[6])>>8 | payload[7];
+            data_item_count = g_ntohs(*(uint16_t *)(payload+4)); /* payload[4] to [5] */
+            data_item_size = g_ntohs(*(uint16_t *)(payload+6)); /* payload[6] to [7] */
             /* g_debug("NTP mode 7 request 42 with %d data items, size: 0x%x",data_item_count,data_item_size); */
             if (data_item_size > 500) /* cannot exceede 500 bytes */
                 return 0;
@@ -90,7 +90,7 @@ uint16_t validate_NTP( uint8_t *payload, unsigned int payloadSize)
         while (consumed < (payloadSize-20))
         {
             /*  we have extension fields */
-            extension_field_len = ((uint16_t)payload[consumed+2])>>8 | payload[consumed+3]; /* byte order flipping, ugly */
+            extension_field_len = g_ntohs(*(uint16_t *)(payload+consumed+2)); /* payload[consumed+2] to [consumed+3] */
             /* g_debug("Extension field length: 0x%x starting at 0x%x",extension_field_len,consumed); */
             if (extension_field_len < 16 || extension_field_len % 4 != 0 || ((extension_field_len + consumed) > (payloadSize-20)))
             {

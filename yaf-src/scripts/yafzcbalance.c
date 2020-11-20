@@ -5,7 +5,7 @@
  * PFRING ZC
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2015-2016 Carnegie Mellon University.
+ ** Copyright (C) 2015-2020 Carnegie Mellon University.
  ** All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Author: Emily Sarneso <ecoff@cert.org>
@@ -141,7 +141,7 @@ static GString *yzPrintVersion() {
     versString = g_string_new("");
 
     g_string_append_printf(versString,
-                           "yafzcbalance version %s (c) 2016 Carnegie Mellon "
+                           "yafzcbalance version %s (c) 2016-2020 Carnegie Mellon "
                            "University.\n", VERSION);
     g_string_append(versString, "GNU General Public License (GPL) Rights "
                     "pursuant to Version 2, June 1991\n");
@@ -212,7 +212,7 @@ void print_stats(
     char buf1[64], buf2[64], buf3[64], buf4[64];
     pfring_zc_stat stats;
     char stats_buf[1024];
-    double duration;
+    /* double duration; */
     int i;
     u_int64_t tot_if_recv = 0, tot_if_drop = 0;
 
@@ -224,7 +224,8 @@ void print_stats(
 
     gettimeofday(&end_time, NULL);
 
-    duration = delta_time(&end_time, &start_time);
+    /* mthomas.2020.11.05: duration is never read. commenting out. */
+    /* duration = delta_time(&end_time, &start_time); */
 
     for (i = 0; i < num_devices; i++) {
         if (pfring_zc_stats(inzqs[i], &stats) == 0) {
@@ -363,6 +364,10 @@ int32_t yz_multiapp_hash_func(
     pfring_zc_queue *in_queue,
     void *user)
 {
+#ifdef PF_RING_ZC_BUILTIN_GTP_HASH_FLAGS_GTPC
+    /* PF_RING 7.8.0 adds output flags parameter, which we ignore */
+    uint32_t flags = 0;
+#endif
     int32_t app_instance,  hash;
     uint32_t id  = pfring_zc_get_queue_id(in_queue);
 
@@ -370,7 +375,10 @@ int32_t yz_multiapp_hash_func(
 
     pkt_handle->hash = QUEUEID_TO_IFINDEX(id);
 
-    hash = pfring_zc_builtin_gtp_hash(pkt_handle, in_queue);
+    hash = pfring_zc_builtin_gtp_hash(pkt_handle, in_queue
+#ifdef PF_RING_ZC_BUILTIN_GTP_HASH_FLAGS_GTPC
+                                      , &flags);
+#endif
 
     app_instance = hash % numout;
 
@@ -549,8 +557,11 @@ main (int argc, char *argv[])
     zc = pfring_zc_create_cluster(cluster, max_packet_len(devices[0]),
                                   0, ((n * MAX_CARD_SLOTS) +
                                       (numout * (QUEUE_LEN + POOL_SIZE))),
-                                  pfring_zc_numa_get_cpu_node(core), NULL);
-
+                                  pfring_zc_numa_get_cpu_node(core), NULL
+#if RING_VERSION_NUM >= 0x070600
+                                  ,0
+#endif
+                                 );
     if (zc == NULL) {
         fprintf(stderr, "pfring_zc_create_cluster error [%s]"
                 "Please check your hugetlb configuration\n",

@@ -3,7 +3,7 @@ dnl ------------------------------------------------------------------------
 dnl configure.in
 dnl autotools build system for YAF applications
 dnl ------------------------------------------------------------------------
-dnl Copyright (C) 2005-2019 Carnegie Mellon University. All Rights Reserved.
+dnl Copyright (C) 2005-2020 Carnegie Mellon University. All Rights Reserved.
 dnl ------------------------------------------------------------------------
 dnl Authors: Brian Trammell
 dnl ------------------------------------------------------------------------
@@ -13,9 +13,9 @@ dnl ------------------------------------------------------------------------
 
 dnl RCSIDENT("$Id$")
 
-AC_INIT([yaf], [2.11.0], [netsa-help@cert.org],[yaf])
+AC_INIT([yaf], [2.11.1], [netsa-help@cert.org],[yaf])
 AC_CONFIG_AUX_DIR([autoconf])
-AC_COPYRIGHT([Copyright (C) 2006-2019 by Carnegie Mellon University
+AC_COPYRIGHT([Copyright (C) 2006-2020 by Carnegie Mellon University
 GNU Public License (GPL) Rights pursuant to Version 2, June 1991
 Government Purpose License Rights (GPLR) pursuant to DFARS 252.227-7013])
 AC_CANONICAL_BUILD
@@ -135,7 +135,7 @@ AX_CHECK_ALIGNED_ACCESS_REQUIRED
 AC_CHECK_SIZEOF([int *])
 
 dnl ----------------------------------------------------------------------
-dnl for some reason prefix doesn't get set here - so this is a nice hack
+dnl for some reason prefix does not get set here - so this is a nice hack
 dnl ----------------------------------------------------------------------
 if test "x$prefix" = "xNONE"; then
    prefix=/usr/local
@@ -280,18 +280,50 @@ AC_DEFINE_UNQUOTED([FIXBUF_VERSION], ["$yfpkg_ver"], [fixbuf version])
 fixbuf_version=$yfpkg_ver
 
 
+dnl ----------------------------------------------------------------------
+dnl Check for libndpi
+dnl ----------------------------------------------------------------------
+
 AC_ARG_ENABLE(ndpi,
-        AS_HELP_STRING([--enable-ndpi], [Enable NDPI application labeling]),[
-        PKG_CHECK_MODULES(libndpi, [libndpi >= 2.0 ],
-        [
-        YF_PKGCONFIG_VERSION(libndpi)
-        YF_PKGCONFIG_LPATH(libndpi)
-        ndpi=true
-        AC_DEFINE(YAF_ENABLE_NDPI, 1, [Define to 1 to enable ndpi])
-        ],
-        [
-        AC_MSG_ERROR([Cannot find a suitable libndpi (>= 2.0 ) (Try setting PKG_CONFIG_PATH): $libndpi_PKG_ERRORS])
-])])
+  AS_HELP_STRING([--enable-ndpi], [Enable NDPI application labeling]),[
+    PKG_CHECK_MODULES(libndpi, [libndpi >= 2.0 libndpi < 3.0.0],
+      [
+        # Save variables
+        yf_save_LIBS="$LIBS"
+        yf_save_CFLAGS="$CFLAGS"
+
+        LDFLAGS="$libndpi_LIBS"
+        CFLAGS="$libndpi_CFLAGS"
+
+        # Check for header
+        AC_CHECK_HEADER([ndpi_main.h], [
+          ndpi=true
+          AC_DEFINE(YAF_ENABLE_NDPI, 1, [Define to 1 to enable ndpi])
+        ], [
+          # Didn't find header, add /libndpi and check again
+          libndpi_CFLAGS="$libndpi_CFLAGS/libndpi"
+          CFLAGS="$libndpi_CFLAGS"
+          AS_UNSET([ac_cv_header_ndpi_main_h])
+
+          AC_CHECK_HEADER([ndpi_main.h], [
+            ndpi=true
+            AC_DEFINE(YAF_ENABLE_NDPI, 1, [Define to 1 to enable ndpi])
+          ], [
+            # No header found in either location
+            AC_MSG_ERROR([Found LIBNDPI but not ndpi_main.h.  Maybe you should install ndpi-devel?])
+          ], AC_INCLUDES_DEFAULT)
+        ], AC_INCLUDES_DEFAULT)
+
+        # Restore libraries
+        LIBS="$yf_save_LIBS"
+        CFLAGS="$yf_save_CFLAGS"
+      ],
+      [
+        AC_MSG_ERROR([Cannot find a suitable libndpi (>= 2.0, < 3.0.0) (Try setting PKG_CONFIG_PATH): $libndpi_PKG_ERRORS])
+      ]
+    )
+  ]
+)
 
 dnl ----------------------------------------------------------------------
 dnl Check for libpcap
@@ -1068,8 +1100,4 @@ AC_CONFIG_FILES([Makefile
                                 airframe/Doxyfile
                                 ])
 
-
 AC_OUTPUT
-
-
-

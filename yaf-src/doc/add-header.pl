@@ -95,7 +95,14 @@ sub add_footer
 {
     return <<EOF;
       </div><!-- l-content -->
-      <div id="l-footer">&copy; 2006-2019 Carnegie Mellon University</div>
+      <div id="l-footer">
+        &copy; 2006-2020 Carnegie Mellon University
+        <span id="l-contact">
+          <a href="https://www.sei.cmu.edu/legal/index.cfm">Legal</a> |
+          <a href="https://www.sei.cmu.edu/legal/privacy-notice/index.cfm">Privacy Notice</a> |
+          <img alt="email address" src="/site/contact_email.png" />
+        </span>
+      </div>
     </div><!-- p-body -->
 </body>
 EOF
@@ -138,18 +145,18 @@ sub do_manpage
 
         # Don't print anything until we see the Perl-generated index
         if ( !$saw_index) {
-	    
-	    #old perldoc
-	    if (m{(<!-- INDEX END -->)}) {
-		$saw_index = 1;
-		print NEW add_header($title);
-		next;
-	    }
-	    next unless m{(<h1 id="NAME">NAME</h1>)};
+
+            #old perldoc
+            if (m{(<!-- INDEX END -->)}) {
+                $saw_index = 1;
+                print NEW add_header($title);
+                next;
+            }
+            next unless m{(<h1 id="NAME">NAME</h1>)};
 
             $saw_index = 1;
             print NEW add_header($title);
-	    print NEW "<h1><a name=\"name\">NAME</a></h1>";
+            print NEW "<h1><a name=\"name\">NAME</a></h1>";
             next;
         }
         s{</body\b[^>]*>}{add_footer()}eio;
