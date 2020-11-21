@@ -131,7 +131,7 @@ typedef struct ycDnsScanMessageHeader_st {
 #ifdef PAYLOAD_INSPECTION
 static uint16_t     ycDnsScanCheckResourceRecord (
     uint8_t * payload,
-    uint16_t * offset,
+    unsigned int * offset,
     unsigned int payloadSize
    );
 #endif
@@ -173,7 +173,7 @@ dnsplugin_LTX_ycDnsScanScan (
     uint16_t firstpkt = payloadSize;
     ycDnsScanMessageHeader_t header;
     gboolean netbios = FALSE;
-    uint16_t payloadOffset;
+    unsigned int payloadOffset;
     uint16_t qtype = 0;
 #if YAF_ENABLE_HOOKS
     unsigned int recordCount = 0;
@@ -551,7 +551,7 @@ static
 uint16_t
 ycDnsScanCheckResourceRecord (
     uint8_t * payload,
-    uint16_t * offset,
+    unsigned int * offset,
     unsigned int payloadSize)
 {
     uint16_t            nameSize;

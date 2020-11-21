@@ -3,7 +3,7 @@
  ** Generic glib-based logging configuration support
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2005-2011 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2005-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell
  ** ------------------------------------------------------------------------
@@ -119,7 +119,7 @@ gboolean logc_add_option_group(
 
 
 static void logc_print_version() {
-    fprintf(stderr,"%s version %s (c) 2000-2019 Carnegie Mellon University.\n",
+    fprintf(stderr,"%s version %s (c) 2000-2020 Carnegie Mellon University.\n",
             logc.appname,logc.version);
     fprintf(stderr,"GNU General Public License (GPL) Rights "
                    "pursuant to Version 2, June 1991\n");

@@ -327,7 +327,7 @@ yfpPacketParse (
                 }
                 tcpOpts[tcpOptCount] = TCPOPT_MAXSEG;
                 tcpOptCount++;
-                maxSegSize = g_ntohs(*(opt_ptr+1));
+                maxSegSize = g_ntohs(*(unsigned short *)(opt_ptr+1));
                 tcpOptLen -= 3;
                 opt_ptr += 3;
                 break;

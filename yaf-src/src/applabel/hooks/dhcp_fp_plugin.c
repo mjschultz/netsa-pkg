@@ -77,7 +77,7 @@
 #if   HAVE_MALLOC_H
 #include <malloc.h>
 #endif
-#endif
+#endif  /* STDC_HEADERS */
 
 #if YAF_ENABLE_HOOKS
 #include <ctype.h>
@@ -207,6 +207,15 @@ typedef struct ypDHCPFlowCtx_st {
 #define assert(x)
 #else
 #define assert(x) if (!(x)) { fprintf(stderr,"assertion failed: \"%s\" at line %d of file %s\n",# x, __LINE__, __FILE__); abort(); }
+#endif
+
+#if YAF_ENABLE_METADATA_EXPORT
+#define  YF_fbSessionAddTemplate(_sess, _inex, _tid, _tmpl, _name, _desc, _err)\
+    fbSessionAddTemplateWithMetadata(                                   \
+        _sess, _inex, _tid, _tmpl, _name, _desc, _err)
+#else
+#define  YF_fbSessionAddTemplate(_sess, _inex, _tid, _tmpl, _name, _desc, _err)\
+    fbSessionAddTemplate(_sess, _inex, _tid, _tmpl, _err)
 #endif
 
 
@@ -917,25 +926,14 @@ gboolean ypGetTemplate(
                 return FALSE;
             }
 
-#if YAF_ENABLE_METADATA_EXPORT
-            if (!fbSessionAddTemplateWithMetadata(session, FALSE,
-                              YAF_DHCP_OP_TID|flags,
-                              revDhcpOpTemplate,
-                              "yaf_dhcp_op_rev", NULL, &err))
+            if (!YF_fbSessionAddTemplate(session, FALSE,
+                    YAF_DHCP_OP_TID|flags, revDhcpOpTemplate,
+                    "yaf_dhcp_op_rev", NULL, &err))
             {
+                g_warning("Error adding template %02x: %s",
+                          YAF_DHCP_OP_TID|flags, err->message);
                 return FALSE;
             }
-#else
-            if (!fbSessionAddTemplate(session, FALSE, YAF_DHCP_OP_TID | flags,
-                                      revDhcpOpTemplate, &err))
-            {
-                g_warning("Error adding template %02x: %s", YAF_DHCP_OP_TID|flags,
-                          err->message);
-                return FALSE;
-            }
-
-#endif
-
         }
 
         dhcpOpTemplate = fbTemplateAlloc(model);
@@ -946,23 +944,13 @@ gboolean ypGetTemplate(
             return FALSE;
         }
 
-#if YAF_ENABLE_METADATA_EXPORT
-        if (!fbSessionAddTemplateWithMetadata(session, FALSE,
-                                              YAF_DHCP_OP_TID,
-                                              dhcpOpTemplate,
-                                              "yaf_dhcp_op", NULL, &err))
-        {
-            return FALSE;
-        }
-#else
-        if (!fbSessionAddTemplate(session, FALSE, YAF_DHCP_OP_TID,
-                                  dhcpOpTemplate, &err))
+        if (!YF_fbSessionAddTemplate(session, FALSE, YAF_DHCP_OP_TID,
+                                     dhcpOpTemplate, "yaf_dhcp_op", NULL, &err))
         {
             g_warning("Error adding template %02x: %s", YAF_DHCP_OP_TID,
                       err->message);
             return FALSE;
         }
-#endif
     } else {
 
         if (!dhcp_uniflow_gl) {
@@ -974,22 +962,14 @@ gboolean ypGetTemplate(
                 return FALSE;
             }
 
-            if (!fbSessionAddTemplate(session, FALSE, YAF_DHCP_FLOW_TID | flags,
-                                      revDhcpTemplate, &err))
+            if (!YF_fbSessionAddTemplate(
+                      session, FALSE, YAF_DHCP_FLOW_TID | flags,
+                      revDhcpTemplate, "yaf_dhcp_rev", NULL, &err))
             {
-                g_warning("Error adding template %02x: %s", YAF_DHCP_FLOW_TID | flags,
-                          err->message);
+                g_warning("Error adding template %02x: %s",
+                          YAF_DHCP_FLOW_TID | flags, err->message);
                 return FALSE;
             }
-#if YAF_ENABLE_METADATA_EXPORT
-            if (!fbSessionSetTemplateMetadata(
-                    session, YAF_DHCP_FLOW_TID|flags,
-                    "yaf_dhcp_rev", NULL, &err))
-            {
-                return FALSE;
-            }
-#endif
-
         }
 
         dhcpTemplate = fbTemplateAlloc(model);
@@ -999,21 +979,13 @@ gboolean ypGetTemplate(
             return FALSE;
         }
 
-        if (!fbSessionAddTemplate(session, FALSE, YAF_DHCP_FLOW_TID,
-                                  dhcpTemplate, &err))
+        if (!YF_fbSessionAddTemplate(session, FALSE, YAF_DHCP_FLOW_TID,
+                                     dhcpTemplate, "yaf_dhcp", NULL, &err))
         {
             g_warning("Error adding template %02x: %s", YAF_DHCP_FLOW_TID,
                       err->message);
             return FALSE;
         }
-#if YAF_ENABLE_METADATA_EXPORT
-        if (!fbSessionSetTemplateMetadata(
-                session, YAF_DHCP_FLOW_TID,
-                "yaf_dhcp", NULL, &err))
-        {
-            return FALSE;
-        }
-#endif
     }
 
     return TRUE;
@@ -1205,5 +1177,5 @@ void ypFreeLists(
     return;
 }
 
-#endif
-#endif
+#endif  /* YAF_ENABLE_APPLABEL */
+#endif  /* YAF_ENABLE_HOOKS */
