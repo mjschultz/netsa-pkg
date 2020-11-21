@@ -377,8 +377,9 @@ int32_t yz_multiapp_hash_func(
 
     hash = pfring_zc_builtin_gtp_hash(pkt_handle, in_queue
 #ifdef PF_RING_ZC_BUILTIN_GTP_HASH_FLAGS_GTPC
-                                      , &flags);
+                                      , &flags
 #endif
+                                     );
 
     app_instance = hash % numout;
 
