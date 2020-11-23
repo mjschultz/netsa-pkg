@@ -1,4 +1,4 @@
-FROM centos:6
+FROM centos:7
 MAINTAINER Bo Bayles <bbayles@gmail.com>
 
 RUN yum install -y \
@@ -20,11 +20,8 @@ RUN yum install -y \
     snappy-devel \
     zlib-devel
 
-RUN gem install rake -v 10.5.0
-RUN gem install childprocess -v 1.0.1
-RUN gem install json -v 1.8.3
 RUN gem install ffi -v 1.9.18
-RUN gem install fpm -v 1.4.0
+RUN gem install fpm
 
 ADD ["./libfixbuf-src/", "/netsa-pkg/libfixbuf-src/"]
 ADD ["./yaf-src/", "/netsa-pkg/yaf-src/"]

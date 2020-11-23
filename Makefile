@@ -92,7 +92,7 @@ build_ubuntu:
 	chmod -R 776 ${OUTPUT_DIR}/*
 
 build_centos:
-	$(eval IMAGE_ID = $(shell docker build --force-rm -q -f "packaging/scripts/buildimage_centos-6/Dockerfile" .))
+	$(eval IMAGE_ID = $(shell docker build --force-rm -q -f "packaging/scripts/buildimage_centos-7/Dockerfile" .))
 	docker run -v "${OUTPUT_DIR}:/netsa-pkg/packaging/output" $(IMAGE_ID) /usr/bin/make build_rpm
 	chmod -R 776 ${OUTPUT_DIR}/*
 
