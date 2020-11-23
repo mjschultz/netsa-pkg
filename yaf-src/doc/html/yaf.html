@@ -51,7 +51,7 @@
             [--force-read-all]
             [--flow-stats] [--delta]
             [--ingress INGRESS_INT] [--egress EGRESS_INT]
-            [--template-info]
+            [--metadata-export]
             [--max-payload PAYLOAD_OCTETS] [--udp-payload]
             [--max-export PAYLOAD_OCTETS]
             [--max-flows FLOW_TABLE_MAX]
@@ -442,7 +442,7 @@
 <dt id="metadata-export"><b>--metadata-export</b></dt>
 <dd>
 
-<p>If present, export template metadata (name and description) and information element metadata before data records.</p>
+<p>If present, export template metadata (name and description) and information element metadata before data records. NOTE: this option was renamed from --template-info in YAF 2.11.0</p>
 
 </dd>
 </dl>
@@ -734,7 +734,7 @@
 <dt id="p0f-fingerprints"><b>--p0f-fingerprints</b></dt>
 <dd>
 
-<p>Location of the p0f fingerprint file(s), p0f.fp. Default is <i>/usr/local/etc/p0f.fp</i>. This version of <b>yaf</b> includes the updated CERT p0f fingerprints. See &lt;https://tools.netsa.cert.org/confluence/display/tt/p0f+fingerprints&gt; for updates.</p>
+<p>Location of the p0f fingerprint file(s), p0f.fp. Default is <i>/usr/local/etc/p0f.fp</i>. This version of <b>yaf</b> includes the updated CERT p0f fingerprints. See <a href="https://tools.netsa.cert.org/p0f/index.html">https://tools.netsa.cert.org/p0f/index.html</a> for updates.</p>
 
 </dd>
 <dt id="fpexport"><b>--fpexport</b></dt>
@@ -1589,7 +1589,7 @@
 
 <p>YAF PCAP Export options are ignored when using <b>--live</b> <i>dag</i>, <i>napatech</i>, or <i>netronome</i>.</p>
 
-<p>YAF requires libfixbuf 1.7.0 or later.</p>
+<p>YAF requires libfixbuf 2.3.0 or later.</p>
 
 <p>YAF 2.0 must be used with an IPFIX Collecting Process that can handle IPFIX lists elements, especially the subTemplateMultiList Information Element in order to retrieve certain flow information. Older versions of YAF can read YAF 2.0 flow files, but will ignore anything contained in the subTemplateMultiList.</p>
 
@@ -1613,10 +1613,17 @@
 
 <h1 id="SEE-ALSO">SEE ALSO</h1>
 
-<p><b>yafscii(1)</b>, <b>tcpdump(1)</b>, <b>pcap(3)</b>, <b>nafalize(1)</b>, <b>yafzcbalance(1)</b>, Spread Documentation at www.spread.org, libp0f at &lt;https://tools.netsa.cert.org/confluence/display/tt/libp0f&gt;, and the following IETF Internet RFCs: Specification of the IPFIX Protocol for the Exchange of IP Traffic Flow Information <b>RFC 5101</b>, Information Model for IP Flow Information Export <b>RFC 5102</b>, Bidirectional Flow Export using IPFIX <b>RFC 5103</b>, Export of Structured Data in IPFIX <b>RFC 6313</b></p>
+<p><b>yafscii(1)</b>, <b>tcpdump(1)</b>, <b>pcap(3)</b>, <b>nafalize(1)</b>, <b>yafzcbalance(1)</b>, Spread Documentation at www.spread.org, libp0f at <a href="https://tools.netsa.cert.org/p0f/libp0f.html">https://tools.netsa.cert.org/p0f/libp0f.html</a>, and the following IETF Internet RFCs: Specification of the IPFIX Protocol for the Exchange of IP Traffic Flow Information <b>RFC 5101</b>, Information Model for IP Flow Information Export <b>RFC 5102</b>, Bidirectional Flow Export using IPFIX <b>RFC 5103</b>, Export of Structured Data in IPFIX <b>RFC 6313</b></p>
 
       </div><!-- l-content -->
-      <div id="l-footer">&copy; 2006-2018 Carnegie Mellon University</div>
+      <div id="l-footer">
+        &copy; 2006-2020 Carnegie Mellon University
+        <span id="l-contact">
+          <a href="https://www.sei.cmu.edu/legal/index.cfm">Legal</a> |
+          <a href="https://www.sei.cmu.edu/legal/privacy-notice/index.cfm">Privacy Notice</a> |
+          <img alt="email address" src="/site/contact_email.png" />
+        </span>
+      </div>
     </div><!-- p-body -->
 </body>
 

@@ -836,6 +836,7 @@ int ypAddSpec(
 
     }
 
+    g_warning("May not add a DPI rule for applabel %u", applabel);
     return -1;
 }
 
@@ -1047,7 +1048,9 @@ gboolean ypInitializeProtocolRules(
                 if (!ctx->appRuleArray[elem_id]) {
                     /* get offset of element -
                        basically which basicList in struct */
-                    ypAddSpec(&spec, applabel, &struct_offset);
+                    if (ypAddSpec(&spec, applabel, &struct_offset) == -1) {
+                        exit(EXIT_FAILURE);
+                    }
                     ypAddRuleKey(ctx, applabel, elem_id, elem, struct_offset);
                 }
 
@@ -4219,7 +4222,7 @@ uint8_t ypGetDNSQName(
             toffset = 0;
             break;
         } else if (DNS_NAME_COMPRESSION ==
-            (*(payload + toffset) & DNS_NAME_COMPRESSION))
+                   (*(payload + toffset) & DNS_NAME_COMPRESSION))
         {
             if ( (toffset + 1) >= payloadSize ) {
                 /*Incomplete Name Pointer */
@@ -4241,7 +4244,7 @@ uint8_t ypGetDNSQName(
 
             continue;
 
-        } else {
+        } else if (0 == (*(payload + toffset) & DNS_NAME_COMPRESSION)) {
 
             nameSize = *(payload + toffset);
             if ( (nameSize + temp_buf_size + 1) > DNS_MAX_NAME_LENGTH ) {
@@ -4257,6 +4260,18 @@ uint8_t ypGetDNSQName(
             }
 
             toffset += nameSize + 1;
+
+        } else if (0x40 == (*(payload + toffset) & DNS_NAME_COMPRESSION)) {
+            /* See RFC6891, Extension Mechanisms for DNS (EDNS(0)),
+             * which obsoletes RFC2671, RFC2673 */
+            /* YAF does not support this */
+            /* g_debug("Extended label types (%#04x) are not supported", */
+            /*        *(payload + toffset)); */
+            return 0;
+        } else {
+            g_assert(0x80 == (*(payload + toffset) & DNS_NAME_COMPRESSION));
+            /* g_debug("Unknown DNS label type %#04x", *(payload + toffset)); */
+            return 0;
         }
     }
 

@@ -140,14 +140,14 @@
     is set to 0x06 and YAF is ran with --silk. */
 
 /** General dimensions */
-#define YTF_BIF         0x0010
+#define YTF_BIF         0x0010 /* Bi-flow */
 /* Special dimensions */
-#define YTF_TOTAL       0x0001
+#define YTF_TOTAL       0x0001 /* Has total packet & octet counters (ie. not delta counters) */
 #define YTF_DELTA       0x0002
 #define YTF_MPLS        0x0004
 #define YTF_SILK        0x0020
 #define YTF_DAGIF       0x0040
-#define YTF_FLE         0x0080
+#define YTF_FLE         0x0080 /* Has (non-reduced) packet & octet counters */
 #define YTF_RLE         0x0100
 #define YTF_IP4         0x0200
 #define YTF_IP6         0x0400

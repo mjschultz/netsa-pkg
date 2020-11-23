@@ -3,7 +3,7 @@ dnl ------------------------------------------------------------------------
 dnl yafconfig.m4
 dnl write summary of configure to a file (stolen from SiLK)
 dnl ------------------------------------------------------------------------
-dnl Copyright (C) 2013 Carnegie Mellon University. All Rights Reserved.
+dnl Copyright (C) 2013-2020 Carnegie Mellon University. All Rights Reserved.
 dnl ------------------------------------------------------------------------
 dnl Authors: Emily Sarneso
 dnl ------------------------------------------------------------------------
@@ -221,10 +221,10 @@ AC_DEFUN([YAF_AC_WRITE_SUMMARY],[
     if test "x$nonip" = xtrue
     then
        YF_BUILD_CONF="$YF_BUILD_CONF
-    * Non-IP Flow Enabled:         YES"
+    * Non-IP Flow Enabled:          YES"
     else
        YF_BUILD_CONF="$YF_BUILD_CONF
-    * Non-IP Flow Enabled:         NO"
+    * Non-IP Flow Enabled:          NO"
     fi
 
     yfpkg_spread=`$PKG_CONFIG --cflags libfixbuf | grep 'SPREAD'`
@@ -240,10 +240,10 @@ AC_DEFUN([YAF_AC_WRITE_SUMMARY],[
     if test "x$type_export" = xtrue
     then
       YF_BUILD_CONF="$YF_BUILD_CONF
-    * Type export Support:              YES"
+    * Type export Support:          YES"
     else
       YF_BUILD_CONF="$YF_BUILD_CONF
-    * Type export Support:              NO"
+    * Type export Support:          NO"
     fi
 
     if test "x$gcc_atomic" = xtrue
@@ -255,16 +255,19 @@ AC_DEFUN([YAF_AC_WRITE_SUMMARY],[
     * GCC Atomic Builtin functions: NO"
     fi
 
+    if test "x$type_export" = xtrue
+    then
+      YF_BUILD_CONF="$YF_BUILD_CONF
+    * IE metadata export available: YES"
+    else
+      YF_BUILD_CONF="$YF_BUILD_CONF
+    * IE metadata export available: NO"
+    fi
+
     if test "x$disable_mt" = xtrue
     then
       YF_BUILD_CONF="$YF_BUILD_CONF
     * Multi-threading available:    NO (reconfigure with --without-pic)"
-    fi
-
-    if test "x$type_export" = xtrue
-    then
-      YF_BUILD_CONF="$YF_BUILD_CONF
-    * IE metadata export available:    YES"
     fi
 
     # Remove leading whitespace
@@ -291,6 +294,11 @@ AC_DEFUN([YAF_AC_WRITE_SUMMARY],[
         then
             cat $YAF_SUMMARY_FILE
         fi],[YAF_SUMMARY_FILE=$YAF_SUMMARY_FILE])
+
+    # Put YAF_SUMMARY_FILE into the environment so that the Lua
+    # subpackage can output it.
+    YAF_SUMMARY_FILE=`pwd`"/${YAF_SUMMARY_FILE}"
+    export YAF_SUMMARY_FILE
 
   #Put config info into the version output of yaf
   YF_BUILD_CONF=${YF_BUILD_CONF}"\n"

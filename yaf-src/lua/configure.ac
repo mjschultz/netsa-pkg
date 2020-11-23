@@ -32,5 +32,12 @@ AC_CONFIG_FILES([
     src/Makefile
 ])
 
+# Output the yaf-summary.txt file again so it is the final thing that
+# configure produces.
+AC_CONFIG_COMMANDS([yaf_summary],[
+    if test -n "${YAF_SUMMARY_FILE}" && test -f ${YAF_SUMMARY_FILE}
+    then
+        cat ${YAF_SUMMARY_FILE}
+    fi])
 
 AC_OUTPUT
