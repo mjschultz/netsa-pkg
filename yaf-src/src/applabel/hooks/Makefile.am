@@ -3,7 +3,7 @@
 ## Makefile.am (source)
 ## autotools build system for YAF
 ## ------------------------------------------------------------------------
-## Copyright (C) 2012-2016 Carnegie Mellon University. All Rights Reserved.
+## Copyright (C) 2012-2020 Carnegie Mellon University. All Rights Reserved.
 ## ------------------------------------------------------------------------
 ## Authors: Chris Inacio <inacio@cert.org>
 ## ------------------------------------------------------------------------

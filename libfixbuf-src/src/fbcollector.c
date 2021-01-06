@@ -5,14 +5,14 @@
  ** IPFIX Collecting Process single transport session implementation
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2019 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell
  ** ------------------------------------------------------------------------
  ** @OPENSOURCE_LICENSE_START@
  ** libfixbuf 2.0
  **
- ** Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright 2018-2020 Carnegie Mellon University. All Rights Reserved.
  **
  ** NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
  ** ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -331,44 +331,46 @@ static gboolean fbCollectorReadFile(
 {
     int                     rc;
     uint16_t                h_len;
-    gboolean                goodLen;
 
     /* Read and decode version and length */
     g_assert(*msglen > 4);
 
     rc = fread(msgbase, 1, 4, collector->stream.fp);
-    if (rc > 0) {
-        goodLen = collector->coreadLen(collector,(fbCollectorMsgVL_t *)msgbase,
-                                       *msglen, &h_len, err);
-        if (FALSE == goodLen) return FALSE;
-        msgbase += 4;
-    } else if (feof(collector->stream.fp)) {
-        g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_EOF,
-                    "End of file");
-        return FALSE;
-    } else {
-        g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_IO,
-                    "I/O error: %s", strerror(errno));
+    if (rc < 4) {
+        goto ERROR;
+    }
+    if (!collector->coreadLen(collector, (fbCollectorMsgVL_t *)msgbase,
+                              *msglen, &h_len, err))
+    {
         return FALSE;
     }
+    msgbase += 4;
 
     /* read rest of message */
     rc = fread(msgbase, 1, h_len - 4, collector->stream.fp);
-    if (rc > 0) {
-        *msglen = rc + 4;
-        if (!collector->copostRead(collector, msgbase, msglen, err)) {
-            return FALSE;
-        }
-        return TRUE;
-    } else if (feof(collector->stream.fp)) {
+    if (rc <= 0) {
+        goto ERROR;
+    }
+
+    *msglen = rc + 4;
+    if (!collector->copostRead(collector, msgbase, msglen, err)) {
+        return FALSE;
+    }
+    return TRUE;
+
+  ERROR:
+    if (feof(collector->stream.fp)) {
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_EOF,
                     "End of file");
-        return FALSE;
+    } else if (rc > 0) {
+        g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_EOF,
+                    "Too few bytes available for IPFIX Message Header (%d/16)",
+                    rc);
     } else {
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_IO,
                     "I/O error: %s", strerror(errno));
-        return FALSE;
     }
+    return FALSE;
 }
 
 /**
@@ -1033,6 +1035,7 @@ static gboolean fbCollectorReadTLS(
 {
     int                     rc;
     uint16_t                h_len, rrem;
+    char                    errbuf[FB_SSL_ERR_BUFSIZ];
     gboolean                rv;
 
     /* Read and decode version and length */
@@ -1050,10 +1053,10 @@ static gboolean fbCollectorReadTLS(
                         "TLS connection shutdown");
             return FALSE;
         } else {
+            ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
             g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_IO,
-                        "TLS I/O error at message start: %s",
-                        ERR_error_string(ERR_get_error(), NULL));
-            while (ERR_get_error());
+                        "TLS I/O error at message start: %s", errbuf);
+            ERR_clear_error();
             return FALSE;
         }
     }
@@ -1070,10 +1073,10 @@ static gboolean fbCollectorReadTLS(
             rrem -= rc;
             msgbase += rc;
         } else {
+            ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
             g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_IO,
-                        "TLS I/O error in message: %s",
-                        ERR_error_string(ERR_get_error(), NULL));
-            while (ERR_get_error());
+                        "TLS I/O error in message: %s", errbuf);
+            ERR_clear_error();
             return FALSE;
         }
     }
@@ -1094,14 +1097,12 @@ static void fbCollectorCloseTLS(
 {
     SSL_shutdown(collector->ssl);
     SSL_free(collector->ssl);
-    if (collector->rip != -1)
-    {
+    if (collector->rip != -1) {
         close(collector->rip);
         collector->rip = -1;
     }
 
-    if (collector->wip != -1)
-    {
+    if (collector->wip != -1) {
         close(collector->wip);
         collector->wip = -1;
     }
@@ -1121,6 +1122,7 @@ static gboolean fbCollectorOpenTLS(
 {
     fbConnSpec_t    *spec = fbListenerGetConnSpec(collector->listener);
     BIO             *conn;
+    char            errbuf[FB_SSL_ERR_BUFSIZ];
     gboolean        ok = TRUE;
 
     /* Initialize SSL context if necessary */
@@ -1133,20 +1135,20 @@ static gboolean fbCollectorOpenTLS(
     /* wrap a stream BIO around the opened socket */
     if (!(conn = BIO_new_socket(collector->stream.fd, 1))) {
         ok = FALSE;
+        ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_CONN,
-                    "couldn't wrap socket for TLS: %s",
-                    ERR_error_string(ERR_get_error(), NULL));
-        while (ERR_get_error());
+                    "couldn't wrap socket for TLS: %s", errbuf);
+        ERR_clear_error();
         goto end;
     }
 
     /* create SSL socket */
     if (!(collector->ssl = SSL_new((SSL_CTX *)spec->vssl_ctx))) {
         ok = FALSE;
+        ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_CONN,
-                    "couldnt create TLS socket: %s",
-                    ERR_error_string(ERR_get_error(), NULL));
-        while (ERR_get_error());
+                    "couldnt create TLS socket: %s", errbuf);
+        ERR_clear_error();
         goto end;
     }
 
@@ -1156,10 +1158,10 @@ static gboolean fbCollectorOpenTLS(
     SSL_set_mode(collector->ssl, SSL_MODE_AUTO_RETRY);
     if (SSL_accept(collector->ssl) <= 0) {
         ok = FALSE;
+        ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_CONN,
-                    "couldn't accept on connected TLS socket: %s",
-                    ERR_error_string(ERR_get_error(), NULL));
-        while (ERR_get_error());
+                    "couldn't accept on connected TLS socket: %s", errbuf);
+        ERR_clear_error();
         goto end;
     }
 
@@ -1192,6 +1194,7 @@ static gboolean fbCollectorOpenDTLS(
 {
     fbConnSpec_t    *spec = fbListenerGetConnSpec(collector->listener);
     BIO             *conn;
+    char            errbuf[FB_SSL_ERR_BUFSIZ];
     gboolean        ok = TRUE;
 
     /* Initialize SSL context if necessary */
@@ -1204,20 +1207,20 @@ static gboolean fbCollectorOpenDTLS(
     /* wrap a stream BIO around the opened socket */
     if (!(conn = BIO_new_dgram(collector->stream.fd, 1))) {
         ok = FALSE;
+        ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_CONN,
-                    "couldn't wrap socket for TLS: %s",
-                    ERR_error_string(ERR_get_error(), NULL));
-        while (ERR_get_error());
+                    "couldn't wrap socket for TLS: %s", errbuf);
+        ERR_clear_error();
         goto end;
     }
 
     /* create SSL socket */
     if (!(collector->ssl = SSL_new((SSL_CTX *)spec->vssl_ctx))) {
         ok = FALSE;
+        ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_CONN,
-                    "couldnt create TLS socket: %s",
-                    ERR_error_string(ERR_get_error(), NULL));
-        while (ERR_get_error());
+                    "couldnt create TLS socket: %s", errbuf);
+        ERR_clear_error();
         goto end;
     }
 
@@ -1230,10 +1233,10 @@ static gboolean fbCollectorOpenDTLS(
     SSL_set_mode(collector->ssl, SSL_MODE_AUTO_RETRY);
     if (SSL_accept(collector->ssl) <= 0) {
         ok = FALSE;
+        ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_CONN,
-                    "couldn't accept on connected TLS socket: %s",
-                    ERR_error_string(ERR_get_error(), NULL));
-        while (ERR_get_error());
+                    "couldn't accept on connected TLS socket: %s", errbuf);
+        ERR_clear_error();
         goto end;
     }
 

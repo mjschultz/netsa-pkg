@@ -1,60 +1,60 @@
 /*
- ** yaftab.h
- ** YAF Active Flow Table
- **
- ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2015 Carnegie Mellon University. All Rights Reserved.
- ** ------------------------------------------------------------------------
- ** Authors: Brian Trammell
- ** ------------------------------------------------------------------------
- ** @OPENSOURCE_HEADER_START@
- ** Use of the YAF system and related source code is subject to the terms
- ** of the following licenses:
- **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
- ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
- **
- ** NO WARRANTY
- **
- ** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
- ** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
- ** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
- ** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
- ** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
- ** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
- ** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
- ** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
- ** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
- ** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
- ** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
- ** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
- ** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
- ** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
- ** DELIVERABLES UNDER THIS LICENSE.
- **
- ** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
- ** Mellon University, its trustees, officers, employees, and agents from
- ** all claims or demands made against them (and any related losses,
- ** expenses, or attorney's fees) arising out of, or relating to Licensee's
- ** and/or its sub licensees' negligent use or willful misuse of or
- ** negligent conduct or willful misconduct regarding the Software,
- ** facilities, or other rights or assistance granted by Carnegie Mellon
- ** University under this License, including, but not limited to, any
- ** claims of product liability, personal injury, death, damage to
- ** property, or violation of any laws or regulations.
- **
- ** Carnegie Mellon University Software Engineering Institute authored
- ** documents are sponsored by the U.S. Department of Defense under
- ** Contract FA8721-05-C-0003. Carnegie Mellon University retains
- ** copyrights in all material produced under this contract. The U.S.
- ** Government retains a non-exclusive, royalty-free license to publish or
- ** reproduce these documents, or allow others to do so, for U.S.
- ** Government purposes only pursuant to the copyright license under the
- ** contract clause at 252.227.7013.
- **
- ** @OPENSOURCE_HEADER_END@
- ** ------------------------------------------------------------------------
- */
+** yaftab.h
+** YAF Active Flow Table
+**
+** ------------------------------------------------------------------------
+** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
+** ------------------------------------------------------------------------
+** Authors: Brian Trammell
+** ------------------------------------------------------------------------
+** @OPENSOURCE_HEADER_START@
+** Use of the YAF system and related source code is subject to the terms
+** of the following licenses:
+**
+** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
+** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
+**
+** NO WARRANTY
+**
+** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
+** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
+** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
+** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
+** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
+** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
+** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
+** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
+** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
+** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
+** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
+** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
+** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
+** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
+** DELIVERABLES UNDER THIS LICENSE.
+**
+** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
+** Mellon University, its trustees, officers, employees, and agents from
+** all claims or demands made against them (and any related losses,
+** expenses, or attorney's fees) arising out of, or relating to Licensee's
+** and/or its sub licensees' negligent use or willful misuse of or
+** negligent conduct or willful misconduct regarding the Software,
+** facilities, or other rights or assistance granted by Carnegie Mellon
+** University under this License, including, but not limited to, any
+** claims of product liability, personal injury, death, damage to
+** property, or violation of any laws or regulations.
+**
+** Carnegie Mellon University Software Engineering Institute authored
+** documents are sponsored by the U.S. Department of Defense under
+** Contract FA8721-05-C-0003. Carnegie Mellon University retains
+** copyrights in all material produced under this contract. The U.S.
+** Government retains a non-exclusive, royalty-free license to publish or
+** reproduce these documents, or allow others to do so, for U.S.
+** Government purposes only pursuant to the copyright license under the
+** contract clause at 252.227.7013.
+**
+** @OPENSOURCE_HEADER_END@
+** ------------------------------------------------------------------------
+*/
 
 /*
  * This is the documentation for the _old_ yaftab.h; it is no longer current,
@@ -77,7 +77,8 @@
  * for the same flow will be counted as part of a new flow. The active timeout
  * is set to 1800 seconds (half an hour) by default.
  *
- * <tt>yaf_flowlim</tt> sets the maximum size of the flow table; flows exceeding
+ * <tt>yaf_flowlim</tt> sets the maximum size of the flow table; flows
+ * exceeding
  * this limit will be expired in least-recent order, as if they were idle. The
  * flow limit defaults to zero, for no limit. Use this global to limit resource
  * usage by the flow table.
@@ -132,7 +133,7 @@ struct yfFlowTab_st;
 typedef struct yfFlowTab_st yfFlowTab_t;
 
 /**
- *yfFlowTabAlloc
+ * yfFlowTabAlloc
  *
  * Allocate a flow table.
  *
@@ -142,14 +143,17 @@ typedef struct yfFlowTab_st yfFlowTab_t;
  *                  flow is the active timeout; additional packets
  *                  for the same flow will be counted as part of a new flow.
  * @param max_flows maximum number of active flows. Flows exceeding this limit
- *                  will be expired in least-recent order, as if they were idle.
+ *                  will be expired in least-recent order, as if they were
+ * idle.
  *                  Used to limit resource usage of a flow table. A value of 0
  *                  disables flow count limits.
- * @param max_payload   maximum octets of payload to capture per flow direction.
+ * @param max_payload   maximum octets of payload to capture per flow
+ * direction.
  *                      Requires at least max_payload octets of payload to be
  *                      available in each packet buffer passed to yfFlowPBuf().
  *                      A value of 0 disables payload capture and export.
- * @param uniflow   If TRUE, export biflows using record adjacency (two uniflows
+ * @param uniflow   If TRUE, export biflows using record adjacency (two
+ * uniflows
  *                  exported back-to-back. Use this for interoperability with
  *                  IPFIX collectors that do not implement RFC 5103.
  * @param silkmode  If TRUE, clamp totalOctetCount and maxTotalOctetCount to 32
@@ -159,7 +163,7 @@ typedef struct yfFlowTab_st yfFlowTab_t;
  *                  direct export to SiLK rwflowpack or flowcap.
  *
  * @param macmode   If TRUE, collect and export source and destination Mac
-                    Addresses.
+ *                  Addresses.
  * @param applabelmode If TRUE, then the payload, (as limited by max_payload,)
  *                     is sent through various plugins and code in order to
  *                     determine which protocol is running on the flow by doing
@@ -171,7 +175,8 @@ typedef struct yfFlowTab_st yfFlowTab_t;
  *                     entropy value is exported as two values one for forward
  *                     payload and one for reverse payload.
  *
- * @param fingerprintmode If TRUE, then this will enable passive OS finger printing
+ * @param fingerprintmode If TRUE, then this will enable passive OS finger
+ * printing
  *                      using the p0f engine based mostly on TCP negotiation
  *
  *
@@ -210,37 +215,39 @@ typedef struct yfFlowTab_st yfFlowTab_t;
  *                       and port-based detection methods.
  * @param hash           The flow key hash to create a PCAP for.
  * @param stime          The start time to create a PCAP for.
- * @param hfctx          The plugin hooks context variable (NULL if plugins not enabled)
+ * @param hfctx          The plugin hooks context variable (NULL if plugins not
+ * enabled)
  *
  * @return a new flow table.
  */
-yfFlowTab_t *yfFlowTabAlloc(
-    uint64_t        idle_ms,
-    uint64_t        active_ms,
-    uint32_t        max_flows,
-    uint32_t        max_payload,
-    gboolean        uniflow,
-    gboolean        silkmode,
-    gboolean        macmode,
-    gboolean        applabelmode,
-    gboolean        entropymode,
-    gboolean        fingerprintmode,
-    gboolean        fpExportMode,
-    gboolean        udp_max_payload,
-    uint16_t        udp_uniflow_port,
-    char            *pcap_dir,
-    char            *pcap_meta_file,
-    uint64_t        max_pcap,
-    gboolean        pcap_per_flow,
-    gboolean        force_read_all,
-    gboolean        stats_mode,
-    gboolean        index_pcap,
-    gboolean        no_vlan_in_key,
-    gboolean        ndpi,
-    char            *ndpi_proto_file,
-    char            *hash,
-    char            *stime,
-    void            **hfctx);
+yfFlowTab_t *
+yfFlowTabAlloc(
+    uint64_t   idle_ms,
+    uint64_t   active_ms,
+    uint32_t   max_flows,
+    uint32_t   max_payload,
+    gboolean   uniflow,
+    gboolean   silkmode,
+    gboolean   macmode,
+    gboolean   applabelmode,
+    gboolean   entropymode,
+    gboolean   fingerprintmode,
+    gboolean   fpExportMode,
+    gboolean   udp_max_payload,
+    uint16_t   udp_uniflow_port,
+    char      *pcap_dir,
+    char      *pcap_meta_file,
+    uint64_t   max_pcap,
+    gboolean   pcap_per_flow,
+    gboolean   force_read_all,
+    gboolean   stats_mode,
+    gboolean   index_pcap,
+    gboolean   no_vlan_in_key,
+    gboolean   ndpi,
+    char      *ndpi_proto_file,
+    char      *hash,
+    char      *stime,
+    void     **hfctx);
 
 /**
  * Free a previously allocated flow table. Discards any outstanding active
@@ -249,9 +256,9 @@ yfFlowTab_t *yfFlowTabAlloc(
  *
  * @param flowtab a flow table allocated by yfFlowTabAlloc()
  */
-
-void yfFlowTabFree(
-    yfFlowTab_t     *flowtab);
+void
+yfFlowTabFree(
+    yfFlowTab_t  *flowtab);
 
 
 /**
@@ -260,10 +267,10 @@ void yfFlowTabFree(
  * @param flowtab pointer to flow table
  * @param new_file_name the filename of the next pcap file to write to
  */
-
-void yfUpdateRollingPcapFile(
-    yfFlowTab_t                *flowtab,
-    char                       *new_file_name);
+void
+yfUpdateRollingPcapFile(
+    yfFlowTab_t  *flowtab,
+    char         *new_file_name);
 
 /**
  * yfGetFlowTabStats
@@ -276,13 +283,14 @@ void yfUpdateRollingPcapFile(
  * @param peak maximum number of flows in the flow table at any 1 time
  * @param flush number of flush events called on flow table
  */
-void yfGetFlowTabStats(
-    yfFlowTab_t *flowtab,
-    uint64_t *packets,
-    uint64_t *flows,
-    uint64_t *rej_pkts,
-    uint32_t *peak,
-    uint32_t *flush);
+void
+yfGetFlowTabStats(
+    yfFlowTab_t  *flowtab,
+    uint64_t     *packets,
+    uint64_t     *flows,
+    uint64_t     *rej_pkts,
+    uint32_t     *peak,
+    uint32_t     *flush);
 
 /**
  * Add a decoded packet buffer to a given flow table. Adds the packet to
@@ -295,11 +303,11 @@ void yfGetFlowTabStats(
  * @param pbuflen   size of the packet buffer pbuf
  * @param pbuf      packet buffer containing decoded packet to add.
  */
-
-void yfFlowPBuf(
-    yfFlowTab_t                 *flowtab,
-    size_t                      pbuflen,
-    yfPBuf_t                    *pbuf);
+void
+yfFlowPBuf(
+    yfFlowTab_t  *flowtab,
+    size_t        pbuflen,
+    yfPBuf_t     *pbuf);
 
 /**
  * Flush closed flows in the given flow table to the given IPFIX Message
@@ -314,11 +322,11 @@ void yfFlowPBuf(
  * @param err       An error description pointer; must not be NULL.
  * @return TRUE on success, FALSE otherwise.
  */
-
-gboolean yfFlowTabFlush(
-    void            *yfContext,
-    gboolean        close,
-    GError          **err);
+gboolean
+yfFlowTabFlush(
+    void      *yfContext,
+    gboolean   close,
+    GError   **err);
 
 /**
  * Get the current packet clock from a flow table.
@@ -326,9 +334,9 @@ gboolean yfFlowTabFlush(
  * @param flowtab a flow table
  * @return current packet clock
  */
-
-uint64_t yfFlowTabCurrentTime(
-    yfFlowTab_t     *flowtab);
+uint64_t
+yfFlowTabCurrentTime(
+    yfFlowTab_t  *flowtab);
 
 /**
  * Print flow table statistics to the log.
@@ -338,9 +346,9 @@ uint64_t yfFlowTabCurrentTime(
  *              (for packet and flow rate logging). May be NULL to suppress
  *              rate logging.
  */
+uint64_t
+yfFlowDumpStats(
+    yfFlowTab_t  *flowtab,
+    GTimer       *timer);
 
-uint64_t yfFlowDumpStats(
-    yfFlowTab_t     *flowtab,
-    GTimer          *timer);
-
-#endif
+#endif /* ifndef _YAF_TAB_H_ */

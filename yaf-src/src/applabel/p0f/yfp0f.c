@@ -5,7 +5,7 @@
  *
  * yaf portion of the p0f OS fingerprinting engine
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2016 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Chris Inacio, Emily Sarneso
  ** ------------------------------------------------------------------------
@@ -13,7 +13,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -422,7 +422,7 @@ endParsing:
     packetDetails->rstQuirks        = rstQuirks;
     packetDetails->openQuirks       = openQuirks;
     packetDetails->ecn              = tcph->flags & (TH_ECE|TH_CWR);
-    packetDetails->pkt              = yg_slice_alloc(YFP_IPTCPHEADER_SIZE);
+    packetDetails->pkt              = g_slice_alloc(YFP_IPTCPHEADER_SIZE);
     memcpy(packetDetails->pkt, pkt, pktLen);
     packetDetails->pktLen           = pktLen;
     packetDetails->payload          = packetDetails->pkt + (payloadPtr - pkt);*/

@@ -10,7 +10,7 @@ Group: NetSA
 License: LGPL
 Source: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}
-Packager: Tony Cebzanov <tonyc@cert.org>
+Packager: Tony Cebzanov
 Vendor: http://tools.netsa.cert.org/
 Provides: libairframe
 Provides: libairframe.so

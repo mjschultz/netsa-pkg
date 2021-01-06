@@ -3,9 +3,9 @@
 ** Invokes yaf, naf, etc. as a file daemon process
 **
 ** ------------------------------------------------------------------------
-** Copyright (C) 2007-2011 Carnegie Mellon University. All Rights Reserved.
+** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
 ** ------------------------------------------------------------------------
-** Authors: Tony Cebzanov <tonyc@cert.org>
+** Authors: Tony Cebzanov
 ** ------------------------------------------------------------------------
 ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
 ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227-7013
@@ -17,17 +17,17 @@
 #include <airframe/airopt.h>
 #include <airframe/logconfig.h>
 
-char        *fd_inspec          = NULL;
-char        *fd_outspec         = NULL;
-char        *fd_nextdir         = NULL;
-char        *fd_faildir         = NULL;
-char        *fd_outext          = NULL;
-uint32_t     fd_poll_delay      = 30;
-gboolean     fd_lock            = FALSE;
-gsize        fd_bufsize         = 1024;
-char        *fd_pidfile         = NULL;
-pid_t        fd_pid             = 0;
-gboolean     fd_nodaemon        = FALSE;
+char          *fd_inspec          = NULL;
+char          *fd_outspec         = NULL;
+char          *fd_nextdir         = NULL;
+char          *fd_faildir         = NULL;
+char          *fd_outext          = NULL;
+uint32_t       fd_poll_delay      = 30;
+gboolean       fd_lock            = FALSE;
+gsize          fd_bufsize         = 1024;
+char          *fd_pidfile         = NULL;
+pid_t          fd_pid             = 0;
+gboolean       fd_nodaemon        = FALSE;
 
 AirOptionEntry fd_options[]  = {
     AF_OPTION( "in", 'i', 0, AF_OPT_TYPE_STRING, &fd_inspec,
@@ -52,11 +52,12 @@ AirOptionEntry fd_options[]  = {
 };
 
 
-static void parse_options(
-    int              *argc,
-    char            **argv[]) {
-
-    AirOptionCtx    *aoctx = NULL;
+static void
+parse_options(
+    int   *argc,
+    char **argv[])
+{
+    AirOptionCtx *aoctx = NULL;
 
     aoctx = air_option_context_new("", argc, argv, fd_options);
     logc_add_option_group(aoctx, "filedaemon", VERSION);
@@ -66,39 +67,42 @@ static void parse_options(
     air_option_context_parse(aoctx);
 }
 
+
 typedef struct _fd_write_data {
-    GIOChannel   *infile;
-    gchar        *buf;
+    GIOChannel  *infile;
+    gchar       *buf;
 } fd_write_data_t;
 
 typedef struct _fd_read_data {
-    GIOChannel   *outfile;
-    gchar        *buf;
-    GMainLoop    *loop;
+    GIOChannel  *outfile;
+    gchar       *buf;
+    GMainLoop   *loop;
 } fd_read_data_t;
 
-static gboolean write_to_child(
-    GIOChannel  *child_stdin,
-    GIOCondition condition,
-    gpointer     data)
+static gboolean
+write_to_child(
+    GIOChannel    *child_stdin,
+    GIOCondition   condition,
+    gpointer       data)
 {
-    GIOStatus      ret;
-    GError        *err    = NULL;
-    gsize          bytes_read, bytes_written;
-    GIOChannel    *infile =  ((fd_write_data_t *)data)->infile;
-    gchar         *buf    =  ((fd_write_data_t *)data)->buf;
+    GIOStatus     ret;
+    GError       *err    = NULL;
+    gsize         bytes_read, bytes_written;
+    GIOChannel   *infile =  ((fd_write_data_t *)data)->infile;
+    gchar        *buf    =  ((fd_write_data_t *)data)->buf;
     /** number of attempts for temporarily busy resource */
     unsigned char stillRetry = 10;
 
-    static int br         = 0;
+    static int    br         = 0;
 
-    if (condition & G_IO_HUP)
+    if (condition & G_IO_HUP) {
         g_critical("Write end of pipe died!");
-    if (condition & G_IO_ERR)
+    }
+    if (condition & G_IO_ERR) {
         g_critical("Error writing to child process");
+    }
 
-    while(stillRetry)
-    {
+    while (stillRetry) {
         ret = g_io_channel_read_chars(infile, buf, fd_bufsize,
                                       &bytes_read,
                                       &err);
@@ -122,36 +126,42 @@ static gboolean write_to_child(
 
     br += bytes_read;
 
-    /* g_debug("Read %u bytes from input file (total: %lu).", bytes_read, br);*/
+    /* g_debug("Read %u bytes from input file (total: %lu).", bytes_read,
+     * br);*/
 
     ret = g_io_channel_write_chars(child_stdin, buf, bytes_read, &bytes_written,
                                    &err);
 
-    if (ret == G_IO_STATUS_ERROR)
+    if (ret == G_IO_STATUS_ERROR) {
         g_critical("Error writing: %s", err->message);
+    }
 
     /* g_debug("Wrote %u bytes to child.", bytes_written); */
     return TRUE;
 }
 
-static gboolean read_from_child(
-    GIOChannel  *child_stdout,
-    GIOCondition condition,
-    gpointer     data)
-{
-    GIOStatus         ret;
-    GError           *err     = NULL;
-    gsize             bytes_read, bytes_written;
-    GIOChannel       *outfile = ((fd_read_data_t *)data)->outfile;
-    gchar            *buf     =  ((fd_read_data_t *)data)->buf;
-    GMainLoop        *loop    = ((fd_read_data_t *)data)->loop;
-    /** number of times to retry a temporary busy read */
-    unsigned char    stillRetry = 10;
 
-    if (condition & G_IO_HUP)
+static gboolean
+read_from_child(
+    GIOChannel    *child_stdout,
+    GIOCondition   condition,
+    gpointer       data)
+{
+    GIOStatus     ret;
+    GError       *err     = NULL;
+    gsize         bytes_read, bytes_written;
+    GIOChannel   *outfile = ((fd_read_data_t *)data)->outfile;
+    gchar        *buf     =  ((fd_read_data_t *)data)->buf;
+    GMainLoop    *loop    = ((fd_read_data_t *)data)->loop;
+    /** number of times to retry a temporary busy read */
+    unsigned char stillRetry = 10;
+
+    if (condition & G_IO_HUP) {
         g_critical("Read end of pipe died!");
-    if (condition & G_IO_ERR)
+    }
+    if (condition & G_IO_ERR) {
         g_critical("Error reading from child process");
+    }
 
     while (stillRetry) {
         ret = g_io_channel_read_chars(child_stdout, buf, fd_bufsize,
@@ -180,43 +190,48 @@ static gboolean read_from_child(
 
     ret = g_io_channel_write_chars(outfile, buf, bytes_read, &bytes_written,
                                    &err);
-    if (ret == G_IO_STATUS_ERROR)
+    if (ret == G_IO_STATUS_ERROR) {
         g_critical("Error writing: %s", err->message);
+    }
 
     /* g_debug("Wrote %u bytes to output file.", bytes_written); */
     return TRUE;
 }
 
 
-static void on_child_exit(
-    GPid     child_pid,
-    gint     status,
-    gpointer data)
+static void
+on_child_exit(
+    GPid       child_pid,
+    gint       status,
+    gpointer   data)
 {
-    char *infile  = (char *) data;
+    char *infile  = (char *)data;
     char *destdir = NULL;
 
-    g_message("pid %lu exited with status %d", (gulong) child_pid, status);
+    g_message("pid %lu exited with status %d", (gulong)child_pid, status);
 
 #ifdef G_OS_UNIX
     if (WIFEXITED(status)) {
         if (WEXITSTATUS(status) == EXIT_SUCCESS) {
-            g_debug("pid %lu returned success", (gulong) child_pid);
-            if (g_ascii_strcasecmp(fd_nextdir, "delete"))
+            g_debug("pid %lu returned success", (gulong)child_pid);
+            if (g_ascii_strcasecmp(fd_nextdir, "delete")) {
                 destdir = fd_nextdir;
+            }
         } else {
-            g_warning("pid %lu returned error status %d", (gulong) child_pid,
+            g_warning("pid %lu returned error status %d", (gulong)child_pid,
                       WEXITSTATUS(status));
-            if (g_ascii_strcasecmp(fd_faildir, "delete"))
+            if (g_ascii_strcasecmp(fd_faildir, "delete")) {
                 destdir = fd_faildir;
+            }
         }
     } else if (WIFSIGNALED(status)) {
         g_critical("pid %lu terminated with signal %d\n",
-                   (gulong) child_pid, WTERMSIG(status));
-        if (g_ascii_strcasecmp(fd_faildir, "delete"))
+                   (gulong)child_pid, WTERMSIG(status));
+        if (g_ascii_strcasecmp(fd_faildir, "delete")) {
             destdir = fd_faildir;
+        }
     } else {
-        g_critical("pid %lu terminated", (gulong) child_pid);
+        g_critical("pid %lu terminated", (gulong)child_pid);
     }
 #endif /* G_OS_UNIX */
 
@@ -228,27 +243,30 @@ static void on_child_exit(
             /* Calculate move destination path */
             dbase = g_path_get_basename(infile);
             g_string_printf(destpath, "%s/%s", destdir, dbase);
-            if (dbase) free(dbase);
+            if (dbase) {free(dbase);}
             /* Do link */
             g_message("moving %s -> %s", infile, destpath->str);
-            if (link(infile, destpath->str) < 0)
+            if (link(infile, destpath->str) < 0) {
                 g_critical(
                     "error moving input file to destination directory: %s",
                     strerror(errno));
+            }
             g_string_free(destpath, TRUE);
         }
     }
 
     /* Do delete */
-    if (unlink(infile) < 0)
+    if (unlink(infile) < 0) {
         g_critical("error deleting input file");
+    }
 
     g_spawn_close_pid(child_pid);
 }
 
 
-void fd_lock_file(
-    char *filename)
+void
+fd_lock_file(
+    char  *filename)
 {
     GString *lockpath = NULL;
     int      fd       = -1;
@@ -259,22 +277,25 @@ void fd_lock_file(
 
     /* Attempt lock */
     fd = open(lockpath->str, O_WRONLY | O_CREAT | O_EXCL, 0664);
-    if (fd < 0)
+    if (fd < 0) {
         goto done;
+    }
     close(fd);
 
     /* Verify existence */
     if (!g_file_test(filename, G_FILE_TEST_IS_REGULAR)) {
         /* file not here; unlock it */
-        if (lockpath->str) unlink(lockpath->str);
+        if (lockpath->str) {unlink(lockpath->str);}
     }
 
   done:
-    if (lockpath) g_string_free(lockpath, TRUE);
+    if (lockpath) {g_string_free(lockpath, TRUE);}
 }
 
-void fd_unlock_file(
-    char *filename)
+
+void
+fd_unlock_file(
+    char  *filename)
 {
     GString *lockpath = NULL;
 
@@ -285,15 +306,17 @@ void fd_unlock_file(
     /* Unlock file */
     if (lockpath) {
         unlink(lockpath->str);
-        if (lockpath) g_string_free(lockpath, TRUE);
+        if (lockpath) {g_string_free(lockpath, TRUE);}
     }
 }
 
-gboolean daemonize(
+
+gboolean
+daemonize(
     void)
 {
     /* fork */
-    if (fork()) exit(0);
+    if (fork()) {exit(0);}
 
     /* dissociate from controlling terminal */
     if (setsid() < 0) {
@@ -308,7 +331,7 @@ gboolean daemonize(
 
     fd_pid = getpid();
     if (fd_pidfile) {
-        FILE *pidfile = fopen(fd_pidfile,"w");
+        FILE *pidfile = fopen(fd_pidfile, "w");
         if (!pidfile) {
             g_critical("could not write pidfile");
             goto end;
@@ -321,19 +344,19 @@ gboolean daemonize(
     return TRUE;
 }
 
-int main(
-    int              argc,
-    char            *argv[])
-{
 
-    glob_t                   gbuf;
-    int                      grc, i;
-    GString                 *cmd;
-    GError                  *err = NULL;
+int
+main(
+    int    argc,
+    char  *argv[])
+{
+    glob_t     gbuf;
+    int        grc, i;
+    GError    *err = NULL;
 
     GMainLoop *loop;
 
-    GPtrArray    *child_args     = NULL;
+    GPtrArray *child_args     = NULL;
 
     /* parse options */
     parse_options(&argc, &argv);
@@ -348,10 +371,11 @@ int main(
     }
 
     child_args = g_ptr_array_sized_new(64);
-    for (i=1; i < argc; i++) {
+    for (i = 1; i < argc; i++) {
         /* Double dash indicates end of filedaemon's arguments */
-        if (!strncmp(argv[i], "--", strlen(argv[i])) )
+        if (!strncmp(argv[i], "--", strlen(argv[i])) ) {
             continue;
+        }
         g_ptr_array_add(child_args, g_strdup(argv[i]));
     }
     g_ptr_array_add(child_args, NULL);
@@ -361,8 +385,6 @@ int main(
             air_opterr("The --faildir switch is required");
         }
     }
-
-    cmd  = g_string_new("");
 
     loop = g_main_loop_new(NULL, FALSE);
 
@@ -396,30 +418,30 @@ int main(
             gbuf.gl_pathc = 0;
             gbuf.gl_pathv = NULL;
         }
-#endif
+#endif /* ifdef GLOB_NOMATCH */
 
         /* Iterate over glob paths, enqueueing. */
-        for (i = 0; i < gbuf.gl_pathc; i++) {
-            char      **child_envp            = {NULL};
-            GError     *child_err             = NULL;
+        for (i = 0; i < (int)gbuf.gl_pathc; i++) {
+            char         **child_envp            = {NULL};
+            GError        *child_err             = NULL;
 
-            GString    *filename_in           = NULL;
-            GString    *filename_out          = NULL;
-            GString    *filename_lock         = NULL;
+            GString       *filename_in           = NULL;
+            GString       *filename_out          = NULL;
+            GString       *filename_lock         = NULL;
 
-            GIOChannel *file_in               = NULL;
-            GIOChannel *file_out              = NULL;
+            GIOChannel    *file_in               = NULL;
+            GIOChannel    *file_out              = NULL;
 
-            GIOChannel *child_stdin           = NULL;
-            gint        child_stdin_fd        = -1;
+            GIOChannel    *child_stdin           = NULL;
+            gint           child_stdin_fd        = -1;
 
-            GIOChannel *child_stdout          = NULL;
-            gint        child_stdout_fd       = -1;
+            GIOChannel    *child_stdout          = NULL;
+            gint           child_stdout_fd       = -1;
 
-            GPid          child_pid;
-            int         len;
+            GPid           child_pid;
+            int            len;
 
-            fd_read_data_t  read_data;
+            fd_read_data_t read_data;
             fd_write_data_t write_data;
 
             filename_in = g_string_new(gbuf.gl_pathv[i]);
@@ -439,7 +461,7 @@ int main(
             }
 
             /* Generate lock path */
-            if (!filename_lock) filename_lock = g_string_new("");
+            if (!filename_lock) {filename_lock = g_string_new("");}
             g_string_printf(filename_lock, "%s.lock", filename_in->str);
 
             /* Skip files locked at queue time */
@@ -458,13 +480,14 @@ int main(
                 dbase = g_path_get_basename(filename_in->str);
 
                 g_string_printf(destpath, "%s/%s", fd_nextdir, dbase);
-                if (dbase) free(dbase);
+                if (dbase) {free(dbase);}
                 /* Do link */
                 g_message("moving %s -> %s", filename_in->str, fd_nextdir);
-                if (link(filename_in->str, destpath->str) < 0)
+                if (link(filename_in->str, destpath->str) < 0) {
                     g_critical(
                         "error moving input file to destination directory: %s",
                         strerror(errno));
+                }
                 /* Do delete */
                 if (unlink(filename_in->str) < 0) {
                     g_critical("error deleting input file");
@@ -535,7 +558,7 @@ int main(
             g_io_channel_set_buffer_size(file_out, fd_bufsize);
 
             if (!g_spawn_async_with_pipes(".",
-                                          (gchar **) child_args->pdata,
+                                          (gchar **)child_args->pdata,
                                           child_envp,
                                           G_SPAWN_SEARCH_PATH |
                                           G_SPAWN_DO_NOT_REAP_CHILD,
@@ -582,9 +605,7 @@ int main(
                 g_error("error setting child stdout encoding!");
             }
 
-
             g_io_channel_set_buffer_size(child_stdout, fd_bufsize);
-
 
             write_data.infile = file_in;
             write_data.buf    = g_malloc(g_io_channel_get_buffer_size(file_in));
@@ -595,11 +616,14 @@ int main(
 
             if (!g_io_add_watch(child_stdin,  G_IO_OUT | G_IO_PRI | G_IO_HUP |
                                 G_IO_ERR, write_to_child, &write_data))
+            {
                 g_error("Cannot add watch on GIOChannel!");
+            }
 
             read_data.outfile = file_out;
             read_data.loop    = loop;
-            read_data.buf     = g_malloc(g_io_channel_get_buffer_size(file_out));
+            read_data.buf     = g_malloc(g_io_channel_get_buffer_size(
+                                             file_out));
 
             if (write_data.buf == NULL) {
                 g_error("error allocating file_in buffer");
@@ -607,7 +631,9 @@ int main(
 
             if (!g_io_add_watch(child_stdout, G_IO_IN | G_IO_PRI | G_IO_HUP |
                                 G_IO_ERR, read_from_child, &read_data))
+            {
                 g_error("Cannot add watch on GIOChannel!");
+            }
 
             g_main_loop_run(loop);
 

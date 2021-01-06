@@ -3,7 +3,7 @@
 ** YAF Netronome support
 **
 ** ------------------------------------------------------------------------
-** Copyright (C) 2006-2016 Carnegie Mellon University. All Rights Reserved.
+** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
 ** ------------------------------------------------------------------------
 ** Authors: Emily Sarneso <ecoff@cert.org>
 ** ------------------------------------------------------------------------
@@ -11,7 +11,7 @@
 ** Use of the YAF system and related source code is subject to the terms
 ** of the following licenses:
 **
-** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
 ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
 **
 ** NO WARRANTY
@@ -71,32 +71,33 @@
 #include "nfe_packetcap.h"
 
 /* Statistics */
-static uint64_t     yaf_nfe_captured = 0;
-static uint64_t     yaf_nfe_dropped = 0;
-static uint32_t     yaf_stats_out = 0;
+static uint64_t yaf_nfe_captured = 0;
+static uint64_t yaf_nfe_dropped = 0;
+static uint32_t yaf_stats_out = 0;
 
-GTimer *stimer = NULL;
+GTimer         *stimer = NULL;
 
 /* Quit flag support */
-extern int yaf_quit;
+extern int      yaf_quit;
 
 struct yfNFESource_st {
-    char * nfe_ring;
-    unsigned int device;
-    unsigned int ring;
+    char          *nfe_ring;
+    unsigned int   device;
+    unsigned int   ring;
 };
 
 #define YAF_NFE_TIMEOUT 1000
 
-yfNFESource_t *yfNFEOpenLive(
-    const char              *ifname,
-    int                     snaplen,
-    int                     *datalink,
-    GError                  **err)
+yfNFESource_t *
+yfNFEOpenLive(
+    const char  *ifname,
+    int          snaplen,
+    int         *datalink,
+    GError     **err)
 {
-    yfNFESource_t            *ps = NULL;
+    yfNFESource_t *ps = NULL;
 
-    if ( ifname[1] != '.' ) {
+    if (ifname[1] != '.') {
         g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_IO,
                     "Invalid interface %s.\n  Inteface should be "
                     "in the form [device].[ring]. ex. 0.0", ifname);
@@ -121,12 +122,12 @@ yfNFESource_t *yfNFEOpenLive(
     }
 
     /* to be able to receive traffic on separate card/ring combos, use
-       nfe_pc_multi_init and nfe_pc_multi_add */
+     * nfe_pc_multi_init and nfe_pc_multi_add */
     if (!(ps->nfe_ring = nfe_pc_init(ps->device, ps->ring))) {
         g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_IO,
                     "Error Initializing Netronome API");
         return NULL;
-    };
+    }
 
     g_debug("Detected Netronome Device. Reading from card %d, ring %d.",
             ps->device, ps->ring);
@@ -137,28 +138,31 @@ yfNFESource_t *yfNFEOpenLive(
 
     /* return context */
     return ps;
-
 }
 
-void yfNFEClose(
-    yfNFESource_t          *ps)
+
+void
+yfNFEClose(
+    yfNFESource_t  *ps)
 {
     nfe_pc_close(ps->nfe_ring);
 }
 
-gboolean yfNFEMain(
-    yfContext_t             *ctx)
+
+gboolean
+yfNFEMain(
+    yfContext_t  *ctx)
 {
-    gboolean                ok = TRUE;
-    yfNFESource_t           *ps = (yfNFESource_t *)ctx->pktsrc;
-    yfPBuf_t                *pbuf = NULL;
-    struct timeval          ts;
+    gboolean       ok = TRUE;
+    yfNFESource_t *ps = (yfNFESource_t *)ctx->pktsrc;
+    yfPBuf_t      *pbuf = NULL;
+    struct timeval ts;
     struct nfe_pc_descriptor *nfe_header;
-    yfIPFragInfo_t          fraginfo_buf,
-                            *fraginfo = ctx->fragtab ?
-                            &fraginfo_buf : NULL;
-    uint8_t                 *frame = NULL;
-    int                     wait_status;
+    yfIPFragInfo_t fraginfo_buf,
+                   *fraginfo = ctx->fragtab ?
+        &fraginfo_buf : NULL;
+    uint8_t       *frame = NULL;
+    int            wait_status;
 
     /* create stats timer if starts are turned on */
     if (!ctx->cfg->nostats) {
@@ -170,9 +174,8 @@ gboolean yfNFEMain(
 
     /* process input until we're done */
     while (!yaf_quit) {
-
         frame = (uint8_t *)nfe_pc_next_packet(ps->nfe_ring, &nfe_header);
-        if (frame == (uint8_t*)NFE_PC_ERROR) {
+        if (frame == (uint8_t *)NFE_PC_ERROR) {
             g_set_error(&(ctx->err), YAF_ERROR_DOMAIN, YAF_ERROR_IO,
                         "Error reading Netronome feed: %s\n",
                         nfe_pc_get_error(ps->nfe_ring));
@@ -244,7 +247,7 @@ gboolean yfNFEMain(
                 if (g_timer_elapsed(stimer, NULL) > ctx->cfg->stats) {
                     yaf_nfe_dropped = nfe_pc_get_drop(ps->nfe_ring);
                     if (!yfWriteOptionsDataFlows(ctx, (uint32_t)yaf_nfe_dropped,
-                                          yfStatGetTimer(), &(ctx->err)))
+                                                 yfStatGetTimer(), &(ctx->err)))
                     {
                         ok = FALSE;
                         break;
@@ -266,7 +269,7 @@ gboolean yfNFEMain(
 
     if (!ctx->cfg->nostats) {
         /* add one for final flush */
-        if (ok) yaf_stats_out++;
+        if (ok) {yaf_stats_out++;}
         g_timer_destroy(stimer);
     }
     /* Handle final flush */
@@ -275,9 +278,10 @@ gboolean yfNFEMain(
 }
 
 
-
-void yfNFEDumpStats() {
-
+void
+yfNFEDumpStats(
+    void)
+{
     if (yaf_stats_out) {
         g_debug("yaf Exported %u stats records.", yaf_stats_out);
     }
@@ -288,4 +292,5 @@ void yfNFEDumpStats() {
     }
 }
 
-#endif
+
+#endif /* if YAF_ENABLE_NETRONOME */

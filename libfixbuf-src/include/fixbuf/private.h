@@ -5,14 +5,14 @@
  ** fixbuf IPFIX Implementation Private Interface
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2019 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell
  ** ------------------------------------------------------------------------
  ** @OPENSOURCE_LICENSE_START@
  ** libfixbuf 2.0
  **
- ** Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright 2018-2020 Carnegie Mellon University. All Rights Reserved.
  **
  ** NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
  ** ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -66,6 +66,9 @@
 /** definition of the max-size of an fbuf_t buffer, or the
     default/only size */
 #define FB_MSGLEN_MAX       65535
+
+/** size of the buffer for OpenSSL error messages */
+#define FB_SSL_ERR_BUFSIZ   512
 
 #if HAVE_SPREAD
 

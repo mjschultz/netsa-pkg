@@ -6,13 +6,8 @@
  * this provides NNTP payload packet recognition for use within YAF
  * It is based on RFC 977 and some random limited packet capture.
  *
- *
- * @author $Author$
- * @date $Date$
- * @Version $Revision$
- *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Ecoff <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -20,7 +15,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -70,6 +65,7 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 #if YAF_ENABLE_HOOKS
 #include <yaf/yafhooks.h>
@@ -80,13 +76,15 @@
 
 #define NNTP_PORT 119
 
+YC_SCANNER_PROTOTYPE(nntpplugin_LTX_ycNNTPScanScan);
+
 /**
  * the compiled regular expressions, and related
  * flags
  *
  */
-static pcre *nntpCommandRegex = NULL;
-static pcre *nntpResponseRegex = NULL;
+static pcre        *nntpCommandRegex = NULL;
+static pcre        *nntpResponseRegex = NULL;
 static unsigned int pcreInitialized = 0;
 
 
@@ -94,13 +92,15 @@ static unsigned int pcreInitialized = 0;
  * static local functions
  *
  */
-static uint16_t ycNNTPScanInit (void);
+static uint16_t
+ycNNTPScanInit(
+    void);
 
 /*static int ycDebugBinPrintf(uint8_t *data, uint16_t size);*/
 
 
 /**
- * nntpplugin_LTX_ycIrcScanScan
+ * nntpplugin_LTX_ycNNTPScanScan
  *
  * scans a given payload to see if it conforms to our idea of what NNTP traffic
  * looks like.
@@ -118,19 +118,17 @@ static uint16_t ycNNTPScanInit (void);
  *
  */
 uint16_t
-nntpplugin_LTX_ycNNTPScanScan (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+nntpplugin_LTX_ycNNTPScanScan(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
-
     int rc;
 #   define NUM_CAPT_VECTS 60
     int vects[NUM_CAPT_VECTS];
-
 
     if (0 == pcreInitialized) {
         if (0 == ycNNTPScanInit()) {
@@ -139,16 +137,15 @@ nntpplugin_LTX_ycNNTPScanScan (
     }
 
     rc = pcre_exec(nntpCommandRegex, NULL, (char *)payload, payloadSize,
-           0, 0, vects, NUM_CAPT_VECTS);
+                   0, 0, vects, NUM_CAPT_VECTS);
 
     if (rc <= 0) {
         rc = pcre_exec(nntpResponseRegex, NULL, (char *)payload,
-               payloadSize, 0, 0, vects, NUM_CAPT_VECTS);
+                       payloadSize, 0, 0, vects, NUM_CAPT_VECTS);
     }
 
-
     /** at some point in the future, this is the place to extract protocol
-        information like message targets and join targets, etc.*/
+     *  information like message targets and join targets, etc.*/
 #if YAF_ENABLE_HOOKS
     if (rc > 0) {
         yfHookScanPayload(flow, payload, payloadSize, nntpCommandRegex, 0,
@@ -156,16 +153,14 @@ nntpplugin_LTX_ycNNTPScanScan (
         yfHookScanPayload(flow, payload, payloadSize, nntpResponseRegex, 0,
                           172, NNTP_PORT);
     }
-#endif
+#endif /* if YAF_ENABLE_HOOKS */
 
     if (rc > 0) {
         return NNTP_PORT;
     }
 
-
     return 0;
 }
-
 
 
 /**
@@ -181,52 +176,55 @@ nntpplugin_LTX_ycNNTPScanScan (
  */
 static
 uint16_t
-ycNNTPScanInit ()
+ycNNTPScanInit(
+    void)
 {
     const char *errorString;
-    int errorPos;
-
-    const char nntpResponseRegexString[] = "(([1-5]([0-4]|[8-9])[0-9] )+"
-                                      ".* (text follows)?[\\r\\n]?"
-                                      "(.* \\r\\n)?)\b";
-    const char nntpCommandRegexString[] ="^((ARTICLE|GROUP|HELP|IHAVE|LAST"
-                                  "|LIST|NEWGROUPS|NEWNEWS|NEXT|POST|QUIT"
-                                  "|SLAVE|STAT|MODE) ?[ a-zA-Z0-9.]*)[ \\r\\n]";
+    int         errorPos;
+    const char  nntpResponseRegexString[] =
+        "(([1-5]([0-4]|[8-9])[0-9] )+"
+        ".* (text follows)?[\\r\\n]?"
+        "(.* \\r\\n)?)\b";
+    const char nntpCommandRegexString[] =
+        "^((ARTICLE|GROUP|HELP|IHAVE|LAST"
+        "|LIST|NEWGROUPS|NEWNEWS|NEXT|POST|QUIT"
+        "|SLAVE|STAT|MODE) ?[ a-zA-Z0-9.]*)[ \\r\\n]";
 
     nntpCommandRegex = pcre_compile(nntpCommandRegexString, 0, &errorString,
                                     &errorPos, NULL);
     nntpResponseRegex = pcre_compile(nntpResponseRegexString,
-                                     PCRE_EXTENDED|PCRE_ANCHORED, &errorString,
-                                     &errorPos, NULL);
+                                     PCRE_EXTENDED | PCRE_ANCHORED,
+                                     &errorString, &errorPos, NULL);
 
     if (NULL != nntpCommandRegex && NULL != nntpResponseRegex) {
         pcreInitialized = 1;
     }
 
-
     return pcreInitialized;
 }
 
-/*
-static
-int
-ycDebugBinPrintf(uint8_t *data, uint16_t size)
+
+#if 0
+static int
+ycDebugBinPrintf(
+    uint8_t   *data,
+    uint16_t   size)
 {
     uint16_t loop;
-    int numPrinted = 0;
+    int      numPrinted = 0;
 
     if (0 == size) {
         return 0;
     }
 
-    for (loop=0; loop < size; loop++) {
-        if (isprint(*(data+loop)) && !iscntrl(*(data+loop))){
-            printf("%c", *(data+loop));
+    for (loop = 0; loop < size; loop++) {
+        if (isprint(*(data + loop)) && !iscntrl(*(data + loop))) {
+            printf("%c", *(data + loop));
         } else {
             printf(".");
         }
-        if ('\n' == *(data+loop) || '\r' == *(data+loop) || '\0' ==
-            *(data+loop))
+        if ('\n' == *(data + loop) || '\r' == *(data + loop)
+            || '\0' == (data + loop))
         {
             break;
         }
@@ -235,4 +233,4 @@ ycDebugBinPrintf(uint8_t *data, uint16_t size)
 
     return numPrinted;
 }
-*/
+#endif /* 0 */

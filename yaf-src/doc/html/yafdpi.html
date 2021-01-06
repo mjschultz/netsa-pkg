@@ -667,74 +667,102 @@
 
 <h2 id="SMTP">SMTP</h2>
 
-<p>Simple Mail Transfer Protocol (SMTP) Deep Packet Inspection is based on RFC 2821. The following information elements are exported as a template in the subTemplateMultiList as basicLists of variable length elements in the order they are listed in the yafDPIRules.conf file. <b>yaf</b> will always export at least 11 information elements in the SMTP template and data record. By default, the following information elements are exported in order:</p>
+<p>Simple Mail Transfer Protocol (SMTP) Deep Packet Inspection is based on RFC 2821. <b>Note:</b> The templates used for SMTP DPI changed in YAF 2.12.0.</p>
+
+<p>An SMTP conversation is exported as a nested set of templates in subTemplateMultiList. The outer template (yaf_smtp) includes the following elements.</p>
 
 <dl>
 
-<dt id="smtpHello-CERT-PEN-6871-IE-162-variable-length-DPI-basicList"><b>smtpHello</b> CERT (PEN 6871) IE 162, variable length, DPI basicList</dt>
+<dt id="smtpHello-CERT-PEN-6871-IE-162-variable-length-string"><b>smtpHello</b> CERT (PEN 6871) IE 162, variable length, string</dt>
 <dd>
 
 <p>SMTP Hello or Extend Hello command. Captures the command and the domain name of the SMTP client.</p>
 
 </dd>
-<dt id="smtpFrom-CERT-PEN-6871-IE-163-variable-length-DPI-basicList"><b>smtpFrom</b> CERT (PEN 6871) IE 163, variable length, DPI basicList</dt>
-<dd>
-
-<p>SMTP Mail Command. Contains the reverse-path of the sender mailbox.</p>
-
-</dd>
-<dt id="smtpTo-CERT-PEN-6871-IE-164-variable-length-DPI-basicList"><b>smtpTo</b> CERT (PEN 6871) IE 164, variable length, DPI basicList</dt>
-<dd>
-
-<p>The SMTP Recipient (RCPT) Command. Captures the command and the forward-path of the recipient of the mail data.</p>
-
-</dd>
-<dt id="smtpContentType-CERT-PEN-6871-IE-165-variable-length-DPI-basicList"><b>smtpContentType</b> CERT (PEN 6871) IE 165, variable length, DPI basicList</dt>
-<dd>
-
-<p>SMTP Content Type Header Field.</p>
-
-</dd>
-<dt id="smtpSubject-CERT-PEN-6871-IE-166-variable-length-DPI-basicList"><b>smtpSubject</b> CERT (PEN 6871) IE 166, variable length, DPI basicList</dt>
-<dd>
-
-<p>SMTP Subject. Contains the subject of the mail data.</p>
-
-</dd>
-<dt id="smtpFilename-CERT-PEN-6871-IE-167-variable-length-DPI-basicList"><b>smtpFilename</b> CERT (PEN 6871) IE 167, variable length, DPI basicList</dt>
-<dd>
-
-<p>SMTP Filename. Contains the name of the file attached to the mail message.</p>
-
-</dd>
-<dt id="smtpContentDisposition-CERT-PEN-6871-IE-168-variable-length-DPI-basicList"><b>smtpContentDisposition</b> CERT (PEN 6871) IE 168, variable length, DPI basicList</dt>
-<dd>
-
-<p>SMTP Content-Disposition Header field.</p>
-
-</dd>
-<dt id="smtpResponse-CERT-PEN-6871-IE-169-variable-length-DPI-basicList"><b>smtpResponse</b> CERT (PEN 6871) IE 169, variable length, DPI basicList</dt>
-<dd>
-
-<p>SMTP Replies. Consists of a three digit number followed by text.</p>
-
-</dd>
-<dt id="smtpEnhanced-CERT-PEN-6871-IE-170-variable-length-DPI-basicList"><b>smtpEnhanced</b> CERT (PEN 6871) IE 170, variable length, DPI basicList</dt>
+<dt id="smtpEnhanced-CERT-PEN-6871-IE-170-variable-length-string"><b>smtpEnhanced</b> CERT (PEN 6871) IE 170, variable length, string</dt>
 <dd>
 
 <p>Enhanced SMTP. Contains the ESMTP command with the following argument.</p>
 
 </dd>
-<dt id="smtpSize-CERT-PEN-6871-IE-222-variable-length-DPI-basicList"><b>smtpSize</b> CERT (PEN 6871) IE 222, variable length, DPI basicList</dt>
+<dt id="smtpMessageSize-CERT-PEN-6871-IE-330-4-unsigned"><b>smtpMessageSize</b>, CERT (PEN 6871) IE 330, 4, unsigned</dt>
 <dd>
 
-<p>SMTP Size Header Field. Contains the size in bytes of the mail data.</p>
+<p>SMTP Message Size</p>
 
 </dd>
-<dt id="smtpDate-CERT-PEN-6871-IE-251-variable-length-DPI-basicList"><b>smtpDate</b> CERT (PEN 6871) IE 251, variable length, DPI basicList</dt>
+<dt id="smtpStartTLS-CERT-PEN-6871-IE-326-1-unsigned"><b>smtpStartTLS</b>, CERT (PEN 6871) IE 326, 1, unsigned</dt>
 <dd>
 
-<p>SMTP Date Field. Added in version 2.3.</p>
+<p>START TLS. Element indicating whether or not the SMTP session sent the START TLS command.</p>
+
+</dd>
+<dt id="smtpResponseList-CERT-PEN-6871-IE-331-variable-length-basicList"><b>smtpResponseList</b>, CERT (PEN 6871) IE 331, variable length, basicList</dt>
+<dd>
+
+<p>A basicList of SMTP Replies, represented by smtpResponse (IE CERT/169, variable length, string) elements. Each smtpResponse contains of a three digit number followed by text.</p>
+
+</dd>
+<dt id="smtpMessageList-CERT-PEN-6871-IE-336-variable-length-subTemplateList"><b>smtpMessageList</b> CERT (PEN 6871) IE 336, variable length, subTemplateList</dt>
+<dd>
+
+<p>A subTemplateList containing zero (but usually at least one) or more records described by the yaf_smtp_message template. Each record represents a single email message sent during the SMTP conversation. That template contains the following elements:</p>
+
+<dl>
+
+<dt id="smtpSubject-CERT-PEN-6871-IE-166-variable-length-string"><b>smtpSubject</b> CERT (PEN 6871) IE 166, variable length, string</dt>
+<dd>
+
+<p>The subject of the message.</p>
+
+</dd>
+<dt id="smtpToList-CERT-PEN-6871-IE-332-variable-length-DPI-basicList"><b>smtpToList</b> CERT (PEN 6871) IE 332, variable length, DPI basicList</dt>
+<dd>
+
+<p>The SMTP Recipient (RCPT) Command. A basicList containing smtpTo (IE CERT/164, variable length, string) elements. Each smtpTo captures the command and the forward-path of the recipient of the mail data.</p>
+
+</dd>
+<dt id="smtpFromList-CERT-PEN-6871-IE-333-variable-length-DPI-basicList"><b>smtpFromList</b> CERT (PEN 6871) IE 333, variable length, DPI basicList</dt>
+<dd>
+
+<p>SMTP Mail Command. A basicList containing smtpFrom (IE CERT/163, variable length, string) elements. Each stmpFrom contains the reverse-path of the sender mailbox.</p>
+
+</dd>
+<dt id="smtpFilenameList-CERT-PEN-6871-IE-334-variable-length-DPI-basicList"><b>smtpFilenameList</b> CERT (PEN 6871) IE 334, variable length, DPI basicList</dt>
+<dd>
+
+<p>SMTP Filename. A basicList containing smtpFilename (IE CERT/167, variable length, string) elements. Each smtpFilename contains the name of a file attached to the mail message, if any.</p>
+
+</dd>
+<dt id="smtpURLList-CERT-PEN-6871-IE-335-variable-length-DPI-basicList"><b>smtpURLList</b> CERT (PEN 6871) IE 335, variable length, DPI basicList</dt>
+<dd>
+
+<p>SMTP URL. A basicList containing smtpURL (IE CERT/329, variable length, string) elements. Each smtpURL contains a URL captured in the SMTP message body, if any.</p>
+
+</dd>
+<dt id="smtpHeaderList-CERT-PEN-6871-IE-337-variable-length-DPI-subTemplateList"><b>smtpHeaderList</b> CERT (PEN 6871) IE 337, variable length, DPI subTemplateList</dt>
+<dd>
+
+<p>A subTemplateList containing zero or more records described by the yaf_smtp_header template. Each record represents a single header (SMTP field name and body) in the email DATA. That template contains the following elements:</p>
+
+<dl>
+
+<dt id="smtpKey-CERT-PEN-6871-IE-327-variable-length-string"><b>smtpKey</b> CERT (PEN 6871), IE 327, variable length, string</dt>
+<dd>
+
+<p>SMTP Header key string. The name of the header (for example, &quot;To&quot;, &quot;From&quot;).</p>
+
+</dd>
+<dt id="smtpValue-CERT-PEN-6871-IE-328-variable-length-string"><b>smtpValue</b> CERT (PEN 6871), IE 328, variable length, string</dt>
+<dd>
+
+<p>SMTP Header value string. The value of that header.</p>
+
+</dd>
+</dl>
+
+</dd>
+</dl>
 
 </dd>
 </dl>

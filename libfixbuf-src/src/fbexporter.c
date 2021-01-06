@@ -6,14 +6,14 @@
  * IPFIX Exporting Process single transport session implementation
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2019 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell
  ** ------------------------------------------------------------------------
  ** @OPENSOURCE_LICENSE_START@
  ** libfixbuf 2.0
  **
- ** Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright 2018-2020 Carnegie Mellon University. All Rights Reserved.
  **
  ** NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
  ** ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -651,6 +651,7 @@ static gboolean fbExporterOpenTLS(
     GError                      **err)
 {
     BIO                         *conn = NULL;
+    char                        errbuf[FB_SSL_ERR_BUFSIZ];
     gboolean                    ok = TRUE;
 
     /* Initialize SSL context if necessary */
@@ -666,21 +667,22 @@ static gboolean fbExporterOpenTLS(
     /* wrap a stream BIO around the opened socket */
     if (!(conn = BIO_new_socket(exporter->stream.fd, 1))) {
         ok = FALSE;
+        ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_CONN,
                     "couldn't wrap socket to %s:%s for TLS: %s",
                     exporter->spec.conn->host, exporter->spec.conn->svc,
-                    ERR_error_string(ERR_get_error(), NULL));
-        while (ERR_get_error());
+                    errbuf);
+        ERR_clear_error();
         goto end;
     }
 
     /* create SSL socket */
     if (!(exporter->ssl = SSL_new((SSL_CTX *)exporter->spec.conn->vssl_ctx))) {
         ok = FALSE;
+        ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_CONN,
-                    "couldnt create TLS socket: %s",
-                    ERR_error_string(ERR_get_error(), NULL));
-        while (ERR_get_error());
+                    "couldnt create TLS socket: %s", errbuf);
+        ERR_clear_error();
         goto end;
     }
 
@@ -688,11 +690,12 @@ static gboolean fbExporterOpenTLS(
     SSL_set_bio(exporter->ssl, conn, conn);
     if (SSL_connect(exporter->ssl) <= 0) {
         ok = FALSE;
+        ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_CONN,
                     "couldn't connect TLS socket to %s:%s: %s",
                     exporter->spec.conn->host, exporter->spec.conn->svc,
-                    ERR_error_string(ERR_get_error(), NULL));
-        while (ERR_get_error());
+                    errbuf);
+        ERR_clear_error();
         goto end;
     }
 
@@ -729,6 +732,7 @@ static gboolean fbExporterOpenDTLS(
     BIO                         *conn = NULL;
     gboolean                    ok = TRUE;
     struct sockaddr             peer;
+    char                        errbuf[FB_SSL_ERR_BUFSIZ];
     size_t                      peerlen = sizeof(struct sockaddr);
 
     /* Initialize SSL context if necessary */
@@ -744,11 +748,12 @@ static gboolean fbExporterOpenDTLS(
     /* wrap a datagram BIO around the opened socket */
     if (!(conn = BIO_new_dgram(exporter->stream.fd, 1))) {
         ok = FALSE;
+        ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_CONN,
                     "couldn't wrap socket to %s:%s for DTLS: %s",
                     exporter->spec.conn->host, exporter->spec.conn->svc,
-                    ERR_error_string(ERR_get_error(), NULL));
-        while (ERR_get_error());
+                    errbuf);
+        ERR_clear_error();
         goto end;
     }
 
@@ -761,15 +766,19 @@ static gboolean fbExporterOpenDTLS(
                     strerror(errno));
         goto end;
     }
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
     BIO_ctrl_set_connected(conn, 1, &peer);
+#else
+    BIO_ctrl_set_connected(conn, &peer);
+#endif
 
     /* create SSL socket */
     if (!(exporter->ssl = SSL_new((SSL_CTX *)exporter->spec.conn->vssl_ctx))) {
         ok = FALSE;
+        ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_CONN,
-                    "couldnt create DTLS socket: %s",
-                    ERR_error_string(ERR_get_error(), NULL));
-        while (ERR_get_error());
+                    "couldnt create DTLS socket: %s", errbuf);
+        ERR_clear_error();
         goto end;
     }
 
@@ -811,15 +820,16 @@ static gboolean fbExporterWriteTLS(
     size_t                      msglen,
     GError                      **err)
 {
+    char                        errbuf[FB_SSL_ERR_BUFSIZ];
     int                         rc;
 
     while (msglen) {
         rc = SSL_write(exporter->ssl, msgbase, msglen);
         if (rc <= 0) {
+            ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
             g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_IO,
-                        "I/O error: %s",
-                        ERR_error_string(ERR_get_error(), NULL));
-            while (ERR_get_error());
+                        "I/O error: %s", errbuf);
+            ERR_clear_error();
             return FALSE;
         }
 

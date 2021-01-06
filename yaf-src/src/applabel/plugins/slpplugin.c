@@ -14,14 +14,8 @@
  *
  * @sa rfc 2608  href="http://www.ietf.org/rfc/rfc2608.txt"
  *
- *
- * @author $Author$
- * @date $Date$
- * @version $Revision$
- *
- *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Chris Inacio <inacio@cert.org>
  ** ------------------------------------------------------------------------
@@ -29,7 +23,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -80,6 +74,7 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 #if YAF_ENABLE_HOOKS
 #include <yaf/yafhooks.h>
@@ -89,54 +84,54 @@
 
 
 typedef struct srcLocProtoHeader_v1_st {
-    uint8_t             version;
-    uint8_t             function;
-    uint16_t            length;
+    uint8_t    version;
+    uint8_t    function;
+    uint16_t   length;
 
-    uint8_t             overflow:1;
-    uint8_t             monolingual:1;
-    uint8_t             urlAuth:1;
-    uint8_t             attribAuth:1;
-    uint8_t             srvcAck:1;
-    uint8_t             reserved:3;
+    uint8_t    overflow    : 1;
+    uint8_t    monolingual : 1;
+    uint8_t    urlAuth     : 1;
+    uint8_t    attribAuth  : 1;
+    uint8_t    srvcAck     : 1;
+    uint8_t    reserved    : 3;
 
-    uint8_t             dialect;
-    uint16_t            langCode;
-    uint16_t            charEncoding;
-    uint16_t            xid;
+    uint8_t    dialect;
+    uint16_t   langCode;
+    uint16_t   charEncoding;
+    uint16_t   xid;
 } srcLocProtoHeader_v1_t;
 
 struct srcLocProtoHeader_v1_st __attribute__ ((packed));
 
 /** this structure does not match (bit-for-bit anyway)  the
-    on the wire protocol.  Machines without native 24-bit
-    int types (darn near everything except some DSPs & older
-    video chips maybe) will not be able to pack it correctly
-    to match the wire */
+ *  on the wire protocol.  Machines without native 24-bit
+ *  int types (darn near everything except some DSPs & older
+ *  video chips maybe) will not be able to pack it correctly
+ *  to match the wire */
 typedef struct srcLocProtoHeader_v2_st {
-    uint8_t             version;
-    uint8_t             function;
+    uint8_t    version;
+    uint8_t    function;
 
     /* this is really a 24-bit value */
-    uint32_t            length;
+    uint32_t   length;
 
-    uint8_t             overflow:1;
-    uint8_t             fresh:1;
-    uint8_t             reqMcast:1;
-    uint16_t            reserved:13;
+    uint8_t    overflow : 1;
+    uint8_t    fresh    : 1;
+    uint8_t    reqMcast : 1;
+    uint16_t   reserved : 13;
 
     /* this is really a 24-bit value */
-    uint32_t            nextExtensionOffset;
+    uint32_t   nextExtensionOffset;
 
-    uint16_t            xid;
+    uint16_t   xid;
 
-    uint16_t            langTagLength;
-    uint8_t             langCode;       /* there is at least 1 char here, and
+    uint16_t   langTagLength;
+    uint8_t    langCode;                /* there is at least 1 char here, and
                                          * up to 8 */
 } srcLocProtoHeader_v2_t;
 
 /* this is the size of the V2 header up to and including the language
-   tag length in uint8_t/octects/bytes */
+ * tag length in uint8_t/octects/bytes */
 #define SLP_V2_HEADER_SIZE 14
 
 typedef enum slpFunction_et {
@@ -156,17 +151,18 @@ typedef enum slpFunction_et {
 
 #define SLP_PORT_NUMBER 427
 
+YC_SCANNER_PROTOTYPE(slpplugin_LTX_ycSlpScanScan);
+
 
 /*
  * File local functions
  *
  */
-static unsigned int ycPopulateSLPV2Header (
-    uint8_t * payload,
-    unsigned int payloadSize,
-    srcLocProtoHeader_v2_t * header);
-
-
+static unsigned int
+ycPopulateSLPV2Header(
+    const uint8_t           *payload,
+    unsigned int             payloadSize,
+    srcLocProtoHeader_v2_t  *header);
 
 
 /**
@@ -187,39 +183,37 @@ static unsigned int ycPopulateSLPV2Header (
  * @return 0 if not a match, if it is SLP, returns the version of the protocol
  */
 uint16_t
-slpplugin_LTX_ycSlpScanScan (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+slpplugin_LTX_ycSlpScanScan(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
-
-    uint8_t             version;
+    uint8_t      version;
     srcLocProtoHeader_v1_t *slpHeader;
-    unsigned int        loop;
+    unsigned int loop;
 
 #if YAF_ENABLE_HOOKS
-    gboolean slpStringFound = FALSE;
-    uint16_t slplength[5];
-    uint16_t slpoffset[5];
+    gboolean     slpStringFound = FALSE;
+    uint16_t     slplength[5];
+    uint16_t     slpoffset[5];
     for (loop = 0; loop < 5; loop++) {
         slplength[loop] = 0;
         slpoffset[loop] = 0;
     }
-#endif
+#endif /* if YAF_ENABLE_HOOKS */
 
     if (payloadSize < 2) {
         return 0;
     }
 
     /* map the payload into an SLP structure */
-    slpHeader = (srcLocProtoHeader_v1_t *) payload;
+    slpHeader = (srcLocProtoHeader_v1_t *)payload;
     version = slpHeader->version;
 
     if (1 == version) {
-
         if (payloadSize < sizeof(srcLocProtoHeader_v1_t)) {
             return 0;
         }
@@ -237,30 +231,29 @@ slpplugin_LTX_ycSlpScanScan (
         }
 
 #if YAF_ENABLE_HOOKS
-    /* version */
+        /* version */
         /*yfHookScanPayload(flow, payload, sizeof(uint8_t), NULL, 0, 90,
-          SLP_PORT_NUMBER);*/
-    /* msg type */
+         * SLP_PORT_NUMBER);*/
+        /* msg type */
         /*yfHookScanPayload(flow, payload, sizeof(uint8_t), NULL, 1, 91,
-          SLP_PORT_NUMBER);*/
+         * SLP_PORT_NUMBER);*/
 
-    /*Nothing valuable for now*/
+        /*Nothing valuable for now*/
 /*    offset = 13;
-    for (loop = 0; loop < 2; loop++){
-        yfHookScanPayload(flow, payload, *(payload+offset),
-                  NULL, (offset + sizeof(uint16_t)), 92+loop,
-                  SLP_PORT_NUMBER);
-        offset += *(payload+offset) + sizeof(uint16_t);
-        }*/
-#endif
+ *  for (loop = 0; loop < 2; loop++){
+ *      yfHookScanPayload(flow, payload, *(payload+offset),
+ *                NULL, (offset + sizeof(uint16_t)), 92+loop,
+ *                SLP_PORT_NUMBER);
+ *      offset += *(payload+offset) + sizeof(uint16_t);
+ *      }*/
+#endif /* if YAF_ENABLE_HOOKS */
 
         /* seems likely that this might be a service location protocol, let's
          * run with that as the answer */
         return 1;
-
     } else if (2 == version) {
         srcLocProtoHeader_v2_t slpHeader2;
-        uint16_t            offset;
+        uint16_t offset;
 
         if (payloadSize < sizeof(srcLocProtoHeader_v2_t)) {
             return 0;
@@ -276,7 +269,8 @@ slpplugin_LTX_ycSlpScanScan (
         }
 
         /* check for a valid function code */
-        if ((slpHeader2.function < SrvReq) || (slpHeader2.function > SAAdvert))
+        if ((slpHeader2.function < SrvReq) ||
+            (slpHeader2.function > SAAdvert))
         {
             return 0;
         }
@@ -297,25 +291,25 @@ slpplugin_LTX_ycSlpScanScan (
 
         /* five string fields are defined for a request */
         if (slpHeader2.function == SrvReq) {
-            uint16_t            stringLength;
+            uint16_t stringLength;
 
             for (loop = 0; loop < 5; loop++) {
-                if ((offset + 2) > payloadSize) {
+                if (((size_t)offset + 2) > payloadSize) {
                     return 0;
                 }
 #if HAVE_ALIGNED_ACCESS_REQUIRED
                 stringLength = ((*(payload + offset)) << 8) |
-                               ((*(payload + offset + 1)) );
+                    ((*(payload + offset + 1)) );
                 stringLength = ntohs(stringLength);
 #if YAF_ENABLE_HOOKS
                 slplength[loop] = stringLength;
 #endif
-#else
-                stringLength = ntohs(*(uint16_t *)(payload+offset));
+#else /* if HAVE_ALIGNED_ACCESS_REQUIRED */
+                stringLength = ntohs(*(uint16_t *)(payload + offset));
 #if YAF_ENABLE_HOOKS
                 slplength[loop] = stringLength;
 #endif
-#endif
+#endif /* if HAVE_ALIGNED_ACCESS_REQUIRED */
                 /* we could get a string out here, but what would we do with
                  * it? */
 # if YAF_ENABLE_HOOKS
@@ -339,7 +333,7 @@ slpplugin_LTX_ycSlpScanScan (
             {
                 slpStringFound = TRUE;
                 yfHookScanPayload(flow, payload, slplength[loop], NULL,
-                                  slpoffset[loop], 92+loop, SLP_PORT_NUMBER);
+                                  slpoffset[loop], 92 + loop, SLP_PORT_NUMBER);
             }
         }
         /* only record version and type if we have some data */
@@ -351,7 +345,7 @@ slpplugin_LTX_ycSlpScanScan (
             yfHookScanPayload(flow, payload, sizeof(uint8_t), NULL, 1, 91,
                               SLP_PORT_NUMBER);
         }
-#endif
+#endif /* if YAF_ENABLE_HOOKS */
 
         return 1;
     }
@@ -360,34 +354,33 @@ slpplugin_LTX_ycSlpScanScan (
 }
 
 
-
-
 /**
  * ycPopulateSLPV2Header
  *
- * reads bytes from a stream (byte-by-byte) to fill in a structure for the V2 SLP header
+ * reads bytes from a stream (byte-by-byte) to fill in a structure for the V2
+ * SLP header
  *
  * @note it doesn't attempt to fill in the langcode field
  *
  * @param payload pointer to the payload bytes as captured from the wire
  * @param payloadSize the size of the payload array
- * @param a pointer to a srcLocProtoHeader_V2_t to populate from parsing the capture array
+ * @param a pointer to a srcLocProtoHeader_V2_t to populate from parsing the
+ * capture array
  *
  *
  * @return 0 on failure, non-zero on success
  */
 static
 unsigned int
-ycPopulateSLPV2Header (
-    uint8_t * payload,
-    unsigned int payloadSize,
-    srcLocProtoHeader_v2_t * header)
+ycPopulateSLPV2Header(
+    const uint8_t           *payload,
+    unsigned int             payloadSize,
+    srcLocProtoHeader_v2_t  *header)
 {
-    uint16_t            offset = 0;
-    uint8_t             readValue;
-    uint8_t             readValue2;
-    unsigned int        loop;
-
+    uint16_t     offset = 0;
+    uint8_t      readValue;
+    uint8_t      readValue2;
+    unsigned int loop;
 
     readValue = *(payload + offset);
     offset++;
@@ -412,8 +405,6 @@ ycPopulateSLPV2Header (
         header->length = (header->length << 8) | readValue;
     }
 
-
-
     if (offset > payloadSize) {
         return 0;
     }
@@ -431,7 +422,6 @@ ycPopulateSLPV2Header (
     offset++;
     header->reserved = ((readValue & 0x1f) << 8) | (readValue2);
 
-
     header->nextExtensionOffset = 0;
     for (loop = 0; loop < 3; loop++) {
         if (offset > payloadSize) {
@@ -441,7 +431,7 @@ ycPopulateSLPV2Header (
         readValue = *(payload + offset);
         offset++;
         header->nextExtensionOffset =
-          (header->nextExtensionOffset << 8) | readValue;
+            (header->nextExtensionOffset << 8) | readValue;
     }
 
     header->xid = 0;
@@ -467,5 +457,4 @@ ycPopulateSLPV2Header (
     }
 
     return offset;
-
 }

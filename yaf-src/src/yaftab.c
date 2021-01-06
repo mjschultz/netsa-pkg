@@ -5,7 +5,7 @@
  ** YAF Active Flow Table
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2019 Carnegie Mellon University.
+ ** Copyright (C) 2006-2020 Carnegie Mellon University.
  ** All Rights Reserved.
  **
  ** ------------------------------------------------------------------------
@@ -15,7 +15,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -122,20 +122,20 @@
 /* full path */
 #define YAF_PCAP_META_ROTATE_FP 23000000
 
-static int       pcap_meta_num = 0;
-static int       pcap_meta_read = 0;
+static int pcap_meta_num = 0;
+static int pcap_meta_read = 0;
 
 typedef struct yfFlowNode_st {
-    struct yfFlowNode_st        *p;
-    struct yfFlowNode_st        *n;
-    struct yfFlowTab_t          *flowtab;
-    uint32_t                    state;
-    yfFlow_t                    f;
+    struct yfFlowNode_st  *p;
+    struct yfFlowNode_st  *n;
+    struct yfFlowTab_t    *flowtab;
+    uint32_t               state;
+    yfFlow_t               f;
 } yfFlowNode_t;
 
 typedef struct yfFlowQueue_st {
-    yfFlowNode_t      *tail;
-    yfFlowNode_t      *head;
+    yfFlowNode_t  *tail;
+    yfFlowNode_t  *head;
 } yfFlowQueue_t;
 
 
@@ -149,150 +149,151 @@ typedef struct yfFlowQueue_st {
  */
 
 typedef struct yfFlowKeyIPv4_st {
-    uint16_t            sp;
-    uint16_t            dp;
-    uint8_t             proto;
-    uint8_t             version;
-    uint16_t            vlanId;
-    uint8_t             tos;
+    uint16_t   sp;
+    uint16_t   dp;
+    uint8_t    proto;
+    uint8_t    version;
+    uint16_t   vlanId;
+    uint8_t    tos;
 #if YAF_ENABLE_DAG_SEPARATE_INTERFACES || YAF_ENABLE_SEPARATE_INTERFACES
-    uint8_t             netIf;
+    uint8_t    netIf;
 #endif
     union {
         struct {
-            uint32_t    sip;
-            uint32_t    dip;
-        }               v4;
-    }                   addr;
+            uint32_t   sip;
+            uint32_t   dip;
+        } v4;
+    } addr;
 } yfFlowKeyIPv4_t;
 
 typedef struct yfFlowIPv4_st {
-    uint64_t        stime;
-    uint64_t        etime;
+    uint64_t          stime;
+    uint64_t          etime;
 #ifdef YAF_ENABLE_HOOKS
-    void            *hfctx[YAF_MAX_HOOKS];
+    void             *hfctx[YAF_MAX_HOOKS];
 #endif
-    uint32_t        rdtime;
+    uint32_t          rdtime;
 #if YAF_ENABLE_APPLABEL || YAF_ENABLE_NDPI
-    uint16_t        appLabel;
+    uint16_t          appLabel;
 #endif
 #if YAF_ENABLE_NDPI
-    uint16_t        ndpi_master;
-    uint16_t        ndpi_sub;
+    uint16_t          ndpi_master;
+    uint16_t          ndpi_sub;
 #endif
-    uint8_t         reason;
-    uint8_t         pcap_serial;
-    uint8_t         sourceMacAddr[6];
-    uint8_t         destinationMacAddr[6];
+    uint8_t           reason;
+    uint8_t           pcap_serial;
+    uint8_t           sourceMacAddr[6];
+    uint8_t           destinationMacAddr[6];
 
-    uint8_t         pcap_file_no;
-    uint8_t         pktdir;
-    uint8_t         rtos;
-    pcap_dumper_t   *pcap;
+    uint8_t           pcap_file_no;
+    uint8_t           pktdir;
+    uint8_t           rtos;
+    pcap_dumper_t    *pcap;
 #if YAF_MPLS
-    yfMPLSNode_t    *mpls;
+    yfMPLSNode_t     *mpls;
 #endif
-    yfMPTCPFlow_t   mptcp;
-    yfFlowVal_t     val;
-    yfFlowVal_t     rval;
-    yfFlowKeyIPv4_t key;
+    yfMPTCPFlow_t     mptcp;
+    yfFlowVal_t       val;
+    yfFlowVal_t       rval;
+    yfFlowKeyIPv4_t   key;
 } yfFlowIPv4_t;
 
 typedef struct yfFlowNodeIPv4_st {
-    struct yfFlowNodeIPv4_st    *p;
-    struct yfFlowNodeIPv4_st    *n;
-    struct yfFlowTab_t          *flowtab;
-    uint32_t                    state;
-    yfFlowIPv4_t                f;
+    struct yfFlowNodeIPv4_st  *p;
+    struct yfFlowNodeIPv4_st  *n;
+    struct yfFlowTab_t        *flowtab;
+    uint32_t                   state;
+    yfFlowIPv4_t               f;
 } yfFlowNodeIPv4_t;
 
-#endif
+#endif /* if YAF_ENABLE_COMPACT_IP4 */
 
 struct yfFlowTabStats_st {
-    uint64_t        stat_octets;
-    uint64_t        stat_packets;
-    uint64_t        stat_seqrej;
-    uint64_t        stat_flows;
-    uint64_t        stat_uniflows;
-    uint32_t        stat_peak;
-    uint32_t        stat_flush;
+    uint64_t   stat_octets;
+    uint64_t   stat_packets;
+    uint64_t   stat_seqrej;
+    uint64_t   stat_flows;
+    uint64_t   stat_uniflows;
+    uint32_t   stat_peak;
+    uint32_t   stat_flush;
 #if YAF_MPLS
-    uint32_t        max_mpls_labels;
-    uint32_t        stat_mpls_labels;
+    uint32_t   max_mpls_labels;
+    uint32_t   stat_mpls_labels;
 #endif
 };
 
 struct yfFlowTab_st {
     /* State */
-    uint64_t        ctime;
-    uint64_t        flushtime;
-    GHashTable      *table;
-    GHashFunc       hashfn;
-    GEqualFunc      hashequalfn;
+    uint64_t                              ctime;
+    uint64_t                              flushtime;
+    GHashTable                           *table;
+    GHashFunc                             hashfn;
+    GEqualFunc                            hashequalfn;
 #ifdef YAF_ENABLE_HOOKS
     /** Plugin context array for this yaf **/
-    void            **yfctx;
+    void                                **yfctx;
 #endif
 #if YAF_MPLS
-    yfMPLSNode_t    *cur_mpls_node;
+    yfMPLSNode_t                         *cur_mpls_node;
 #endif
 #if YAF_ENABLE_NDPI
-    struct ndpi_detection_module_struct *ndpi_struct;
+    struct ndpi_detection_module_struct  *ndpi_struct;
 #endif
-    yfFlowQueue_t   aq;
-    yfFlowQueue_t   cq;
-    uint32_t        count;
-    uint32_t        cq_count;
+    yfFlowQueue_t                         aq;
+    yfFlowQueue_t                         cq;
+    uint32_t                              count;
+    uint32_t                              cq_count;
     /* Configuration */
-    uint64_t        idle_ms;
-    uint64_t        active_ms;
-    uint64_t        hash_search;
-    uint64_t        stime_search;
-    uint32_t        max_flows;
-    uint32_t        max_payload;
-    char            *pcap_dir;
-    GString         *pcap_roll;
-    char            *pcap_meta_name;
-    FILE            *pcap_meta;
-    uint8_t         pcap_file_no;
-    uint64_t        max_pcap;
-    long            last_offset;
-    uint64_t        lasttime;
-    gboolean        uniflow;
-    gboolean        silkmode;
-    gboolean        macmode;
-    gboolean        applabelmode;
-    gboolean        entropymode;
-    gboolean        fingerprintmode;
-    gboolean        fingerprintExport;
-    gboolean        udp_max_payload;
-    gboolean        force_read_all;
-    gboolean        stats_mode;
-    gboolean        index_pcap;
-    uint16_t        udp_uniflow_port;
+    uint64_t                              idle_ms;
+    uint64_t                              active_ms;
+    uint64_t                              hash_search;
+    uint64_t                              stime_search;
+    uint32_t                              max_flows;
+    uint32_t                              max_payload;
+    char                                 *pcap_dir;
+    GString                              *pcap_roll;
+    char                                 *pcap_meta_name;
+    FILE                                 *pcap_meta;
+    uint8_t                               pcap_file_no;
+    uint64_t                              max_pcap;
+    long                                  last_offset;
+    uint64_t                              lasttime;
+    gboolean                              uniflow;
+    gboolean                              silkmode;
+    gboolean                              macmode;
+    gboolean                              applabelmode;
+    gboolean                              entropymode;
+    gboolean                              fingerprintmode;
+    gboolean                              fingerprintExport;
+    gboolean                              udp_max_payload;
+    gboolean                              force_read_all;
+    gboolean                              stats_mode;
+    gboolean                              index_pcap;
+    uint16_t                              udp_uniflow_port;
     /* Statistics */
-    struct yfFlowTabStats_st stats;
+    struct yfFlowTabStats_st              stats;
 };
 
 /**
  * protypes
-*/
-static gboolean yfRotatePcapMetaFile(
-    yfFlowTab_t                *flowtab);
+ */
+static gboolean
+yfRotatePcapMetaFile(
+    yfFlowTab_t  *flowtab);
 
 /**
  * yfGetFlowTabStats
  *
  *
  */
-void yfGetFlowTabStats(
-    yfFlowTab_t *flowtab,
-    uint64_t *packets,
-    uint64_t *flows,
-    uint64_t *rej_pkts,
-    uint32_t *peak,
-    uint32_t *flush)
-
+void
+yfGetFlowTabStats(
+    yfFlowTab_t  *flowtab,
+    uint64_t     *packets,
+    uint64_t     *flows,
+    uint64_t     *rej_pkts,
+    uint32_t     *peak,
+    uint32_t     *flush)
 {
     *packets = flowtab->stats.stat_packets;
     *flows = flowtab->stats.stat_flows;
@@ -300,6 +301,7 @@ void yfGetFlowTabStats(
     *peak = flowtab->stats.stat_peak;
     *flush = flowtab->stats.stat_flush;
 }
+
 
 #if YAF_MPLS
 /**
@@ -311,10 +313,10 @@ void yfGetFlowTabStats(
  * @param pointer to struct that holds MPLS values
  * @return 32-bit hashed integer of the 3 mpls labels
  */
-static uint32_t yfMPLSHash(
-    yfMPLSNode_t    *mpls)
+static uint32_t
+yfMPLSHash(
+    yfMPLSNode_t  *mpls)
 {
-
     return ((mpls->mpls_label[1] << 10) ^ (mpls->mpls_label[2] << 6) ^
             mpls->mpls_label[0]);
 }
@@ -329,11 +331,11 @@ static uint32_t yfMPLSHash(
  * @param b
  * @return true/false
  */
-static gboolean yfMPLSEqual(
-    yfMPLSNode_t       *a,
-    yfMPLSNode_t       *b)
+static gboolean
+yfMPLSEqual(
+    yfMPLSNode_t  *a,
+    yfMPLSNode_t  *b)
 {
-
     if ((a->mpls_label[0] == b->mpls_label[0]) &&
         (a->mpls_label[1] == b->mpls_label[1]) &&
         (a->mpls_label[2] == b->mpls_label[2]))
@@ -344,7 +346,8 @@ static gboolean yfMPLSEqual(
     }
 }
 
-#endif
+
+#endif /* if YAF_MPLS */
 /**
  * yfFlowKeyHash
  *
@@ -358,96 +361,12 @@ static gboolean yfMPLSEqual(
  *
  * @return 32-bit hashed integer of the flow
  */
-static uint32_t yfFlowKeyHash(
-    yfFlowKey_t       *key)
+static uint32_t
+yfFlowKeyHash(
+    yfFlowKey_t  *key)
 {
-
     /* Mask out priority/CFI bits */
     uint16_t vlan_mask = 0x0FFF & key->vlanId;
-
-#if YAF_ENABLE_DAG_SEPARATE_INTERFACES
-    uint32_t netInterfaceHash;
-
-    switch (key->netIf) {
-        case 0:
-            netInterfaceHash = 0x33333333;
-            break;
-        case 1:
-            netInterfaceHash = 0x55555555;
-            break;
-        case 2:
-            netInterfaceHash = 0xaaaaaaaa;
-            break;
-        case 3:
-            netInterfaceHash = 0xbbbbbbbb;
-            break;
-        default:
-            /* this is impossible because of the
-               dag structure is a 2-bit field for
-               this */
-            g_warning("Invalid DAG interface code recorded: %d"
-                      " - continuing processing", key->netIf);
-            netInterfaceHash = 0xcccccccc;
-    }
-
-    if (key->version == 4) {
-        return (key->sp << 16) ^ key->dp ^
-            (key->proto << 12) ^ (key->version << 4) ^
-            (vlan_mask << 20) ^ key->addr.v4.sip ^
-            key->addr.v4.dip ^ netInterfaceHash;
-    } else {
-        return (key->sp << 16) ^ key->dp ^
-            (key->proto << 12) ^ (key->version << 4) ^
-            (vlan_mask << 20) ^
-            *((uint32_t *)&(key->addr.v6.sip[0])) ^
-            *((uint32_t *)&(key->addr.v6.sip[4])) ^
-            *((uint32_t *)&(key->addr.v6.sip[8])) ^
-            *((uint32_t *)&(key->addr.v6.sip[12])) ^
-            *((uint32_t *)&(key->addr.v6.dip[0])) ^
-            *((uint32_t *)&(key->addr.v6.dip[4])) ^
-            *((uint32_t *)&(key->addr.v6.dip[8])) ^
-            *((uint32_t *)&(key->addr.v6.dip[12])) ^
-            netInterfaceHash;
-    }
-#endif
-
-    if (key->version == 4) {
-        return (key->sp << 16) ^ key->dp ^
-               (key->proto << 12) ^ (key->version << 4) ^
-               (vlan_mask << 20) ^
-               key->addr.v4.sip ^ key->addr.v4.dip;
-    } else {
-        return (key->sp << 16) ^ key->dp ^
-            (key->proto << 12) ^ (key->version << 4) ^
-            (vlan_mask << 20) ^
-            *((uint32_t *)&(key->addr.v6.sip[0])) ^
-            *((uint32_t *)&(key->addr.v6.sip[4])) ^
-            *((uint32_t *)&(key->addr.v6.sip[8])) ^
-            *((uint32_t *)&(key->addr.v6.sip[12])) ^
-            *((uint32_t *)&(key->addr.v6.dip[0])) ^
-            *((uint32_t *)&(key->addr.v6.dip[4])) ^
-            *((uint32_t *)&(key->addr.v6.dip[8])) ^
-            *((uint32_t *)&(key->addr.v6.dip[12]));
-    }
-}
-
-
-/**
- * yfFlowKeyHashNoVlan
- *
- * hash function that takes the 6-tuple for flow
- * identification and turns it into a single
- * 32-bit integer
- *
- * @param key pointer the the flow key which holds
- *        the set of values that uniquely identify
- *        a flow within yaf
- *
- * @return 32-bit hashed integer of the flow
- */
-static uint32_t yfFlowKeyHashNoVlan(
-    yfFlowKey_t       *key)
-{
 
 #if YAF_ENABLE_DAG_SEPARATE_INTERFACES
     uint32_t netInterfaceHash;
@@ -467,8 +386,8 @@ static uint32_t yfFlowKeyHashNoVlan(
         break;
       default:
         /* this is impossible because of the
-               dag structure is a 2-bit field for
-               this */
+         * dag structure is a 2-bit field for
+         * this */
         g_warning("Invalid DAG interface code recorded: %d"
                   " - continuing processing", key->netIf);
         netInterfaceHash = 0xcccccccc;
@@ -476,38 +395,122 @@ static uint32_t yfFlowKeyHashNoVlan(
 
     if (key->version == 4) {
         return (key->sp << 16) ^ key->dp ^
-            (key->proto << 12) ^ (key->version << 4) ^
-            key->addr.v4.sip ^
-            key->addr.v4.dip ^ netInterfaceHash;
+               (key->proto << 12) ^ (key->version << 4) ^
+               (vlan_mask << 20) ^ key->addr.v4.sip ^
+               key->addr.v4.dip ^ netInterfaceHash;
     } else {
         return (key->sp << 16) ^ key->dp ^
-            (key->proto << 12) ^ (key->version << 4) ^
-            *((uint32_t *)&(key->addr.v6.sip[0])) ^
-            *((uint32_t *)&(key->addr.v6.sip[4])) ^
-            *((uint32_t *)&(key->addr.v6.sip[8])) ^
-            *((uint32_t *)&(key->addr.v6.sip[12])) ^
-            *((uint32_t *)&(key->addr.v6.dip[0])) ^
-            *((uint32_t *)&(key->addr.v6.dip[4])) ^
-            *((uint32_t *)&(key->addr.v6.dip[8])) ^
-            *((uint32_t *)&(key->addr.v6.dip[12])) ^
-            netInterfaceHash;
+               (key->proto << 12) ^ (key->version << 4) ^
+               (vlan_mask << 20) ^
+               *((uint32_t *)&(key->addr.v6.sip[0])) ^
+               *((uint32_t *)&(key->addr.v6.sip[4])) ^
+               *((uint32_t *)&(key->addr.v6.sip[8])) ^
+               *((uint32_t *)&(key->addr.v6.sip[12])) ^
+               *((uint32_t *)&(key->addr.v6.dip[0])) ^
+               *((uint32_t *)&(key->addr.v6.dip[4])) ^
+               *((uint32_t *)&(key->addr.v6.dip[8])) ^
+               *((uint32_t *)&(key->addr.v6.dip[12])) ^
+               netInterfaceHash;
     }
-#endif
+#endif /* if YAF_ENABLE_DAG_SEPARATE_INTERFACES */
+
     if (key->version == 4) {
         return (key->sp << 16) ^ key->dp ^
-            (key->proto << 12) ^ (key->version << 4) ^
-            key->addr.v4.sip ^ key->addr.v4.dip;
+               (key->proto << 12) ^ (key->version << 4) ^
+               (vlan_mask << 20) ^
+               key->addr.v4.sip ^ key->addr.v4.dip;
     } else {
         return (key->sp << 16) ^ key->dp ^
-            (key->proto << 12) ^ (key->version << 4) ^
-            *((uint32_t *)&(key->addr.v6.sip[0])) ^
-            *((uint32_t *)&(key->addr.v6.sip[4])) ^
-            *((uint32_t *)&(key->addr.v6.sip[8])) ^
-            *((uint32_t *)&(key->addr.v6.sip[12])) ^
-            *((uint32_t *)&(key->addr.v6.dip[0])) ^
-            *((uint32_t *)&(key->addr.v6.dip[4])) ^
-            *((uint32_t *)&(key->addr.v6.dip[8])) ^
-            *((uint32_t *)&(key->addr.v6.dip[12]));
+               (key->proto << 12) ^ (key->version << 4) ^
+               (vlan_mask << 20) ^
+               *((uint32_t *)&(key->addr.v6.sip[0])) ^
+               *((uint32_t *)&(key->addr.v6.sip[4])) ^
+               *((uint32_t *)&(key->addr.v6.sip[8])) ^
+               *((uint32_t *)&(key->addr.v6.sip[12])) ^
+               *((uint32_t *)&(key->addr.v6.dip[0])) ^
+               *((uint32_t *)&(key->addr.v6.dip[4])) ^
+               *((uint32_t *)&(key->addr.v6.dip[8])) ^
+               *((uint32_t *)&(key->addr.v6.dip[12]));
+    }
+}
+
+
+/**
+ * yfFlowKeyHashNoVlan
+ *
+ * hash function that takes the 6-tuple for flow
+ * identification and turns it into a single
+ * 32-bit integer
+ *
+ * @param key pointer the the flow key which holds
+ *        the set of values that uniquely identify
+ *        a flow within yaf
+ *
+ * @return 32-bit hashed integer of the flow
+ */
+static uint32_t
+yfFlowKeyHashNoVlan(
+    yfFlowKey_t  *key)
+{
+#if YAF_ENABLE_DAG_SEPARATE_INTERFACES
+    uint32_t netInterfaceHash;
+
+    switch (key->netIf) {
+      case 0:
+        netInterfaceHash = 0x33333333;
+        break;
+      case 1:
+        netInterfaceHash = 0x55555555;
+        break;
+      case 2:
+        netInterfaceHash = 0xaaaaaaaa;
+        break;
+      case 3:
+        netInterfaceHash = 0xbbbbbbbb;
+        break;
+      default:
+        /* this is impossible because of the
+         *     dag structure is a 2-bit field for
+         *     this */
+        g_warning("Invalid DAG interface code recorded: %d"
+                  " - continuing processing", key->netIf);
+        netInterfaceHash = 0xcccccccc;
+    }
+
+    if (key->version == 4) {
+        return (key->sp << 16) ^ key->dp ^
+               (key->proto << 12) ^ (key->version << 4) ^
+               key->addr.v4.sip ^
+               key->addr.v4.dip ^ netInterfaceHash;
+    } else {
+        return (key->sp << 16) ^ key->dp ^
+               (key->proto << 12) ^ (key->version << 4) ^
+               *((uint32_t *)&(key->addr.v6.sip[0])) ^
+               *((uint32_t *)&(key->addr.v6.sip[4])) ^
+               *((uint32_t *)&(key->addr.v6.sip[8])) ^
+               *((uint32_t *)&(key->addr.v6.sip[12])) ^
+               *((uint32_t *)&(key->addr.v6.dip[0])) ^
+               *((uint32_t *)&(key->addr.v6.dip[4])) ^
+               *((uint32_t *)&(key->addr.v6.dip[8])) ^
+               *((uint32_t *)&(key->addr.v6.dip[12])) ^
+               netInterfaceHash;
+    }
+#endif /* if YAF_ENABLE_DAG_SEPARATE_INTERFACES */
+    if (key->version == 4) {
+        return (key->sp << 16) ^ key->dp ^
+               (key->proto << 12) ^ (key->version << 4) ^
+               key->addr.v4.sip ^ key->addr.v4.dip;
+    } else {
+        return (key->sp << 16) ^ key->dp ^
+               (key->proto << 12) ^ (key->version << 4) ^
+               *((uint32_t *)&(key->addr.v6.sip[0])) ^
+               *((uint32_t *)&(key->addr.v6.sip[4])) ^
+               *((uint32_t *)&(key->addr.v6.sip[8])) ^
+               *((uint32_t *)&(key->addr.v6.sip[12])) ^
+               *((uint32_t *)&(key->addr.v6.dip[0])) ^
+               *((uint32_t *)&(key->addr.v6.dip[4])) ^
+               *((uint32_t *)&(key->addr.v6.dip[8])) ^
+               *((uint32_t *)&(key->addr.v6.dip[12]));
     }
 }
 
@@ -522,11 +525,11 @@ static uint32_t yfFlowKeyHashNoVlan(
  * @param
  *
  */
-static gboolean yfFlowKeyEqual(
-    yfFlowKey_t       *a,
-    yfFlowKey_t       *b)
+static gboolean
+yfFlowKeyEqual(
+    yfFlowKey_t  *a,
+    yfFlowKey_t  *b)
 {
-
     uint16_t a_vlan_mask = 0x0FFF & a->vlanId;
     uint16_t b_vlan_mask = 0x0FFF & b->vlanId;
 
@@ -536,13 +539,13 @@ static gboolean yfFlowKeyEqual(
     }
 #endif
 
-    if ((a->sp      == b->sp)    &&
-        (a->dp      == b->dp)    &&
-        (a->proto   == b->proto) &&
+    if ((a->sp == b->sp) &&
+        (a->dp == b->dp) &&
+        (a->proto == b->proto) &&
         (a->version == b->version) &&
         (a_vlan_mask == b_vlan_mask))
     {
-        if ((a->version     == 4) &&
+        if ((a->version == 4) &&
             (a->addr.v4.sip == b->addr.v4.sip) &&
             (a->addr.v4.dip == b->addr.v4.dip))
         {
@@ -559,6 +562,7 @@ static gboolean yfFlowKeyEqual(
         return FALSE;
     }
 }
+
 
 /**
  * yfFlowKeyEqualNoVlan
@@ -570,23 +574,23 @@ static gboolean yfFlowKeyEqual(
  * @param
  *
  */
-static gboolean yfFlowKeyEqualNoVlan(
-    yfFlowKey_t       *a,
-    yfFlowKey_t       *b)
+static gboolean
+yfFlowKeyEqualNoVlan(
+    yfFlowKey_t  *a,
+    yfFlowKey_t  *b)
 {
-
 #if YAF_ENABLE_DAG_SEPARATE_INTERFACES
     if (a->netIf != b->netIf) {
         return FALSE;
     }
 #endif
 
-    if ((a->sp      == b->sp)    &&
-        (a->dp      == b->dp)    &&
-        (a->proto   == b->proto) &&
+    if ((a->sp == b->sp) &&
+        (a->dp == b->dp) &&
+        (a->proto == b->proto) &&
         (a->version == b->version))
     {
-        if ((a->version     == 4) &&
+        if ((a->version == 4) &&
             (a->addr.v4.sip == b->addr.v4.sip) &&
             (a->addr.v4.dip == b->addr.v4.dip))
         {
@@ -603,6 +607,7 @@ static gboolean yfFlowKeyEqualNoVlan(
         return FALSE;
     }
 }
+
 
 /**
  * yfFlowKeyReverse
@@ -615,9 +620,10 @@ static gboolean yfFlowKeyEqualNoVlan(
  * @param dst pointer to the reversed destination record
  *
  */
-static void yfFlowKeyReverse(
-    yfFlowKey_t       *fwd,
-    yfFlowKey_t       *rev)
+static void
+yfFlowKeyReverse(
+    yfFlowKey_t  *fwd,
+    yfFlowKey_t  *rev)
 {
     if (fwd->proto == YF_PROTO_ICMP || fwd->proto == YF_PROTO_ICMP6) {
         rev->sp = fwd->sp;
@@ -639,8 +645,8 @@ static void yfFlowKeyReverse(
 #if YAF_ENABLE_DAG_SEPARATE_INTERFACES
     rev->netIf = fwd->netIf;
 #endif
-
 }
+
 
 /**
  * yfFlowKeyCopy
@@ -651,34 +657,41 @@ static void yfFlowKeyReverse(
  * @param dst pointer to the destination flow key
  *
  */
-static void yfFlowKeyCopy(
-    yfFlowKey_t       *src,
-    yfFlowKey_t       *dst)
+static void
+yfFlowKeyCopy(
+    yfFlowKey_t  *src,
+    yfFlowKey_t  *dst)
 {
 #if YAF_ENABLE_COMPACT_IP4
     if (src->version == 4) {
         memcpy(dst, src, sizeof(yfFlowKeyIPv4_t));
     } else {
 #endif
-        memcpy(dst, src, sizeof(yfFlowKey_t));
+    memcpy(dst, src, sizeof(yfFlowKey_t));
 #if YAF_ENABLE_COMPACT_IP4
-    }
+}
+
+
 #endif
 }
 
+#if 0
 /**
- *yfFlowIncrementUniflow
+ * yfFlowIncrementUniflow
  *
  * simple helper function to allow counting of unidirectional flows
  * (vs. captured biflows on the wire)
  *
  */
 static void
-yfFlowIncrementUniflow (
+yfFlowIncrementUniflow(
     yfFlowTab_t  *flowtab)
 {
     (flowtab->stats.stat_uniflows)++;
 }
+
+
+#endif /* #if 0 */
 
 
 #if YFDEBUG_FLOWTABLE == 1
@@ -690,20 +703,22 @@ yfFlowIncrementUniflow (
  * @param flow
  *
  */
-static void yfFlowDebug(
-    const char        *msg,
-    yfFlow_t          *flow)
+static void
+yfFlowDebug(
+    const char  *msg,
+    yfFlow_t    *flow)
 {
-    static GString      *str = NULL;
+    static GString *str = NULL;
 
     if (!str) {
         str = g_string_new("");
     }
 
-    g_string_printf(str,"%s ",msg);
+    g_string_printf(str, "%s ", msg);
     yfPrintString(str, flow);
     g_debug("%s", str->str);
 }
+
 
 /**
  * yfFlowTabVerifyIdleOrder
@@ -712,12 +727,13 @@ static void yfFlowDebug(
  * @param flowtab
  *
  */
-static void yfFlowTabVerifyIdleOrder(
-    yfFlowTab_t         *flowtab)
+static void
+yfFlowTabVerifyIdleOrder(
+    yfFlowTab_t  *flowtab)
 {
-    yfFlowNode_t        *fn = NULL, *nfn = NULL;
-    uint64_t            end;
-    uint32_t            i;
+    yfFlowNode_t *fn = NULL, *nfn = NULL;
+    uint64_t      end;
+    uint32_t      i;
 
     /* rip through the active queue making sure end time strictly decreases */
     for (fn = flowtab->aq.head, end = flowtab->aq.head->f.etime, i = 0;
@@ -731,7 +747,9 @@ static void yfFlowTabVerifyIdleOrder(
         }
     }
 }
-#endif
+
+
+#endif /* if YFDEBUG_FLOWTABLE == 1 */
 
 #if YAF_MPLS
 /**
@@ -741,19 +759,22 @@ static void yfFlowTabVerifyIdleOrder(
  * set of MPLS labels has been closed
  *
  */
-static void yfMPLSNodeFree(
-    yfFlowTab_t                    *flowtab,
-    yfMPLSNode_t                   *mpls)
+static void
+yfMPLSNodeFree(
+    yfFlowTab_t   *flowtab,
+    yfMPLSNode_t  *mpls)
 {
     g_hash_table_remove(flowtab->table, mpls);
 
     g_hash_table_destroy(mpls->tab);
 
-    yg_slice_free(yfMPLSNode_t, mpls);
+    g_slice_free(yfMPLSNode_t, mpls);
 
     --(flowtab->stats.stat_mpls_labels);
 }
-#endif
+
+
+#endif /* if YAF_MPLS */
 
 /**
  * yfFlowFree
@@ -765,23 +786,24 @@ static void yfMPLSNodeFree(
  * @param fn node in the table to free
  *
  */
-static void yfFlowFree(
-    yfFlowTab_t         *flowtab,
-    yfFlowNode_t        *fn)
+static void
+yfFlowFree(
+    yfFlowTab_t   *flowtab,
+    yfFlowNode_t  *fn)
 {
 #if YAF_ENABLE_PAYLOAD
     /* free payload if present */
     if (fn->f.val.payload) {
-        yg_slice_free1(flowtab->max_payload, fn->f.val.payload);
-        yg_slice_free1((sizeof(size_t) * YAF_MAX_PKT_BOUNDARY),
-                       fn->f.val.paybounds);
+        g_slice_free1(flowtab->max_payload, fn->f.val.payload);
+        g_slice_free1((sizeof(size_t) * YAF_MAX_PKT_BOUNDARY),
+                      fn->f.val.paybounds);
     }
     if (fn->f.rval.payload) {
-        yg_slice_free1(flowtab->max_payload, fn->f.rval.payload);
-        yg_slice_free1((sizeof(size_t) * YAF_MAX_PKT_BOUNDARY),
-                       fn->f.rval.paybounds);
+        g_slice_free1(flowtab->max_payload, fn->f.rval.payload);
+        g_slice_free1((sizeof(size_t) * YAF_MAX_PKT_BOUNDARY),
+                      fn->f.rval.paybounds);
     }
-#endif
+#endif /* if YAF_ENABLE_PAYLOAD */
 #if YAF_ENABLE_HOOKS
     /* let the hook free its context */
     yfHookFlowFree(&(fn->f));
@@ -790,18 +812,18 @@ static void yfFlowFree(
 #if YAF_ENABLE_FPEXPORT
     /* if present free the banner grabs for OS fingerprinting */
     if (fn->f.val.firstPacket) {
-        yg_slice_free1(YFP_IPTCPHEADER_SIZE, fn->f.val.firstPacket);
+        g_slice_free1(YFP_IPTCPHEADER_SIZE, fn->f.val.firstPacket);
     }
     if (fn->f.val.secondPacket) {
-        yg_slice_free1(YFP_IPTCPHEADER_SIZE, fn->f.val.secondPacket);
+        g_slice_free1(YFP_IPTCPHEADER_SIZE, fn->f.val.secondPacket);
     }
     if (fn->f.rval.firstPacket) {
-        yg_slice_free1(YFP_IPTCPHEADER_SIZE, fn->f.rval.firstPacket);
+        g_slice_free1(YFP_IPTCPHEADER_SIZE, fn->f.rval.firstPacket);
     }
     if (fn->f.rval.secondPacket) {
-        yg_slice_free1(YFP_IPTCPHEADER_SIZE, fn->f.rval.secondPacket);
+        g_slice_free1(YFP_IPTCPHEADER_SIZE, fn->f.rval.secondPacket);
     }
-#endif
+#endif /* if YAF_ENABLE_FPEXPORT */
 #if YAF_ENABLE_P0F
     if (fn->f.val.osFingerPrint) {
         g_free(fn->f.val.osFingerPrint);
@@ -809,14 +831,14 @@ static void yfFlowFree(
     if (fn->f.rval.osFingerPrint) {
         g_free(fn->f.rval.osFingerPrint);
     }
-#endif
+#endif /* if YAF_ENABLE_P0F */
 
     if (flowtab->stats_mode) {
         if (fn->f.val.stats) {
-            yg_slice_free(yfFlowStats_t, fn->f.val.stats);
+            g_slice_free(yfFlowStats_t, fn->f.val.stats);
         }
         if (fn->f.rval.stats) {
-            yg_slice_free(yfFlowStats_t, fn->f.rval.stats);
+            g_slice_free(yfFlowStats_t, fn->f.rval.stats);
         }
     }
 
@@ -826,17 +848,19 @@ static void yfFlowFree(
         /* remove node */
         yfMPLSNodeFree(flowtab, fn->f.mpls);
     }
-#endif
+#endif /* if YAF_MPLS */
 
     /* free flow */
 #if YAF_ENABLE_COMPACT_IP4
     if (fn->f.key.version == 4) {
-        yg_slice_free(yfFlowNodeIPv4_t, (yfFlowNodeIPv4_t *)fn);
+        g_slice_free(yfFlowNodeIPv4_t, (yfFlowNodeIPv4_t *)fn);
     } else {
 #endif
-        yg_slice_free(yfFlowNode_t, fn);
+    g_slice_free(yfFlowNode_t, fn);
 #if YAF_ENABLE_COMPACT_IP4
-    }
+}
+
+
 #endif
 }
 
@@ -852,9 +876,10 @@ static void yfFlowFree(
  *        table
  *
  */
-static void yfFlowTick(
-    yfFlowTab_t                     *flowtab,
-    yfFlowNode_t                    *fn)
+static void
+yfFlowTick(
+    yfFlowTab_t   *flowtab,
+    yfFlowNode_t  *fn)
 {
     /* move flow node to head of queue */
     if (flowtab->aq.head != fn) {
@@ -862,6 +887,7 @@ static void yfFlowTick(
         piqEnQ(&flowtab->aq, fn);
     }
 }
+
 
 #if YAF_ENABLE_APPLABEL
 /**
@@ -875,20 +901,24 @@ static void yfFlowTick(
  * @param fn pointer to the flow node entry in the table
  *
  */
-static void yfFlowLabelApp(
-    yfFlowTab_t                     *flowtab,
-    yfFlowNode_t                    *fn)
+static void
+yfFlowLabelApp(
+    yfFlowTab_t   *flowtab,
+    yfFlowNode_t  *fn)
 {
     /* If the app labeler is enabled, let it inspect the packet
-       (for UDP & TCP packets anyway) */
+     * (for UDP & TCP packets anyway) */
     if (flowtab->applabelmode == TRUE &&
-        ((fn->f.key.proto == 6) || (fn->f.key.proto == 17))) {
+        ((fn->f.key.proto == 6) || (fn->f.key.proto == 17)))
+    {
         yfAppLabelFlow(&(fn->f));
     } else {
         fn->f.appLabel = 0;
     }
 }
-#endif
+
+
+#endif /* if YAF_ENABLE_APPLABEL */
 
 
 #if YAF_ENABLE_ENTROPY
@@ -903,13 +933,14 @@ static void yfFlowLabelApp(
  * @param fn pointer to the flow node entry in the table
  *
  */
-static void yfFlowDoEntropy(
-    yfFlowTab_t             *flowtab,
-    yfFlowNode_t            *fn)
+static void
+yfFlowDoEntropy(
+    yfFlowTab_t   *flowtab,
+    yfFlowNode_t  *fn)
 {
-    uint8_t                 entropyDist[256];
-    double                  entropyScratch;
-    uint32_t                loop;
+    uint8_t  entropyDist[256];
+    double   entropyScratch;
+    uint32_t loop;
 
     /* if entropy is enabled, then we need to calculate it */
     /* FIXME deglobalize */
@@ -926,12 +957,12 @@ static void yfFlowDoEntropy(
                     continue;
                 }
                 entropyScratch += ((double)entropyDist[loop] /
-                                    (double)fn->f.val.paylen) *
-                                   (log((double)entropyDist[loop] /
-                                    (double)fn->f.val.paylen)/log(2.0));
+                                   (double)fn->f.val.paylen) *
+                    (log((double)entropyDist[loop] /
+                         (double)fn->f.val.paylen) / log(2.0));
             }
             entropyScratch *= -1;
-            fn->f.val.entropy = (uint8_t)((entropyScratch / 8.0)*256.0);
+            fn->f.val.entropy = (uint8_t)((entropyScratch / 8.0) * 256.0);
         }
 
         /* reverse entropy */
@@ -946,20 +977,21 @@ static void yfFlowDoEntropy(
                     continue;
                 }
                 entropyScratch += ((double)entropyDist[loop] /
-                                    (double)fn->f.rval.paylen) *
-                                   (log((double)entropyDist[loop] /
-                                    (double)fn->f.rval.paylen)/log(2.0));
+                                   (double)fn->f.rval.paylen) *
+                    (log((double)entropyDist[loop] /
+                         (double)fn->f.rval.paylen) / log(2.0));
             }
             entropyScratch *= -1;
-            fn->f.rval.entropy = (uint8_t)((entropyScratch / 8.0)*256.0);
+            fn->f.rval.entropy = (uint8_t)((entropyScratch / 8.0) * 256.0);
         }
-
     } else {
         fn->f.val.entropy = 0;
         fn->f.rval.entropy = 0;
     }
 }
-#endif
+
+
+#endif /* if YAF_ENABLE_ENTROPY */
 
 /**
  * yfFlowClose
@@ -973,12 +1005,12 @@ static void yfFlowDoEntropy(
  * @param reason reason code for closing the flow
  *
  */
-static void yfFlowClose(
-    yfFlowTab_t                     *flowtab,
-    yfFlowNode_t                    *fn,
-    uint8_t                         reason)
+static void
+yfFlowClose(
+    yfFlowTab_t   *flowtab,
+    yfFlowNode_t  *fn,
+    uint8_t        reason)
 {
-
 #if YAF_MPLS
     g_hash_table_remove(fn->f.mpls->tab, &(fn->f.key));
 #else
@@ -1003,20 +1035,20 @@ static void yfFlowClose(
     if (flowtab->applabelmode) {
         yfFlowLabelApp(flowtab, fn);
     }
-#endif
+#endif /* if YAF_ENABLE_APPLABEL */
 
 #if YAF_ENABLE_ENTROPY
     /* do entropy calculation if necessary */
     if (flowtab->entropymode) {
         yfFlowDoEntropy(flowtab, fn);
     }
-#endif
+#endif /* if YAF_ENABLE_ENTROPY */
 
 #if YAF_ENABLE_HOOKS
     yfHookFlowClose(&(fn->f));
 #endif
 
-#endif
+#endif /* if YAF_ENABLE_PAYLOAD */
 
     /** count the flow in the close queue */
     ++(flowtab->cq_count);
@@ -1030,8 +1062,9 @@ static void yfFlowClose(
             pcap_dump_close(fn->f.pcap);
         }
     }
-
 }
+
+
 #if YAF_ENABLE_PAYLOAD
 /**
  * yfActiveFlowCleanUp
@@ -1040,17 +1073,17 @@ static void yfFlowClose(
  * for next packet payload
  *
  */
-
 static void
 yfActiveFlowCleanUp(
-    yfFlowTab_t *flowtab,
-    yfFlowNode_t *fn)
+    yfFlowTab_t   *flowtab,
+    yfFlowNode_t  *fn)
 {
     fn->f.val.paylen = 0;
     fn->f.rval.paylen = 0;
 }
 
-#endif
+
+#endif /* if YAF_ENABLE_PAYLOAD */
 /**
  * yfCloseActiveFlow
  *
@@ -1062,30 +1095,31 @@ yfActiveFlowCleanUp(
  * @param reason reason code for closing the flow
  *
  */
-
-
-static void yfCloseActiveFlow(
-    yfFlowTab_t                     *flowtab,
-    yfFlowNode_t                    *fn,
-    yfFlowVal_t                     *val,
-    const uint8_t                   *pkt,
-    uint32_t                        paylen,
-    uint8_t                         reason,
-    uint16_t                        iplen)
+static void
+yfCloseActiveFlow(
+    yfFlowTab_t    *flowtab,
+    yfFlowNode_t   *fn,
+    yfFlowVal_t    *val,
+    const uint8_t  *pkt,
+    uint32_t        paylen,
+    uint8_t         reason,
+    uint16_t        iplen)
 {
     yfFlowNode_t *tfn;  /*temp flow to write*/
-    yfFlowVal_t *valtemp;
+    yfFlowVal_t  *valtemp;
 
 #if YAF_ENABLE_COMPACT_IP4
     if (fn->f.key.version == 4) {
-        tfn = (yfFlowNode_t *) yg_slice_new0(yfFlowNodeIPv4_t);
+        tfn = (yfFlowNode_t *)g_slice_new0(yfFlowNodeIPv4_t);
         memcpy(tfn, fn, sizeof(yfFlowNodeIPv4_t));
     } else {
-#endif
-        tfn = yg_slice_new0(yfFlowNode_t);
-        memcpy(tfn, fn, sizeof(yfFlowNode_t));
+#endif /* if YAF_ENABLE_COMPACT_IP4 */
+    tfn = g_slice_new0(yfFlowNode_t);
+    memcpy(tfn, fn, sizeof(yfFlowNode_t));
 #if YAF_ENABLE_COMPACT_IP4
-    }
+}
+
+
 #endif
 
     if (&(fn->f.rval) == val) {
@@ -1098,7 +1132,7 @@ static void yfCloseActiveFlow(
     memset(&(tfn->f.rval), 0, sizeof(yfFlowVal_t));
 
     /* Since we are creating a new node - we need to allocate
-       hooks context for it */
+     * hooks context for it */
 #if YAF_ENABLE_HOOKS
     /*Let the hook allocate its context */
     yfHookFlowAlloc(&(tfn->f), flowtab->yfctx);
@@ -1126,30 +1160,29 @@ static void yfCloseActiveFlow(
 
     /* Short-circuit no payload capture */
     if (flowtab->max_payload && paylen && pkt) {
-
-        valtemp->payload = yg_slice_alloc0(flowtab->max_payload);
+        valtemp->payload = g_slice_alloc0(flowtab->max_payload);
 
         /* truncate capture length to payload limit */
-        if (paylen  > flowtab->max_payload) {
+        if (paylen > flowtab->max_payload) {
             paylen = flowtab->max_payload;
         }
 
         /* only need 1 entry in paybounds */
-        valtemp->paybounds = (size_t *)yg_slice_alloc0(sizeof(size_t) *
-                                                       YAF_MAX_PKT_BOUNDARY);
+        valtemp->paybounds = (size_t *)g_slice_alloc0(sizeof(size_t) *
+                                                      YAF_MAX_PKT_BOUNDARY);
         valtemp->paybounds[0] = paylen;
 
         memcpy(valtemp->payload, pkt, paylen);
         tfn->f.val.paylen = paylen;
     }
-#endif
+#endif /* if YAF_ENABLE_PAYLOAD */
     /* move flow node to close queue */
     piqEnQ(&flowtab->cq, tfn);
 
 #if YAF_MPLS
     /* Since yfFlowFree frees UDP uniflows, but they're never
-       added to the mpls tables - we add one here, to account
-       for subtracting it in yfflowfree */
+     * added to the mpls tables - we add one here, to account
+     * for subtracting it in yfflowfree */
     ++(fn->f.mpls->tab_count);
 #endif
 
@@ -1168,31 +1201,42 @@ static void yfCloseActiveFlow(
         /* store in ongoing flow */
         fn->f.appLabel = tfn->f.appLabel;
     }
-#endif
+#endif /* if YAF_ENABLE_APPLABEL */
 
 #if YAF_ENABLE_ENTROPY
-        /* do entropy calculation if necessary */
+    /* do entropy calculation if necessary */
     if (flowtab->entropymode) {
         yfFlowDoEntropy(flowtab, tfn);
     }
-#endif
+#endif /* if YAF_ENABLE_ENTROPY */
 
 #if YAF_ENABLE_HOOKS
     yfHookFlowClose(&(tfn->f));
 #endif
 
     yfActiveFlowCleanUp(flowtab, fn);
-#endif
+#endif /* if YAF_ENABLE_PAYLOAD */
 }
 
 
-static void *yf_malloc(unsigned long size) {
+#if YAF_ENABLE_NDPI
+static void *
+yf_malloc(
+    unsigned long   size)
+{
     return g_malloc(size);
 }
 
-static void yf_free(void *mem) {
+
+static void
+yf_free(
+    void  *mem)
+{
     g_free(mem);
 }
+
+
+#endif /* YAF_ENABLE_NDPI */
 
 
 /**
@@ -1204,38 +1248,39 @@ static void yf_free(void *mem) {
  *
  * @return a pointer to the flow node entry in the flow table
  */
-yfFlowTab_t *yfFlowTabAlloc(
-    uint64_t        idle_ms,
-    uint64_t        active_ms,
-    uint32_t        max_flows,
-    uint32_t        max_payload,
-    gboolean        uniflow,
-    gboolean        silkmode,
-    gboolean        macmode,
-    gboolean        applabelmode,
-    gboolean        entropymode,
-    gboolean        fingerprintmode,
-    gboolean        fpExportMode,
-    gboolean        udp_max_payload,
-    uint16_t        udp_uniflow_port,
-    char            *pcap_dir,
-    char            *pcap_meta_file,
-    uint64_t        max_pcap,
-    gboolean        pcap_per_flow,
-    gboolean        force_read_all,
-    gboolean        stats_mode,
-    gboolean        index_pcap,
-    gboolean        no_vlan_in_key,
-    gboolean        ndpi,
-    char            *ndpi_proto_file,
-    char            *hash,
-    char            *stime,
-    void            **yfctx)
+yfFlowTab_t *
+yfFlowTabAlloc(
+    uint64_t   idle_ms,
+    uint64_t   active_ms,
+    uint32_t   max_flows,
+    uint32_t   max_payload,
+    gboolean   uniflow,
+    gboolean   silkmode,
+    gboolean   macmode,
+    gboolean   applabelmode,
+    gboolean   entropymode,
+    gboolean   fingerprintmode,
+    gboolean   fpExportMode,
+    gboolean   udp_max_payload,
+    uint16_t   udp_uniflow_port,
+    char      *pcap_dir,
+    char      *pcap_meta_file,
+    uint64_t   max_pcap,
+    gboolean   pcap_per_flow,
+    gboolean   force_read_all,
+    gboolean   stats_mode,
+    gboolean   index_pcap,
+    gboolean   no_vlan_in_key,
+    gboolean   ndpi,
+    char      *ndpi_proto_file,
+    char      *hash,
+    char      *stime,
+    void     **yfctx)
 {
-    yfFlowTab_t     *flowtab = NULL;
+    yfFlowTab_t *flowtab = NULL;
 
     /* Allocate a flow table */
-    flowtab = yg_slice_new0(yfFlowTab_t);
+    flowtab = g_slice_new0(yfFlowTab_t);
 
 /* FIXME consider a better mode selection interface */
 /* FIXME max payload should not be settable if payload not enabled */
@@ -1282,7 +1327,6 @@ yfFlowTab_t *yfFlowTabAlloc(
     }
     flowtab->max_pcap = max_pcap;
 
-
     if (hash) {
         flowtab->hash_search = strtoull(hash, NULL, 10);
     }
@@ -1299,7 +1343,6 @@ yfFlowTab_t *yfFlowTabAlloc(
         flowtab->hashequalfn = (GEqualFunc)yfFlowKeyEqual;
     }
 
-
 #if YAF_MPLS
     flowtab->table = g_hash_table_new((GHashFunc)yfMPLSHash,
                                       (GEqualFunc)yfMPLSEqual);
@@ -1308,20 +1351,20 @@ yfFlowTab_t *yfFlowTabAlloc(
     flowtab->table = g_hash_table_new(flowtab->hashfn,
                                       flowtab->hashequalfn);
 
-#endif
+#endif /* if YAF_MPLS */
 
 #if YAF_ENABLE_HOOKS
     yfHookValidateFlowTab(yfctx, max_payload, uniflow,
                           silkmode, applabelmode, entropymode,
                           fingerprintmode, fpExportMode, udp_max_payload,
                           udp_uniflow_port);
-#endif
+#endif /* if YAF_ENABLE_HOOKS */
 
 #if YAF_ENABLE_NDPI
     if (ndpi) {
         NDPI_PROTOCOL_BITMASK all;
-	set_ndpi_malloc(yf_malloc);
-	set_ndpi_free(yf_free);
+        set_ndpi_malloc(yf_malloc);
+        set_ndpi_free(yf_free);
         flowtab->ndpi_struct = ndpi_init_detection_module();
         if (flowtab->ndpi_struct == NULL) {
             g_warning("Could not initialize NDPI");
@@ -1335,21 +1378,23 @@ yfFlowTab_t *yfFlowTabAlloc(
             ndpi_load_protocols_file(flowtab->ndpi_struct, ndpi_proto_file);
         }
     }
-#endif
+#endif /* if YAF_ENABLE_NDPI */
 
     /* Done */
     return flowtab;
 }
+
 
 /**
  * yfFlowTabFree
  *
  * free's the entry in the flow table for a given flow entry *
  */
-void yfFlowTabFree(
-    yfFlowTab_t             *flowtab)
+void
+yfFlowTabFree(
+    yfFlowTab_t  *flowtab)
 {
-    yfFlowNode_t            *fn = NULL, *nfn = NULL;
+    yfFlowNode_t *fn = NULL, *nfn = NULL;
 
     /* zip through the close queue freeing flows */
     for (fn = flowtab->cq.head; fn; fn = nfn) {
@@ -1371,12 +1416,12 @@ void yfFlowTabFree(
     if (flowtab->pcap_meta) {
         long cp = ftell(flowtab->pcap_meta);
         fseek(flowtab->pcap_meta, flowtab->last_offset, SEEK_SET);
-        fprintf(flowtab->pcap_meta, "%"PRIu64"|%010ld\n",
+        fprintf(flowtab->pcap_meta, "%" PRIu64 "|%010ld\n",
                 flowtab->lasttime, cp);
         fclose(flowtab->pcap_meta);
     }
 
-   /* free the key index table */
+    /* free the key index table */
     g_hash_table_destroy(flowtab->table);
 
 #if YAF_ENABLE_NDPI
@@ -1384,8 +1429,9 @@ void yfFlowTabFree(
 #endif
 
     /* now free the flow table */
-    yg_slice_free(yfFlowTab_t, flowtab);
+    g_slice_free(yfFlowTab_t, flowtab);
 }
+
 
 #if YAF_MPLS
 /**
@@ -1394,25 +1440,25 @@ void yfFlowTabFree(
  * finds an MPLS node entry in the MPLS table
  * based on the labels in the MPLS header.
  */
-static yfMPLSNode_t *yfMPLSGetNode(
-    yfFlowTab_t             *flowtab,
-    yfL2Info_t              *l2info)
+static yfMPLSNode_t *
+yfMPLSGetNode(
+    yfFlowTab_t  *flowtab,
+    yfL2Info_t   *l2info)
 {
-    yfMPLSNode_t            *mpls;
-    yfMPLSNode_t            key;
+    yfMPLSNode_t *mpls;
+    yfMPLSNode_t  key;
 
-    memcpy(key.mpls_label, l2info->mpls_label, sizeof(uint32_t)*3);
+    memcpy(key.mpls_label, l2info->mpls_label, sizeof(uint32_t) * 3);
 
-    if ((mpls = g_hash_table_lookup(flowtab->table, &key)))
-    {
+    if ((mpls = g_hash_table_lookup(flowtab->table, &key))) {
         flowtab->cur_mpls_node = mpls;
         return mpls;
     }
 
     /* create new mpls node */
-    mpls = yg_slice_new0(yfMPLSNode_t);
+    mpls = g_slice_new0(yfMPLSNode_t);
 
-    memcpy(mpls->mpls_label, l2info->mpls_label, sizeof(uint32_t)*3);
+    memcpy(mpls->mpls_label, l2info->mpls_label, sizeof(uint32_t) * 3);
 
     mpls->tab = g_hash_table_new(flowtab->hashfn,
                                  flowtab->hashequalfn);
@@ -1430,7 +1476,9 @@ static yfMPLSNode_t *yfMPLSGetNode(
 
     return mpls;
 }
-#endif
+
+
+#endif /* if YAF_MPLS */
 /**
  * yfFlowGetNode
  *
@@ -1438,14 +1486,15 @@ static yfMPLSNode_t *yfMPLSGetNode(
  * the appropriate key value given
  *
  */
-static yfFlowNode_t *yfFlowGetNode(
-    yfFlowTab_t             *flowtab,
-    yfFlowKey_t             *key,
-    yfFlowVal_t             **valp)
+static yfFlowNode_t *
+yfFlowGetNode(
+    yfFlowTab_t  *flowtab,
+    yfFlowKey_t  *key,
+    yfFlowVal_t **valp)
 {
-    yfFlowKey_t             rkey;
-    yfFlowNode_t            *fn;
-    GHashTable              *ht;
+    yfFlowKey_t   rkey;
+    yfFlowNode_t *fn;
+    GHashTable   *ht;
 
 #if YAF_MPLS
     ht = flowtab->cur_mpls_node->tab;
@@ -1472,12 +1521,14 @@ static yfFlowNode_t *yfFlowGetNode(
     /* Neither exists. Create a new flow and put it in the table. */
 #if YAF_ENABLE_COMPACT_IP4
     if (key->version == 4) {
-        fn = (yfFlowNode_t *)yg_slice_new0(yfFlowNodeIPv4_t);
+        fn = (yfFlowNode_t *)g_slice_new0(yfFlowNodeIPv4_t);
     } else {
 #endif
-        fn = yg_slice_new0(yfFlowNode_t);
+    fn = g_slice_new0(yfFlowNode_t);
 #if YAF_ENABLE_COMPACT_IP4
-    }
+}
+
+
 #endif
     /* Copy key */
     yfFlowKeyCopy(key, &(fn->f.key));
@@ -1520,8 +1571,9 @@ static yfFlowNode_t *yfFlowGetNode(
  * rotate the pcap_meta_file
  *
  */
-static gboolean yfRotatePcapMetaFile(
-    yfFlowTab_t                *flowtab)
+static gboolean
+yfRotatePcapMetaFile(
+    yfFlowTab_t  *flowtab)
 {
     GString *namebuf = g_string_new("");
 
@@ -1533,7 +1585,7 @@ static gboolean yfRotatePcapMetaFile(
     if (flowtab->pcap_meta) {
         long cp = ftell(flowtab->pcap_meta);
         fseek(flowtab->pcap_meta, flowtab->last_offset, SEEK_SET);
-        fprintf(flowtab->pcap_meta, "%"PRIu64"|%010ld\n",
+        fprintf(flowtab->pcap_meta, "%" PRIu64 "|%010ld\n",
                 flowtab->lasttime, cp);
         if (fclose(flowtab->pcap_meta)) {
             g_warning("Error (%d) Could not close current pcap "
@@ -1543,7 +1595,6 @@ static gboolean yfRotatePcapMetaFile(
     } else {
         g_debug("Opening Pcap Meta File %s", namebuf->str);
     }
-
 
     flowtab->pcap_meta = fopen(namebuf->str, "w");
     flowtab->last_offset = 0;
@@ -1556,7 +1607,7 @@ static gboolean yfRotatePcapMetaFile(
     }
 
     if (flowtab->ctime) {
-        fprintf(flowtab->pcap_meta, "%"PRIu64"|0000000000\n", flowtab->ctime);
+        fprintf(flowtab->pcap_meta, "%" PRIu64 "|0000000000\n", flowtab->ctime);
         flowtab->lasttime = flowtab->ctime;
     }
 
@@ -1565,6 +1616,7 @@ static gboolean yfRotatePcapMetaFile(
     return TRUE;
 }
 
+
 /**
  * yfUpdateRollingPcapFile
  *
@@ -1572,11 +1624,11 @@ static gboolean yfRotatePcapMetaFile(
  *
  *
  */
-void yfUpdateRollingPcapFile(
-    yfFlowTab_t                *flowtab,
-    char                       *new_file_name)
+void
+yfUpdateRollingPcapFile(
+    yfFlowTab_t  *flowtab,
+    char         *new_file_name)
 {
-
     g_string_truncate(flowtab->pcap_roll, 0);
 
     g_string_append_printf(flowtab->pcap_roll, "%s", new_file_name);
@@ -1589,7 +1641,9 @@ void yfUpdateRollingPcapFile(
             if ((flowtab->stats.stat_packets % YAF_PCAP_META_ROTATE) == 0) {
                 yfRotatePcapMetaFile(flowtab);
             }
-        } else if ((flowtab->stats.stat_packets % YAF_PCAP_META_ROTATE_FP) == 0) {
+        } else if ((flowtab->stats.stat_packets % YAF_PCAP_META_ROTATE_FP) ==
+                   0)
+        {
             yfRotatePcapMetaFile(flowtab);
         }
     }
@@ -1606,18 +1660,18 @@ void yfUpdateRollingPcapFile(
  * @param key
  * @param pbuf
  */
-static void yfWritePcap(
-    yfFlowTab_t              *flowtab,
-    yfFlow_t                 *flow,
-    yfFlowKey_t              *key,
-    yfPBuf_t                 *pbuf)
+static void
+yfWritePcap(
+    yfFlowTab_t  *flowtab,
+    yfFlow_t     *flow,
+    yfFlowKey_t  *key,
+    yfPBuf_t     *pbuf)
 {
-
-    GString                  *namebuf;
-    gboolean                 fexists = FALSE;
-    yfFlowNode_t             *node;
-    FILE                     *pfile = NULL;
-    uint32_t                 rem_ms;
+    GString      *namebuf;
+    gboolean      fexists = FALSE;
+    yfFlowNode_t *node;
+    FILE         *pfile = NULL;
+    uint32_t      rem_ms;
 
     if (flowtab->hash_search) {
         if (flowtab->hashfn(key) == flowtab->hash_search) {
@@ -1656,7 +1710,7 @@ static void yfWritePcap(
                                rem_ms);
         g_mkdir(namebuf->str, 0777);
         g_string_append_printf(namebuf, "/%u-", flowtab->hashfn(key));
-        air_time_g_string_append(namebuf, (flow->stime/1000),
+        air_time_g_string_append(namebuf, (flow->stime / 1000),
                                  AIR_TIME_SQUISHED);
         g_string_append_printf(namebuf, "_%d.pcap", flow->pcap_serial);
         if (g_file_test(namebuf->str, G_FILE_TEST_EXISTS)) {
@@ -1677,21 +1731,19 @@ static void yfWritePcap(
 
         g_string_free(namebuf, TRUE);
     } else if (flowtab->max_pcap) {
-
         pfile = pcap_dump_file(flow->pcap);
 
-        if ((ftell(pfile) > flowtab->max_pcap)) {
-
+        if ((ftell(pfile) > (long)flowtab->max_pcap)) {
             pcap_dump_flush(flow->pcap);
             pcap_dump_close(flow->pcap);
             flow->pcap_serial += 1;
             namebuf = g_string_new("");
-            rem_ms = (flow->stime %1000);
+            rem_ms = (flow->stime % 1000);
             rem_ms = (rem_ms > 1000) ? (rem_ms / 10) : rem_ms;
             g_string_append_printf(namebuf, "%s/%03u", flowtab->pcap_dir,
                                    rem_ms);
             g_string_append_printf(namebuf, "/%u-", flowtab->hashfn(key));
-            air_time_g_string_append(namebuf, (flow->stime/1000),
+            air_time_g_string_append(namebuf, (flow->stime / 1000),
                                      AIR_TIME_SQUISHED);
             g_string_append_printf(namebuf, "_%d.pcap", flow->pcap_serial);
             flow->pcap = pcap_dump_open(pbuf->pcapt, namebuf->str);
@@ -1745,28 +1797,30 @@ static void yfWritePcap(
     pcap_dump((u_char *)flow->pcap, &(pbuf->pcap_hdr), pbuf->payload);
 }
 
+
 /**
  * yfWritePcapMetaIndex
  *
  *
  */
-static void yfWritePcapMetaIndex(
-    yfFlowTab_t *flowtab,
-    gboolean     packets)
+static void
+yfWritePcapMetaIndex(
+    yfFlowTab_t  *flowtab,
+    gboolean      packets)
 {
-    long       cp;
-    uint64_t   count;
-    int        rotate = 10000;
+    long     cp;
+    uint64_t count;
+    int      rotate = 10000;
 
     if (packets) {
         count = flowtab->stats.stat_packets;
     } else {
         count = flowtab->stats.stat_flows;
-        rotate=5000;
+        rotate = 5000;
     }
 
     if (flowtab->stats.stat_packets == 1) {
-        fprintf(flowtab->pcap_meta, "%"PRIu64"|0000000000\n", flowtab->ctime);
+        fprintf(flowtab->pcap_meta, "%" PRIu64 "|0000000000\n", flowtab->ctime);
         flowtab->lasttime = flowtab->ctime;
     }
 
@@ -1777,22 +1831,21 @@ static void yfWritePcapMetaIndex(
     if ((count % rotate) == 0) {
         cp = ftell(flowtab->pcap_meta);
         if (cp == 0) {
-            fprintf(flowtab->pcap_meta, "%"PRIu64"|0000000000\n", flowtab->ctime);
+            fprintf(flowtab->pcap_meta, "%" PRIu64 "|0000000000\n",
+                    flowtab->ctime);
             flowtab->lasttime = flowtab->ctime;
         } else {
             fseek(flowtab->pcap_meta, flowtab->last_offset, SEEK_SET);
-            fprintf(flowtab->pcap_meta, "%"PRIu64"|%010ld\n", flowtab->lasttime, cp);
+            fprintf(flowtab->pcap_meta, "%" PRIu64 "|%010ld\n",
+                    flowtab->lasttime, cp);
             fseek(flowtab->pcap_meta, cp, SEEK_SET);
             flowtab->last_offset = cp;
-            fprintf(flowtab->pcap_meta, "%"PRIu64"|0000000000\n", flowtab->ctime);
+            fprintf(flowtab->pcap_meta, "%" PRIu64 "|0000000000\n",
+                    flowtab->ctime);
             flowtab->lasttime = flowtab->ctime;
         }
-
     }
-
 }
-
-
 
 
 /**
@@ -1800,12 +1853,13 @@ static void yfWritePcapMetaIndex(
  *
  *
  */
-static void yfWritePcapMetaFile(
-    yfFlowTab_t                *flowtab,
-    yfFlowNode_t               *fn,
-    yfPBuf_t                   *pbuf,
-    uint32_t                   hash,
-    uint32_t                   pcap_len)
+static void
+yfWritePcapMetaFile(
+    yfFlowTab_t   *flowtab,
+    yfFlowNode_t  *fn,
+    yfPBuf_t      *pbuf,
+    uint32_t       hash,
+    uint32_t       pcap_len)
 {
     int rv;
 
@@ -1845,7 +1899,8 @@ static void yfWritePcapMetaFile(
                             (long long unsigned int)pbuf->pcap_offset,
                             pcap_len);
                 }
-            } else if ((flowtab->stats.stat_packets % YAF_PCAP_META_ROTATE_FP) == 0)
+            } else if ((flowtab->stats.stat_packets %
+                        YAF_PCAP_META_ROTATE_FP) == 0)
             {
                 yfRotatePcapMetaFile(flowtab);
             }
@@ -1859,9 +1914,7 @@ static void yfWritePcapMetaFile(
             return;
         }
     }
-
 }
-
 
 
 /**
@@ -1877,14 +1930,15 @@ static void yfWritePcapMetaFile(
  * @param caplen
  *
  */
-static void yfFlowPktGenericTpt(
-    yfFlowTab_t                 *flowtab,
-    yfFlowNode_t                *fn,
-    yfFlowVal_t                 *val,
-    const uint8_t               *pkt,
-    uint32_t                    caplen)
+static void
+yfFlowPktGenericTpt(
+    yfFlowTab_t    *flowtab,
+    yfFlowNode_t   *fn,
+    yfFlowVal_t    *val,
+    const uint8_t  *pkt,
+    uint32_t        caplen)
 {
-    int  p;
+    int p;
 
 #if YAF_ENABLE_PAYLOAD
     /* Short-circuit nth packet or no payload capture */
@@ -1902,9 +1956,9 @@ static void yfFlowPktGenericTpt(
     /* allocate */
 
     if (!val->payload) {
-        val->payload = yg_slice_alloc0(flowtab->max_payload);
-        val->paybounds = (size_t *)yg_slice_alloc0(sizeof(size_t) *
-                                                   YAF_MAX_PKT_BOUNDARY);
+        val->payload = g_slice_alloc0(flowtab->max_payload);
+        val->paybounds = (size_t *)g_slice_alloc0(sizeof(size_t) *
+                                                  YAF_MAX_PKT_BOUNDARY);
     }
 
     memcpy(val->payload + val->paylen, pkt, caplen);
@@ -1917,7 +1971,7 @@ static void yfFlowPktGenericTpt(
 
     val->paylen += caplen;
 
-#endif
+#endif /* if YAF_ENABLE_PAYLOAD */
 }
 
 
@@ -1937,19 +1991,20 @@ static void yfFlowPktGenericTpt(
  * @param headerLen length of headerVal
  *
  */
-static void yfFlowPktTCP(
-    yfFlowTab_t                 *flowtab,
-    yfFlowNode_t                *fn,
-    yfFlowVal_t                 *val,
-    const uint8_t               *pkt,
-    uint32_t                    caplen,
-    yfTCPInfo_t                 *tcpinfo,
-    uint8_t                     *headerVal,
-    uint16_t                    headerLen)
+static void
+yfFlowPktTCP(
+    yfFlowTab_t    *flowtab,
+    yfFlowNode_t   *fn,
+    yfFlowVal_t    *val,
+    const uint8_t  *pkt,
+    uint32_t        caplen,
+    yfTCPInfo_t    *tcpinfo,
+    uint8_t        *headerVal,
+    uint16_t        headerLen)
 {
-    uint32_t                    appdata_po;
-    uint32_t                    last_seq_num = val->lsn;
-    int                         p;
+    uint32_t appdata_po;
+    uint32_t last_seq_num = val->lsn;
+    int      p;
 
     /*Update flags in flow record - may need to upload iflags if out of order*/
     if (val->pkt && (tcpinfo->seq > val->isn)) {
@@ -1957,7 +2012,8 @@ static void yfFlowPktTCP(
         val->uflags |= tcpinfo->flags;
     } else {
         if (val->pkt && (tcpinfo->seq <= val->isn)) {
-          /*if packets out of order - don't lose other flags - add to uflags*/
+            /*if packets out of order - don't lose other flags - add to
+             * uflags*/
             val->uflags |= val->iflags;
         }
         /* Initial flags */
@@ -1970,15 +2026,19 @@ static void yfFlowPktTCP(
 
     /* Update flow state for FIN flag */
     if (val == &(fn->f.val)) {
-        if (tcpinfo->flags & YF_TF_FIN)
+        if (tcpinfo->flags & YF_TF_FIN) {
             fn->state |= YAF_STATE_FFIN;
-        if ((fn->state & YAF_STATE_RFIN) && (tcpinfo->flags & YF_TF_ACK))
+        }
+        if ((fn->state & YAF_STATE_RFIN) && (tcpinfo->flags & YF_TF_ACK)) {
             fn->state |= YAF_STATE_FFINACK;
+        }
     } else {
-        if (tcpinfo->flags & YF_TF_FIN)
+        if (tcpinfo->flags & YF_TF_FIN) {
             fn->state |= YAF_STATE_RFIN;
-        if ((fn->state & YAF_STATE_FFIN) && (tcpinfo->flags & YF_TF_ACK))
+        }
+        if ((fn->state & YAF_STATE_FFIN) && (tcpinfo->flags & YF_TF_ACK)) {
             fn->state |= YAF_STATE_RFINACK;
+        }
     }
 
     /* Update flow state for RST flag */
@@ -2020,14 +2080,13 @@ static void yfFlowPktTCP(
         fn->f.mptcp.addrid = tcpinfo->mptcp.addrid;
     }
 
-
 #if YAF_ENABLE_P0F
 
     /* run through p0f if it's enabled here */
     if (flowtab->fingerprintmode) {
         /* do os fingerprinting if enabled */
         if (NULL == val->osname) {
-            GError *err = NULL;
+            GError  *err = NULL;
             struct packetDecodeDetails_st packetDetails;
             gboolean fuzzyMatched;
 
@@ -2038,43 +2097,44 @@ static void yfFlowPktTCP(
                 if (!yfpSynFindMatch(&packetDetails, TRUE, &fuzzyMatched,
                                      &(val->osname), &(val->osver),
                                      &(val->osFingerPrint), &err))
-                    {
-                        g_warning("Error finger printing packet: %s",
-                                  err->message);
-                        g_clear_error(&err);
-                    }
+                {
+                    g_warning("Error finger printing packet: %s",
+                              err->message);
+                    g_clear_error(&err);
+                }
             }
         }
     }
-#endif
+#endif /* if YAF_ENABLE_P0F */
 
 #if YAF_ENABLE_FPEXPORT
     if (flowtab->fingerprintExport && headerVal) {
-      /* Let's capture the detailed header information for the first 3 packets
-         mostly for external OS id'ing*/
+        /* Let's capture the detailed header information for the first 3
+         * packets
+         * mostly for external OS id'ing*/
         if (&(fn->f.val) == val) {
             if (NULL == val->firstPacket) {
-                val->firstPacket = yg_slice_alloc0(YFP_IPTCPHEADER_SIZE);
+                val->firstPacket = g_slice_alloc0(YFP_IPTCPHEADER_SIZE);
                 val->firstPacketLen = headerLen;
                 memcpy(val->firstPacket, headerVal, headerLen);
             } else if (NULL == val->secondPacket) {
-                val->secondPacket = yg_slice_alloc0(YFP_IPTCPHEADER_SIZE);
+                val->secondPacket = g_slice_alloc0(YFP_IPTCPHEADER_SIZE);
                 val->secondPacketLen = headerLen;
                 memcpy(val->secondPacket, headerVal, headerLen);
             }
         } else {
             if (NULL == val->firstPacket) {
-               val->firstPacket = yg_slice_alloc0(YFP_IPTCPHEADER_SIZE);
-               val->firstPacketLen = headerLen;
-               memcpy(val->firstPacket, headerVal, headerLen);
+                val->firstPacket = g_slice_alloc0(YFP_IPTCPHEADER_SIZE);
+                val->firstPacketLen = headerLen;
+                memcpy(val->firstPacket, headerVal, headerLen);
             }
         }
     }
-#endif
+#endif /* if YAF_ENABLE_FPEXPORT */
 
 #if YAF_ENABLE_PAYLOAD
     /* short circuit no payload capture, continuation,
-       payload full, or no payload in packet */
+     * payload full, or no payload in packet */
     if (!flowtab->max_payload || !(val->iflags & YF_TF_SYN) ||
         caplen == 0)
     {
@@ -2091,9 +2151,9 @@ static void yfFlowPktTCP(
 
     /* allocate and copy */
     if (!val->payload) {
-        val->payload = yg_slice_alloc0(flowtab->max_payload);
-        val->paybounds = (size_t *)yg_slice_alloc0(sizeof(size_t) *
-                                                   YAF_MAX_PKT_BOUNDARY);
+        val->payload = g_slice_alloc0(flowtab->max_payload);
+        val->paybounds = (size_t *)g_slice_alloc0(sizeof(size_t) *
+                                                  YAF_MAX_PKT_BOUNDARY);
     }
 
     if (val->pkt < YAF_MAX_PKT_BOUNDARY) {
@@ -2109,7 +2169,7 @@ static void yfFlowPktTCP(
     }
 
     /* Short circuit entire packet after capture filter */
-    if (appdata_po >= flowtab->max_payload) return;
+    if (appdata_po >= flowtab->max_payload) {return;}
 
     /* truncate payload copy length to capture length */
     if ((appdata_po + caplen) > flowtab->max_payload) {
@@ -2123,23 +2183,23 @@ static void yfFlowPktTCP(
         val->paylen = appdata_po + caplen;
     }
     memcpy(val->payload + appdata_po, pkt, caplen);
-#endif
+#endif /* if YAF_ENABLE_PAYLOAD */
 }
+
 
 static void
 yfFlowStatistics(
-    yfFlowNode_t            *fn,
-    yfFlowVal_t             *val,
-    uint64_t                ptime,
-    uint16_t                datalen)
+    yfFlowNode_t  *fn,
+    yfFlowVal_t   *val,
+    uint64_t       ptime,
+    uint16_t       datalen)
 {
-
     if (val->stats->ltime) {
         val->stats->aitime += (ptime - val->stats->ltime);
     }
 
     if (val->pkt > 1 && val->pkt < 12) {
-        val->stats->iaarray[val->pkt -2] = (ptime - val->stats->ltime);
+        val->stats->iaarray[val->pkt - 2] = (ptime - val->stats->ltime);
     }
 
     val->stats->ltime = fn->f.etime;
@@ -2160,49 +2220,48 @@ yfFlowStatistics(
             val->stats->largepktct++;
         }
         val->stats->payoct += datalen;
-        if (val->stats->firstpktsize== 0) {
-            val->stats->firstpktsize= datalen;
+        if (val->stats->firstpktsize == 0) {
+            val->stats->firstpktsize = datalen;
         }
-        if (datalen> val->stats->maxpktsize) {
-            val->stats->maxpktsize =datalen;
+        if (datalen > val->stats->maxpktsize) {
+            val->stats->maxpktsize = datalen;
         }
     }
-
 }
 
 
 static void
 yfAddOutOfSequence(
-    yfFlowTab_t             *flowtab,
-    yfFlowKey_t             *key,
-    size_t                  pbuflen,
-    yfPBuf_t                *pbuf)
+    yfFlowTab_t  *flowtab,
+    yfFlowKey_t  *key,
+    size_t        pbuflen,
+    yfPBuf_t     *pbuf)
 {
-    yfFlowNode_t            *fn = NULL;
-    yfFlowNode_t            *tn = NULL;
-    yfFlowNode_t            *nfn = NULL;
-    yfFlowKey_t             rkey;
-    uint64_t                end;
-    yfFlowVal_t             *val = NULL;
-    yfTCPInfo_t             *tcpinfo = &(pbuf->tcpinfo);
-    yfL2Info_t              *l2info = &(pbuf->l2info);
-    uint8_t                 *payload = (pbuflen >= YF_PBUFLEN_BASE) ?
-                                       pbuf->payload : NULL;
-    size_t                  paylen = (pbuflen >= YF_PBUFLEN_BASE) ?
-                                     pbuf->paylen : 0;
-    uint16_t                datalen = (pbuf->iplen - pbuf->allHeaderLen +
-                                       l2info->l2hlen);
-    uint32_t                pcap_len = 0;
-    gboolean                rev = FALSE;
-    GHashTable              *ht;
+    yfFlowNode_t *fn = NULL;
+    yfFlowNode_t *tn = NULL;
+    yfFlowNode_t *nfn = NULL;
+    yfFlowKey_t   rkey;
+    uint64_t      end;
+    yfFlowVal_t  *val = NULL;
+    yfTCPInfo_t  *tcpinfo = &(pbuf->tcpinfo);
+    yfL2Info_t   *l2info = &(pbuf->l2info);
+    uint8_t      *payload = (pbuflen >= YF_PBUFLEN_BASE) ?
+        pbuf->payload : NULL;
+    size_t        paylen = (pbuflen >= YF_PBUFLEN_BASE) ?
+        pbuf->paylen : 0;
+    uint16_t      datalen = (pbuf->iplen - pbuf->allHeaderLen +
+                             l2info->l2hlen);
+    uint32_t      pcap_len = 0;
+    gboolean      rev = FALSE;
+    GHashTable   *ht;
 #if YAF_MPLS
-    yfMPLSNode_t            *mpls = NULL;
+    yfMPLSNode_t *mpls = NULL;
 
     ht = flowtab->cur_mpls_node->tab;
     mpls = yfMPLSGetNode(flowtab, l2info);
-#else
+#else /* if YAF_MPLS */
     ht = flowtab->table;
-#endif
+#endif /* if YAF_MPLS */
 
     /* Count the packet and its octets */
     ++(flowtab->stats.stat_packets);
@@ -2238,12 +2297,12 @@ yfAddOutOfSequence(
         /* Neither exists. Create a new flow and put it in the table. */
 #if YAF_ENABLE_COMPACT_IP4
         if (key->version == 4) {
-            fn = (yfFlowNode_t *)yg_slice_new0(yfFlowNodeIPv4_t);
+            fn = (yfFlowNode_t *)g_slice_new0(yfFlowNodeIPv4_t);
         } else {
 #endif
-            fn = yg_slice_new0(yfFlowNode_t);
+        fn = g_slice_new0(yfFlowNode_t);
 #if YAF_ENABLE_COMPACT_IP4
-        }
+    }
 #endif
         /* Copy key */
         yfFlowKeyCopy(key, &(fn->f.key));
@@ -2289,7 +2348,7 @@ yfAddOutOfSequence(
         }
         /* Allocate Flow Statistics */
         if (flowtab->stats_mode) {
-            val->stats = yg_slice_new0(yfFlowStats_t);
+            val->stats = g_slice_new0(yfFlowStats_t);
         }
     }
 
@@ -2321,7 +2380,6 @@ yfAddOutOfSequence(
 #else
         yfFlowPktTCP(flowtab, fn, val, payload, paylen, tcpinfo, NULL, 0);
 #endif
-
     } else {
         if (val->pkt == 0) {
             val->first_pkt_size = pbuf->iplen;
@@ -2364,7 +2422,6 @@ yfAddOutOfSequence(
         yfFlowStatistics(fn, val, pbuf->ptime, datalen);
     }
 
-
 #if YAF_ENABLE_HOOKS
     /* Hook Flow Processing */
     yfHookFlowPacket(&(fn->f), val, payload,
@@ -2376,7 +2433,7 @@ yfAddOutOfSequence(
     /* Write Packet to Pcap-Per-Flow pcap file */
     if (flowtab->pcap_dir) {
         /* what we actually hold in yaf dependent on max-payload */
-        pbuf->pcap_hdr.caplen = (pbuflen > YF_PBUFLEN_BASE) ? pbuf->paylen :0;
+        pbuf->pcap_hdr.caplen = (pbuflen > YF_PBUFLEN_BASE) ? pbuf->paylen : 0;
         if (val == &(fn->f.rval)) {
             yfFlowKeyReverse(key, &rkey);
             yfWritePcap(flowtab, &(fn->f), &rkey, pbuf);
@@ -2391,12 +2448,13 @@ yfAddOutOfSequence(
             yfWritePcapMetaFile(flowtab, fn, pbuf, flowtab->hashfn(&rkey),
                                 pcap_len);
         } else {
-            yfWritePcapMetaFile(flowtab, fn, pbuf,flowtab->hashfn(key),pcap_len);
+            yfWritePcapMetaFile(flowtab, fn, pbuf, flowtab->hashfn(key),
+                                pcap_len);
         }
     }
 
     /* if udp-uniflow-mode, close UDP flow now */
-    if ((fn->f.key.proto == YF_PROTO_UDP) && (flowtab->udp_uniflow_port != 0)){
+    if ((fn->f.key.proto == YF_PROTO_UDP) && (flowtab->udp_uniflow_port != 0)) {
         if (((flowtab->udp_uniflow_port == 1) ||
              (flowtab->udp_uniflow_port == fn->f.key.sp) ||
              (flowtab->udp_uniflow_port == fn->f.key.dp)))
@@ -2432,7 +2490,7 @@ yfAddOutOfSequence(
     /* first remove the node */
     piqPick(&flowtab->aq, fn);
 
-    for (tn = flowtab->aq.head; tn; tn=nfn) {
+    for (tn = flowtab->aq.head; tn; tn = nfn) {
         end = tn->f.etime;
         nfn = tn->p;
         if (end <= fn->f.etime) {
@@ -2475,17 +2533,20 @@ yfAddOutOfSequence(
         yfFlowClose(flowtab, fn, YAF_END_IDLE);
     }
 }
+
+
 #if YAF_ENABLE_NDPI
 
 /**
  * yfNDPIApplabel
  *
  */
-static void yfNDPIApplabel(
-    yfFlowTab_t          *flowtab,
-    yfFlow_t             *flow,
-    uint8_t              *payload,
-    size_t               paylen)
+static void
+yfNDPIApplabel(
+    yfFlowTab_t  *flowtab,
+    yfFlow_t     *flow,
+    uint8_t      *payload,
+    size_t        paylen)
 {
     struct ndpi_flow_struct *nflow;
     struct ndpi_id_struct src, dst;
@@ -2505,11 +2566,13 @@ static void yfNDPIApplabel(
     flow->ndpi_master = proto.master_protocol;
     flow->ndpi_sub = proto.app_protocol;
 
-    /* g_debug("proto is %d other is %d", proto.master_protocol, proto.protocol); */
+    /* g_debug("proto is %d other is %d", proto.master_protocol,
+     * proto.protocol); */
     ndpi_free_flow(nflow);
-
 }
-#endif
+
+
+#endif /* if YAF_ENABLE_NDPI */
 
 /**
  * yfFlowPBuf
@@ -2524,29 +2587,30 @@ static void yfNDPIApplabel(
  * @param pbuf pointer to the packet data
  *
  */
-void yfFlowPBuf(
-    yfFlowTab_t                 *flowtab,
-    size_t                      pbuflen,
-    yfPBuf_t                    *pbuf)
+void
+yfFlowPBuf(
+    yfFlowTab_t  *flowtab,
+    size_t        pbuflen,
+    yfPBuf_t     *pbuf)
 {
-    yfFlowKey_t                 *key = &(pbuf->key);
-    yfFlowKey_t                 rkey;
-    yfFlowVal_t                 *val = NULL;
-    yfFlowNode_t                *fn = NULL;
-    yfTCPInfo_t                 *tcpinfo = &(pbuf->tcpinfo);
-    yfL2Info_t                  *l2info = &(pbuf->l2info);
-    uint8_t                     *payload = (pbuflen >= YF_PBUFLEN_BASE) ?
-                                           pbuf->payload : NULL;
-    size_t                      paylen = (pbuflen >= YF_PBUFLEN_BASE) ?
-                                         pbuf->paylen : 0;
-    uint16_t                    datalen = (pbuf->iplen - pbuf->allHeaderLen +
-                                           l2info->l2hlen);
-    uint32_t                    pcap_len = 0;
+    yfFlowKey_t *key = &(pbuf->key);
+    yfFlowKey_t rkey;
+    yfFlowVal_t *val = NULL;
+    yfFlowNode_t *fn = NULL;
+    yfTCPInfo_t *tcpinfo = &(pbuf->tcpinfo);
+    yfL2Info_t *l2info = &(pbuf->l2info);
+    uint8_t *payload = (pbuflen >= YF_PBUFLEN_BASE) ?
+        pbuf->payload : NULL;
+    size_t paylen = (pbuflen >= YF_PBUFLEN_BASE) ?
+        pbuf->paylen : 0;
+    uint16_t datalen = (pbuf->iplen - pbuf->allHeaderLen +
+                        l2info->l2hlen);
+    uint32_t pcap_len = 0;
 #if YAF_MPLS
-    yfMPLSNode_t                *mpls = NULL;
+    yfMPLSNode_t *mpls = NULL;
 #endif
 #if YAF_ENABLE_APPLABEL
-    uint16_t                    tapp = 0;
+    uint16_t tapp = 0;
 #endif
 
     /* skip and count out of sequence packets */
@@ -2584,7 +2648,7 @@ void yfFlowPBuf(
     {
         return;
     }
-#endif
+#endif /* if YAF_ENABLE_HOOKS */
 
 #if YAF_MPLS
     mpls = yfMPLSGetNode(flowtab, l2info);
@@ -2598,15 +2662,15 @@ void yfFlowPBuf(
         yfFlowClose(flowtab, fn, YAF_END_ACTIVE);
 #if YAF_ENABLE_APPLABEL
         /* copy applabel over */
-        if (flowtab->applabelmode) tapp = fn->f.appLabel;
+        if (flowtab->applabelmode) {tapp = fn->f.appLabel;}
 #endif
         /* get a new flow node containing this packet */
         fn = yfFlowGetNode(flowtab, key, &val);
         /* set continuation flag in silk mode */
-        if (flowtab->silkmode) fn->f.reason = YAF_ENDF_ISCONT;
+        if (flowtab->silkmode) {fn->f.reason = YAF_ENDF_ISCONT;}
 #if YAF_ENABLE_APPLABEL
         /* copy applabel into new flow */
-        if (flowtab->applabelmode) fn->f.appLabel = tapp;
+        if (flowtab->applabelmode) {fn->f.appLabel = tapp;}
 #endif
     }
 
@@ -2616,7 +2680,6 @@ void yfFlowPBuf(
         /* get a new flow node for the current packet */
         fn = yfFlowGetNode(flowtab, key, &val);
     }
-
 
     /* First Packet? */
     if (val->pkt == 0) {
@@ -2632,7 +2695,7 @@ void yfFlowPBuf(
         }
         /* Allocate Flow Statistics */
         if (flowtab->stats_mode) {
-            val->stats = yg_slice_new0(yfFlowStats_t);
+            val->stats = g_slice_new0(yfFlowStats_t);
         }
         /* Calculate reverse RTT */
         if (val == &(fn->f.rval)) {
@@ -2720,7 +2783,7 @@ void yfFlowPBuf(
     /* Write Packet to Pcap-Per-Flow pcap file */
     if (flowtab->pcap_dir) {
         /* what we actually hold in yaf dependent on max-payload */
-        pbuf->pcap_hdr.caplen = (pbuflen > YF_PBUFLEN_BASE) ? pbuf->paylen :0;
+        pbuf->pcap_hdr.caplen = (pbuflen > YF_PBUFLEN_BASE) ? pbuf->paylen : 0;
         if (val == &(fn->f.rval)) {
             yfFlowKeyReverse(key, &rkey);
             yfWritePcap(flowtab, &(fn->f), &rkey, pbuf);
@@ -2736,7 +2799,8 @@ void yfFlowPBuf(
             yfWritePcapMetaFile(flowtab, fn, pbuf, flowtab->hashfn(&rkey),
                                 pcap_len);
         } else {
-            yfWritePcapMetaFile(flowtab, fn, pbuf,flowtab->hashfn(key),pcap_len);
+            yfWritePcapMetaFile(flowtab, fn, pbuf, flowtab->hashfn(key),
+                                pcap_len);
         }
     }
 
@@ -2746,10 +2810,10 @@ void yfFlowPBuf(
                        payload - pbuf->allHeaderLen + l2info->l2hlen,
                        paylen + pbuf->allHeaderLen - l2info->l2hlen);
     }
-#endif
+#endif /* if YAF_ENABLE_NDPI */
 
     /* if udp-uniflow-mode, close UDP flow now */
-    if ((fn->f.key.proto == YF_PROTO_UDP) && (flowtab->udp_uniflow_port != 0)){
+    if ((fn->f.key.proto == YF_PROTO_UDP) && (flowtab->udp_uniflow_port != 0)) {
         if (((flowtab->udp_uniflow_port == 1) ||
              (flowtab->udp_uniflow_port == fn->f.key.sp) ||
              (flowtab->udp_uniflow_port == fn->f.key.dp)))
@@ -2773,8 +2837,8 @@ void yfFlowPBuf(
     } else {
         yfFlowTick(flowtab, fn);
     }
-
 }
+
 
 /**
  * yfUniflow
@@ -2787,19 +2851,21 @@ void yfFlowPBuf(
  *           (reverse) values NULLed
  *
  */
-static void yfUniflow(
-    yfFlow_t          *bf,
-    yfFlow_t          *uf)
+static void
+yfUniflow(
+    yfFlow_t  *bf,
+    yfFlow_t  *uf)
 {
-
 #if YAF_ENABLE_COMPACT_IP4
     if (bf->key.version == 4) {
         memcpy(uf, bf, sizeof(yfFlowIPv4_t));
     } else {
 #endif
-        memcpy(uf, bf, sizeof(yfFlow_t));
+    memcpy(uf, bf, sizeof(yfFlow_t));
 #if YAF_ENABLE_COMPACT_IP4
-    }
+}
+
+
 #endif
     memset(&(uf->rval), 0, sizeof(yfFlowVal_t));
     uf->rdtime = 0;
@@ -2817,11 +2883,12 @@ static void yfUniflow(
  *
  * @return TRUE on success, FALSE on error
  */
-static gboolean yfUniflowReverse(
-    yfFlow_t          *bf,
-    yfFlow_t          *uf)
+static gboolean
+yfUniflowReverse(
+    yfFlow_t  *bf,
+    yfFlow_t  *uf)
 {
-    if (!(bf->rval.pkt)) return FALSE;
+    if (!(bf->rval.pkt)) {return FALSE;}
 
     /* calculate reverse time */
     uf->stime = bf->stime + bf->rdtime;
@@ -2848,22 +2915,24 @@ static gboolean yfUniflowReverse(
     return TRUE;
 }
 
+
 /**
  * yfFlowTabFlush
  *
  *
  *
  */
-gboolean yfFlowTabFlush(
-    void            *yfContext,
-    gboolean        close,
-    GError          **err)
+gboolean
+yfFlowTabFlush(
+    void      *yfContext,
+    gboolean   close,
+    GError   **err)
 {
-    gboolean        wok = TRUE;
-    yfFlowNode_t    *fn = NULL;
-    yfFlow_t        uf;
-    yfContext_t     *ctx = (yfContext_t *)yfContext;
-    yfFlowTab_t     *flowtab = ctx->flowtab;
+    gboolean wok = TRUE;
+    yfFlowNode_t *fn = NULL;
+    yfFlow_t uf;
+    yfContext_t *ctx = (yfContext_t *)yfContext;
+    yfFlowTab_t *flowtab = ctx->flowtab;
 
     if (!close && flowtab->flushtime &&
         (flowtab->ctime < flowtab->flushtime + YF_FLUSH_DELAY)
@@ -2932,11 +3001,12 @@ gboolean yfFlowTabFlush(
         yfFlowFree(flowtab, fn);
 
         /* return error if necessary */
-        if (!wok) return wok;
+        if (!wok) {return wok;}
     }
 
     return TRUE;
 }
+
 
 /**
  * yfFlowTabCurrentTime
@@ -2945,8 +3015,9 @@ gboolean yfFlowTabFlush(
  *
  *
  */
-uint64_t yfFlowTabCurrentTime(
-    yfFlowTab_t     *flowtab)
+uint64_t
+yfFlowTabCurrentTime(
+    yfFlowTab_t  *flowtab)
 {
     return flowtab->ctime;
 }
@@ -2964,18 +3035,21 @@ uint64_t yfFlowTabCurrentTime(
  *
  *
  */
-uint64_t yfFlowDumpStats(
-    yfFlowTab_t     *flowtab,
-    GTimer          *timer)
+uint64_t
+yfFlowDumpStats(
+    yfFlowTab_t  *flowtab,
+    GTimer       *timer)
 {
     g_debug("Processed %llu packets into %llu flows:",
             (long long unsigned int)flowtab->stats.stat_packets,
             (long long unsigned int)flowtab->stats.stat_flows);
     if (timer) {
         g_debug("  Mean flow rate %.2f/s.",
-                ((double)flowtab->stats.stat_flows / g_timer_elapsed(timer, NULL)));
+                ((double)flowtab->stats.stat_flows /
+                 g_timer_elapsed(timer, NULL)));
         g_debug("  Mean packet rate %.2f/s.",
-                ((double)flowtab->stats.stat_packets / g_timer_elapsed(timer, NULL)));
+                ((double)flowtab->stats.stat_packets /
+                 g_timer_elapsed(timer, NULL)));
         g_debug("  Virtual bandwidth %.4f Mbps.",
                 ((((double)flowtab->stats.stat_octets * 8.0) / 1000000) /
                  g_timer_elapsed(timer, NULL)));
@@ -2986,12 +3060,13 @@ uint64_t yfFlowDumpStats(
     g_debug("  %u Max. MPLS Nodes.", flowtab->stats.max_mpls_labels);
 #endif
     if (flowtab->stats.stat_seqrej) {
-        g_warning("Rejected %"PRIu64" out-of-sequence packets.",
+        g_warning("Rejected %" PRIu64 " out-of-sequence packets.",
                   flowtab->stats.stat_seqrej);
     }
-    g_debug("  %"PRIu64" asymmetric/unidirectional flows detected (%2.2f%%)",
+    g_debug("  %" PRIu64 " asymmetric/unidirectional flows detected (%2.2f%%)",
             flowtab->stats.stat_uniflows,
-            (((double)flowtab->stats.stat_uniflows)/((double)flowtab->stats.stat_flows)) * 100);
+            (((double)flowtab->stats.stat_uniflows) /
+             ((double)flowtab->stats.stat_flows)) * 100);
 
     return flowtab->stats.stat_packets;
 }

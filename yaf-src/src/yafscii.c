@@ -1,60 +1,60 @@
 /*
- ** yafscii.c
- ** YAF flow printer
- **
- ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2015 Carnegie Mellon University. All Rights Reserved.
- ** ------------------------------------------------------------------------
- ** Authors: Brian Trammell
- ** ------------------------------------------------------------------------
- ** @OPENSOURCE_HEADER_START@
- ** Use of the YAF system and related source code is subject to the terms
- ** of the following licenses:
- **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
- ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
- **
- ** NO WARRANTY
- **
- ** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
- ** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
- ** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
- ** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
- ** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
- ** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
- ** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
- ** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
- ** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
- ** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
- ** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
- ** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
- ** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
- ** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
- ** DELIVERABLES UNDER THIS LICENSE.
- **
- ** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
- ** Mellon University, its trustees, officers, employees, and agents from
- ** all claims or demands made against them (and any related losses,
- ** expenses, or attorney's fees) arising out of, or relating to Licensee's
- ** and/or its sub licensees' negligent use or willful misuse of or
- ** negligent conduct or willful misconduct regarding the Software,
- ** facilities, or other rights or assistance granted by Carnegie Mellon
- ** University under this License, including, but not limited to, any
- ** claims of product liability, personal injury, death, damage to
- ** property, or violation of any laws or regulations.
- **
- ** Carnegie Mellon University Software Engineering Institute authored
- ** documents are sponsored by the U.S. Department of Defense under
- ** Contract FA8721-05-C-0003. Carnegie Mellon University retains
- ** copyrights in all material produced under this contract. The U.S.
- ** Government retains a non-exclusive, royalty-free license to publish or
- ** reproduce these documents, or allow others to do so, for U.S.
- ** Government purposes only pursuant to the copyright license under the
- ** contract clause at 252.227.7013.
- **
- ** @OPENSOURCE_HEADER_END@
- ** ------------------------------------------------------------------------
- */
+** yafscii.c
+** YAF flow printer
+**
+** ------------------------------------------------------------------------
+** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
+** ------------------------------------------------------------------------
+** Authors: Brian Trammell
+** ------------------------------------------------------------------------
+** @OPENSOURCE_HEADER_START@
+** Use of the YAF system and related source code is subject to the terms
+** of the following licenses:
+**
+** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
+** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
+**
+** NO WARRANTY
+**
+** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
+** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
+** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
+** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
+** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
+** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
+** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
+** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
+** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
+** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
+** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
+** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
+** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
+** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
+** DELIVERABLES UNDER THIS LICENSE.
+**
+** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
+** Mellon University, its trustees, officers, employees, and agents from
+** all claims or demands made against them (and any related losses,
+** expenses, or attorney's fees) arising out of, or relating to Licensee's
+** and/or its sub licensees' negligent use or willful misuse of or
+** negligent conduct or willful misconduct regarding the Software,
+** facilities, or other rights or assistance granted by Carnegie Mellon
+** University under this License, including, but not limited to, any
+** claims of product liability, personal injury, death, damage to
+** property, or violation of any laws or regulations.
+**
+** Carnegie Mellon University Software Engineering Institute authored
+** documents are sponsored by the U.S. Department of Defense under
+** Contract FA8721-05-C-0003. Carnegie Mellon University retains
+** copyrights in all material produced under this contract. The U.S.
+** Government retains a non-exclusive, royalty-free license to publish or
+** reproduce these documents, or allow others to do so, for U.S.
+** Government purposes only pursuant to the copyright license under the
+** contract clause at 252.227.7013.
+**
+** @OPENSOURCE_HEADER_END@
+** ------------------------------------------------------------------------
+*/
 
 #define _YAF_SOURCE_
 #include <yaf/autoinc.h>
@@ -69,27 +69,27 @@
 #include <yaf/yafcore.h>
 
 typedef struct ytContext_st {
-    fBuf_t          *fbuf;
-    yfFlow_t        flow;
+    fBuf_t    *fbuf;
+    yfFlow_t   flow;
 } ytContext_t;
 
-static uint32_t     yaft_flows = 0;
+static uint32_t yaft_flows = 0;
 
-static gboolean     yaft_tabular = FALSE;
-static gboolean     yaft_mac = FALSE;
-static gboolean     yaft_first = TRUE;
-static gboolean     yaft_print_header = FALSE;
+static gboolean yaft_tabular = FALSE;
+static gboolean yaft_mac = FALSE;
+static gboolean yaft_first = TRUE;
+static gboolean yaft_print_header = FALSE;
 
-static uint32_t     yaft_cliflags = MIO_F_CLI_FILE_IN |
-                                    MIO_F_CLI_DIR_IN |
-                                    MIO_F_CLI_DEF_STDIN |
-                                    MIO_F_CLI_FILE_OUT |
-                                    MIO_F_CLI_DIR_OUT |
-                                    MIO_F_CLI_DEF_STDOUT;
+static uint32_t yaft_cliflags = MIO_F_CLI_FILE_IN |
+    MIO_F_CLI_DIR_IN |
+    MIO_F_CLI_DEF_STDIN |
+    MIO_F_CLI_FILE_OUT |
+    MIO_F_CLI_DIR_OUT |
+    MIO_F_CLI_DEF_STDOUT;
 
 AirOptionEntry yaft_optentries[] = {
     AF_OPTION( "tabular", (char)0, 0, AF_OPT_TYPE_NONE, &yaft_tabular,
-      "Print flows in tabular format", NULL ),
+               "Print flows in tabular format", NULL ),
     AF_OPTION( "mac", (char)0, 0, AF_OPT_TYPE_NONE, &yaft_mac,
                "Print mac addresses (when used with --tabular)", NULL ),
     AF_OPTION( "print-header", (char)0, 0, AF_OPT_TYPE_NONE, &yaft_print_header,
@@ -97,10 +97,11 @@ AirOptionEntry yaft_optentries[] = {
     AF_OPTION_END
 };
 
-static void ytParseOptions(
-    int             *argc,
-    char            **argv[]) {
-
+static void
+ytParseOptions(
+    int   *argc,
+    char **argv[])
+{
     AirOptionCtx *aoctx = NULL;
 
     aoctx = air_option_context_new("", argc, argv, yaft_optentries);
@@ -123,13 +124,15 @@ static void ytParseOptions(
     air_option_context_free(aoctx);
 }
 
-static gboolean ytOpenSource(
-    MIOSource               *source,
-    void                    *vctx,
-    uint32_t                *flags,
-    GError                  **err)
+
+static gboolean
+ytOpenSource(
+    MIOSource  *source,
+    void       *vctx,
+    uint32_t   *flags,
+    GError    **err)
 {
-    ytContext_t          *yx = (ytContext_t *)vctx;
+    ytContext_t *yx = (ytContext_t *)vctx;
 
     /* start reading a YAF file */
     if (!(yx->fbuf = yfReaderForFP(yx->fbuf, mio_fp(source), err))) {
@@ -145,15 +148,17 @@ static gboolean ytOpenSource(
     return TRUE;
 }
 
-static gboolean ytProcess(
-    MIOSource               *source,
-    MIOSink                 *sink,
-    void                    *vctx,
-    uint32_t                *flags,
-    GError                  **err)
+
+static gboolean
+ytProcess(
+    MIOSource  *source,
+    MIOSink    *sink,
+    void       *vctx,
+    uint32_t   *flags,
+    GError    **err)
 {
-    ytContext_t          *yx = (ytContext_t *)vctx;
-    gboolean                ok;
+    ytContext_t *yx = (ytContext_t *)vctx;
+    gboolean     ok;
 
     /* Print first line column headers if tabular */
     if (yaft_tabular && yaft_first && yaft_print_header) {
@@ -188,17 +193,18 @@ static gboolean ytProcess(
 }
 
 
-int main (
-    int                 argc,
-    char                *argv[]) {
-
-    GError              *err = NULL;
-    ytContext_t         yx;
-    MIOSource           source;
-    MIOSink             sink;
-    MIOAppDriver        adrv;
-    uint32_t            miodflags;
-    int                 rv = 0;
+int
+main(
+    int    argc,
+    char  *argv[])
+{
+    GError      *err = NULL;
+    ytContext_t  yx;
+    MIOSource    source;
+    MIOSink      sink;
+    MIOAppDriver adrv;
+    uint32_t     miodflags;
+    int          rv = 0;
 
     /* parse options */
     ytParseOptions(&argc, &argv);
@@ -225,7 +231,8 @@ int main (
 
     /* set up sink */
     if (!mio_config_sink(&source, &sink, "%s.yaf.txt", yaft_cliflags,
-                         &miodflags, &err)) {
+                         &miodflags, &err))
+    {
         air_opterr("Cannot set up output: %s", err->message);
     }
 

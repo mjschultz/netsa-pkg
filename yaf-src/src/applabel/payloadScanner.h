@@ -6,7 +6,7 @@
  * This defines the interface to the payload scanner functions
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2016 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Chris Inacio <inacio@cert.org>
  ** ------------------------------------------------------------------------
@@ -14,7 +14,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -70,28 +70,62 @@
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
 
-/* if this is a power of 2, then the hash used for the sparse array is (every so slightly) more efficient */
+
+/*
+ *  Defines the prototype signature of the function that each appLabel plug-in
+ *  function must define.  The function scans the payload and returns an
+ *  appLabel or returns 0 if the payload does not match its rules.
+ *
+ *  The function's parameters are:
+ *
+ *  -- argc number of string arguments in argv
+ *  -- argv string arguments for this plugin (first two are library
+ *         name and function name)
+ *  -- payload the packet payload
+ *  -- payloadSize size of the packet payload
+ *  -- flow a pointer to the flow state structure
+ *  -- val a pointer to biflow state (used for forward vs reverse)
+ *
+ *  Adding the following to a plugin's C code ensures that the plugin's
+ *  function, "file_LTX_functionScan", matches this signature:
+ *
+ *  @include "../payloadScanner.h"
+ *  YC_SCANNER_PROTOTYPE(file_LTX_functionScan);
+ *
+ */
+#define YC_SCANNER_PROTOTYPE(_func_name_) \
+    uint16_t _func_name_(                 \
+        int argc,                         \
+        char *argv[],                     \
+        const uint8_t * payload,          \
+        unsigned int payloadSize,         \
+        yfFlow_t * flow,                  \
+        yfFlowVal_t * val)
+
+
+/* if this is a power of 2, then the hash used for the sparse array is
+ * (every so slightly) more efficient */
 #define MAX_PAYLOAD_RULES 1024
 #define LINE_BUF_SIZE 4096
 
 typedef struct ycDnsScanMessageHeader_st {
-    uint16_t            id;
+    uint16_t   id;
 
-    uint16_t            qr:1;
-    uint16_t            opcode:4;
-    uint16_t            aa:1;
-    uint16_t            tc:1;
-    uint16_t            rd:1;
-    uint16_t            ra:1;
-    uint16_t            z:1;
-    uint16_t            ad:1;
-    uint16_t            cd:1;
-    uint16_t            rcode:4;
+    uint16_t   qr     : 1;
+    uint16_t   opcode : 4;
+    uint16_t   aa     : 1;
+    uint16_t   tc     : 1;
+    uint16_t   rd     : 1;
+    uint16_t   ra     : 1;
+    uint16_t   z      : 1;
+    uint16_t   ad     : 1;
+    uint16_t   cd     : 1;
+    uint16_t   rcode  : 4;
 
-    uint16_t            qdcount;
-    uint16_t            ancount;
-    uint16_t            nscount;
-    uint16_t            arcount;
+    uint16_t   qdcount;
+    uint16_t   ancount;
+    uint16_t   nscount;
+    uint16_t   arcount;
 } ycDnsScanMessageHeader_t;
 
 #define DNS_PORT_NUMBER 53
@@ -108,9 +142,10 @@ typedef struct ycDnsScanMessageHeader_st {
  * @return FALSE if an error occurs, TRUE if there were no errors
  *
  */
-gboolean            ycInitializeScanRules (
-    FILE * scriptFile,
-    GError ** err);
+gboolean
+ycInitializeScanRules(
+    FILE    *scriptFile,
+    GError **err);
 
 /**
  * ycScanPayload
@@ -121,15 +156,16 @@ gboolean            ycInitializeScanRules (
  * @param flow
  * @param val
  *
- * @return the value of the label of the matching rule if there is a match, otherwise 0
+ * @return the value of the label of the matching rule if there is a match,
+ * otherwise 0
  *
  */
 uint16_t
-ycScanPayload (
-    const uint8_t * payloadData,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val);
+ycScanPayload(
+    const uint8_t  *payloadData,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val);
 
 
 /**
@@ -145,10 +181,10 @@ ycScanPayload (
  *
  *
  */
-
-void         ycDnsScanRebuildHeader (
-    uint8_t * payload,
-    ycDnsScanMessageHeader_t * header);
+void
+ycDnsScanRebuildHeader(
+    const uint8_t             *payload,
+    ycDnsScanMessageHeader_t  *header);
 
 /**
  * ycGetRuleType
@@ -161,8 +197,9 @@ void         ycDnsScanRebuildHeader (
  * @return ruleType
  *
  */
-int ycGetRuleType(
-    uint16_t port);
+int
+ycGetRuleType(
+    uint16_t   port);
 
 /**
  *
@@ -181,12 +218,13 @@ int ycGetRuleType(
  *
  *
  */
-void yfRemoveCRC(
-    uint8_t *start,
-    size_t  length,
-    uint8_t *dst,
-    size_t  *dst_length,
-    int     block_size,
-    int    crc_length);
+void
+yfRemoveCRC(
+    const uint8_t  *start,
+    size_t          length,
+    uint8_t        *dst,
+    size_t         *dst_length,
+    int             block_size,
+    int             crc_length);
 
-#endif
+#endif /* ifndef PAYLOAD_SCANNER_H_ */

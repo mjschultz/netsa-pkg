@@ -9,7 +9,7 @@
  *
  * @ href="http://forge.mysql.com/wiki/MySQL_Internals_ClientServer_Protocol"
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Ecoff <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -17,7 +17,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -69,6 +69,7 @@
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
 #include <arpa/inet.h>
+#include <payloadScanner.h>
 
 #if YAF_ENABLE_HOOKS
 #include <yaf/yafhooks.h>
@@ -76,9 +77,11 @@
 
 #define MYSQL_PORT_NUMBER 3306
 
+YC_SCANNER_PROTOTYPE(mysqlplugin_LTX_ycMYSQLScanScan);
+
 
 /**
- * mysqlplugin_LTX_ycMYSQLScan
+ * mysqlplugin_LTX_ycMYSQLScanScan
  *
  * returns MYSQL_PORT_NUMBER if the passed in payload matches
  * a MySQL Server Greeting packet
@@ -93,20 +96,18 @@
  *
  * return 0 if no match
  */
-
 uint16_t
-mysqlplugin_LTX_ycMYSQLScanScan (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+mysqlplugin_LTX_ycMYSQLScanScan(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
-
     uint16_t payloadOffset = 0;
     uint32_t fillerOffset = 0;
-    int i = 0;
+    int      i = 0;
     uint8_t  packetNumber;
     uint32_t packetLength;
     uint8_t  temp;
@@ -151,7 +152,7 @@ mysqlplugin_LTX_ycMYSQLScanScan (
         }
 
         for (i = 0; i < 13; i++) {
-            temp = *(payload+fillerOffset+i);
+            temp = *(payload + fillerOffset + i);
             if (temp != 0) {
                 return 0;
             }
@@ -164,7 +165,7 @@ mysqlplugin_LTX_ycMYSQLScanScan (
         /* Max Packet Size + 1 for Charset*/
         payloadOffset += 5;
 
-        if (payloadOffset + 23 > payloadSize ) {
+        if ((size_t)payloadOffset + 23 > payloadSize) {
             return 0;
         }
 
@@ -180,7 +181,7 @@ mysqlplugin_LTX_ycMYSQLScanScan (
         /* Here's the Username */
         i = 0;
         while ((payloadOffset < packetLength) &&
-               (payloadOffset + i < payloadSize))
+               ((size_t)payloadOffset + i < payloadSize))
         {
             if (*(payload + payloadOffset + i)) {
                 i++;
@@ -201,9 +202,8 @@ mysqlplugin_LTX_ycMYSQLScanScan (
 
         /* Check for more packets */
         while (payloadOffset < payloadSize) {
-
-            packetLength=(*(uint32_t *)(payload + payloadOffset)) & 0x00FFFFFF;
-
+            packetLength =
+                (*(uint32_t *)(payload + payloadOffset)) & 0x00FFFFFF;
 
             if (packetLength > payloadSize) {
                 return MYSQL_PORT_NUMBER;
@@ -222,7 +222,7 @@ mysqlplugin_LTX_ycMYSQLScanScan (
             /* The text of the command follows */
             i = (packetLength - 1);
 
-            if (payloadOffset + i > payloadSize) {
+            if ((size_t)payloadOffset + i > payloadSize) {
                 return MYSQL_PORT_NUMBER;
             }
 
@@ -231,10 +231,9 @@ mysqlplugin_LTX_ycMYSQLScanScan (
                               MYSQL_PORT_NUMBER);
 
             payloadOffset += i;
-
         }
 
-#endif
+#endif /* if YAF_ENABLE_HOOKS */
     }
 
     return MYSQL_PORT_NUMBER;

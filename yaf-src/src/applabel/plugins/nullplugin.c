@@ -7,13 +7,8 @@
  * are useful for testing the shared library loading and argument
  * passing to the plugins
  *
- * @author $Author$
- * @date  $Date$
- * @version $Revision$
- *
- *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2014 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Chris Inacio <inacio@cert.org>
  ** ------------------------------------------------------------------------
@@ -21,7 +16,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -70,7 +65,12 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
+YC_SCANNER_PROTOTYPE(nullplugin_LTX_ycNullScanScan);
+YC_SCANNER_PROTOTYPE(nullplugin_LTX_ycNullScanScan2);
+YC_SCANNER_PROTOTYPE(nullplugin_LTX_ycNullScanScan3);
+YC_SCANNER_PROTOTYPE(nullplugin_LTX_ycNullScanScan4);
 
 /* #define DEBUG_VERBOSITY */
 
@@ -89,34 +89,35 @@
  * @return always 0
  */
 uint16_t
-nullplugin_LTX_ycNullScanScan (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+nullplugin_LTX_ycNullScanScan(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
 #ifdef DEBUG_VERBOSITY
-    int                 loop;
+    int loop;
 #endif
 
     /* supress compiler warnings about unused arguments */
-    (void) payload;
-    (void) payloadSize;
-    (void) argc;
-    (void) argv;
-    (void) flow;
-    (void) val;
+    (void)payload;
+    (void)payloadSize;
+    (void)argc;
+    (void)argv;
+    (void)flow;
+    (void)val;
 
 #ifdef DEBUG_VERBOSITY
     for (loop = 0; loop < argc; loop++) {
-        printf ("arg %d is \"%s\"\n", loop, argv[loop]);
+        printf("arg %d is \"%s\"\n", loop, argv[loop]);
     }
 #endif
 
     return 0;
 }
+
 
 /**
  * nullplugin_LTX_ycNullScanScan2
@@ -132,34 +133,35 @@ nullplugin_LTX_ycNullScanScan (
  * @return always 0
  */
 uint16_t
-nullplugin_LTX_ycNullScanScan2 (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+nullplugin_LTX_ycNullScanScan2(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
 #ifdef DEBUG_VERBOSITY
-    int                 loop;
+    int loop;
 #endif
 
     /* supress compiler warnings about unused arguments */
-    (void) payload;
-    (void) payloadSize;
-    (void) argc;
-    (void) argv;
-    (void) flow;
-    (void) val;
+    (void)payload;
+    (void)payloadSize;
+    (void)argc;
+    (void)argv;
+    (void)flow;
+    (void)val;
 
 #ifdef DEBUG_VERBOSITY
     for (loop = 0; loop < argc; loop++) {
-        printf ("arg %d is \"%s\"\n", loop, argv[loop]);
+        printf("arg %d is \"%s\"\n", loop, argv[loop]);
     }
 #endif
 
     return 0;
 }
+
 
 /**
  * nullplugin_LTX_ycNullScanScan3
@@ -175,34 +177,35 @@ nullplugin_LTX_ycNullScanScan2 (
  * @return always 0
  */
 uint16_t
-nullplugin_LTX_ycNullScanScan3 (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+nullplugin_LTX_ycNullScanScan3(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
 #ifdef DEBUG_VERBOSITY
-    int                 loop;
+    int loop;
 #endif
 
     /* supress compiler warnings about unused arguments */
-    (void) payload;
-    (void) payloadSize;
-    (void) argc;
-    (void) argv;
-    (void) flow;
-    (void) val;
+    (void)payload;
+    (void)payloadSize;
+    (void)argc;
+    (void)argv;
+    (void)flow;
+    (void)val;
 
 #ifdef DEBUG_VERBOSITY
     for (loop = 0; loop < argc; loop++) {
-        printf ("arg %d is \"%s\"\n", loop, argv[loop]);
+        printf("arg %d is \"%s\"\n", loop, argv[loop]);
     }
 #endif
 
     return 0;
 }
+
 
 /**
  * nullplugin_LTX_ycNullScanScan4
@@ -218,30 +221,29 @@ nullplugin_LTX_ycNullScanScan3 (
  * @return always 0
  */
 uint16_t
-nullplugin_LTX_ycNullScanScan4 (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+nullplugin_LTX_ycNullScanScan4(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
 #ifdef DEBUG_VERBOSITY
-    int                 loop;
+    int loop;
 #endif
 
     /* supress compiler warnings about unused arguments */
-    (void) payload;
-    (void) payloadSize;
-    (void) argc;
-    (void) argv;
-    (void) flow;
-    (void) val;
-
+    (void)payload;
+    (void)payloadSize;
+    (void)argc;
+    (void)argv;
+    (void)flow;
+    (void)val;
 
 #ifdef DEBUG_VERBOSITY
     for (loop = 0; loop < argc; loop++) {
-        printf ("arg %d is \"%s\"\n", loop, argv[loop]);
+        printf("arg %d is \"%s\"\n", loop, argv[loop]);
     }
 #endif
 

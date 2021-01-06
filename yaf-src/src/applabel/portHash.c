@@ -12,12 +12,8 @@
  * not using well-known ports used in the applabel plug-in:
  * 80, 22, 25, 6346, 5050, 53, 21, 443, 427, 143, 194
  *
- * @author $Author$
- * @date $Date$
- * @version $Revision$
- *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2016 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Chris Inacio <inacio@cert.org>
  ** ------------------------------------------------------------------------
@@ -25,7 +21,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -80,18 +76,18 @@
 #if YAF_ENABLE_APPLABEL
 
 /** defining unit test makes this into a self compilable file and tries
-    to do some (very minimal) testing of the hash functions */
+ *  to do some (very minimal) testing of the hash functions */
 #ifdef UNIT_TEST
 typedef struct GError_st {
-    int                 foo;
+    int   foo;
 } GError;
-typedef uint8_t     gboolean;
+typedef uint8_t gboolean;
 
-static int          primaryHash;
-static int          secondaryHash;
-static int          linearChaining;
+static int primaryHash;
+static int secondaryHash;
+static int linearChaining;
 
-#endif
+#endif /* ifdef UNIT_TEST */
 
 static int linearChainingMax;
 
@@ -102,8 +98,8 @@ static int linearChainingMax;
  * local types
  */
 typedef struct portRuleHash_st {
-    uint16_t            portNumber;
-    uint16_t            ruleIndex;
+    uint16_t   portNumber;
+    uint16_t   ruleIndex;
 } portRuleHash_t;
 
 
@@ -121,10 +117,10 @@ static portRuleHash_t portRuleHash[MAX_PAYLOAD_RULES];
  *
  */
 void
-ycPortHashInitialize (
-    )
+ycPortHashInitialize(
+    void)
 {
-    int                 loop;
+    int loop;
 
     for (loop = 0; loop < MAX_PAYLOAD_RULES; loop++) {
         portRuleHash[loop].ruleIndex = MAX_PAYLOAD_RULES + 1;
@@ -136,7 +132,6 @@ ycPortHashInitialize (
 #   endif
     linearChainingMax = 0;
 }
-
 
 
 /**
@@ -159,12 +154,12 @@ ycPortHashInitialize (
  *
  */
 void
-ycPortHashInsert (
-    uint16_t portNum,
-    uint16_t ruleNum)
+ycPortHashInsert(
+    uint16_t   portNum,
+    uint16_t   ruleNum)
 {
-    uint16_t            insertLoc = portNum % MAX_PAYLOAD_RULES;
-    int linChain = 0;
+    uint16_t insertLoc = portNum % MAX_PAYLOAD_RULES;
+    int      linChain = 0;
 
     /* primary hash function insert, check for collision */
     if ((MAX_PAYLOAD_RULES + 1) == portRuleHash[insertLoc].ruleIndex) {
@@ -230,11 +225,11 @@ ycPortHashInsert (
  *         returns MAX_PAYLOAD_RULES+1 if there is no match
  */
 uint16_t
-ycPortHashSearch (
-    uint16_t portNum)
+ycPortHashSearch(
+    uint16_t   portNum)
 {
-    uint16_t            searchLoc = portNum % MAX_PAYLOAD_RULES;
-    int                 linChain = 0;
+    uint16_t searchLoc = portNum % MAX_PAYLOAD_RULES;
+    int      linChain = 0;
 
     /* primary hash search */
     if (portRuleHash[searchLoc].portNumber == portNum) {
@@ -263,7 +258,6 @@ ycPortHashSearch (
 }
 
 
-
 #ifdef UNIT_TEST
 /**
  * main
@@ -273,85 +267,85 @@ ycPortHashSearch (
  *
  */
 int
-main (
-    int argc,
-    char *argv[])
+main(
+    int    argc,
+    char  *argv[])
 {
-    ycPortHashInitialize ();
+    ycPortHashInitialize();
 
-    // first lets do a "practical" example to see how the hash functions
-    // operate
-    printf ("inserting: {80,0}, {25,1}, {53,2}, {21,3}, {143,4}, {443,5}\n");
-    ycPortHashInsert (80, 0);
-    ycPortHashInsert (25, 1);
-    ycPortHashInsert (53, 2);
-    ycPortHashInsert (21, 3);
-    ycPortHashInsert (143, 4);
-    ycPortHashInsert (443, 5);
+    /* first lets do a "practical" example to see how the hash functions */
+    /* operate */
+    printf("inserting: {80,0}, {25,1}, {53,2}, {21,3}, {143,4}, {443,5}\n");
+    ycPortHashInsert(80, 0);
+    ycPortHashInsert(25, 1);
+    ycPortHashInsert(53, 2);
+    ycPortHashInsert(21, 3);
+    ycPortHashInsert(143, 4);
+    ycPortHashInsert(443, 5);
 
-    printf ("searching:\n");
-    printf ("21, %d\n", ycPortHashSearch (21));
-    printf ("25, %d\n", ycPortHashSearch (25));
-    printf ("53, %d\n", ycPortHashSearch (53));
-    printf ("143, %d\n", ycPortHashSearch (143));
-    printf ("80, %d\n", ycPortHashSearch (80));
-    printf ("443, %d\n", ycPortHashSearch (443));
+    printf("searching:\n");
+    printf("21, %d\n", ycPortHashSearch(21));
+    printf("25, %d\n", ycPortHashSearch(25));
+    printf("53, %d\n", ycPortHashSearch(53));
+    printf("143, %d\n", ycPortHashSearch(143));
+    printf("80, %d\n", ycPortHashSearch(80));
+    printf("443, %d\n", ycPortHashSearch(443));
 
-    printf ("hashing functions used: primary: %d secondary: %d linear: %d\n",
-            primaryHash, secondaryHash, linearChaining);
+    printf("hashing functions used: primary: %d secondary: %d linear: %d\n",
+           primaryHash, secondaryHash, linearChaining);
 
+    printf("inserting conflicts:\n");
+    ycPortHashInsert(80 + MAX_PAYLOAD_RULES, 6);
+    ycPortHashInsert(25 + MAX_PAYLOAD_RULES, 7);
+    ycPortHashInsert(53 + MAX_PAYLOAD_RULES, 8);
 
-    printf ("inserting conflicts:\n");
-    ycPortHashInsert (80 + MAX_PAYLOAD_RULES, 6);
-    ycPortHashInsert (25 + MAX_PAYLOAD_RULES, 7);
-    ycPortHashInsert (53 + MAX_PAYLOAD_RULES, 8);
+    printf("searching:\n");
+    printf("%d, %d\n", (80 + MAX_PAYLOAD_RULES),
+           ycPortHashSearch(80 + MAX_PAYLOAD_RULES));
+    printf("%d, %d\n", (25 + MAX_PAYLOAD_RULES),
+           ycPortHashSearch(25 + MAX_PAYLOAD_RULES));
+    printf("%d, %d\n", (53 + MAX_PAYLOAD_RULES),
+           ycPortHashSearch(53 + MAX_PAYLOAD_RULES));
 
-    printf ("searching:\n");
-    printf ("%d, %d\n", (80 + MAX_PAYLOAD_RULES),
-            ycPortHashSearch (80 + MAX_PAYLOAD_RULES));
-    printf ("%d, %d\n", (25 + MAX_PAYLOAD_RULES),
-            ycPortHashSearch (25 + MAX_PAYLOAD_RULES));
-    printf ("%d, %d\n", (53 + MAX_PAYLOAD_RULES),
-            ycPortHashSearch (53 + MAX_PAYLOAD_RULES));
+    printf("hashing functions used: primary: %d secondary: %d linear: %d\n",
+           primaryHash, secondaryHash, linearChaining);
 
-    printf ("hashing functions used: primary: %d secondary: %d linear: %d\n",
-            primaryHash, secondaryHash, linearChaining);
+    printf("testing wrap around + linear chaining\n");
+    ycPortHashInsert((MAX_PAYLOAD_RULES - 3) + (0 * MAX_PAYLOAD_RULES), 9);
+    ycPortHashInsert((MAX_PAYLOAD_RULES - 3) + (1 * MAX_PAYLOAD_RULES), 10);
+    ycPortHashInsert((MAX_PAYLOAD_RULES - 3) + (2 * MAX_PAYLOAD_RULES), 11);
+    ycPortHashInsert((MAX_PAYLOAD_RULES - 3) + (3 * MAX_PAYLOAD_RULES), 12);
+    ycPortHashInsert((MAX_PAYLOAD_RULES - 3) + (4 * MAX_PAYLOAD_RULES), 13);
+    ycPortHashInsert((MAX_PAYLOAD_RULES - 3) + (5 * MAX_PAYLOAD_RULES), 14);
 
-    printf ("testing wrap around + linear chaining\n");
-    ycPortHashInsert ((MAX_PAYLOAD_RULES - 3) + (0 * MAX_PAYLOAD_RULES), 9);
-    ycPortHashInsert ((MAX_PAYLOAD_RULES - 3) + (1 * MAX_PAYLOAD_RULES), 10);
-    ycPortHashInsert ((MAX_PAYLOAD_RULES - 3) + (2 * MAX_PAYLOAD_RULES), 11);
-    ycPortHashInsert ((MAX_PAYLOAD_RULES - 3) + (3 * MAX_PAYLOAD_RULES), 12);
-    ycPortHashInsert ((MAX_PAYLOAD_RULES - 3) + (4 * MAX_PAYLOAD_RULES), 13);
-    ycPortHashInsert ((MAX_PAYLOAD_RULES - 3) + (5 * MAX_PAYLOAD_RULES), 14);
+    printf("searching:\n");
+    printf("%d, %d\n", (MAX_PAYLOAD_RULES - 3) + (0 * MAX_PAYLOAD_RULES),
+           ycPortHashSearch((MAX_PAYLOAD_RULES - 3) +
+                            (0 * MAX_PAYLOAD_RULES)));
+    printf("%d, %d\n", (MAX_PAYLOAD_RULES - 3) + (1 * MAX_PAYLOAD_RULES),
+           ycPortHashSearch((MAX_PAYLOAD_RULES - 3) +
+                            (1 * MAX_PAYLOAD_RULES)));
+    printf("%d, %d\n", (MAX_PAYLOAD_RULES - 3) + (2 * MAX_PAYLOAD_RULES),
+           ycPortHashSearch((MAX_PAYLOAD_RULES - 3) +
+                            (2 * MAX_PAYLOAD_RULES)));
+    printf("%d, %d\n", (MAX_PAYLOAD_RULES - 3) + (3 * MAX_PAYLOAD_RULES),
+           ycPortHashSearch((MAX_PAYLOAD_RULES - 3) +
+                            (3 * MAX_PAYLOAD_RULES)));
+    printf("%d, %d\n", (MAX_PAYLOAD_RULES - 3) + (4 * MAX_PAYLOAD_RULES),
+           ycPortHashSearch((MAX_PAYLOAD_RULES - 3) +
+                            (4 * MAX_PAYLOAD_RULES)));
+    printf("%d, %d\n", (MAX_PAYLOAD_RULES - 3) + (5 * MAX_PAYLOAD_RULES),
+           ycPortHashSearch((MAX_PAYLOAD_RULES - 3) +
+                            (5 * MAX_PAYLOAD_RULES)));
 
-    printf ("searching:\n");
-    printf ("%d, %d\n", (MAX_PAYLOAD_RULES - 3) + (0 * MAX_PAYLOAD_RULES),
-            ycPortHashSearch ((MAX_PAYLOAD_RULES - 3) +
-                              (0 * MAX_PAYLOAD_RULES)));
-    printf ("%d, %d\n", (MAX_PAYLOAD_RULES - 3) + (1 * MAX_PAYLOAD_RULES),
-            ycPortHashSearch ((MAX_PAYLOAD_RULES - 3) +
-                              (1 * MAX_PAYLOAD_RULES)));
-    printf ("%d, %d\n", (MAX_PAYLOAD_RULES - 3) + (2 * MAX_PAYLOAD_RULES),
-            ycPortHashSearch ((MAX_PAYLOAD_RULES - 3) +
-                              (2 * MAX_PAYLOAD_RULES)));
-    printf ("%d, %d\n", (MAX_PAYLOAD_RULES - 3) + (3 * MAX_PAYLOAD_RULES),
-            ycPortHashSearch ((MAX_PAYLOAD_RULES - 3) +
-                              (3 * MAX_PAYLOAD_RULES)));
-    printf ("%d, %d\n", (MAX_PAYLOAD_RULES - 3) + (4 * MAX_PAYLOAD_RULES),
-            ycPortHashSearch ((MAX_PAYLOAD_RULES - 3) +
-                              (4 * MAX_PAYLOAD_RULES)));
-    printf ("%d, %d\n", (MAX_PAYLOAD_RULES - 3) + (5 * MAX_PAYLOAD_RULES),
-            ycPortHashSearch ((MAX_PAYLOAD_RULES - 3) +
-                              (5 * MAX_PAYLOAD_RULES)));
-
-    printf ("hashing functions used: primary: %d secondary: %d linear: %d\n",
-            primaryHash, secondaryHash, linearChaining);
+    printf("hashing functions used: primary: %d secondary: %d linear: %d\n",
+           primaryHash, secondaryHash, linearChaining);
 
     return 0;
 }
 
+
 #endif /* UNIT_TEST */
 
 
-#endif
+#endif /* if YAF_ENABLE_APPLABEL */

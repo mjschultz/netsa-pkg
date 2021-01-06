@@ -3,7 +3,7 @@
  *
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -11,7 +11,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -61,9 +61,12 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 
 #define PIOFFSET 256
+
+YC_SCANNER_PROTOTYPE(piplugin_LTX_ycPIScanScan);
 
 /**
  * piplugin_LTX_ycPIScanScan
@@ -85,18 +88,17 @@
  *         otherwise 0
  */
 uint16_t
-piplugin_LTX_ycPIScanScan (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+piplugin_LTX_ycPIScanScan(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
-
-    int loop = 0;
-    int size = 0;
-    uint32_t length;
+    unsigned int loop = 0;
+    int          size = 0;
+    uint32_t     length;
 
     if (flow->val.payload == NULL || flow->rval.payload == NULL) {
         return 0;
@@ -136,7 +138,7 @@ piplugin_LTX_ycPIScanScan (
 
     loop = 0;
     /* find first non zero payload boundary and see if it is PIOFFSET */
-    while (loop < flow->rval.pkt && loop < YAF_MAX_PKT_BOUNDARY){
+    while (loop < flow->rval.pkt && loop < YAF_MAX_PKT_BOUNDARY) {
         if (flow->rval.paybounds[loop] == 0) {
             loop++;
             continue;
@@ -158,18 +160,17 @@ piplugin_LTX_ycPIScanScan (
     }
 
     /* After the challenge/response, the server sends 4 bytes
-       that signify the length of the next encrypted data which
-       may be sent over the next few packets - make sure
-       it's at least feasible. */
+     * that signify the length of the next encrypted data which
+     * may be sent over the next few packets - make sure
+     * it's at least feasible. */
     if (flow->rval.paylen > 260) {
-        length = *(uint32_t *)(flow->rval.payload+256);
-        if (flow->rval.oct >= (length+256)) {
+        length = *(uint32_t *)(flow->rval.payload + 256);
+        if (flow->rval.oct >= (length + 256)) {
             return 1;
         } else {
             return 0;
         }
     }
-
 
     return 0;
 }

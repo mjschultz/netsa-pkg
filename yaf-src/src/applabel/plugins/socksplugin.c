@@ -6,7 +6,7 @@
  * http://en.wikipedia.org/wiki/SOCKS
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -14,7 +14,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -64,8 +64,11 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 #define SOCKS_PORT_NUMBER  1080
+
+YC_SCANNER_PROTOTYPE(socksplugin_LTX_ycSocksScanScan);
 
 
 /**
@@ -86,34 +89,32 @@
  *         otherwise 0
  */
 uint16_t
-socksplugin_LTX_ycSocksScanScan (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+socksplugin_LTX_ycSocksScanScan(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
-
-    uint8_t offsetptr = 0;
-    uint32_t socks_ip;
-    uint8_t num_auth_methods = 0;
-    uint8_t auth_method;
-    int loop;
+    uint8_t      offsetptr = 0;
+    uint32_t     socks_ip;
+    unsigned int num_auth_methods = 0;
+    uint8_t      auth_method;
+    unsigned int loop;
 
     if (payloadSize < 2) {
         return 0;
     }
 
     if (payload[0] == 4) {
-
         if (payload[1] != 1 && payload[1] != 2) {
             return 0;
         }
 
         offsetptr += 2;
 
-        if (offsetptr + 6 > payloadSize) {
+        if ((size_t)offsetptr + 6 > payloadSize) {
             return 0;
         }
 
@@ -126,7 +127,6 @@ socksplugin_LTX_ycSocksScanScan (
                 return 0;
             }
         }
-
     } else if (payload[0] == 5) {
         num_auth_methods = payload[1];
 
@@ -150,7 +150,6 @@ socksplugin_LTX_ycSocksScanScan (
         if ((*(payload + offsetptr) != 5)) {
             return 0;
         }
-
     } else {
         return 0;
     }

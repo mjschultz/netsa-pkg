@@ -11,13 +11,8 @@
  * PAYLOAD_INSPECTION enabled, it is possible that this may not be 100%
  * correct in ID'ing the packets
  *
- *
- * @author $Author$
- * @date $Date$
- * @Version $Revision$
- *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2019 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Chris Inacio <inacio@cert.org>
  ** ------------------------------------------------------------------------
@@ -25,7 +20,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -76,48 +71,49 @@
 #include <yaf/decode.h>
 #include <payloadScanner.h>
 
-
 #if YAF_ENABLE_HOOKS
 #include <yaf/yafhooks.h>
 #endif
 
 /*
-typedef struct ycDnsScanMessageHeader_st {
-    uint16_t            id;
-
-    uint16_t            qr:1;
-    uint16_t            opcode:4;
-    uint16_t            aa:1;
-    uint16_t            tc:1;
-    uint16_t            rd:1;
-    uint16_t            ra:1;
-    uint16_t            z:1;
-    uint16_t            ad:1;
-    uint16_t            cd:1;
-    uint16_t            rcode:4;
-
-    uint16_t            qdcount;
-    uint16_t            ancount;
-    uint16_t            nscount;
-    uint16_t            arcount;
-} ycDnsScanMessageHeader_t;
-*/
+ * typedef struct ycDnsScanMessageHeader_st {
+ *  uint16_t            id;
+ *
+ *  uint16_t            qr:1;
+ *  uint16_t            opcode:4;
+ *  uint16_t            aa:1;
+ *  uint16_t            tc:1;
+ *  uint16_t            rd:1;
+ *  uint16_t            ra:1;
+ *  uint16_t            z:1;
+ *  uint16_t            ad:1;
+ *  uint16_t            cd:1;
+ *  uint16_t            rcode:4;
+ *
+ *  uint16_t            qdcount;
+ *  uint16_t            ancount;
+ *  uint16_t            nscount;
+ *  uint16_t            arcount;
+ * } ycDnsScanMessageHeader_t;
+ */
 
 #define DNS_PORT_NUMBER 53
 #define DNS_NAME_COMPRESSION 0xc0
 #define DNS_NAME_OFFSET 0x0FFF
 #define DNS_MAX_NAME_LENGTH 255
 /** this field defines the number of octects we fuzz the size of the
-    DNS to the IP+TCP+payload size with; we don't record any TCP
-    options, so it is possible to have a few extra bytes in the
-    calculation, and we won't say that's bad until that is larger
-    than the following constant */
+ *  DNS to the IP+TCP+payload size with; we don't record any TCP
+ *  options, so it is possible to have a few extra bytes in the
+ *  calculation, and we won't say that's bad until that is larger
+ *  than the following constant */
 #define DNS_TCP_FLAG_SLACK 8
 
 /** Since NETBIOS looks A LOT like DNS, there's no need to create
-    a separate plugin for it - if we think it's NETBIOS we will
-    return NETBIOS_PORT */
+ *  a separate plugin for it - if we think it's NETBIOS we will
+ *  return NETBIOS_PORT */
 #define NETBIOS_PORT 137
+
+YC_SCANNER_PROTOTYPE(dnsplugin_LTX_ycDnsScanScan);
 
 #define PAYLOAD_INSPECTION 1
 
@@ -129,12 +125,13 @@ typedef struct ycDnsScanMessageHeader_st {
  */
 
 #ifdef PAYLOAD_INSPECTION
-static uint16_t     ycDnsScanCheckResourceRecord (
-    uint8_t * payload,
-    unsigned int * offset,
-    unsigned int payloadSize
-   );
-#endif
+static uint16_t
+ycDnsScanCheckResourceRecord(
+    const uint8_t  *payload,
+    unsigned int   *offset,
+    unsigned int    payloadSize);
+
+#endif /* ifdef PAYLOAD_INSPECTION */
 
 
 /**
@@ -160,29 +157,29 @@ static uint16_t     ycDnsScanCheckResourceRecord (
  *
  */
 uint16_t
-dnsplugin_LTX_ycDnsScanScan (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+dnsplugin_LTX_ycDnsScanScan(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
     unsigned int loop = 0;
-    uint16_t msglen;
-    uint16_t firstpkt = payloadSize;
+    uint16_t     msglen;
+    uint16_t     firstpkt = payloadSize;
     ycDnsScanMessageHeader_t header;
-    gboolean netbios = FALSE;
+    gboolean     netbios = FALSE;
     unsigned int payloadOffset;
-    uint16_t qtype = 0;
+    uint16_t     qtype = 0;
 #if YAF_ENABLE_HOOKS
     unsigned int recordCount = 0;
-    uint16_t direction;
+    uint16_t     direction;
 #endif
 
     if (payloadSize < sizeof(ycDnsScanMessageHeader_t)) {
         /*fprintf(stderr, " <dns exit 1> ");
-          g_debug("returning at line 118");*/
+         * g_debug("returning at line 118");*/
         return 0;
     }
 
@@ -202,7 +199,6 @@ dnsplugin_LTX_ycDnsScanScan (
             payloadSize -= sizeof(uint16_t);
         }
     }
-
 
     ycDnsScanRebuildHeader(payload, &header);
 
@@ -230,46 +226,51 @@ dnsplugin_LTX_ycDnsScanScan (
     }
 
     /* check to make sure resource records are not empty -
-       gets rid of all 0's payloads */
+     * gets rid of all 0's payloads */
     if (header.qdcount == 0 && header.ancount == 0 && header.nscount == 0
         && header.arcount == 0)
     {
-        if (! (header.rcode > 0 && header.qr == 1)) {
+        if (!(header.rcode > 0 && header.qr == 1)) {
             /* DNS responses that are not errors will have something in them*/
             return 0;
         }
     }
 
     /* query validation */
-    if (header.qr == 0 )
-    {
-        if ((header.rcode > 0 || header.aa != 0 || header.ra != 0 || header.ad != 0))
-            /* queries should not have an rcode, an authoritative answer, recursion available, or authenticated data */
+    if (header.qr == 0) {
+        if ((header.rcode > 0 || header.aa != 0 || header.ra != 0 ||
+             header.ad != 0))
+        {
+            /* queries should not have an rcode, an authoritative answer,
+             * recursion available, or authenticated data */
             return 0;
-        if (!(header.qdcount > 0))
+        }
+        if (!(header.qdcount > 0)) {
             /* queries should have at least one question */
             return 0;
+        }
     }
 
 #ifdef PAYLOAD_INSPECTION
     /* parse through the rest of the DNS message, only the header is fixed
      * in size */
-    payloadOffset = sizeof (ycDnsScanMessageHeader_t);
+    payloadOffset = sizeof(ycDnsScanMessageHeader_t);
     /* the the query entries */
 
     if (payloadOffset >= payloadSize) {
         return 0;
     }
-    /*fprintf(stderr,"dns qdcount %d, ancount %d, nscount %d, arcount %d\n",header.qdcount,header.ancount,header.nscount, header.arcount);*/
+    /*fprintf(stderr,"dns qdcount %d, ancount %d, nscount %d, arcount
+     * %d\n",header.qdcount,header.ancount,header.nscount, header.arcount);*/
 
     for (loop = 0; loop < header.qdcount; loop++) {
-        uint8_t             sizeOct = *(payload + payloadOffset);
-        uint16_t            qclass;
-        uint8_t             comp = 0; /* turn on if something is compressed */
+        uint8_t  sizeOct = *(payload + payloadOffset);
+        uint16_t qclass;
+        uint8_t  comp = 0;            /* turn on if something is compressed */
 
         while (0 != sizeOct && payloadOffset < payloadSize) {
             if (DNS_NAME_COMPRESSION == (sizeOct & DNS_NAME_COMPRESSION)) {
-                payloadOffset += sizeof (uint16_t);
+                payloadOffset += sizeof(uint16_t);
                 /* compression happened so we don't need add 1 later */
                 comp = 1;
             } else {
@@ -302,9 +303,9 @@ dnsplugin_LTX_ycDnsScanScan (
             ((*(payload + payloadOffset + 1)) );
 
         qtype = ntohs(qtype);
-#else
+#else /* if HAVE_ALIGNED_ACCESS_REQUIRED */
         qtype = ntohs(*((uint16_t *)(payload + payloadOffset)));
-#endif
+#endif /* if HAVE_ALIGNED_ACCESS_REQUIRED */
         if (qtype == 0) {
             return 0;
         } else if (qtype > 52) {
@@ -323,7 +324,7 @@ dnsplugin_LTX_ycDnsScanScan (
             netbios = TRUE;
         }
 
-        payloadOffset += sizeof (uint16_t);
+        payloadOffset += sizeof(uint16_t);
 
         if ((payloadOffset + 2) > payloadSize) {
             return 0;
@@ -333,10 +334,10 @@ dnsplugin_LTX_ycDnsScanScan (
 #if HAVE_ALIGNED_ACCESS_REQUIRED
         qclass = ((*(payload + payloadOffset)) << 8) |
             ((*(payload + payloadOffset + 1)) );
-        qclass = ntohs (qclass);
+        qclass = ntohs(qclass);
 #else
-        qclass = ntohs(*((uint16_t *)(payload+payloadOffset)));
-#endif
+        qclass = ntohs(*((uint16_t *)(payload + payloadOffset)));
+#endif /* if HAVE_ALIGNED_ACCESS_REQUIRED */
 
         if (qclass > 4 && qclass != 255) {
             /*fprintf(stderr, " <dns exit 7, qclass = %d> ", qclass);*/
@@ -349,7 +350,7 @@ dnsplugin_LTX_ycDnsScanScan (
             }
         }
 
-        payloadOffset += sizeof (uint16_t);
+        payloadOffset += sizeof(uint16_t);
 
         if (payloadOffset > payloadSize) {
             return 0;
@@ -358,11 +359,10 @@ dnsplugin_LTX_ycDnsScanScan (
 
     /* check each record for the answer record count */
     for (loop = 0; loop < header.ancount; loop++) {
-        uint16_t            rc;
+        uint16_t rc;
 
-        rc =
-            ycDnsScanCheckResourceRecord(payload, &payloadOffset,
-                                         payloadSize);
+        rc = ycDnsScanCheckResourceRecord(payload, &payloadOffset,
+                                          payloadSize);
         if (0 == rc) {
             return rc;
         }
@@ -382,15 +382,13 @@ dnsplugin_LTX_ycDnsScanScan (
             recordCount++;
         }
 #endif
-
     }
 
     /* check each record for the name server resource record count */
     for (loop = 0; loop < header.nscount; loop++) {
-        uint16_t            rc;
-        rc =
-            ycDnsScanCheckResourceRecord(payload, &payloadOffset,
-                                         payloadSize);
+        uint16_t rc;
+        rc = ycDnsScanCheckResourceRecord(payload, &payloadOffset,
+                                          payloadSize);
         if (0 == rc) {
             return 0;
         }
@@ -408,14 +406,12 @@ dnsplugin_LTX_ycDnsScanScan (
             recordCount++;
         }
 #endif
-
     }
     /* check each record for the additional record count */
     for (loop = 0; loop < header.arcount; loop++) {
-        uint16_t            rc;
-        rc =
-            ycDnsScanCheckResourceRecord(payload, &payloadOffset,
-                                         payloadSize);
+        uint16_t rc;
+        rc = ycDnsScanCheckResourceRecord(payload, &payloadOffset,
+                                          payloadSize);
         if (0 == rc) {
             return 0;
         }
@@ -431,7 +427,6 @@ dnsplugin_LTX_ycDnsScanScan (
             recordCount++;
         }
 #endif
-
     }
 
     if (netbios) {
@@ -445,7 +440,7 @@ dnsplugin_LTX_ycDnsScanScan (
         direction = 1;
     }
 
-#if defined (YAF_ENABLE_DNSAUTH) && defined(YAF_ENABLE_DNSNXDOMAIN)
+#if defined(YAF_ENABLE_DNSAUTH) && defined(YAF_ENABLE_DNSNXDOMAIN)
     if ((header.aa == 1) || (header.rcode == 3)) {
         if (recordCount + header.qdcount) {
             yfHookScanPayload(flow, payload, 0, NULL,
@@ -469,7 +464,7 @@ dnsplugin_LTX_ycDnsScanScan (
                               DNS_PORT_NUMBER);
         }
     }
-#else
+#else /* if defined(YAF_ENABLE_DNSAUTH) && defined(YAF_ENABLE_DNSNXDOMAIN) */
     if (header.qr && !(header.rcode)) {
         if (recordCount) {
             yfHookScanPayload(flow, payload, 0, NULL, recordCount, direction,
@@ -482,10 +477,10 @@ dnsplugin_LTX_ycDnsScanScan (
                               direction, DNS_PORT_NUMBER);
         }
     }
-#endif
-#endif
+#endif /* if defined(YAF_ENABLE_DNSAUTH) && defined(YAF_ENABLE_DNSNXDOMAIN) */
+#endif /* if YAF_ENABLE_HOOKS */
 
-#endif
+#endif /* ifdef PAYLOAD_INSPECTION */
 
     /* this is the DNS port code */
     /* fprintf(stderr, " <dns exit 11 match> ");*/
@@ -506,20 +501,21 @@ dnsplugin_LTX_ycDnsScanScan (
  *
  *
  */
-/*static
-  void
-ycDnsScanRebuildHeader (
-    uint8_t * payload,
-    ycDnsScanMessageHeader_t * header)
+#if 0
+static void
+ycDnsScanRebuildHeader(
+    uint8_t                   *payload,
+    ycDnsScanMessageHeader_t  *header)
 {
-    uint16_t           *tempArray = (uint16_t *) header;
-    uint16_t            bitmasks = ntohs (*((uint16_t *) (payload + 2)));
-    unsigned int        loop;
+    uint16_t    *tempArray = (uint16_t *)header;
+    uint16_t     bitmasks  = ntohs(*((uint16_t *)(payload + 2)));
+    unsigned int loop;
 
-    memcpy (tempArray, payload, sizeof (ycDnsScanMessageHeader_t));
-    for (loop = 0; loop < sizeof (ycDnsScanMessageHeader_t) / sizeof (uint16_t);
-         loop++) {
-        *(tempArray + loop) = ntohs (*(tempArray + loop));
+    memcpy(tempArray, payload, sizeof(ycDnsScanMessageHeader_t));
+    for (loop = 0;
+         loop < sizeof(ycDnsScanMessageHeader_t) / sizeof(uint16_t);
+         loop++)
+    {
     }
 
     header->qr = bitmasks & 0x8000 ? 1 : 0;
@@ -529,7 +525,8 @@ ycDnsScanRebuildHeader (
     header->rd = bitmasks & 0x0100 ? 1 : 0;
     header->ra = bitmasks & 0x0080 ? 1 : 0;
     header->z = bitmasks & 0x0040 ? 1 : 0;
-    /* don't think we care about these
+#if 0
+    /* don't think we care about these */
     header->ad = bitmasks & 0x0020 ? 1 : 0;
     header->cd = bitmasks & 0x0010 ? 1 : 0;
     header->rcode = bitmasks & 0x000f;
@@ -542,22 +539,22 @@ ycDnsScanRebuildHeader (
     g_debug("header->ra %d", header->ra);
     g_debug("header->z %d", header->z);
     g_debug("header->rcode %d", header->rcode);
+#endif /* 0 */
 }
-*/
-
+#endif /* 0 */
 
 #ifdef PAYLOAD_INSPECTION
 static
 uint16_t
-ycDnsScanCheckResourceRecord (
-    uint8_t * payload,
-    unsigned int * offset,
-    unsigned int payloadSize)
+ycDnsScanCheckResourceRecord(
+    const uint8_t  *payload,
+    unsigned int   *offset,
+    unsigned int    payloadSize)
 {
-    uint16_t            nameSize;
-    uint16_t            rrType;
-    uint16_t            rrClass;
-    uint16_t            rdLength;
+    uint16_t nameSize;
+    uint16_t rrType;
+    uint16_t rrClass;
+    uint16_t rdLength;
     gboolean compress_flag = FALSE;
 
     if (*offset >= payloadSize) {
@@ -568,11 +565,10 @@ ycDnsScanCheckResourceRecord (
 
     while ((0 != nameSize) && (*offset < payloadSize)) {
         if (DNS_NAME_COMPRESSION == (nameSize & DNS_NAME_COMPRESSION)) {
-            *offset += sizeof (uint16_t);
+            *offset += sizeof(uint16_t);
             if (!compress_flag) {
                 compress_flag = TRUE;
             }
-
         } else {
             *offset += nameSize + 1;
         }
@@ -593,12 +589,12 @@ ycDnsScanCheckResourceRecord (
     /* check the type */
 #   if HAVE_ALIGNED_ACCESS_REQUIRED
     rrType = ((*(payload + (*offset))) << 8) |
-             ((*(payload + (*offset) + 1)) );
-    rrType = ntohs (rrType);
+        ((*(payload + (*offset) + 1)) );
+    rrType = ntohs(rrType);
 #   else
-    rrType = ntohs(*(uint16_t*)(payload + (*offset)));
-#   endif
-    *offset += sizeof (uint16_t);
+    rrType = ntohs(*(uint16_t *)(payload + (*offset)));
+#   endif /* if HAVE_ALIGNED_ACCESS_REQUIRED */
+    *offset += sizeof(uint16_t);
 
     if (rrType == 0) {
         return 0;
@@ -617,12 +613,12 @@ ycDnsScanCheckResourceRecord (
     /* check the class */
 #   if HAVE_ALIGNED_ACCESS_REQUIRED
     rrClass = ((*(payload + (*offset))) << 8) |
-              ((*(payload + (*offset) + 1)) );
-    rrClass = ntohs (rrClass);
+        ((*(payload + (*offset) + 1)) );
+    rrClass = ntohs(rrClass);
 #   else
-    rrClass = ntohs(*(uint16_t*)(payload + (*offset)));
-#   endif
-    *offset += sizeof (uint16_t);
+    rrClass = ntohs(*(uint16_t *)(payload + (*offset)));
+#   endif /* if HAVE_ALIGNED_ACCESS_REQUIRED */
+    *offset += sizeof(uint16_t);
     /* OPT Records use class field as UDP payload size */
     if (rrClass > 4 && rrType != 41) {
         /* rfc 2136 */
@@ -631,7 +627,7 @@ ycDnsScanCheckResourceRecord (
         }
     }
     /* skip past the time to live */
-    *offset += sizeof (uint32_t);
+    *offset += sizeof(uint32_t);
 
     if ((*offset + 2) > payloadSize) {
         return 0;
@@ -640,12 +636,12 @@ ycDnsScanCheckResourceRecord (
     /* get the record data length, (so we can skip ahead the right amount) */
 #   if HAVE_ALIGNED_ACCESS_REQUIRED
     rdLength = ((*(payload + (*offset))) << 8) |
-               ((*(payload + (*offset) + 1)) );
-    rdLength = ntohs (rdLength);
+        ((*(payload + (*offset) + 1)) );
+    rdLength = ntohs(rdLength);
 #   else
-    rdLength = ntohs(*(uint16_t*)(payload + (*offset)));
-#   endif
-    *offset += sizeof (uint16_t);
+    rdLength = ntohs(*(uint16_t *)(payload + (*offset)));
+#   endif /* if HAVE_ALIGNED_ACCESS_REQUIRED */
+    *offset += sizeof(uint16_t);
 
     /* not going to try to parse the data record, what's in there depends on
      * the class and type fields, but the rdlength field always tells us how
@@ -654,8 +650,9 @@ ycDnsScanCheckResourceRecord (
 
     if (*offset > payloadSize) {
         return 0;
-
     }/* the record seems intact enough */
     return rrType;
 }
-#endif
+
+
+#endif /* ifdef PAYLOAD_INSPECTION */

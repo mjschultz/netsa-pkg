@@ -3,7 +3,7 @@
  *
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -11,7 +11,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -61,12 +61,15 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 
 #define PAL1_STARTS 0x18
 #define PKT_SIZE 21
 #define PAL2_STARTS 0x0A
 #define PAL2_ENDS 0xC3E7
+
+YC_SCANNER_PROTOTYPE(palplugin_LTX_ycPalScanScan);
 
 /**
  * palplugin_LTX_ycPalScanScan
@@ -87,15 +90,14 @@
  *         otherwise 0
  */
 uint16_t
-palplugin_LTX_ycPalScanScan (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+palplugin_LTX_ycPalScanScan(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
-
     uint16_t ends;
 
     /* must be at least 21 bytes */
@@ -116,7 +118,6 @@ palplugin_LTX_ycPalScanScan (
     }
 
     if (val->payload[0] == PAL1_STARTS) {
-
         ends = ntohs(*(uint16_t *)(val->payload + 19));
 
         if (ends != 0) {
@@ -127,7 +128,7 @@ palplugin_LTX_ycPalScanScan (
             return 0;
         }
 
-        if (val->payload [12] != val->payload[13]) {
+        if (val->payload[12] != val->payload[13]) {
             return 0;
         }
 
@@ -136,9 +137,7 @@ palplugin_LTX_ycPalScanScan (
         }
 
         return 1;
-
     } else if (val->payload[0] == PAL2_STARTS) {
-
         ends = ntohs(*(uint16_t *)(val->payload + 19));
 
         if (ends != PAL2_ENDS) {
@@ -149,5 +148,4 @@ palplugin_LTX_ycPalScanScan (
     }
 
     return 0;
-
 }

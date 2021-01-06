@@ -54,11 +54,11 @@ The yafDPIRules.conf file should be in the same location as the yafApplabelRules
 
 =over 2
 
-label <N> element <N2> <element-rule>
+label E<lt>NE<gt> element E<lt>N2E<gt> E<lt>element-ruleE<gt>
 
 =back
 
-where <N> is the application label (usually the well-known port) found in the yafApplabelRules.conf file (an unsigned 16-bit decimal integer in the range 0 to 65535), <N2> is the Information Element ID found in the F</usr/local/yaf/CERT_IE.h> and below, and <element-rule> is a PCRE regular expression and will be stored and associated with the ID number preceding it.  There can be multiple lines for a single application label, however each should have a different <N2>.  There should be parentheses around the substring you want to capture and store.  If there is more than 1 set of parentheses in the regular expression, the most outer set is the substring captured.  (See PCRE documentation for details on regular expressions and substring matching.)
+where E<lt>NE<gt> is the application label (usually the well-known port) found in the yafApplabelRules.conf file (an unsigned 16-bit decimal integer in the range 0 to 65535), E<lt>N2E<gt> is the Information Element ID found in the F</usr/local/yaf/CERT_IE.h> and below, and E<lt>element-ruleE<gt> is a PCRE regular expression and will be stored and associated with the ID number preceding it.  There can be multiple lines for a single application label, however each should have a different E<lt>N2E<gt>.  There should be parentheses around the substring you want to capture and store.  If there is more than 1 set of parentheses in the regular expression, the most outer set is the substring captured.  (See PCRE documentation for details on regular expressions and substring matching.)
 
 =head2 User Defined Elements
 
@@ -66,11 +66,11 @@ To define your own information elements, use the following form:
 
 =over 2
 
-label <N> user <E> name <element-name> <element-rule>
+label E<lt>NE<gt> user E<lt>EE<gt> name E<lt>element-nameE<gt> E<lt>element-ruleE<gt>
 
 =back
 
-where <N> is the application label found in yafApplabelRules.conf file. <E> is the Information Element ID in the range of 0 to 65535 to be given to the element upon export.  This number should be unique to this file and should NOT be defined in F</usr/local/yaf/CERT_IE.h>.  This element will be added to the template upon processing of this file, and must be added to the B<yaf> collecting process in order to properly decode the IPFIX message.  <element-name> is the name you want to give to this IPFIX Information Element.  This name can consist of letters and numbers and underscores; it can not contain special characters or spaces.  <label-rule> is the PCRE regular expression and will be stored and associated with the Information Element ID and name preceding it.  There is a limit of 30 additional fields per protocol that YAF will store and execute.  To find out if B<yaf> accepted your elements, run B<yaf> with --verbose.  All user elements will be exported using the CERT Private Enterprise Number (PEN) 6871.  ONLY user labels for protocols FTP, HTTP, IMAP, SMTP, RTSP, SSH, and SIP will be added.  Elements will be added to the template in the order they are
+where E<lt>NE<gt> is the application label found in yafApplabelRules.conf file. E<lt>EE<gt> is the Information Element ID in the range of 0 to 65535 to be given to the element upon export.  This number should be unique to this file and should NOT be defined in F</usr/local/yaf/CERT_IE.h>.  This element will be added to the template upon processing of this file, and must be added to the B<yaf> collecting process in order to properly decode the IPFIX message.  E<lt>element-nameE<gt> is the name you want to give to this IPFIX Information Element.  This name can consist of letters and numbers and underscores; it can not contain special characters or spaces.  E<lt>label-ruleE<gt> is the PCRE regular expression and will be stored and associated with the Information Element ID and name preceding it.  There is a limit of 30 additional fields per protocol that YAF will store and execute.  To find out if B<yaf> accepted your elements, run B<yaf> with --verbose.  All user elements will be exported using the CERT Private Enterprise Number (PEN) 6871.  ONLY user labels for protocols FTP, HTTP, IMAP, SMTP, RTSP, SSH, and SIP will be added.  Elements will be added to the template in the order they are
 listed in the yafDPIRules.conf file in the form of an fbBasicList_t.  By default,
 HTTP exports 20 basicLists, FTP exports 5 basicLists, IMAP exports 7 basicLists,
 RTSP exports 12 basicLists, SIP exports 7 basicLists, SMTP exports 11 basicLists,
@@ -85,15 +85,15 @@ A limit statement begins with the keyword 'limit', and has the following form:
 
 =over 2
 
-limit [field|total] <limit-value>
+limit [field|total] E<lt>limit-valueE<gt>
 
 =back
 
-If the "field" label is present, the <limit-value> will be the number of bytes B<yaf> will export for
+If the "field" label is present, the E<lt>limit-valueE<gt> will be the number of bytes B<yaf> will export for
 any given field in this file.  This does not affect the DNS Deep Packet Inspection or SSL Certificate Capture.
 FOr DNS, a domain name can have a maximum of 255 characters, so the limit is not configurable.
 
-If the "total" field is present, the <limit-value> will be the total number of bytes B<yaf> may export
+If the "total" field is present, the E<lt>limit-valueE<gt> will be the total number of bytes B<yaf> may export
 from the DPI plugin. Obviously, this number will not be larger than the --max-payload value B<yaf> is given
 at run time.
 
@@ -173,7 +173,7 @@ only recognized if B<--plugin-name> is set to the DPI plugin, application labeli
 =head2  DPI Templates & Information Elements by Protocol
 
 B<yaf>'s output consists of an IPFIX message stream.  B<yaf> uses a variety of templates for IPFIX data records; As of B<yaf> 2.0, B<yaf> uses a subTemplateMultiList to export optional information elements, such as Deep Packet Inspection fields, relating to the flow.  Below are templates that may appear in this subTemplateMultiList depending on the application label of the flow.
-For more information on B<yaf> information elements see B<yaf(1)>.  For more information on IPFIX Structured lists, see the Internet Draft, Export of Structured Data in IPFIX, <RFC 6313>.  Most of the elements are exported as a basicList. An IPFIX basicList represents a list of zero or more instances of any Information Element (IE 291).
+For more information on B<yaf> information elements see B<yaf(1)>.  For more information on IPFIX Structured lists, see the Internet Draft, Export of Structured Data in IPFIX, E<lt>RFC 6313E<gt>.  Most of the elements are exported as a basicList. An IPFIX basicList represents a list of zero or more instances of any Information Element (IE 291).
 
 =head2 FTP
 
@@ -549,59 +549,96 @@ SIP User Agent Header Field.  Contains information about the User Agent Client o
 
 =head2 SMTP
 
-Simple Mail Transfer Protocol (SMTP) Deep Packet Inspection is based on RFC 2821.
-The following information elements are exported as a template
-in the subTemplateMultiList as basicLists of variable length
-elements in the order they are listed in the yafDPIRules.conf file.  B<yaf>
-will always export at least 11 information elements in the SMTP template
-and data record.  By default, the following information elements are exported
-in order:
+Simple Mail Transfer Protocol (SMTP) Deep Packet Inspection is based on RFC
+2821.  B<Note:>  The templates used for SMTP DPI changed in YAF 2.12.0.
+
+An SMTP conversation is exported as a nested set of templates in
+subTemplateMultiList.  The outer template (yaf_smtp) includes the following
+elements.
 
 =over 2
 
-=item B<smtpHello> CERT (PEN 6871) IE 162, variable length, DPI basicList
+=item B<smtpHello> CERT (PEN 6871) IE 162, variable length, string
 
-SMTP Hello or Extend Hello command.  Captures the command and the domain name of the SMTP client.
+SMTP Hello or Extend Hello command.  Captures the command and the domain name
+of the SMTP client.
 
-=item B<smtpFrom> CERT (PEN 6871) IE 163, variable length, DPI basicList
-
-SMTP Mail Command.  Contains the reverse-path of the sender mailbox.
-
-=item B<smtpTo> CERT (PEN 6871) IE 164, variable length, DPI basicList
-
-The SMTP Recipient (RCPT) Command.  Captures the command and the forward-path of the recipient of the mail data.
-
-=item B<smtpContentType> CERT (PEN 6871) IE 165, variable length, DPI basicList
-
-SMTP Content Type Header Field.
-
-=item B<smtpSubject> CERT (PEN 6871) IE 166, variable length, DPI basicList
-
-SMTP Subject.  Contains the subject of the mail data.
-
-=item B<smtpFilename> CERT (PEN 6871) IE 167, variable length, DPI basicList
-
-SMTP Filename.  Contains the name of the file attached to the mail message.
-
-=item B<smtpContentDisposition> CERT (PEN 6871) IE 168, variable length, DPI basicList
-
-SMTP Content-Disposition Header field.
-
-=item B<smtpResponse> CERT (PEN 6871) IE 169, variable length, DPI basicList
-
-SMTP Replies.  Consists of a three digit number followed by text.
-
-=item B<smtpEnhanced> CERT (PEN 6871) IE 170, variable length, DPI basicList
+=item B<smtpEnhanced> CERT (PEN 6871) IE 170, variable length, string
 
 Enhanced SMTP.  Contains the ESMTP command with the following argument.
 
-=item B<smtpSize> CERT (PEN 6871) IE 222, variable length, DPI basicList
+=item B<smtpMessageSize>, CERT (PEN 6871) IE 330, 4, unsigned
 
-SMTP Size Header Field.  Contains the size in bytes of the mail data.
+SMTP Message Size
 
-=item B<smtpDate> CERT (PEN 6871) IE 251, variable length, DPI basicList
+=item B<smtpStartTLS>, CERT (PEN 6871) IE 326, 1, unsigned
 
-SMTP Date Field. Added in version 2.3.
+START TLS. Element indicating whether or not the SMTP session sent the START
+TLS command.
+
+=item B<smtpResponseList>, CERT (PEN 6871) IE 331, variable length, basicList
+
+A basicList of SMTP Replies, represented by smtpResponse (IE CERT/169, variable
+length, string) elements.  Each smtpResponse contains of a three digit number
+followed by text.
+
+=item B<smtpMessageList> CERT (PEN 6871) IE 336, variable length, subTemplateList
+
+A subTemplateList containing zero (but usually at least one) or more records
+described by the yaf_smtp_message template.  Each record represents a single
+email message sent during the SMTP conversation.  That template contains the
+following elements:
+
+=over 2
+
+=item B<smtpSubject> CERT (PEN 6871) IE 166, variable length, string
+
+The subject of the message.
+
+=item B<smtpToList> CERT (PEN 6871) IE 332, variable length, DPI basicList
+
+The SMTP Recipient (RCPT) Command.  A basicList containing smtpTo (IE CERT/164,
+variable length, string) elements.  Each smtpTo captures the command and the
+forward-path of the recipient of the mail data.
+
+=item B<smtpFromList> CERT (PEN 6871) IE 333, variable length, DPI basicList
+
+SMTP Mail Command.  A basicList containing smtpFrom (IE CERT/163, variable
+length, string) elements.  Each stmpFrom contains the reverse-path of the
+sender mailbox.
+
+=item B<smtpFilenameList> CERT (PEN 6871) IE 334, variable length, DPI basicList
+
+SMTP Filename.  A basicList containing smtpFilename (IE CERT/167, variable
+length, string) elements.  Each smtpFilename contains the name of a file
+attached to the mail message, if any.
+
+=item B<smtpURLList> CERT (PEN 6871) IE 335, variable length, DPI basicList
+
+SMTP URL.  A basicList containing smtpURL (IE CERT/329, variable
+length, string) elements.  Each smtpURL contains a URL captured in the SMTP
+message body, if any.
+
+=item B<smtpHeaderList> CERT (PEN 6871) IE 337, variable length, DPI subTemplateList
+
+A subTemplateList containing zero or more records described by the
+yaf_smtp_header template.  Each record represents a single header (SMTP field
+name and body) in the email DATA.  That template contains the following
+elements:
+
+=over 2
+
+=item B<smtpKey> CERT (PEN 6871), IE 327, variable length, string
+
+SMTP Header key string.  The name of the header (for example, "To", "From").
+
+=item B<smtpValue> CERT (PEN 6871), IE 328, variable length, string
+
+SMTP Header value string.  The value of that header.
+
+=back
+
+=back
 
 =back
 
@@ -1378,7 +1415,7 @@ reverse direction.
 
 =head1 AUTHORS
 
-Emily Sarneso <ecoff@cert.org> and the CERT Network Situational Awareness Group Engineering Team, http://www.cert.org/netsa
+Emily Sarneso E<lt>ecoff@cert.orgE<gt> and the CERT Network Situational Awareness Group Engineering Team, http://www.cert.org/netsa
 
 =head1 SEE ALSO
 

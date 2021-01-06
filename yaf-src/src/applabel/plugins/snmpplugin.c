@@ -8,7 +8,7 @@
  * See RFCs 1901, 1905, 1906 for SNMPv2c
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Ecoff <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -16,7 +16,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -66,9 +66,12 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 
 #define SNMP_PORT_NUMBER  161
+
+YC_SCANNER_PROTOTYPE(snmpplugin_LTX_ycSnmpScanScan);
 
 /* snmp data types */
 #define SNMP_INT 0x02
@@ -85,7 +88,9 @@
 
 /* Local Prototypes */
 
-uint8_t snmpGetType(uint8_t identifier);
+static uint8_t
+snmpGetType(
+    uint8_t   identifier);
 
 /**
  * snmpplugin_LTX_ycSnmpScanScan
@@ -105,20 +110,19 @@ uint8_t snmpGetType(uint8_t identifier);
  *         otherwise 0
  */
 uint16_t
-snmpplugin_LTX_ycSnmpScanScan (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+snmpplugin_LTX_ycSnmpScanScan(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
-
     uint16_t offsetptr = 0;
-    uint8_t pdu_type = 0;
-    uint8_t pdu_length = 0;
-    uint8_t version = 0;
-    uint8_t msg_len = 0;
+    uint8_t  pdu_type = 0;
+    uint8_t  pdu_length = 0;
+    uint8_t  version = 0;
+    uint8_t  msg_len = 0;
 
     if (payloadSize < 5) {
         return 0;
@@ -218,7 +222,7 @@ snmpplugin_LTX_ycSnmpScanScan (
             return 0;
         }
 
-        if ((offsetptr + 8) > payloadSize) {
+        if (((size_t)offsetptr + 8) > payloadSize) {
             return 0;
         }
 
@@ -264,12 +268,11 @@ snmpplugin_LTX_ycSnmpScanScan (
         /* close enough */
 
         return SNMP_PORT_NUMBER;
-
     } else if (version == 3) {
         /* version 3 fun - not there yet */
         uint8_t msg_flags = 0;
 
-        if (offsetptr + 5 > payloadSize) {
+        if ((size_t)offsetptr + 5 > payloadSize) {
             return 0;
         }
 
@@ -299,7 +302,7 @@ snmpplugin_LTX_ycSnmpScanScan (
             return 0;
         }
 
-        if (offsetptr + 4 > payloadSize) {
+        if ((size_t)offsetptr + 4 > payloadSize) {
             return 0;
         }
         if (*(payload + offsetptr) != SNMP_INT) {
@@ -315,7 +318,7 @@ snmpplugin_LTX_ycSnmpScanScan (
         }
         offsetptr += 1 + msg_len;
 
-        if (offsetptr + 3 > payloadSize) {
+        if ((size_t)offsetptr + 3 > payloadSize) {
             return 0;
         }
         /* 1 for type - 1 for length */
@@ -342,12 +345,12 @@ snmpplugin_LTX_ycSnmpScanScan (
             offsetptr += msg_len;
         }
 
-        if (offsetptr + 3 > payloadSize) {
+        if ((size_t)offsetptr + 3 > payloadSize) {
             return 0;
         }
 
         /* message security model */
-        if (*(offsetptr + payload) == SNMP_INT){
+        if (*(offsetptr + payload) == SNMP_INT) {
             offsetptr++;
 
             msg_len = *(payload + offsetptr);
@@ -357,7 +360,7 @@ snmpplugin_LTX_ycSnmpScanScan (
             return 0;
         }
 
-        if (offsetptr + 3 > payloadSize) {
+        if ((size_t)offsetptr + 3 > payloadSize) {
             return 0;
         }
 
@@ -377,28 +380,29 @@ snmpplugin_LTX_ycSnmpScanScan (
     }
 }
 
-uint8_t snmpGetType(
-    uint8_t identifier)
-{
 
+static uint8_t
+snmpGetType(
+    uint8_t   identifier)
+{
     switch (identifier) {
-    case SNMP_INT:
+      case SNMP_INT:
         return SNMP_INT;
-    case SNMP_OCT:
+      case SNMP_OCT:
         return SNMP_OCT;
-    case SNMP_NULL:
+      case SNMP_NULL:
         return SNMP_NULL;
-    case SNMP_OBID:
+      case SNMP_OBID:
         return SNMP_OBID;
-    case SNMP_SEQ:
+      case SNMP_SEQ:
         return SNMP_SEQ;
-    case SNMP_GETREQ:
+      case SNMP_GETREQ:
         return SNMP_GETREQ;
-    case SNMP_GETRES:
+      case SNMP_GETRES:
         return SNMP_GETRES;
-    case SNMP_SETREQ:
+      case SNMP_SETREQ:
         return SNMP_GETREQ;
-    default:
+      default:
         return 0;
     }
 }

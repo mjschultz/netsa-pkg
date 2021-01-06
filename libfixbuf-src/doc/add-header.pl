@@ -6,7 +6,7 @@
 ## @OPENSOURCE_LICENSE_START@
 ## libfixbuf 2.0
 ##
-## Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
+## Copyright 2018-2020 Carnegie Mellon University. All Rights Reserved.
 ##
 ## NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
 ## ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -110,7 +110,14 @@ sub add_footer
 {
     return <<EOF;
     </div><!-- l-content -->
-    <div id="l-footer">&copy; 2006-2019 Carnegie Mellon University</div>
+    <div id="l-footer">
+      &copy; 2006-2020 Carnegie Mellon University
+      <span id="l-contact">
+        <a href="https://www.sei.cmu.edu/legal/index.cfm">Legal</a> |
+        <a href="https://www.sei.cmu.edu/legal/privacy-notice/index.cfm">Privacy Notice</a> |
+        <img alt="email address" src="/site/contact_email.png" />
+      </span>
+    </div>
   </div><!-- p-body -->
 </body>
 EOF

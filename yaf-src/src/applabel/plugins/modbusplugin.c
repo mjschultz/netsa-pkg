@@ -6,7 +6,7 @@
  * http://www.modbus.org/docs/Modbus_Application_Protocol_V1_1b3.pdf
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2014-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2014-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -14,7 +14,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -64,6 +64,7 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 #if YAF_ENABLE_HOOKS
 #include <yaf/yafhooks.h>
@@ -73,20 +74,22 @@
 #define MODBUS_OBJECT 285
 #define MODBUS_EXCEPTION 0x80
 
+YC_SCANNER_PROTOTYPE(modbusplugin_LTX_ycModbusScanScan);
+
 typedef struct ycMBAPMessageHeader_st {
-    uint16_t            trans_id;
-    uint16_t            protocol;
-    uint16_t            length;
-    uint8_t             unit_id;
+    uint16_t   trans_id;
+    uint16_t   protocol;
+    uint16_t   length;
+    uint8_t    unit_id;
 } ycMBAPMessageHeader_t;
 
 
 /* Local Prototypes */
 static
 void
-ycMBAPScanRebuildHeader (
-    uint8_t * payload,
-    ycMBAPMessageHeader_t * header);
+ycMBAPScanRebuildHeader(
+    const uint8_t          *payload,
+    ycMBAPMessageHeader_t  *header);
 
 /**
  * modbusplugin_LTX_ycModbusScanScan
@@ -105,22 +108,21 @@ ycMBAPScanRebuildHeader (
  * @return dnp_port_number
  *         otherwise 0
  */
-
 uint16_t
 modbusplugin_LTX_ycModbusScanScan(
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
-    uint16_t offset = 0, total_offset = 0;
-    uint64_t num_packets = val->pkt;
-    uint8_t function, exception;
-    int packets = 0;
-    int i = 0;
-    size_t pkt_length = 0;
+    uint16_t     offset = 0, total_offset = 0;
+    uint64_t     num_packets = val->pkt;
+    uint8_t      function, exception;
+    unsigned int packets = 0;
+    unsigned int i;
+    size_t       pkt_length = 0;
     ycMBAPMessageHeader_t header;
 
     /* must be TCP */
@@ -129,7 +131,7 @@ modbusplugin_LTX_ycModbusScanScan(
     }
 
     /* must have MBAP Header and function and data */
-    if ( payloadSize < 9 ) {
+    if (payloadSize < 9) {
         return 0;
     }
 
@@ -137,7 +139,7 @@ modbusplugin_LTX_ycModbusScanScan(
         num_packets = YAF_MAX_PKT_BOUNDARY;
     }
 
-    while (i < num_packets) {
+    for (i = 0; i < num_packets; ++i) {
         if (val->paybounds[i]) {
             pkt_length = val->paybounds[i];
             if (pkt_length > payloadSize) {
@@ -145,7 +147,6 @@ modbusplugin_LTX_ycModbusScanScan(
             }
             break;
         }
-        i++;
     }
 
     if (pkt_length > 260) {
@@ -154,7 +155,6 @@ modbusplugin_LTX_ycModbusScanScan(
     }
 
     while (offset < payloadSize) {
-
         exception = 0;
 #ifndef YAF_ENABLE_HOOKS
         if (packets > 0) {
@@ -163,7 +163,7 @@ modbusplugin_LTX_ycModbusScanScan(
 #endif
         offset = total_offset;
 
-        if ((offset + 9) > payloadSize) {
+        if (((size_t)offset + 9) > payloadSize) {
             goto end;
         }
 
@@ -177,7 +177,7 @@ modbusplugin_LTX_ycModbusScanScan(
 
         if (!packets) {
             if ((header.trans_id & 0xFF80) == 0x3080) {
-                uint8_t len_octets = header.trans_id & 0x7F;
+                unsigned int len_octets = header.trans_id & 0x7F;
                 /* this might be LDAP (ASN.1 SEQUENCE) long form */
                 if ((len_octets + 2) < payloadSize) {
                     if (*(payload + len_octets + 2) == 0x02) {
@@ -200,12 +200,11 @@ modbusplugin_LTX_ycModbusScanScan(
             goto end;
         }
 
-
-        if ((offset + header.length - 1) > payloadSize) {
+        if (((size_t)offset + header.length - 1) > payloadSize) {
             goto end;
         }
 
-        if (!packets && ((header.length + 6) != pkt_length)) {
+        if (!packets && (((size_t)header.length + 6) != pkt_length)) {
             /* 6 byte header + length */
             return 0;
         }
@@ -222,13 +221,12 @@ modbusplugin_LTX_ycModbusScanScan(
         }
 
 #if YAF_ENABLE_HOOKS
-        yfHookScanPayload(flow, payload, (offset+header.length-1), NULL,
+        yfHookScanPayload(flow, payload, (offset + header.length - 1), NULL,
                           offset, MODBUS_OBJECT, MODBUS_PORT_NUMBER);
 #endif
         /* length plus transaction id, protocol id, and length field */
         total_offset += header.length + 6;
         packets++;
-
     }
 
   end:
@@ -238,7 +236,6 @@ modbusplugin_LTX_ycModbusScanScan(
     }
 
     return 0;
-
 }
 
 
@@ -257,11 +254,11 @@ modbusplugin_LTX_ycModbusScanScan(
  */
 static
 void
-ycMBAPScanRebuildHeader (
-    uint8_t               * payload,
-    ycMBAPMessageHeader_t * header)
+ycMBAPScanRebuildHeader(
+    const uint8_t          *payload,
+    ycMBAPMessageHeader_t  *header)
 {
-    uint16_t              offset = 0;
+    uint16_t offset = 0;
 
     header->trans_id = ntohs(*((uint16_t *)(payload)));
     offset += 2;
@@ -272,7 +269,7 @@ ycMBAPScanRebuildHeader (
     header->unit_id = *(payload + offset);
 
     /*    g_debug("header->trans_id %d", header->trans_id);
-    g_debug("header->proto_id %d", header->protocol);
-    g_debug("header->length %d", header->length);
-    g_debug("header->unit_id %d", header->unit_id);*/
+     * g_debug("header->proto_id %d", header->protocol);
+     * g_debug("header->length %d", header->length);
+     * g_debug("header->unit_id %d", header->unit_id);*/
 }

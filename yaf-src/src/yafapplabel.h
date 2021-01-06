@@ -5,12 +5,8 @@
  *
  * This defines the interface to the YAF application labeler.
  *
- * @author $Author$
- * @date $Date$
- * @version $Revision$
- *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2016 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Chris Inacio <inacio@cert.org>
  ** ------------------------------------------------------------------------
@@ -18,7 +14,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -88,10 +84,10 @@
  *
  * @return TRUE on success, FALSE otherwise
  */
-
-gboolean yfAppLabelInit(
-    const char      *ruleFileName,
-    GError          **err);
+gboolean
+yfAppLabelInit(
+    const char  *ruleFileName,
+    GError     **err);
 
 /**
  * Labels a flow's protocol according to its payload. Sets the appLabel
@@ -100,10 +96,10 @@ gboolean yfAppLabelInit(
  * @param flow A YAF flow.
  *
  */
-
-void yfAppLabelFlow(
-    yfFlow_t        *flow);
+void
+yfAppLabelFlow(
+    yfFlow_t  *flow);
 
 #endif /* YAF_ENABLE_APPLABEL */
 
-#endif
+#endif /* ifndef YAF_APP_LABEL_H_ */

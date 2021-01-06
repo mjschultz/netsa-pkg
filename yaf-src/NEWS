@@ -1,3 +1,10 @@
+Version 2.12.1: 2020-12-22
+==========================
+
+Changed the templates and IEs used for SMTP DPI.  The new templates use different IDs than those used by previous releases of YAF.  super_mediator-1.8.0 or later is required to read this format.  Currently there is no version of Analysis Pipeline that reads the SMTP DPI.
+
+First public release of YAF 2.12.x.
+
 Version 2.11.2: 2020-11-20
 ==========================
 

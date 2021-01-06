@@ -7,7 +7,7 @@
  * 65b4a3780db3b3f3c2256e68003dffe6/$file/rec523_dnpprotmanend.pdf
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2015-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -15,7 +15,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -108,28 +108,29 @@
 #define DNP_OBJECT          284
 #define DNP_PLACEHOLDER     15
 
+YC_SCANNER_PROTOTYPE(dnp3plugin_LTX_ycDnpScanScan);
+
 typedef struct ycDNPMessageHeader_st {
     /* Data Link Layer */
-    uint16_t      start_bytes; /*0x0564*/
-    uint8_t       length;
+    uint16_t   start_bytes;    /*0x0564*/
+    uint8_t    length;
     /* control */
-    uint8_t       dir:1;
-    uint8_t       prm:1;
-    uint8_t       fcb:1;
-    uint8_t       fcv:1;
-    uint8_t       control:4;
-    uint16_t      destination;
-    uint16_t      source;
-    uint16_t      crc;
+    uint8_t    dir     : 1;
+    uint8_t    prm     : 1;
+    uint8_t    fcb     : 1;
+    uint8_t    fcv     : 1;
+    uint8_t    control : 4;
+    uint16_t   destination;
+    uint16_t   source;
+    uint16_t   crc;
 
     /* Transport Layer */
-    uint8_t       transport;
+    uint8_t    transport;
     /* Application Layer */
-    uint8_t       app_control;
-    uint8_t       app_function;
+    uint8_t    app_control;
+    uint8_t    app_function;
     /* responses only */
-    uint16_t      indications;
-
+    uint16_t   indications;
 } ycDNPMessageHeader_t;
 
 
@@ -137,9 +138,9 @@ typedef struct ycDNPMessageHeader_st {
 /* Local Prototypes */
 static
 void
-ycDNPScanRebuildHeader (
-    uint8_t * payload,
-    ycDNPMessageHeader_t * header);
+ycDNPScanRebuildHeader(
+    const uint8_t         *payload,
+    ycDNPMessageHeader_t  *header);
 
 
 /**
@@ -159,44 +160,41 @@ ycDNPScanRebuildHeader (
  * @return dnp_port_number
  *         otherwise 0
  */
-
 uint16_t
 dnp3plugin_LTX_ycDnpScanScan(
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
-
     ycDNPMessageHeader_t header;
-    int                  direction;
+    /* int                  direction; */
     uint16_t             offset = 0, function_offset = 0;
     uint16_t             total_offset = 0;
     uint8_t              function = 0;
-    uint8_t              group, variation, prefix, qual_code;
-    int                  app_header_len = 0, packets = 0;
-    int                  packet_len, packet_rem;
+    /* uint8_t              group, variation, prefix, qual_code; */
+    int     app_header_len = 0, packets = 0;
+    int     packet_len, packet_rem;
     /*    uint32_t            quantity = 0;*/
 #if YAF_ENABLE_HOOKS
     uint8_t crc_buf[payloadSize];
-    size_t crc_buf_len;
+    size_t  crc_buf_len;
 #endif
 
     /* direction is determined by TCP session */
     /* There is a direction and primary bit in the Control flags but
-       it does not determine request vs response */
+     * it does not determine request vs response */
     if (val == &(flow->val)) {
-        direction = DNP_CLIENT;
+        /* direction = DNP_CLIENT; */
         app_header_len = 2;
     } else {
-        direction = DNP_SERVER;
+        /* direction = DNP_SERVER; */
         app_header_len = 4;
     }
 
     while (offset < payloadSize) {
-
         /* only go around once for just applabeling */
 #ifndef YAF_ENABLE_HOOKS
         if (packets > 0) {
@@ -207,7 +205,7 @@ dnp3plugin_LTX_ycDnpScanScan(
         offset = total_offset;
 
         /*must have start(2),length(1), control(1), dest(2), src(2), crc(2)*/
-        if ((offset + 10) > payloadSize) {
+        if (((size_t)offset + 10) > payloadSize) {
             goto end;
         }
 
@@ -227,22 +225,23 @@ dnp3plugin_LTX_ycDnpScanScan(
         } else {
             if (header.control > 1) {
                 if ((header.control != 11) &&
-                    (header.control != 14) && (header.control != 15)) {
+                    (header.control != 14) && (header.control != 15))
+                {
                     goto end;
                 }
             }
         }
 
         /* min length is 5 which indicates there is only a header
-           which includes control, dest, and src. CRC fields are
-           not included in the count */
+         * which includes control, dest, and src. CRC fields are
+         * not included in the count */
         if (header.length < 5) {
             goto end;
         }
 
         /* Length only counts non-CRC octets. Each CRC is 2 octets.
-           There is one after the header and then one for each 16 octets
-           of user data, plus a CRC for the extra */
+         * There is one after the header and then one for each 16 octets
+         * of user data, plus a CRC for the extra */
         packet_len = header.length + 4;
 
         /* get past the header */
@@ -256,9 +255,9 @@ dnp3plugin_LTX_ycDnpScanScan(
         }
 
         /* have room for transport and application layer headers?
-           if it's the first packet we should and if for some reason we don't,
-           it's not DNP */
-        if ( (total_offset + offset + packet_rem) > payloadSize) {
+         * if it's the first packet we should and if for some reason we don't,
+         * it's not DNP */
+        if ( ((size_t)total_offset + offset + packet_rem) > payloadSize) {
             goto end;
         }
 
@@ -293,8 +292,8 @@ dnp3plugin_LTX_ycDnpScanScan(
         packet_rem -= app_header_len;
 
         /* now we're at Data Link Layer which contains objects.
-           object is a 2 octet field that identifies the
-           class and variation of object */
+         * object is a 2 octet field that identifies the
+         * class and variation of object */
 
         if (packet_rem <= 0) {
             packets++;
@@ -303,128 +302,128 @@ dnp3plugin_LTX_ycDnpScanScan(
             continue;
         }
 
-        group = *(payload + offset);
-        variation = *(payload + offset + 1);
+        /* group = *(payload + offset); */
+        /* variation = *(payload + offset + 1); */
 
         offset += 2;
 
         /* The Qualifier field specifies the Range field */
-        prefix = DNP3_OBJ_QUAL_INDEX(*(payload + offset));
-        qual_code = DNP3_OBJ_QUAL_CODE(*(payload + offset));
+        /* prefix = DNP3_OBJ_QUAL_INDEX(*(payload + offset)); */
+        /* qual_code = DNP3_OBJ_QUAL_CODE(*(payload + offset)); */
 
         offset++;
 
         /* For a Request, The Index (prefix) bit are only valid when Qualifier
-           Code (qual_code) is 11.  These bits indicate the size, in
-           octets, of each entry in the Range Field. */
+         * Code (qual_code) is 11.  These bits indicate the size, in
+         * octets, of each entry in the Range Field. */
 
         /*
-        if (direction == DNP_CLIENT && qual_code == 11) {
-
-            switch (prefix) {
-              case DNP3_NO_INDEX:
-                index = 0;
-                return 0;
-              case DNP3_1OCT_INDEX:
-                index = 1;
-                offset++;
-                break;
-              case DNP3_2OCT_INDEX:
-                index = 2;
-                offset+=2;
-                break;
-              case DNP3_4OCT_INDEX:
-                index = 4;
-                offset+=4;
-                break;
-              default:
-                return 0;
-            }
-
-        } else {
-            switch (prefix) {
-              case DNP3_NO_INDEX:
-                index = 0;
-                break;
-              case DNP3_1OCT_INDEX:
-              case DNP3_1SZ_INDEX:
-                index = 1;
-                offset++;
-                break;
-              case DNP3_2OCT_INDEX:
-              case DNP3_2SZ_INDEX:
-                index = 2;
-                offset+=2;
-                break;
-              case DNP3_4OCT_INDEX:
-              case DNP3_4SZ_INDEX:
-                index = 4;
-                offset+=4;
-                break;
-              default:
-                return 0;
-            }
-        }
-            /* 0 - 5 describes points in sequence */
-            /* 7 - 9 describe unrelated points */
-            /* 11 describes points that need an object identifier */
+         * if (direction == DNP_CLIENT && qual_code == 11) {
+         *
+         *  switch (prefix) {
+         *    case DNP3_NO_INDEX:
+         *      index = 0;
+         *      return 0;
+         *    case DNP3_1OCT_INDEX:
+         *      index = 1;
+         *      offset++;
+         *      break;
+         *    case DNP3_2OCT_INDEX:
+         *      index = 2;
+         *      offset+=2;
+         *      break;
+         *    case DNP3_4OCT_INDEX:
+         *      index = 4;
+         *      offset+=4;
+         *      break;
+         *    default:
+         *      return 0;
+         *  }
+         *
+         * } else {
+         *  switch (prefix) {
+         *    case DNP3_NO_INDEX:
+         *      index = 0;
+         *      break;
+         *    case DNP3_1OCT_INDEX:
+         *    case DNP3_1SZ_INDEX:
+         *      index = 1;
+         *      offset++;
+         *      break;
+         *    case DNP3_2OCT_INDEX:
+         *    case DNP3_2SZ_INDEX:
+         *      index = 2;
+         *      offset+=2;
+         *      break;
+         *    case DNP3_4OCT_INDEX:
+         *    case DNP3_4SZ_INDEX:
+         *      index = 4;
+         *      offset+=4;
+         *      break;
+         *    default:
+         *      return 0;
+         *  }
+         * }
+         *  /* 0 - 5 describes points in sequence */
+        /* 7 - 9 describe unrelated points */
+        /* 11 describes points that need an object identifier */
         /*
-        switch(qual_code) {
-          case DNP3_8BIT_IND:
-          case DNP3_8BIT_ADDRESS:
-            offset+=2;
-            break;
-          case DNP3_16BIT_ADDRESS:
-          case DNP3_16BIT_IND:
-            offset+=4;
-            break;
-          case DNP3_32BIT_IND:
-          case DNP3_32BIT_ADDRESS:
-            offset += 8;
-            break;
-          case DNP3_NO_RANGE:
-            break;
-          case DNP3_8BIT_FIELD:
-            {
-                quantity = *(payload + offset);
-                offset += 1 + (index * quantity);
-                break;
-            }
-          case DNP3_16BIT_FIELD:
-            {
-                quantity = ntohs(*((uint16_t *)(payload + offset)));
-                offset += 2 + (index * quantity);
-                break;
-            }
-          case DNP3_32BIT_FIELD:
-            {
-                quantity = ntohl(*((uint32_t *)(payload + offset)));
-                offset += 4 + (index * quantity);
-                break;
-            }
-          case DNP3_VARIABLE:
-            {
-                if (index == 1) {
-                    uint8_t size = *(payload + offset + 1);
-                    quantity = *(payload + offset);
-                    offset += 2 + (quantity * size);
-                } else if (index == 2) {
-                    uint16_t size=ntohs(*((uint16_t *)(payload + offset + 2)));
-                    quantity = ntohs(*((uint16_t *)(payload + offset)));
-                    offset += 4 + (quantity * size);
-                } else {
-                    uint32_t size=ntohl(*((uint32_t *)(payload + offset + 4)));
-                    quantity = ntohl(*((uint32_t *)(payload + offset)));
-                    offset += 8 + (quantity * size);
-                }
-                break;
-            }
-          default:
-            return 0;
-        }
-        */
+         * switch(qual_code) {
+         * case DNP3_8BIT_IND:
+         * case DNP3_8BIT_ADDRESS:
+         *  offset+=2;
+         *  break;
+         * case DNP3_16BIT_ADDRESS:
+         * case DNP3_16BIT_IND:
+         *  offset+=4;
+         *  break;
+         * case DNP3_32BIT_IND:
+         * case DNP3_32BIT_ADDRESS:
+         *  offset += 8;
+         *  break;
+         * case DNP3_NO_RANGE:
+         *  break;
+         * case DNP3_8BIT_FIELD:
+         *  {
+         *      quantity = *(payload + offset);
+         *      offset += 1 + (index * quantity);
+         *      break;
+         *  }
+         * case DNP3_16BIT_FIELD:
+         *  {
+         *      quantity = ntohs(*((uint16_t *)(payload + offset)));
+         *      offset += 2 + (index * quantity);
+         *      break;
+         *  }
+         * case DNP3_32BIT_FIELD:
+         *  {
+         *      quantity = ntohl(*((uint32_t *)(payload + offset)));
+         *      offset += 4 + (index * quantity);
+         *      break;
+         *  }
+         * case DNP3_VARIABLE:
+         *  {
+         *      if (index == 1) {
+         *          uint8_t size = *(payload + offset + 1);
+         *          quantity = *(payload + offset);
+         *          offset += 2 + (quantity * size);
+         *      } else if (index == 2) {
+         *          uint16_t size=ntohs(*((uint16_t *)(payload + offset + 2)));
+         *          quantity = ntohs(*((uint16_t *)(payload + offset)));
+         *          offset += 4 + (quantity * size);
+         *      } else {
+         *          uint32_t size=ntohl(*((uint32_t *)(payload + offset + 4)));
+         *          quantity = ntohl(*((uint32_t *)(payload + offset)));
+         *          offset += 8 + (quantity * size);
+         *      }
+         *      break;
+         *  }
+         * default:
+         *  return 0;
+         * }
+         */
         /* Figure out how much to account for CRCs and add it to the total
-           packet length */
+         * packet length */
         packet_len += ((packet_rem / 16) * 2) + 2;
 
 #if YAF_ENABLE_HOOKS
@@ -436,17 +435,17 @@ dnp3plugin_LTX_ycDnpScanScan(
                               DNP_SRC_ADDRESS, DNP_PORT_NUMBER);
             yfHookScanPayload(flow, payload, 1, NULL, function_offset,
                               DNP_FUNCTION, DNP_PORT_NUMBER);
-            yfHookScanPayload(flow, payload, (packet_len-10), NULL,
-                              (total_offset+10), DNP_PLACEHOLDER,
+            yfHookScanPayload(flow, payload, (packet_len - 10), NULL,
+                              (total_offset + 10), DNP_PLACEHOLDER,
                               DNP_PORT_NUMBER);
             crc_buf_len = payloadSize;
-            yfRemoveCRC((payload+total_offset+10), (packet_len - 10),
+            yfRemoveCRC((payload + total_offset + 10), (packet_len - 10),
                         crc_buf, &crc_buf_len, DNP_BLOCK_SIZE, 2);
             /* offset is 2, past transport & application control */
             yfHookScanPayload(flow, crc_buf, crc_buf_len, NULL,
                               2, DNP_OBJECT, DNP_PORT_NUMBER);
         }
-#endif
+#endif /* if YAF_ENABLE_HOOKS */
         total_offset += packet_len + 1;
         packets++;
     }
@@ -457,7 +456,6 @@ dnp3plugin_LTX_ycDnpScanScan(
     }
 
     return 0;
-
 }
 
 
@@ -476,11 +474,11 @@ dnp3plugin_LTX_ycDnpScanScan(
  */
 static
 void
-ycDNPScanRebuildHeader (
-    uint8_t * payload,
-    ycDNPMessageHeader_t * header)
+ycDNPScanRebuildHeader(
+    const uint8_t         *payload,
+    ycDNPMessageHeader_t  *header)
 {
-    uint8_t            bitmasks = *(payload + 3);
+    uint8_t bitmasks = *(payload + 3);
 
     header->start_bytes = ntohs(*((uint16_t *)(payload)));
     header->length = *(payload + 2);
@@ -495,12 +493,12 @@ ycDNPScanRebuildHeader (
     header->source = *((uint16_t *)(payload + 6));
 
     /*    g_debug("header->start_bytes %d", header->start_bytes);
-    g_debug("header->length %d", header->length);
-    g_debug("header->dir %d", header->dir);
-    g_debug("header->prm %d", header->prm);
-    g_debug("header->fcb %d", header->fcb);
-    g_debug("header->fcv %d", header->fcv);
-    g_debug("header->control %d", header->control);
-    g_debug("header->destination %d", header->destination);
-    g_debug("header->source %d", header->source);*/
+     * g_debug("header->length %d", header->length);
+     * g_debug("header->dir %d", header->dir);
+     * g_debug("header->prm %d", header->prm);
+     * g_debug("header->fcb %d", header->fcb);
+     * g_debug("header->fcv %d", header->fcv);
+     * g_debug("header->control %d", header->control);
+     * g_debug("header->destination %d", header->destination);
+     * g_debug("header->source %d", header->source);*/
 }

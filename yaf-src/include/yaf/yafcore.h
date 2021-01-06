@@ -11,7 +11,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -183,8 +183,8 @@
 #define YAF_IP_UDP              17
 
 /** This is the size of the packet to store away for use primarily in
-passive OS fingerprinting, this value is only used if application
-labeling is enabled */
+ * passive OS fingerprinting, this value is only used if application
+ * labeling is enabled */
 #define YFP_IPTCPHEADER_SIZE    128
 /** length of Ethernet MAC Address */
 #define ETHERNET_MAC_ADDR_LENGTH 6
@@ -192,7 +192,7 @@ labeling is enabled */
 #define YAF_MAX_HOOKS            4
 
 /** this is the maximum amount of data that the plugins may export in sum total
-*/
+ */
 #define YAF_HOOKS_MAX_EXPORT    1500
 /** Maximum Number of Packet Boundaries to keep around per payload */
 #define YAF_MAX_PKT_BOUNDARY    25
@@ -207,38 +207,38 @@ labeling is enabled */
  */
 typedef struct yfFlowKey_st {
     /** Source transport port */
-    uint16_t            sp;
+    uint16_t   sp;
     /** Destination transport port. Contains type and code for ICMP */
-    uint16_t            dp;
+    uint16_t   dp;
     /** IP protocol */
-    uint8_t             proto;
+    uint8_t    proto;
     /** IP Version */
-    uint8_t             version;
+    uint8_t    version;
     /** VLAN Tag - only fwd */
-    uint16_t            vlanId;
+    uint16_t   vlanId;
     /** Type of Service/Traffic Class */
-    uint8_t             tos;
+    uint8_t    tos;
     /** for DAG cards need to record the interface, may only be seeing
-    unidirectional flows on each interface, and want to record what
-    direction that is happening on */
+     * unidirectional flows on each interface, and want to record what
+     * direction that is happening on */
 #if YAF_ENABLE_DAG_SEPARATE_INTERFACES || YAF_ENABLE_SEPARATE_INTERFACES
-    uint8_t             netIf;
+    uint8_t    netIf;
 #endif
     /** IP address two-tuple union */
     union {
         struct {
             /** Source IPv4 address */
-            uint32_t    sip;
+            uint32_t   sip;
             /** Destination IPv4 address */
-            uint32_t    dip;
-        }               v4;
+            uint32_t   dip;
+        } v4;
         struct {
             /** Source IPv6 address */
-            uint8_t     sip[16];
+            uint8_t   sip[16];
             /** Destination IPv6 address */
-            uint8_t     dip[16];
-        }               v6;
-    }                   addr;
+            uint8_t   dip[16];
+        } v6;
+    } addr;
 } yfFlowKey_t;
 
 /**
@@ -246,27 +246,27 @@ typedef struct yfFlowKey_st {
  */
 typedef struct yfFlowStats_st {
     /** to calculate inter-packet delay */
-    uint64_t iaarray[10];
+    uint64_t   iaarray[10];
     /** to calculate distribution of packet payload size */
-    uint16_t pktsize[10];
+    uint16_t   pktsize[10];
     /** total amount of payload data */
-    uint64_t payoct;
+    uint64_t   payoct;
     /** used to calculate interarrival time */
-    uint64_t ltime;
+    uint64_t   ltime;
     /** Number of urgent packets */
-    uint32_t tcpurgct;
+    uint32_t   tcpurgct;
     /** Number of packets with 60 bytes or less of data */
-    uint32_t smallpktct;
+    uint32_t   smallpktct;
     /** total number of non empty pkts */
-    uint32_t nonemptypktct;
+    uint32_t   nonemptypktct;
     /** total number of packets with 225 bytes or more */
-    uint32_t largepktct;
+    uint32_t   largepktct;
     /** average interarrival time in milliseconds */
-    uint32_t aitime;
+    uint32_t   aitime;
     /** payload length of first non-empty pkt */
-    uint16_t firstpktsize;
+    uint16_t   firstpktsize;
     /** largest pkt size */
-    uint16_t maxpktsize;
+    uint16_t   maxpktsize;
 } yfFlowStats_t;
 
 /**
@@ -275,90 +275,90 @@ typedef struct yfFlowStats_st {
  */
 typedef struct yfFlowVal_st {
     /** Octet count */
-    uint64_t    oct;
+    uint64_t        oct;
     /** Packet count */
-    uint64_t    pkt;
+    uint64_t        pkt;
 #   if YAF_ENABLE_PAYLOAD
     /** Payload length */
-    uint32_t    paylen;
+    uint32_t        paylen;
     /** Captured payload buffer */
-    uint8_t     *payload;
+    uint8_t        *payload;
     /** Offsets into the payload on packet boundaries */
-    size_t      *paybounds;
-#   endif
+    size_t         *paybounds;
+#   endif /* if YAF_ENABLE_PAYLOAD */
     /** Initial TCP sequence number */
-    uint32_t    isn;
+    uint32_t        isn;
     /** Last TCP sequence number */
-    uint32_t    lsn;
+    uint32_t        lsn;
     /** First Packet Size - to determine whether to turn on fixed size flag*/
-    uint16_t    first_pkt_size;
+    uint16_t        first_pkt_size;
     /** flowAttributes */
-    uint16_t    attributes;
+    uint16_t        attributes;
     /** Initial TCP flags */
-    uint8_t     iflags;
+    uint8_t         iflags;
     /** Union of remaining TCP flags */
-    uint8_t     uflags;
+    uint8_t         uflags;
     /** packets with payload - don't care if this wraps. */
-    uint8_t     appkt;
+    uint8_t         appkt;
     /** VLAN TAG (also in key, but want to record both sides) */
-    uint16_t    vlan;
+    uint16_t        vlan;
 #   if YAF_ENABLE_SEPARATE_INTERFACES
-    uint8_t     netIf;
+    uint8_t         netIf;
 #   endif
 #   if YAF_ENABLE_ENTROPY
     /** Entropy value */
-    uint8_t     entropy;
+    uint8_t         entropy;
     /** Entropy padding */
-    uint8_t     entpad[7];
-#   endif
+    uint8_t         entpad[7];
+#   endif /* if YAF_ENABLE_ENTROPY */
 #   if YAF_ENABLE_P0F
     /** passive OS finger printing OS Name */
-    const char  *osname;
+    const char     *osname;
     /** passive OS finger printing OS version */
-    const char  *osver;
+    const char     *osver;
     /** required for libp0f */
-    uint8_t     fuzzyMatch;
+    uint8_t         fuzzyMatch;
     /** required for libp0f */
-    uint8_t     fuzzyPad[7];
+    uint8_t         fuzzyPad[7];
     /** p0f OS FingerPrint */
-    char        *osFingerPrint;
-#   endif
+    char           *osFingerPrint;
+#   endif /* if YAF_ENABLE_P0F */
 #   if YAF_ENABLE_FPEXPORT
     /** length of firstPacket Handshake header */
-    uint32_t    firstPacketLen;
+    uint32_t        firstPacketLen;
     /** length of secondPacket Handshake header */
-    uint32_t    secondPacketLen;
+    uint32_t        secondPacketLen;
     /** TCP Handshake header from first TCP packet */
-    uint8_t     *firstPacket;
+    uint8_t        *firstPacket;
     /** TCP Handshake header from second TCP packet */
-    uint8_t     *secondPacket;
-#   endif
+    uint8_t        *secondPacket;
+#   endif /* if YAF_ENABLE_FPEXPORT */
     /** yaf flow statistics */
-    yfFlowStats_t *stats;
+    yfFlowStats_t  *stats;
 } yfFlowVal_t;
 
 #if YAF_MPLS
 typedef struct yfMPLSNode_st {
     /** Flow Key Hash Tables */
-    GHashTable       *tab;
+    GHashTable  *tab;
     /** TOP 3 MPLS Labels */
-    uint32_t         mpls_label[YAF_MAX_MPLS_LABELS];
+    uint32_t     mpls_label[YAF_MAX_MPLS_LABELS];
     /** number of mpls nodes hash table */
-    int              tab_count;
+    int          tab_count;
 } yfMPLSNode_t;
-#endif
+#endif /* if YAF_MPLS */
 
 typedef struct yfMPTCPFlow_st {
     /** initial data seq no. */
-    uint64_t          idsn;
+    uint64_t   idsn;
     /** receiver token */
-    uint32_t          token;
+    uint32_t   token;
     /** max segment size */
-    uint16_t          mss;
+    uint16_t   mss;
     /** addr id */
-    uint8_t           addrid;
+    uint8_t    addrid;
     /** hash_flags */
-    uint8_t           flags;
+    uint8_t    flags;
 } yfMPTCPFlow_t;
 
 
@@ -378,9 +378,9 @@ typedef struct yfFlow_st {
      * Hook flow context array.  Used by extensions to store per-flow state.
      * An array of ptr's - one per hook.
      */
-    void            *hfctx[YAF_MAX_HOOKS];
+    void           *hfctx[YAF_MAX_HOOKS];
 #endif
-     /*
+    /*
      * Reverse flow delta start time in milliseconds. Equivalent to initial
      * packet round-trip time; useful for decomposing biflows into uniflows.
      */
@@ -408,14 +408,14 @@ typedef struct yfFlow_st {
     /** reverse ToS  (fwd in flowKey) */
     uint8_t         rtos;
     /** Pcap File Ptr */
-    pcap_dumper_t   *pcap;
+    pcap_dumper_t  *pcap;
 #if YAF_MPLS
     /** MPLS Node that contains this flow */
-    yfMPLSNode_t    *mpls;
+    yfMPLSNode_t   *mpls;
 #endif
     /** MPTCP Flow */
     yfMPTCPFlow_t   mptcp;
-   /** Forward value */
+    /** Forward value */
     yfFlowVal_t     val;
     /** Reverse value */
     yfFlowVal_t     rval;
@@ -431,7 +431,9 @@ typedef struct yfFlow_st {
  * the program to abort if there is an alignment issue.
  *
  */
-void yfAlignmentCheck(void);
+void
+yfAlignmentCheck(
+    void);
 
 
 /**
@@ -441,9 +443,9 @@ void yfAlignmentCheck(void);
  *
  * @param flow  a yfFlow_t to initialize
  */
-
-void yfFlowPrepare(
-    yfFlow_t          *flow);
+void
+yfFlowPrepare(
+    yfFlow_t  *flow);
 
 /**
  * Clean up after a static flow buffer prepared by yfFlowPrepare.
@@ -451,9 +453,9 @@ void yfFlowPrepare(
  *
  * @param flow  a yfFlow_t to free
  */
-
-void yfFlowCleanup(
-    yfFlow_t          *flow);
+void
+yfFlowCleanup(
+    yfFlow_t  *flow);
 
 /**
  * Get an IPFIX message buffer for writing YAF flows to a named file.
@@ -466,12 +468,12 @@ void yfFlowCleanup(
  * @return fBuf_t   a new writer, or a reused writer, for writing on the
  *                  given open file. NULL on failure.
  */
-
-fBuf_t *yfWriterForFile(
-    const char              *path,
-    uint32_t                domain,
-    gboolean                export_meta,
-    GError                  **err);
+fBuf_t *
+yfWriterForFile(
+    const char  *path,
+    uint32_t     domain,
+    gboolean     export_meta,
+    GError     **err);
 
 /**
  * Get an IPFIX message buffer for writing YAF flows to an open file pointer.
@@ -486,12 +488,12 @@ fBuf_t *yfWriterForFile(
  * @return fBuf_t   a new writer, or a reused writer, for writing on the
  *                  given open file. NULL on failure.
  */
-
-fBuf_t *yfWriterForFP(
-    FILE                    *fp,
-    uint32_t                domain,
-    gboolean                export_meta,
-    GError                  **err);
+fBuf_t *
+yfWriterForFP(
+    FILE      *fp,
+    uint32_t   domain,
+    gboolean   export_meta,
+    GError   **err);
 
 /**
  * Get an IPFIX message buffer for writing YAF flows to a socket.
@@ -502,12 +504,12 @@ fBuf_t *yfWriterForFP(
  * @param err an error description, set on failure.
  * @return a new writer for export to the given address.
  */
-
-fBuf_t *yfWriterForSpec(
-    fbConnSpec_t            *spec,
-    uint32_t                domain,
-    gboolean                export_meta,
-    GError                  **err);
+fBuf_t *
+yfWriterForSpec(
+    fbConnSpec_t  *spec,
+    uint32_t       domain,
+    gboolean       export_meta,
+    GError       **err);
 
 
 #ifdef HAVE_SPREAD
@@ -523,13 +525,13 @@ fBuf_t *yfWriterForSpec(
  * @param err an error description, set on failure.
  * @return a new writer for export to the given address
  */
-
-fBuf_t *yfWriterForSpread(
-    fbSpreadParams_t       *params,
-    uint32_t               domain,
-    uint16_t               *spreadGroupIndex,
-    gboolean               export_meta,
-    GError                 **err);
+fBuf_t *
+yfWriterForSpread(
+    fbSpreadParams_t  *params,
+    uint32_t           domain,
+    uint16_t          *spreadGroupIndex,
+    gboolean           export_meta,
+    GError           **err);
 
 #endif /* HAVE_SPREAD */
 
@@ -545,11 +547,12 @@ fBuf_t *yfWriterForSpread(
  * @return          TRUE on success, FALSE otherwise.
  *
  */
-gboolean yfWriteOptionsDataFlows(
-    void               *yfContext,
-    uint32_t           pcap_drop,
-    GTimer             *timer,
-    GError             **err);
+gboolean
+yfWriteOptionsDataFlows(
+    void      *yfContext,
+    uint32_t   pcap_drop,
+    GTimer    *timer,
+    GError   **err);
 
 /**
  * Write a statistics options data record to an IPFIX Message buffer.  To turn
@@ -565,11 +568,12 @@ gboolean yfWriteOptionsDataFlows(
  * @return          TRUE on success, FALSE otherwise.
  *
  */
-gboolean yfWriteStatsFlow(
-    void *yfContext,
-    uint32_t pcap_drop,
-    GTimer *timer,
-    GError **err);
+gboolean
+yfWriteStatsFlow(
+    void      *yfContext,
+    uint32_t   pcap_drop,
+    GTimer    *timer,
+    GError   **err);
 
 /**
  * Write a tombstone options data record to an IPFIX Message buffer.  Sets the
@@ -582,8 +586,9 @@ gboolean yfWriteStatsFlow(
  * @return          TRUE on success, FALSE otherwise.
  *
  */
-gboolean yfWriteTombstoneFlow(
-    void *yfContext,
+gboolean
+yfWriteTombstoneFlow(
+    void    *yfContext,
     GError **err);
 
 /**
@@ -597,11 +602,11 @@ gboolean yfWriteTombstoneFlow(
  * @param err   an error description; required.
  * @return      TRUE on success, FALSE otherwise.
  */
-
-gboolean yfWriteFlow(
-    void                *yfContext,
-    yfFlow_t            *flow,
-    GError              **err);
+gboolean
+yfWriteFlow(
+    void      *yfContext,
+    yfFlow_t  *flow,
+    GError   **err);
 
 /**
  * Close the connection underlying an IPFIX message buffer created by
@@ -614,42 +619,43 @@ gboolean yfWriteFlow(
  * @param err an error description, set on failure.
  * @return TRUE on success, FALSE otherwise.
  */
-
-gboolean yfWriterClose(
-    fBuf_t          *fbuf,
-    gboolean        flush,
-    GError          **err);
-
-/**
- * FIXME doc
- */
-
-void yfWriterExportPayload(
-    int                max_payload);
+gboolean
+yfWriterClose(
+    fBuf_t    *fbuf,
+    gboolean   flush,
+    GError   **err);
 
 /**
  * FIXME doc
  */
+void
+yfWriterExportPayload(
+    int   max_payload);
 
-void yfWriterExportMappedV6(
-    gboolean           map_mode);
+/**
+ * FIXME doc
+ */
+void
+yfWriterExportMappedV6(
+    gboolean   map_mode);
 
 /**
  * Get an IPFIX message buffer for reading YAF flows from an open file pointer.
  * Reuses an existing buffer if supplied.
  *
  * @param fbuf  IPFIX message buffer to reuse; must have been returned by a
- *              prior call to yfReaderForFP(). Pass NULL to create a new buffer.
+ *              prior call to yfReaderForFP(). Pass NULL to create a new
+ *              buffer.
  * @param fp    File pointer to open file to read from.
  * @param err an error description, set on failure.
  * @return a new reader, or a reused reader, for reading the
  *         given open file. NULL on failure.
  */
-
-fBuf_t *yfReaderForFP(
-    fBuf_t          *fbuf,
-    FILE            *fp,
-    GError          **err);
+fBuf_t *
+yfReaderForFP(
+    fBuf_t  *fbuf,
+    FILE    *fp,
+    GError **err);
 
 /**
  * Get an IPFIX connection listener for collecting YAF flows via IPFIX from
@@ -666,12 +672,12 @@ fBuf_t *yfReaderForFP(
  *          with fbListenerWait(). Buffers returned from this call can
  *          then be used with yfReadFlow() and yfReadFlowExtended().
  */
-
-fbListener_t *yfListenerForSpec(
-    fbConnSpec_t        *spec,
-    fbListenerAppInit_fn    appinit,
-    fbListenerAppFree_fn    appfree,
-    GError              **err);
+fbListener_t *
+yfListenerForSpec(
+    fbConnSpec_t          *spec,
+    fbListenerAppInit_fn   appinit,
+    fbListenerAppFree_fn   appfree,
+    GError               **err);
 
 /**
  * Read a single flow from an IPFIX message buffer. The buffer must have been
@@ -687,11 +693,11 @@ fbListener_t *yfListenerForSpec(
  *              file or stream, or against FB_ERROR_EOM to see if the listener
  *              should be waited upon.
  */
-
-gboolean yfReadFlow(
-    fBuf_t          *fbuf,
-    yfFlow_t        *flow,
-    GError          **err);
+gboolean
+yfReadFlow(
+    fBuf_t    *fbuf,
+    yfFlow_t  *flow,
+    GError   **err);
 
 /**
  * Read a single flow from an IPFIX message buffer. The buffer must have been
@@ -710,35 +716,35 @@ gboolean yfReadFlow(
  *              file or stream, or against FB_ERROR_EOM to see if the listener
  *              should be waited upon.
  */
-
-gboolean yfReadFlowExtended(
-    fBuf_t                  *fbuf,
-    yfFlow_t                *flow,
-    GError                  **err);
-
-/**
-* Print a YAF flow to a GString.
-*
-* @param rstr string to append text representation of flow to.
-* @param flow flow to print.
-*/
-
-void yfPrintString(
-    GString             *rstr,
-    yfFlow_t            *flow);
+gboolean
+yfReadFlowExtended(
+    fBuf_t    *fbuf,
+    yfFlow_t  *flow,
+    GError   **err);
 
 /**
-* Print a YAF flow to a GString in pipe-delimited (tabular) format.
-*
-* @param rstr string to append text representation of flow to.
-* @param flow flow to print.
-* @param yaft_mac Add mac addresses to tabular format.
-*/
+ * Print a YAF flow to a GString.
+ *
+ * @param rstr string to append text representation of flow to.
+ * @param flow flow to print.
+ */
+void
+yfPrintString(
+    GString   *rstr,
+    yfFlow_t  *flow);
 
-void yfPrintDelimitedString(
-    GString                 *rstr,
-    yfFlow_t                *flow,
-    gboolean                yaft_mac);
+/**
+ * Print a YAF flow to a GString in pipe-delimited (tabular) format.
+ *
+ * @param rstr string to append text representation of flow to.
+ * @param flow flow to print.
+ * @param yaft_mac Add mac addresses to tabular format.
+ */
+void
+yfPrintDelimitedString(
+    GString   *rstr,
+    yfFlow_t  *flow,
+    gboolean   yaft_mac);
 
 /**
  * Print a YAF flow to a file.
@@ -748,11 +754,11 @@ void yfPrintDelimitedString(
  * @param err an error descriptor.
  * @return TRUE on success, FALSE otherwise.
  */
-
-gboolean yfPrint(
-    FILE                *out,
-    yfFlow_t            *flow,
-    GError              **err);
+gboolean
+yfPrint(
+    FILE      *out,
+    yfFlow_t  *flow,
+    GError   **err);
 
 /**
  * Print a YAF flow to a file in pipe-delimited (tabular) format.
@@ -763,12 +769,12 @@ gboolean yfPrint(
  * @param err an error descriptor.
  * @return TRUE on success, FALSE otherwise.
  */
-
-gboolean yfPrintDelimited(
-    FILE                *out,
-    yfFlow_t            *flow,
-    gboolean            yaft_mac,
-    GError              **err);
+gboolean
+yfPrintDelimited(
+    FILE      *out,
+    yfFlow_t  *flow,
+    gboolean   yaft_mac,
+    GError   **err);
 
 /**
  * Print column headers for the pipe-delimited (tabular) format.
@@ -778,11 +784,11 @@ gboolean yfPrintDelimited(
  * @param err an error descriptor.
  * @return TRUE on success, FALSE otherwise.
  */
-
-void yfPrintColumnHeaders(
-        FILE           *out,
-        gboolean       yaft_mac,
-        GError         **err);
+void
+yfPrintColumnHeaders(
+    FILE      *out,
+    gboolean   yaft_mac,
+    GError   **err);
 
 #if YAF_ENABLE_HOOKS
 /**
@@ -790,9 +796,12 @@ void yfPrintColumnHeaders(
  *
  *
  */
-fbInfoModel_t *yfDPIInfoModel();
-#endif
+fbInfoModel_t *
+yfDPIInfoModel(
+    void);
+
+#endif /* if YAF_ENABLE_HOOKS */
 
 
 
-#endif
+#endif /* ifndef _YAF_CORE_H_ */

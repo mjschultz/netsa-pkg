@@ -6,13 +6,8 @@
  * this provides IRC payload packet recognition for use within YAF
  * It is based on RFC 2812 and some random limited packet capture.
  *
- *
- * @author $Author$
- * @date $Date$
- * @Version $Revision$
- *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Chris Inacio <inacio@cert.org>
  ** ------------------------------------------------------------------------
@@ -20,7 +15,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -71,6 +66,7 @@
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
 #include <pcre.h>
+#include <payloadScanner.h>
 
 #if YAF_ENABLE_HOOKS
 #include <yaf/yafhooks.h>
@@ -79,17 +75,18 @@
 #define IRCDEBUG 0
 #define IRC_PORT 194
 
+YC_SCANNER_PROTOTYPE(ircplugin_LTX_ycIrcScanScan);
+
 /**
  * the compiled regular expressions, and related
  * flags
  *
  */
-static pcre *ircMsgRegex = NULL;
+static pcre        *ircMsgRegex = NULL;
 /*static pcre *ircJoinRegex = NULL;*/
-static pcre *ircRegex = NULL;
-static pcre *ircDPIRegex = NULL;
+static pcre        *ircRegex = NULL;
+static pcre        *ircDPIRegex = NULL;
 static unsigned int pcreInitialized = 0;
-
 
 
 
@@ -97,10 +94,17 @@ static unsigned int pcreInitialized = 0;
  * static local functions
  *
  */
-static uint16_t ycIrcScanInit (void);
+static uint16_t
+ycIrcScanInit(
+    void);
+
 #if IRCDEBUG
-static int ycDebugBinPrintf(uint8_t *data, uint16_t size);
-#endif
+static int
+ycDebugBinPrintf(
+    uint8_t   *data,
+    uint16_t   size);
+
+#endif /* if IRCDEBUG */
 
 /**
  * ircplugin_LTX_ycIrcScanScan
@@ -109,7 +113,8 @@ static int ycDebugBinPrintf(uint8_t *data, uint16_t size);
  * looks like.
  *
  *
- * name abomination has been achieved by combining multiple naming standards until the prefix to
+ * name abomination has been achieved by combining multiple naming standards
+ * until the prefix to
  * the function name is ircplugin_LTX_ycIrcScanScan --- it's a feature
  *
  * @param argc NOT USED
@@ -123,15 +128,14 @@ static int ycDebugBinPrintf(uint8_t *data, uint16_t size);
  *
  */
 uint16_t
-ircplugin_LTX_ycIrcScanScan (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+ircplugin_LTX_ycIrcScanScan(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
-
     int rc;
 #   define NUM_CAPT_VECTS 60
     int vects[NUM_CAPT_VECTS];
@@ -146,16 +150,16 @@ ircplugin_LTX_ycIrcScanScan (
                    0, 0, vects, NUM_CAPT_VECTS);
 
     /*if (rc <= 0) {
-        rc = pcre_exec(ircJoinRegex, NULL, (char *)payload, payloadSize,
-                       0, 0, vects, NUM_CAPT_VECTS);
-                       }*/
+     *  rc = pcre_exec(ircJoinRegex, NULL, (char *)payload, payloadSize,
+     *                 0, 0, vects, NUM_CAPT_VECTS);
+     *                 }*/
     if (rc <= 0) {
         rc = pcre_exec(ircRegex, NULL, (char *)payload, payloadSize,
                        0, 0, vects, NUM_CAPT_VECTS);
     }
 
     /** at some point in the future, this is the place to extract protocol
-        information like message targets and join targets, etc.*/
+     *  information like message targets and join targets, etc.*/
 
 #if YAF_ENABLE_HOOKS
 
@@ -164,16 +168,14 @@ ircplugin_LTX_ycIrcScanScan (
                           202, IRC_PORT);
     }
 
-#endif
+#endif /* if YAF_ENABLE_HOOKS */
 
     if (rc > 0) {
         return IRC_PORT;
     }
 
-
     return 0;
 }
-
 
 
 /**
@@ -189,75 +191,80 @@ ircplugin_LTX_ycIrcScanScan (
  */
 static
 uint16_t
-ycIrcScanInit ()
+ycIrcScanInit(
+    void)
 {
     const char *errorString;
-    int errorPos;
+    int         errorPos;
 
-    const char ircMsgRegexString[] = "^(?:(:[^: \\n\\r]+)(?:\\ ))?"
-                                     "(PRIVMSG|NOTICE) \\ "
-                                     "([^: \\n\\r]+|:.*) (?:\\ )"
-                                     "([^: \\n\\r]+\\ |:.*)";
+    const char  ircMsgRegexString[] = "^(?:(:[^: \\n\\r]+)(?:\\ ))?"
+        "(PRIVMSG|NOTICE) \\ "
+        "([^: \\n\\r]+|:.*) (?:\\ )"
+        "([^: \\n\\r]+\\ |:.*)";
     /*const char ircJoinRegexString[] = "^(?:(:[^\\: \\n\\r]+)(?:\\ ))?"
-      "((JOIN) \\ [^: \\n\\r]+\\ |:.*)\\s";*/
+     * "((JOIN) \\ [^: \\n\\r]+\\ |:.*)\\s";*/
     const char ircRegexString[] = "^((?:(:[^: \\n\\r]+)(?:\\ ))?"
-                                  "(PASS|OPER|QUIT|SQUIT|NICK"
-                                  "|MODE|USER|SERVICE|JOIN|NAMES|INVITE"
-                                  "|PART|TOPIC|LIST|KICK|PRIVMSG|NOTICE"
-                                  "|MOTD|STATS|CONNECT|INFO|LUSERS|LINKS"
-                                  "|TRACE|VERSION|TIME|ADMIN|SERVLIST"
-                                  "|SQUERY|WHO|WHOWAS|WHOIS|KILL|PING"
-                                  "|PONG|ERROR|AWAY|DIE|SUMMON|REHASH"
-                                  "|RESTART|USERS|USERHOST)[ a-zA-Z0-9$#.:*\"]*)"
-                                  "(?:[\\r\\n])";
+        "(PASS|OPER|QUIT|SQUIT|NICK"
+        "|MODE|USER|SERVICE|JOIN|NAMES|INVITE"
+        "|PART|TOPIC|LIST|KICK|PRIVMSG|NOTICE"
+        "|MOTD|STATS|CONNECT|INFO|LUSERS|LINKS"
+        "|TRACE|VERSION|TIME|ADMIN|SERVLIST"
+        "|SQUERY|WHO|WHOWAS|WHOIS|KILL|PING"
+        "|PONG|ERROR|AWAY|DIE|SUMMON|REHASH"
+        "|RESTART|USERS|USERHOST)[ a-zA-Z0-9$#.:*\"]*)"
+        "(?:[\\r\\n])";
 
     const char ircDPIRegexString[] = "((\\d{3}|PASS|OPER|QUIT|SQUIT|NICK"
-                                     "|MODE|USER|SERVICE|JOIN|NAMES|INVITE"
-                                     "|PART|TOPIC|LIST|KICK|PRIVMSG"
-                                     "|MOTD|STATS|CONNECT|INFO|LUSERS|LINKS"
-                                     "|TRACE|VERSION|TIME|ADMIN|SERVLIST"
-                                     "|SQUERY|WHO|WHOWAS|WHOIS|KILL|PING"
-                                     "|PONG|ERROR|AWAY|DIE|SUMMON|REHASH"
-                                     "|RESTART|USERS|USERHOST|PROTOCTL) "
-                                     "[-a-zA-Z0-9$#.:*\" ]*)(?:[\\r\\n])";
+        "|MODE|USER|SERVICE|JOIN|NAMES|INVITE"
+        "|PART|TOPIC|LIST|KICK|PRIVMSG"
+        "|MOTD|STATS|CONNECT|INFO|LUSERS|LINKS"
+        "|TRACE|VERSION|TIME|ADMIN|SERVLIST"
+        "|SQUERY|WHO|WHOWAS|WHOIS|KILL|PING"
+        "|PONG|ERROR|AWAY|DIE|SUMMON|REHASH"
+        "|RESTART|USERS|USERHOST|PROTOCTL) "
+        "[-a-zA-Z0-9$#.:*\" ]*)(?:[\\r\\n])";
 
-    ircRegex = pcre_compile(ircRegexString, PCRE_EXTENDED|PCRE_ANCHORED,
+    ircRegex = pcre_compile(ircRegexString, PCRE_EXTENDED | PCRE_ANCHORED,
                             &errorString, &errorPos, NULL);
-    ircMsgRegex = pcre_compile(ircMsgRegexString, PCRE_EXTENDED|PCRE_ANCHORED,
+    ircMsgRegex = pcre_compile(ircMsgRegexString, PCRE_EXTENDED | PCRE_ANCHORED,
                                &errorString, &errorPos, NULL);
-    /*ircJoinRegex = pcre_compile(ircJoinRegexString,PCRE_EXTENDED|PCRE_ANCHORED,
-      &errorString, &errorPos, NULL);*/
+    /*ircJoinRegex =
+     * pcre_compile(ircJoinRegexString,PCRE_EXTENDED|PCRE_ANCHORED,
+     * &errorString, &errorPos, NULL);*/
     ircDPIRegex = pcre_compile(ircDPIRegexString, PCRE_MULTILINE,
                                &errorString, &errorPos, NULL);
 
-    if (NULL != ircRegex && NULL != ircMsgRegex)
-    {
+    if (NULL != ircRegex && NULL != ircMsgRegex) {
         pcreInitialized = 1;
     }
-
 
     return pcreInitialized;
 }
 
+
 #if IRCDEBUG
 static
 int
-ycDebugBinPrintf(uint8_t *data, uint16_t size)
+ycDebugBinPrintf(
+    uint8_t   *data,
+    uint16_t   size)
 {
     uint16_t loop;
-    int numPrinted = 0;
+    int      numPrinted = 0;
 
     if (0 == size) {
         return 0;
     }
 
-    for (loop=0; loop < size; loop++) {
-        if (isprint(*(data+loop)) && !iscntrl(*(data+loop))){
-            printf("%c", *(data+loop));
+    for (loop = 0; loop < size; loop++) {
+        if (isprint(*(data + loop)) && !iscntrl(*(data + loop))) {
+            printf("%c", *(data + loop));
         } else {
             printf(".");
         }
-        if ('\n' == *(data+loop) || '\r' == *(data+loop) || '\0' == *(data+loop)) {
+        if ('\n' == *(data + loop) || '\r' == *(data + loop)
+            || '\0' == *(data + loop))
+        {
             break;
         }
         numPrinted++;
@@ -265,4 +272,6 @@ ycDebugBinPrintf(uint8_t *data, uint16_t size)
 
     return numPrinted;
 }
-#endif
+
+
+#endif /* if IRCDEBUG */

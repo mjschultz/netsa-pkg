@@ -9,7 +9,7 @@
  * dhcp_fingerprints.conf
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2018 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso
  ** ------------------------------------------------------------------------
@@ -18,7 +18,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -77,7 +77,7 @@
 #if   HAVE_MALLOC_H
 #include <malloc.h>
 #endif
-#endif  /* STDC_HEADERS */
+#endif /* STDC_HEADERS */
 
 #if YAF_ENABLE_HOOKS
 #include <ctype.h>
@@ -109,12 +109,12 @@
 
 
 static struct yfHookMetaData metaData = {
-  6,
-  256,
-  1
+    6,
+    256,
+    1
 };
 
-static fbInfoElementSpec_t yaf_dhcp_fp_spec[] = {
+static fbInfoElementSpec_t   yaf_dhcp_fp_spec[] = {
     {"dhcpFingerPrint",             FB_IE_VARLEN, 0 },
     {"dhcpVendorCode",              FB_IE_VARLEN, 0 },
     {"reverseDhcpFingerPrint",      FB_IE_VARLEN, DHCP_REV },
@@ -122,7 +122,7 @@ static fbInfoElementSpec_t yaf_dhcp_fp_spec[] = {
     FB_IESPEC_NULL
 };
 
-static fbInfoElementSpec_t yaf_dhcp_options_spec[] = {
+static fbInfoElementSpec_t   yaf_dhcp_options_spec[] = {
     {"basicList",                   FB_IE_VARLEN, 0 },
     {"dhcpVendorCode",              FB_IE_VARLEN, 0 },
     {"basicList",                   FB_IE_VARLEN, DHCP_REV},
@@ -131,17 +131,17 @@ static fbInfoElementSpec_t yaf_dhcp_options_spec[] = {
 };
 
 typedef struct yfDHCP_FP_Flow_st {
-    fbVarfield_t dhcpFP;
-    fbVarfield_t dhcpVC;
-    fbVarfield_t reverseDhcpFP;
-    fbVarfield_t reverseDhcpVC;
+    fbVarfield_t   dhcpFP;
+    fbVarfield_t   dhcpVC;
+    fbVarfield_t   reverseDhcpFP;
+    fbVarfield_t   reverseDhcpVC;
 } yfDHCP_FP_Flow_t;
 
 typedef struct yfDHCP_OP_Flow_st {
-    fbBasicList_t options;
-    fbVarfield_t dhcpVC;
-    fbBasicList_t revOptions;
-    fbVarfield_t reverseDhcpVC;
+    fbBasicList_t   options;
+    fbVarfield_t    dhcpVC;
+    fbBasicList_t   revOptions;
+    fbVarfield_t    reverseDhcpVC;
 } yfDHCP_OP_Flow_t;
 
 static fbTemplate_t *dhcpTemplate;
@@ -150,51 +150,51 @@ static fbTemplate_t *dhcpOpTemplate;
 static fbTemplate_t *revDhcpOpTemplate;
 
 typedef struct ypDHCPFlowValCtx_st {
-    char        *fp;
-    size_t      fplen;
-    uint8_t     *vc;
-    size_t      vclen;
-    uint8_t     options[256];
-    uint8_t     count;
+    char     *fp;
+    size_t    fplen;
+    uint8_t  *vc;
+    size_t    vclen;
+    uint8_t   options[256];
+    uint8_t   count;
 } ypDHCPFlowValCtx_t;
 
 
 typedef struct dhcpFingerPrint_st {
-    char         *desc;
-    uint8_t      options[256];
+    char     *desc;
+    uint8_t   options[256];
 } dhcpFingerPrint_t;
 
 typedef struct dhcpOptions_st dhcpOptions_t;
 
 struct dhcpOptions_st {
-    dhcpOptions_t     *next;
-    dhcpFingerPrint_t fp;
+    dhcpOptions_t      *next;
+    dhcpFingerPrint_t   fp;
 };
 
 typedef struct dhcpList_st {
-    dhcpOptions_t     *head;
-    int               count;
+    dhcpOptions_t  *head;
+    int             count;
 } dhcpList_t;
 
 /*static dhcpList_t opList[256];
-static int dhcpInitialized = 0;
-static char *dhcp_fp_FileName = NULL;*/
+ * static int dhcpInitialized = 0;
+ * static char *dhcp_fp_FileName = NULL;*/
 static gboolean dhcp_uniflow_gl = FALSE;
 static gboolean options_global = FALSE;
 
-typedef struct yfDHCPContext_st{
-    int dhcpInitialized;
-    gboolean  dhcp_uniflow;
-    gboolean  export_options;
-    char      *dhcp_fp_FileName;
-    dhcpList_t opList[256];
+typedef struct yfDHCPContext_st {
+    int          dhcpInitialized;
+    gboolean     dhcp_uniflow;
+    gboolean     export_options;
+    char        *dhcp_fp_FileName;
+    dhcpList_t   opList[256];
 } yfDHCPContext_t;
 
 typedef struct ypDHCPFlowCtx_st {
-    ypDHCPFlowValCtx_t val;
-    ypDHCPFlowValCtx_t rval;
-    yfDHCP_OP_Flow_t   *rec;
-    yfDHCPContext_t    *yfctx;
+    ypDHCPFlowValCtx_t   val;
+    ypDHCPFlowValCtx_t   rval;
+    yfDHCP_OP_Flow_t    *rec;
+    yfDHCPContext_t     *yfctx;
 } ypDHCPFlowCtx_t;
 
 
@@ -206,17 +206,21 @@ typedef struct ypDHCPFlowCtx_st {
 #ifdef NDEBUG
 #define assert(x)
 #else
-#define assert(x) if (!(x)) { fprintf(stderr,"assertion failed: \"%s\" at line %d of file %s\n",# x, __LINE__, __FILE__); abort(); }
-#endif
+#define assert(x)                                                           \
+    if (!(x)) {                                                             \
+        fprintf(stderr, "assertion failed: \"%s\" at line %d of file %s\n", \
+                # x, __LINE__, __FILE__); abort();                          \
+    }
+#endif /* ifdef NDEBUG */
 
 #if YAF_ENABLE_METADATA_EXPORT
-#define  YF_fbSessionAddTemplate(_sess, _inex, _tid, _tmpl, _name, _desc, _err)\
-    fbSessionAddTemplateWithMetadata(                                   \
+#define YF_fbSessionAddTemplate(_sess, _inex, _tid, _tmpl, _name, _desc, _err) \
+    fbSessionAddTemplateWithMetadata(                                          \
         _sess, _inex, _tid, _tmpl, _name, _desc, _err)
 #else
-#define  YF_fbSessionAddTemplate(_sess, _inex, _tid, _tmpl, _name, _desc, _err)\
+#define YF_fbSessionAddTemplate(_sess, _inex, _tid, _tmpl, _name, _desc, _err) \
     fbSessionAddTemplate(_sess, _inex, _tid, _tmpl, _err)
-#endif
+#endif /* if YAF_ENABLE_METADATA_EXPORT */
 
 
 /**
@@ -227,21 +231,21 @@ typedef struct ypDHCPFlowCtx_st {
  *
  *
  */
-void ypFlowAlloc(
-    void       ** yfHookContext,
-    yfFlow_t   *flow,
-    void       *yfctx)
+void
+ypFlowAlloc(
+    void     **yfHookContext,
+    yfFlow_t  *flow,
+    void      *yfctx)
 {
-    ypDHCPFlowCtx_t   *flowContext = NULL;
+    ypDHCPFlowCtx_t *flowContext = NULL;
 
-    flowContext = (ypDHCPFlowCtx_t *) yg_slice_alloc0(sizeof(ypDHCPFlowCtx_t));
+    flowContext = (ypDHCPFlowCtx_t *)g_slice_alloc0(sizeof(ypDHCPFlowCtx_t));
 
     flowContext->yfctx = yfctx;
 
     *yfHookContext = (void *)flowContext;
-
-    return;
 }
+
 
 /**
  * getDPIInfoModel
@@ -251,7 +255,9 @@ void ypFlowAlloc(
  * @return a pointer to a fixbuf info model
  *
  */
-fbInfoModel_t *ypGetDHCPInfoModel()
+static fbInfoModel_t *
+ypGetDHCPInfoModel(
+    void)
 {
     static fbInfoModel_t *yaf_dhcp_model = NULL;
     if (!yaf_dhcp_model) {
@@ -264,8 +270,6 @@ fbInfoModel_t *ypGetDHCPInfoModel()
 }
 
 
-
-
 /**
  * attachInOrderToSLL
  *
@@ -273,10 +277,10 @@ fbInfoModel_t *ypGetDHCPInfoModel()
  * in order by first options number
  *
  */
-
-void attachInOrderToSLL(
-    dhcpList_t    *list,
-    dhcpOptions_t *newEntry)
+static void
+attachInOrderToSLL(
+    dhcpList_t     *list,
+    dhcpOptions_t  *newEntry)
 {
     dhcpOptions_t *next = list->head;
     dhcpOptions_t *prev = NULL;
@@ -312,25 +316,25 @@ void attachInOrderToSLL(
  * parses an ini config file.
  *
  */
-void parse_name_val(
-    yfDHCPContext_t *ctx,
-    char            *name,
-    char            *value)
+static void
+parse_name_val(
+    yfDHCPContext_t  *ctx,
+    char             *name,
+    char             *value)
 {
-    static char *os_name = NULL;
+    static char   *os_name = NULL;
     dhcpOptions_t *new_op = NULL;
 
     if (strcmp(name, VENDOR) == 0) {
         /* don't care at this point */
         return;
-
     } else if (strcmp(name, OS) == 0) {
         os_name = g_strdup(value);
         return;
     }
 
     if (strcmp(name, FINGERPRINT) == 0) {
-        int n = 0;
+        int     n = 0;
         gchar **f = g_strsplit(value, ",", -1);
 
         new_op = g_new0(dhcpOptions_t, 1);
@@ -344,8 +348,8 @@ void parse_name_val(
         g_strfreev(f);
         attachInOrderToSLL(&(ctx->opList[n]), new_op);
     }
-
 }
+
 
 /**
  * ini_parse
@@ -353,21 +357,21 @@ void parse_name_val(
  * parse an ini-style config file
  *
  */
-int ini_parse(
-    yfDHCPContext_t *ctx,
-    FILE            *file)
+static int
+ini_parse(
+    yfDHCPContext_t  *ctx,
+    FILE             *file)
 {
-
-    char line[MAX_LINE];
-    char section[MAX_NAME]=  "";
-    char prev_name[MAX_NAME] = "";
-    char *start;
-    char *end;
-    char *name;
-    char *comment;
-    char *value;
-    int lineno = 0;
-    int error = 0;
+    char     line[MAX_LINE];
+    char     section[MAX_NAME] =  "";
+    char     prev_name[MAX_NAME] = "";
+    char    *start;
+    char    *end;
+    char    *name;
+    char    *comment;
+    char    *value;
+    int      lineno = 0;
+    int      error = 0;
     gboolean multiline = FALSE;
 
     while (fgets(line, sizeof(line), file) != NULL) {
@@ -384,7 +388,6 @@ int ini_parse(
                 parse_name_val(ctx, prev_name, start);
             }
             /* call something */
-
         } else if (*start == '[') {
             /* a new section */
             comment = strstr(start + 1, ";");
@@ -442,8 +445,9 @@ int ini_parse(
  * @param err
  *
  */
-gboolean ypHookInitialize (
-    yfDHCPContext_t *ctx)
+static gboolean
+ypHookInitialize(
+    yfDHCPContext_t  *ctx)
 {
     FILE *dhcp_fp_File = NULL;
 
@@ -456,7 +460,8 @@ gboolean ypHookInitialize (
         return FALSE;
     }
 
-    g_debug("Initializing Fingerprints from DHCP File %s", ctx->dhcp_fp_FileName);
+    g_debug("Initializing Fingerprints from DHCP File %s",
+            ctx->dhcp_fp_FileName);
 
     ini_parse(ctx, dhcp_fp_File);
 
@@ -474,23 +479,23 @@ gboolean ypHookInitialize (
  * @param paylen size of payload
  *
  */
-void ypDHCPScanner(
-    yfDHCPContext_t       *ctx,
-    ypDHCPFlowValCtx_t    *val,
-    uint8_t               *payload,
-    size_t                paylen)
+static void
+ypDHCPScanner(
+    yfDHCPContext_t     *ctx,
+    ypDHCPFlowValCtx_t  *val,
+    uint8_t             *payload,
+    size_t               paylen)
 {
-
-    dhcpOptions_t      *cur;
-    uint32_t           magic_cookie;
-    uint16_t           offset = 0;
+    dhcpOptions_t *cur;
+    uint32_t       magic_cookie;
+    uint16_t       offset = 0;
     /*uint16_t           op_offset;*/
-    uint8_t            op, op_len = 0;
-    uint8_t            op55len = 0;
-    int                i;
-    int                found = 0;
+    uint8_t        op, op_len = 0;
+    uint8_t        op55len = 0;
+    int            i;
+    int            found = 0;
 
-    if ( paylen < 240 ) {
+    if (paylen < 240) {
         return;
     }
 
@@ -504,13 +509,13 @@ void ypDHCPScanner(
 
     offset += 4;
 
-    while (offset + 2 < paylen) {
+    while ((size_t)offset + 2 < paylen) {
         op = *(payload + offset);
         offset++;
         op_len = *(payload + offset);
         offset++;
         if (op == 55) {
-            if (offset + op_len < paylen) {
+            if ((size_t)offset + op_len < paylen) {
                 /*op_offset = offset;*/
                 op55len = op_len;
                 for (i = 0; i < op_len; i++) {
@@ -519,7 +524,7 @@ void ypDHCPScanner(
             }
         } else if (op == 60) {
             /* Vendor Code */
-            if (offset + op_len < paylen) {
+            if ((size_t)offset + op_len < paylen) {
                 val->vc = (payload + offset);
                 val->vclen = op_len;
             }
@@ -566,12 +571,13 @@ void ypDHCPScanner(
     }
     /* this would export options in dhcp pkt, but how will collector know? */
     /*else {
-        if (op_offset) {
-            val->fp = (char *)(payload + op_offset);
-            val->fplen = op55len;
-        }
-        }*/
+     *  if (op_offset) {
+     *      val->fp = (char *)(payload + op_offset);
+     *      val->fplen = op55len;
+     *  }
+     *  }*/
 }
+
 
 /**
  * flowClose
@@ -581,13 +587,12 @@ void ypDHCPScanner(
  *             context
  *
  */
-
-gboolean ypFlowClose(
-    void        *yfHookContext,
-    yfFlow_t    *flow)
+gboolean
+ypFlowClose(
+    void      *yfHookContext,
+    yfFlow_t  *flow)
 {
-
-    ypDHCPFlowCtx_t   *flowContext = (ypDHCPFlowCtx_t *)yfHookContext;
+    ypDHCPFlowCtx_t *flowContext = (ypDHCPFlowCtx_t *)yfHookContext;
 
     if (flow->appLabel != DHCP_APPLABEL) {
         return TRUE;
@@ -613,31 +618,32 @@ gboolean ypFlowClose(
     return TRUE;
 }
 
+
 /**
  * ypValidateFlowTab
  *
  * returns FALSE if applabel mode is disabled, true otherwise
  *
  */
-gboolean ypValidateFlowTab(
-    void            *yfctx,
-    uint32_t        max_payload,
-    gboolean        uniflow,
-    gboolean        silkmode,
-    gboolean        applabelmode,
-    gboolean        entropymode,
-    gboolean        fingerprintmode,
-    gboolean        fpExportMode,
-    gboolean        udp_max_payload,
-    gboolean        udp_uniflow_mode,
-    GError          **err)
+gboolean
+ypValidateFlowTab(
+    void      *yfctx,
+    uint32_t   max_payload,
+    gboolean   uniflow,
+    gboolean   silkmode,
+    gboolean   applabelmode,
+    gboolean   entropymode,
+    gboolean   fingerprintmode,
+    gboolean   fpExportMode,
+    gboolean   udp_max_payload,
+    uint16_t   udp_uniflow_port,
+    GError   **err)
 {
-
     yfDHCPContext_t *ctx = (yfDHCPContext_t *)yfctx;
 
     if (!applabelmode) {
         g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_IMPL,
-            "ERROR: dhcp_fp_plugin.c will not operate without --applabel");
+                    "ERROR: dhcp_fp_plugin.c will not operate without --applabel");
         return FALSE;
     }
 
@@ -647,8 +653,9 @@ gboolean ypValidateFlowTab(
     }
 
     return TRUE;
-
 }
+
+
 /**
  * flowFree
  *
@@ -657,23 +664,21 @@ gboolean ypValidateFlowTab(
  *
  *
  */
-void ypFlowFree(
-    void     *yfHookContext,
-    yfFlow_t *flow)
+void
+ypFlowFree(
+    void      *yfHookContext,
+    yfFlow_t  *flow)
 {
-
     ypDHCPFlowCtx_t *flowContext = (ypDHCPFlowCtx_t *)yfHookContext;
 
     if (NULL == flowContext) {
         return;
     }
 
-    yg_slice_free1(sizeof(ypDHCPFlowCtx_t), flowContext);
+    g_slice_free1(sizeof(ypDHCPFlowCtx_t), flowContext);
 
     /* the other half of the slab allocator */
     /* free (flowContext); */
-
-    return;
 }
 
 
@@ -693,13 +698,14 @@ void ypFlowFree(
  * @return TRUE to continue tracking this flow, false to drop tracking the flow
  *
  */
-gboolean ypHookPacket(
-    yfFlowKey_t   *key,
-    const uint8_t *pkt,
-    size_t        caplen,
-    uint16_t      iplen,
-    yfTCPInfo_t   *tcpinfo,
-    yfL2Info_t    *l2info)
+gboolean
+ypHookPacket(
+    yfFlowKey_t    *key,
+    const uint8_t  *pkt,
+    size_t          caplen,
+    uint16_t        iplen,
+    yfTCPInfo_t    *tcpinfo,
+    yfL2Info_t     *l2info)
 {
     /* this never decides to drop packet flow */
 
@@ -720,18 +726,17 @@ gboolean ypHookPacket(
  *
  *
  */
-
-void ypFlowPacket(
-    void    *yfHookContext,
-    yfFlow_t        *flow,
-    yfFlowVal_t     *val,
-    const uint8_t   *pkt,
+void
+ypFlowPacket(
+    void           *yfHookContext,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val,
+    const uint8_t  *pkt,
     size_t          caplen,
     uint16_t        iplen,
-    yfTCPInfo_t     *tcpinfo,
-    yfL2Info_t      *l2info)
+    yfTCPInfo_t    *tcpinfo,
+    yfL2Info_t     *l2info)
 {
-    return;
 }
 
 
@@ -753,22 +758,23 @@ void ypFlowPacket(
  *         available and the flow can be closed
  *
  */
-gboolean ypFlowWrite(
-    void                          *yfHookContext,
-    fbSubTemplateMultiList_t      *rec,
-    fbSubTemplateMultiListEntry_t *stml,
-    yfFlow_t                      *flow,
+gboolean
+ypFlowWrite(
+    void                           *yfHookContext,
+    fbSubTemplateMultiList_t       *rec,
+    fbSubTemplateMultiListEntry_t  *stml,
+    yfFlow_t                       *flow,
     GError                        **err)
 {
-    ypDHCPFlowCtx_t      *flowContext = (ypDHCPFlowCtx_t *)yfHookContext;
-    yfDHCP_FP_Flow_t     *dhcp_rec = NULL;
-    yfDHCP_OP_Flow_t     *dhcp_op = NULL;
-    uint8_t              *options = NULL;
-    int                  loop;
-    uint16_t             flags = DHCP_REV;
-    fbInfoModel_t        *model = ypGetDHCPInfoModel();
-    fbTemplate_t         *otmpl = revDhcpOpTemplate;
-    fbTemplate_t         *tmpl = revDhcpTemplate;
+    ypDHCPFlowCtx_t  *flowContext = (ypDHCPFlowCtx_t *)yfHookContext;
+    yfDHCP_FP_Flow_t *dhcp_rec = NULL;
+    yfDHCP_OP_Flow_t *dhcp_op = NULL;
+    uint8_t          *options = NULL;
+    int loop;
+    uint16_t          flags = DHCP_REV;
+    fbInfoModel_t    *model = ypGetDHCPInfoModel();
+    fbTemplate_t     *otmpl = revDhcpOpTemplate;
+    fbTemplate_t     *tmpl = revDhcpTemplate;
 
     if (NULL == flowContext) {
         return TRUE;
@@ -797,13 +803,12 @@ gboolean ypFlowWrite(
     }
 
     if (flowContext->yfctx->export_options) {
-        dhcp_op = (yfDHCP_OP_Flow_t *)fbSubTemplateMultiListEntryInit(stml,
-                                                                      (YAF_DHCP_OP_TID | flags),
-                                                                      otmpl, 1);
-        options = (uint8_t *)fbBasicListInit(&(dhcp_op->options), 3,
-                                             fbInfoModelGetElementByName(model,
-                                                                         "dhcpOption"),
-                                             flowContext->val.count);
+        dhcp_op = (yfDHCP_OP_Flow_t *)fbSubTemplateMultiListEntryInit(
+            stml, (YAF_DHCP_OP_TID | flags), otmpl, 1);
+        options = (uint8_t *)fbBasicListInit(
+            &(dhcp_op->options), 3,
+            fbInfoModelGetElementByName(model, "dhcpOption"),
+            flowContext->val.count);
         for (loop = 0; loop < flowContext->val.count; loop++) {
             *options = flowContext->val.options[loop];
             options++;
@@ -821,10 +826,10 @@ gboolean ypFlowWrite(
                    sizeof(ypDHCPFlowValCtx_t));
             memset(&(flowContext->rval), 0, sizeof(ypDHCPFlowValCtx_t));
         } else if (flags) {
-            options = (uint8_t *)fbBasicListInit(&(dhcp_op->revOptions), 3,
-                                                 fbInfoModelGetElementByName(model,
-                                                                             "dhcpOption"),
-                                                 flowContext->rval.count);
+            options = (uint8_t *)fbBasicListInit(
+                &(dhcp_op->revOptions), 3,
+                fbInfoModelGetElementByName(model, "dhcpOption"),
+                flowContext->rval.count);
             for (loop = 0; loop < flowContext->rval.count; loop++) {
                 *options = flowContext->rval.options[loop];
                 options++;
@@ -840,11 +845,8 @@ gboolean ypFlowWrite(
 
         flowContext->rec = (void *)dhcp_op;
     } else {
-
-        dhcp_rec = (yfDHCP_FP_Flow_t *)fbSubTemplateMultiListEntryInit(stml,
-                                                                       (YAF_DHCP_FLOW_TID | flags),
-                                                                       tmpl, 1);
-
+        dhcp_rec = (yfDHCP_FP_Flow_t *)fbSubTemplateMultiListEntryInit(
+            stml, (YAF_DHCP_FLOW_TID | flags), tmpl, 1);
 
         if (flowContext->val.fp) {
             dhcp_rec->dhcpFP.buf = (uint8_t *)flowContext->val.fp;
@@ -861,7 +863,7 @@ gboolean ypFlowWrite(
         }
 
         /* if uniflow - copy reverse to fwd, when we return to this function
-           everything will be ready */
+         * everything will be ready */
         if (flowContext->yfctx->dhcp_uniflow) {
             memcpy(&(flowContext->val), &(flowContext->rval),
                    sizeof(ypDHCPFlowValCtx_t));
@@ -886,6 +888,7 @@ gboolean ypFlowWrite(
     return TRUE;
 }
 
+
 /**
  * getInfoModel
  *
@@ -895,10 +898,13 @@ gboolean ypFlowWrite(
  * @return a pointer to a fixbuf information element model array
  *
  */
-fbInfoElement_t *ypGetInfoModel()
+fbInfoElement_t *
+ypGetInfoModel(
+    void)
 {
     return infomodel_array_static_yaf_dhcp;
 }
+
 
 /**
  * getTemplate
@@ -908,37 +914,41 @@ fbInfoElement_t *ypGetInfoModel()
  * @return a pointer to the fixbuf info element array for the templates
  *
  */
-gboolean ypGetTemplate(
-    fbSession_t *session)
+gboolean
+ypGetTemplate(
+    fbSession_t  *session)
 {
     GError        *err = NULL;
     fbInfoModel_t *model = ypGetDHCPInfoModel();
-    uint16_t      flags = DHCP_REV;
+    uint16_t       flags = DHCP_REV;
 
     if (options_global) {
         if (!dhcp_uniflow_gl) {
             revDhcpOpTemplate = fbTemplateAlloc(model);
 
-            if (!fbTemplateAppendSpecArray(revDhcpOpTemplate, yaf_dhcp_options_spec,
-                                           flags, &err)) {
-                g_warning("Error adding elements to DHCP Options Template:\n %s",
-                          err->message);
+            if (!fbTemplateAppendSpecArray(
+                    revDhcpOpTemplate, yaf_dhcp_options_spec, flags, &err))
+            {
+                g_warning(
+                    "Error adding elements to DHCP Options Template:\n %s",
+                    err->message);
                 return FALSE;
             }
 
-            if (!YF_fbSessionAddTemplate(session, FALSE,
-                    YAF_DHCP_OP_TID|flags, revDhcpOpTemplate,
-                    "yaf_dhcp_op_rev", NULL, &err))
+            if (!YF_fbSessionAddTemplate(
+                    session, FALSE, YAF_DHCP_OP_TID | flags,
+                    revDhcpOpTemplate, "yaf_dhcp_op_rev", NULL, &err))
             {
                 g_warning("Error adding template %02x: %s",
-                          YAF_DHCP_OP_TID|flags, err->message);
+                          YAF_DHCP_OP_TID | flags, err->message);
                 return FALSE;
             }
         }
 
         dhcpOpTemplate = fbTemplateAlloc(model);
         if (!fbTemplateAppendSpecArray(dhcpOpTemplate, yaf_dhcp_options_spec,
-                                       0, &err)) {
+                                       0, &err))
+        {
             g_warning("Error adding elements to DHCP Options Template:\n %s",
                       err->message);
             return FALSE;
@@ -952,19 +962,19 @@ gboolean ypGetTemplate(
             return FALSE;
         }
     } else {
-
         if (!dhcp_uniflow_gl) {
             revDhcpTemplate = fbTemplateAlloc(model);
             if (!fbTemplateAppendSpecArray(revDhcpTemplate, yaf_dhcp_fp_spec,
-                                           flags, &err)) {
+                                           flags, &err))
+            {
                 g_warning("Error adding elements to DHCP Template:\n %s",
                           err->message);
                 return FALSE;
             }
 
             if (!YF_fbSessionAddTemplate(
-                      session, FALSE, YAF_DHCP_FLOW_TID | flags,
-                      revDhcpTemplate, "yaf_dhcp_rev", NULL, &err))
+                    session, FALSE, YAF_DHCP_FLOW_TID | flags,
+                    revDhcpTemplate, "yaf_dhcp_rev", NULL, &err))
             {
                 g_warning("Error adding template %02x: %s",
                           YAF_DHCP_FLOW_TID | flags, err->message);
@@ -973,7 +983,9 @@ gboolean ypGetTemplate(
         }
 
         dhcpTemplate = fbTemplateAlloc(model);
-        if (!fbTemplateAppendSpecArray(dhcpTemplate, yaf_dhcp_fp_spec, 0, &err)) {
+        if (!fbTemplateAppendSpecArray(dhcpTemplate, yaf_dhcp_fp_spec, 0,
+                                       &err))
+        {
             g_warning("Error adding elements to DHCP Template:\n %s",
                       err->message);
             return FALSE;
@@ -990,19 +1002,21 @@ gboolean ypGetTemplate(
 
     return TRUE;
 }
+
+
 /**
  * setPluginConf
  *
  * sets the pluginConf variable passed from the command line
  *
  */
-void ypSetPluginConf(
-    char * conf,
-    void ** yfctx)
+void
+ypSetPluginConf(
+    const char  *conf,
+    void       **yfctx)
 {
-
     yfDHCPContext_t *newctx = NULL;
-    newctx = (yfDHCPContext_t *)yg_slice_alloc0(sizeof(yfDHCPContext_t));
+    newctx = (yfDHCPContext_t *)g_slice_alloc0(sizeof(yfDHCPContext_t));
 
     newctx->dhcpInitialized = 1;
 
@@ -1014,7 +1028,6 @@ void ypSetPluginConf(
         }
         newctx->export_options = FALSE;
         options_global = FALSE;
-
     } else {
         newctx->export_options = TRUE;
         options_global = TRUE;
@@ -1022,9 +1035,10 @@ void ypSetPluginConf(
     }
 
     *yfctx = (void *)newctx;
-
 }
 
+
+#if 0
 /**
  * ypParsePluginOpt
  *
@@ -1034,14 +1048,15 @@ void ypSetPluginConf(
  *  @param pluginOpt Variable
  *
  */
-void ypParsePluginOpt(
-    const char         *option)
+static void
+ypParsePluginOpt(
+    const char  *option)
 {
     /* No options available - ignore*/
-
-    return;
 }
 
+
+#endif /* 0 */
 
 /**
  * setPluginOpt
@@ -1049,14 +1064,14 @@ void ypParsePluginOpt(
  * sets the pluginOpt variable passed from the command line
  *
  */
-void ypSetPluginOpt(
-    const char * option,
-    void       * yfctx)
+void
+ypSetPluginOpt(
+    const char  *option,
+    void        *yfctx)
 {
-
     /*ypParsePluginOpt(option);*/
-    return;
 }
+
 
 /**
  * scanPayload
@@ -1065,18 +1080,17 @@ void ypSetPluginOpt(
  *
  *
  */
-
-void ypScanPayload(
-    void * yfHookContext,
-    yfFlow_t *flow,
-    const uint8_t *pkt,
-    size_t caplen,
-    pcre *expression,
-    uint16_t offset,
-    uint16_t elementID,
-    uint16_t applabel)
+void
+ypScanPayload(
+    void           *yfHookContext,
+    yfFlow_t       *flow,
+    const uint8_t  *pkt,
+    size_t          caplen,
+    pcre           *expression,
+    uint16_t        offset,
+    uint16_t        elementID,
+    uint16_t        applabel)
 {
-    return;
 }
 
 
@@ -1090,10 +1104,13 @@ void ypScanPayload(
  * appropriately filled in, API version & export data size
  *
  */
-const struct yfHookMetaData* ypGetMetaData ()
+const struct yfHookMetaData *
+ypGetMetaData(
+    void)
 {
     return &metaData;
 }
+
 
 /**
  * ypGetTemplateCount
@@ -1102,11 +1119,11 @@ const struct yfHookMetaData* ypGetMetaData ()
  * main subtemplatemultilist, for DPI - this is usually just 1
  *
  */
-uint8_t ypGetTemplateCount(
-    void            *yfHookContext,
-    yfFlow_t        *flow)
+uint8_t
+ypGetTemplateCount(
+    void      *yfHookContext,
+    yfFlow_t  *flow)
 {
-
     ypDHCPFlowCtx_t *flowContext = (ypDHCPFlowCtx_t *)yfHookContext;
 
     if (NULL == flowContext) {
@@ -1133,13 +1150,15 @@ uint8_t ypGetTemplateCount(
     }
 
     if (flowContext->val.fp || flowContext->rval.fp || flowContext->val.vc ||
-        flowContext->rval.vc || flowContext->val.count || flowContext->rval.count)
+        flowContext->rval.vc || flowContext->val.count ||
+        flowContext->rval.count)
     {
         return 1;
     }
 
     return 0;
 }
+
 
 /**
  * ypFreeLists
@@ -1148,11 +1167,11 @@ uint8_t ypGetTemplateCount(
  *
  *
  */
-void ypFreeLists(
-    void    *yfHookContext,
-    yfFlow_t *flow)
+void
+ypFreeLists(
+    void      *yfHookContext,
+    yfFlow_t  *flow)
 {
-
     ypDHCPFlowCtx_t *flowContext = (ypDHCPFlowCtx_t *)yfHookContext;
 
     if (NULL == flowContext) {
@@ -1172,10 +1191,9 @@ void ypFreeLists(
         }
     }
 
-
     /* No LISTS */
-    return;
 }
 
-#endif  /* YAF_ENABLE_APPLABEL */
-#endif  /* YAF_ENABLE_HOOKS */
+
+#endif /* YAF_ENABLE_APPLABEL */
+#endif /* YAF_ENABLE_HOOKS */

@@ -5,7 +5,7 @@
  ** YAF Layer 2 and Layer 3 decode routines
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell
  ** ------------------------------------------------------------------------
@@ -13,7 +13,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -68,7 +68,8 @@
  * support the export of the first N bytes of a given flow.
  *
  *
- * The structures filled in by yfDecodePkt() are used within the flow generator,
+ * The structures filled in by yfDecodePkt() are used within the flow
+ * generator,
  * and are suitable for other similar purposes.
  */
 
@@ -81,25 +82,25 @@
 /** Fragmentation information structure */
 typedef struct yfIPFragInfo_st {
     /** Fragment ID. This is a 32-bit integer to support both IPv4 and IPv6. */
-    uint32_t        ipid;
+    uint32_t   ipid;
     /** Fragment offset within the reassembled datagram. */
-    uint16_t        offset;
+    uint16_t   offset;
     /** IP header length. Used to calculate total fragment length. */
-    uint16_t        iphlen;
+    uint16_t   iphlen;
     /**
      * Decoded header length. Number of bytes at the start of the packet _not_
      * represented in the associated packet data.
      */
-    uint16_t        l4hlen;
+    uint16_t   l4hlen;
     /**
      * Fragmented packet flag. Set if the packet is a fragment,
      * clear if it is complete.
      */
-    uint8_t         frag;
+    uint8_t    frag;
     /**
      * More fragments flag. Set if this fragment is not the last in the packet.
      */
-    uint8_t         more;
+    uint8_t    more;
 } yfIPFragInfo_t;
 
 /** Maximum MPLS label count */
@@ -108,31 +109,31 @@ typedef struct yfIPFragInfo_st {
 /** Datalink layer information structure */
 typedef struct yfL2Info_st {
     /** Source MAC address */
-    uint8_t         smac[6];
+    uint8_t    smac[6];
     /** Destination MAC address */
-    uint8_t         dmac[6];
+    uint8_t    dmac[6];
     /** Layer 2 Header Length */
-    uint16_t        l2hlen;
+    uint16_t   l2hlen;
     /** VLAN tag */
-    uint16_t        vlan_tag;
+    uint16_t   vlan_tag;
     /** MPLS label count */
-    uint32_t        mpls_count;
+    uint32_t   mpls_count;
     /** MPLS label stack */
-    uint32_t        mpls_label[YF_MPLS_LABEL_COUNT_MAX];
+    uint32_t   mpls_label[YF_MPLS_LABEL_COUNT_MAX];
 } yfL2Info_t;
 
 /** MPTCP information structure */
 typedef struct yfMPTCPInfo_st {
     /** initial dsn */
-    uint64_t        idsn;
+    uint64_t   idsn;
     /** token */
-    uint32_t        token;
+    uint32_t   token;
     /** maximum segment size */
-    uint16_t        mss;
+    uint16_t   mss;
     /** flags */
-    uint8_t         flags;
+    uint8_t    flags;
     /* address id */
-    uint8_t         addrid;
+    uint8_t    addrid;
 } yfMPTCPInfo_t;
 
 /** TCP information structure */
@@ -148,42 +149,42 @@ typedef struct yfTCPInfo_st {
 /** Full packet information structure. Used in the packet ring buffer. */
 typedef struct yfPBuf_st {
     /** Packet timestamp in epoch milliseconds */
-    uint64_t        ptime;
+    uint64_t             ptime;
     /** Flow key containing decoded IP and transport headers. */
-    yfFlowKey_t     key;
+    yfFlowKey_t          key;
     /** Length of all headers, L2, L3, L4 */
-    size_t          allHeaderLen;
+    size_t               allHeaderLen;
     /** pcap header */
-    struct pcap_pkthdr  pcap_hdr;
+    struct pcap_pkthdr   pcap_hdr;
     /** pcap struct */
-    pcap_t          *pcapt;
+    pcap_t              *pcapt;
     /** offset into pcap */
-    uint64_t        pcap_offset;
+    uint64_t             pcap_offset;
     /** caplist */
-    uint16_t        pcap_caplist;
+    uint16_t             pcap_caplist;
     /** Packet IP length. */
-    uint16_t        iplen;
+    uint16_t             iplen;
     /** Interface number packet was decoded from. Currently unused. */
-    uint16_t        ifnum;
+    uint16_t             ifnum;
     /** flag for determining if the packet was fragmented 0-no, 1-yes,
-        2-not fully assembled*/
-    uint8_t         frag;
+     *  2-not fully assembled*/
+    uint8_t              frag;
     /** TCP information structure. */
-    yfTCPInfo_t     tcpinfo;
+    yfTCPInfo_t          tcpinfo;
     /** Decoded layer 2 information. */
-    yfL2Info_t      l2info;
+    yfL2Info_t           l2info;
 # if defined(YAF_ENABLE_P0F) || defined(YAF_ENABLE_FPEXPORT)
     /** Length of IP/TCP Headers */
-    size_t          headerLen;
+    size_t               headerLen;
     /** contains TCP Headers for export if p0f enabled */
-    uint8_t         headerVal[YFP_IPTCPHEADER_SIZE];
-#   endif
+    uint8_t              headerVal[YFP_IPTCPHEADER_SIZE];
+#   endif /* if defined(YAF_ENABLE_P0F) || defined(YAF_ENABLE_FPEXPORT) */
     /** Length of payload available in captured payload buffer. */
-    size_t          paylen;
+    size_t               paylen;
     /**
      * Captured payload buffer. Note that this in a convenience field;
      * the actual field is larger than one byte. */
-    uint8_t         payload[1];
+    uint8_t              payload[1];
 } yfPBuf_t;
 
 /** Size of a packet buffer with payload capture disabled */
@@ -273,19 +274,20 @@ typedef struct yfDecodeCtx_st yfDecodeCtx_t;
  *                 will be left encapsulated.
  * @return a new decode context
  */
+yfDecodeCtx_t *
+yfDecodeCtxAlloc(
+    int        datalink,
+    uint16_t   reqtype,
+    gboolean   gremode);
 
-yfDecodeCtx_t *yfDecodeCtxAlloc(
-    int             datalink,
-    uint16_t        reqtype,
-    gboolean        gremode);
-
-/** Free a decode context.
+/**
+ * Free a decode context.
  *
  * @param ctx A decode context allocated with yfDecodeCtxAlloc()
  */
-
-void yfDecodeCtxFree(
-    yfDecodeCtx_t           *ctx);
+void
+yfDecodeCtxFree(
+    yfDecodeCtx_t  *ctx);
 
 /**
  * Decode a packet into a durable packet buffer. It is assumed the packet
@@ -321,15 +323,15 @@ void yfDecodeCtxFree(
  *         are counted in the decode statistics which can be logged with the
  *         yfDecodeDumpStats() call;
  */
-
-gboolean yfDecodeToPBuf(
-    yfDecodeCtx_t           *ctx,
-    uint64_t                ptime,
-    size_t                  caplen,
-    const uint8_t           *pkt,
-    yfIPFragInfo_t          *fraginfo,
-    size_t                  pbuflen,
-    yfPBuf_t                *pbuf);
+gboolean
+yfDecodeToPBuf(
+    yfDecodeCtx_t   *ctx,
+    uint64_t         ptime,
+    size_t           caplen,
+    const uint8_t   *pkt,
+    yfIPFragInfo_t  *fraginfo,
+    size_t           pbuflen,
+    yfPBuf_t        *pbuf);
 
 /**
  * Utility call to convert a struct timeval (as returned from pcap) into a
@@ -338,9 +340,9 @@ gboolean yfDecodeToPBuf(
  * @param tv        Pointer to struct timeval to convert
  * @return the corresponding timestamp in epoch milliseconds
  */
-
-uint64_t yfDecodeTimeval(
-    const struct timeval    *tv);
+uint64_t
+yfDecodeTimeval(
+    const struct timeval  *tv);
 
 /**
  * Utility call to convert an NTP timestamp (as returned from DAG) into a
@@ -349,9 +351,9 @@ uint64_t yfDecodeTimeval(
  * @param tv        Pointer to struct timeval to convert
  * @return the corresponding timestamp in epoch milliseconds
  */
-
-uint64_t yfDecodeTimeNTP(
-    uint64_t                ntp);
+uint64_t
+yfDecodeTimeNTP(
+    uint64_t   ntp);
 
 /**
  * Print decoder statistics to the log.
@@ -359,10 +361,10 @@ uint64_t yfDecodeTimeNTP(
  * @param ctx decode context to print statistics from
  * @param packetTotal total number of packets observed
  */
-
-void yfDecodeDumpStats(
-    yfDecodeCtx_t       *ctx,
-    uint64_t            packetTotal);
+void
+yfDecodeDumpStats(
+    yfDecodeCtx_t  *ctx,
+    uint64_t        packetTotal);
 
 /**
  * Reset Offset into Pcap if evaluating multiple pcap
@@ -370,8 +372,9 @@ void yfDecodeDumpStats(
  *
  * @param ctx decode context
  */
-void yfDecodeResetOffset(
-    yfDecodeCtx_t *ctx);
+void
+yfDecodeResetOffset(
+    yfDecodeCtx_t  *ctx);
 
 /**
  * Get Stats to Export in Options Records
@@ -379,8 +382,9 @@ void yfDecodeResetOffset(
  * @param ctx decode context to print stats from
  * @return number of packets YAF failed to decode
  */
-uint32_t yfGetDecodeStats(
-    yfDecodeCtx_t *ctx);
+uint32_t
+yfGetDecodeStats(
+    yfDecodeCtx_t  *ctx);
 
 
 /**
@@ -396,13 +400,13 @@ uint32_t yfGetDecodeStats(
  * @param payoff pointer to size of frag payload
  * @return TRUE/FALSE depending if the full TCP header is available
  */
-gboolean yfDefragTCP(
-    uint8_t             *pkt,
-    size_t              *caplen,
-    yfFlowKey_t         *key,
-    yfIPFragInfo_t      *fraginfo,
-    yfTCPInfo_t         *tcpinfo,
-    size_t              *payoff);
+gboolean
+yfDefragTCP(
+    uint8_t         *pkt,
+    size_t          *caplen,
+    yfFlowKey_t     *key,
+    yfIPFragInfo_t  *fraginfo,
+    yfTCPInfo_t     *tcpinfo,
+    size_t          *payoff);
 
-/* end idem */
-#endif
+#endif /* ifndef _YAF_DECODE_H_ */
