@@ -7,7 +7,7 @@
  * http://read.pudn.com/downloads166/ebook/763212/EIP-CIP-V2-1.0.pdf
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2015-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -15,7 +15,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -65,6 +65,7 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 #if YAF_ENABLE_HOOKS
 #include <yaf/yafhooks.h>
@@ -73,22 +74,24 @@
 #define ENIP_PORT_NUMBER 44818
 #define ENIP_OBJECT 286
 
+YC_SCANNER_PROTOTYPE(ethipplugin_LTX_ycEthIPScanScan);
+
 typedef struct ycEthIPMessageHeader_st {
-    uint16_t            command;
-    uint16_t            length;
-    uint32_t            session;
-    uint32_t            status;
-    uint64_t            sender;
-    uint32_t            options;
+    uint16_t   command;
+    uint16_t   length;
+    uint32_t   session;
+    uint32_t   status;
+    uint64_t   sender;
+    uint32_t   options;
 } ycEthIPMessageHeader_t;
 
 
 /* Local Prototypes */
 static
 void
-ycEthIPScanRebuildHeader (
-    uint8_t * payload,
-    ycEthIPMessageHeader_t * header);
+ycEthIPScanRebuildHeader(
+    const uint8_t           *payload,
+    ycEthIPMessageHeader_t  *header);
 
 /**
  * ethipplugin_LTX_ycEthIPScanScan
@@ -107,25 +110,23 @@ ycEthIPScanRebuildHeader (
  * @return ethip_port_number
  *         otherwise 0
  */
-
 uint16_t
 ethipplugin_LTX_ycEthIPScanScan(
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
     uint16_t offset = 0, total_offset = 0;
     uint16_t temp16 = 0;
     uint32_t temp32 = 0;
-    int packets = 0;
+    int      packets = 0;
     gboolean legacy = FALSE;
     ycEthIPMessageHeader_t header;
 
     while (offset < payloadSize) {
-
 #ifndef YAF_ENABLE_HOOKS
         if (packets > 0) {
             goto end;
@@ -133,7 +134,7 @@ ethipplugin_LTX_ycEthIPScanScan(
 #endif
         offset = total_offset;
 
-        if ((offset + 24) > payloadSize) {
+        if (((size_t)offset + 24) > payloadSize) {
             /* must have MBAP Header and function and data */
             goto end;
         }
@@ -149,17 +150,17 @@ ethipplugin_LTX_ycEthIPScanScan(
 
         switch (header.status) {
           case 0x0000:
-            /* success */
+          /* success */
           case 0x0001:
-            /* invalid or unsupported encapsulation command */
+          /* invalid or unsupported encapsulation command */
           case 0x0002:
-            /* insufficient memory resources */
+          /* insufficient memory resources */
           case 0x0003:
-            /* poorly formed or incorrect data */
+          /* poorly formed or incorrect data */
           case 0x0064:
-            /* invalid session handle */
+          /* invalid session handle */
           case 0x0065:
-            /* invalid length */
+          /* invalid length */
           case 0x0069:
             /* unspported encapsulation protocol revision */
             break;
@@ -177,18 +178,19 @@ ethipplugin_LTX_ycEthIPScanScan(
             if (header.status != 0) {
                 goto end;
             }
-            if (header.length == 0 && header.session==0 && header.sender == 0)
+            if (header.length == 0 && header.session == 0 &&
+                header.sender == 0)
             {
                 /* don't allow all 0 packets to go through -
-                   it has to contain something */
+                 * it has to contain something */
                 goto end;
             }
             break;
           case 0x0001:
-            /*case 0x0002:
-          case 0x0003:
-          case 0x0005:
-          case 0x0071:*/
+            /* case 0x0002: */
+            /* case 0x0003: */
+            /* case 0x0005: */
+            /* case 0x0071: */
             /* reserved for legacy, don't allow for now - too many fp */
             legacy = TRUE;
             break;
@@ -199,7 +201,7 @@ ethipplugin_LTX_ycEthIPScanScan(
             }
             /* check for command specific data in Reply */
             if (header.length) {
-                if (offset + 4 < payloadSize) {
+                if ((size_t)offset + 4 < payloadSize) {
                     temp16 = *((uint16_t *)(payload + offset));
                     /* should only have 1 item in list */
                     if (temp16 != 1) {
@@ -215,7 +217,7 @@ ethipplugin_LTX_ycEthIPScanScan(
             }
             break;
           case 0x0063:
-            /*List Identity */
+          /*List Identity */
           case 0x0064:
             /*List Interfaces */
             if (header.status != 0) {
@@ -249,7 +251,7 @@ ethipplugin_LTX_ycEthIPScanScan(
                 goto end;
             }
             /* command specific data */
-            if (offset + 4 > payloadSize) {
+            if ((size_t)offset + 4 > payloadSize) {
                 goto end;
             }
             temp32 = *((uint32_t *)(payload + offset));
@@ -268,7 +270,7 @@ ethipplugin_LTX_ycEthIPScanScan(
                 goto end;
             }
             /* command specific data */
-            if (offset + 4 > payloadSize) {
+            if ((size_t)offset + 4 > payloadSize) {
                 goto end;
             }
             temp32 = *((uint32_t *)(payload + offset));
@@ -295,14 +297,12 @@ ethipplugin_LTX_ycEthIPScanScan(
         }
 
 #if YAF_ENABLE_HOOKS
-        yfHookScanPayload(flow, payload, (total_offset+header.length+24), NULL,
-                          total_offset, ENIP_OBJECT, ENIP_PORT_NUMBER);
+        yfHookScanPayload(flow, payload, (total_offset + header.length + 24),
+                          NULL, total_offset, ENIP_OBJECT, ENIP_PORT_NUMBER);
 #endif
         /* length plus transaction id, protocol id, and length field */
         total_offset += header.length + 24;
         packets++;
-
-
     }
 
   end:
@@ -317,7 +317,6 @@ ethipplugin_LTX_ycEthIPScanScan(
     }
 
     return 0;
-
 }
 
 
@@ -336,11 +335,11 @@ ethipplugin_LTX_ycEthIPScanScan(
  */
 static
 void
-ycEthIPScanRebuildHeader (
-    uint8_t               * payload,
-    ycEthIPMessageHeader_t * header)
+ycEthIPScanRebuildHeader(
+    const uint8_t           *payload,
+    ycEthIPMessageHeader_t  *header)
 {
-    uint16_t              offset = 0;
+    uint16_t offset = 0;
 
     header->command = *((uint16_t *)(payload));
     offset += 2;
@@ -350,15 +349,15 @@ ycEthIPScanRebuildHeader (
     offset += 4;
     header->status = *((uint32_t *)(payload + offset));
     offset += 4;
-    memcpy(&(header->sender), payload+offset, sizeof(uint64_t));
+    memcpy(&(header->sender), payload + offset, sizeof(uint64_t));
     offset += 8;
     header->options = *((uint32_t *)(payload + offset));
     /*
-    g_debug("header->command %02x", header->command);
-    g_debug("header->length %d", header->length);
-    g_debug("header->session_handle %u", header->session);
-    g_debug("header->status %u", header->status);
-    g_debug("header->sender %llu", header->sender);
-    g_debug("header->options %u", header->options);
-    */
+     * g_debug("header->command %02x", header->command);
+     * g_debug("header->length %d", header->length);
+     * g_debug("header->session_handle %u", header->session);
+     * g_debug("header->status %u", header->status);
+     * g_debug("header->sender %llu", header->sender);
+     * g_debug("header->options %u", header->options);
+     */
 }

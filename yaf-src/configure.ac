@@ -11,12 +11,10 @@ dnl GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
 dnl Government Purpose License Rights (GPLR) pursuant to DFARS 252.227-7013
 dnl ------------------------------------------------------------------------
 
-dnl RCSIDENT("$Id$")
-
-AC_INIT([yaf], [2.11.2], [netsa-help@cert.org],[yaf])
+AC_INIT([yaf], [2.12.1], [netsa-help@cert.org],[yaf])
 AC_CONFIG_AUX_DIR([autoconf])
 AC_COPYRIGHT([Copyright (C) 2006-2020 by Carnegie Mellon University
-GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
 Government Purpose License Rights (GPLR) pursuant to DFARS 252.227-7013])
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
@@ -24,7 +22,6 @@ AC_CANONICAL_TARGET
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([1.6.3 foreign subdir-objects])
 LIBCOMPAT="4:0:0"
-AC_REVISION($Revision$)
 AC_CONFIG_HEADERS(include/yaf/config.h)
 AC_CONFIG_HEADERS(airframe/include/airframe/config.h)
 
@@ -174,7 +171,7 @@ dnl ----------------------------------------------------------------------
 GLIB_PRESENT=NO
 GLIB_LDADD=
 
-AM_PATH_GLIB_2_0([2.4.7],[GLIB_PRESENT=YES])
+AM_PATH_GLIB_2_0([2.18.0],[GLIB_PRESENT=YES])
 
 AC_ARG_WITH(glib-static,
 AS_HELP_STRING([--with-glib-static=prefix],[use static glib tree]),[
@@ -195,7 +192,7 @@ fi
 ])
 
 if test x"$GLIB_PRESENT" != "xYES"; then
-  AC_MSG_ERROR([Cannot find a suitable glib2 (>= 2.4.7)])
+  AC_MSG_ERROR([Cannot find a suitable glib2 (>= 2.18.0)])
 fi
 
 AC_SUBST(GLIB_LDADD)
@@ -231,24 +228,10 @@ if test "x$use_popt" = "xyes"; then
         ]
     )
 else
-    if $PKG_CONFIG --atleast-version 2.6.4 glib-2.0 >/dev/null 2>&1 ; then
-        AC_MSG_NOTICE([using GLib for options processing])
-        AC_DEFINE(USE_GOPTION, 1, [Define to 1 to enable use of GOption])
-        AC_SUBST(YAF_REQ_GLIB_VER, [2.6.4])
-        OPTION_CONFIG_STRING=${OPTION_CONFIG_STRING}"glib opt processing|"
-    else
-        AC_SUBST(YAF_REQ_GLIB_VER, [2.4.7])
-        AC_CHECK_LIB(popt,poptParseArgvString, [
-            AC_MSG_NOTICE([using libpopt found in ${with_popt} for options processing])
-            POPT_LDFLAGS="-lpopt"
-            LDFLAGS="$LDFLAGS ${POPT_LDFLAGS}"
-            AC_DEFINE([USE_POPT], 1,
-              [Define to 1 to use libpopt])
-              OPTION_CONFIG_STRING=${OPTION_CONFIG_STRING}"popt from ${with_popt}|"],[
-                AC_MSG_ERROR([Unable to find a suitable library for options processing])
-            ]
-        )
-    fi
+    AC_MSG_NOTICE([using GLib for options processing])
+    AC_DEFINE(USE_GOPTION, 1, [Define to 1 to enable use of GOption])
+    AC_SUBST(YAF_REQ_GLIB_VER, [2.18.0])
+    OPTION_CONFIG_STRING=${OPTION_CONFIG_STRING}"glib opt processing|"
 fi
 
 dnl ----------------------------------------------------------------------

@@ -3,7 +3,7 @@
 ## Makefile.am (toplevel)
 ## autotools build system for YAF
 ## ------------------------------------------------------------------------
-## Copyright (C) 2006-2018 Carnegie Mellon University. All Rights Reserved.
+## Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
 ## ------------------------------------------------------------------------
 ## Authors: Brian Trammell
 ## ------------------------------------------------------------------------

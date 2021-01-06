@@ -6,7 +6,7 @@
  * RFC 1002
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2015-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -14,7 +14,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -64,6 +64,7 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 #define NETDGM_PORT 138
 #define NETDGM_DU  0x10
@@ -73,6 +74,9 @@
 #define NETDGM_QR  0x14
 #define NETDGM_QRP 0x15
 #define NETDGM_QRN 0x16
+
+YC_SCANNER_PROTOTYPE(netdgmplugin_LTX_ycNetDgmScanScan);
+
 /**
  * netdgmplugin_LTX_ycNetDgmScanScan
  *
@@ -92,13 +96,13 @@
  *         otherwise 0
  */
 uint16_t
-netdgmplugin_LTX_ycNetDgmScanScan (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+netdgmplugin_LTX_ycNetDgmScanScan(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
     uint8_t  msgtype;
     uint8_t  flags;

@@ -4,7 +4,7 @@
  * \brief This dumps an ipfix file to outspec or stdout.
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2019 Carnegie Mellon University.
+ ** Copyright (C) 2006-2020 Carnegie Mellon University.
  ** All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Author: Emily Sarneso <ecoff@cert.org>
@@ -12,7 +12,7 @@
  ** @OPENSOURCE_LICENSE_START@
  ** libfixbuf 2.0
  **
- ** Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright 2018-2020 Carnegie Mellon University. All Rights Reserved.
  **
  ** NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
  ** ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -111,7 +111,7 @@ static GOptionEntry id_core_option[] = {
 static void idPrintVersion(
     void)
 {
-    fprintf(stderr,"ipfixDump version %s (c) 2018-2019 Carnegie Mellon "
+    fprintf(stderr,"ipfixDump version %s (c) 2018-2020 Carnegie Mellon "
           "University.\n", FIXBUF_PACKAGE_VERISON);
     fprintf(stderr,"GNU Lesser General Public License (LGPL) Rights "
             "pursuant to Version 2, June 1991\n");

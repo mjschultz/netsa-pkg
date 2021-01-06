@@ -16,7 +16,7 @@ print <<HEAD;
            xmlns="http://www.w3.org/1999/xhtml"
            xmlns:xi="http://www.w3.org/2001/XInclude">
 HEAD
-    
+
 $ul = 0;
 $li = 0;
 
@@ -66,20 +66,20 @@ RELHEAD3
     }
     # Otherwise, assume items are delimited by \n
     else
-    {            
+    {
         while ($notes =~m@(.*?)\n+@msg)
         {
             print "\t\t<li>$1</li>\n";
-        }            
+        }
     }
 
     print <<RELTAIL;
              </ul>
         </p:notes>
-    </p:release>        
+    </p:release>
 RELTAIL
 ;
-    
+
 }
 print <<TAIL;
 </p:project>

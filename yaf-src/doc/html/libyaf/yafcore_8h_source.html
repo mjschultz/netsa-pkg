@@ -67,7 +67,7 @@
 <div class="line"><a name="l00011"></a><span class="lineno">   11</span>&#160;<span class="comment"> ** Use of the YAF system and related source code is subject to the terms</span></div>
 <div class="line"><a name="l00012"></a><span class="lineno">   12</span>&#160;<span class="comment"> ** of the following licenses:</span></div>
 <div class="line"><a name="l00013"></a><span class="lineno">   13</span>&#160;<span class="comment"> **</span></div>
-<div class="line"><a name="l00014"></a><span class="lineno">   14</span>&#160;<span class="comment"> ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991</span></div>
+<div class="line"><a name="l00014"></a><span class="lineno">   14</span>&#160;<span class="comment"> ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991</span></div>
 <div class="line"><a name="l00015"></a><span class="lineno">   15</span>&#160;<span class="comment"> ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013</span></div>
 <div class="line"><a name="l00016"></a><span class="lineno">   16</span>&#160;<span class="comment"> **</span></div>
 <div class="line"><a name="l00017"></a><span class="lineno">   17</span>&#160;<span class="comment"> ** NO WARRANTY</span></div>
@@ -197,101 +197,101 @@
 <div class="line"><a name="l00202"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a0dc0f654dac7b347d8a50b446397faf7">  202</a></span>&#160;<span class="preprocessor">#define YAF_MAX_MPLS_LABELS     3</span></div>
 <div class="line"><a name="l00203"></a><span class="lineno">  203</span>&#160; </div>
 <div class="line"><a name="l00208"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html">  208</a></span>&#160;<span class="keyword">typedef</span> <span class="keyword">struct </span><a class="code" href="structyf_flow_key__st.html">yfFlowKey_st</a> {</div>
-<div class="line"><a name="l00210"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#a5492334625ebb2c584e8037b40110f74">  210</a></span>&#160;    uint16_t            <a class="code" href="structyf_flow_key__st.html#a5492334625ebb2c584e8037b40110f74">sp</a>;</div>
-<div class="line"><a name="l00212"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#aaf1dc99a072368f0b7681a5ec5c6fbb8">  212</a></span>&#160;    uint16_t            <a class="code" href="structyf_flow_key__st.html#aaf1dc99a072368f0b7681a5ec5c6fbb8">dp</a>;</div>
-<div class="line"><a name="l00214"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#ac108ef1e0b8337857abb1192e858f2d2">  214</a></span>&#160;    uint8_t             <a class="code" href="structyf_flow_key__st.html#ac108ef1e0b8337857abb1192e858f2d2">proto</a>;</div>
-<div class="line"><a name="l00216"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#a228979ae186b30c0c22c91d7feb9451a">  216</a></span>&#160;    uint8_t             <a class="code" href="structyf_flow_key__st.html#a228979ae186b30c0c22c91d7feb9451a">version</a>;</div>
-<div class="line"><a name="l00218"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#aaf66da99f33b414f0f4b506c7a95c5e7">  218</a></span>&#160;    uint16_t            <a class="code" href="structyf_flow_key__st.html#aaf66da99f33b414f0f4b506c7a95c5e7">vlanId</a>;</div>
-<div class="line"><a name="l00220"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#a17e41eb5951880854c7dab3bc5f30a43">  220</a></span>&#160;    uint8_t             <a class="code" href="structyf_flow_key__st.html#a17e41eb5951880854c7dab3bc5f30a43">tos</a>;</div>
+<div class="line"><a name="l00210"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#a5492334625ebb2c584e8037b40110f74">  210</a></span>&#160;    uint16_t   <a class="code" href="structyf_flow_key__st.html#a5492334625ebb2c584e8037b40110f74">sp</a>;</div>
+<div class="line"><a name="l00212"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#aaf1dc99a072368f0b7681a5ec5c6fbb8">  212</a></span>&#160;    uint16_t   <a class="code" href="structyf_flow_key__st.html#aaf1dc99a072368f0b7681a5ec5c6fbb8">dp</a>;</div>
+<div class="line"><a name="l00214"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#ac108ef1e0b8337857abb1192e858f2d2">  214</a></span>&#160;    uint8_t    <a class="code" href="structyf_flow_key__st.html#ac108ef1e0b8337857abb1192e858f2d2">proto</a>;</div>
+<div class="line"><a name="l00216"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#a228979ae186b30c0c22c91d7feb9451a">  216</a></span>&#160;    uint8_t    <a class="code" href="structyf_flow_key__st.html#a228979ae186b30c0c22c91d7feb9451a">version</a>;</div>
+<div class="line"><a name="l00218"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#aaf66da99f33b414f0f4b506c7a95c5e7">  218</a></span>&#160;    uint16_t   <a class="code" href="structyf_flow_key__st.html#aaf66da99f33b414f0f4b506c7a95c5e7">vlanId</a>;</div>
+<div class="line"><a name="l00220"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#a17e41eb5951880854c7dab3bc5f30a43">  220</a></span>&#160;    uint8_t    <a class="code" href="structyf_flow_key__st.html#a17e41eb5951880854c7dab3bc5f30a43">tos</a>;</div>
 <div class="line"><a name="l00224"></a><span class="lineno">  224</span>&#160;<span class="preprocessor">#if YAF_ENABLE_DAG_SEPARATE_INTERFACES || YAF_ENABLE_SEPARATE_INTERFACES</span></div>
-<div class="line"><a name="l00225"></a><span class="lineno">  225</span>&#160;    uint8_t             netIf;</div>
+<div class="line"><a name="l00225"></a><span class="lineno">  225</span>&#160;    uint8_t    netIf;</div>
 <div class="line"><a name="l00226"></a><span class="lineno">  226</span>&#160;<span class="preprocessor">#endif</span></div>
 <div class="line"><a name="l00227"></a><span class="lineno">  227</span>&#160; </div>
 <div class="line"><a name="l00228"></a><span class="lineno">  228</span>&#160;    <span class="keyword">union </span>{</div>
 <div class="line"><a name="l00229"></a><span class="lineno">  229</span>&#160;        <span class="keyword">struct </span>{</div>
-<div class="line"><a name="l00231"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#a3464b9231ded43b265432fa08154edcd">  231</a></span>&#160;            uint32_t    <a class="code" href="structyf_flow_key__st.html#a3464b9231ded43b265432fa08154edcd">sip</a>;</div>
-<div class="line"><a name="l00233"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#a38cb0326f01632ee94b02521a136464e">  233</a></span>&#160;            uint32_t    <a class="code" href="structyf_flow_key__st.html#a38cb0326f01632ee94b02521a136464e">dip</a>;</div>
-<div class="line"><a name="l00234"></a><span class="lineno">  234</span>&#160;        }               v4;</div>
+<div class="line"><a name="l00231"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#a3464b9231ded43b265432fa08154edcd">  231</a></span>&#160;            uint32_t   <a class="code" href="structyf_flow_key__st.html#a3464b9231ded43b265432fa08154edcd">sip</a>;</div>
+<div class="line"><a name="l00233"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#a38cb0326f01632ee94b02521a136464e">  233</a></span>&#160;            uint32_t   <a class="code" href="structyf_flow_key__st.html#a38cb0326f01632ee94b02521a136464e">dip</a>;</div>
+<div class="line"><a name="l00234"></a><span class="lineno">  234</span>&#160;        } v4;</div>
 <div class="line"><a name="l00235"></a><span class="lineno">  235</span>&#160;        <span class="keyword">struct </span>{</div>
-<div class="line"><a name="l00237"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#a1f6558fe2a20ad314cc3b22fe092c09e">  237</a></span>&#160;            uint8_t     <a class="code" href="structyf_flow_key__st.html#a3464b9231ded43b265432fa08154edcd">sip</a>[16];</div>
-<div class="line"><a name="l00239"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#a51e529c0ae7c64856f748c567009dfb7">  239</a></span>&#160;            uint8_t     <a class="code" href="structyf_flow_key__st.html#a38cb0326f01632ee94b02521a136464e">dip</a>[16];</div>
-<div class="line"><a name="l00240"></a><span class="lineno">  240</span>&#160;        }               v6;</div>
-<div class="line"><a name="l00241"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#abe25e391198906f8860128d6484b0504">  241</a></span>&#160;    }                   <a class="code" href="structyf_flow_key__st.html#abe25e391198906f8860128d6484b0504">addr</a>;</div>
+<div class="line"><a name="l00237"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#a1f6558fe2a20ad314cc3b22fe092c09e">  237</a></span>&#160;            uint8_t   <a class="code" href="structyf_flow_key__st.html#a3464b9231ded43b265432fa08154edcd">sip</a>[16];</div>
+<div class="line"><a name="l00239"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#a51e529c0ae7c64856f748c567009dfb7">  239</a></span>&#160;            uint8_t   <a class="code" href="structyf_flow_key__st.html#a38cb0326f01632ee94b02521a136464e">dip</a>[16];</div>
+<div class="line"><a name="l00240"></a><span class="lineno">  240</span>&#160;        } v6;</div>
+<div class="line"><a name="l00241"></a><span class="lineno"><a class="line" href="structyf_flow_key__st.html#abe25e391198906f8860128d6484b0504">  241</a></span>&#160;    } <a class="code" href="structyf_flow_key__st.html#abe25e391198906f8860128d6484b0504">addr</a>;</div>
 <div class="line"><a name="l00242"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a1ac4b4f6b2720c2af3c728aec9abd7a2">  242</a></span>&#160;} <a class="code" href="yafcore_8h.html#a1ac4b4f6b2720c2af3c728aec9abd7a2">yfFlowKey_t</a>;</div>
 <div class="line"><a name="l00243"></a><span class="lineno">  243</span>&#160; </div>
 <div class="line"><a name="l00247"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html">  247</a></span>&#160;<span class="keyword">typedef</span> <span class="keyword">struct </span><a class="code" href="structyf_flow_stats__st.html">yfFlowStats_st</a> {</div>
-<div class="line"><a name="l00249"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#a60add6843a0f99ccbc9b9f151496e0a1">  249</a></span>&#160;    uint64_t <a class="code" href="structyf_flow_stats__st.html#a60add6843a0f99ccbc9b9f151496e0a1">iaarray</a>[10];</div>
-<div class="line"><a name="l00251"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#a5012e3545ea35eb1a5742189dcd18e67">  251</a></span>&#160;    uint16_t <a class="code" href="structyf_flow_stats__st.html#a5012e3545ea35eb1a5742189dcd18e67">pktsize</a>[10];</div>
-<div class="line"><a name="l00253"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#aea7a61dca30c9578ecf605bbb0b5f6aa">  253</a></span>&#160;    uint64_t <a class="code" href="structyf_flow_stats__st.html#aea7a61dca30c9578ecf605bbb0b5f6aa">payoct</a>;</div>
-<div class="line"><a name="l00255"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#a27d8a5a74008fa597cfd2ec0755541d0">  255</a></span>&#160;    uint64_t <a class="code" href="structyf_flow_stats__st.html#a27d8a5a74008fa597cfd2ec0755541d0">ltime</a>;</div>
-<div class="line"><a name="l00257"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#adf99a84fc4061b4ee82e6b8689c72a21">  257</a></span>&#160;    uint32_t <a class="code" href="structyf_flow_stats__st.html#adf99a84fc4061b4ee82e6b8689c72a21">tcpurgct</a>;</div>
-<div class="line"><a name="l00259"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#a0df047142cd8181cfd5c18840eff88cc">  259</a></span>&#160;    uint32_t <a class="code" href="structyf_flow_stats__st.html#a0df047142cd8181cfd5c18840eff88cc">smallpktct</a>;</div>
-<div class="line"><a name="l00261"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#a15fde22f85e28fdf1e3eabe518a54ad5">  261</a></span>&#160;    uint32_t <a class="code" href="structyf_flow_stats__st.html#a15fde22f85e28fdf1e3eabe518a54ad5">nonemptypktct</a>;</div>
-<div class="line"><a name="l00263"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#aa79b5da69380f568267b8150a83855cc">  263</a></span>&#160;    uint32_t <a class="code" href="structyf_flow_stats__st.html#aa79b5da69380f568267b8150a83855cc">largepktct</a>;</div>
-<div class="line"><a name="l00265"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#ac1c2835007bd120c0ee446482b170de7">  265</a></span>&#160;    uint32_t <a class="code" href="structyf_flow_stats__st.html#ac1c2835007bd120c0ee446482b170de7">aitime</a>;</div>
-<div class="line"><a name="l00267"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#af83c18e325caffe04dd5edcf25d6908f">  267</a></span>&#160;    uint16_t <a class="code" href="structyf_flow_stats__st.html#af83c18e325caffe04dd5edcf25d6908f">firstpktsize</a>;</div>
-<div class="line"><a name="l00269"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#ada286ad66901bb774ebd99a7de37b5ad">  269</a></span>&#160;    uint16_t <a class="code" href="structyf_flow_stats__st.html#ada286ad66901bb774ebd99a7de37b5ad">maxpktsize</a>;</div>
+<div class="line"><a name="l00249"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#a60add6843a0f99ccbc9b9f151496e0a1">  249</a></span>&#160;    uint64_t   <a class="code" href="structyf_flow_stats__st.html#a60add6843a0f99ccbc9b9f151496e0a1">iaarray</a>[10];</div>
+<div class="line"><a name="l00251"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#a5012e3545ea35eb1a5742189dcd18e67">  251</a></span>&#160;    uint16_t   <a class="code" href="structyf_flow_stats__st.html#a5012e3545ea35eb1a5742189dcd18e67">pktsize</a>[10];</div>
+<div class="line"><a name="l00253"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#aea7a61dca30c9578ecf605bbb0b5f6aa">  253</a></span>&#160;    uint64_t   <a class="code" href="structyf_flow_stats__st.html#aea7a61dca30c9578ecf605bbb0b5f6aa">payoct</a>;</div>
+<div class="line"><a name="l00255"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#a27d8a5a74008fa597cfd2ec0755541d0">  255</a></span>&#160;    uint64_t   <a class="code" href="structyf_flow_stats__st.html#a27d8a5a74008fa597cfd2ec0755541d0">ltime</a>;</div>
+<div class="line"><a name="l00257"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#adf99a84fc4061b4ee82e6b8689c72a21">  257</a></span>&#160;    uint32_t   <a class="code" href="structyf_flow_stats__st.html#adf99a84fc4061b4ee82e6b8689c72a21">tcpurgct</a>;</div>
+<div class="line"><a name="l00259"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#a0df047142cd8181cfd5c18840eff88cc">  259</a></span>&#160;    uint32_t   <a class="code" href="structyf_flow_stats__st.html#a0df047142cd8181cfd5c18840eff88cc">smallpktct</a>;</div>
+<div class="line"><a name="l00261"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#a15fde22f85e28fdf1e3eabe518a54ad5">  261</a></span>&#160;    uint32_t   <a class="code" href="structyf_flow_stats__st.html#a15fde22f85e28fdf1e3eabe518a54ad5">nonemptypktct</a>;</div>
+<div class="line"><a name="l00263"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#aa79b5da69380f568267b8150a83855cc">  263</a></span>&#160;    uint32_t   <a class="code" href="structyf_flow_stats__st.html#aa79b5da69380f568267b8150a83855cc">largepktct</a>;</div>
+<div class="line"><a name="l00265"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#ac1c2835007bd120c0ee446482b170de7">  265</a></span>&#160;    uint32_t   <a class="code" href="structyf_flow_stats__st.html#ac1c2835007bd120c0ee446482b170de7">aitime</a>;</div>
+<div class="line"><a name="l00267"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#af83c18e325caffe04dd5edcf25d6908f">  267</a></span>&#160;    uint16_t   <a class="code" href="structyf_flow_stats__st.html#af83c18e325caffe04dd5edcf25d6908f">firstpktsize</a>;</div>
+<div class="line"><a name="l00269"></a><span class="lineno"><a class="line" href="structyf_flow_stats__st.html#ada286ad66901bb774ebd99a7de37b5ad">  269</a></span>&#160;    uint16_t   <a class="code" href="structyf_flow_stats__st.html#ada286ad66901bb774ebd99a7de37b5ad">maxpktsize</a>;</div>
 <div class="line"><a name="l00270"></a><span class="lineno"><a class="line" href="yafcore_8h.html#ae3d57343f0a558146a78d44e621bb5fa">  270</a></span>&#160;} <a class="code" href="yafcore_8h.html#ae3d57343f0a558146a78d44e621bb5fa">yfFlowStats_t</a>;</div>
 <div class="line"><a name="l00271"></a><span class="lineno">  271</span>&#160; </div>
 <div class="line"><a name="l00276"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html">  276</a></span>&#160;<span class="keyword">typedef</span> <span class="keyword">struct </span><a class="code" href="structyf_flow_val__st.html">yfFlowVal_st</a> {</div>
-<div class="line"><a name="l00278"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a902636c62db3c441cba644bc14b3c2af">  278</a></span>&#160;    uint64_t    <a class="code" href="structyf_flow_val__st.html#a902636c62db3c441cba644bc14b3c2af">oct</a>;</div>
-<div class="line"><a name="l00280"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a0baf2e2be638df09c8de5c3356a4d45b">  280</a></span>&#160;    uint64_t    <a class="code" href="structyf_flow_val__st.html#a0baf2e2be638df09c8de5c3356a4d45b">pkt</a>;</div>
+<div class="line"><a name="l00278"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a902636c62db3c441cba644bc14b3c2af">  278</a></span>&#160;    uint64_t        <a class="code" href="structyf_flow_val__st.html#a902636c62db3c441cba644bc14b3c2af">oct</a>;</div>
+<div class="line"><a name="l00280"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a0baf2e2be638df09c8de5c3356a4d45b">  280</a></span>&#160;    uint64_t        <a class="code" href="structyf_flow_val__st.html#a0baf2e2be638df09c8de5c3356a4d45b">pkt</a>;</div>
 <div class="line"><a name="l00281"></a><span class="lineno">  281</span>&#160;<span class="preprocessor">#   if YAF_ENABLE_PAYLOAD</span></div>
 <div class="line"><a name="l00282"></a><span class="lineno">  282</span>&#160; </div>
-<div class="line"><a name="l00283"></a><span class="lineno">  283</span>&#160;    uint32_t    paylen;</div>
-<div class="line"><a name="l00285"></a><span class="lineno">  285</span>&#160;    uint8_t     *payload;</div>
-<div class="line"><a name="l00287"></a><span class="lineno">  287</span>&#160;    <span class="keywordtype">size_t</span>      *paybounds;</div>
-<div class="line"><a name="l00288"></a><span class="lineno">  288</span>&#160;<span class="preprocessor">#   endif</span></div>
+<div class="line"><a name="l00283"></a><span class="lineno">  283</span>&#160;    uint32_t        paylen;</div>
+<div class="line"><a name="l00285"></a><span class="lineno">  285</span>&#160;    uint8_t        *payload;</div>
+<div class="line"><a name="l00287"></a><span class="lineno">  287</span>&#160;    <span class="keywordtype">size_t</span>         *paybounds;</div>
+<div class="line"><a name="l00288"></a><span class="lineno">  288</span>&#160;<span class="preprocessor">#   endif </span><span class="comment">/* if YAF_ENABLE_PAYLOAD */</span><span class="preprocessor"></span></div>
 <div class="line"><a name="l00289"></a><span class="lineno">  289</span>&#160; </div>
-<div class="line"><a name="l00290"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#ae286c7a4e163374af85fd83a9ea21943">  290</a></span>&#160;    uint32_t    <a class="code" href="structyf_flow_val__st.html#ae286c7a4e163374af85fd83a9ea21943">isn</a>;</div>
-<div class="line"><a name="l00292"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a12721b48b1cb4d780b4cb1f4c6a79ee2">  292</a></span>&#160;    uint32_t    <a class="code" href="structyf_flow_val__st.html#a12721b48b1cb4d780b4cb1f4c6a79ee2">lsn</a>;</div>
-<div class="line"><a name="l00294"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a965b5611a1cdb30961570db8c05ec946">  294</a></span>&#160;    uint16_t    <a class="code" href="structyf_flow_val__st.html#a965b5611a1cdb30961570db8c05ec946">first_pkt_size</a>;</div>
-<div class="line"><a name="l00296"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a970ca5b621f3c6818af38e587a6e4d1d">  296</a></span>&#160;    uint16_t    <a class="code" href="structyf_flow_val__st.html#a970ca5b621f3c6818af38e587a6e4d1d">attributes</a>;</div>
-<div class="line"><a name="l00298"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a23e2de2c48d5e1bbb05d60d603c7f07f">  298</a></span>&#160;    uint8_t     <a class="code" href="structyf_flow_val__st.html#a23e2de2c48d5e1bbb05d60d603c7f07f">iflags</a>;</div>
-<div class="line"><a name="l00300"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a9ce255f378ee49e061e7c478d0b5df2c">  300</a></span>&#160;    uint8_t     <a class="code" href="structyf_flow_val__st.html#a9ce255f378ee49e061e7c478d0b5df2c">uflags</a>;</div>
-<div class="line"><a name="l00302"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a20a70a6ffc37e331d8d2517a80b7a99b">  302</a></span>&#160;    uint8_t     <a class="code" href="structyf_flow_val__st.html#a20a70a6ffc37e331d8d2517a80b7a99b">appkt</a>;</div>
-<div class="line"><a name="l00304"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#ac277efe86433384583f8c70d38a0ab43">  304</a></span>&#160;    uint16_t    <a class="code" href="structyf_flow_val__st.html#ac277efe86433384583f8c70d38a0ab43">vlan</a>;</div>
+<div class="line"><a name="l00290"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#ae286c7a4e163374af85fd83a9ea21943">  290</a></span>&#160;    uint32_t        <a class="code" href="structyf_flow_val__st.html#ae286c7a4e163374af85fd83a9ea21943">isn</a>;</div>
+<div class="line"><a name="l00292"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a12721b48b1cb4d780b4cb1f4c6a79ee2">  292</a></span>&#160;    uint32_t        <a class="code" href="structyf_flow_val__st.html#a12721b48b1cb4d780b4cb1f4c6a79ee2">lsn</a>;</div>
+<div class="line"><a name="l00294"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a965b5611a1cdb30961570db8c05ec946">  294</a></span>&#160;    uint16_t        <a class="code" href="structyf_flow_val__st.html#a965b5611a1cdb30961570db8c05ec946">first_pkt_size</a>;</div>
+<div class="line"><a name="l00296"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a970ca5b621f3c6818af38e587a6e4d1d">  296</a></span>&#160;    uint16_t        <a class="code" href="structyf_flow_val__st.html#a970ca5b621f3c6818af38e587a6e4d1d">attributes</a>;</div>
+<div class="line"><a name="l00298"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a23e2de2c48d5e1bbb05d60d603c7f07f">  298</a></span>&#160;    uint8_t         <a class="code" href="structyf_flow_val__st.html#a23e2de2c48d5e1bbb05d60d603c7f07f">iflags</a>;</div>
+<div class="line"><a name="l00300"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a9ce255f378ee49e061e7c478d0b5df2c">  300</a></span>&#160;    uint8_t         <a class="code" href="structyf_flow_val__st.html#a9ce255f378ee49e061e7c478d0b5df2c">uflags</a>;</div>
+<div class="line"><a name="l00302"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a20a70a6ffc37e331d8d2517a80b7a99b">  302</a></span>&#160;    uint8_t         <a class="code" href="structyf_flow_val__st.html#a20a70a6ffc37e331d8d2517a80b7a99b">appkt</a>;</div>
+<div class="line"><a name="l00304"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#ac277efe86433384583f8c70d38a0ab43">  304</a></span>&#160;    uint16_t        <a class="code" href="structyf_flow_val__st.html#ac277efe86433384583f8c70d38a0ab43">vlan</a>;</div>
 <div class="line"><a name="l00305"></a><span class="lineno">  305</span>&#160;<span class="preprocessor">#   if YAF_ENABLE_SEPARATE_INTERFACES</span></div>
-<div class="line"><a name="l00306"></a><span class="lineno">  306</span>&#160;    uint8_t     netIf;</div>
+<div class="line"><a name="l00306"></a><span class="lineno">  306</span>&#160;    uint8_t         netIf;</div>
 <div class="line"><a name="l00307"></a><span class="lineno">  307</span>&#160;<span class="preprocessor">#   endif</span></div>
 <div class="line"><a name="l00308"></a><span class="lineno">  308</span>&#160;<span class="preprocessor">#   if YAF_ENABLE_ENTROPY</span></div>
 <div class="line"><a name="l00309"></a><span class="lineno">  309</span>&#160; </div>
-<div class="line"><a name="l00310"></a><span class="lineno">  310</span>&#160;    uint8_t     entropy;</div>
-<div class="line"><a name="l00312"></a><span class="lineno">  312</span>&#160;    uint8_t     entpad[7];</div>
-<div class="line"><a name="l00313"></a><span class="lineno">  313</span>&#160;<span class="preprocessor">#   endif</span></div>
+<div class="line"><a name="l00310"></a><span class="lineno">  310</span>&#160;    uint8_t         entropy;</div>
+<div class="line"><a name="l00312"></a><span class="lineno">  312</span>&#160;    uint8_t         entpad[7];</div>
+<div class="line"><a name="l00313"></a><span class="lineno">  313</span>&#160;<span class="preprocessor">#   endif </span><span class="comment">/* if YAF_ENABLE_ENTROPY */</span><span class="preprocessor"></span></div>
 <div class="line"><a name="l00314"></a><span class="lineno">  314</span>&#160;<span class="preprocessor">#   if YAF_ENABLE_P0F</span></div>
 <div class="line"><a name="l00315"></a><span class="lineno">  315</span>&#160; </div>
-<div class="line"><a name="l00316"></a><span class="lineno">  316</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">char</span>  *osname;</div>
-<div class="line"><a name="l00318"></a><span class="lineno">  318</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">char</span>  *osver;</div>
-<div class="line"><a name="l00320"></a><span class="lineno">  320</span>&#160;    uint8_t     fuzzyMatch;</div>
-<div class="line"><a name="l00322"></a><span class="lineno">  322</span>&#160;    uint8_t     fuzzyPad[7];</div>
-<div class="line"><a name="l00324"></a><span class="lineno">  324</span>&#160;    <span class="keywordtype">char</span>        *osFingerPrint;</div>
-<div class="line"><a name="l00325"></a><span class="lineno">  325</span>&#160;<span class="preprocessor">#   endif</span></div>
+<div class="line"><a name="l00316"></a><span class="lineno">  316</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">char</span>     *osname;</div>
+<div class="line"><a name="l00318"></a><span class="lineno">  318</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">char</span>     *osver;</div>
+<div class="line"><a name="l00320"></a><span class="lineno">  320</span>&#160;    uint8_t         fuzzyMatch;</div>
+<div class="line"><a name="l00322"></a><span class="lineno">  322</span>&#160;    uint8_t         fuzzyPad[7];</div>
+<div class="line"><a name="l00324"></a><span class="lineno">  324</span>&#160;    <span class="keywordtype">char</span>           *osFingerPrint;</div>
+<div class="line"><a name="l00325"></a><span class="lineno">  325</span>&#160;<span class="preprocessor">#   endif </span><span class="comment">/* if YAF_ENABLE_P0F */</span><span class="preprocessor"></span></div>
 <div class="line"><a name="l00326"></a><span class="lineno">  326</span>&#160;<span class="preprocessor">#   if YAF_ENABLE_FPEXPORT</span></div>
 <div class="line"><a name="l00327"></a><span class="lineno">  327</span>&#160; </div>
-<div class="line"><a name="l00328"></a><span class="lineno">  328</span>&#160;    uint32_t    firstPacketLen;</div>
-<div class="line"><a name="l00330"></a><span class="lineno">  330</span>&#160;    uint32_t    secondPacketLen;</div>
-<div class="line"><a name="l00332"></a><span class="lineno">  332</span>&#160;    uint8_t     *firstPacket;</div>
-<div class="line"><a name="l00334"></a><span class="lineno">  334</span>&#160;    uint8_t     *secondPacket;</div>
-<div class="line"><a name="l00335"></a><span class="lineno">  335</span>&#160;<span class="preprocessor">#   endif</span></div>
+<div class="line"><a name="l00328"></a><span class="lineno">  328</span>&#160;    uint32_t        firstPacketLen;</div>
+<div class="line"><a name="l00330"></a><span class="lineno">  330</span>&#160;    uint32_t        secondPacketLen;</div>
+<div class="line"><a name="l00332"></a><span class="lineno">  332</span>&#160;    uint8_t        *firstPacket;</div>
+<div class="line"><a name="l00334"></a><span class="lineno">  334</span>&#160;    uint8_t        *secondPacket;</div>
+<div class="line"><a name="l00335"></a><span class="lineno">  335</span>&#160;<span class="preprocessor">#   endif </span><span class="comment">/* if YAF_ENABLE_FPEXPORT */</span><span class="preprocessor"></span></div>
 <div class="line"><a name="l00336"></a><span class="lineno">  336</span>&#160; </div>
-<div class="line"><a name="l00337"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a502b105653ed4e9121115a32fa5c84bb">  337</a></span>&#160;    <a class="code" href="structyf_flow_stats__st.html">yfFlowStats_t</a> *<a class="code" href="structyf_flow_val__st.html#a502b105653ed4e9121115a32fa5c84bb">stats</a>;</div>
+<div class="line"><a name="l00337"></a><span class="lineno"><a class="line" href="structyf_flow_val__st.html#a502b105653ed4e9121115a32fa5c84bb">  337</a></span>&#160;    <a class="code" href="structyf_flow_stats__st.html">yfFlowStats_t</a>  *<a class="code" href="structyf_flow_val__st.html#a502b105653ed4e9121115a32fa5c84bb">stats</a>;</div>
 <div class="line"><a name="l00338"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a9c408b16b38eab11ab595368798ac304">  338</a></span>&#160;} <a class="code" href="yafcore_8h.html#a9c408b16b38eab11ab595368798ac304">yfFlowVal_t</a>;</div>
 <div class="line"><a name="l00339"></a><span class="lineno">  339</span>&#160; </div>
 <div class="line"><a name="l00340"></a><span class="lineno">  340</span>&#160;<span class="preprocessor">#if YAF_MPLS</span></div>
 <div class="line"><a name="l00341"></a><span class="lineno">  341</span>&#160;<span class="keyword">typedef</span> <span class="keyword">struct </span>yfMPLSNode_st {</div>
-<div class="line"><a name="l00343"></a><span class="lineno">  343</span>&#160;    GHashTable       *tab;</div>
-<div class="line"><a name="l00345"></a><span class="lineno">  345</span>&#160;    uint32_t         mpls_label[<a class="code" href="yafcore_8h.html#a0dc0f654dac7b347d8a50b446397faf7">YAF_MAX_MPLS_LABELS</a>];</div>
-<div class="line"><a name="l00347"></a><span class="lineno">  347</span>&#160;    <span class="keywordtype">int</span>              tab_count;</div>
+<div class="line"><a name="l00343"></a><span class="lineno">  343</span>&#160;    GHashTable  *tab;</div>
+<div class="line"><a name="l00345"></a><span class="lineno">  345</span>&#160;    uint32_t     mpls_label[<a class="code" href="yafcore_8h.html#a0dc0f654dac7b347d8a50b446397faf7">YAF_MAX_MPLS_LABELS</a>];</div>
+<div class="line"><a name="l00347"></a><span class="lineno">  347</span>&#160;    <span class="keywordtype">int</span>          tab_count;</div>
 <div class="line"><a name="l00348"></a><span class="lineno">  348</span>&#160;} yfMPLSNode_t;</div>
-<div class="line"><a name="l00349"></a><span class="lineno">  349</span>&#160;<span class="preprocessor">#endif</span></div>
+<div class="line"><a name="l00349"></a><span class="lineno">  349</span>&#160;<span class="preprocessor">#endif </span><span class="comment">/* if YAF_MPLS */</span><span class="preprocessor"></span></div>
 <div class="line"><a name="l00350"></a><span class="lineno">  350</span>&#160; </div>
 <div class="line"><a name="l00351"></a><span class="lineno"><a class="line" href="structyf_m_p_t_c_p_flow__st.html">  351</a></span>&#160;<span class="keyword">typedef</span> <span class="keyword">struct </span><a class="code" href="structyf_m_p_t_c_p_flow__st.html">yfMPTCPFlow_st</a> {</div>
-<div class="line"><a name="l00353"></a><span class="lineno"><a class="line" href="structyf_m_p_t_c_p_flow__st.html#a3f24968fcbce7932fd22824254a63d5d">  353</a></span>&#160;    uint64_t          <a class="code" href="structyf_m_p_t_c_p_flow__st.html#a3f24968fcbce7932fd22824254a63d5d">idsn</a>;</div>
-<div class="line"><a name="l00355"></a><span class="lineno"><a class="line" href="structyf_m_p_t_c_p_flow__st.html#a982d157eb2d5788213886e396cb4e5a4">  355</a></span>&#160;    uint32_t          <a class="code" href="structyf_m_p_t_c_p_flow__st.html#a982d157eb2d5788213886e396cb4e5a4">token</a>;</div>
-<div class="line"><a name="l00357"></a><span class="lineno"><a class="line" href="structyf_m_p_t_c_p_flow__st.html#a42c37dd2218df14fdd448ebd1bde6439">  357</a></span>&#160;    uint16_t          <a class="code" href="structyf_m_p_t_c_p_flow__st.html#a42c37dd2218df14fdd448ebd1bde6439">mss</a>;</div>
-<div class="line"><a name="l00359"></a><span class="lineno"><a class="line" href="structyf_m_p_t_c_p_flow__st.html#a9271452781c9a7066f766e8523be9dc5">  359</a></span>&#160;    uint8_t           <a class="code" href="structyf_m_p_t_c_p_flow__st.html#a9271452781c9a7066f766e8523be9dc5">addrid</a>;</div>
-<div class="line"><a name="l00361"></a><span class="lineno"><a class="line" href="structyf_m_p_t_c_p_flow__st.html#ad00f8029110c5e1eead9dd567864464d">  361</a></span>&#160;    uint8_t           <a class="code" href="structyf_m_p_t_c_p_flow__st.html#ad00f8029110c5e1eead9dd567864464d">flags</a>;</div>
+<div class="line"><a name="l00353"></a><span class="lineno"><a class="line" href="structyf_m_p_t_c_p_flow__st.html#a3f24968fcbce7932fd22824254a63d5d">  353</a></span>&#160;    uint64_t   <a class="code" href="structyf_m_p_t_c_p_flow__st.html#a3f24968fcbce7932fd22824254a63d5d">idsn</a>;</div>
+<div class="line"><a name="l00355"></a><span class="lineno"><a class="line" href="structyf_m_p_t_c_p_flow__st.html#a982d157eb2d5788213886e396cb4e5a4">  355</a></span>&#160;    uint32_t   <a class="code" href="structyf_m_p_t_c_p_flow__st.html#a982d157eb2d5788213886e396cb4e5a4">token</a>;</div>
+<div class="line"><a name="l00357"></a><span class="lineno"><a class="line" href="structyf_m_p_t_c_p_flow__st.html#a42c37dd2218df14fdd448ebd1bde6439">  357</a></span>&#160;    uint16_t   <a class="code" href="structyf_m_p_t_c_p_flow__st.html#a42c37dd2218df14fdd448ebd1bde6439">mss</a>;</div>
+<div class="line"><a name="l00359"></a><span class="lineno"><a class="line" href="structyf_m_p_t_c_p_flow__st.html#a9271452781c9a7066f766e8523be9dc5">  359</a></span>&#160;    uint8_t    <a class="code" href="structyf_m_p_t_c_p_flow__st.html#a9271452781c9a7066f766e8523be9dc5">addrid</a>;</div>
+<div class="line"><a name="l00361"></a><span class="lineno"><a class="line" href="structyf_m_p_t_c_p_flow__st.html#ad00f8029110c5e1eead9dd567864464d">  361</a></span>&#160;    uint8_t    <a class="code" href="structyf_m_p_t_c_p_flow__st.html#ad00f8029110c5e1eead9dd567864464d">flags</a>;</div>
 <div class="line"><a name="l00362"></a><span class="lineno">  362</span>&#160;} <a class="code" href="structyf_m_p_t_c_p_flow__st.html">yfMPTCPFlow_t</a>;</div>
 <div class="line"><a name="l00363"></a><span class="lineno">  363</span>&#160; </div>
 <div class="line"><a name="l00364"></a><span class="lineno">  364</span>&#160; </div>
@@ -300,9 +300,9 @@
 <div class="line"><a name="l00375"></a><span class="lineno"><a class="line" href="structyf_flow__st.html#af67afa1d3822e8bcfea4e0af78e779f8">  375</a></span>&#160;    uint64_t        <a class="code" href="structyf_flow__st.html#af67afa1d3822e8bcfea4e0af78e779f8">etime</a>;</div>
 <div class="line"><a name="l00376"></a><span class="lineno">  376</span>&#160;<span class="preprocessor">#ifdef YAF_ENABLE_HOOKS</span></div>
 <div class="line"><a name="l00377"></a><span class="lineno">  377</span>&#160; </div>
-<div class="line"><a name="l00381"></a><span class="lineno">  381</span>&#160;    <span class="keywordtype">void</span>            *hfctx[<a class="code" href="yafcore_8h.html#a2395ccdd70f26be0ecef94cca543efda">YAF_MAX_HOOKS</a>];</div>
+<div class="line"><a name="l00381"></a><span class="lineno">  381</span>&#160;    <span class="keywordtype">void</span>           *hfctx[<a class="code" href="yafcore_8h.html#a2395ccdd70f26be0ecef94cca543efda">YAF_MAX_HOOKS</a>];</div>
 <div class="line"><a name="l00382"></a><span class="lineno">  382</span>&#160;<span class="preprocessor">#endif</span></div>
-<div class="line"><a name="l00383"></a><span class="lineno">  383</span>&#160;     <span class="comment">/*</span></div>
+<div class="line"><a name="l00383"></a><span class="lineno">  383</span>&#160;    <span class="comment">/*</span></div>
 <div class="line"><a name="l00384"></a><span class="lineno">  384</span>&#160;<span class="comment">     * Reverse flow delta start time in milliseconds. Equivalent to initial</span></div>
 <div class="line"><a name="l00385"></a><span class="lineno">  385</span>&#160;<span class="comment">     * packet round-trip time; useful for decomposing biflows into uniflows.</span></div>
 <div class="line"><a name="l00386"></a><span class="lineno">  386</span>&#160;<span class="comment">     */</span></div>
@@ -323,10 +323,10 @@
 <div class="line"><a name="l00405"></a><span class="lineno"><a class="line" href="structyf_flow__st.html#af36f6cfa4087c362f576cab006daaab1">  405</a></span>&#160;    uint8_t         <a class="code" href="structyf_flow__st.html#af36f6cfa4087c362f576cab006daaab1">pcap_file_no</a>;</div>
 <div class="line"><a name="l00407"></a><span class="lineno"><a class="line" href="structyf_flow__st.html#a7ece787277b6f0cfd8f8016c94331c45">  407</a></span>&#160;    uint8_t         <a class="code" href="structyf_flow__st.html#a7ece787277b6f0cfd8f8016c94331c45">pktdir</a>;</div>
 <div class="line"><a name="l00409"></a><span class="lineno"><a class="line" href="structyf_flow__st.html#a4423aaae63ce3b9f3c18add7176a0888">  409</a></span>&#160;    uint8_t         <a class="code" href="structyf_flow__st.html#a4423aaae63ce3b9f3c18add7176a0888">rtos</a>;</div>
-<div class="line"><a name="l00411"></a><span class="lineno"><a class="line" href="structyf_flow__st.html#abf79ccca78e9434e29f3a361a4d2cb5b">  411</a></span>&#160;    pcap_dumper_t   *<a class="code" href="structyf_flow__st.html#abf79ccca78e9434e29f3a361a4d2cb5b">pcap</a>;</div>
+<div class="line"><a name="l00411"></a><span class="lineno"><a class="line" href="structyf_flow__st.html#abf79ccca78e9434e29f3a361a4d2cb5b">  411</a></span>&#160;    pcap_dumper_t  *<a class="code" href="structyf_flow__st.html#abf79ccca78e9434e29f3a361a4d2cb5b">pcap</a>;</div>
 <div class="line"><a name="l00412"></a><span class="lineno">  412</span>&#160;<span class="preprocessor">#if YAF_MPLS</span></div>
 <div class="line"><a name="l00413"></a><span class="lineno">  413</span>&#160; </div>
-<div class="line"><a name="l00414"></a><span class="lineno">  414</span>&#160;    yfMPLSNode_t    *mpls;</div>
+<div class="line"><a name="l00414"></a><span class="lineno">  414</span>&#160;    yfMPLSNode_t   *mpls;</div>
 <div class="line"><a name="l00415"></a><span class="lineno">  415</span>&#160;<span class="preprocessor">#endif</span></div>
 <div class="line"><a name="l00416"></a><span class="lineno">  416</span>&#160; </div>
 <div class="line"><a name="l00417"></a><span class="lineno"><a class="line" href="structyf_flow__st.html#a991367ba45047ac303e8dfc3df05dbb8">  417</a></span>&#160;    <a class="code" href="structyf_m_p_t_c_p_flow__st.html">yfMPTCPFlow_t</a>   <a class="code" href="structyf_flow__st.html#a991367ba45047ac303e8dfc3df05dbb8">mptcp</a>;</div>
@@ -335,131 +335,158 @@
 <div class="line"><a name="l00423"></a><span class="lineno"><a class="line" href="structyf_flow__st.html#a8004f0df8ff7d3039d714c8dc9914084">  423</a></span>&#160;    <a class="code" href="structyf_flow_key__st.html">yfFlowKey_t</a>     <a class="code" href="structyf_flow__st.html#a8004f0df8ff7d3039d714c8dc9914084">key</a>;</div>
 <div class="line"><a name="l00424"></a><span class="lineno"><a class="line" href="yafcore_8h.html#ac846c7e494485aceab2fcdec4264f90f">  424</a></span>&#160;} <a class="code" href="yafcore_8h.html#ac846c7e494485aceab2fcdec4264f90f">yfFlow_t</a>;</div>
 <div class="line"><a name="l00425"></a><span class="lineno">  425</span>&#160; </div>
-<div class="line"><a name="l00434"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a68a8f1cdca0c20efb8bce1dd0e6917c1">  434</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="yafcore_8h.html#a68a8f1cdca0c20efb8bce1dd0e6917c1">yfAlignmentCheck</a>(<span class="keywordtype">void</span>);</div>
-<div class="line"><a name="l00435"></a><span class="lineno">  435</span>&#160; </div>
-<div class="line"><a name="l00436"></a><span class="lineno">  436</span>&#160; </div>
-<div class="line"><a name="l00445"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a96a23294d877e529cacc564bb3a51488">  445</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="yafcore_8h.html#a96a23294d877e529cacc564bb3a51488">yfFlowPrepare</a>(</div>
-<div class="line"><a name="l00446"></a><span class="lineno">  446</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>          *flow);</div>
-<div class="line"><a name="l00447"></a><span class="lineno">  447</span>&#160; </div>
-<div class="line"><a name="l00455"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a771c185221c27f7b69374c40b208a0e3">  455</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="yafcore_8h.html#a771c185221c27f7b69374c40b208a0e3">yfFlowCleanup</a>(</div>
-<div class="line"><a name="l00456"></a><span class="lineno">  456</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>          *flow);</div>
-<div class="line"><a name="l00457"></a><span class="lineno">  457</span>&#160; </div>
-<div class="line"><a name="l00470"></a><span class="lineno"><a class="line" href="yafcore_8h.html#aa9b26834bd6afb77df5ef7512612ab53">  470</a></span>&#160;fBuf_t *<a class="code" href="yafcore_8h.html#aa9b26834bd6afb77df5ef7512612ab53">yfWriterForFile</a>(</div>
-<div class="line"><a name="l00471"></a><span class="lineno">  471</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">char</span>              *path,</div>
-<div class="line"><a name="l00472"></a><span class="lineno">  472</span>&#160;    uint32_t                domain,</div>
-<div class="line"><a name="l00473"></a><span class="lineno">  473</span>&#160;    gboolean                export_meta,</div>
-<div class="line"><a name="l00474"></a><span class="lineno">  474</span>&#160;    GError                  **err);</div>
-<div class="line"><a name="l00475"></a><span class="lineno">  475</span>&#160; </div>
-<div class="line"><a name="l00490"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a04f7111fef9987b4f227f77b09115663">  490</a></span>&#160;fBuf_t *<a class="code" href="yafcore_8h.html#a04f7111fef9987b4f227f77b09115663">yfWriterForFP</a>(</div>
-<div class="line"><a name="l00491"></a><span class="lineno">  491</span>&#160;    FILE                    *fp,</div>
-<div class="line"><a name="l00492"></a><span class="lineno">  492</span>&#160;    uint32_t                domain,</div>
-<div class="line"><a name="l00493"></a><span class="lineno">  493</span>&#160;    gboolean                export_meta,</div>
-<div class="line"><a name="l00494"></a><span class="lineno">  494</span>&#160;    GError                  **err);</div>
-<div class="line"><a name="l00495"></a><span class="lineno">  495</span>&#160; </div>
-<div class="line"><a name="l00506"></a><span class="lineno"><a class="line" href="yafcore_8h.html#af5fade3de6363844ac8d55470e81f9df">  506</a></span>&#160;fBuf_t *<a class="code" href="yafcore_8h.html#af5fade3de6363844ac8d55470e81f9df">yfWriterForSpec</a>(</div>
-<div class="line"><a name="l00507"></a><span class="lineno">  507</span>&#160;    fbConnSpec_t            *spec,</div>
-<div class="line"><a name="l00508"></a><span class="lineno">  508</span>&#160;    uint32_t                domain,</div>
-<div class="line"><a name="l00509"></a><span class="lineno">  509</span>&#160;    gboolean                export_meta,</div>
-<div class="line"><a name="l00510"></a><span class="lineno">  510</span>&#160;    GError                  **err);</div>
-<div class="line"><a name="l00511"></a><span class="lineno">  511</span>&#160; </div>
-<div class="line"><a name="l00512"></a><span class="lineno">  512</span>&#160; </div>
-<div class="line"><a name="l00513"></a><span class="lineno">  513</span>&#160;<span class="preprocessor">#ifdef HAVE_SPREAD</span></div>
+<div class="line"><a name="l00434"></a><span class="lineno">  434</span>&#160;<span class="keywordtype">void</span></div>
+<div class="line"><a name="l00435"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a68a8f1cdca0c20efb8bce1dd0e6917c1">  435</a></span>&#160;<a class="code" href="yafcore_8h.html#a68a8f1cdca0c20efb8bce1dd0e6917c1">yfAlignmentCheck</a>(</div>
+<div class="line"><a name="l00436"></a><span class="lineno">  436</span>&#160;    <span class="keywordtype">void</span>);</div>
+<div class="line"><a name="l00437"></a><span class="lineno">  437</span>&#160; </div>
+<div class="line"><a name="l00438"></a><span class="lineno">  438</span>&#160; </div>
+<div class="line"><a name="l00446"></a><span class="lineno">  446</span>&#160;<span class="keywordtype">void</span></div>
+<div class="line"><a name="l00447"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a96a23294d877e529cacc564bb3a51488">  447</a></span>&#160;<a class="code" href="yafcore_8h.html#a96a23294d877e529cacc564bb3a51488">yfFlowPrepare</a>(</div>
+<div class="line"><a name="l00448"></a><span class="lineno">  448</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>  *flow);</div>
+<div class="line"><a name="l00449"></a><span class="lineno">  449</span>&#160; </div>
+<div class="line"><a name="l00456"></a><span class="lineno">  456</span>&#160;<span class="keywordtype">void</span></div>
+<div class="line"><a name="l00457"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a771c185221c27f7b69374c40b208a0e3">  457</a></span>&#160;<a class="code" href="yafcore_8h.html#a771c185221c27f7b69374c40b208a0e3">yfFlowCleanup</a>(</div>
+<div class="line"><a name="l00458"></a><span class="lineno">  458</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>  *flow);</div>
+<div class="line"><a name="l00459"></a><span class="lineno">  459</span>&#160; </div>
+<div class="line"><a name="l00471"></a><span class="lineno">  471</span>&#160;fBuf_t *</div>
+<div class="line"><a name="l00472"></a><span class="lineno"><a class="line" href="yafcore_8h.html#aa9b26834bd6afb77df5ef7512612ab53">  472</a></span>&#160;<a class="code" href="yafcore_8h.html#aa9b26834bd6afb77df5ef7512612ab53">yfWriterForFile</a>(</div>
+<div class="line"><a name="l00473"></a><span class="lineno">  473</span>&#160;    <span class="keyword">const</span> <span class="keywordtype">char</span>  *path,</div>
+<div class="line"><a name="l00474"></a><span class="lineno">  474</span>&#160;    uint32_t     domain,</div>
+<div class="line"><a name="l00475"></a><span class="lineno">  475</span>&#160;    gboolean     export_meta,</div>
+<div class="line"><a name="l00476"></a><span class="lineno">  476</span>&#160;    GError     **err);</div>
+<div class="line"><a name="l00477"></a><span class="lineno">  477</span>&#160; </div>
+<div class="line"><a name="l00491"></a><span class="lineno">  491</span>&#160;fBuf_t *</div>
+<div class="line"><a name="l00492"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a04f7111fef9987b4f227f77b09115663">  492</a></span>&#160;<a class="code" href="yafcore_8h.html#a04f7111fef9987b4f227f77b09115663">yfWriterForFP</a>(</div>
+<div class="line"><a name="l00493"></a><span class="lineno">  493</span>&#160;    FILE      *fp,</div>
+<div class="line"><a name="l00494"></a><span class="lineno">  494</span>&#160;    uint32_t   domain,</div>
+<div class="line"><a name="l00495"></a><span class="lineno">  495</span>&#160;    gboolean   export_meta,</div>
+<div class="line"><a name="l00496"></a><span class="lineno">  496</span>&#160;    GError   **err);</div>
+<div class="line"><a name="l00497"></a><span class="lineno">  497</span>&#160; </div>
+<div class="line"><a name="l00507"></a><span class="lineno">  507</span>&#160;fBuf_t *</div>
+<div class="line"><a name="l00508"></a><span class="lineno"><a class="line" href="yafcore_8h.html#af5fade3de6363844ac8d55470e81f9df">  508</a></span>&#160;<a class="code" href="yafcore_8h.html#af5fade3de6363844ac8d55470e81f9df">yfWriterForSpec</a>(</div>
+<div class="line"><a name="l00509"></a><span class="lineno">  509</span>&#160;    fbConnSpec_t  *spec,</div>
+<div class="line"><a name="l00510"></a><span class="lineno">  510</span>&#160;    uint32_t       domain,</div>
+<div class="line"><a name="l00511"></a><span class="lineno">  511</span>&#160;    gboolean       export_meta,</div>
+<div class="line"><a name="l00512"></a><span class="lineno">  512</span>&#160;    GError       **err);</div>
+<div class="line"><a name="l00513"></a><span class="lineno">  513</span>&#160; </div>
 <div class="line"><a name="l00514"></a><span class="lineno">  514</span>&#160; </div>
-<div class="line"><a name="l00527"></a><span class="lineno">  527</span>&#160;fBuf_t *yfWriterForSpread(</div>
-<div class="line"><a name="l00528"></a><span class="lineno">  528</span>&#160;    fbSpreadParams_t       *params,</div>
-<div class="line"><a name="l00529"></a><span class="lineno">  529</span>&#160;    uint32_t               domain,</div>
-<div class="line"><a name="l00530"></a><span class="lineno">  530</span>&#160;    uint16_t               *spreadGroupIndex,</div>
-<div class="line"><a name="l00531"></a><span class="lineno">  531</span>&#160;    gboolean               export_meta,</div>
-<div class="line"><a name="l00532"></a><span class="lineno">  532</span>&#160;    GError                 **err);</div>
-<div class="line"><a name="l00533"></a><span class="lineno">  533</span>&#160; </div>
-<div class="line"><a name="l00534"></a><span class="lineno">  534</span>&#160;<span class="preprocessor">#endif </span><span class="comment">/* HAVE_SPREAD */</span><span class="preprocessor"></span></div>
+<div class="line"><a name="l00515"></a><span class="lineno">  515</span>&#160;<span class="preprocessor">#ifdef HAVE_SPREAD</span></div>
+<div class="line"><a name="l00516"></a><span class="lineno">  516</span>&#160; </div>
+<div class="line"><a name="l00528"></a><span class="lineno">  528</span>&#160;fBuf_t *</div>
+<div class="line"><a name="l00529"></a><span class="lineno">  529</span>&#160;yfWriterForSpread(</div>
+<div class="line"><a name="l00530"></a><span class="lineno">  530</span>&#160;    fbSpreadParams_t  *params,</div>
+<div class="line"><a name="l00531"></a><span class="lineno">  531</span>&#160;    uint32_t           domain,</div>
+<div class="line"><a name="l00532"></a><span class="lineno">  532</span>&#160;    uint16_t          *spreadGroupIndex,</div>
+<div class="line"><a name="l00533"></a><span class="lineno">  533</span>&#160;    gboolean           export_meta,</div>
+<div class="line"><a name="l00534"></a><span class="lineno">  534</span>&#160;    GError           **err);</div>
 <div class="line"><a name="l00535"></a><span class="lineno">  535</span>&#160; </div>
-<div class="line"><a name="l00548"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a107643892b9846c39b27ecea4b90cf35">  548</a></span>&#160;gboolean <a class="code" href="yafcore_8h.html#a107643892b9846c39b27ecea4b90cf35">yfWriteOptionsDataFlows</a>(</div>
-<div class="line"><a name="l00549"></a><span class="lineno">  549</span>&#160;    <span class="keywordtype">void</span>               *yfContext,</div>
-<div class="line"><a name="l00550"></a><span class="lineno">  550</span>&#160;    uint32_t           pcap_drop,</div>
-<div class="line"><a name="l00551"></a><span class="lineno">  551</span>&#160;    GTimer             *timer,</div>
-<div class="line"><a name="l00552"></a><span class="lineno">  552</span>&#160;    GError             **err);</div>
-<div class="line"><a name="l00553"></a><span class="lineno">  553</span>&#160; </div>
-<div class="line"><a name="l00568"></a><span class="lineno"><a class="line" href="yafcore_8h.html#aad688e7ab8e1c8a7c221db81b8b4ab9b">  568</a></span>&#160;gboolean <a class="code" href="yafcore_8h.html#aad688e7ab8e1c8a7c221db81b8b4ab9b">yfWriteStatsFlow</a>(</div>
-<div class="line"><a name="l00569"></a><span class="lineno">  569</span>&#160;    <span class="keywordtype">void</span> *yfContext,</div>
-<div class="line"><a name="l00570"></a><span class="lineno">  570</span>&#160;    uint32_t pcap_drop,</div>
-<div class="line"><a name="l00571"></a><span class="lineno">  571</span>&#160;    GTimer *timer,</div>
-<div class="line"><a name="l00572"></a><span class="lineno">  572</span>&#160;    GError **err);</div>
-<div class="line"><a name="l00573"></a><span class="lineno">  573</span>&#160; </div>
-<div class="line"><a name="l00585"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a791a57ef2c8c5e66afa9ca3b9ceaa298">  585</a></span>&#160;gboolean <a class="code" href="yafcore_8h.html#a791a57ef2c8c5e66afa9ca3b9ceaa298">yfWriteTombstoneFlow</a>(</div>
-<div class="line"><a name="l00586"></a><span class="lineno">  586</span>&#160;    <span class="keywordtype">void</span> *yfContext,</div>
-<div class="line"><a name="l00587"></a><span class="lineno">  587</span>&#160;    GError **err);</div>
-<div class="line"><a name="l00588"></a><span class="lineno">  588</span>&#160; </div>
-<div class="line"><a name="l00601"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a4aba445d9e6561395ee1a2de5a91ac15">  601</a></span>&#160;gboolean <a class="code" href="yafcore_8h.html#a4aba445d9e6561395ee1a2de5a91ac15">yfWriteFlow</a>(</div>
-<div class="line"><a name="l00602"></a><span class="lineno">  602</span>&#160;    <span class="keywordtype">void</span>                *yfContext,</div>
-<div class="line"><a name="l00603"></a><span class="lineno">  603</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>            *flow,</div>
-<div class="line"><a name="l00604"></a><span class="lineno">  604</span>&#160;    GError              **err);</div>
-<div class="line"><a name="l00605"></a><span class="lineno">  605</span>&#160; </div>
-<div class="line"><a name="l00618"></a><span class="lineno"><a class="line" href="yafcore_8h.html#ace9d2497ad9dfacc3abb8cc20a95492b">  618</a></span>&#160;gboolean <a class="code" href="yafcore_8h.html#ace9d2497ad9dfacc3abb8cc20a95492b">yfWriterClose</a>(</div>
-<div class="line"><a name="l00619"></a><span class="lineno">  619</span>&#160;    fBuf_t          *fbuf,</div>
-<div class="line"><a name="l00620"></a><span class="lineno">  620</span>&#160;    gboolean        flush,</div>
-<div class="line"><a name="l00621"></a><span class="lineno">  621</span>&#160;    GError          **err);</div>
-<div class="line"><a name="l00622"></a><span class="lineno">  622</span>&#160; </div>
-<div class="line"><a name="l00627"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a15cb87d59c756b4b5185eec7b10518e0">  627</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="yafcore_8h.html#a15cb87d59c756b4b5185eec7b10518e0">yfWriterExportPayload</a>(</div>
-<div class="line"><a name="l00628"></a><span class="lineno">  628</span>&#160;    <span class="keywordtype">int</span>                max_payload);</div>
-<div class="line"><a name="l00629"></a><span class="lineno">  629</span>&#160; </div>
-<div class="line"><a name="l00634"></a><span class="lineno"><a class="line" href="yafcore_8h.html#acf608a94a2469d3b6777c3b92aa9937e">  634</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="yafcore_8h.html#acf608a94a2469d3b6777c3b92aa9937e">yfWriterExportMappedV6</a>(</div>
-<div class="line"><a name="l00635"></a><span class="lineno">  635</span>&#160;    gboolean           map_mode);</div>
-<div class="line"><a name="l00636"></a><span class="lineno">  636</span>&#160; </div>
-<div class="line"><a name="l00649"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a17ef8e5b972e0ec36d372a703604c85f">  649</a></span>&#160;fBuf_t *<a class="code" href="yafcore_8h.html#a17ef8e5b972e0ec36d372a703604c85f">yfReaderForFP</a>(</div>
-<div class="line"><a name="l00650"></a><span class="lineno">  650</span>&#160;    fBuf_t          *fbuf,</div>
-<div class="line"><a name="l00651"></a><span class="lineno">  651</span>&#160;    FILE            *fp,</div>
-<div class="line"><a name="l00652"></a><span class="lineno">  652</span>&#160;    GError          **err);</div>
-<div class="line"><a name="l00653"></a><span class="lineno">  653</span>&#160; </div>
-<div class="line"><a name="l00670"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a99e3f8d2e81765581ee143c1e5b77571">  670</a></span>&#160;fbListener_t *<a class="code" href="yafcore_8h.html#a99e3f8d2e81765581ee143c1e5b77571">yfListenerForSpec</a>(</div>
-<div class="line"><a name="l00671"></a><span class="lineno">  671</span>&#160;    fbConnSpec_t        *spec,</div>
-<div class="line"><a name="l00672"></a><span class="lineno">  672</span>&#160;    fbListenerAppInit_fn    appinit,</div>
-<div class="line"><a name="l00673"></a><span class="lineno">  673</span>&#160;    fbListenerAppFree_fn    appfree,</div>
-<div class="line"><a name="l00674"></a><span class="lineno">  674</span>&#160;    GError              **err);</div>
-<div class="line"><a name="l00675"></a><span class="lineno">  675</span>&#160; </div>
-<div class="line"><a name="l00691"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a4916880e1835ed3bc8d2912791076caf">  691</a></span>&#160;gboolean <a class="code" href="yafcore_8h.html#a4916880e1835ed3bc8d2912791076caf">yfReadFlow</a>(</div>
-<div class="line"><a name="l00692"></a><span class="lineno">  692</span>&#160;    fBuf_t          *fbuf,</div>
-<div class="line"><a name="l00693"></a><span class="lineno">  693</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>        *flow,</div>
-<div class="line"><a name="l00694"></a><span class="lineno">  694</span>&#160;    GError          **err);</div>
-<div class="line"><a name="l00695"></a><span class="lineno">  695</span>&#160; </div>
-<div class="line"><a name="l00714"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a2508ff2b0d463c2689e382e4b46bc167">  714</a></span>&#160;gboolean <a class="code" href="yafcore_8h.html#a2508ff2b0d463c2689e382e4b46bc167">yfReadFlowExtended</a>(</div>
-<div class="line"><a name="l00715"></a><span class="lineno">  715</span>&#160;    fBuf_t                  *fbuf,</div>
-<div class="line"><a name="l00716"></a><span class="lineno">  716</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>                *flow,</div>
-<div class="line"><a name="l00717"></a><span class="lineno">  717</span>&#160;    GError                  **err);</div>
-<div class="line"><a name="l00718"></a><span class="lineno">  718</span>&#160; </div>
-<div class="line"><a name="l00726"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a65663f982cb1eec1717c9608584c2ff0">  726</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="yafcore_8h.html#a65663f982cb1eec1717c9608584c2ff0">yfPrintString</a>(</div>
-<div class="line"><a name="l00727"></a><span class="lineno">  727</span>&#160;    GString             *rstr,</div>
-<div class="line"><a name="l00728"></a><span class="lineno">  728</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>            *flow);</div>
-<div class="line"><a name="l00729"></a><span class="lineno">  729</span>&#160; </div>
-<div class="line"><a name="l00738"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a7320f2e7a349df396c09ebfccbb9311a">  738</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="yafcore_8h.html#a7320f2e7a349df396c09ebfccbb9311a">yfPrintDelimitedString</a>(</div>
-<div class="line"><a name="l00739"></a><span class="lineno">  739</span>&#160;    GString                 *rstr,</div>
-<div class="line"><a name="l00740"></a><span class="lineno">  740</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>                *flow,</div>
-<div class="line"><a name="l00741"></a><span class="lineno">  741</span>&#160;    gboolean                yaft_mac);</div>
-<div class="line"><a name="l00742"></a><span class="lineno">  742</span>&#160; </div>
-<div class="line"><a name="l00752"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a84556dc608d472f7efa5c7a22a1ed714">  752</a></span>&#160;gboolean <a class="code" href="yafcore_8h.html#a84556dc608d472f7efa5c7a22a1ed714">yfPrint</a>(</div>
-<div class="line"><a name="l00753"></a><span class="lineno">  753</span>&#160;    FILE                *out,</div>
-<div class="line"><a name="l00754"></a><span class="lineno">  754</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>            *flow,</div>
-<div class="line"><a name="l00755"></a><span class="lineno">  755</span>&#160;    GError              **err);</div>
-<div class="line"><a name="l00756"></a><span class="lineno">  756</span>&#160; </div>
-<div class="line"><a name="l00767"></a><span class="lineno"><a class="line" href="yafcore_8h.html#ac67f74d1debf3a8af50537cfa714fd2b">  767</a></span>&#160;gboolean <a class="code" href="yafcore_8h.html#ac67f74d1debf3a8af50537cfa714fd2b">yfPrintDelimited</a>(</div>
-<div class="line"><a name="l00768"></a><span class="lineno">  768</span>&#160;    FILE                *out,</div>
-<div class="line"><a name="l00769"></a><span class="lineno">  769</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>            *flow,</div>
-<div class="line"><a name="l00770"></a><span class="lineno">  770</span>&#160;    gboolean            yaft_mac,</div>
-<div class="line"><a name="l00771"></a><span class="lineno">  771</span>&#160;    GError              **err);</div>
-<div class="line"><a name="l00772"></a><span class="lineno">  772</span>&#160; </div>
-<div class="line"><a name="l00782"></a><span class="lineno"><a class="line" href="yafcore_8h.html#ad77e6ac6049bf5feb7c9d4c2430a4ce1">  782</a></span>&#160;<span class="keywordtype">void</span> <a class="code" href="yafcore_8h.html#ad77e6ac6049bf5feb7c9d4c2430a4ce1">yfPrintColumnHeaders</a>(</div>
-<div class="line"><a name="l00783"></a><span class="lineno">  783</span>&#160;        FILE           *out,</div>
-<div class="line"><a name="l00784"></a><span class="lineno">  784</span>&#160;        gboolean       yaft_mac,</div>
-<div class="line"><a name="l00785"></a><span class="lineno">  785</span>&#160;        GError         **err);</div>
-<div class="line"><a name="l00786"></a><span class="lineno">  786</span>&#160; </div>
-<div class="line"><a name="l00787"></a><span class="lineno">  787</span>&#160;<span class="preprocessor">#if YAF_ENABLE_HOOKS</span></div>
-<div class="line"><a name="l00788"></a><span class="lineno">  788</span>&#160; </div>
-<div class="line"><a name="l00793"></a><span class="lineno">  793</span>&#160;fbInfoModel_t *yfDPIInfoModel();</div>
-<div class="line"><a name="l00794"></a><span class="lineno">  794</span>&#160;<span class="preprocessor">#endif</span></div>
-<div class="line"><a name="l00795"></a><span class="lineno">  795</span>&#160; </div>
-<div class="line"><a name="l00796"></a><span class="lineno">  796</span>&#160; </div>
-<div class="line"><a name="l00797"></a><span class="lineno">  797</span>&#160; </div>
-<div class="line"><a name="l00798"></a><span class="lineno">  798</span>&#160;<span class="preprocessor">#endif</span></div>
+<div class="line"><a name="l00536"></a><span class="lineno">  536</span>&#160;<span class="preprocessor">#endif </span><span class="comment">/* HAVE_SPREAD */</span><span class="preprocessor"></span></div>
+<div class="line"><a name="l00537"></a><span class="lineno">  537</span>&#160; </div>
+<div class="line"><a name="l00550"></a><span class="lineno">  550</span>&#160;gboolean</div>
+<div class="line"><a name="l00551"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a107643892b9846c39b27ecea4b90cf35">  551</a></span>&#160;<a class="code" href="yafcore_8h.html#a107643892b9846c39b27ecea4b90cf35">yfWriteOptionsDataFlows</a>(</div>
+<div class="line"><a name="l00552"></a><span class="lineno">  552</span>&#160;    <span class="keywordtype">void</span>      *yfContext,</div>
+<div class="line"><a name="l00553"></a><span class="lineno">  553</span>&#160;    uint32_t   pcap_drop,</div>
+<div class="line"><a name="l00554"></a><span class="lineno">  554</span>&#160;    GTimer    *timer,</div>
+<div class="line"><a name="l00555"></a><span class="lineno">  555</span>&#160;    GError   **err);</div>
+<div class="line"><a name="l00556"></a><span class="lineno">  556</span>&#160; </div>
+<div class="line"><a name="l00571"></a><span class="lineno">  571</span>&#160;gboolean</div>
+<div class="line"><a name="l00572"></a><span class="lineno"><a class="line" href="yafcore_8h.html#aad688e7ab8e1c8a7c221db81b8b4ab9b">  572</a></span>&#160;<a class="code" href="yafcore_8h.html#aad688e7ab8e1c8a7c221db81b8b4ab9b">yfWriteStatsFlow</a>(</div>
+<div class="line"><a name="l00573"></a><span class="lineno">  573</span>&#160;    <span class="keywordtype">void</span>      *yfContext,</div>
+<div class="line"><a name="l00574"></a><span class="lineno">  574</span>&#160;    uint32_t   pcap_drop,</div>
+<div class="line"><a name="l00575"></a><span class="lineno">  575</span>&#160;    GTimer    *timer,</div>
+<div class="line"><a name="l00576"></a><span class="lineno">  576</span>&#160;    GError   **err);</div>
+<div class="line"><a name="l00577"></a><span class="lineno">  577</span>&#160; </div>
+<div class="line"><a name="l00589"></a><span class="lineno">  589</span>&#160;gboolean</div>
+<div class="line"><a name="l00590"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a791a57ef2c8c5e66afa9ca3b9ceaa298">  590</a></span>&#160;<a class="code" href="yafcore_8h.html#a791a57ef2c8c5e66afa9ca3b9ceaa298">yfWriteTombstoneFlow</a>(</div>
+<div class="line"><a name="l00591"></a><span class="lineno">  591</span>&#160;    <span class="keywordtype">void</span>    *yfContext,</div>
+<div class="line"><a name="l00592"></a><span class="lineno">  592</span>&#160;    GError **err);</div>
+<div class="line"><a name="l00593"></a><span class="lineno">  593</span>&#160; </div>
+<div class="line"><a name="l00605"></a><span class="lineno">  605</span>&#160;gboolean</div>
+<div class="line"><a name="l00606"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a4aba445d9e6561395ee1a2de5a91ac15">  606</a></span>&#160;<a class="code" href="yafcore_8h.html#a4aba445d9e6561395ee1a2de5a91ac15">yfWriteFlow</a>(</div>
+<div class="line"><a name="l00607"></a><span class="lineno">  607</span>&#160;    <span class="keywordtype">void</span>      *yfContext,</div>
+<div class="line"><a name="l00608"></a><span class="lineno">  608</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>  *flow,</div>
+<div class="line"><a name="l00609"></a><span class="lineno">  609</span>&#160;    GError   **err);</div>
+<div class="line"><a name="l00610"></a><span class="lineno">  610</span>&#160; </div>
+<div class="line"><a name="l00622"></a><span class="lineno">  622</span>&#160;gboolean</div>
+<div class="line"><a name="l00623"></a><span class="lineno"><a class="line" href="yafcore_8h.html#ace9d2497ad9dfacc3abb8cc20a95492b">  623</a></span>&#160;<a class="code" href="yafcore_8h.html#ace9d2497ad9dfacc3abb8cc20a95492b">yfWriterClose</a>(</div>
+<div class="line"><a name="l00624"></a><span class="lineno">  624</span>&#160;    fBuf_t    *fbuf,</div>
+<div class="line"><a name="l00625"></a><span class="lineno">  625</span>&#160;    gboolean   flush,</div>
+<div class="line"><a name="l00626"></a><span class="lineno">  626</span>&#160;    GError   **err);</div>
+<div class="line"><a name="l00627"></a><span class="lineno">  627</span>&#160; </div>
+<div class="line"><a name="l00631"></a><span class="lineno">  631</span>&#160;<span class="keywordtype">void</span></div>
+<div class="line"><a name="l00632"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a15cb87d59c756b4b5185eec7b10518e0">  632</a></span>&#160;<a class="code" href="yafcore_8h.html#a15cb87d59c756b4b5185eec7b10518e0">yfWriterExportPayload</a>(</div>
+<div class="line"><a name="l00633"></a><span class="lineno">  633</span>&#160;    <span class="keywordtype">int</span>   max_payload);</div>
+<div class="line"><a name="l00634"></a><span class="lineno">  634</span>&#160; </div>
+<div class="line"><a name="l00638"></a><span class="lineno">  638</span>&#160;<span class="keywordtype">void</span></div>
+<div class="line"><a name="l00639"></a><span class="lineno"><a class="line" href="yafcore_8h.html#acf608a94a2469d3b6777c3b92aa9937e">  639</a></span>&#160;<a class="code" href="yafcore_8h.html#acf608a94a2469d3b6777c3b92aa9937e">yfWriterExportMappedV6</a>(</div>
+<div class="line"><a name="l00640"></a><span class="lineno">  640</span>&#160;    gboolean   map_mode);</div>
+<div class="line"><a name="l00641"></a><span class="lineno">  641</span>&#160; </div>
+<div class="line"><a name="l00654"></a><span class="lineno">  654</span>&#160;fBuf_t *</div>
+<div class="line"><a name="l00655"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a17ef8e5b972e0ec36d372a703604c85f">  655</a></span>&#160;<a class="code" href="yafcore_8h.html#a17ef8e5b972e0ec36d372a703604c85f">yfReaderForFP</a>(</div>
+<div class="line"><a name="l00656"></a><span class="lineno">  656</span>&#160;    fBuf_t  *fbuf,</div>
+<div class="line"><a name="l00657"></a><span class="lineno">  657</span>&#160;    FILE    *fp,</div>
+<div class="line"><a name="l00658"></a><span class="lineno">  658</span>&#160;    GError **err);</div>
+<div class="line"><a name="l00659"></a><span class="lineno">  659</span>&#160; </div>
+<div class="line"><a name="l00675"></a><span class="lineno">  675</span>&#160;fbListener_t *</div>
+<div class="line"><a name="l00676"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a99e3f8d2e81765581ee143c1e5b77571">  676</a></span>&#160;<a class="code" href="yafcore_8h.html#a99e3f8d2e81765581ee143c1e5b77571">yfListenerForSpec</a>(</div>
+<div class="line"><a name="l00677"></a><span class="lineno">  677</span>&#160;    fbConnSpec_t          *spec,</div>
+<div class="line"><a name="l00678"></a><span class="lineno">  678</span>&#160;    fbListenerAppInit_fn   appinit,</div>
+<div class="line"><a name="l00679"></a><span class="lineno">  679</span>&#160;    fbListenerAppFree_fn   appfree,</div>
+<div class="line"><a name="l00680"></a><span class="lineno">  680</span>&#160;    GError               **err);</div>
+<div class="line"><a name="l00681"></a><span class="lineno">  681</span>&#160; </div>
+<div class="line"><a name="l00696"></a><span class="lineno">  696</span>&#160;gboolean</div>
+<div class="line"><a name="l00697"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a4916880e1835ed3bc8d2912791076caf">  697</a></span>&#160;<a class="code" href="yafcore_8h.html#a4916880e1835ed3bc8d2912791076caf">yfReadFlow</a>(</div>
+<div class="line"><a name="l00698"></a><span class="lineno">  698</span>&#160;    fBuf_t    *fbuf,</div>
+<div class="line"><a name="l00699"></a><span class="lineno">  699</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>  *flow,</div>
+<div class="line"><a name="l00700"></a><span class="lineno">  700</span>&#160;    GError   **err);</div>
+<div class="line"><a name="l00701"></a><span class="lineno">  701</span>&#160; </div>
+<div class="line"><a name="l00719"></a><span class="lineno">  719</span>&#160;gboolean</div>
+<div class="line"><a name="l00720"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a2508ff2b0d463c2689e382e4b46bc167">  720</a></span>&#160;<a class="code" href="yafcore_8h.html#a2508ff2b0d463c2689e382e4b46bc167">yfReadFlowExtended</a>(</div>
+<div class="line"><a name="l00721"></a><span class="lineno">  721</span>&#160;    fBuf_t    *fbuf,</div>
+<div class="line"><a name="l00722"></a><span class="lineno">  722</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>  *flow,</div>
+<div class="line"><a name="l00723"></a><span class="lineno">  723</span>&#160;    GError   **err);</div>
+<div class="line"><a name="l00724"></a><span class="lineno">  724</span>&#160; </div>
+<div class="line"><a name="l00731"></a><span class="lineno">  731</span>&#160;<span class="keywordtype">void</span></div>
+<div class="line"><a name="l00732"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a65663f982cb1eec1717c9608584c2ff0">  732</a></span>&#160;<a class="code" href="yafcore_8h.html#a65663f982cb1eec1717c9608584c2ff0">yfPrintString</a>(</div>
+<div class="line"><a name="l00733"></a><span class="lineno">  733</span>&#160;    GString   *rstr,</div>
+<div class="line"><a name="l00734"></a><span class="lineno">  734</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>  *flow);</div>
+<div class="line"><a name="l00735"></a><span class="lineno">  735</span>&#160; </div>
+<div class="line"><a name="l00743"></a><span class="lineno">  743</span>&#160;<span class="keywordtype">void</span></div>
+<div class="line"><a name="l00744"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a7320f2e7a349df396c09ebfccbb9311a">  744</a></span>&#160;<a class="code" href="yafcore_8h.html#a7320f2e7a349df396c09ebfccbb9311a">yfPrintDelimitedString</a>(</div>
+<div class="line"><a name="l00745"></a><span class="lineno">  745</span>&#160;    GString   *rstr,</div>
+<div class="line"><a name="l00746"></a><span class="lineno">  746</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>  *flow,</div>
+<div class="line"><a name="l00747"></a><span class="lineno">  747</span>&#160;    gboolean   yaft_mac);</div>
+<div class="line"><a name="l00748"></a><span class="lineno">  748</span>&#160; </div>
+<div class="line"><a name="l00757"></a><span class="lineno">  757</span>&#160;gboolean</div>
+<div class="line"><a name="l00758"></a><span class="lineno"><a class="line" href="yafcore_8h.html#a84556dc608d472f7efa5c7a22a1ed714">  758</a></span>&#160;<a class="code" href="yafcore_8h.html#a84556dc608d472f7efa5c7a22a1ed714">yfPrint</a>(</div>
+<div class="line"><a name="l00759"></a><span class="lineno">  759</span>&#160;    FILE      *out,</div>
+<div class="line"><a name="l00760"></a><span class="lineno">  760</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>  *flow,</div>
+<div class="line"><a name="l00761"></a><span class="lineno">  761</span>&#160;    GError   **err);</div>
+<div class="line"><a name="l00762"></a><span class="lineno">  762</span>&#160; </div>
+<div class="line"><a name="l00772"></a><span class="lineno">  772</span>&#160;gboolean</div>
+<div class="line"><a name="l00773"></a><span class="lineno"><a class="line" href="yafcore_8h.html#ac67f74d1debf3a8af50537cfa714fd2b">  773</a></span>&#160;<a class="code" href="yafcore_8h.html#ac67f74d1debf3a8af50537cfa714fd2b">yfPrintDelimited</a>(</div>
+<div class="line"><a name="l00774"></a><span class="lineno">  774</span>&#160;    FILE      *out,</div>
+<div class="line"><a name="l00775"></a><span class="lineno">  775</span>&#160;    <a class="code" href="structyf_flow__st.html">yfFlow_t</a>  *flow,</div>
+<div class="line"><a name="l00776"></a><span class="lineno">  776</span>&#160;    gboolean   yaft_mac,</div>
+<div class="line"><a name="l00777"></a><span class="lineno">  777</span>&#160;    GError   **err);</div>
+<div class="line"><a name="l00778"></a><span class="lineno">  778</span>&#160; </div>
+<div class="line"><a name="l00787"></a><span class="lineno">  787</span>&#160;<span class="keywordtype">void</span></div>
+<div class="line"><a name="l00788"></a><span class="lineno"><a class="line" href="yafcore_8h.html#ad77e6ac6049bf5feb7c9d4c2430a4ce1">  788</a></span>&#160;<a class="code" href="yafcore_8h.html#ad77e6ac6049bf5feb7c9d4c2430a4ce1">yfPrintColumnHeaders</a>(</div>
+<div class="line"><a name="l00789"></a><span class="lineno">  789</span>&#160;    FILE      *out,</div>
+<div class="line"><a name="l00790"></a><span class="lineno">  790</span>&#160;    gboolean   yaft_mac,</div>
+<div class="line"><a name="l00791"></a><span class="lineno">  791</span>&#160;    GError   **err);</div>
+<div class="line"><a name="l00792"></a><span class="lineno">  792</span>&#160; </div>
+<div class="line"><a name="l00793"></a><span class="lineno">  793</span>&#160;<span class="preprocessor">#if YAF_ENABLE_HOOKS</span></div>
+<div class="line"><a name="l00794"></a><span class="lineno">  794</span>&#160; </div>
+<div class="line"><a name="l00799"></a><span class="lineno">  799</span>&#160;fbInfoModel_t *</div>
+<div class="line"><a name="l00800"></a><span class="lineno">  800</span>&#160;yfDPIInfoModel(</div>
+<div class="line"><a name="l00801"></a><span class="lineno">  801</span>&#160;    <span class="keywordtype">void</span>);</div>
+<div class="line"><a name="l00802"></a><span class="lineno">  802</span>&#160; </div>
+<div class="line"><a name="l00803"></a><span class="lineno">  803</span>&#160;<span class="preprocessor">#endif </span><span class="comment">/* if YAF_ENABLE_HOOKS */</span><span class="preprocessor"></span></div>
+<div class="line"><a name="l00804"></a><span class="lineno">  804</span>&#160; </div>
+<div class="line"><a name="l00805"></a><span class="lineno">  805</span>&#160; </div>
+<div class="line"><a name="l00806"></a><span class="lineno">  806</span>&#160; </div>
+<div class="line"><a name="l00807"></a><span class="lineno">  807</span>&#160;<span class="preprocessor">#endif </span><span class="comment">/* ifndef _YAF_CORE_H_ */</span><span class="preprocessor"></span></div>
 </div><!-- fragment --></div><!-- contents -->
 <div class="ttc" id="astructyf_flow__st_html_a0537f518f0ee5c887a935cfcdec1a7e4"><div class="ttname"><a href="structyf_flow__st.html#a0537f518f0ee5c887a935cfcdec1a7e4">yfFlow_st::rval</a></div><div class="ttdeci">yfFlowVal_t rval</div><div class="ttdoc">Reverse value.</div><div class="ttdef"><b>Definition:</b> yafcore.h:421</div></div>
 <div class="ttc" id="astructyf_flow_stats__st_html_a27d8a5a74008fa597cfd2ec0755541d0"><div class="ttname"><a href="structyf_flow_stats__st.html#a27d8a5a74008fa597cfd2ec0755541d0">yfFlowStats_st::ltime</a></div><div class="ttdeci">uint64_t ltime</div><div class="ttdoc">used to calculate interarrival time</div><div class="ttdef"><b>Definition:</b> yafcore.h:255</div></div>

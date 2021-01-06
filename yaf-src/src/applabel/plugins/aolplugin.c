@@ -5,14 +5,8 @@
  * This tries to recognize the AOL instant Messenger (OSCAR) protocol
  * http://en.wikipedia.org/wiki/OSCAR_protocol
  *
- *
- * @author $Author: ecoff_svn $
- * @date $Date: 2010-07-26 09:28:45 -0400 (Mon, 26 Jul 2010) $
- * @Version $Revision: 16060 $
- *
- *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -20,7 +14,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -70,15 +64,19 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 #define AIM_PORT_NUMBER 5190
 
+YC_SCANNER_PROTOTYPE(aolplugin_LTX_ycAolScanScan);
+
 /* Local Prototypes */
 
-uint16_t getTLVID(
-    uint8_t *payload,
-    unsigned int  payloadSize,
-    uint16_t offsetptr);
+static uint16_t
+getTLVID(
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    uint16_t        offsetptr);
 
 
 /**
@@ -98,22 +96,20 @@ uint16_t getTLVID(
  * @return aim_port_number
  *         otherwise 0
  */
-
 uint16_t
 aolplugin_LTX_ycAolScanScan(
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
-
     gboolean snac = FALSE;
     uint16_t flap_seq_number = 0;
     uint16_t offsetptr = 0;
     uint16_t flap_data_size = 0;
-    uint8_t class;
+    uint8_t  class;
     uint16_t tlv_id;
 
     if (payloadSize < 6) {
@@ -139,7 +135,7 @@ aolplugin_LTX_ycAolScanScan(
     /* seq number */
 
     flap_seq_number = ntohs(*(uint16_t *)(payload + offsetptr));
-    if (flap_seq_number > 0xEFFF){
+    if (flap_seq_number > 0xEFFF) {
         return 0;
     }
 
@@ -152,7 +148,7 @@ aolplugin_LTX_ycAolScanScan(
         uint16_t family;
         uint16_t family_sub_id;
 
-        if (offsetptr + 4 > payloadSize) {
+        if ((size_t)offsetptr + 4 > payloadSize) {
             return 0;
         }
 
@@ -165,8 +161,8 @@ aolplugin_LTX_ycAolScanScan(
 
         family_sub_id = ntohs(*(uint16_t *)(payload + offsetptr));
         /* there are more detailed specifications on what family id and
-           family_sub_id can be paired, but too many to efficiently check
-           so we will generalize */
+         * family_sub_id can be paired, but too many to efficiently check
+         * so we will generalize */
         if (family_sub_id > 0x21) {
             return 0;
         }
@@ -178,11 +174,11 @@ aolplugin_LTX_ycAolScanScan(
         }
     }
 
-    if ( class == 1 ) {
+    if (class == 1) {
         uint32_t protocol;
 
         /* protocol version */
-        if (offsetptr + 4 > payloadSize) {
+        if ((size_t)offsetptr + 4 > payloadSize) {
             return 0;
         }
 
@@ -194,29 +190,29 @@ aolplugin_LTX_ycAolScanScan(
 
         offsetptr += 4;
         if (flap_data_size != 4) {
-
             tlv_id = getTLVID(payload, payloadSize, offsetptr);
             if (tlv_id != 6 && tlv_id != 7 && tlv_id != 8 && tlv_id != 3 &&
-                tlv_id != 148 && tlv_id != 74) {
+                tlv_id != 148 && tlv_id != 74)
+            {
                 return 0;
             }
             offsetptr += 2;
         }
-
     }
 
     return AIM_PORT_NUMBER;
 }
 
 
-uint16_t getTLVID(
-    uint8_t *payload,
-    unsigned int payloadSize,
-    uint16_t offsetptr)
+static uint16_t
+getTLVID(
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    uint16_t        offsetptr)
 {
     uint16_t tlvid;
 
-    if (offsetptr + 2 > payloadSize) {
+    if ((size_t)offsetptr + 2 > payloadSize) {
         return 0;
     }
 

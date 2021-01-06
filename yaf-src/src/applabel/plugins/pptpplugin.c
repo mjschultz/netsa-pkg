@@ -3,7 +3,8 @@
  *
  *@file pptpplugin.c
  *
- *@brief this is a protocol classifier for the point-to-point tunneling protocol (PPTP)
+ *@brief this is a protocol classifier for the point-to-point tunneling
+ * protocol (PPTP)
  *
  * PPTPis a protocol which allows the Point to Point Protocol (PPP) to be
  * tunneled through an IP network.  PPTP describes a new vehichle for carrying
@@ -11,14 +12,8 @@
  *
  * @sa rfc 2637  href="http://www.ietf.org/rfc/rfc2637.txt"
  *
- *
- * @author $Author: ecoff_svn $
- * @date $Date: 2010-01-20 15:54:44 -0500 (Wed, 20 Jan 2010) $
- * @version $Revision: 15242 $
- *
- *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Ecoff <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -26,7 +21,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -77,19 +72,22 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 #include <arpa/inet.h>
 
 typedef struct pptpProtoHeader_st {
-    uint16_t length;
-    uint16_t msgType;
-    uint32_t magicCookie;
-    uint16_t controlMsgType;
-    uint16_t reserved;
+    uint16_t   length;
+    uint16_t   msgType;
+    uint32_t   magicCookie;
+    uint16_t   controlMsgType;
+    uint16_t   reserved;
 } pptpProtoHeader_t;
 
 #define PPTP_PORT_NUMBER 1723
 #define MAGIC_COOKIE 0x1A2B3C4D
+
+YC_SCANNER_PROTOTYPE(pptpplugin_LTX_ycPPTPScanScan);
 
 /**
  * pptpplugin_LTX_ycPPTPScan
@@ -107,34 +105,32 @@ typedef struct pptpProtoHeader_st {
  *
  * return 0 if no match
  */
-
 uint16_t
-pptpplugin_LTX_ycPPTPScanScan (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+pptpplugin_LTX_ycPPTPScanScan(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
-
     pptpProtoHeader_t *pptpHeader;
-    uint16_t  pptpLength;
-    uint16_t  pptpMsgType;
-    uint32_t  pptpMagicCookie;
-    uint16_t  pptpControlType;
-    uint16_t  pptpReserved;
+    uint16_t           pptpLength;
+    uint16_t           pptpMsgType;
+    uint32_t           pptpMagicCookie;
+    uint16_t           pptpControlType;
+    uint16_t           pptpReserved;
 
-    if ( 0 == payloadSize ){
+    if (0 == payloadSize) {
         return 0;
     }
 
-    if (payloadSize < sizeof(pptpProtoHeader_t)){
+    if (payloadSize < sizeof(pptpProtoHeader_t)) {
         /*g_debug("PPTP exiting line 100");*/
         return 0;
     }
 
-    pptpHeader = (pptpProtoHeader_t *) payload;
+    pptpHeader = (pptpProtoHeader_t *)payload;
 
     pptpLength = pptpHeader->length;
     pptpMsgType = pptpHeader->msgType;
@@ -150,35 +146,33 @@ pptpplugin_LTX_ycPPTPScanScan (
 
     /*debug*/
     /*g_debug("PPTP Length: %d", pptpLength);
-      g_debug("PPTP Length: %d", pptpMsgType);
-      g_debug("PPTP Length: %d", pptpMagicCookie);
-      g_debug("PPTP Length: %d", pptpControlType);
-      g_debug("PPTP Length: %d", pptpReserved);
-    */
+     * g_debug("PPTP Length: %d", pptpMsgType);
+     * g_debug("PPTP Length: %d", pptpMagicCookie);
+     * g_debug("PPTP Length: %d", pptpControlType);
+     * g_debug("PPTP Length: %d", pptpReserved);
+     */
 
-
-
-    if (pptpLength <= 0){
+    if (pptpLength <= 0) {
         /*  g_debug("PPTP exiting line 105");*/
         return 0;
     }
 
-    if (pptpReserved != 0){
+    if (pptpReserved != 0) {
         /*g_debug("PPTP exiting line 110");*/
         return 0;
     }
 
-    if (pptpMagicCookie != MAGIC_COOKIE){
+    if (pptpMagicCookie != MAGIC_COOKIE) {
         /*g_debug("PPTP exiting line 115");*/
         return 0;
     }
 
-    if (pptpMsgType != 1 && pptpMsgType != 2){
+    if (pptpMsgType != 1 && pptpMsgType != 2) {
         /*g_debug("PPTP exiting line 120");*/
         return 0;
     }
 
-    if (pptpControlType == 0 || pptpControlType > 15){
+    if (pptpControlType == 0 || pptpControlType > 15) {
         /*printf("PPTP  exiting line 128");*/
         return 0;
     }

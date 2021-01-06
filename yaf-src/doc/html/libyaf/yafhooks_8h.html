@@ -104,9 +104,9 @@ Functions</h2></td></tr>
 <tr class="memitem:a3f9d70dbb8a7a2ab72e82977be7b4596"><td class="memItemLeft" align="right" valign="top">gboolean&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="yafhooks_8h.html#a3f9d70dbb8a7a2ab72e82977be7b4596">yfHookGetTemplate</a> (fbSession_t *session)</td></tr>
 <tr class="memdesc:a3f9d70dbb8a7a2ab72e82977be7b4596"><td class="mdescLeft">&#160;</td><td class="mdescRight">Gets the IPFIX info model template for the export data from <em>all</em> the plugins and turns it into a single template to return.  <a href="yafhooks_8h.html#a3f9d70dbb8a7a2ab72e82977be7b4596">More...</a><br /></td></tr>
 <tr class="separator:a3f9d70dbb8a7a2ab72e82977be7b4596"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad791565736a87937fd8c4004bf9d7a51"><td class="memItemLeft" align="right" valign="top">gboolean&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="yafhooks_8h.html#ad791565736a87937fd8c4004bf9d7a51">yfWriteFlowHook</a> (fbSubTemplateMultiList_t *rec, fbSubTemplateMultiListEntry_t *stml, <a class="el" href="yafcore_8h.html#ac846c7e494485aceab2fcdec4264f90f">yfFlow_t</a> *flow, GError **err)</td></tr>
-<tr class="memdesc:ad791565736a87937fd8c4004bf9d7a51"><td class="mdescLeft">&#160;</td><td class="mdescRight">called by yfWriteFlow to add the data from all registered plugins to the outgoing IPFIX record  <a href="yafhooks_8h.html#ad791565736a87937fd8c4004bf9d7a51">More...</a><br /></td></tr>
-<tr class="separator:ad791565736a87937fd8c4004bf9d7a51"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3258c77bd8bb2cebf6336a484bb0b641"><td class="memItemLeft" align="right" valign="top">gboolean&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="yafhooks_8h.html#a3258c77bd8bb2cebf6336a484bb0b641">yfHookFlowWrite</a> (fbSubTemplateMultiList_t *rec, fbSubTemplateMultiListEntry_t *stml, <a class="el" href="yafcore_8h.html#ac846c7e494485aceab2fcdec4264f90f">yfFlow_t</a> *flow, GError **err)</td></tr>
+<tr class="memdesc:a3258c77bd8bb2cebf6336a484bb0b641"><td class="mdescLeft">&#160;</td><td class="mdescRight">called by yfWriteFlow to add the data from all registered plugins to the outgoing IPFIX record  <a href="yafhooks_8h.html#a3258c77bd8bb2cebf6336a484bb0b641">More...</a><br /></td></tr>
+<tr class="separator:a3258c77bd8bb2cebf6336a484bb0b641"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3bbe4cceea2466b23053af3dfde1ad49"><td class="memItemLeft" align="right" valign="top">gboolean&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="yafhooks_8h.html#a3bbe4cceea2466b23053af3dfde1ad49">yfHookAddNewHook</a> (const char *hookName, const char *hookOpts, const char *hookConf, void **yfctx, GError **err)</td></tr>
 <tr class="memdesc:a3bbe4cceea2466b23053af3dfde1ad49"><td class="mdescLeft">&#160;</td><td class="mdescRight">Adds another hook (plugin) into yaf.  <a href="yafhooks_8h.html#a3bbe4cceea2466b23053af3dfde1ad49">More...</a><br /></td></tr>
 <tr class="separator:a3bbe4cceea2466b23053af3dfde1ad49"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -116,6 +116,48 @@ Functions</h2></td></tr>
 <tr class="memitem:a9416f3b5e9dcc40e47563622b645e7a9"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="yafhooks_8h.html#a9416f3b5e9dcc40e47563622b645e7a9">yfHookFreeLists</a> (<a class="el" href="yafcore_8h.html#ac846c7e494485aceab2fcdec4264f90f">yfFlow_t</a> *flow)</td></tr>
 <tr class="memdesc:a9416f3b5e9dcc40e47563622b645e7a9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Sends control back to the plugin to free any BasicLists, SubTemplateLists, or SubTemplateMultiLists that may have been used in it's added templates.  <a href="yafhooks_8h.html#a9416f3b5e9dcc40e47563622b645e7a9">More...</a><br /></td></tr>
 <tr class="separator:a9416f3b5e9dcc40e47563622b645e7a9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2e8adc9c53dabf4efd5086fcfd7c20e3"><td class="memItemLeft" align="right" valign="top"><a id="a2e8adc9c53dabf4efd5086fcfd7c20e3"></a>
+const struct <a class="el" href="structyf_hook_meta_data.html">yfHookMetaData</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>ypGetMetaData</b> (void)</td></tr>
+<tr class="separator:a2e8adc9c53dabf4efd5086fcfd7c20e3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5bdce080fb9e3b718a45b7996a9978d0"><td class="memItemLeft" align="right" valign="top"><a id="a5bdce080fb9e3b718a45b7996a9978d0"></a>
+gboolean&#160;</td><td class="memItemRight" valign="bottom"><b>ypHookPacket</b> (<a class="el" href="yafcore_8h.html#a1ac4b4f6b2720c2af3c728aec9abd7a2">yfFlowKey_t</a> *key, const uint8_t *pkt, size_t caplen, uint16_t iplen, <a class="el" href="structyf_t_c_p_info__st.html">yfTCPInfo_t</a> *tcpinfo, <a class="el" href="structyf_l2_info__st.html">yfL2Info_t</a> *l2info)</td></tr>
+<tr class="separator:a5bdce080fb9e3b718a45b7996a9978d0"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abbd23f245e402b41301ce0d3e2c7812c"><td class="memItemLeft" align="right" valign="top"><a id="abbd23f245e402b41301ce0d3e2c7812c"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>ypFlowPacket</b> (void *yfHookConext, <a class="el" href="yafcore_8h.html#ac846c7e494485aceab2fcdec4264f90f">yfFlow_t</a> *flow, <a class="el" href="yafcore_8h.html#a9c408b16b38eab11ab595368798ac304">yfFlowVal_t</a> *val, const uint8_t *pkt, size_t caplen, uint16_t iplen, <a class="el" href="structyf_t_c_p_info__st.html">yfTCPInfo_t</a> *tcpinfo, <a class="el" href="structyf_l2_info__st.html">yfL2Info_t</a> *l2info)</td></tr>
+<tr class="separator:abbd23f245e402b41301ce0d3e2c7812c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa9258d9260f91c1a5277ef3fa4c2c2bf"><td class="memItemLeft" align="right" valign="top"><a id="aa9258d9260f91c1a5277ef3fa4c2c2bf"></a>
+gboolean&#160;</td><td class="memItemRight" valign="bottom"><b>ypFlowClose</b> (void *yfHookConext, <a class="el" href="yafcore_8h.html#ac846c7e494485aceab2fcdec4264f90f">yfFlow_t</a> *flow)</td></tr>
+<tr class="separator:aa9258d9260f91c1a5277ef3fa4c2c2bf"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a09646bb73968f8faf2c8f2a3e49d7ac4"><td class="memItemLeft" align="right" valign="top"><a id="a09646bb73968f8faf2c8f2a3e49d7ac4"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>ypFlowAlloc</b> (void **yfHookConext, <a class="el" href="yafcore_8h.html#ac846c7e494485aceab2fcdec4264f90f">yfFlow_t</a> *flow, void *yfctx)</td></tr>
+<tr class="separator:a09646bb73968f8faf2c8f2a3e49d7ac4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a99b49a6cc43c2394d480759fd336aaa3"><td class="memItemLeft" align="right" valign="top"><a id="a99b49a6cc43c2394d480759fd336aaa3"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>ypFlowFree</b> (void *yfHookConext, <a class="el" href="yafcore_8h.html#ac846c7e494485aceab2fcdec4264f90f">yfFlow_t</a> *flow)</td></tr>
+<tr class="separator:a99b49a6cc43c2394d480759fd336aaa3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae336f5bf49153048d89a26ad79345892"><td class="memItemLeft" align="right" valign="top"><a id="ae336f5bf49153048d89a26ad79345892"></a>
+gboolean&#160;</td><td class="memItemRight" valign="bottom"><b>ypFlowWrite</b> (void *yfHookConext, fbSubTemplateMultiList_t *rec, fbSubTemplateMultiListEntry_t *stml, <a class="el" href="yafcore_8h.html#ac846c7e494485aceab2fcdec4264f90f">yfFlow_t</a> *flow, GError **err)</td></tr>
+<tr class="separator:ae336f5bf49153048d89a26ad79345892"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac570f733b0a85e6764c062d64431ce74"><td class="memItemLeft" align="right" valign="top"><a id="ac570f733b0a85e6764c062d64431ce74"></a>
+fbInfoElement_t *&#160;</td><td class="memItemRight" valign="bottom"><b>ypGetInfoModel</b> (void)</td></tr>
+<tr class="separator:ac570f733b0a85e6764c062d64431ce74"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af871cadfffafb406066790e1fc38bdd4"><td class="memItemLeft" align="right" valign="top"><a id="af871cadfffafb406066790e1fc38bdd4"></a>
+gboolean&#160;</td><td class="memItemRight" valign="bottom"><b>ypGetTemplate</b> (fbSession_t *session)</td></tr>
+<tr class="separator:af871cadfffafb406066790e1fc38bdd4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a163b27cebf1c50fbaac8a391346f8c60"><td class="memItemLeft" align="right" valign="top"><a id="a163b27cebf1c50fbaac8a391346f8c60"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>ypSetPluginOpt</b> (const char *pluginOpt, void *yfctx)</td></tr>
+<tr class="separator:a163b27cebf1c50fbaac8a391346f8c60"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad5224f32b17cccd0039354c14b31e239"><td class="memItemLeft" align="right" valign="top"><a id="ad5224f32b17cccd0039354c14b31e239"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>ypSetPluginConf</b> (const char *pluginConf, void **yfctx)</td></tr>
+<tr class="separator:ad5224f32b17cccd0039354c14b31e239"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6a86fa1e210ad6b739a9d808a6f99b88"><td class="memItemLeft" align="right" valign="top"><a id="a6a86fa1e210ad6b739a9d808a6f99b88"></a>
+gboolean&#160;</td><td class="memItemRight" valign="bottom"><b>ypValidateFlowTab</b> (void *yfctx, uint32_t max_payload, gboolean uniflow, gboolean silkmode, gboolean applabelmode, gboolean entropymode, gboolean fingerprintmode, gboolean fpExportMode, gboolean udp_max_payload, uint16_t udp_uniflow_port, GError **err)</td></tr>
+<tr class="separator:a6a86fa1e210ad6b739a9d808a6f99b88"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:adc9e3551ab5ff145333e7b74bb6b3c69"><td class="memItemLeft" align="right" valign="top"><a id="adc9e3551ab5ff145333e7b74bb6b3c69"></a>
+uint8_t&#160;</td><td class="memItemRight" valign="bottom"><b>ypGetTemplateCount</b> (void *yfHookConext, <a class="el" href="yafcore_8h.html#ac846c7e494485aceab2fcdec4264f90f">yfFlow_t</a> *flow)</td></tr>
+<tr class="separator:adc9e3551ab5ff145333e7b74bb6b3c69"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a754311c3b9c7d6581e0259c2885956fb"><td class="memItemLeft" align="right" valign="top"><a id="a754311c3b9c7d6581e0259c2885956fb"></a>
+void&#160;</td><td class="memItemRight" valign="bottom"><b>ypFreeLists</b> (void *yfHookConext, <a class="el" href="yafcore_8h.html#ac846c7e494485aceab2fcdec4264f90f">yfFlow_t</a> *flow)</td></tr>
+<tr class="separator:a754311c3b9c7d6581e0259c2885956fb"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Processing hook interface for YAF. </p>
@@ -127,6 +169,7 @@ Functions</h2></td></tr>
 <p>ypFlowClose - called by yfFlowClose()</p>
 <p>ypFlowAlloc - called by yfFlowGetNode()</p>
 <p>ypFlowFree - called by yfFlowFree()</p>
+<p>ypFlowWrite - called by <a class="el" href="yafcore_8h.html#a4aba445d9e6561395ee1a2de5a91ac15" title="Write a single flow to an IPFIX message buffer.">yfWriteFlow()</a></p>
 <p>ypGetInfoModel - called by yfInfoModel() - this should not be used for v.3</p>
 <p>ypGetTemplate - called by yfInitExporterSession()</p>
 <p>ypSetPluginOpt - called by <a class="el" href="yafhooks_8h.html#a3bbe4cceea2466b23053af3dfde1ad49" title="Adds another hook (plugin) into yaf.">yfHookAddNewHook()</a></p>
@@ -351,6 +394,57 @@ Functions</h2></td></tr>
     <tr><td class="paramname">iplen</td><td></td></tr>
     <tr><td class="paramname">tcpinfo</td><td></td></tr>
     <tr><td class="paramname">l2info</td><td></td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="a3258c77bd8bb2cebf6336a484bb0b641"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3258c77bd8bb2cebf6336a484bb0b641">&#9670;&nbsp;</a></span>yfHookFlowWrite()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">gboolean yfHookFlowWrite </td>
+          <td>(</td>
+          <td class="paramtype">fbSubTemplateMultiList_t *&#160;</td>
+          <td class="paramname"><em>rec</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">fbSubTemplateMultiListEntry_t *&#160;</td>
+          <td class="paramname"><em>stml</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="yafcore_8h.html#ac846c7e494485aceab2fcdec4264f90f">yfFlow_t</a> *&#160;</td>
+          <td class="paramname"><em>flow</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">GError **&#160;</td>
+          <td class="paramname"><em>err</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>called by yfWriteFlow to add the data from all registered plugins to the outgoing IPFIX record </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">rec</td><td>outgoing subTemplateMultiList </td></tr>
+    <tr><td class="paramname">stml</td><td>Current entry of subTemplateMultiList </td></tr>
+    <tr><td class="paramname">flow</td><td>pointer to the flow context structure </td></tr>
+    <tr><td class="paramname">err</td><td>Error </td></tr>
   </table>
   </dd>
 </dl>
@@ -611,57 +705,6 @@ Functions</h2></td></tr>
     <tr><td class="paramname">fpExportMode</td><td>handshake header export mode </td></tr>
     <tr><td class="paramname">udp_max_payload</td><td>concatenate udp payloads similar to TCP </td></tr>
     <tr><td class="paramname">udp_uniflow_port</td><td>export all udp packets if have this src or dst port </td></tr>
-  </table>
-  </dd>
-</dl>
-
-</div>
-</div>
-<a id="ad791565736a87937fd8c4004bf9d7a51"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ad791565736a87937fd8c4004bf9d7a51">&#9670;&nbsp;</a></span>yfWriteFlowHook()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">gboolean yfWriteFlowHook </td>
-          <td>(</td>
-          <td class="paramtype">fbSubTemplateMultiList_t *&#160;</td>
-          <td class="paramname"><em>rec</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">fbSubTemplateMultiListEntry_t *&#160;</td>
-          <td class="paramname"><em>stml</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype"><a class="el" href="yafcore_8h.html#ac846c7e494485aceab2fcdec4264f90f">yfFlow_t</a> *&#160;</td>
-          <td class="paramname"><em>flow</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">GError **&#160;</td>
-          <td class="paramname"><em>err</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>called by yfWriteFlow to add the data from all registered plugins to the outgoing IPFIX record </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">rec</td><td>outgoing subTemplateMultiList </td></tr>
-    <tr><td class="paramname">stml</td><td>Current entry of subTemplateMultiList </td></tr>
-    <tr><td class="paramname">flow</td><td>pointer to the flow context structure </td></tr>
-    <tr><td class="paramname">err</td><td>Error </td></tr>
   </table>
   </dd>
 </dl>

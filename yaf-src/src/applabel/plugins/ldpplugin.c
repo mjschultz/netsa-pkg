@@ -6,7 +6,7 @@
  * see http://www.ietf.org/rfc/rfc3036 for more info
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2014 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -14,7 +14,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -64,10 +64,13 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 
 #define LDP_PORT_NUMBER  646
 #define LDP_VERSION 1
+
+YC_SCANNER_PROTOTYPE(ldpplugin_LTX_ycLdpScanScan);
 
 /**
  * ldpplugin_LTX_ycLdpScanScan
@@ -87,18 +90,18 @@
  *         otherwise 0
  */
 uint16_t
-ldpplugin_LTX_ycLdpScanScan (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+ldpplugin_LTX_ycLdpScanScan(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
     unsigned int offsetptr = 0;
-    uint16_t version;
-    uint16_t length;
-    uint32_t id;
+    uint16_t     version;
+    uint16_t     length;
+    uint32_t     id;
 
     /* Only do decode if MPLS is enabled */
 #ifndef YAF_MPLS
@@ -117,7 +120,7 @@ ldpplugin_LTX_ycLdpScanScan (
 
     offsetptr += 2;
 
-    length = g_ntohs(*(uint16_t*)(payload + offsetptr));
+    length = g_ntohs(*(uint16_t *)(payload + offsetptr));
 
     if (length > 4096) {
         return 0;

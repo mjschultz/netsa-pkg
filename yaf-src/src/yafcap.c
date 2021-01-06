@@ -5,7 +5,7 @@
  ** YAF libpcap input support
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2019 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell
  ** ------------------------------------------------------------------------
@@ -13,7 +13,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -86,29 +86,29 @@
 #define GZIP_HEADER 0x8B1F
 
 struct yfCapSource_st {
-    pcap_t          *pcap;
-    FILE            *lfp;
-    FILE            *pcapng;
-    char            *tmp;
-    char            *last_filename;
-    gboolean        swap;
-    gboolean        is_live;
-    int             datalink;
+    pcap_t    *pcap;
+    FILE      *lfp;
+    FILE      *pcapng;
+    char      *tmp;
+    char      *last_filename;
+    gboolean   swap;
+    gboolean   is_live;
+    int        datalink;
 };
 
-static pcap_t *yaf_pcap;
-static int     yaf_promisc_mode = 1;
-static GTimer *timer_pcap_file = NULL;
+static pcap_t    *yaf_pcap;
+static int        yaf_promisc_mode = 1;
+static GTimer    *timer_pcap_file = NULL;
 
 /* Quit flag support */
-extern int yaf_quit;
+extern int        yaf_quit;
 
 extern yfConfig_t yaf_config;
 
 /* Statistics */
-static uint32_t            yaf_pcap_drop = 0;
-static uint32_t            yaf_stats_out = 0;
-static uint32_t            yaf_ifdrop = 0;
+static uint32_t   yaf_pcap_drop = 0;
+static uint32_t   yaf_stats_out = 0;
+static uint32_t   yaf_ifdrop = 0;
 
 /* One second timeout for capture loop */
 #define YAF_CAP_TIMEOUT 1000
@@ -118,10 +118,11 @@ static uint32_t            yaf_ifdrop = 0;
 
 #define PCAPNG_BLOCKTYPE 0x0A0D0D0A
 
-static gboolean yfCapCheckDatalink(
-    pcap_t                  *pcap,
-    int                     *datalink,
-    GError                  **err)
+static gboolean
+yfCapCheckDatalink(
+    pcap_t  *pcap,
+    int     *datalink,
+    GError **err)
 {
     /* verify datalink */
     *datalink = pcap_datalink(pcap);
@@ -156,9 +157,9 @@ static gboolean yfCapCheckDatalink(
 #endif
         break;
       case -1:
-          g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_IO,
-              "Unable to access pcap datalink, (superuser access?)");
-          return FALSE;
+        g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_IO,
+                    "Unable to access pcap datalink, (superuser access?)");
+        return FALSE;
       default:
         g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_IO,
                     "Unsupported pcap datalink type %u", *datalink);
@@ -168,31 +169,35 @@ static gboolean yfCapCheckDatalink(
     return TRUE;
 }
 
-static void yfSwapBytes(
-    uint8_t     *a,
-    uint32_t    len)
-{
-    uint32_t            i;
-    uint8_t             t;
 
-    for (i = 0; i < len/2; i++) {
+static void
+yfSwapBytes(
+    uint8_t   *a,
+    uint32_t   len)
+{
+    uint32_t i;
+    uint8_t  t;
+
+    for (i = 0; i < len / 2; i++) {
         t = a[i];
-        a[i] = a[(len-1)-i];
-        a[(len-1)-i] = t;
+        a[i] = a[(len - 1) - i];
+        a[(len - 1) - i] = t;
     }
 }
 
-static uint32_t yfCapPcapNGBlockLen(
-    yfCapSource_t          *cs)
+
+static uint32_t
+yfCapPcapNGBlockLen(
+    yfCapSource_t  *cs)
 {
-    uint8_t                 pr[10];
-    size_t                  b = 0;
-    uint32_t                block_len;
+    uint8_t  pr[10];
+    size_t   b = 0;
+    uint32_t block_len;
 
     b = fread(pr, 8, 1, cs->pcapng);
     if (cs->swap) {
         yfSwapBytes(pr, 4);
-        yfSwapBytes(pr+4, 4);
+        yfSwapBytes(pr + 4, 4);
     }
     block_len = ntohl(*(uint32_t *)(pr));
     if (block_len != 0x00000006) {
@@ -201,19 +206,21 @@ static uint32_t yfCapPcapNGBlockLen(
 
     block_len = ntohl(*(uint32_t *)(pr + 4));
 
-    fseek(cs->pcapng, (block_len-8), SEEK_CUR);
+    fseek(cs->pcapng, (block_len - 8), SEEK_CUR);
 
     return block_len;
 }
 
-static void yfCapPcapNGCheck(
-    yfCapSource_t           *cs,
-    const char              *path)
+
+static void
+yfCapPcapNGCheck(
+    yfCapSource_t  *cs,
+    const char     *path)
 {
-    uint8_t                 pr[10];
-    size_t                  b = 0;
-    uint32_t                ng_magic;
-    uint32_t                block_len;
+    uint8_t  pr[10];
+    size_t   b = 0;
+    uint32_t ng_magic;
+    uint32_t block_len;
 
     /* check if this is a pcapng file */
     cs->pcapng = fopen(path, "r");
@@ -222,7 +229,7 @@ static void yfCapPcapNGCheck(
     }
 
     b = fread(pr, sizeof(uint32_t), 1, cs->pcapng);
-    ng_magic = ntohl(*(uint32_t*)(pr));
+    ng_magic = ntohl(*(uint32_t *)(pr));
     if (ng_magic != PCAPNG_BLOCKTYPE) {
         /* not pcapng */
         fclose(cs->pcapng);
@@ -258,25 +265,27 @@ static void yfCapPcapNGCheck(
             return;
         }
         block_len = ntohl(*(uint32_t *)(pr + 4));
-        fseek(cs->pcapng, block_len-8, SEEK_CUR);
+        fseek(cs->pcapng, block_len - 8, SEEK_CUR);
         /* now should be at packet header */
     }
 }
 
+
 #if YAF_ENABLE_ZLIB
-static FILE *yfCapFileDecompress(
-    FILE *src,
-    char *tmp_file_path)
+static FILE *
+yfCapFileDecompress(
+    FILE  *src,
+    char  *tmp_file_path)
 {
-    int ret;
-    z_stream strm;
-    unsigned int leftover;
+    int           ret;
+    z_stream      strm;
+    unsigned int  leftover;
     unsigned char in[YF_CHUNK];
     unsigned char out[YF_CHUNK];
-    FILE *dst = NULL;
-    int fd;
-    char tmpname[YF_CHUNK];
-    char temp_suffix[] = ".XXXXXX";
+    FILE         *dst = NULL;
+    int           fd;
+    char          tmpname[YF_CHUNK];
+    char          temp_suffix[] = ".XXXXXX";
 
     /*allocate state */
     strm.zalloc = Z_NULL;
@@ -311,7 +320,7 @@ static FILE *yfCapFileDecompress(
         }
     }
 
-    ret = inflateInit2(&strm, 16+MAX_WBITS);
+    ret = inflateInit2(&strm, 16 + MAX_WBITS);
     if (ret != Z_OK) {
         return NULL;
     }
@@ -339,8 +348,7 @@ static FILE *yfCapFileDecompress(
                 (void)inflateEnd(&strm);
                 return NULL;
             }
-        } while(strm.avail_out == 0);
-
+        } while (strm.avail_out == 0);
     } while (ret != Z_STREAM_END);
 
     (void)inflateEnd(&strm);
@@ -350,22 +358,25 @@ static FILE *yfCapFileDecompress(
 
     return dst;
 }
-#endif
 
-static pcap_t *yfCapOpenFileInner(
-    const char              *path,
-    int                     *datalink,
-    char                    *tmp_file,
-    GError                  **err)
+
+#endif /* if YAF_ENABLE_ZLIB */
+
+static pcap_t *
+yfCapOpenFileInner(
+    const char  *path,
+    int         *datalink,
+    char        *tmp_file,
+    GError     **err)
 {
-    pcap_t                  *pcap;
-    static char             pcap_errbuf[PCAP_ERRBUF_SIZE];
+    pcap_t     *pcap;
+    static char pcap_errbuf[PCAP_ERRBUF_SIZE];
 
     if ((strlen(path) == 1) && path[0] == '-') {
         /* Don't open stdin if it's a terminal */
         if (isatty(fileno(stdin))) {
             g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_IO,
-                "Refusing to read from terminal on stdin");
+                        "Refusing to read from terminal on stdin");
             return NULL;
         }
     }
@@ -395,7 +406,6 @@ static pcap_t *yfCapOpenFileInner(
                                 "File could not be decompressed.");
                     return NULL;
                 }
-
             } else {
                 fclose(tmp);
                 g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_IO,
@@ -403,12 +413,12 @@ static pcap_t *yfCapOpenFileInner(
                 return NULL;
             }
         } else {
-#endif
-            g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_IO,
-                        "%s", pcap_errbuf);
-            return NULL;
+#endif /* if YAF_ENABLE_ZLIB */
+        g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_IO,
+                    "%s", pcap_errbuf);
+        return NULL;
 #if YAF_ENABLE_ZLIB
-        }
+    }
 #endif
     }
 
@@ -422,13 +432,15 @@ static pcap_t *yfCapOpenFileInner(
     return pcap;
 }
 
-yfCapSource_t *yfCapOpenFile(
-    const char              *path,
-    int                     *datalink,
-    char                    *tmp_file,
-    GError                  **err)
+
+yfCapSource_t *
+yfCapOpenFile(
+    const char  *path,
+    int         *datalink,
+    char        *tmp_file,
+    GError     **err)
 {
-    yfCapSource_t           *cs;
+    yfCapSource_t *cs;
 
     cs = g_new0(yfCapSource_t, 1);
     cs->pcap = yfCapOpenFileInner(path, datalink, tmp_file, err);
@@ -449,13 +461,15 @@ yfCapSource_t *yfCapOpenFile(
     return cs;
 }
 
-static gboolean yfCapFileListNext(
-    yfCapSource_t           *cs,
-    GError                  **err)
+
+static gboolean
+yfCapFileListNext(
+    yfCapSource_t  *cs,
+    GError        **err)
 {
-    static char             cappath[FILENAME_MAX+1];
-    size_t                  cappath_len;
-    int                     this_datalink;
+    static char cappath[FILENAME_MAX + 1];
+    size_t cappath_len;
+    int this_datalink;
 
     /* close the present pcap if necessary */
     if (cs->pcap) {
@@ -465,15 +479,15 @@ static gboolean yfCapFileListNext(
 
     /* keep going until we get an actual opened pcap file */
     while (1) {
-
         /* get the next line from the name list file */
         if (!fgets(cappath, FILENAME_MAX, cs->lfp)) {
             if (feof(cs->lfp)) {
                 g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_EOF,
-                    "End of pcap file list");
+                            "End of pcap file list");
             } else {
                 g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_IO,
-                    "Couldn't read pcap file list: %s", strerror(errno));
+                            "Couldn't read pcap file list: %s", strerror(
+                                errno));
             }
             return FALSE;
         }
@@ -488,15 +502,15 @@ static gboolean yfCapFileListNext(
 
         /* remove trailing newline */
         cappath_len = strlen(cappath);
-        if (cappath[cappath_len-1] == '\n') {
-            cappath[cappath_len-1] = (char)0;
+        if (cappath[cappath_len - 1] == '\n') {
+            cappath[cappath_len - 1] = (char)0;
         }
 
         /* we have what we think is a filename. try opening it. */
         cs->pcap = yfCapOpenFileInner(cappath, &this_datalink, cs->tmp, err);
         if (!cs->pcap) {
             g_warning("skipping pcap file %s due to error: %s.",
-                cappath, (*err)->message);
+                      cappath, (*err)->message);
             g_clear_error(err);
             continue;
         }
@@ -513,8 +527,8 @@ static gboolean yfCapFileListNext(
             cs->datalink = this_datalink;
         } else if (cs->datalink != this_datalink) {
             g_warning("skipping pcap file %s due to mismatched "
-                "datalink type %u (expecting %u).",
-                cappath, this_datalink, cs->datalink);
+                      "datalink type %u (expecting %u).",
+                      cappath, this_datalink, cs->datalink);
             pcap_close(cs->pcap);
             cs->pcap = NULL;
             continue;
@@ -525,13 +539,15 @@ static gboolean yfCapFileListNext(
     }
 }
 
-yfCapSource_t *yfCapOpenFileList(
-    const char              *path,
-    int                     *datalink,
-    char                    *tmp_file,
-    GError                  **err)
+
+yfCapSource_t *
+yfCapOpenFileList(
+    const char  *path,
+    int         *datalink,
+    char        *tmp_file,
+    GError     **err)
 {
-    yfCapSource_t           *cs;
+    yfCapSource_t *cs;
 
     /* allocate a new capsource */
     cs = g_new0(yfCapSource_t, 1);
@@ -541,7 +557,7 @@ yfCapSource_t *yfCapOpenFileList(
         /* Don't open stdin if it's a terminal */
         if (isatty(fileno(stdin))) {
             g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_IO,
-                "Refusing to read from terminal on stdin");
+                        "Refusing to read from terminal on stdin");
             g_free(cs);
             return NULL;
         }
@@ -551,7 +567,7 @@ yfCapSource_t *yfCapOpenFileList(
         cs->lfp = fopen(path, "r");
         if (!cs->lfp) {
             g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_IO,
-                "Couldn't open pcap file list: %s", strerror(errno));
+                        "Couldn't open pcap file list: %s", strerror(errno));
             g_free(cs);
             return NULL;
         }
@@ -579,10 +595,12 @@ yfCapSource_t *yfCapOpenFileList(
     return cs;
 }
 
-static gboolean yfSetPcapFilter(
-    pcap_t             *pcap,
-    const char         *bpf_expr,
-    GError             **err)
+
+static gboolean
+yfSetPcapFilter(
+    pcap_t      *pcap,
+    const char  *bpf_expr,
+    GError     **err)
 {
     struct bpf_program bpf;
 
@@ -593,7 +611,7 @@ static gboolean yfSetPcapFilter(
                     bpf_expr, pcap_geterr(pcap));
         return FALSE;
     }
-    if ( pcap_setfilter(pcap, &bpf) ) {
+    if (pcap_setfilter(pcap, &bpf) ) {
         g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_ARGUMENT,
                     "couldn't compile BPF expression %s: %s",
                     bpf_expr, pcap_geterr(pcap));
@@ -604,22 +622,25 @@ static gboolean yfSetPcapFilter(
     return TRUE;
 }
 
-void yfSetPromiscMode(
-    int              mode)
+
+void
+yfSetPromiscMode(
+    int   mode)
 {
     yaf_promisc_mode = mode;
 }
 
 
-yfCapSource_t *yfCapOpenLive(
-    const char              *ifname,
-    int                     snaplen,
-    int                     *datalink,
-    GError                  **err)
+yfCapSource_t *
+yfCapOpenLive(
+    const char  *ifname,
+    int          snaplen,
+    int         *datalink,
+    GError     **err)
 {
-    yfCapSource_t           *cs;
-    pcap_t                  *pcap;
-    static char             pcap_errbuf[PCAP_ERRBUF_SIZE];
+    yfCapSource_t *cs;
+    pcap_t *pcap;
+    static char pcap_errbuf[PCAP_ERRBUF_SIZE];
 
     pcap = pcap_open_live(ifname, snaplen, yaf_promisc_mode,
                           YAF_CAP_TIMEOUT, pcap_errbuf);
@@ -649,8 +670,10 @@ yfCapSource_t *yfCapOpenLive(
     return cs;
 }
 
-void yfCapClose(
-    yfCapSource_t                 *cs)
+
+void
+yfCapClose(
+    yfCapSource_t  *cs)
 {
     if (cs->pcap) {
         pcap_close(cs->pcap);
@@ -662,8 +685,11 @@ void yfCapClose(
     g_free(cs);
 }
 
-static void yfCapUpdateStats(pcap_t *pcap) {
 
+static void
+yfCapUpdateStats(
+    pcap_t  *pcap)
+{
     struct pcap_stat ps;
 
     if (pcap_stats(pcap, &ps) != 0) {
@@ -675,8 +701,11 @@ static void yfCapUpdateStats(pcap_t *pcap) {
     yaf_ifdrop = ps.ps_ifdrop;
 }
 
-void yfCapDumpStats() {
 
+void
+yfCapDumpStats(
+    void)
+{
     if (yaf_stats_out) {
         g_debug("yaf Exported %u stats records.", yaf_stats_out);
     }
@@ -690,14 +719,16 @@ void yfCapDumpStats() {
     }
 }
 
-static pcap_dumper_t *yfCapPcapRotate(
-    yfContext_t        *ctx)
+
+static pcap_dumper_t *
+yfCapPcapRotate(
+    yfContext_t  *ctx)
 {
-    pcap_dumper_t      *pcap_ret = NULL;
-    GString            *namebuf = g_string_new("");
-    AirLock            *lock = &(ctx->pcap_lock);
-    GError             *err = NULL;
-    static uint32_t    serial = 0;
+    pcap_dumper_t *pcap_ret = NULL;
+    GString *namebuf = g_string_new("");
+    AirLock *lock = &(ctx->pcap_lock);
+    GError *err = NULL;
+    static uint32_t serial = 0;
 
     if (ctx->pcap) {
         pcap_dump_flush(ctx->pcap);
@@ -727,7 +758,7 @@ static pcap_dumper_t *yfCapPcapRotate(
     g_string_free(namebuf, TRUE);
 
     if (ctx->cfg->pcap_timer) {
-        if ( !timer_pcap_file ) {
+        if (!timer_pcap_file) {
             timer_pcap_file = g_timer_new();
         }
         g_timer_start(timer_pcap_file);
@@ -749,19 +780,20 @@ static pcap_dumper_t *yfCapPcapRotate(
  * @param pkt pointer to the captured packet
  *
  */
-static void yfCapHandle(
-    yfContext_t                 *ctx,
-    const struct pcap_pkthdr    *hdr,
-    const uint8_t               *pkt)
+static void
+yfCapHandle(
+    yfContext_t               *ctx,
+    const struct pcap_pkthdr  *hdr,
+    const uint8_t             *pkt)
 {
-    yfPBuf_t                    *pbuf;
-    yfCapSource_t               *cs = (yfCapSource_t *)ctx->pktsrc;
+    yfPBuf_t *pbuf;
+    yfCapSource_t *cs = (yfCapSource_t *)ctx->pktsrc;
 #ifdef YAF_ENABLE_BIVIO
-    int                         iface = 0;
+    int iface = 0;
 #endif
-    yfIPFragInfo_t              fraginfo_buf,
-                                *fraginfo = ctx->fragtab ?
-                                            &fraginfo_buf : NULL;
+    yfIPFragInfo_t fraginfo_buf,
+                   *fraginfo = ctx->fragtab ?
+        &fraginfo_buf : NULL;
     /* get next spot in ring buffer */
     pbuf = (yfPBuf_t *)rgaNextHead(ctx->pbufring);
     g_assert(pbuf);
@@ -779,7 +811,7 @@ static void yfCapHandle(
     } else {
         pbuf->key.netIf = iface;
     }
-#endif
+#endif /* ifdef YAF_ENABLE_BIVIO */
 
     /* rolling pcap dump */
     if (ctx->pcap) {
@@ -793,7 +825,6 @@ static void yfCapHandle(
     } else {
         ctx->pcap_offset += (16 + pbuf->pcap_hdr.caplen);
     }
-
 
     /* Decode packet into packet buffer */
     if (!yfDecodeToPBuf(ctx->dectx,
@@ -814,8 +845,8 @@ static void yfCapHandle(
             return;
         }
     }
-
 }
+
 
 /**
  * yfCapMain
@@ -824,16 +855,17 @@ static void yfCapHandle(
  *
  *
  */
-gboolean yfCapMain(
-    yfContext_t             *ctx)
+gboolean
+yfCapMain(
+    yfContext_t  *ctx)
 {
-    AirLock                 lockbuf = AIR_LOCK_INIT, *lock = NULL;
-    gboolean                ok = TRUE;
-    gboolean                buf_excess = FALSE;
-    yfCapSource_t           *cs = (yfCapSource_t *)ctx->pktsrc;
-    int                     pcrv = 0;
-    char                    *bp_filter= (char *)ctx->cfg->bpf_expr;
-    GTimer                  *stimer = NULL;  /* to export stats */
+    AirLock lockbuf = AIR_LOCK_INIT, *lock = NULL;
+    gboolean ok = TRUE;
+    gboolean buf_excess = FALSE;
+    yfCapSource_t *cs = (yfCapSource_t *)ctx->pktsrc;
+    int pcrv = 0;
+    char *bp_filter = (char *)ctx->cfg->bpf_expr;
+    GTimer *stimer = NULL;                   /* to export stats */
 
     /* set up output locking in lock mode */
     if (ctx->cfg->lockmode) {
@@ -855,7 +887,7 @@ gboolean yfCapMain(
     }
 
     if (ctx->cfg->pcapdir) {
-        if (!yfTimeOutFlush(ctx, yaf_pcap_drop+yaf_ifdrop, &yaf_stats_out,
+        if (!yfTimeOutFlush(ctx, yaf_pcap_drop + yaf_ifdrop, &yaf_stats_out,
                             yfStatGetTimer(), stimer,
                             &(ctx->err)))
         {
@@ -883,7 +915,6 @@ gboolean yfCapMain(
 
     /* process input until we're done */
     while (!yaf_quit) {
-
         yaf_pcap = cs->pcap;
 
         /* Process some packets */
@@ -918,15 +949,14 @@ gboolean yfCapMain(
                         ctx->pcap_offset = sizeof(struct pcap_file_header);
                     }
                 }
-
             } else if (!cs->is_live) {
-             /* EOF in single capfile mode; break; will check to see if
-                excess in buffer */
+                /* EOF in single capfile mode; break; will check to see if
+                 * excess in buffer */
                 buf_excess = TRUE;
                 break;
             } else {
                 /* Live, no packet processed (timeout). Flush buffer */
-                if (!yfTimeOutFlush(ctx, yaf_pcap_drop+yaf_ifdrop,
+                if (!yfTimeOutFlush(ctx, yaf_pcap_drop + yaf_ifdrop,
                                     &yaf_stats_out,
                                     yfStatGetTimer(), stimer,
                                     &(ctx->err)))
@@ -951,7 +981,7 @@ gboolean yfCapMain(
                 }
                 yfDecodeResetOffset(ctx->dectx);
                 yfUpdateRollingPcapFile(ctx->flowtab, cs->last_filename);
-                if (!ctx->pcap){
+                if (!ctx->pcap) {
                     if (cs->pcapng) {
                         ctx->pcap_offset = ftell(cs->pcapng);
                     } else {
@@ -982,15 +1012,14 @@ gboolean yfCapMain(
 
         if (ok && !ctx->cfg->nostats) {
             if (g_timer_elapsed(stimer, NULL) > ctx->cfg->stats) {
-
                 /* Update packet drop statistics for live capture */
                 if (cs->is_live) {
                     yfCapUpdateStats(cs->pcap);
                 }
 
-                if (!yfWriteOptionsDataFlows(ctx, yaf_pcap_drop+yaf_ifdrop,
-                                      yfStatGetTimer(),
-                                      &(ctx->err)))
+                if (!yfWriteOptionsDataFlows(ctx, yaf_pcap_drop + yaf_ifdrop,
+                                             yfStatGetTimer(),
+                                             &(ctx->err)))
                 {
                     ok = FALSE;
                     break;
@@ -1001,10 +1030,10 @@ gboolean yfCapMain(
         }
 
         if (ok && ctx->cfg->pcapdir && !ctx->cfg->pcap_per_flow) {
-            if (!ctx->pcap || (ftell(pcap_dump_file(ctx->pcap)) >
-                               ctx->cfg->max_pcap) || (timer_pcap_file &&
-                               (g_timer_elapsed(timer_pcap_file, NULL) >
-                                ctx->cfg->pcap_timer)))
+            if (!ctx->pcap ||
+                (ftell(pcap_dump_file(ctx->pcap)) > (long)ctx->cfg->max_pcap) ||
+                (timer_pcap_file && (g_timer_elapsed(timer_pcap_file, NULL) >
+                                     ctx->cfg->pcap_timer)))
             {
                 ctx->pcap = yfCapPcapRotate(ctx);
             }
@@ -1043,6 +1072,6 @@ gboolean yfCapMain(
         }
     }
 
-    return yfFinalFlush(ctx, ok, yaf_pcap_drop+yaf_ifdrop,
+    return yfFinalFlush(ctx, ok, yaf_pcap_drop + yaf_ifdrop,
                         yfStatGetTimer(), &(ctx->err));
 }

@@ -3,20 +3,15 @@
  *
  *@file tftpplugin.c
  *
- *@brief this is a protocol classifier for the Trivial File Transfer protocol (TFTP)
+ *@brief this is a protocol classifier for the Trivial File Transfer protocol
+ *(TFTP)
  *
  * TFTP is a very simple protocol used to transfer files.
  *
  * @sa rfc 1350  href="http://www.ietf.org/rfc/rfc1350.txt"
  *
- *
- * @author $Author: ecoff_svn $
- * @date $Date: 2010-01-20 15:54:44 -0500 (Wed, 20 Jan 2010) $
- * @version $Revision: 15242 $
- *
- *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Ecoff <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -24,7 +19,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -75,6 +70,7 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 #include <arpa/inet.h>
 #if YAF_ENABLE_HOOKS
@@ -85,18 +81,22 @@
 
 #define TFTP_PORT_NUMBER 69
 
+YC_SCANNER_PROTOTYPE(tftpplugin_LTX_ycTFTPScanScan);
 
-static pcre *tftpRegex = NULL;
+
+static pcre        *tftpRegex = NULL;
 static unsigned int pcreInitialized = 0;
 
 /**
  * static local functions
  *
  */
-static uint16_t ycTFTPScanInit (void);
+static uint16_t
+ycTFTPScanInit(
+    void);
 
 /**
- * tftpplugin_LTX_ycTFTPScan
+ * tftpplugin_LTX_ycTFTPScanScan
  *
  * returns TFTP_PORT_NUMBER if the passed in payload matches
  * a trivial file transfer protocol packet
@@ -111,20 +111,19 @@ static uint16_t ycTFTPScanInit (void);
  *
  * return 0 if no match
  */
-
 uint16_t
-tftpplugin_LTX_ycTFTPScanScan (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+tftpplugin_LTX_ycTFTPScanScan(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
 #define NUM_CAPT_VECTS 60
-    int vects[NUM_CAPT_VECTS];
+    int      vects[NUM_CAPT_VECTS];
     uint16_t payloadOffset = 0;
-    int rc;
+    int      rc;
     uint16_t tempVar = 0;
     uint16_t opcode;
 
@@ -138,7 +137,7 @@ tftpplugin_LTX_ycTFTPScanScan (
         }
     }
 
-    opcode = ntohs(*(uint16_t*)payload);
+    opcode = ntohs(*(uint16_t *)payload);
     payloadOffset += 2;
 
     if ((opcode > 5) || (opcode == 0)) {
@@ -163,27 +162,26 @@ tftpplugin_LTX_ycTFTPScanScan (
         if (rc > 2) {
             tempVar = vects[5] - vects[4];  /*len of mode*/
             yfHookScanPayload(flow, payload, tempVar, NULL, vects[4], 70,
-                          TFTP_PORT_NUMBER);
+                              TFTP_PORT_NUMBER);
         }
-#endif
+#endif /* if YAF_ENABLE_HOOKS */
     } else if ((opcode == 3) || (opcode == 4)) {
         /* DATA or ACK packet */
-        tempVar = ntohs(*(uint16_t*)(payload + payloadOffset));
+        tempVar = ntohs(*(uint16_t *)(payload + payloadOffset));
         if (tempVar != 1) {
             return 0;
         }
     } else if (opcode == 5) {
         /* Error Packet */
-        tempVar = ntohs(*(uint16_t*)(payload + payloadOffset));
+        tempVar = ntohs(*(uint16_t *)(payload + payloadOffset));
         /* Error codes are 1-7 */
-        if (tempVar > 8){
+        if (tempVar > 8) {
             return 0;
         }
     }
 
     return TFTP_PORT_NUMBER;
 }
-
 
 
 /**
@@ -199,13 +197,14 @@ tftpplugin_LTX_ycTFTPScanScan (
  */
 static
 uint16_t
-ycTFTPScanInit ()
+ycTFTPScanInit(
+    void)
 {
     const char *errorString;
-    int errorPos;
+    int         errorPos;
 
-    const char tftpRegexString[] = "\\x00[\\x01|\\x02]([-a-zA-Z1-9. ]+)"
-                                   "\\x00(?i)(netascii|octet|mail)\\x00";
+    const char  tftpRegexString[] = "\\x00[\\x01|\\x02]([-a-zA-Z1-9. ]+)"
+        "\\x00(?i)(netascii|octet|mail)\\x00";
 
     tftpRegex = pcre_compile(tftpRegexString, PCRE_ANCHORED, &errorString,
                              &errorPos, NULL);
@@ -215,7 +214,6 @@ ycTFTPScanInit ()
     } else {
         g_debug("errpos is %d", errorPos);
     }
-
 
     return pcreInitialized;
 }

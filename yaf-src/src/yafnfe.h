@@ -3,7 +3,7 @@
 ** YAF Netronome Support
 **
 ** ------------------------------------------------------------------------
-** Copyright (C) 2006-2016 Carnegie Mellon University. All Rights Reserved.
+** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
 ** ------------------------------------------------------------------------
 ** Authors: Emily Sarneso <netsa-help@cert.org>
 ** ------------------------------------------------------------------------
@@ -11,7 +11,7 @@
 ** Use of the YAF system and related source code is subject to the terms
 ** of the following licenses:
 **
-** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
 ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
 **
 ** NO WARRANTY
@@ -62,18 +62,23 @@
 struct yfNFESource_st;
 typedef struct yfNFESource_st yfNFESource_t;
 
-yfNFESource_t *yfNFEOpenLive(
-    const char              *ifname,
-    int                     snaplen,
-    int                     *datalink,
-    GError                  **err);
+yfNFESource_t *
+yfNFEOpenLive(
+    const char  *ifname,
+    int          snaplen,
+    int         *datalink,
+    GError     **err);
 
-void yfNFEClose(
-    yfNFESource_t            *ps);
+void
+yfNFEClose(
+    yfNFESource_t  *ps);
 
-gboolean yfNFEMain(
-    yfContext_t              *ctx);
+gboolean
+yfNFEMain(
+    yfContext_t  *ctx);
 
-void yfNFEDumpStats();
+void
+yfNFEDumpStats(
+    void);
 
-#endif
+#endif /* ifndef _YAF_NETRONOME_H_ */

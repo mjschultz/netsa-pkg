@@ -3,15 +3,15 @@
 ** Airframe options interface
 **
 ** ------------------------------------------------------------------------
-** Copyright (C) 2005-2011 Carnegie Mellon University. All Rights Reserved.
+** Copyright (C) 2005-2020 Carnegie Mellon University. All Rights Reserved.
 ** ------------------------------------------------------------------------
-** Authors: Tony Cebzanov <tonyc@cert.org>
+** Authors: Tony Cebzanov
 ** ------------------------------------------------------------------------
 ** @OPENSOURCE_HEADER_START@
 ** Use of the YAF system and related source code is subject to the terms
 ** of the following licenses:
 **
-** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
 ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
 **
 ** NO WARRANTY
@@ -59,26 +59,23 @@
 #define _AIRFRAME_SOURCE_
 #include <airframe/airopt.h>
 
-static char *RCSID __attribute__(
-    (unused)) =
-    "$Id: airutil.c 4728 2006-08-30 14:41:01Z bht $";
-
 struct _AirOptionCtx {
 #if USE_GOPTION
-    GOptionContext *octx;
+    GOptionContext  *octx;
 #elif USE_POPT
-    poptContext     octx;
-    GArray         *options;
-#endif
-    int            *argc;
-    char         ***argv;
+    poptContext      octx;
+    GArray          *options;
+#endif /* if USE_GOPTION */
+    int             *argc;
+    char          ***argv;
 };
 
-void air_opterr(
-    const char      *fmt,
+void
+air_opterr(
+    const char  *fmt,
     ...)
 {
-    va_list         ap;
+    va_list ap;
 
     fprintf(stderr, "Command-line argument error: \n");
 
@@ -91,19 +88,21 @@ void air_opterr(
     exit(1);
 }
 
-AirOptionCtx *air_option_context_new(
-    const char     *helpstr,
-    int            *argc,
-    char         ***argv,
-    AirOptionEntry *entries)
+
+AirOptionCtx *
+air_option_context_new(
+    const char      *helpstr,
+    int             *argc,
+    char          ***argv,
+    AirOptionEntry  *entries)
 {
-    AirOptionCtx *aoctx;
+    AirOptionCtx   *aoctx;
 #if USE_GOPTION
-    GOptionContext  *octx = NULL;
+    GOptionContext *octx = NULL;
 #elif USE_POPT
-    poptContext octx = NULL;
-    int i    = 0;
-#endif
+    poptContext     octx = NULL;
+    int             i    = 0;
+#endif /* if USE_GOPTION */
 
     aoctx = g_new0(AirOptionCtx, 1);
 #if USE_GOPTION
@@ -115,16 +114,15 @@ AirOptionCtx *air_option_context_new(
 
     aoctx->options = g_array_sized_new(TRUE, TRUE, sizeof(AirOptionEntry), 64);
     if (entries) {
-
-        for (i=0; !AF_OPTION_EMPTY(entries[i]); i++) {
+        for (i = 0; !AF_OPTION_EMPTY(entries[i]); i++) {
             g_array_append_val(aoctx->options, entries[i]);
         }
     }
-    octx = poptGetContext(NULL, *argc,  (const char **) *argv,
-                          (AirOptionEntry *) aoctx->options->data, 0);
+    octx = poptGetContext(NULL, *argc,  (const char **)*argv,
+                          (AirOptionEntry *)aoctx->options->data, 0);
 
     poptSetOtherOptionHelp(octx, helpstr);
-#endif
+#endif /* if USE_GOPTION */
 
     aoctx->argc = argc;
     aoctx->argv = argv;
@@ -134,12 +132,13 @@ AirOptionCtx *air_option_context_new(
 }
 
 
-gboolean air_option_context_add_group(
-    AirOptionCtx   *aoctx,
-    const char     *shortname,
-    const char     *longname,
-    const char     *description,
-    AirOptionEntry *entries)
+gboolean
+air_option_context_add_group(
+    AirOptionCtx    *aoctx,
+    const char      *shortname,
+    const char      *longname,
+    const char      *description,
+    AirOptionEntry  *entries)
 {
     g_assert(aoctx != NULL);
     g_assert(aoctx->octx != NULL);
@@ -171,16 +170,18 @@ gboolean air_option_context_add_group(
 
         return TRUE;
     }
-#endif
+#endif /* if USE_GOPTION */
 
     return FALSE;
 }
 
-void air_option_context_parse(
-    AirOptionCtx *aoctx)
+
+void
+air_option_context_parse(
+    AirOptionCtx  *aoctx)
 {
 #if USE_GOPTION
-    GError          *oerr = NULL;
+    GError *oerr = NULL;
 
     g_option_context_parse(aoctx->octx, aoctx->argc, aoctx->argv, &oerr);
     if (oerr) {
@@ -188,9 +189,9 @@ void air_option_context_parse(
     }
 #elif USE_POPT
     {
-        int argcount = 0;
-        char **rest     = 0;
-        int rc;
+        int        argcount = 0;
+        char     **rest     = 0;
+        int        rc;
 
         GPtrArray *new_argv = NULL;
 
@@ -205,7 +206,7 @@ void air_option_context_parse(
         g_ptr_array_add(new_argv, g_strdup(*(aoctx->argv)[0]));
 
         /* Do the actual parsing, returning non-switch args */
-        rest = (char **) poptGetArgs(aoctx->octx);
+        rest = (char **)poptGetArgs(aoctx->octx);
 
         /* Walk through the remaining args, adding them to the new argv and
          * counting them for argc */
@@ -216,13 +217,15 @@ void air_option_context_parse(
         g_ptr_array_add(new_argv, NULL);
         /* Now replace the original argc and argv with post-parse values */
         *(aoctx->argc) = argcount;
-        *(aoctx->argv) = (char **) g_ptr_array_free(new_argv, FALSE);
+        *(aoctx->argv) = (char **)g_ptr_array_free(new_argv, FALSE);
     }
-#endif
+#endif /* if USE_GOPTION */
 }
 
-void air_option_context_set_help_enabled(
-    AirOptionCtx *aoctx)
+
+void
+air_option_context_set_help_enabled(
+    AirOptionCtx  *aoctx)
 {
     g_assert(aoctx != NULL);
     g_assert(aoctx->octx != NULL);
@@ -241,33 +244,29 @@ void air_option_context_set_help_enabled(
         poption.argDescrip = NULL;
         g_array_append_val(aoctx->options,  poption);
     }
-#endif
+#endif /* if USE_GOPTION */
 }
 
-void air_option_context_usage(
-    AirOptionCtx *aoctx)
+
+void
+air_option_context_usage(
+    AirOptionCtx  *aoctx)
 {
     g_assert(aoctx != NULL);
     g_assert(aoctx->octx != NULL);
 
 #if USE_GOPTION
-    /* Grr.  GLib has a g_option_context_get_help() function, but it's new as
-     * of GLib 2.14, which almost nobody has.  So, we timidly tell the user
-     * to get the usage for themselves instead of printing it for them.
-     * GLib--
-     *
-     * g_fprintf(stderr, g_option_context_get_help(aoctx->octx, FALSE, NULL));
-     */
-
-    g_fprintf(stderr, "Use --help for usage.");
+    g_fprintf(stderr, "%s",
+              g_option_context_get_help(aoctx->octx, FALSE, NULL));
 #elif USE_POPT
     poptPrintHelp(aoctx->octx, stderr, 0);
-#endif
-    return;
+#endif /* if USE_GOPTION */
 }
 
-void air_option_context_free(
-    AirOptionCtx *aoctx)
+
+void
+air_option_context_free(
+    AirOptionCtx  *aoctx)
 {
 #if USE_GOPTION
     g_option_context_free(aoctx->octx);
@@ -275,6 +274,5 @@ void air_option_context_free(
 #elif USE_POPT
     g_array_free(aoctx->options, TRUE);
     poptFreeContext(aoctx->octx);
-#endif
-
+#endif /* if USE_GOPTION */
 }

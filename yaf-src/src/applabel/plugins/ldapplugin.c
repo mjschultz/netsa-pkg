@@ -5,7 +5,7 @@
  * Decoder based on RFC 4511.
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2014-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2014-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -13,7 +13,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -63,25 +63,29 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 #define LDAP_PORT_NUMBER 389
 
-typedef struct asn_tlv_st {
-    uint8_t        class:2;
-    uint8_t        p_c:1;
-    uint8_t        tag:5;
+YC_SCANNER_PROTOTYPE(ldapplugin_LTX_ycLdapScanScan);
 
-    uint8_t        longform:1;
-    uint8_t        length:7;
+typedef struct asn_tlv_st {
+    uint8_t   class    : 2;
+    uint8_t   p_c      : 1;
+    uint8_t   tag      : 5;
+
+    uint8_t   longform : 1;
+    uint8_t   length   : 7;
 } asn_tlv_t;
 
 
 
 /* Local Prototypes */
 static
-void ldapDecodeTLV(
-    uint8_t *payload,
-    asn_tlv_t *tlv);
+void
+ldapDecodeTLV(
+    const uint8_t  *payload,
+    asn_tlv_t      *tlv);
 
 /**
  * ldapplugin_LTX_ycLdapScanScan
@@ -100,26 +104,24 @@ void ldapDecodeTLV(
  * @return ldap_port_number
  *         otherwise 0
  */
-
 uint16_t
 ldapplugin_LTX_ycLdapScanScan(
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
-    uint16_t offset = 0;
-    uint16_t min_length = 7;
-    int i = 0;
-    uint64_t num_packets = val->pkt;
-    size_t pkt_length = payloadSize;
-    asn_tlv_t tlv;
-
+    uint16_t     offset = 0;
+    uint16_t     min_length = 7;
+    unsigned int i;
+    uint64_t     num_packets = val->pkt;
+    size_t       pkt_length = payloadSize;
+    asn_tlv_t    tlv;
 
     /* must have SEQUENCE Tag, Integer TAG for Message ID, protocol Op Tag */
-    if ( payloadSize < min_length ) {
+    if (payloadSize < min_length) {
         return 0;
     }
 
@@ -131,7 +133,7 @@ ldapplugin_LTX_ycLdapScanScan(
         num_packets = YAF_MAX_PKT_BOUNDARY;
     }
 
-    while (i < num_packets) {
+    for (i = 0; i < num_packets; ++i) {
         if (val->paybounds[i]) {
             pkt_length = val->paybounds[i];
             if (pkt_length > payloadSize) {
@@ -139,9 +141,7 @@ ldapplugin_LTX_ycLdapScanScan(
             }
             break;
         }
-        i++;
     }
-
 
     ldapDecodeTLV(payload, &tlv);
 
@@ -211,11 +211,11 @@ ldapplugin_LTX_ycLdapScanScan(
             return 0;
         }
         /* could test resultCode 0-123, 4096 */
-
     }
 
     return LDAP_PORT_NUMBER;
 }
+
 
 /**
  * ldapDecodeTLV
@@ -232,11 +232,11 @@ ldapplugin_LTX_ycLdapScanScan(
 static
 void
 ldapDecodeTLV(
-    uint8_t               *payload,
-    asn_tlv_t             *tlv)
+    const uint8_t  *payload,
+    asn_tlv_t      *tlv)
 {
     uint8_t byte1 = *payload;
-    uint8_t byte2 = *(payload+1);
+    uint8_t byte2 = *(payload + 1);
 
     tlv->class = (byte1 & 0xD0) >> 6;
     tlv->p_c = (byte1 & 0x20) >> 5;
@@ -246,6 +246,7 @@ ldapDecodeTLV(
     tlv->length = (byte2 & 0x7F);
 
     /*g_debug("tlv->class: %d, tlv->pc: %d, tlv->tag: %d",
-            tlv->class, tlv->p_c, tlv->tag);
-            g_debug("tlv->longform: %d, tlv->length %d", tlv->longform, tlv->length);*/
+     *      tlv->class, tlv->p_c, tlv->tag);
+     *      g_debug("tlv->longform: %d, tlv->length %d", tlv->longform,
+     * tlv->length);*/
 }

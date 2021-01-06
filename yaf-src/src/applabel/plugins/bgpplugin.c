@@ -9,7 +9,7 @@
  * see http://www.ietf.org/rfc/rfc4271 for more info
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -17,7 +17,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -67,10 +67,13 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 
 #define BGP_PORT_NUMBER  179
 #define BGP_MARKER 0xff
+
+YC_SCANNER_PROTOTYPE(bgpplugin_LTX_ycBgpScanScan);
 
 /**
  * bgpplugin_LTX_ycBgpScanScan
@@ -90,23 +93,22 @@
  *         otherwise 0
  */
 uint16_t
-bgpplugin_LTX_ycBgpScanScan (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+bgpplugin_LTX_ycBgpScanScan(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
     unsigned int offsetptr;
-    uint16_t bgp_len;
-    uint8_t bgp_type;
+    uint16_t     bgp_len;
+    uint8_t      bgp_type;
 
     /* BGP header is fixed - has to be at least 19 bytes long... */
     if (payloadSize < 19) {
         return 0;
     }
-
 
     for (offsetptr = 0; offsetptr < 16; offsetptr++) {
         if (*(payload + offsetptr) != BGP_MARKER) {
@@ -125,7 +127,6 @@ bgpplugin_LTX_ycBgpScanScan (
     if (bgp_type == 0 || bgp_type > 4) {
         return 0;
     }
-
 
     return BGP_PORT_NUMBER;
 }

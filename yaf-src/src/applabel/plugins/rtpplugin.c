@@ -6,14 +6,8 @@
  * and associated RTP Control Protocol (RTCP) session.
  * Based on RFC 3550.
  *
- *
- * @author $Author: ecoff_svn $
- * @date $Date: 2010-07-26 09:28:45 -0400 (Mon, 26 Jul 2010) $
- * @Version $Revision: 16060 $
- *
- *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2019 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -21,7 +15,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -71,6 +65,7 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 #if YAF_ENABLE_HOOKS
 #include <yaf/yafhooks.h>
@@ -80,29 +75,30 @@
 #define RTCP_PORT_NUMBER 5005
 #define RTP_PAYTYPE 287
 
+YC_SCANNER_PROTOTYPE(rtpplugin_LTX_ycRtpScanScan);
+
 typedef struct ycRtpScanMessageHeader_st {
-    uint16_t      version:2;
-    uint16_t      padding:1;
-    uint16_t      extension:1;
-    uint16_t      csrc:4;
-    uint16_t      marker:1;
-    uint16_t      paytype:7;
+    uint16_t   version   : 2;
+    uint16_t   padding   : 1;
+    uint16_t   extension : 1;
+    uint16_t   csrc      : 4;
+    uint16_t   marker    : 1;
+    uint16_t   paytype   : 7;
 
-    uint16_t      sequence;
-    uint32_t      timestamp;
-    uint32_t      ssrc;
-
+    uint16_t   sequence;
+    uint32_t   timestamp;
+    uint32_t   ssrc;
 } ycRtpScanMessageHeader_t;
 
 
 typedef struct ycRtcpScanMessageHeader_st {
-    uint8_t      version:2;
-    uint8_t      padding:1;
-    uint8_t      count:5;
+    uint8_t    version : 2;
+    uint8_t    padding : 1;
+    uint8_t    count   : 5;
 
-    uint8_t      packet_type;
-    uint16_t     length;
-    uint32_t     ssrc;
+    uint8_t    packet_type;
+    uint16_t   length;
+    uint32_t   ssrc;
 } ycRtcpScanMessageHeader_t;
 
 
@@ -111,16 +107,16 @@ typedef struct ycRtcpScanMessageHeader_st {
 
 static
 void
-ycRtpScanRebuildHeader (
-    uint8_t * payload,
-    ycRtpScanMessageHeader_t * header);
+ycRtpScanRebuildHeader(
+    const uint8_t             *payload,
+    ycRtpScanMessageHeader_t  *header);
 
 
 static
 void
 ycRtcpScanRebuildHeader(
-    uint8_t *payload,
-    ycRtcpScanMessageHeader_t * header);
+    const uint8_t              *payload,
+    ycRtcpScanMessageHeader_t  *header);
 
 
 /**
@@ -140,18 +136,16 @@ ycRtcpScanRebuildHeader(
  * @return rtp_port_number
  *         otherwise 0
  */
-
 uint16_t
 rtpplugin_LTX_ycRtpScanScan(
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
-
-    ycRtpScanMessageHeader_t header;
+    ycRtpScanMessageHeader_t  header;
     ycRtcpScanMessageHeader_t rtcp_header;
     uint16_t offset = 0;
 
@@ -172,7 +166,6 @@ rtpplugin_LTX_ycRtpScanScan(
     }
 
     if (header.paytype > 34) {
-
         if ((header.paytype > 71) && (header.paytype < 77)) {
             goto rtcp;
         }
@@ -184,14 +177,13 @@ rtpplugin_LTX_ycRtpScanScan(
         if ((header.paytype > 76) && (header.paytype < 96)) {
             return 0;
         }
-
     }
 
     offset += 12;
 
     if (header.csrc > 0) {
-        int csrc_count = (header.csrc > 15) ? 15 : header.csrc;
-        int csrc_length = csrc_count * 4;
+        unsigned int csrc_count = (header.csrc > 15) ? 15 : header.csrc;
+        unsigned int csrc_length = csrc_count * 4;
 
         if ((payloadSize - offset) < csrc_length) {
             return 0;
@@ -203,7 +195,7 @@ rtpplugin_LTX_ycRtpScanScan(
     if (header.extension) {
         uint16_t extension_length;
 
-        if (offset + 4 > payloadSize) {
+        if ((size_t)offset + 4 > payloadSize) {
             return 0;
         }
 
@@ -237,7 +229,6 @@ rtpplugin_LTX_ycRtpScanScan(
 
     return RTP_PORT_NUMBER;
 
-
   rtcp:
 
     offset = 0;
@@ -259,7 +250,7 @@ rtpplugin_LTX_ycRtpScanScan(
 
     offset += 8;
 
-    if (offset + 8 > payloadSize) {
+    if ((size_t)offset + 8 > payloadSize) {
         return 0;
     }
 
@@ -313,7 +304,6 @@ rtpplugin_LTX_ycRtpScanScan(
     }
 
     return RTCP_PORT_NUMBER;
-
 }
 
 
@@ -332,11 +322,11 @@ rtpplugin_LTX_ycRtpScanScan(
  */
 static
 void
-ycRtpScanRebuildHeader (
-    uint8_t * payload,
-    ycRtpScanMessageHeader_t * header)
+ycRtpScanRebuildHeader(
+    const uint8_t             *payload,
+    ycRtpScanMessageHeader_t  *header)
 {
-    uint16_t            bitmasks = ntohs(*((uint16_t *)payload));
+    uint16_t bitmasks = ntohs(*((uint16_t *)payload));
 
     header->version = (bitmasks & 0xC000) >> 14;
     header->padding = bitmasks & 0x2000 ? 1 : 0;
@@ -352,26 +342,25 @@ ycRtpScanRebuildHeader (
     header->ssrc = ntohl(*((uint32_t *)(payload + 8)));
 
     /*
-    g_debug("header->version %d", header->version);
-    g_debug("header->padding %d", header->padding);
-    g_debug("header->extension %d", header->extension);
-    g_debug("header->csrc %d", header->csrc);
-    g_debug("header->marker %d", header->marker);
-    g_debug("header->paytype %d", header->paytype);
-    g_debug("header->sequence %d", header->sequence);
-    g_debug("header->timestamp %d", header->timestamp);
-    g_debug("header->ssrc %d", header->ssrc);
-    */
+     * g_debug("header->version %d", header->version);
+     * g_debug("header->padding %d", header->padding);
+     * g_debug("header->extension %d", header->extension);
+     * g_debug("header->csrc %d", header->csrc);
+     * g_debug("header->marker %d", header->marker);
+     * g_debug("header->paytype %d", header->paytype);
+     * g_debug("header->sequence %d", header->sequence);
+     * g_debug("header->timestamp %d", header->timestamp);
+     * g_debug("header->ssrc %d", header->ssrc);
+     */
 }
 
 
 static
 void
 ycRtcpScanRebuildHeader(
-    uint8_t *payload,
-    ycRtcpScanMessageHeader_t * header)
+    const uint8_t              *payload,
+    ycRtcpScanMessageHeader_t  *header)
 {
-
     uint8_t bitmasks = *payload;
 
     header->version = (bitmasks & 0xC0) >> 6;
@@ -385,11 +374,11 @@ ycRtcpScanRebuildHeader(
     header->ssrc = ntohl(*((uint32_t *)(payload + 4)));
 
     /*
-    g_debug("header->version %d", header->version);
-    g_debug("header->padding %d", header->padding);
-    g_debug("header->count %d", header->count);
-
-    g_debug("header_pkt type %d", header->packet_type);
-    g_debug("header->length is %d", header->length);
-    */
+     * g_debug("header->version %d", header->version);
+     * g_debug("header->padding %d", header->padding);
+     * g_debug("header->count %d", header->count);
+     *
+     * g_debug("header_pkt type %d", header->packet_type);
+     * g_debug("header->length is %d", header->length);
+     */
 }

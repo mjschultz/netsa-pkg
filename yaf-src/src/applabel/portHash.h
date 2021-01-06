@@ -6,7 +6,7 @@
  * the interface to a simple hash that is implemented to hide a sparse array
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2016 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Chris Inacio
  ** ------------------------------------------------------------------------
@@ -15,7 +15,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -65,15 +65,19 @@
 #define _YAF_SOURCE_
 #include <yaf/autoinc.h>
 
-void ycPortHashInitialize(void);
+void
+ycPortHashInitialize(
+    void);
 
-void ycPortHashInsert (
-        uint16_t portNum,
-        uint16_t ruleNum);
+void
+ycPortHashInsert(
+    uint16_t   portNum,
+    uint16_t   ruleNum);
 
 
-uint16_t ycPortHashSearch (
-        uint16_t portNum);
+uint16_t
+ycPortHashSearch(
+    uint16_t   portNum);
 
 
-#endif
+#endif /* ifndef PORT_HASH_H_ */

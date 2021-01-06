@@ -6,7 +6,7 @@ dnl ------------------------------------------------------------------------
 dnl @OPENSOURCE_LICENSE_START@
 dnl libfixbuf 2.0
 dnl
-dnl Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
+dnl Copyright 2018-2020 Carnegie Mellon University. All Rights Reserved.
 dnl
 dnl NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
 dnl ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -35,9 +35,9 @@ dnl Authors: Brian Trammell, Dan Ruef <druef@cert.org>, Chris Inacio
 dnl <inacio@cert.org>
 dnl ------------------------------------------------------------------------
 
-AC_INIT([libfixbuf], [2.4.0], [netsa-help@cert.org], [libfixbuf], [http://tools.netsa.cert.org/fixbuf/])
+AC_INIT([libfixbuf], [2.4.1], [netsa-help@cert.org], [libfixbuf], [http://tools.netsa.cert.org/fixbuf/])
 AC_CONFIG_AUX_DIR([autoconf])
-AC_COPYRIGHT([Copyright (C) 2006-2019 by Carnegie Mellon University
+AC_COPYRIGHT([Copyright (C) 2006-2020 by Carnegie Mellon University
 GNU Public License (GPL) Rights pursuant to Version 3, June 2007])
 
 AM_INIT_AUTOMAKE([1.6.3 foreign nostdinc])
@@ -49,8 +49,8 @@ dnl the third number should be changed if the first number changes and
 dnl the release is backwards compatible with the previous release.
 dnl https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
 
-# Previous release: 2.3.1, LIBCOMPAT 9:1:0
-LIBCOMPAT="9:2:0"
+# Previous release: 2.4.0, LIBCOMPAT 9:2:0
+LIBCOMPAT="9:3:0"
 
 AM_CONFIG_HEADER(include/fixbuf/config.h)
 AC_CONFIG_MACRO_DIR([m4])
@@ -228,37 +228,35 @@ dnl Check for OpenSSL TLS and DTLS support
 dnl ----------------------------------------------------------------------
 
 AC_ARG_WITH(openssl,
-AC_HELP_STRING([--with-openssl=prefix], [Use OpenSSL for TLS/DTLS support]),[
-if test -d ${withval}; then
-    LDFLAGS="-L${withval}/lib ${LDFLAGS}"
-    CPPFLAGS="-I${withval}/include ${CPPFLAGS}"
-    RPM_CONFIG_FLAGS="${RPM_CONFIG_FLAGS} --with-openssl=${withval}"
-else
-    RPM_CONFIG_FLAGS="${RPM_CONFIG_FLAGS} --with-openssl"
-fi
+    AC_HELP_STRING([--with-openssl=prefix],
+                   [Use OpenSSL for TLS/DTLS support]),[
+    if test -d ${withval}; then
+        LDFLAGS="-L${withval}/lib ${LDFLAGS}"
+        CPPFLAGS="-I${withval}/include ${CPPFLAGS}"
+        RPM_CONFIG_FLAGS="${RPM_CONFIG_FLAGS} --with-openssl=${withval}"
+    else
+        RPM_CONFIG_FLAGS="${RPM_CONFIG_FLAGS} --with-openssl"
+    fi
 
-
-dnl look for libssl
-    AC_CHECK_LIB(ssl,SSL_new,[
+dnl look for libssl 1.0.2 or later by checking for SSL_certs_clear
+    AC_CHECK_LIB(ssl,SSL_certs_clear,[
         AC_DEFINE(HAVE_OPENSSL, 1, [Define to 1 to enable OpenSSL support])
         LIBS="-lssl -lcrypto ${LIBS}"
         AC_SUBST(FIXBUF_REQ_LIBSSL, [1])
     ],[
-        AC_MSG_ERROR([--with-openssl given but cannot find SSL_new()])
+        AC_MSG_ERROR([--with-openssl given but cannot find SSL_certs_clear()])
     ])
 
 dnl look for dtls
-    AC_CHECK_LIB(ssl,DTLSv1_method,[
+    AC_CHECK_LIB(ssl,DTLS_method,[
         AC_DEFINE(HAVE_OPENSSL_DTLS, 1, [Define to 1 to enable DTLS support])
     ],[
         AC_MSG_NOTICE([OpenSSL does not support DTLS])
     ])
 
-    AC_CHECK_HEADER(openssl/ssl.h,[],
-    [
+    AC_CHECK_HEADER(openssl/ssl.h,[],[
        AC_MSG_ERROR([--with-openssl given but cannot find libssl headers.])
     ])
-
 ])
 
 dnl ----------------------------------------------------------------------

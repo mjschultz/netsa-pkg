@@ -4,7 +4,7 @@
 ## Makefile.am (startup)
 ## autotools build system for NAF applications
 ## ------------------------------------------------------------------------
-## Copyright (C) 2005-2015 Carnegie Mellon University. All Rights Reserved.
+## Copyright (C) 2005-2020 Carnegie Mellon University. All Rights Reserved.
 ## ------------------------------------------------------------------------
 ## Authors: Brian Trammell 
 ## ------------------------------------------------------------------------

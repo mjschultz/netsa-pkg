@@ -1,60 +1,60 @@
 /*
- ** yafrag.c
- ** YAF Active Fragment Table
- **
- ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2016 Carnegie Mellon University. All Rights Reserved.
- ** ------------------------------------------------------------------------
- ** Authors: Brian Trammell
- ** ------------------------------------------------------------------------
- ** @OPENSOURCE_HEADER_START@
- ** Use of the YAF system and related source code is subject to the terms
- ** of the following licenses:
- **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
- ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
- **
- ** NO WARRANTY
- **
- ** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
- ** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
- ** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
- ** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
- ** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
- ** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
- ** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
- ** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
- ** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
- ** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
- ** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
- ** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
- ** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
- ** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
- ** DELIVERABLES UNDER THIS LICENSE.
- **
- ** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
- ** Mellon University, its trustees, officers, employees, and agents from
- ** all claims or demands made against them (and any related losses,
- ** expenses, or attorney's fees) arising out of, or relating to Licensee's
- ** and/or its sub licensees' negligent use or willful misuse of or
- ** negligent conduct or willful misconduct regarding the Software,
- ** facilities, or other rights or assistance granted by Carnegie Mellon
- ** University under this License, including, but not limited to, any
- ** claims of product liability, personal injury, death, damage to
- ** property, or violation of any laws or regulations.
- **
- ** Carnegie Mellon University Software Engineering Institute authored
- ** documents are sponsored by the U.S. Department of Defense under
- ** Contract FA8721-05-C-0003. Carnegie Mellon University retains
- ** copyrights in all material produced under this contract. The U.S.
- ** Government retains a non-exclusive, royalty-free license to publish or
- ** reproduce these documents, or allow others to do so, for U.S.
- ** Government purposes only pursuant to the copyright license under the
- ** contract clause at 252.227.7013.
- **
- ** @OPENSOURCE_HEADER_END@
- ** ------------------------------------------------------------------------
- */
+** yafrag.c
+** YAF Active Fragment Table
+**
+** ------------------------------------------------------------------------
+** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
+** ------------------------------------------------------------------------
+** Authors: Brian Trammell
+** ------------------------------------------------------------------------
+** @OPENSOURCE_HEADER_START@
+** Use of the YAF system and related source code is subject to the terms
+** of the following licenses:
+**
+** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
+** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
+**
+** NO WARRANTY
+**
+** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
+** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
+** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
+** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
+** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
+** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
+** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
+** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
+** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
+** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
+** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
+** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
+** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
+** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
+** DELIVERABLES UNDER THIS LICENSE.
+**
+** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
+** Mellon University, its trustees, officers, employees, and agents from
+** all claims or demands made against them (and any related losses,
+** expenses, or attorney's fees) arising out of, or relating to Licensee's
+** and/or its sub licensees' negligent use or willful misuse of or
+** negligent conduct or willful misconduct regarding the Software,
+** facilities, or other rights or assistance granted by Carnegie Mellon
+** University under this License, including, but not limited to, any
+** claims of product liability, personal injury, death, damage to
+** property, or violation of any laws or regulations.
+**
+** Carnegie Mellon University Software Engineering Institute authored
+** documents are sponsored by the U.S. Department of Defense under
+** Contract FA8721-05-C-0003. Carnegie Mellon University retains
+** copyrights in all material produced under this contract. The U.S.
+** Government retains a non-exclusive, royalty-free license to publish or
+** reproduce these documents, or allow others to do so, for U.S.
+** Government purposes only pursuant to the copyright license under the
+** contract clause at 252.227.7013.
+**
+** @OPENSOURCE_HEADER_END@
+** ------------------------------------------------------------------------
+*/
 
 #define _YAF_SOURCE_
 #include <yaf/yafcore.h>
@@ -68,80 +68,81 @@
 #define YF_FRAGPRUNE_DELAY 5000
 
 typedef struct yfFragRec_st {
-    uint16_t                off;
-    uint16_t                len;
+    uint16_t   off;
+    uint16_t   len;
 } yfFragRec_t;
 
 typedef struct yfFragKey_st {
-    uint32_t                ipid;
-    yfFlowKey_t             f;
+    uint32_t      ipid;
+    yfFlowKey_t   f;
 } yfFragKey_t;
 
 typedef struct yfFragNode_st {
-    struct yfFragNode_st        *p;
-    struct yfFragNode_st        *n;
-    struct yfFragTab_st         *tab;
-    uint64_t                    last_ctime;
-    gboolean                    have_first;
-    gboolean                    have_last;
-    gboolean                    have_l4hdr;
-    yfFragKey_t                 key;
-    yfTCPInfo_t                 tcpinfo;
-    yfL2Info_t                  l2info;
-    uint16_t                    iplen;
-    GArray                      *records;
-    size_t                      paylen;
-    size_t                      payoff;
-    uint8_t                     *payload;
+    struct yfFragNode_st  *p;
+    struct yfFragNode_st  *n;
+    struct yfFragTab_st   *tab;
+    uint64_t               last_ctime;
+    gboolean               have_first;
+    gboolean               have_last;
+    gboolean               have_l4hdr;
+    yfFragKey_t            key;
+    yfTCPInfo_t            tcpinfo;
+    yfL2Info_t             l2info;
+    uint16_t               iplen;
+    GArray                *records;
+    size_t                 paylen;
+    size_t                 payoff;
+    uint8_t               *payload;
 } yfFragNode_t;
 
 typedef struct yfFragQueue_st {
-    yfFragNode_t      *tail;
-    yfFragNode_t      *head;
+    yfFragNode_t  *tail;
+    yfFragNode_t  *head;
 } yfFragQueue_t;
 
 
 struct yfFragTabStats_st {
-    uint32_t                    stat_frags;
-    uint32_t                    stat_seqrej;
-    uint32_t                    stat_packets;
-    uint32_t                    stat_dropped;
-    uint32_t                    stat_peak;
+    uint32_t   stat_frags;
+    uint32_t   stat_seqrej;
+    uint32_t   stat_packets;
+    uint32_t   stat_dropped;
+    uint32_t   stat_peak;
 };
 
 struct yfFragTabStatsDescrip_st {
-    const char    *name_frag;
-    const char    *descrip_frag;
-    const char    *name_seqrej;
-    const char    *descrip_seqrej;
-    const char    *name_packets;
-    const char    *descrip_packets;
-    const char    *name_dropped;
-    const char    *descrip_dropped;
-    const char    *name_peak;
-    const char    *descrip_peak;
+    const char  *name_frag;
+    const char  *descrip_frag;
+    const char  *name_seqrej;
+    const char  *descrip_seqrej;
+    const char  *name_packets;
+    const char  *descrip_packets;
+    const char  *name_dropped;
+    const char  *descrip_dropped;
+    const char  *name_peak;
+    const char  *descrip_peak;
 };
 
 struct yfFragTabStatsDescrip_st yfFragTabStatsDescrip;
 
 struct yfFragTab_st {
     /* State */
-    uint64_t                    ctime;
-    uint64_t                    prunetime;
-    GHashTable                  *table;
-    yfFragQueue_t               fraq;
-    uint32_t                    count;
-    yfFragNode_t                *assembled;
+    uint64_t                   ctime;
+    uint64_t                   prunetime;
+    GHashTable                *table;
+    yfFragQueue_t              fraq;
+    uint32_t                   count;
+    yfFragNode_t              *assembled;
     /* Configuration */
-    uint32_t                    idle_ms;
-    uint32_t                    max_frags;
-    uint32_t                    max_payload;
+    uint32_t                   idle_ms;
+    uint32_t                   max_frags;
+    uint32_t                   max_payload;
     /* Stats */
-    struct yfFragTabStats_st    stats;
+    struct yfFragTabStats_st   stats;
 };
 
-static uint32_t yfFragKeyHash(
-    yfFragKey_t       *key)
+static uint32_t
+yfFragKeyHash(
+    yfFragKey_t  *key)
 {
     if (key->f.version == 4) {
         return key->ipid ^ (key->f.proto << 12) ^ (key->f.version << 4) ^
@@ -159,14 +160,17 @@ static uint32_t yfFragKeyHash(
     }
 }
 
-static gboolean yfFragKeyEqual(
-    yfFragKey_t       *a,
-    yfFragKey_t       *b)
+
+static gboolean
+yfFragKeyEqual(
+    yfFragKey_t  *a,
+    yfFragKey_t  *b)
 {
     if ((a->f.version == b->f.version) &&
         (a->ipid == b->ipid) &&
-        (a->f.proto == b->f.proto)) {
-        if ((a->f.version     == 4) &&
+        (a->f.proto == b->f.proto))
+    {
+        if ((a->f.version == 4) &&
             (a->f.addr.v4.sip == b->f.addr.v4.sip) &&
             (a->f.addr.v4.dip == b->f.addr.v4.dip))
         {
@@ -184,11 +188,13 @@ static gboolean yfFragKeyEqual(
     }
 }
 
-void yfGetFragTabStats(
-    yfFragTab_t          *fragtab,
-    uint32_t             *dropped,
-    uint32_t             *assembled,
-    uint32_t             *frags)
+
+void
+yfGetFragTabStats(
+    yfFragTab_t  *fragtab,
+    uint32_t     *dropped,
+    uint32_t     *assembled,
+    uint32_t     *frags)
 {
     if (fragtab) {
         *dropped = fragtab->stats.stat_dropped;
@@ -199,30 +205,33 @@ void yfGetFragTabStats(
         *assembled = 0;
         *frags = 0;
     }
-
 }
 
-static int yfFragSortByOffset(
-    yfFragRec_t          *a,
-    yfFragRec_t          *b)
+
+static int
+yfFragSortByOffset(
+    yfFragRec_t  *a,
+    yfFragRec_t  *b)
 {
     return (int)a->off - (int)b->off;
 }
 
-static void yfFragAdd(
-    yfFragTab_t         *fragtab,
-    yfFragNode_t        *fn,
-    yfIPFragInfo_t      *fraginfo,
-    uint16_t            iplen,
-    const uint8_t       *pkt,
-    size_t              caplen,
-    const uint8_t       *pkt_hdr,
-    size_t              hdr_len)
+
+static void
+yfFragAdd(
+    yfFragTab_t     *fragtab,
+    yfFragNode_t    *fn,
+    yfIPFragInfo_t  *fraginfo,
+    uint16_t         iplen,
+    const uint8_t   *pkt,
+    size_t           caplen,
+    const uint8_t   *pkt_hdr,
+    size_t           hdr_len)
 {
-    yfFragRec_t         fr;
-    ssize_t             frag_payoff = 0;
-    ssize_t             frag_paylen, frag_payover;
-    ssize_t             pay_offset;
+    yfFragRec_t fr;
+    ssize_t     frag_payoff = 0;
+    ssize_t     frag_paylen, frag_payover;
+    ssize_t     pay_offset;
 
     /* append a fragment record */
     fr.off = fraginfo->offset;
@@ -233,7 +242,7 @@ static void yfFragAdd(
     pay_offset = fraginfo->iphlen + fn->l2info.l2hlen + fraginfo->l4hlen;
 
     /* we don't want to include headers in caplen  */
-    if (caplen >= pay_offset) {
+    if (caplen >= (size_t)pay_offset) {
         caplen -= pay_offset;
     }
 
@@ -241,7 +250,7 @@ static void yfFragAdd(
     if (fraginfo->offset == 0) {
         fn->have_first = TRUE;
         /* first one needs to copy l2, l3, l4 (if avail) */
-        frag_payoff = hdr_len > YF_FRAG_L4H_MAX?YF_FRAG_L4H_MAX :hdr_len;
+        frag_payoff = hdr_len > YF_FRAG_L4H_MAX ? YF_FRAG_L4H_MAX : hdr_len;
         memcpy(fn->payload, pkt_hdr, frag_payoff);
         fn->paylen = frag_payoff;
     } else {
@@ -257,7 +266,7 @@ static void yfFragAdd(
         (fn->have_l4hdr || (fn->paylen >= YF_FRAG_L4H_MAX)))
     {
         /* we don't have max payload & we already have layer 4 headers
-           or captured max fraglen */
+         * or captured max fraglen */
         return;
     }
 
@@ -265,13 +274,13 @@ static void yfFragAdd(
     frag_paylen = iplen - fraginfo->iphlen - fraginfo->l4hlen;
 
     /* caplen will be 0 if max-payload is not set */
-    if (caplen && frag_paylen > caplen) {
+    if (caplen && frag_paylen > (ssize_t)caplen) {
         frag_paylen = caplen;
     }
 
     /* Cap payload length to payload buffer length */
     frag_payover = (frag_payoff + frag_paylen) -
-                   (fragtab->max_payload + YF_FRAG_L4H_MAX);
+        (fragtab->max_payload + YF_FRAG_L4H_MAX);
 
     if (frag_payover > 0) {
         frag_paylen -= frag_payover;
@@ -286,29 +295,31 @@ static void yfFragAdd(
 
     /* Copy payload into buffer */
     if (!caplen) {
-        if (hdr_len >= (frag_paylen + pay_offset)) {
+        if ((ssize_t)hdr_len >= (frag_paylen + pay_offset)) {
             memcpy(fn->payload + frag_payoff, (pkt_hdr + pay_offset),
                    frag_paylen);
         } else {
             return;
         }
     } else {
-        memcpy(fn->payload + frag_payoff,(pkt + pay_offset),frag_paylen);
+        memcpy(fn->payload + frag_payoff, (pkt + pay_offset), frag_paylen);
     }
 
     /* Track payload buffer length */
-    if (frag_payoff + frag_paylen > fn->paylen) {
+    if (frag_payoff + frag_paylen > (ssize_t)fn->paylen) {
         fn->paylen = frag_payoff + frag_paylen;
     }
 }
 
-static yfFragNode_t *yfFragGetNode(
-    yfFragTab_t         *fragtab,
-    yfFlowKey_t         *flowkey,
-    yfIPFragInfo_t      *fraginfo)
+
+static yfFragNode_t *
+yfFragGetNode(
+    yfFragTab_t     *fragtab,
+    yfFlowKey_t     *flowkey,
+    yfIPFragInfo_t  *fraginfo)
 {
-    yfFragNode_t        *fn;
-    yfFragKey_t         fragkey;
+    yfFragNode_t *fn;
+    yfFragKey_t   fragkey;
 
     /* construct a key to look up the frag node */
     memcpy(&fragkey.f, flowkey, sizeof(*flowkey));
@@ -325,7 +336,7 @@ static yfFragNode_t *yfFragGetNode(
     }
 
     /* no fragment node available; create a new one */
-    fn = yg_slice_new0(yfFragNode_t);
+    fn = g_slice_new0(yfFragNode_t);
 
     /* fill in the fragment node */
     memcpy(&fn->key, &fragkey, sizeof(fragkey));
@@ -334,7 +345,7 @@ static yfFragNode_t *yfFragGetNode(
     fn->records = g_array_sized_new(FALSE, TRUE, sizeof(yfFragRec_t), 4);
 
     /* create payload buffer, accounting for maximum TCP header size */
-    fn->payload = yg_slice_alloc0(fragtab->max_payload + YF_FRAG_L4H_MAX);
+    fn->payload = g_slice_alloc0(fragtab->max_payload + YF_FRAG_L4H_MAX);
 
     /* place it at the head of the fragment queue */
     piqEnQ(&(fragtab->fraq), fn);
@@ -352,24 +363,28 @@ static yfFragNode_t *yfFragGetNode(
     return fn;
 }
 
-static void yfFragNodeFree(
-    yfFragTab_t         *fragtab,
-    yfFragNode_t        *fn)
+
+static void
+yfFragNodeFree(
+    yfFragTab_t   *fragtab,
+    yfFragNode_t  *fn)
 {
     if (fn->payload) {
-        yg_slice_free1(fragtab->max_payload + YF_FRAG_L4H_MAX, fn->payload);
+        g_slice_free1(fragtab->max_payload + YF_FRAG_L4H_MAX, fn->payload);
     }
     if (fn->records) {
         g_array_free(fn->records, TRUE);
     }
 
-    yg_slice_free(yfFragNode_t, fn);
+    g_slice_free(yfFragNode_t, fn);
 }
 
-static void yfFragRemoveNode(
-    yfFragTab_t         *fragtab,
-    yfFragNode_t        *fn,
-    gboolean            drop)
+
+static void
+yfFragRemoveNode(
+    yfFragTab_t   *fragtab,
+    yfFragNode_t  *fn,
+    gboolean       drop)
 {
     g_hash_table_remove(fragtab->table, &(fn->key));
     piqPick(&(fragtab->fraq), fn);
@@ -385,13 +400,15 @@ static void yfFragRemoveNode(
     }
 }
 
-static gboolean yfFragComplete(
-    yfFragTab_t         *fragtab,
-    yfFragNode_t        *fn,
-    yfIPFragInfo_t      *fraginfo)
+
+static gboolean
+yfFragComplete(
+    yfFragTab_t     *fragtab,
+    yfFragNode_t    *fn,
+    yfIPFragInfo_t  *fraginfo)
 {
-    yfFragRec_t         *frag = NULL;
-    uint32_t            i, next_off;
+    yfFragRec_t *frag = NULL;
+    uint32_t     i, next_off;
 
     /* Short circuit unless we have both the first and last fragment */
     if (!fn->have_first || !fn->have_last) {
@@ -415,7 +432,7 @@ static gboolean yfFragComplete(
     /* If we have a short first fragment - need to do Layer 4 decode */
     if (!fn->have_l4hdr) {
         if (fn->key.f.proto == YF_PROTO_TCP) {
-            if (!yfDefragTCP(fn->payload + fraginfo->iphlen+fn->l2info.l2hlen,
+            if (!yfDefragTCP(fn->payload + fraginfo->iphlen + fn->l2info.l2hlen,
                              &(fn->paylen), &(fn->key.f),
                              fraginfo, &(fn->tcpinfo), &(fn->payoff)))
             {
@@ -439,11 +456,12 @@ static gboolean yfFragComplete(
     return TRUE;
 }
 
-static void yfFragQueuePrune(
-    yfFragTab_t     *fragtab,
-    gboolean        prune_all)
-{
 
+static void
+yfFragQueuePrune(
+    yfFragTab_t  *fragtab,
+    gboolean      prune_all)
+{
     /* Limit prune rate */
     if (fragtab->prunetime &&
         (fragtab->ctime < fragtab->prunetime + YF_FRAGPRUNE_DELAY))
@@ -473,15 +491,17 @@ static void yfFragQueuePrune(
     }
 }
 
-yfFragTab_t *yfFragTabAlloc(
-    uint32_t        idle_ms,
-    uint32_t        max_frags,
-    uint32_t        max_payload)
+
+yfFragTab_t *
+yfFragTabAlloc(
+    uint32_t   idle_ms,
+    uint32_t   max_frags,
+    uint32_t   max_payload)
 {
-    yfFragTab_t     *fragtab = NULL;
+    yfFragTab_t *fragtab = NULL;
 
     /* Allocate a fragment table */
-    fragtab = yg_slice_new0(yfFragTab_t);
+    fragtab = g_slice_new0(yfFragTab_t);
 
     /* Fill in the configuration */
     fragtab->idle_ms = idle_ms;
@@ -491,7 +511,6 @@ yfFragTab_t *yfFragTabAlloc(
     /* Allocate key index table */
     fragtab->table = g_hash_table_new((GHashFunc)yfFragKeyHash,
                                       (GEqualFunc)yfFragKeyEqual);
-
 
     /* initialize the stats meta information */
     yfFragTabStatsDescrip.name_frag = "frag";
@@ -509,8 +528,10 @@ yfFragTab_t *yfFragTabAlloc(
     return fragtab;
 }
 
-void yfFragTabFree(
-    yfFragTab_t         *fragtab)
+
+void
+yfFragTabFree(
+    yfFragTab_t  *fragtab)
 {
     while (fragtab->fraq.tail) {
         yfFragRemoveNode(fragtab, fragtab->fraq.tail, TRUE);
@@ -520,26 +541,28 @@ void yfFragTabFree(
     g_hash_table_destroy(fragtab->table);
 
     /* now free the flow table */
-    yg_slice_free(yfFragTab_t, fragtab);
+    g_slice_free(yfFragTab_t, fragtab);
 }
 
-gboolean yfDefragPBuf(
-    yfFragTab_t         *fragtab,
-    yfIPFragInfo_t      *fraginfo,
-    size_t              pbuflen,
-    yfPBuf_t            *pbuf,
-    const uint8_t       *pkt,
-    size_t              hdrlen)
+
+gboolean
+yfDefragPBuf(
+    yfFragTab_t     *fragtab,
+    yfIPFragInfo_t  *fraginfo,
+    size_t           pbuflen,
+    yfPBuf_t        *pbuf,
+    const uint8_t   *pkt,
+    size_t           hdrlen)
 {
-    yfFragNode_t        *fn;
-    yfTCPInfo_t         *tcpinfo = &(pbuf->tcpinfo);
-    yfL2Info_t          *l2info = (pbuflen >= YF_PBUFLEN_NOPAYLOAD) ?
-                                    &(pbuf->l2info) : NULL;
-    uint8_t             *payload = (pbuflen >= YF_PBUFLEN_BASE) ?
-                                    pbuf->payload : NULL;
-    size_t              paylen = (pbuflen >= YF_PBUFLEN_BASE) ?
-                                    pbuf->paylen : 0;
-    size_t              calc_l4;
+    yfFragNode_t *fn;
+    yfTCPInfo_t  *tcpinfo = &(pbuf->tcpinfo);
+    yfL2Info_t   *l2info = (pbuflen >= YF_PBUFLEN_NOPAYLOAD) ?
+        &(pbuf->l2info) : NULL;
+    uint8_t      *payload = (pbuflen >= YF_PBUFLEN_BASE) ?
+        pbuf->payload : NULL;
+    size_t        paylen = (pbuflen >= YF_PBUFLEN_BASE) ?
+        pbuf->paylen : 0;
+    size_t        calc_l4;
 
     /* short-circuit unfragmented packets */
     if (!fraginfo || !fraginfo->frag) {
@@ -582,7 +605,7 @@ gboolean yfDefragPBuf(
 
     if (l2info) {
         /* this needs to be right for putting together fragmented header
-           info in yfFragAdd (not sure why it would change) */
+         * info in yfFragAdd (not sure why it would change) */
         fn->l2info.l2hlen = l2info->l2hlen;
     }
 
@@ -596,7 +619,7 @@ gboolean yfDefragPBuf(
     if (yfFragComplete(fragtab, fn, fraginfo)) {
         if (calc_l4 != fn->payoff) {
             /* defragtcp will add the tcphlen -
-               add l4hlen to pbuf->allheaderlen */
+             *  add l4hlen to pbuf->allheaderlen */
             pbuf->allHeaderLen += fraginfo->l4hlen;
             fn->payoff -= fraginfo->l4hlen;
         }
@@ -647,24 +670,28 @@ gboolean yfDefragPBuf(
     return TRUE;
 }
 
-void yfFragDumpStats(
-    yfFragTab_t         *fragtab,
-    uint64_t           packetTotal)
+
+void
+yfFragDumpStats(
+    yfFragTab_t  *fragtab,
+    uint64_t      packetTotal)
 {
     if (!fragtab) {
         return;
     }
 
     g_debug("Assembled %u fragments into %u packets:",
-        fragtab->stats.stat_frags, fragtab->stats.stat_packets);
+            fragtab->stats.stat_frags, fragtab->stats.stat_packets);
     g_debug("  Expired %u incomplete fragmented packets. (%3.2f%%)",
-        fragtab->stats.stat_dropped,
-        ((double)(fragtab->stats.stat_dropped)/(double)(packetTotal) * 100) );
+            fragtab->stats.stat_dropped,
+            ((double)(fragtab->stats.stat_dropped) / (double)(packetTotal) *
+             100) );
     g_debug("  Maximum fragment table size %u.",
-        fragtab->stats.stat_peak);
+            fragtab->stats.stat_peak);
     if (fragtab->stats.stat_seqrej) {
         g_warning("Rejected %u out-of-sequence fragments. (%3.2f%%)",
-                    fragtab->stats.stat_seqrej,
-                    ((double)(fragtab->stats.stat_seqrej)/(double)(packetTotal) * 100) );
+                  fragtab->stats.stat_seqrej,
+                  ((double)(fragtab->stats.stat_seqrej) /
+                   (double)(packetTotal) * 100) );
     }
 }

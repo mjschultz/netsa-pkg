@@ -6,7 +6,7 @@
 
   <title>CERT IPFIX Registry</title>
   <created>2017-11-28</created>
-  <updated>2019-02-20</updated>
+  <updated>2020-01-31</updated>
 
   <registry id="cert-information-elements">
     <title>CERT Enterprise IPFIX Elements (PEN 6871)</title>
@@ -1784,16 +1784,20 @@
       <revision>0</revision>
     </record>
 
-    <!-- 191-195 were removed in yaf 2.3.0 -->
-
     <record>
       <name>sslCertIssuerCountryName</name>
       <dataType>string</dataType>
       <group>yaf-dpi</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>191</elementId>
-      <status>obsolete</status>
-      <revision>0</revision>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Country name {id-at 6} of the issuer of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>1</revision>
+      <date>2019-10-31</date>
     </record>
 
     <record>
@@ -1802,8 +1806,14 @@
       <group>yaf-dpi</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>192</elementId>
-      <status>obsolete</status>
-      <revision>0</revision>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Organization name {id-at 10} of the issuer of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>1</revision>
+      <date>2019-10-31</date>
     </record>
 
     <record>
@@ -1812,8 +1822,15 @@
       <group>yaf-dpi</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>193</elementId>
-      <status>obsolete</status>
-      <revision>0</revision>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Organizational unit name {id-at 11} of the issuer of an SSL
+          certificate.
+        </paragraph>
+      </description>
+      <revision>1</revision>
+      <date>2019-10-31</date>
     </record>
 
     <record>
@@ -1822,8 +1839,14 @@
       <group>yaf-dpi</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>194</elementId>
-      <status>obsolete</status>
-      <revision>0</revision>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Postal or zip code {id-at 17} of the issuer of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>1</revision>
+      <date>2019-10-31</date>
     </record>
 
     <record>
@@ -1832,25 +1855,32 @@
       <group>yaf-dpi</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>195</elementId>
-      <status>obsolete</status>
-      <revision>0</revision>
+      <status>current</status>
+      <description>
+        <paragraph>
+          State or providence name {id-at 8} of the issuer of an SSL
+          certificate.
+        </paragraph>
+      </description>
+      <revision>1</revision>
+      <date>2019-10-31</date>
     </record>
 
-    <!-- 191-195 (above) were removed in yaf 2.3.0 -->
-
-    <!-- 196 removed in yaf 2.3.3 -->
     <record>
       <name>sslCertIssuerCommonName</name>
       <dataType>string</dataType>
       <group>yaf-dpi</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>196</elementId>
-      <status>obsolete</status>
-      <revision>0</revision>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Common name {id-at 3} of the issuer of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>1</revision>
+      <date>2019-10-31</date>
     </record>
-    <!-- 196 (above) removed in yaf 2.3.3 -->
-
-    <!-- 197-198 removed in yaf 2.3.0 -->
 
     <record>
       <name>sslCertIssuerLocalityName</name>
@@ -1858,8 +1888,14 @@
       <group>yaf-dpi</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>197</elementId>
-      <status>obsolete</status>
-      <revision>0</revision>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Locality name {id-at 7} of the issuer of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>1</revision>
+      <date>2019-10-31</date>
     </record>
 
     <record>
@@ -1868,11 +1904,15 @@
       <group>yaf-dpi</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>198</elementId>
-      <status>obsolete</status>
-      <revision>0</revision>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Street address {id-at 9} of the issuer of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>1</revision>
+      <date>2019-10-31</date>
     </record>
-
-    <!-- 197-198 (above) removed in yaf 2.3.0 -->
 
     <record>
       <name>dnsTTL</name>
@@ -1892,16 +1932,20 @@
       <revision>0</revision>
     </record>
 
-    <!-- 200-207 removed in yaf 2.3.0 -->
-
     <record>
       <name>sslCertSubCountryName</name>
       <dataType>string</dataType>
       <group>yaf-dpi</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>200</elementId>
-      <status>obsolete</status>
-      <revision>0</revision>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Country name {id-at 6} of the subject of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>1</revision>
+      <date>2019-10-31</date>
     </record>
 
     <record>
@@ -1910,8 +1954,14 @@
       <group>yaf-dpi</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>201</elementId>
-      <status>obsolete</status>
-      <revision>0</revision>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Organization name {id-at 10} of the subject of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>1</revision>
+      <date>2019-10-31</date>
     </record>
 
     <record>
@@ -1920,8 +1970,15 @@
       <group>yaf-dpi</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>202</elementId>
-      <status>obsolete</status>
-      <revision>0</revision>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Organizational unit name {id-at 11} of the subject of an SSL
+          certificate.
+        </paragraph>
+      </description>
+      <revision>1</revision>
+      <date>2019-10-31</date>
     </record>
 
     <record>
@@ -1930,8 +1987,14 @@
       <group>yaf-dpi</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>203</elementId>
-      <status>obsolete</status>
-      <revision>0</revision>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Postal or zip code {id-at 17} of the subject of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>1</revision>
+      <date>2019-10-31</date>
     </record>
 
     <record>
@@ -1940,8 +2003,15 @@
       <group>yaf-dpi</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>204</elementId>
-      <status>obsolete</status>
-      <revision>0</revision>
+      <status>current</status>
+      <description>
+        <paragraph>
+          State or providence name {id-at 8} of the subject of an SSL
+          certificate.
+        </paragraph>
+      </description>
+      <revision>1</revision>
+      <date>2019-10-31</date>
     </record>
 
     <record>
@@ -1950,8 +2020,14 @@
       <group>yaf-dpi</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>205</elementId>
-      <status>obsolete</status>
-      <revision>0</revision>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Common name {id-at 3} of the subject of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>1</revision>
+      <date>2019-10-31</date>
     </record>
 
     <record>
@@ -1960,8 +2036,14 @@
       <group>yaf-dpi</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>206</elementId>
-      <status>obsolete</status>
-      <revision>0</revision>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Locality name {id-at 7} of the subject of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>1</revision>
+      <date>2019-10-31</date>
     </record>
 
     <record>
@@ -1970,11 +2052,15 @@
       <group>yaf-dpi</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
       <elementId>207</elementId>
-      <status>obsolete</status>
-      <revision>0</revision>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Street address {id-at 9} of the subject of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>1</revision>
+      <date>2019-10-31</date>
     </record>
-
-    <!-- 200-207 (above) removed in yaf 2.3.0 -->
 
     <record>
       <name>dnsTXTData</name>
@@ -3399,7 +3485,7 @@ id-at-name                   {id-at 41}
         <paragraph>
           IPv4 address than a dns query resolved to in a resource record. It is
           from the yaf-DNS template. Called rrIPv4 instead of sourceIPv4Address
-           for disambiguation purposes.
+          for disambiguation purposes.
         </paragraph>
       </description>
       <revision>0</revision>
@@ -3415,14 +3501,15 @@ id-at-name                   {id-at 41}
       <description>
         <paragraph>
           IPv6 address than a dns query resolved to in a resource record. It is
-          from the yaf-DNS template. Called rrIPv4 instead of sourceIPv4Address            for disambiguation purposes.
+          from the yaf-DNS template. Called rrIPv4 instead of sourceIPv4Address
+          for disambiguation purposes.
         </paragraph>
       </description>
       <revision>0</revision>
     </record>
 
     <record>
-      <name>DNSKEY_protocolIdentifier</name>
+      <name>DNSKEY_ProtocolIdentifier</name>
       <dataType>unsigned8</dataType>
       <group>analysis-pipeline</group>
       <cert:enterpriseId>6871</cert:enterpriseId>
@@ -3437,7 +3524,7 @@ id-at-name                   {id-at 41}
     </record>
 
     <record>
-      <name>DNS_A_RECORD</name>
+      <name>DNS_A_Record</name>
       <dataType>subTemplateList</dataType>
       <group>analysis-pipeline</group>
       <dataTypeSemantics>list</dataTypeSemantics>
@@ -3455,7 +3542,7 @@ id-at-name                   {id-at 41}
     </record>
 
     <record>
-      <name>DNS_AAAA_RECORD</name>
+      <name>DNS_AAAA_Record</name>
       <dataType>subTemplateList</dataType>
       <group>analysis-pipeline</group>
       <dataTypeSemantics>list</dataTypeSemantics>
@@ -3487,14 +3574,509 @@ id-at-name                   {id-at 41}
         </paragraph>
       </description>
       <revision>0</revision>
-      <date>2018-11-29</date>
     </record>
 
-    <!-- 308-499 unassigned -->
+    <record>
+      <name>sslCertIssuerTitle</name>
+      <dataType>string</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>308</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Title {id-at 12} of the issuer of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertSubTitle</name>
+      <dataType>string</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>309</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Title {id-at 12} of the subject of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertIssuerName</name>
+      <dataType>string</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>310</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Name {id-at 41} of the issuer of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertSubName</name>
+      <dataType>string</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>311</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Name {id-at 41} of the subject of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertIssuerEmailAddress</name>
+      <dataType>string</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>312</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Email address {pkcs-9 1} of the issuer of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertSubEmailAddress</name>
+      <dataType>string</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>313</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Email address {pkcs-9 1} of the subject of an SSL certificate.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertIssuerDomainComponent</name>
+      <dataType>string</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>314</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          LDAP dc (domainComponent), 0.9.2342.19200300.100.1.25, holding one
+          component, a label, of the DNS name of the issuer of an SSL
+          certificate.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertSubDomainComponent</name>
+      <dataType>string</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>315</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          LDAP dc (domainComponent), 0.9.2342.19200300.100.1.25, holding one
+          component, a label, of the DNS name of the subject of an SSL
+          certificate.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertExtSubjectKeyIdent</name>
+      <dataType>octetArray</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>316</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          SSL extension value holding the subject key identifer, {id-ce 14}
+          subjectKeyIdentifier.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertExtKeyUsage</name>
+      <dataType>octetArray</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>317</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          SSL extension value holding the key usage, {id-ce 15} keyUsage.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertExtPrivKeyUsagePeriod</name>
+      <dataType>octetArray</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>318</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          SSL extension value holding the usage period for the private key,
+          {id-ce 16} privateKeyUsagePeriod.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertExtSubjectAltName</name>
+      <dataType>octetArray</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>319</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          SSL extension value holding the subject's alternative names, {id-ce
+          17} subjectAltName.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertExtIssuerAltName</name>
+      <dataType>octetArray</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>320</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          SSL extension value holding the issuer's alternative names, {id-ce
+          18} issuerAltName.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertExtCertIssuer</name>
+      <dataType>octetArray</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>321</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          SSL extension value holding the certificate issuer associated with
+          an entry in an indirect CRL, {id-ce 29} certificateIssuer.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertExtCrlDistribution</name>
+      <dataType>octetArray</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>322</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          SSL extension value holding the certificate revocation list (CRL)
+          distribution points, {id-ce 31} crlDistributionPoints.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertExtCertPolicies</name>
+      <dataType>octetArray</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>323</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          SSL extension value holding the certificate policies, {id-ce 32}
+          certificatePolicies.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertExtAuthorityKeyIdent</name>
+      <dataType>octetArray</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>324</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          SSL extension value holding the authority key identifier, {id-ce 35}
+          authorityKeyIdentifier.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>sslCertExtExtendedKeyUsage</name>
+      <dataType>octetArray</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>325</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          SSL extension value holding the extended key usage {id-ce 37},
+          extKeyUage.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2019-10-31</date>
+    </record>
+
+    <record>
+      <name>smtpStartTLS</name>
+      <dataType>unsigned8</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>326</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Element indicating whether or not the SMTP session sent the START TLS
+          command.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2020-01-31</date>
+    </record>
+
+    <record>
+      <name>smtpKey</name>
+      <dataType>string</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>327</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          SMTP Header key string.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2020-01-31</date>
+    </record>
+
+    <record>
+      <name>smtpValue</name>
+      <dataType>string</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>328</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          SMTP Header value string.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2020-01-31</date>
+    </record>
+
+    <record>
+      <name>smtpURL</name>
+      <dataType>string</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>329</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Element for URLs captured in the SMTP message body
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2020-01-31</date>
+    </record>
+
+    <record>
+      <name>smtpMessageSize</name>
+      <dataType>unsigned32</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>330</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          Element containing the value of the SMTP message size.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2020-01-31</date>
+    </record>
+
+    <record>
+      <name>smtpResponseList</name>
+      <dataType>basicList</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>331</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          A basicList of smtpResponse elements.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2020-01-31</date>
+    </record>
+
+    <record>
+      <name>smtpToList</name>
+      <dataType>basicList</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>332</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          A basicList of smtpTo elements.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2020-01-31</date>
+    </record>
+
+    <record>
+      <name>smtpFromList</name>
+      <dataType>basicList</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>333</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          A basicList of smtpFrom elements.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2020-01-31</date>
+    </record>
+
+    <record>
+      <name>smtpFilenameList</name>
+      <dataType>basicList</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>334</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          A basicList of smtpFilename elements.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2020-01-31</date>
+    </record>
+
+    <record>
+      <name>smtpURLList</name>
+      <dataType>basicList</dataType>
+      <group>yaf-dpi</group>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>335</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          A basicList of smtpURL elements.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2020-01-31</date>
+    </record>
+
+    <record>
+      <name>smtpMessageList</name>
+      <dataType>subTemplateList</dataType>
+      <group>yaf-dpi</group>
+      <dataTypeSemantics>list</dataTypeSemantics>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>336</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          A sub template list holding email data in smtpMessage templates.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2020-01-31</date>
+    </record>
+
+    <record>
+      <name>smtpHeaderList</name>
+      <dataType>subTemplateList</dataType>
+      <group>yaf-dpi</group>
+      <dataTypeSemantics>list</dataTypeSemantics>
+      <cert:enterpriseId>6871</cert:enterpriseId>
+      <elementId>337</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+          A sub template list holding email header data in smtpHeader templates.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2020-01-31</date>
+    </record>
+
+    <!-- 338-499 unassigned -->
     <record>
       <name>Unassigned</name>
       <cert:enterpriseId>6871</cert:enterpriseId>
-      <elementId>308-499</elementId>
+      <elementId>338-499</elementId>
     </record>
 
     <record>

@@ -1,60 +1,60 @@
 /**
- ** yaf.c
- ** Yet Another Flow generator
- * **
- ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2019 Carnegie Mellon University. All Rights Reserved.
- ** ------------------------------------------------------------------------
- ** Authors: Brian Trammell
- ** ------------------------------------------------------------------------
- ** @OPENSOURCE_HEADER_START@
- ** Use of the YAF system and related source code is subject to the terms
- ** of the following licenses:
- **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
- ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
- **
- ** NO WARRANTY
- **
- ** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
- ** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
- ** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
- ** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
- ** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
- ** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
- ** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
- ** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
- ** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
- ** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
- ** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
- ** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
- ** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
- ** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
- ** DELIVERABLES UNDER THIS LICENSE.
- **
- ** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
- ** Mellon University, its trustees, officers, employees, and agents from
- ** all claims or demands made against them (and any related losses,
- ** expenses, or attorney's fees) arising out of, or relating to Licensee's
- ** and/or its sub licensees' negligent use or willful misuse of or
- ** negligent conduct or willful misconduct regarding the Software,
- ** facilities, or other rights or assistance granted by Carnegie Mellon
- ** University under this License, including, but not limited to, any
- ** claims of product liability, personal injury, death, damage to
- ** property, or violation of any laws or regulations.
- **
- ** Carnegie Mellon University Software Engineering Institute authored
- ** documents are sponsored by the U.S. Department of Defense under
- ** Contract FA8721-05-C-0003. Carnegie Mellon University retains
- ** copyrights in all material produced under this contract. The U.S.
- ** Government retains a non-exclusive, royalty-free license to publish or
- ** reproduce these documents, or allow others to do so, for U.S.
- ** Government purposes only pursuant to the copyright license under the
- ** contract clause at 252.227.7013.
- **
- ** @OPENSOURCE_HEADER_END@
- ** ------------------------------------------------------------------------
- */
+** yaf.c
+** Yet Another Flow generator
+* **
+** ------------------------------------------------------------------------
+** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
+** ------------------------------------------------------------------------
+** Authors: Brian Trammell
+** ------------------------------------------------------------------------
+** @OPENSOURCE_HEADER_START@
+** Use of the YAF system and related source code is subject to the terms
+** of the following licenses:
+**
+** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
+** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
+**
+** NO WARRANTY
+**
+** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
+** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
+** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
+** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
+** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
+** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
+** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
+** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
+** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
+** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
+** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
+** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
+** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
+** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
+** DELIVERABLES UNDER THIS LICENSE.
+**
+** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
+** Mellon University, its trustees, officers, employees, and agents from
+** all claims or demands made against them (and any related losses,
+** expenses, or attorney's fees) arising out of, or relating to Licensee's
+** and/or its sub licensees' negligent use or willful misuse of or
+** negligent conduct or willful misconduct regarding the Software,
+** facilities, or other rights or assistance granted by Carnegie Mellon
+** University under this License, including, but not limited to, any
+** claims of product liability, personal injury, death, damage to
+** property, or violation of any laws or regulations.
+**
+** Carnegie Mellon University Software Engineering Institute authored
+** documents are sponsored by the U.S. Department of Defense under
+** Contract FA8721-05-C-0003. Carnegie Mellon University retains
+** copyrights in all material produced under this contract. The U.S.
+** Government retains a non-exclusive, royalty-free license to publish or
+** reproduce these documents, or allow others to do so, for U.S.
+** Government purposes only pursuant to the copyright license under the
+** contract clause at 252.227.7013.
+**
+** @OPENSOURCE_HEADER_END@
+** ------------------------------------------------------------------------
+*/
 
 #define _YAF_SOURCE_
 #include <yaf/autoinc.h>
@@ -95,286 +95,299 @@
 #include <lualib.h>
 
 /* I/O configuration */
-static yfConfig_t    yaf_config = YF_CONFIG_INIT;
-static char          *yaf_config_file = NULL;
-static int           yaf_opt_rotate = 0;
-static int           yaf_opt_stats = 300;
-static gboolean      yaf_opt_no_tombstone = FALSE;
-static uint16_t      yaf_opt_configured_id = 0;
-static uint64_t      yaf_rotate_ms = 0;
-static gboolean      yaf_opt_caplist_mode = FALSE;
-static char          *yaf_opt_ipfix_transport = NULL;
-static gboolean      yaf_opt_ipfix_tls = FALSE;
-static char          *yaf_pcap_meta_file = NULL;
-static gboolean      yaf_index_pcap = FALSE;
-static gboolean      yaf_daemon = FALSE;
-static char          *yaf_pidfile = NULL;
-static char          *yaf_tmp_file = NULL;
-static int           yaf_opt_udp_temp_timeout = 600;
-static int           yaf_live_type = 0;
-static gboolean      yaf_opt_promisc = FALSE;
+static yfConfig_t yaf_config = YF_CONFIG_INIT;
+static char      *yaf_config_file = NULL;
+static int        yaf_opt_rotate = 0;
+static int        yaf_opt_stats = 300;
+static gboolean   yaf_opt_no_tombstone = FALSE;
+static uint16_t   yaf_opt_configured_id = 0;
+static uint64_t   yaf_rotate_ms = 0;
+static gboolean   yaf_opt_caplist_mode = FALSE;
+static char      *yaf_opt_ipfix_transport = NULL;
+static gboolean   yaf_opt_ipfix_tls = FALSE;
+static char      *yaf_pcap_meta_file = NULL;
+static gboolean   yaf_index_pcap = FALSE;
+static gboolean   yaf_daemon = FALSE;
+static char      *yaf_pidfile = NULL;
+static char      *yaf_tmp_file = NULL;
+static int        yaf_opt_udp_temp_timeout = 600;
+static int        yaf_live_type = 0;
+static gboolean   yaf_opt_promisc = FALSE;
 #ifdef HAVE_SPREAD
 /* spread config options */
-static char         *yaf_opt_spread_group = 0;
-static char         *yaf_opt_spread_groupby = 0;
+static char      *yaf_opt_spread_group = 0;
+static char      *yaf_opt_spread_groupby = 0;
 #endif
 
 /* GOption managed flow table options */
-static int          yaf_opt_idle = 300;
-static int          yaf_opt_active = 1800;
-static int          yaf_opt_max_flows = 0;
-static int          yaf_opt_max_payload = 0;
-static int          yaf_opt_payload_export = 0;
-static gboolean     yaf_opt_payload_export_on = FALSE;
-static gboolean     yaf_opt_applabel_mode = FALSE;
-static gboolean     yaf_opt_force_read_all = FALSE;
+static int      yaf_opt_idle = 300;
+static int      yaf_opt_active = 1800;
+static int      yaf_opt_max_flows = 0;
+static int      yaf_opt_max_payload = 0;
+static int      yaf_opt_payload_export = 0;
+static gboolean yaf_opt_payload_export_on = FALSE;
+static gboolean yaf_opt_applabel_mode = FALSE;
+static gboolean yaf_opt_force_read_all = FALSE;
 
 #if YAF_ENABLE_APPLABEL
-static char       *yaf_opt_applabel_rules = NULL;
+static char    *yaf_opt_applabel_rules = NULL;
 #endif
-static gboolean     yaf_opt_ndpi = FALSE;
-static char         *yaf_ndpi_proto_file = NULL;
-static gboolean     yaf_opt_entropy_mode = FALSE;
-static gboolean     yaf_opt_uniflow_mode = FALSE;
-static uint16_t     yaf_opt_udp_uniflow_port = 0;
-static gboolean     yaf_opt_silk_mode = FALSE;
-static gboolean     yaf_opt_p0fprint_mode = FALSE;
+static gboolean yaf_opt_ndpi = FALSE;
+static char    *yaf_ndpi_proto_file = NULL;
+static gboolean yaf_opt_entropy_mode = FALSE;
+static gboolean yaf_opt_uniflow_mode = FALSE;
+static uint16_t yaf_opt_udp_uniflow_port = 0;
+static gboolean yaf_opt_silk_mode = FALSE;
+static gboolean yaf_opt_p0fprint_mode = FALSE;
 #if YAF_ENABLE_P0F
-static char       *yaf_opt_p0f_fingerprints = NULL;
+static char    *yaf_opt_p0f_fingerprints = NULL;
 #endif
-static gboolean     yaf_opt_fpExport_mode = FALSE;
-static gboolean     yaf_opt_udp_max_payload = FALSE;
-static gboolean     yaf_opt_extra_stats_mode = FALSE;
-static int          yaf_opt_max_pcap = 25;
-static int          yaf_opt_pcap_timer = 0;
-static char         *yaf_hash_search = NULL;
-static char         *yaf_stime_search = NULL;
-static int          yaf_opt_ingress_int = 0;
-static int          yaf_opt_egress_int = 0;
-static gboolean     yaf_novlan_in_key;
+static gboolean yaf_opt_fpExport_mode = FALSE;
+static gboolean yaf_opt_udp_max_payload = FALSE;
+static gboolean yaf_opt_extra_stats_mode = FALSE;
+static int      yaf_opt_max_pcap = 25;
+static int      yaf_opt_pcap_timer = 0;
+static char    *yaf_hash_search = NULL;
+static char    *yaf_stime_search = NULL;
+static int      yaf_opt_ingress_int = 0;
+static int      yaf_opt_egress_int = 0;
+static gboolean yaf_novlan_in_key;
 /* GOption managed fragment table options */
-static int          yaf_opt_max_frags = 0;
-static gboolean     yaf_opt_nofrag = FALSE;
+static int      yaf_opt_max_frags = 0;
+static gboolean yaf_opt_nofrag = FALSE;
 
 /* GOption managed decoder options and derived decoder config */
-static gboolean     yaf_opt_ip4_mode = FALSE;
-static gboolean     yaf_opt_ip6_mode = FALSE;
-static uint16_t     yaf_reqtype;
-static gboolean     yaf_opt_gre_mode = FALSE;
-static gboolean     yaf_opt_mac_mode = FALSE;
+static gboolean yaf_opt_ip4_mode = FALSE;
+static gboolean yaf_opt_ip6_mode = FALSE;
+static uint16_t yaf_reqtype;
+static gboolean yaf_opt_gre_mode = FALSE;
+static gboolean yaf_opt_mac_mode = FALSE;
 
 /* GOption managed core export options */
-static gboolean        yaf_opt_ip6map_mode = FALSE;
+static gboolean yaf_opt_ip6map_mode = FALSE;
 
 #ifdef YAF_ENABLE_HOOKS
-static char          *pluginName = NULL;
-static char          *pluginOpts = NULL;
-static char          *pluginConf = NULL;
-static gboolean      hooks_initialized = FALSE;
-#endif
+static char    *pluginName = NULL;
+static char    *pluginOpts = NULL;
+static char    *pluginConf = NULL;
+static gboolean hooks_initialized = FALSE;
+#endif /* ifdef YAF_ENABLE_HOOKS */
 /* array of configuration information that is passed to flow table */
-static void          *yfctx[YAF_MAX_HOOKS];
+static void    *yfctx[YAF_MAX_HOOKS];
 
 /* global quit flag */
-int    yaf_quit = 0;
+int             yaf_quit = 0;
 
 /* Runtime functions */
 
-typedef void *(*yfLiveOpen_fn)(const char *, int, int *, GError **);
+typedef void *(*yfLiveOpen_fn)(
+    const char *,
+    int,
+    int *,
+    GError **);
 static yfLiveOpen_fn yaf_liveopen_fn = NULL;
 
-typedef gboolean (*yfLoop_fn)(yfContext_t *);
+typedef gboolean (*yfLoop_fn)(
+    yfContext_t *);
 static yfLoop_fn yaf_loop_fn = NULL;
 
-typedef void (*yfClose_fn)(void *);
+typedef void (*yfClose_fn)(
+    void *);
 static yfClose_fn yaf_close_fn = NULL;
 
 #define THE_LAME_80COL_FORMATTER_STRING "\n\t\t\t\t"
 
 /*local functions */
 #if YAF_ENABLE_HOOKS
-static void pluginOptParse(GError **err);
-#endif
+static void
+pluginOptParse(
+    GError **err);
+
+#endif /* if YAF_ENABLE_HOOKS */
 /* Local derived configutation */
 
 AirOptionEntry yaf_optent_core[] = {
     AF_OPTION( "in", 'i', 0, AF_OPT_TYPE_STRING, &yaf_config.inspec,
-               THE_LAME_80COL_FORMATTER_STRING"Input (file, - for stdin; "
+               THE_LAME_80COL_FORMATTER_STRING "Input (file, - for stdin; "
                "interface)", "inspec"),
     AF_OPTION( "out", 'o', 0, AF_OPT_TYPE_STRING, &yaf_config.outspec,
-               THE_LAME_80COL_FORMATTER_STRING"Output (file, - for stdout; "
-               "file prefix,"THE_LAME_80COL_FORMATTER_STRING"address)",
+               THE_LAME_80COL_FORMATTER_STRING "Output (file, - for stdout; "
+               "file prefix,"THE_LAME_80COL_FORMATTER_STRING "address)",
                "outspec"),
     AF_OPTION( "config", 'c', 0, AF_OPT_TYPE_STRING, &yaf_config_file,
-               THE_LAME_80COL_FORMATTER_STRING"YAF configuration filename",
+               THE_LAME_80COL_FORMATTER_STRING "YAF configuration filename",
                "file"),
 #ifdef HAVE_SPREAD
     AF_OPTION( "group", 'g', 0, AF_OPT_TYPE_STRING, &yaf_opt_spread_group,
-               THE_LAME_80COL_FORMATTER_STRING"Spread group name (comma "
+               THE_LAME_80COL_FORMATTER_STRING "Spread group name (comma "
                "seperated list). "THE_LAME_80COL_FORMATTER_STRING
                "For groupby: comma separated "
-               THE_LAME_80COL_FORMATTER_STRING"group_name:value,[group_name:"
+               THE_LAME_80COL_FORMATTER_STRING "group_name:value,[group_name:"
                "value,...]", "group-name"),
     AF_OPTION( "groupby", (char)0, 0, AF_OPT_TYPE_STRING,
                &yaf_opt_spread_groupby, THE_LAME_80COL_FORMATTER_STRING
                "<port, vlan, applabel, protocol, version>"
-               THE_LAME_80COL_FORMATTER_STRING"(Must be used "
+               THE_LAME_80COL_FORMATTER_STRING "(Must be used "
                "with group and group must have"THE_LAME_80COL_FORMATTER_STRING
                "values to groupby", "type"),
-#endif
+#endif /* ifdef HAVE_SPREAD */
     AF_OPTION( "live", 'P', 0, AF_OPT_TYPE_STRING, &yaf_config.livetype,
-               THE_LAME_80COL_FORMATTER_STRING"Capture from interface in -i; "
-               "type is "THE_LAME_80COL_FORMATTER_STRING"[pcap], dag, "
+               THE_LAME_80COL_FORMATTER_STRING "Capture from interface in -i; "
+               "type is "THE_LAME_80COL_FORMATTER_STRING "[pcap], dag, "
                "napatech, netronome, pfring, zc", "type"),
     AF_OPTION( "filter", 'F', 0, AF_OPT_TYPE_STRING, &yaf_config.bpf_expr,
-               THE_LAME_80COL_FORMATTER_STRING"BPF filtering expression",
+               THE_LAME_80COL_FORMATTER_STRING "BPF filtering expression",
                "expression"),
     AF_OPTION( "caplist", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_caplist_mode,
-               THE_LAME_80COL_FORMATTER_STRING"Read ordered list of input "
-               "files from "THE_LAME_80COL_FORMATTER_STRING"file in -i", NULL),
+               THE_LAME_80COL_FORMATTER_STRING "Read ordered list of input "
+               "files from "THE_LAME_80COL_FORMATTER_STRING "file in -i", NULL),
 #if YAF_ENABLE_ZLIB
     AF_OPTION( "decompress", (char)0, 0, AF_OPT_TYPE_STRING, &yaf_tmp_file,
-               THE_LAME_80COL_FORMATTER_STRING"Decompression file directory",
-                "dir"),
+               THE_LAME_80COL_FORMATTER_STRING "Decompression file directory",
+               "dir"),
 #endif
     AF_OPTION( "rotate", 'R', 0, AF_OPT_TYPE_INT, &yaf_opt_rotate,
-               THE_LAME_80COL_FORMATTER_STRING"Rotate output files every n "
+               THE_LAME_80COL_FORMATTER_STRING "Rotate output files every n "
                "seconds ", "sec" ),
     AF_OPTION( "lock", 'k', 0, AF_OPT_TYPE_NONE, &yaf_config.lockmode,
-               THE_LAME_80COL_FORMATTER_STRING"Use exclusive .lock files on "
-               "output for"THE_LAME_80COL_FORMATTER_STRING"concurrency", NULL),
+               THE_LAME_80COL_FORMATTER_STRING "Use exclusive .lock files on "
+               "output for"THE_LAME_80COL_FORMATTER_STRING "concurrency", NULL),
     AF_OPTION( "daemonize", 'd', 0, AF_OPT_TYPE_NONE, &yaf_daemon,
-               THE_LAME_80COL_FORMATTER_STRING"Daemonize yaf.", NULL),
+               THE_LAME_80COL_FORMATTER_STRING "Daemonize yaf.", NULL),
     AF_OPTION( "pidfile", (char)0, 0, AF_OPT_TYPE_STRING, &yaf_pidfile,
-               THE_LAME_80COL_FORMATTER_STRING"Complete path to the process ID "
+               THE_LAME_80COL_FORMATTER_STRING
+               "Complete path to the process ID "
                "file.", NULL),
     AF_OPTION( "promisc-off", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_promisc,
-               THE_LAME_80COL_FORMATTER_STRING"Do not put the interface in "
+               THE_LAME_80COL_FORMATTER_STRING "Do not put the interface in "
                "promiscuous mode.", NULL),
     AF_OPTION( "noerror", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_config.noerror,
-               THE_LAME_80COL_FORMATTER_STRING"Do not error out on single "
-               "PCAP file issue"THE_LAME_80COL_FORMATTER_STRING" with "
+               THE_LAME_80COL_FORMATTER_STRING "Do not error out on single "
+               "PCAP file issue"THE_LAME_80COL_FORMATTER_STRING " with "
                "multiple inputs", NULL ),
 #ifdef HAVE_SPREAD
-    AF_OPTION("ipfix", (char)0, 0,AF_OPT_TYPE_STRING, &yaf_opt_ipfix_transport,
-              THE_LAME_80COL_FORMATTER_STRING"Export via IPFIX (tcp, udp, "
-              "sctp, spread) to CP "THE_LAME_80COL_FORMATTER_STRING"at -o",
+    AF_OPTION("ipfix", (char)0, 0, AF_OPT_TYPE_STRING, &yaf_opt_ipfix_transport,
+              THE_LAME_80COL_FORMATTER_STRING "Export via IPFIX (tcp, udp, "
+              "sctp, spread) to CP "THE_LAME_80COL_FORMATTER_STRING "at -o",
               "protocol" ),
-#else
-    AF_OPTION("ipfix",(char)0, 0, AF_OPT_TYPE_STRING, &yaf_opt_ipfix_transport,
-              THE_LAME_80COL_FORMATTER_STRING"Export via IPFIX (tcp, udp, "
-              "sctp) to CP at -o","protocol"),
-#endif
+#else /* ifdef HAVE_SPREAD */
+    AF_OPTION("ipfix", (char)0, 0, AF_OPT_TYPE_STRING, &yaf_opt_ipfix_transport,
+              THE_LAME_80COL_FORMATTER_STRING "Export via IPFIX (tcp, udp, "
+              "sctp) to CP at -o", "protocol"),
+#endif /* ifdef HAVE_SPREAD */
     AF_OPTION_END
 };
 
 AirOptionEntry yaf_optent_dec[] = {
     AF_OPTION( "no-frag", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_nofrag,
-               THE_LAME_80COL_FORMATTER_STRING"Disable IP fragment reassembly",
+               THE_LAME_80COL_FORMATTER_STRING "Disable IP fragment reassembly",
                NULL ),
     AF_OPTION( "max-frags", (char)0, 0, AF_OPT_TYPE_INT, &yaf_opt_max_frags,
-               THE_LAME_80COL_FORMATTER_STRING"Maximum size of fragment table "
+               THE_LAME_80COL_FORMATTER_STRING "Maximum size of fragment table "
                "[0]", "fragments" ),
     AF_OPTION( "ip4-only", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_ip4_mode,
-               THE_LAME_80COL_FORMATTER_STRING"Only process IPv4 packets",
+               THE_LAME_80COL_FORMATTER_STRING "Only process IPv4 packets",
                NULL ),
     AF_OPTION( "ip6-only", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_ip6_mode,
-               THE_LAME_80COL_FORMATTER_STRING"Only process IPv6 packets",
+               THE_LAME_80COL_FORMATTER_STRING "Only process IPv6 packets",
                NULL ),
     AF_OPTION( "gre-decode", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_gre_mode,
-               THE_LAME_80COL_FORMATTER_STRING"Decode GRE encapsulated "
+               THE_LAME_80COL_FORMATTER_STRING "Decode GRE encapsulated "
                "packets", NULL ),
     AF_OPTION_END
 };
 
 AirOptionEntry yaf_optent_flow[] = {
     AF_OPTION( "idle-timeout", 'I', 0, AF_OPT_TYPE_INT, &yaf_opt_idle,
-               THE_LAME_80COL_FORMATTER_STRING"Idle flow timeout [300, 5m]",
+               THE_LAME_80COL_FORMATTER_STRING "Idle flow timeout [300, 5m]",
                "sec" ),
     AF_OPTION( "active-timeout", 'A', 0, AF_OPT_TYPE_INT, &yaf_opt_active,
-               THE_LAME_80COL_FORMATTER_STRING"Active flow timeout [1800, "
+               THE_LAME_80COL_FORMATTER_STRING "Active flow timeout [1800, "
                "30m]", "sec" ),
     AF_OPTION( "max-flows", (char)0, 0, AF_OPT_TYPE_INT, &yaf_opt_max_flows,
-               THE_LAME_80COL_FORMATTER_STRING"Maximum size of flow table [0]",
+               THE_LAME_80COL_FORMATTER_STRING "Maximum size of flow table [0]",
                "flows" ),
     AF_OPTION( "udp-temp-timeout", (char)0, 0, AF_OPT_TYPE_INT,
                &yaf_opt_udp_temp_timeout,
-               THE_LAME_80COL_FORMATTER_STRING"UDP template timeout period "
+               THE_LAME_80COL_FORMATTER_STRING "UDP template timeout period "
                "[600 sec, 10 m]", "sec"),
     AF_OPTION( "force-read-all", (char)0, 0, AF_OPT_TYPE_NONE,
-               &yaf_opt_force_read_all, THE_LAME_80COL_FORMATTER_STRING"Force "
+               &yaf_opt_force_read_all, THE_LAME_80COL_FORMATTER_STRING "Force "
                "read of any out of sequence packets", NULL),
     AF_OPTION( "no-vlan-in-key", (char)0, 0, AF_OPT_TYPE_NONE,
-               &yaf_novlan_in_key, THE_LAME_80COL_FORMATTER_STRING"Do not use "
+               &yaf_novlan_in_key, THE_LAME_80COL_FORMATTER_STRING "Do not use "
                "the VLAN in the flow key hash calculation", NULL),
     AF_OPTION_END
 };
 
 AirOptionEntry yaf_optent_exp[] = {
-    AF_OPTION( "no-output", (char)0, 0, AF_OPT_TYPE_NONE,&yaf_config.no_output,
-               THE_LAME_80COL_FORMATTER_STRING"Turn off IPFIX export", NULL),
+    AF_OPTION( "no-output", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_config.no_output,
+               THE_LAME_80COL_FORMATTER_STRING "Turn off IPFIX export", NULL),
     AF_OPTION( "no-stats", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_config.nostats,
-               THE_LAME_80COL_FORMATTER_STRING"Turn off stats option records "
+               THE_LAME_80COL_FORMATTER_STRING "Turn off stats option records "
                "IPFIX export", NULL),
     AF_OPTION( "stats", (char)0, 0, AF_OPT_TYPE_INT, &yaf_opt_stats,
-               THE_LAME_80COL_FORMATTER_STRING"Export yaf process stats "
+               THE_LAME_80COL_FORMATTER_STRING "Export yaf process stats "
                "every n seconds "THE_LAME_80COL_FORMATTER_STRING
                "[300 (5 min)]", NULL),
-    AF_OPTION( "no-tombstone", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_no_tombstone,
-               THE_LAME_80COL_FORMATTER_STRING"Turn off tombstone records "
+    AF_OPTION( "no-tombstone", (char)0, 0, AF_OPT_TYPE_NONE,
+               &yaf_opt_no_tombstone,
+               THE_LAME_80COL_FORMATTER_STRING "Turn off tombstone records "
                "IPFIX export", NULL),
-    AF_OPTION( "tombstone-configured-id", (char)0, 0, AF_OPT_TYPE_INT, &yaf_opt_configured_id,
-               THE_LAME_80COL_FORMATTER_STRING"Set tombstone record's 16 bit "
+    AF_OPTION( "tombstone-configured-id", (char)0, 0, AF_OPT_TYPE_INT,
+               &yaf_opt_configured_id,
+               THE_LAME_80COL_FORMATTER_STRING "Set tombstone record's 16 bit "
                "configured identifier.", NULL),
     AF_OPTION( "silk", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_silk_mode,
-               THE_LAME_80COL_FORMATTER_STRING"Clamp octets to 32 bits, "
+               THE_LAME_80COL_FORMATTER_STRING "Clamp octets to 32 bits, "
                "note continued in"THE_LAME_80COL_FORMATTER_STRING
                "flowEndReason.  Now Exports TCP Fields within "
-               THE_LAME_80COL_FORMATTER_STRING"flow record instead of "
+               THE_LAME_80COL_FORMATTER_STRING "flow record instead of "
                "subTemplateMultiList.", NULL ),
     AF_OPTION( "mac", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_mac_mode,
-               THE_LAME_80COL_FORMATTER_STRING"Export MAC-layer information",
+               THE_LAME_80COL_FORMATTER_STRING "Export MAC-layer information",
                NULL ),
     AF_OPTION( "uniflow", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_uniflow_mode,
-               THE_LAME_80COL_FORMATTER_STRING"Write uniflows for "
+               THE_LAME_80COL_FORMATTER_STRING "Write uniflows for "
                "compatibility", NULL ),
     AF_OPTION( "udp-uniflow", 0, 0, AF_OPT_TYPE_INT, &yaf_opt_udp_uniflow_port,
-               THE_LAME_80COL_FORMATTER_STRING"Exports a single UDP packet "
-               "as a flow on the"THE_LAME_80COL_FORMATTER_STRING"given port. "
+               THE_LAME_80COL_FORMATTER_STRING "Exports a single UDP packet "
+               "as a flow on the"THE_LAME_80COL_FORMATTER_STRING "given port. "
                "Use 1 for all ports [0]", "port" ),
     AF_OPTION( "force-ip6-export", (char)0, 0, AF_OPT_TYPE_NONE,
-               &yaf_opt_ip6map_mode, THE_LAME_80COL_FORMATTER_STRING"Export "
+               &yaf_opt_ip6map_mode, THE_LAME_80COL_FORMATTER_STRING "Export "
                "all IPv4 addresses as IPv6 in "THE_LAME_80COL_FORMATTER_STRING
                "::FFFF/96 [N/A]", NULL ),
     AF_OPTION( "observation-domain", (char)0, 0, AF_OPT_TYPE_INT,
                &yaf_config.odid, THE_LAME_80COL_FORMATTER_STRING
                "Set observationDomainID on exported"
-               THE_LAME_80COL_FORMATTER_STRING"messages [0]", "odId" ),
+               THE_LAME_80COL_FORMATTER_STRING "messages [0]", "odId" ),
     AF_OPTION( "flow-stats", (char)0, 0, AF_OPT_TYPE_NONE,
                &yaf_opt_extra_stats_mode, THE_LAME_80COL_FORMATTER_STRING
                "Export extra flow attributes and statistics ", NULL),
     AF_OPTION( "delta", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_config.deltaMode,
-               THE_LAME_80COL_FORMATTER_STRING"Export packet and octet counts "
+               THE_LAME_80COL_FORMATTER_STRING "Export packet and octet counts "
                "using delta "THE_LAME_80COL_FORMATTER_STRING
                "information elements", NULL),
-    AF_OPTION ("ingress", (char)0, 0, AF_OPT_TYPE_INT, &yaf_opt_ingress_int,
-               THE_LAME_80COL_FORMATTER_STRING"Set ingressInterface field in "
-               "flow template", NULL),
+    AF_OPTION("ingress", (char)0, 0, AF_OPT_TYPE_INT, &yaf_opt_ingress_int,
+              THE_LAME_80COL_FORMATTER_STRING "Set ingressInterface field in "
+              "flow template", NULL),
     AF_OPTION( "egress", (char)0, 0, AF_OPT_TYPE_INT, &yaf_opt_egress_int,
-               THE_LAME_80COL_FORMATTER_STRING"Set egressInterface field in "
+               THE_LAME_80COL_FORMATTER_STRING "Set egressInterface field in "
                "flow template", NULL),
 #if YAF_ENABLE_METADATA_EXPORT
     AF_OPTION( "metadata-export", (char)0, 0, AF_OPT_TYPE_NONE,
                &yaf_config.tmpl_metadata,
-               THE_LAME_80COL_FORMATTER_STRING"Export template and information"
+               THE_LAME_80COL_FORMATTER_STRING "Export template and information"
                " element metadata before data", NULL),
-#endif
+#endif /* if YAF_ENABLE_METADATA_EXPORT */
 #if YAF_ENABLE_DAG_SEPARATE_INTERFACES || YAF_ENABLE_SEPARATE_INTERFACES
     AF_OPTION( "export-interface", (char)0, 0, AF_OPT_TYPE_NONE,
                &yaf_config.exportInterface, THE_LAME_80COL_FORMATTER_STRING
                "Export DAG, Napatech, or Netronome interface numbers in "
                "export records", NULL ),
-#endif
+#endif /* if YAF_ENABLE_DAG_SEPARATE_INTERFACES ||
+        * YAF_ENABLE_SEPARATE_INTERFACES */
     AF_OPTION_END
 };
 
@@ -383,56 +396,58 @@ AirOptionEntry yaf_optent_ipfix[] = {
                &(yaf_config.connspec.svc), THE_LAME_80COL_FORMATTER_STRING
                "Select IPFIX export port [4739, 4740]", "port" ),
     AF_OPTION( "tls", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_ipfix_tls,
-               THE_LAME_80COL_FORMATTER_STRING"Use TLS/DTLS to secure IPFIX "
+               THE_LAME_80COL_FORMATTER_STRING "Use TLS/DTLS to secure IPFIX "
                "export", NULL ),
     AF_OPTION( "tls-ca", (char)0, 0, AF_OPT_TYPE_STRING,
                &(yaf_config.connspec.ssl_ca_file),
-               THE_LAME_80COL_FORMATTER_STRING"Specify TLS Certificate "
+               THE_LAME_80COL_FORMATTER_STRING "Specify TLS Certificate "
                "Authority file", "cafile" ),
     AF_OPTION( "tls-cert", (char)0, 0, AF_OPT_TYPE_STRING,
                &(yaf_config.connspec.ssl_cert_file),
-               THE_LAME_80COL_FORMATTER_STRING"Specify TLS Certificate file",
+               THE_LAME_80COL_FORMATTER_STRING "Specify TLS Certificate file",
                "certfile" ),
     AF_OPTION( "tls-key", (char)0, 0, AF_OPT_TYPE_STRING,
                &(yaf_config.connspec.ssl_key_file),
-               THE_LAME_80COL_FORMATTER_STRING"Specify TLS Private Key file",
+               THE_LAME_80COL_FORMATTER_STRING "Specify TLS Private Key file",
                "keyfile" ),
     AF_OPTION_END
 };
 
 AirOptionEntry yaf_optent_pcap[] = {
     AF_OPTION( "pcap", 'p', 0, AF_OPT_TYPE_STRING, &yaf_config.pcapdir,
-               THE_LAME_80COL_FORMATTER_STRING"Directory/File prefix to store "
-               THE_LAME_80COL_FORMATTER_STRING"rolling pcap files", "dir"),
+               THE_LAME_80COL_FORMATTER_STRING "Directory/File prefix to store "
+               THE_LAME_80COL_FORMATTER_STRING "rolling pcap files", "dir"),
     AF_OPTION( "pcap-per-flow", (char)0, 0, AF_OPT_TYPE_NONE,
                &yaf_config.pcap_per_flow,
-               THE_LAME_80COL_FORMATTER_STRING"Create a separate pcap file for"
+               THE_LAME_80COL_FORMATTER_STRING "Create a separate pcap file for"
                " each flow"THE_LAME_80COL_FORMATTER_STRING
                "in the --pcap directory", NULL),
     AF_OPTION( "max-pcap", (char)0, 0, AF_OPT_TYPE_INT, &yaf_opt_max_pcap,
-               THE_LAME_80COL_FORMATTER_STRING"Max File Size of Pcap File "
+               THE_LAME_80COL_FORMATTER_STRING "Max File Size of Pcap File "
                "[25 MB]", "MB"),
     AF_OPTION( "pcap-timer", (char)0, 0, AF_OPT_TYPE_INT,
                &yaf_opt_pcap_timer,
-               THE_LAME_80COL_FORMATTER_STRING"Number of seconds for rolling"
-               THE_LAME_80COL_FORMATTER_STRING" pcap file [300]", "sec"),
+               THE_LAME_80COL_FORMATTER_STRING "Number of seconds for rolling"
+               THE_LAME_80COL_FORMATTER_STRING " pcap file [300]", "sec"),
     AF_OPTION( "pcap-meta-file", (char)0, 0, AF_OPT_TYPE_STRING,
                &yaf_pcap_meta_file,
-               THE_LAME_80COL_FORMATTER_STRING"Metadata file for rolling pcap "
-               THE_LAME_80COL_FORMATTER_STRING"output or indexing input pcap",
+               THE_LAME_80COL_FORMATTER_STRING "Metadata file for rolling pcap "
+               THE_LAME_80COL_FORMATTER_STRING "output or indexing input pcap",
                "path"),
     AF_OPTION( "index-pcap", (char)0, 0, AF_OPT_TYPE_NONE,
                &yaf_index_pcap,
-               THE_LAME_80COL_FORMATTER_STRING"Index the pcap with offset and "
-               THE_LAME_80COL_FORMATTER_STRING"lengths per packet", NULL),
+               THE_LAME_80COL_FORMATTER_STRING "Index the pcap with offset and "
+               THE_LAME_80COL_FORMATTER_STRING "lengths per packet", NULL),
     AF_OPTION( "hash", (char)0, 0, AF_OPT_TYPE_STRING,
                &yaf_hash_search,
-               THE_LAME_80COL_FORMATTER_STRING"Create only a PCAP for the "
-               THE_LAME_80COL_FORMATTER_STRING"given hash", "hash"),
+               THE_LAME_80COL_FORMATTER_STRING "Create only a PCAP for the "
+               THE_LAME_80COL_FORMATTER_STRING "given hash", "hash"),
     AF_OPTION( "stime", (char)0, 0, AF_OPT_TYPE_STRING,
                &yaf_stime_search,
-               THE_LAME_80COL_FORMATTER_STRING"Create only a PCAP for the given stime"
-               THE_LAME_80COL_FORMATTER_STRING"(--hash must also be present)", "ms"),
+               THE_LAME_80COL_FORMATTER_STRING
+               "Create only a PCAP for the given stime"
+               THE_LAME_80COL_FORMATTER_STRING "(--hash must also be present)",
+               "ms"),
     AF_OPTION_END
 };
 
@@ -440,7 +455,7 @@ AirOptionEntry yaf_optent_pcap[] = {
 #if YAF_ENABLE_PAYLOAD
 AirOptionEntry yaf_optent_payload[] = {
     AF_OPTION( "max-payload", 's', 0, AF_OPT_TYPE_INT, &yaf_opt_max_payload,
-               THE_LAME_80COL_FORMATTER_STRING"Maximum payload to capture per "
+               THE_LAME_80COL_FORMATTER_STRING "Maximum payload to capture per "
                "flow [0]", "octets" ),
     AF_OPTION( "export-payload", (char)0, 0, AF_OPT_TYPE_NONE,
                &yaf_opt_payload_export_on, THE_LAME_80COL_FORMATTER_STRING
@@ -448,68 +463,68 @@ AirOptionEntry yaf_optent_payload[] = {
     AF_OPTION( "udp-payload", (char)0, 0, AF_OPT_TYPE_NONE,
                &yaf_opt_udp_max_payload, THE_LAME_80COL_FORMATTER_STRING
                "Capture maximum payload for udp flow", NULL),
-    AF_OPTION ( "max-export", (char)0, 0, AF_OPT_TYPE_INT,
-                &yaf_opt_payload_export, THE_LAME_80COL_FORMATTER_STRING
-                "Maximum payload to export per flow direction[0]", NULL),
+    AF_OPTION( "max-export", (char)0, 0, AF_OPT_TYPE_INT,
+               &yaf_opt_payload_export, THE_LAME_80COL_FORMATTER_STRING
+               "Maximum payload to export per flow direction[0]", NULL),
 #if YAF_ENABLE_ENTROPY
     AF_OPTION( "entropy", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_entropy_mode,
-               THE_LAME_80COL_FORMATTER_STRING"Export Shannon entropy of "
+               THE_LAME_80COL_FORMATTER_STRING "Export Shannon entropy of "
                "captured payload", NULL),
 #endif
 #if YAF_ENABLE_APPLABEL
     AF_OPTION( "applabel-rules", 0, 0, AF_OPT_TYPE_STRING,
                &yaf_opt_applabel_rules,
-               THE_LAME_80COL_FORMATTER_STRING"specify the name of the "
-               "application labeler"THE_LAME_80COL_FORMATTER_STRING"rules "
+               THE_LAME_80COL_FORMATTER_STRING "specify the name of the "
+               "application labeler"THE_LAME_80COL_FORMATTER_STRING "rules "
                "file", "file"),
     AF_OPTION("applabel", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_applabel_mode,
-              THE_LAME_80COL_FORMATTER_STRING"enable the packet inspection "
-              "protocol"THE_LAME_80COL_FORMATTER_STRING"application labeler "
+              THE_LAME_80COL_FORMATTER_STRING "enable the packet inspection "
+              "protocol"THE_LAME_80COL_FORMATTER_STRING "application labeler "
               "engine", NULL ),
-#endif
+#endif /* if YAF_ENABLE_APPLABEL */
 #if YAF_ENABLE_NDPI
     AF_OPTION( "ndpi", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_ndpi,
-               THE_LAME_80COL_FORMATTER_STRING"enable nDPI application "
+               THE_LAME_80COL_FORMATTER_STRING "enable nDPI application "
                "labeling.", NULL),
     AF_OPTION( "ndpi-protocol-file", 0, 0, AF_OPT_TYPE_STRING,
-               &yaf_ndpi_proto_file, THE_LAME_80COL_FORMATTER_STRING"Specify"
+               &yaf_ndpi_proto_file, THE_LAME_80COL_FORMATTER_STRING "Specify"
                " protocol file for sub-protocol"THE_LAME_80COL_FORMATTER_STRING
                "and port-based protocol detection", "file"),
-#endif
+#endif /* if YAF_ENABLE_NDPI */
 #if YAF_ENABLE_P0F
     AF_OPTION( "p0f-fingerprints", 0, 0, AF_OPT_TYPE_STRING,
                &yaf_opt_p0f_fingerprints,
-               THE_LAME_80COL_FORMATTER_STRING"specify the location of the "
+               THE_LAME_80COL_FORMATTER_STRING "specify the location of the "
                "p0f fingerprint "THE_LAME_80COL_FORMATTER_STRING
                "files", "file"),
     AF_OPTION("p0fprint", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_p0fprint_mode,
-              THE_LAME_80COL_FORMATTER_STRING"enable the p0f OS "
+              THE_LAME_80COL_FORMATTER_STRING "enable the p0f OS "
               "fingerprinter", NULL ),
-#endif
+#endif /* if YAF_ENABLE_P0F */
 #if YAF_ENABLE_FPEXPORT
     AF_OPTION("fpexport", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_fpExport_mode,
-              THE_LAME_80COL_FORMATTER_STRING"enable export of handshake "
-              "headers for"THE_LAME_80COL_FORMATTER_STRING"external OS "
+              THE_LAME_80COL_FORMATTER_STRING "enable export of handshake "
+              "headers for"THE_LAME_80COL_FORMATTER_STRING "external OS "
               "fingerprinters", NULL ),
-#endif
+#endif /* if YAF_ENABLE_FPEXPORT */
     AF_OPTION_END
 };
-#endif
+#endif /* if YAF_ENABLE_PAYLOAD */
 
 #ifdef YAF_ENABLE_HOOKS
 AirOptionEntry yaf_optent_plugin[] = {
     AF_OPTION( "plugin-name", '\0', 0, AF_OPT_TYPE_STRING, &pluginName,
-               THE_LAME_80COL_FORMATTER_STRING"load a yaf plugin(s)",
+               THE_LAME_80COL_FORMATTER_STRING "load a yaf plugin(s)",
                "libplugin_name[,libplugin_name...]"),
     AF_OPTION( "plugin-opts", '\0', 0, AF_OPT_TYPE_STRING, &pluginOpts,
-               THE_LAME_80COL_FORMATTER_STRING"parse options to the "
-               "plugin(s)","\"plugin_opts[,plugin_opts...]\""),
+               THE_LAME_80COL_FORMATTER_STRING "parse options to the "
+               "plugin(s)", "\"plugin_opts[,plugin_opts...]\""),
     AF_OPTION( "plugin-conf", '\0', 0, AF_OPT_TYPE_STRING, &pluginConf,
-               THE_LAME_80COL_FORMATTER_STRING"configuration file for the "
+               THE_LAME_80COL_FORMATTER_STRING "configuration file for the "
                "plugin(s)", "\"plugin_conf[,plugin_conf...]\""),
     AF_OPTION_END
 };
-#endif
+#endif /* ifdef YAF_ENABLE_HOOKS */
 
 /**
  * yfVersionString
@@ -517,10 +532,10 @@ AirOptionEntry yaf_optent_plugin[] = {
  * Print version info and info about how YAF was configured
  *
  */
-static GString *yfVersionString(
-    const char *verNumStr)
+static GString *
+yfVersionString(
+    const char  *verNumStr)
 {
-
     GString *resultString;
 
     resultString = g_string_new("");
@@ -566,7 +581,7 @@ static GString *yfVersionString(
                            "NO"
 #endif
                            );
-    g_string_append_printf(resultString,"    * %-32s  %s\n",
+    g_string_append_printf(resultString, "    * %-32s  %s\n",
                            "Bivio support:",
 #if YAF_ENABLE_BIVIO
                            "YES"
@@ -574,7 +589,7 @@ static GString *yfVersionString(
                            "NO"
 #endif
                            );
-    g_string_append_printf(resultString,"    * %-32s  %s\n",
+    g_string_append_printf(resultString, "    * %-32s  %s\n",
                            "PFRING support:",
 #if YAF_ENABLE_PFRING
                            "YES"
@@ -582,7 +597,7 @@ static GString *yfVersionString(
                            "NO"
 #endif
                            );
-    g_string_append_printf(resultString,"    * %-32s  %s\n",
+    g_string_append_printf(resultString, "    * %-32s  %s\n",
                            "Compact IPv4 support:",
 #if YAF_COMPACT_V4
                            "YES"
@@ -614,7 +629,7 @@ static GString *yfVersionString(
                            "NO"
 #endif
                            );
-    g_string_append_printf(resultString,"    * %-32s  %s\n",
+    g_string_append_printf(resultString, "    * %-32s  %s\n",
                            "Entropy support:",
 #if YAF_ENABLE_ENTROPY
                            "YES"
@@ -622,7 +637,7 @@ static GString *yfVersionString(
                            "NO"
 #endif
                            );
-    g_string_append_printf(resultString,"    * %-32s  %s\n",
+    g_string_append_printf(resultString, "    * %-32s  %s\n",
                            "Fingerprint Export Support:",
 #if YAF_ENABLE_FPEXPORT
                            "YES"
@@ -630,7 +645,7 @@ static GString *yfVersionString(
                            "NO"
 #endif
                            );
-    g_string_append_printf(resultString,"    * %-32s  %s\n",
+    g_string_append_printf(resultString, "    * %-32s  %s\n",
                            "P0F Support:",
 #if YAF_ENABLE_P0F
                            "YES"
@@ -638,7 +653,7 @@ static GString *yfVersionString(
                            "NO"
 #endif
                            );
-    g_string_append_printf(resultString,"    * %-32s  %s\n",
+    g_string_append_printf(resultString, "    * %-32s  %s\n",
                            "Spread Support:",
 #if HAVE_SPREAD
                            "YES"
@@ -646,7 +661,7 @@ static GString *yfVersionString(
                            "NO"
 #endif
                            );
-    g_string_append_printf(resultString,"    * %-32s  %s\n",
+    g_string_append_printf(resultString, "    * %-32s  %s\n",
                            "MPLS Support:",
 #if YAF_MPLS
                            "YES"
@@ -654,7 +669,7 @@ static GString *yfVersionString(
                            "NO"
 #endif
                            );
-    g_string_append_printf(resultString,"    * %-32s  %s\n",
+    g_string_append_printf(resultString, "    * %-32s  %s\n",
                            "Non-IP Support:",
 #if YAF_NONIP
                            "YES"
@@ -662,7 +677,7 @@ static GString *yfVersionString(
                            "NO"
 #endif
                            );
-    g_string_append_printf(resultString,"    * %-32s  %s\n",
+    g_string_append_printf(resultString, "    * %-32s  %s\n",
                            "Separate Interface Support:",
 #if YAF_ENABLE_SEPARATE_INTERFACES
                            "YES"
@@ -670,9 +685,9 @@ static GString *yfVersionString(
                            "YES (Dag)"
 #else
                            "NO"
-#endif
+#endif /* if YAF_ENABLE_SEPARATE_INTERFACES */
                            );
-    g_string_append_printf(resultString,"    * %-32s  %s\n",
+    g_string_append_printf(resultString, "    * %-32s  %s\n",
                            "nDPI Support:",
 #if YAF_ENABLE_NDPI
                            "YES"
@@ -681,7 +696,7 @@ static GString *yfVersionString(
 #endif
                            );
 
-    g_string_append_printf(resultString,"    * %-32s  %s\n",
+    g_string_append_printf(resultString, "    * %-32s  %s\n",
                            "IE Metadata Export:",
 #if YAF_ENABLE_METADATA_EXPORT
                            "YES"
@@ -691,16 +706,20 @@ static GString *yfVersionString(
                            );
 
     return resultString;
-};
+}
+
 
 #ifdef HAVE_SPREAD
-static void groups_from_list( char *list, char ***groups,
-                              uint16_t **spreadIndex,
-                              uint8_t  *numSpreadGroups)
+static void
+groups_from_list(
+    char      *list,
+    char    ***groups,
+    uint16_t **spreadIndex,
+    uint8_t   *numSpreadGroups)
 {
-    gchar **sa = g_strsplit( list, ",", -1 );
-    int n = 0, x = 0, g = 0, spaces = 0;
-    gchar **spread_split = NULL;
+    gchar  **sa = g_strsplit( list, ",", -1 );
+    int      n = 0, x = 0, g = 0, spaces = 0;
+    gchar  **spread_split = NULL;
     gboolean catch_all_group = FALSE;
 
     while (sa[n] && *sa[n]) {
@@ -708,7 +727,7 @@ static void groups_from_list( char *list, char ***groups,
     }
     g_debug("Adding Spread Groups: %s", list);
 
-    *groups = g_new0( char *, n+1 );
+    *groups = g_new0( char *, n + 1 );
 
     *spreadIndex = g_new0(uint16_t, n);
 
@@ -749,6 +768,8 @@ static void groups_from_list( char *list, char ***groups,
     g_strfreev(spread_split);
     g_strfreev( sa );
 }
+
+
 #endif /* HAVE_SPREAD */
 
 
@@ -758,13 +779,15 @@ static void groups_from_list( char *list, char ***groups,
  * exit handler for YAF
  *
  */
-
-void yfExit() {
-
+static void
+yfExit(
+    void)
+{
     if (yaf_pidfile) {
         unlink(yaf_pidfile);
     }
 }
+
 
 /**
  * yfDaemonize
@@ -773,12 +796,14 @@ void yfExit() {
  * it's issues.
  *
  */
-static void yfDaemonize()
+static void
+yfDaemonize(
+    void)
 {
     pid_t pid;
-    int rv = -1;
-    char str[256];
-    int fp;
+    int   rv = -1;
+    char  str[256];
+    int   fp;
 
     if (chdir("/") == -1) {
         rv = errno;
@@ -810,7 +835,7 @@ static void yfDaemonize()
     close(STDIN_FILENO);
 
     if (yaf_pidfile) {
-        fp = open(yaf_pidfile, O_RDWR|O_CREAT, 0640);
+        fp = open(yaf_pidfile, O_RDWR | O_CREAT, 0640);
         if (fp < 0) {
             g_warning("Unable to open pid file %s", yaf_pidfile);
             exit(1);
@@ -822,56 +847,57 @@ static void yfDaemonize()
     } else {
         g_debug("pid: %d", getpid());
     }
-
 }
+
 
 /**
  * Lua helper functions
  *
  */
-#define yf_lua_getnum(_key_, _ret_)                     \
-    lua_getglobal(L, _key_);                            \
-    if (!lua_isnil(L, -1)) {                            \
-        _ret_= (int)lua_tonumber(L, -1);                \
-    }                                                   \
+#define yf_lua_getnum(_key_, _ret_)       \
+    lua_getglobal(L, _key_);              \
+    if (!lua_isnil(L, -1)) {              \
+        _ret_ = (int)lua_tonumber(L, -1); \
+    }                                     \
     lua_pop(L, 1);
 
-#define yf_lua_getstr(_key_, _ret_)                     \
-    lua_getglobal(L, _key_);                            \
-    if (!lua_isnil(L, -1)) {                            \
-        _ret_= strdup(lua_tostring(L, -1));             \
-    }                                                   \
+#define yf_lua_getstr(_key_, _ret_)          \
+    lua_getglobal(L, _key_);                 \
+    if (!lua_isnil(L, -1)) {                 \
+        _ret_ = strdup(lua_tostring(L, -1)); \
+    }                                        \
     lua_pop(L, 1);
 
-#define yf_lua_getbool(_key_, _ret_)                    \
-    lua_getglobal(L, _key_);                            \
-    if (!lua_isnil(L, -1)) {                            \
-        _ret_ = (int)lua_toboolean(L, -1);              \
-    }                                                   \
+#define yf_lua_getbool(_key_, _ret_)       \
+    lua_getglobal(L, _key_);               \
+    if (!lua_isnil(L, -1)) {               \
+        _ret_ = (int)lua_toboolean(L, -1); \
+    }                                      \
     lua_pop(L, 1);
 
-#define yf_lua_checktablebool(_key_, _val_)             \
-    lua_pushstring(L, _key_);                           \
-    lua_gettable(L, -2);                                \
-    if (!lua_isnil(L, -1)) {                            \
-        _val_ = (int)lua_toboolean(L, -1);              \
-    }                                                   \
+#define yf_lua_checktablebool(_key_, _val_) \
+    lua_pushstring(L, _key_);               \
+    lua_gettable(L, -2);                    \
+    if (!lua_isnil(L, -1)) {                \
+        _val_ = (int)lua_toboolean(L, -1);  \
+    }                                       \
     lua_pop(L, 1);
 
-#define yf_lua_gettableint(_key_, _val_)                \
-    lua_pushstring(L, _key_);                           \
-    lua_gettable(L, -2);                                \
-    if (!lua_isnil(L, -1)) {                            \
-        if (!lua_isnumber(L, -1)) {                     \
-            g_error("%s must be a number", _key_);      \
-        }                                               \
-        _val_ = (int)lua_tonumber(L, -1);               \
-    }                                                   \
+#define yf_lua_gettableint(_key_, _val_)           \
+    lua_pushstring(L, _key_);                      \
+    lua_gettable(L, -2);                           \
+    if (!lua_isnil(L, -1)) {                       \
+        if (!lua_isnumber(L, -1)) {                \
+            g_error("%s must be a number", _key_); \
+        }                                          \
+        _val_ = (int)lua_tonumber(L, -1);          \
+    }                                              \
     lua_pop(L, 1);
 
-int yfLuaGetLen(
-    lua_State *L,
-    int index)
+static int
+yfLuaGetLen(
+    lua_State  *L,
+    int         index)
 {
     int len = 0;
 
@@ -882,9 +908,11 @@ int yfLuaGetLen(
     return len;
 }
 
-char * yfLuaGetStrField(
-    lua_State  *L,
-    const char *key)
+
+static char *
+yfLuaGetStrField(
+    lua_State   *L,
+    const char  *key)
 {
     const char *result;
 
@@ -897,18 +925,20 @@ char * yfLuaGetStrField(
     return (char *)g_strdup(result);
 }
 
+
 /**
  * yfLuaLoadConfig
  *
  *
  */
-static void yfLuaLoadConfig(
-                            void)
+static void
+yfLuaLoadConfig(
+    void)
 {
     lua_State *L = luaL_newstate();
-    int i, len;
-    char *str = NULL;
-    GError *err = NULL;
+    int        i, len;
+    char      *str = NULL;
+    GError    *err = NULL;
 
     luaopen_base(L);
     luaopen_io(L);
@@ -998,7 +1028,7 @@ static void yfLuaLoadConfig(
                 len = yfLuaGetLen(L, -1);
                 yaf_config.numSpreadGroups = len;
                 if (len) {
-                    yaf_config.spreadparams.groups = g_new0( char *, len+1);
+                    yaf_config.spreadparams.groups = g_new0( char *, len + 1);
                     yaf_config.spreadGroupIndex = g_new0(uint16_t, len);
                 }
                 for (i = 1; i <= len; i++) {
@@ -1007,17 +1037,16 @@ static void yfLuaLoadConfig(
                         air_opterr("group must be a valid table. Should be "
                                    "in the form: {name=\"NAME\", [value=]}");
                     }
-                    yaf_config.spreadparams.groups[i-1] = yfLuaGetStrField(L,
-                                                                       "name");
+                    yaf_config.spreadparams.groups[i - 1] = yfLuaGetStrField(L,
+                                                                             "name");
                     yf_lua_gettableint("value",
-                                       yaf_config.spreadGroupIndex[i-1]);
+                                       yaf_config.spreadGroupIndex[i - 1]);
                     lua_pop(L, 1);
                 }
-
             }
-#else
+#else /* ifdef HAVE_SPREAD */
             air_opterr("Spread is not enabled. Configure --with-spread");
-#endif
+#endif /* ifdef HAVE_SPREAD */
         } else {
             yaf_config.outspec = yfLuaGetStrField(L, "host");
             yaf_config.connspec.svc = yfLuaGetStrField(L, "port");
@@ -1129,7 +1158,8 @@ static void yfLuaLoadConfig(
                 pluginName = yfLuaGetStrField(L, "name");
                 pluginConf = yfLuaGetStrField(L, "conf");
                 pluginOpts = yfLuaGetStrField(L, "options");
-                if(!yfHookAddNewHook(pluginName, pluginOpts, pluginConf, yfctx, &err))
+                if (!yfHookAddNewHook(
+                        pluginName, pluginOpts, pluginConf, yfctx, &err))
                 {
                     g_warning("Couldn't load requested plugin: %s",
                               err->message);
@@ -1139,8 +1169,7 @@ static void yfLuaLoadConfig(
             lua_pop(L, 1);
         }
     }
-#endif
-
+#endif /* if YAF_ENABLE_HOOKS */
 
     /* pcap options */
     lua_getglobal(L, "pcap");
@@ -1156,7 +1185,6 @@ static void yfLuaLoadConfig(
         yaf_config.pcapdir = yfLuaGetStrField(L, "path");
         /* pcap per flow and index pcap */
     }
-
 
     /* pidfile */
     yf_lua_getstr("pidfile", yaf_pidfile);
@@ -1177,43 +1205,44 @@ static void yfLuaLoadConfig(
  *
  *
  */
-static void yfParseOptions(
-    int             *argc,
-    char            **argv[]) {
-
-    AirOptionCtx    *aoctx = NULL;
-    GError          *err = NULL;
-    GString         *versionString;
+static void
+yfParseOptions(
+    int   *argc,
+    char **argv[])
+{
+    AirOptionCtx *aoctx = NULL;
+    GError       *err = NULL;
+    GString      *versionString;
 
     aoctx = air_option_context_new("", argc, argv, yaf_optent_core);
 
     air_option_context_add_group(aoctx, "decode", "Decoder Options:",
-                                 THE_LAME_80COL_FORMATTER_STRING"Show help "
+                                 THE_LAME_80COL_FORMATTER_STRING "Show help "
                                  "for packet decoder options", yaf_optent_dec);
     air_option_context_add_group(aoctx, "flow", "Flow table Options:",
-                                 THE_LAME_80COL_FORMATTER_STRING"Show help "
+                                 THE_LAME_80COL_FORMATTER_STRING "Show help "
                                  "for flow table options", yaf_optent_flow);
     air_option_context_add_group(aoctx, "export", "Export Options:",
-                                 THE_LAME_80COL_FORMATTER_STRING"Show help "
+                                 THE_LAME_80COL_FORMATTER_STRING "Show help "
                                  "for export format options", yaf_optent_exp);
     air_option_context_add_group(aoctx, "ipfix", "IPFIX Options:",
-                                 THE_LAME_80COL_FORMATTER_STRING"Show help "
+                                 THE_LAME_80COL_FORMATTER_STRING "Show help "
                                  "for IPFIX export options", yaf_optent_ipfix);
     air_option_context_add_group(aoctx, "pcap", "PCAP Options:",
-                                 THE_LAME_80COL_FORMATTER_STRING"Show help "
+                                 THE_LAME_80COL_FORMATTER_STRING "Show help "
                                  "for PCAP Export Options", yaf_optent_pcap);
 #if YAF_ENABLE_PAYLOAD
     air_option_context_add_group(aoctx, "payload", "Payload Options:",
-                                 THE_LAME_80COL_FORMATTER_STRING"Show the "
+                                 THE_LAME_80COL_FORMATTER_STRING "Show the "
                                  "help for payload options",
                                  yaf_optent_payload);
-#endif
+#endif /* if YAF_ENABLE_PAYLOAD */
 #ifdef YAF_ENABLE_HOOKS
     air_option_context_add_group(aoctx, "plugin", "Plugin Options:",
-                                 THE_LAME_80COL_FORMATTER_STRING"Show help "
+                                 THE_LAME_80COL_FORMATTER_STRING "Show help "
                                  "for plugin interface options",
                                  yaf_optent_plugin);
-#endif
+#endif /* ifdef YAF_ENABLE_HOOKS */
     privc_add_option_group(aoctx);
 
     versionString = yfVersionString(VERSION);
@@ -1260,7 +1289,7 @@ static void yfParseOptions(
             }
         }
     }
-#endif
+#endif /* if YAF_ENABLE_APPLABEL */
 #if YAF_ENABLE_NDPI
     if (yaf_ndpi_proto_file && (FALSE == yaf_opt_ndpi)) {
         g_warning("--ndpi-proto-file requires --ndpi.");
@@ -1273,7 +1302,7 @@ static void yfParseOptions(
             yaf_opt_ndpi = FALSE;
         }
     }
-#endif
+#endif /* if YAF_ENABLE_NDPI */
 
 #if YAF_ENABLE_P0F
     if (yaf_opt_p0f_fingerprints && (FALSE == yaf_opt_p0fprint_mode)) {
@@ -1282,7 +1311,7 @@ static void yfParseOptions(
         yaf_opt_p0fprint_mode = FALSE;
     }
     if (TRUE == yaf_opt_p0fprint_mode) {
-        if (yaf_opt_max_payload == 0){
+        if (yaf_opt_max_payload == 0) {
             g_warning("--p0fprint requires --max-payload");
             yaf_opt_p0fprint_mode = FALSE;
         } else if (!yfpLoadConfig(yaf_opt_p0f_fingerprints, &err)) {
@@ -1291,7 +1320,7 @@ static void yfParseOptions(
             g_clear_error(&err);
         }
     }
-#endif
+#endif /* if YAF_ENABLE_P0F */
 #if YAF_ENABLE_FPEXPORT
     if (TRUE == yaf_opt_fpExport_mode) {
         if (yaf_opt_max_payload == 0) {
@@ -1299,7 +1328,7 @@ static void yfParseOptions(
             yaf_opt_fpExport_mode = FALSE;
         }
     }
-#endif
+#endif /* if YAF_ENABLE_FPEXPORT */
     if (TRUE == yaf_opt_udp_max_payload) {
         if (yaf_opt_max_payload == 0) {
             g_warning("--udp-payload requires --max-payload > 0.");
@@ -1325,7 +1354,7 @@ static void yfParseOptions(
             yaf_opt_entropy_mode = FALSE;
         }
     }
-#endif
+#endif /* if YAF_ENABLE_ENTROPY */
 
     /* process ip4mode and ip6mode */
     if (yaf_opt_ip4_mode && yaf_opt_ip6_mode) {
@@ -1349,8 +1378,9 @@ static void yfParseOptions(
     }
 
     if (yaf_opt_payload_export > yaf_opt_max_payload) {
-        g_warning("--max-export can not be larger than max-payload.  Setting to %d",
-                  yaf_opt_max_payload);
+        g_warning(
+            "--max-export can not be larger than max-payload.  Setting to %d",
+            yaf_opt_max_payload);
         yaf_opt_payload_export = yaf_opt_max_payload;
     }
 
@@ -1361,7 +1391,6 @@ static void yfParseOptions(
     if (yaf_opt_ip6map_mode) {
         yfWriterExportMappedV6(TRUE);
     }
-
 
     /* Pre-process input options */
     if (yaf_config.livetype) {
@@ -1391,7 +1420,7 @@ static void yfParseOptions(
                 yaf_config.pcapdir = NULL;
             }
             yaf_live_type = 1;
-#endif
+#endif /* if YAF_ENABLE_DAG */
 #if YAF_ENABLE_NAPATECH
         } else if (strncmp(yaf_config.livetype, "napatech", 8) == 0) {
             /* live capture via napatech adapter (--live=napatech) */
@@ -1403,7 +1432,7 @@ static void yfParseOptions(
                 yaf_config.pcapdir = NULL;
             }
             yaf_live_type = 2;
-#endif
+#endif /* if YAF_ENABLE_NAPATECH */
 #if YAF_ENABLE_NETRONOME
         } else if (strncmp(yaf_config.livetype, "netronome", 9) == 0) {
             yaf_liveopen_fn = (yfLiveOpen_fn)yfNFEOpenLive;
@@ -1413,7 +1442,7 @@ static void yfParseOptions(
                 g_warning("--pcap not valid for --live netronome");
                 yaf_config.pcapdir = NULL;
             }
-#endif
+#endif /* if YAF_ENABLE_NETRONOME */
 #if YAF_ENABLE_PFRING
         } else if (strncmp(yaf_config.livetype, "pfring", 6) == 0) {
             yaf_liveopen_fn = (yfLiveOpen_fn)yfPfRingOpenLive;
@@ -1425,15 +1454,15 @@ static void yfParseOptions(
             }
 #if YAF_ENABLE_PFRINGZC
         } else if (strncmp(yaf_config.livetype, "zc", 2) == 0) {
-          yaf_liveopen_fn = (yfLiveOpen_fn)yfPfRingZCOpenLive;
-          yaf_loop_fn = (yfLoop_fn)yfPfRingZCMain;
-          yaf_close_fn = (yfClose_fn)yfPfRingZCClose;
-          if (yaf_config.pcapdir) {
-            g_warning("--pcap not valid for --live zc");
-            yaf_config.pcapdir = NULL;
-          }
-#endif
-#endif
+            yaf_liveopen_fn = (yfLiveOpen_fn)yfPfRingZCOpenLive;
+            yaf_loop_fn = (yfLoop_fn)yfPfRingZCMain;
+            yaf_close_fn = (yfClose_fn)yfPfRingZCClose;
+            if (yaf_config.pcapdir) {
+                g_warning("--pcap not valid for --live zc");
+                yaf_config.pcapdir = NULL;
+            }
+#endif /* if YAF_ENABLE_PFRINGZC */
+#endif /* if YAF_ENABLE_PFRING */
         } else {
             /* unsupported live capture type */
             air_opterr("Unsupported live capture type %s", yaf_config.livetype);
@@ -1443,11 +1472,10 @@ static void yfParseOptions(
         if (!yaf_config.inspec) {
             air_opterr("--live requires interface name in --in");
         }
-
     } else {
         /* Use pcap loop and close functions */
         yaf_loop_fn = (yfLoop_fn)yfCapMain;
-        yaf_close_fn =(yfClose_fn)yfCapClose;
+        yaf_close_fn = (yfClose_fn)yfCapClose;
 
         /* Default to stdin for no input */
         if (!yaf_config.inspec || !strlen(yaf_config.inspec)) {
@@ -1529,9 +1557,9 @@ static void yfParseOptions(
             yaf_config.spreadGroupby = 0;
             if (yaf_opt_spread_groupby != 0) {
                 /*if (!yaf_config.spreadGroupIndex[0]) {
-                    air_opterr("Invalid groupby: Must have values to group by"
-                               " in --group");
-                               }*/
+                 *  air_opterr("Invalid groupby: Must have values to group by"
+                 *             " in --group");
+                 *             }*/
                 if (!(strcmp(yaf_opt_spread_groupby, "port")) ||
                     !(strcmp(yaf_opt_spread_groupby, "Port")))
                 {
@@ -1580,7 +1608,6 @@ static void yfParseOptions(
 
         /* mark that a network connection is requested for this spec */
         yaf_config.ipfixNetTrans = TRUE;
-
     } else {
         if (!yaf_config.outspec || !strlen(yaf_config.outspec)) {
             if (yaf_rotate_ms) {
@@ -1604,8 +1631,7 @@ static void yfParseOptions(
     }
 
     if (!yaf_config.no_output) {
-        if ((strlen(yaf_config.outspec) == 1) && yaf_config.outspec[0] == '-')
-        {
+        if ((strlen(yaf_config.outspec) == 1) && yaf_config.outspec[0] == '-') {
             /* Don't open stdout if it's a terminal */
             if (isatty(fileno(stdout))) {
                 air_opterr("Refusing to write to terminal on stdout");
@@ -1629,8 +1655,8 @@ static void yfParseOptions(
                            "using --pcap-per-flow");
             }
             if (yaf_index_pcap) {
-               g_warning("Ignoring --index-pcap option with --pcap-per-flow.");
-               yaf_index_pcap = FALSE;
+                g_warning("Ignoring --index-pcap option with --pcap-per-flow.");
+                yaf_index_pcap = FALSE;
             }
             if (yaf_pcap_meta_file) {
                 g_warning("Ignoring --pcap-meta-file option with "
@@ -1679,20 +1705,23 @@ static void yfParseOptions(
     air_option_context_free(aoctx);
 }
 
+
 #ifdef YAF_ENABLE_HOOKS
 /*
- *yfPluginLoad
+ * yfPluginLoad
  *
  * parses parameters for plugin loading and calls the hook add function to
  * load the plugins
  *
  */
-static void pluginOptParse(GError **err) {
-
-    char *plugName, *endPlugName = NULL;
-    char *plugOpt, *endPlugOpt = NULL;
-    char *plugConf, *endPlugConf = NULL;
-    char *plugNameIndex, *plugOptIndex, *plugConfIndex;
+static void
+pluginOptParse(
+    GError **err)
+{
+    char         *plugName, *endPlugName = NULL;
+    char         *plugOpt, *endPlugOpt = NULL;
+    char         *plugConf, *endPlugConf = NULL;
+    char         *plugNameIndex, *plugOptIndex, *plugConfIndex;
     unsigned char plugNameAlloc = 0;
     unsigned char plugOptAlloc = 0;
     unsigned char plugConfAlloc = 0;
@@ -1719,14 +1748,13 @@ static void pluginOptParse(GError **err) {
             endPlugOpt = strchr(plugOptIndex, ',');
             if (NULL == endPlugOpt) {
                 plugOpt = plugOptIndex;
-            } else if ( plugOptIndex == endPlugOpt) {
+            } else if (plugOptIndex == endPlugOpt) {
                 plugOpt = NULL;
             } else {
                 plugOpt = g_new0(char, (endPlugOpt - plugOptIndex + 1));
                 strncpy(plugOpt, plugOptIndex, (endPlugOpt - plugOptIndex));
                 plugOptAlloc = 1;
             }
-
         }
 
         /* Plugin config */
@@ -1736,20 +1764,19 @@ static void pluginOptParse(GError **err) {
             endPlugConf = strchr(plugConfIndex, ',');
             if (NULL == endPlugConf) {
                 plugConf = plugConfIndex;
-            } else if ( plugConfIndex == endPlugConf) {
+            } else if (plugConfIndex == endPlugConf) {
                 plugConf = NULL;
             } else {
                 plugConf = g_new0(char, (endPlugConf - plugConfIndex + 1));
-                strncpy(plugConf, plugConfIndex,(endPlugConf - plugConfIndex));
+                strncpy(plugConf, plugConfIndex, (endPlugConf - plugConfIndex));
                 plugConfAlloc = 1;
             }
-
         }
 
         /* Attempt to load/initialize the plugin */
         if (!yfHookAddNewHook(plugName, plugOpt, plugConf, yfctx, err)) {
             g_warning("couldn't load requested plugin: %s",
-                  (*err)->message);
+                      (*err)->message);
         }
 
         if (NULL != plugNameIndex) {
@@ -1790,7 +1817,9 @@ static void pluginOptParse(GError **err) {
         }
     }
 }
-#endif
+
+
+#endif /* ifdef YAF_ENABLE_HOOKS */
 
 /**
  *
@@ -1799,14 +1828,18 @@ static void pluginOptParse(GError **err) {
  *
  *
  */
-void yfQuit() {
+static void
+yfQuit(
+    int   s)
+{
+    (void)s;
     yaf_quit++;
 
 #if YAF_ENABLE_PFRING
     yfPfRingBreakLoop(NULL);
 #endif
-
 }
+
 
 /**
  *
@@ -1815,7 +1848,9 @@ void yfQuit() {
  *
  *
  */
-static void yfQuitInit()
+static void
+yfQuitInit(
+    void)
 {
     struct sigaction sa, osa;
 
@@ -1823,17 +1858,18 @@ static void yfQuitInit()
     sa.sa_handler = yfQuit;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
-    if (sigaction(SIGINT,&sa,&osa)) {
+    if (sigaction(SIGINT, &sa, &osa)) {
         g_error("sigaction(SIGINT) failed: %s", strerror(errno));
     }
 
     sa.sa_handler = yfQuit;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
-    if (sigaction(SIGTERM,&sa,&osa)) {
+    if (sigaction(SIGTERM, &sa, &osa)) {
         g_error("sigaction(SIGTERM) failed: %s", strerror(errno));
     }
 }
+
 
 /**
  *
@@ -1842,14 +1878,15 @@ static void yfQuitInit()
  *
  *
  */
-int main (
-    int             argc,
-    char            *argv[])
+int
+main(
+    int    argc,
+    char  *argv[])
 {
-    GError          *err = NULL;
-    yfContext_t     ctx = YF_CTX_INIT;
-    int             datalink;
-    gboolean        loop_ok = TRUE;
+    GError     *err = NULL;
+    yfContext_t ctx = YF_CTX_INIT;
+    int         datalink;
+    gboolean    loop_ok = TRUE;
 
     /* check structure alignment */
     yfAlignmentCheck();
@@ -1895,12 +1932,14 @@ int main (
                                                  yaf_tmp_file, &err)))
             {
                 g_warning("Cannot open packet file list file %s: %s",
-                         yaf_config.inspec, err->message);
+                          yaf_config.inspec, err->message);
                 exit(1);
             }
             /* drop privilege */
             if (!privc_become(&err)) {
-                if (g_error_matches(err, PRIVC_ERROR_DOMAIN, PRIVC_ERROR_NODROP)) {
+                if (g_error_matches(err, PRIVC_ERROR_DOMAIN,
+                                    PRIVC_ERROR_NODROP))
+                {
                     g_warning("running as root in --caplist mode, "
                               "but not dropping privilege");
                     g_clear_error(&err);
@@ -1938,7 +1977,7 @@ int main (
     if (yaf_opt_max_payload) {
         /* 54 for Headers (14 for L2, 20 for IP, 20 for L4) */
         /* This was added bc we now capture starting at L2 up to max-payload
-           for possible PCAP capture */
+         * for possible PCAP capture */
         ctx.pbuflen = YF_PBUFLEN_BASE + yaf_opt_max_payload + 54;
     } else {
         ctx.pbuflen = YF_PBUFLEN_NOPAYLOAD;
@@ -1986,7 +2025,7 @@ int main (
     }
 
     /* We have a packet source, an output stream,
-       and all the tables we need. Run with it. */
+    * and all the tables we need. Run with it. */
 
     yfStatInit(&ctx);
 

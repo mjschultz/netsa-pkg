@@ -1,60 +1,60 @@
 /**
- ** decode.c
- ** YAF Layer 2 and Layer 3 decode routines
- **
- ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2016 Carnegie Mellon University. All Rights Reserved.
- ** ------------------------------------------------------------------------
- ** Authors: Brian Trammell
- ** ------------------------------------------------------------------------
- ** @OPENSOURCE_HEADER_START@
- ** Use of the YAF system and related source code is subject to the terms
- ** of the following licenses:
- **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
- ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
- **
- ** NO WARRANTY
- **
- ** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
- ** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
- ** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
- ** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
- ** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
- ** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
- ** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
- ** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
- ** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
- ** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
- ** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
- ** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
- ** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
- ** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
- ** DELIVERABLES UNDER THIS LICENSE.
- **
- ** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
- ** Mellon University, its trustees, officers, employees, and agents from
- ** all claims or demands made against them (and any related losses,
- ** expenses, or attorney's fees) arising out of, or relating to Licensee's
- ** and/or its sub licensees' negligent use or willful misuse of or
- ** negligent conduct or willful misconduct regarding the Software,
- ** facilities, or other rights or assistance granted by Carnegie Mellon
- ** University under this License, including, but not limited to, any
- ** claims of product liability, personal injury, death, damage to
- ** property, or violation of any laws or regulations.
- **
- ** Carnegie Mellon University Software Engineering Institute authored
- ** documents are sponsored by the U.S. Department of Defense under
- ** Contract FA8721-05-C-0003. Carnegie Mellon University retains
- ** copyrights in all material produced under this contract. The U.S.
- ** Government retains a non-exclusive, royalty-free license to publish or
- ** reproduce these documents, or allow others to do so, for U.S.
- ** Government purposes only pursuant to the copyright license under the
- ** contract clause at 252.227.7013.
- **
- ** @OPENSOURCE_HEADER_END@
- ** ------------------------------------------------------------------------
- */
+** decode.c
+** YAF Layer 2 and Layer 3 decode routines
+**
+** ------------------------------------------------------------------------
+** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
+** ------------------------------------------------------------------------
+** Authors: Brian Trammell
+** ------------------------------------------------------------------------
+** @OPENSOURCE_HEADER_START@
+** Use of the YAF system and related source code is subject to the terms
+** of the following licenses:
+**
+** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
+** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
+**
+** NO WARRANTY
+**
+** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
+** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
+** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
+** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
+** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
+** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
+** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
+** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
+** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
+** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
+** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
+** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
+** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
+** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
+** DELIVERABLES UNDER THIS LICENSE.
+**
+** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
+** Mellon University, its trustees, officers, employees, and agents from
+** all claims or demands made against them (and any related losses,
+** expenses, or attorney's fees) arising out of, or relating to Licensee's
+** and/or its sub licensees' negligent use or willful misuse of or
+** negligent conduct or willful misconduct regarding the Software,
+** facilities, or other rights or assistance granted by Carnegie Mellon
+** University under this License, including, but not limited to, any
+** claims of product liability, personal injury, death, damage to
+** property, or violation of any laws or regulations.
+**
+** Carnegie Mellon University Software Engineering Institute authored
+** documents are sponsored by the U.S. Department of Defense under
+** Contract FA8721-05-C-0003. Carnegie Mellon University retains
+** copyrights in all material produced under this contract. The U.S.
+** Government retains a non-exclusive, royalty-free license to publish or
+** reproduce these documents, or allow others to do so, for U.S.
+** Government purposes only pursuant to the copyright license under the
+** contract clause at 252.227.7013.
+**
+** @OPENSOURCE_HEADER_END@
+** ------------------------------------------------------------------------
+*/
 
 #define _YAF_SOURCE_
 #include <yaf/autoinc.h>
@@ -64,45 +64,45 @@
 /* Definitions of the various headers the decoder understands */
 
 typedef struct yfHdrEn10Mb_st {
-    uint8_t         dmac[6];
-    uint8_t         smac[6];
-    uint16_t        type;
+    uint8_t    dmac[6];
+    uint8_t    smac[6];
+    uint16_t   type;
 } yfHdrEn10Mb_t;
 
 typedef struct yfHdrChdlc_st {
-    uint8_t         address;
-    uint8_t         control;
-    uint16_t        type;
+    uint8_t    address;
+    uint8_t    control;
+    uint16_t   type;
 } yfHdrChdlc_t;
 
 typedef struct yfHdrLinuxSll_st {
-    uint16_t        sll_type;
-    uint16_t        addr_type;
-    uint16_t        addr_len;
-    uint8_t         addr[8];
-    uint16_t        type;
+    uint16_t   sll_type;
+    uint16_t   addr_type;
+    uint16_t   addr_len;
+    uint8_t    addr[8];
+    uint16_t   type;
 } yfHdrLinuxSll_t;
 
 typedef struct yfHdrPppOeShim_st {
-    uint8_t         vertype;
-    uint8_t         code;
-    uint16_t        session;
-    uint16_t        length;
+    uint8_t    vertype;
+    uint8_t    code;
+    uint16_t   session;
+    uint16_t   length;
 } yfHdrPppOeShim_t;
 
 typedef struct yfHdr1qShim_st {
-    uint16_t        ptt;
-    uint16_t        type;
+    uint16_t   ptt;
+    uint16_t   type;
 } yfHdr1qShim_t;
 
 typedef struct yfHdrJuniper_st {
-    uint8_t         magic[3];
-    uint8_t         flags;
-    uint16_t        ext_len;
+    uint8_t    magic[3];
+    uint8_t    flags;
+    uint16_t   ext_len;
 } yfHdrJuniper_t;
 
 typedef struct yfHdrNull_st {
-    uint32_t        addr_family;
+    uint32_t   addr_family;
 } yfHdrNull_t;
 
 /** Ethertype for 802.1q VLAN shim header */
@@ -121,20 +121,20 @@ typedef struct yfHdrNull_st {
 #define YF_TYPE_SLOW     0x8809
 
 /** Ethernet encoding types:
-0x0800  IP v4
-0x0806  ARP
-0x8035  RARP
-0x809b  ApppleTalk
-0x80f3  AppleTalk ARP
-0x8100  802.1Q tag
-0x8137  Novell IPX (alternate)
-0x8138  Novell
-0x86dd  IP v6
-0x8847  MPLS unicast
-0x8848  MPLS multicast
-0x8863  PPPoE discovery
-0x8864  PPPoE session
-*/
+ * 0x0800  IP v4
+ * 0x0806  ARP
+ * 0x8035  RARP
+ * 0x809b  ApppleTalk
+ * 0x80f3  AppleTalk ARP
+ * 0x8100  802.1Q tag
+ * 0x8137  Novell IPX (alternate)
+ * 0x8138  Novell
+ * 0x86dd  IP v6
+ * 0x8847  MPLS unicast
+ * 0x8848  MPLS multicast
+ * 0x8863  PPPoE discovery
+ * 0x8864  PPPoE session
+ */
 
 /** PPP type for IPv4 */
 #define YF_PPPTYPE_IPv4 0x0021
@@ -147,7 +147,7 @@ typedef struct yfHdrNull_st {
 
 /* 802.1q VLAN tag decode macros */
 
-#define YF_VLAN_TAG(_pkt_) (0x0FFF &(g_ntohs(((yfHdr1qShim_t *)(_pkt_))->ptt)))
+#define YF_VLAN_TAG(_pkt_) (0x0FFF & (g_ntohs(((yfHdr1qShim_t *)(_pkt_))->ptt)))
 
 /* MPLS label decode macros */
 #define YF_MPLS_LABEL(_x_) (((_x_) & 0xFFFFF000) >> 12)
@@ -189,56 +189,57 @@ typedef struct yfHdrNull_st {
 /* IP v4/v6 version macros */
 #define YF_IP_VERSION(_pkt_)  ((*((uint8_t *)(_pkt_)) & 0xF0) >> 4)
 
-#define YF_IP_VERSION_TO_TYPE(_pkt_, _caplen_, _type_) {    \
-    uint8_t         _ipv;                                   \
-    /* Check for at least one byte for IP version */        \
-    if ((_caplen_) < 1) return NULL;                        \
-    /* Fake ethertype based upon IP version */              \
-    _ipv = YF_IP_VERSION(_pkt_);                            \
-    if (_ipv == 4) {                                        \
-        (_type_) = YF_TYPE_IPv4;                            \
-    } else if (_ipv == 6) {                                 \
-        (_type_) = YF_TYPE_IPv6;                            \
-    } else {                                                \
-        (_type_) = 0;                                       \
-    }                                                       \
-}
+#define YF_IP_VERSION_TO_TYPE(_pkt_, _caplen_, _type_)   \
+    {                                                    \
+        uint8_t _ipv;                                    \
+        /* Check for at least one byte for IP version */ \
+        if ((_caplen_) < 1) return NULL;                 \
+        /* Fake ethertype based upon IP version */       \
+        _ipv = YF_IP_VERSION (_pkt_);                    \
+        if (_ipv == 4) {                                 \
+            (_type_) = YF_TYPE_IPv4;                     \
+        } else if (_ipv == 6) {                          \
+            (_type_) = YF_TYPE_IPv6;                     \
+        } else {                                         \
+            (_type_) = 0;                                \
+        }                                                \
+    }
 
 /**
  * IPv4 header structure, without options.
  */
-typedef struct yfHdrIPv4_st{
+typedef struct yfHdrIPv4_st {
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
     /** IP header length in 32-bit words. */
-    unsigned int    ip_hl:4,
+    unsigned int   ip_hl : 4,
     /** IP version. Always 4 for IPv4 packets.*/
-                    ip_v:4;
+                   ip_v  : 4;
 #elif G_BYTE_ORDER == G_BIG_ENDIAN
     /** IP version. Always 4 for IPv4 packets.*/
-    unsigned int    ip_v:4,
+    unsigned int   ip_v  : 4,
     /** IP header length in 32-bit words. */
-                    ip_hl:4;
-#else
+                   ip_hl : 4;
+#else /* if G_BYTE_ORDER == G_LITTLE_ENDIAN */
 #error Cannot determine byte order while defining IP header structure.
-#endif
+#endif /* if G_BYTE_ORDER == G_LITTLE_ENDIAN */
     /** Type of Service */
-    uint8_t         ip_tos;
+    uint8_t        ip_tos;
     /** Total IP datagram length including header in bytes */
-    uint16_t        ip_len;
+    uint16_t       ip_len;
     /** Fragment identifier */
-    uint16_t        ip_id;
+    uint16_t       ip_id;
     /** Fragment offset and flags */
-    uint16_t        ip_off;
+    uint16_t       ip_off;
     /** Time to live in routing hops */
-    uint8_t         ip_ttl;
+    uint8_t        ip_ttl;
     /** Protocol identifier */
-    uint8_t         ip_p;
+    uint8_t        ip_p;
     /** Header checksum */
-    uint16_t        ip_sum;
+    uint16_t       ip_sum;
     /** Source IPv4 address */
-    uint32_t        ip_src;
+    uint32_t       ip_src;
     /** Destination IPv4 address */
-    uint32_t        ip_dst;
+    uint32_t       ip_dst;
 } yfHdrIPv4_t;
 
 /** IPv4 don't fragment flag. For decoding yfHdrIPv4_t.ip_off. */
@@ -253,20 +254,20 @@ typedef struct yfHdrIPv4_st{
  */
 typedef struct yfHdrIPv6_st {
     /** Version, traffic class, and flow ID. Use YF_VCF6_ macros to access. */
-    uint32_t        ip6_vcf;
+    uint32_t   ip6_vcf;
     /**
      * Payload length. Does NOT include IPv6 header (40 bytes), but does
      * include subsequent extension headers, upper layer headers, and payload.
      */
-    uint16_t        ip6_plen;
+    uint16_t   ip6_plen;
     /** Next header identifier. Use YF_PROTO_ macros. */
-    uint8_t         ip6_nxt;
+    uint8_t    ip6_nxt;
     /** Hop limit */
-    uint8_t         ip6_hlim;
+    uint8_t    ip6_hlim;
     /** Source IPv6 address */
-    uint8_t         ip6_src[16];
+    uint8_t    ip6_src[16];
     /** Destination IPv6 address */
-    uint8_t         ip6_dst[16];
+    uint8_t    ip6_dst[16];
 } yfHdrIPv6_t;
 
 /* Version, class, and flow decode macros */
@@ -274,33 +275,34 @@ typedef struct yfHdrIPv6_st {
 #define YF_VCF6_CLASS(_ip6hdr_)     (((_ip6hdr_)->ip6_vcf & 0x0FF00000) >> 20)
 #define YF_VCF6_FLOW(_ip6hdr_)       ((_ip6hdr_)->ip6_vcf & 0x000FFFFF)
 
-#define yf_ntohll(x) \
-    ((((uint64_t)g_ntohl((uint32_t)((x) & 0xffffffff))) << 32)  \
+#define yf_ntohll(x)                                           \
+    ((((uint64_t)g_ntohl((uint32_t)((x) & 0xffffffff))) << 32) \
      | g_ntohl((uint32_t)(((x) >> 32) & 0xffffffff)))
 
 /**
- * IPv6 partial extension header structure. Used to decode next and length only.
+ * IPv6 partial extension header structure. Used to decode next and length
+ * only.
  */
 
 typedef struct yfHdrIPv6Ext_st {
     /** Next header identifier. Use YF_PROTO_ macros. */
-    uint8_t     ip6e_nxt;
+    uint8_t   ip6e_nxt;
     /** Extension header length. */
-    uint8_t     ip6e_len;
+    uint8_t   ip6e_len;
 } yfHdrIPv6Ext_t;
 
 /**
  * IPv6 fragment extension header structure.
  */
-typedef struct yfHdrIPv6Frag_st  {
+typedef struct yfHdrIPv6Frag_st {
     /** Next header identifier. Use YF_PROTO_ macros. */
-    uint8_t     ip6f_nxt;
+    uint8_t    ip6f_nxt;
     /** Reserved field. */
-    uint8_t     ip6f_reserved;
+    uint8_t    ip6f_reserved;
     /** Fragment offset and flags. */
-    uint16_t    ip6f_offlg;
+    uint16_t   ip6f_offlg;
     /** Fragment identifier. */
-    uint32_t    ip6f_ident;
+    uint32_t   ip6f_ident;
 } yfHdrIPv6Frag_t;
 
 /* IPv6 Fragmentation decode macros */
@@ -312,41 +314,41 @@ typedef struct yfHdrIPv6Frag_st  {
  */
 typedef struct yfHdrTcp_st {
     /** Source port */
-    uint16_t        th_sport;
+    uint16_t       th_sport;
     /** Destination port */
-    uint16_t        th_dport;
+    uint16_t       th_dport;
     /** Sequence number */
-    uint32_t        th_seq;
+    uint32_t       th_seq;
     /** Acknowledgment number */
-    uint32_t        th_ack;
+    uint32_t       th_ack;
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
     /** Unused. Must be 0. */
-    unsigned int    th_x2:4,
+    unsigned int   th_x2  : 4,
     /** Data offset. TCP header length in 32-bit words. */
-                    th_off:4;
+                   th_off : 4;
 #elif G_BYTE_ORDER == G_BIG_ENDIAN
     /** Data offset. TCP header length in 32-bit words. */
-    unsigned int    th_off:4,
+    unsigned int   th_off : 4,
     /** Unused. Must be 0. */
-                    th_x2:4;
-#else
+                   th_x2  : 4;
+#else /* if G_BYTE_ORDER == G_LITTLE_ENDIAN */
 #error Cannot determine byte order while defining TCP header structure.
-#endif
+#endif /* if G_BYTE_ORDER == G_LITTLE_ENDIAN */
     /** TCP flags. */
-    uint8_t         th_flags;
+    uint8_t        th_flags;
     /** Congestion window. */
-    uint16_t        th_win;
+    uint16_t       th_win;
     /** Segment checksum. */
-    uint16_t        th_sum;
+    uint16_t       th_sum;
     /** Urgent pointer. */
-    uint16_t        th_urp;
+    uint16_t       th_urp;
 } yfHdrTcp_t;
 
 typedef struct yfHdrTcpOpt_st {
     /** kind */
-    uint8_t          op_kind;
+    uint8_t   op_kind;
     /** length */
-    uint8_t          op_len;
+    uint8_t   op_len;
 } yfHdrTcpOpt_t;
 
 /**
@@ -354,13 +356,13 @@ typedef struct yfHdrTcpOpt_st {
  */
 typedef struct yfHdrUdp_st {
     /** Source port */
-    uint16_t        uh_sport;
+    uint16_t   uh_sport;
     /** Destination port */
-    uint16_t        uh_dport;
+    uint16_t   uh_dport;
     /** UDP length. Includes header and payload, in octets. */
-    uint16_t        uh_ulen;
+    uint16_t   uh_ulen;
     /** UDP checksum. Calculated over the entire message. */
-    uint16_t        uh_sum;
+    uint16_t   uh_sum;
 } yfHdrUdp_t;
 
 /**
@@ -368,9 +370,9 @@ typedef struct yfHdrUdp_st {
  */
 typedef struct ydHdrIcmp_st {
     /* ICMP type */
-    u_char    icmp_type;
+    u_char   icmp_type;
     /* ICMP code */
-    u_char    icmp_code;
+    u_char   icmp_code;
 } yfHdrIcmp_t;
 
 /**
@@ -380,37 +382,37 @@ typedef struct ydHdrIcmp_st {
 typedef struct yfHdrGre_st {
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
     /** Recursion Control */
-     unsigned int   gh_recur:3,
+    unsigned int   gh_recur   : 3,
     /** Strict Source Routing */
-                    gh_f_ssr:1,
+                   gh_f_ssr   : 1,
     /** Sequence Number Present */
-                    gh_f_seq:1,
+                   gh_f_seq   : 1,
     /** Key Present */
-                    gh_f_key:1,
+                   gh_f_key   : 1,
     /** Routing Present */
-                    gh_f_route:1,
+                   gh_f_route : 1,
     /** Checksum Present */
-                    gh_f_sum:1;
+                   gh_f_sum   : 1;
 #elif G_BYTE_ORDER == G_BIG_ENDIAN
     /** Checksum Present */
-    unsigned int    gh_f_sum:1,
+    unsigned int   gh_f_sum   : 1,
     /** Routing Present */
-                    gh_f_route:1,
+                   gh_f_route : 1,
     /** Key Present */
-                    gh_f_key:1,
+                   gh_f_key   : 1,
     /** Sequence Number Present */
-                    gh_f_seq:1,
+                   gh_f_seq   : 1,
     /** Strict Source Routing */
-                    gh_f_ssr:1,
+                   gh_f_ssr   : 1,
     /** Recursion Control */
-                    gh_recur:3;
-#else
+                   gh_recur   : 3;
+#else /* if G_BYTE_ORDER == G_LITTLE_ENDIAN */
 #error Cannot determine byte order while defining GRE header structure.
-#endif
+#endif /* if G_BYTE_ORDER == G_LITTLE_ENDIAN */
     /** Flags and Version. Reserved, must be zero */
-    uint8_t         gh_fv;
+    uint8_t    gh_fv;
     /** Protocol. Ethertype of next header. */
-    uint16_t        gh_type;
+    uint16_t   gh_type;
 } yfHdrGre_t;
 
 /* Version, class, and flow decode macros */
@@ -422,40 +424,40 @@ typedef struct yfHdrGre_st {
  */
 typedef struct yfHdrSre_st {
     /** Address family for routing information */
-    uint16_t        gh_sre_af;
+    uint16_t   gh_sre_af;
     /** SRE offset */
-    uint8_t         gh_sre_off;
+    uint8_t    gh_sre_off;
     /** SRE length */
-    uint8_t         gh_sre_len;
+    uint8_t    gh_sre_len;
 } yfHdrSre_t;
 
 /* Decode context for configuration and statistics */
 struct yfDecodeCtx_st {
     /* State (none) */
     /* Configuration */
-    int             datalink;
-    uint16_t        pcap_caplist;
-    uint16_t        reqtype;
-    gboolean        gremode;
+    int        datalink;
+    uint16_t   pcap_caplist;
+    uint16_t   reqtype;
+    gboolean   gremode;
     /* Statistics */
     struct stats_tag {
-        uint32_t        fail_l2hdr;
-        uint32_t        fail_l2shim;
-        uint32_t        fail_l2loop;
-        uint32_t        fail_l2type;
-        uint32_t        fail_l3type;
-        uint32_t        fail_arptype;
-        uint32_t        fail_8023type;
-        uint32_t        fail_lldptype;
-        uint32_t        fail_ip4hdr;
-        uint32_t        fail_ip4frag;
-        uint32_t        fail_ip6hdr;
-        uint32_t        fail_ip6ext;
-        uint32_t        fail_ip6frag;
-        uint32_t        fail_l4hdr;
-        uint32_t        fail_l4frag;
-        uint32_t        fail_grevers;
-        uint32_t        fail_erspan;
+        uint32_t   fail_l2hdr;
+        uint32_t   fail_l2shim;
+        uint32_t   fail_l2loop;
+        uint32_t   fail_l2type;
+        uint32_t   fail_l3type;
+        uint32_t   fail_arptype;
+        uint32_t   fail_8023type;
+        uint32_t   fail_lldptype;
+        uint32_t   fail_ip4hdr;
+        uint32_t   fail_ip4frag;
+        uint32_t   fail_ip6hdr;
+        uint32_t   fail_ip6ext;
+        uint32_t   fail_ip6frag;
+        uint32_t   fail_l4hdr;
+        uint32_t   fail_l4frag;
+        uint32_t   fail_grevers;
+        uint32_t   fail_erspan;
     } stats;
 };
 
@@ -465,11 +467,12 @@ struct yfDecodeCtx_st {
  * Decode loopback packet family
  *
  */
-static const uint8_t *yfDecodeL2Loop(
-    yfDecodeCtx_t   *ctx,
+static const uint8_t *
+yfDecodeL2Loop(
+    yfDecodeCtx_t  *ctx,
     uint32_t        pf,
-    const uint8_t   *pkt,
-    uint16_t        *type)
+    const uint8_t  *pkt,
+    uint16_t       *type)
 {
     if (pf == PF_INET) {
         *type = YF_TYPE_IPv4;
@@ -490,19 +493,21 @@ static const uint8_t *yfDecodeL2Loop(
     return pkt;
 }
 
+
 /**
  * yfDecodeL2PPP
  *
  * decode PPP header
  *
  */
-static const uint8_t *yfDecodeL2PPP(
-    yfDecodeCtx_t   *ctx,
-    size_t          *caplen,
-    const uint8_t   *pkt,
-    uint16_t        *type)
+static const uint8_t *
+yfDecodeL2PPP(
+    yfDecodeCtx_t  *ctx,
+    size_t         *caplen,
+    const uint8_t  *pkt,
+    uint16_t       *type)
 {
-    uint16_t        ppptype;
+    uint16_t ppptype;
 
     /* Check for PPP header  */
     if (*caplen < 2) {
@@ -511,7 +516,7 @@ static const uint8_t *yfDecodeL2PPP(
     }
     /* Decode PPP type to ethertype */
     ppptype = g_ntohs(*((uint16_t *)pkt));
-    switch(ppptype) {
+    switch (ppptype) {
       case YF_PPPTYPE_IPv4:
         *type = YF_TYPE_IPv4;
         break;
@@ -533,6 +538,7 @@ static const uint8_t *yfDecodeL2PPP(
     return pkt;
 }
 
+
 /**
  * yfDecodeL2Shim
  *
@@ -540,14 +546,15 @@ static const uint8_t *yfDecodeL2PPP(
  *
  *
  */
-static const uint8_t *yfDecodeL2Shim(
-    yfDecodeCtx_t   *ctx,
-    size_t          *caplen,
-    const uint8_t   *pkt,
-    uint16_t        *type,
-    yfL2Info_t      *l2info)
+static const uint8_t *
+yfDecodeL2Shim(
+    yfDecodeCtx_t  *ctx,
+    size_t         *caplen,
+    const uint8_t  *pkt,
+    uint16_t       *type,
+    yfL2Info_t     *l2info)
 {
-    uint32_t        mpls_entry;
+    uint32_t mpls_entry;
 
     while (1) {
         switch (*type) {
@@ -604,7 +611,7 @@ static const uint8_t *yfDecodeL2Shim(
                 return NULL;
             }
             /* We don't actually _need_ anything out of the PPPoE header.
-               Just skip it. */
+             * Just skip it. */
             *caplen -= 6;
             pkt += 6;
             /* now decode ppp */
@@ -620,6 +627,7 @@ static const uint8_t *yfDecodeL2Shim(
     }
 }
 
+
 /**
  * yfDecodeL2
  *
@@ -627,14 +635,15 @@ static const uint8_t *yfDecodeL2Shim(
  *
  *
  */
-static const uint8_t *yfDecodeL2(
-    yfDecodeCtx_t   *ctx,
-    size_t          *caplen,
-    const uint8_t   *pkt,
-    uint16_t        *type,
-    yfL2Info_t      *l2info)
+static const uint8_t *
+yfDecodeL2(
+    yfDecodeCtx_t  *ctx,
+    size_t         *caplen,
+    const uint8_t  *pkt,
+    uint16_t       *type,
+    yfL2Info_t     *l2info)
 {
-    uint32_t        pf;
+    uint32_t pf;
 
     if (l2info) {
         memset(l2info, 0, sizeof(*l2info));
@@ -665,7 +674,7 @@ static const uint8_t *yfDecodeL2(
         *caplen -= 14;
         /* Decode shim headers */
         return yfDecodeL2Shim(ctx, caplen, pkt, type, l2info);
-#endif
+#endif /* if defined(DLT_EN10MB) || defined(DLT_PPP_ETHER) */
 #ifdef DLT_C_HDLC
       case DLT_C_HDLC:
         /* Check for full C-HDLC header */
@@ -680,7 +689,7 @@ static const uint8_t *yfDecodeL2(
         *caplen -= 4;
         /* Decode shim headers */
         return yfDecodeL2Shim(ctx, caplen, pkt, type, l2info);
-#endif
+#endif /* ifdef DLT_C_HDLC */
 #ifdef DLT_LINUX_SLL
       case DLT_LINUX_SLL:
         /* Check for full Linux SLL pseudoheader */
@@ -695,7 +704,7 @@ static const uint8_t *yfDecodeL2(
         *caplen -= 16;
         /* Decode shim headers */
         return yfDecodeL2Shim(ctx, caplen, pkt, type, l2info);
-#endif
+#endif /* ifdef DLT_LINUX_SLL */
 #ifdef DLT_PPP
       case DLT_PPP:
         /* Check for HDLC framing */
@@ -710,7 +719,7 @@ static const uint8_t *yfDecodeL2(
         }
         pkt = yfDecodeL2PPP(ctx, caplen, pkt, type);
         return pkt ? yfDecodeL2Shim(ctx, caplen, pkt, type, l2info) : NULL;
-#endif
+#endif /* ifdef DLT_PPP */
 #ifdef DLT_RAW
       case DLT_RAW:
         YF_IP_VERSION_TO_TYPE(pkt, *caplen, *type);
@@ -719,7 +728,7 @@ static const uint8_t *yfDecodeL2(
             return NULL;
         }
         return pkt;
-#endif
+#endif /* ifdef DLT_RAW */
 #ifdef DLT_NULL
       case DLT_NULL:
         /* Check for full NULL header */
@@ -734,7 +743,7 @@ static const uint8_t *yfDecodeL2(
         *caplen -= 4;
         /* Decode loopback from packet family */
         return yfDecodeL2Loop(ctx, pf, pkt, type);
-#endif
+#endif /* ifdef DLT_NULL */
 #ifdef DLT_LOOP
       case DLT_LOOP:
         /* Check for full LOOP header */
@@ -749,13 +758,13 @@ static const uint8_t *yfDecodeL2(
         *caplen -= 4;
         /* Decode loopback from packet family */
         return yfDecodeL2Loop(ctx, pf, pkt, type);
-#endif
+#endif /* ifdef DLT_LOOP */
 #ifdef DLT_JUNIPER_ETHER
       case DLT_JUNIPER_ETHER:
         {
-            uint16_t        tot_ext_len = 0;
-            uint16_t        hdr_len = 4;
-            uint32_t        proto;
+            uint16_t tot_ext_len = 0;
+            uint16_t hdr_len = 4;
+            uint32_t proto;
 
             if (*caplen < 4) {
                 ++ctx->stats.fail_l2hdr;
@@ -828,12 +837,13 @@ static const uint8_t *yfDecodeL2(
             /* Decode shim headers */
             return yfDecodeL2Shim(ctx, caplen, pkt, type, l2info);
         }
-#endif
+#endif /* ifdef DLT_JUNIPER_ETHER */
       default:
         g_warning("unknown datalink %u", ctx->datalink);
         return NULL;
     }
 }
+
 
 /**
  * yfDecodeIPv4
@@ -841,16 +851,17 @@ static const uint8_t *yfDecodeL2(
  *
  *
  */
-static const uint8_t *yfDecodeIPv4(
-    yfDecodeCtx_t           *ctx,
-    size_t                  *caplen,
-    const uint8_t           *pkt,
-    yfFlowKey_t             *key,
-    uint16_t                *iplen,
-    yfIPFragInfo_t          *fraginfo)
+static const uint8_t *
+yfDecodeIPv4(
+    yfDecodeCtx_t   *ctx,
+    size_t          *caplen,
+    const uint8_t   *pkt,
+    yfFlowKey_t     *key,
+    uint16_t        *iplen,
+    yfIPFragInfo_t  *fraginfo)
 {
-    const yfHdrIPv4_t       *iph = (const yfHdrIPv4_t *)pkt;
-    size_t                  iph_len;
+    const yfHdrIPv4_t *iph = (const yfHdrIPv4_t *)pkt;
+    size_t             iph_len;
 
     /* Verify we have a full IP header */
     if (*caplen < 1) {
@@ -901,14 +912,13 @@ static const uint8_t *yfDecodeIPv4(
             fraginfo->frag = 0;
         }
     } else {
-       /* Null fraginfo means we don't want fragments. Drop fragged packets. */
+        /* Null fraginfo means we don't want fragments. Drop fragged packets.
+         * */
         if (g_ntohs(iph->ip_off) & (YF_IP4_OFFMASK | YF_IP4_MF)) {
             ++ctx->stats.fail_ip4frag;
             return NULL;
         }
     }
-
-
 
     /* Advance packet pointer */
     *caplen -= iph_len;
@@ -922,21 +932,21 @@ static const uint8_t *yfDecodeIPv4(
  *
  *
  */
-static const uint8_t *yfDecodeIPv6(
-    yfDecodeCtx_t           *ctx,
-    size_t                  *caplen,
-    const uint8_t           *pkt,
-    yfFlowKey_t             *key,
-    uint16_t                *iplen,
-    yfIPFragInfo_t          *fraginfo)
+static const uint8_t *
+yfDecodeIPv6(
+    yfDecodeCtx_t   *ctx,
+    size_t          *caplen,
+    const uint8_t   *pkt,
+    yfFlowKey_t     *key,
+    uint16_t        *iplen,
+    yfIPFragInfo_t  *fraginfo)
 {
-    const yfHdrIPv6_t       *iph = (const yfHdrIPv6_t *)pkt;
-    const yfHdrIPv6Ext_t    *ipe;
-    const yfHdrIPv6Frag_t   *ipf;
-    uint16_t                iph_len = 0;    /* total IP header accumulator */
-    size_t                  hdr_len = 40;   /* next header length */
-    uint8_t                 hdr_next;
-
+    const yfHdrIPv6_t     *iph = (const yfHdrIPv6_t *)pkt;
+    const yfHdrIPv6Ext_t  *ipe;
+    const yfHdrIPv6Frag_t *ipf;
+    uint16_t iph_len = 0;                   /* total IP header accumulator */
+    size_t   hdr_len = 40;                  /* next header length */
+    uint8_t  hdr_next;
 
     /* Verify that we have a full IPv6 header */
     if (*caplen < hdr_len) {
@@ -969,7 +979,6 @@ static const uint8_t *yfDecodeIPv6(
     }
     /* Now unwrap extension headers */
     while (1) {
-
         /* Advance packet pointer */
         *caplen -= hdr_len;
         pkt += hdr_len;
@@ -977,9 +986,9 @@ static const uint8_t *yfDecodeIPv6(
 
         /* Process next extension header */
         switch (hdr_next) {
-        case YF_PROTO_IP6_NONEXT:
+          case YF_PROTO_IP6_NONEXT:
             return NULL;
-        case YF_PROTO_IP6_FRAG:
+          case YF_PROTO_IP6_FRAG:
             /* Verify we have a full fragment header */
             hdr_len = 8;
             if (*caplen < hdr_len) {
@@ -997,16 +1006,16 @@ static const uint8_t *yfDecodeIPv6(
                 fraginfo->more = (fraginfo->offset | YF_IP6_MF) ? 1 : 0;
                 fraginfo->offset = fraginfo->offset & YF_IP6_OFFMASK;
             } else {
-            /* Null fraginfo means we don't want fragments. */
+                /* Null fraginfo means we don't want fragments. */
                 if (g_ntohs(ipf->ip6f_offlg) & (YF_IP4_OFFMASK | YF_IP4_MF)) {
                     ++ctx->stats.fail_ip6frag;
                     return NULL;
                 }
             }
             break;
-        case YF_PROTO_IP6_HOP:
-        case YF_PROTO_IP6_ROUTE:
-        case YF_PROTO_IP6_DOPT:
+          case YF_PROTO_IP6_HOP:
+          case YF_PROTO_IP6_ROUTE:
+          case YF_PROTO_IP6_DOPT:
             /* Verify we have the first two bytes of the extension header */
             if (*caplen < 2) {
                 ++ctx->stats.fail_ip6ext;
@@ -1023,7 +1032,7 @@ static const uint8_t *yfDecodeIPv6(
                 return NULL;
             }
             break;
-        default:
+          default:
             /* This is not an extension header. We're at layer 4 now. */
             key->proto = hdr_next;
             /*Stash total IPv6 header length for fragment length calculation */
@@ -1033,37 +1042,34 @@ static const uint8_t *yfDecodeIPv6(
             }
 
             return pkt;
-
         }
     }
-
-
 }
+
 
 /**
  * yfDecodeTCPOptions
  *
  *
  */
-static void yfDecodeTCPOptions(
-    const uint8_t          *pkt,
-    size_t                 *caplen,
-    yfTCPInfo_t            *tcpinfo,
-    size_t                 tcph_len)
+static void
+yfDecodeTCPOptions(
+    const uint8_t  *pkt,
+    size_t         *caplen,
+    yfTCPInfo_t    *tcpinfo,
+    size_t          tcph_len)
 {
-
-    const yfHdrTcpOpt_t    *opth = (const yfHdrTcpOpt_t *)pkt;
-    uint8_t                subtype, flags, backup, hash;
-    size_t                 op_len = tcph_len - sizeof(yfHdrTcp_t);
-    size_t                 offset = 0;
-    size_t                 pktlen = *caplen - sizeof(yfHdrTcp_t);
+    const yfHdrTcpOpt_t *opth = (const yfHdrTcpOpt_t *)pkt;
+    uint8_t              subtype, flags, backup, hash;
+    size_t op_len = tcph_len - sizeof(yfHdrTcp_t);
+    size_t offset = 0;
+    size_t pktlen = *caplen - sizeof(yfHdrTcp_t);
 
     if (pktlen < op_len) {
         return;
     }
 
-    while ( (offset + 2) < op_len ) {
-
+    while ( (offset + 2) < op_len) {
         opth = (const yfHdrTcpOpt_t *)(pkt + offset);
 
         if (opth->op_kind < 2) {
@@ -1074,13 +1080,11 @@ static void yfDecodeTCPOptions(
 
         offset += sizeof(yfHdrTcpOpt_t);
 
-        if ((opth->op_len > op_len) || (opth->op_len < sizeof(yfHdrTcpOpt_t)))
-        {
+        if ((opth->op_len > op_len) || (opth->op_len < sizeof(yfHdrTcpOpt_t))) {
             return;
         }
 
         if (opth->op_kind == YF_MPTCP_OPTION_CODE) {
-
             subtype = *(pkt + offset) >> 4;
             backup = *(pkt + offset) & 1;
             offset += 1;
@@ -1095,7 +1099,7 @@ static void yfDecodeTCPOptions(
               case YF_MPTCP_JOIN:
                 /* MP_JOIN */
                 /* just the initial syn has the token,
-                   syn/ack is len 16 w/hmac and random #, ack is 24 with hmac*/
+                 * syn/ack is len 16 w/hmac and random #, ack is 24 with hmac*/
                 if (opth->op_len == 12) {
                     tcpinfo->mptcp.token = g_ntohl(*(uint32_t *)(pkt +
                                                                  offset + 1));
@@ -1106,7 +1110,7 @@ static void yfDecodeTCPOptions(
                 }
                 tcpinfo->mptcp.flags |= 0x1;
                 /* address id in initial syn is always zero, but will be set
-                   in syn/ack */
+                 * in syn/ack */
                 tcpinfo->mptcp.addrid = *(pkt + offset);
                 break;
               case YF_MPTCP_DSS:
@@ -1117,7 +1121,7 @@ static void yfDecodeTCPOptions(
                     offset += 1;
                     if (flags & 0x04) {
                         /* if M (0x04): DSN, subflow seq no, data-level length,
-                           and checksum present */
+                         * and checksum present */
                         if (flags & 0x02) {
                             /* if data ack present and 8 octets */
                             len = 8;
@@ -1127,12 +1131,12 @@ static void yfDecodeTCPOptions(
                         }
                         if (flags & 0x08) {
                             /* data seq no is 8 octets, not 4 */
-                            tcpinfo->mptcp.idsn = yf_ntohll(*(uint64_t *)(pkt +
-                                                               offset + len));
+                            tcpinfo->mptcp.idsn = yf_ntohll(
+                                *(uint64_t *)(pkt + offset + len));
                         } else {
                             /* data seq no is 4 octets */
-                            tcpinfo->mptcp.idsn = g_ntohl(*(uint32_t *)(pkt +
-                                                               offset + len));
+                            tcpinfo->mptcp.idsn = g_ntohl(
+                                *(uint32_t *)(pkt + offset + len));
                         }
                     }
                     /* added one so subtract one before length is added*/
@@ -1164,7 +1168,6 @@ static void yfDecodeTCPOptions(
             }
             /* added one so subtract it before we add op_len below */
             offset--;
-
         } else if (opth->op_kind == YF_MSS_OPTION_CODE) {
             /* maximum segment size */
             tcpinfo->mptcp.mss = g_ntohs(*(uint16_t *)(pkt + offset));
@@ -1172,12 +1175,8 @@ static void yfDecodeTCPOptions(
 
         /* length includes header length */
         offset += (opth->op_len - sizeof(yfHdrTcpOpt_t));
-
     }
-
 }
-
-
 
 
 /**
@@ -1186,16 +1185,17 @@ static void yfDecodeTCPOptions(
  *
  *
  */
-static const uint8_t *yfDecodeTCP(
-    yfDecodeCtx_t           *ctx,
-    size_t                  *caplen,
-    const uint8_t           *pkt,
-    yfFlowKey_t             *key,
-    yfIPFragInfo_t          *fraginfo,
-    yfTCPInfo_t             *tcpinfo)
+static const uint8_t *
+yfDecodeTCP(
+    yfDecodeCtx_t   *ctx,
+    size_t          *caplen,
+    const uint8_t   *pkt,
+    yfFlowKey_t     *key,
+    yfIPFragInfo_t  *fraginfo,
+    yfTCPInfo_t     *tcpinfo)
 {
-    const yfHdrTcp_t        *tcph = (const yfHdrTcp_t *)pkt;
-    size_t                  tcph_len;
+    const yfHdrTcp_t *tcph = (const yfHdrTcp_t *)pkt;
+    size_t            tcph_len;
 
     /* Verify we have a full TCP header */
     if (*caplen < 13) {
@@ -1236,34 +1236,32 @@ static const uint8_t *yfDecodeTCP(
 
     if (tcph_len > sizeof(yfHdrTcp_t)) {
         /* we have TCP options */
-        yfDecodeTCPOptions(pkt+sizeof(yfHdrTcp_t), caplen, tcpinfo, tcph_len);
+        yfDecodeTCPOptions(pkt + sizeof(yfHdrTcp_t), caplen, tcpinfo, tcph_len);
     }
-
 
     /* Advance packet pointer */
     *caplen -= tcph_len;
 
-
-
     return pkt + tcph_len;
 }
+
 
 /**
  * yfDefragTCP
  *
  *
  */
-gboolean yfDefragTCP(
-    uint8_t             *pkt,
-    size_t              *caplen,
-    yfFlowKey_t         *key,
-    yfIPFragInfo_t      *fraginfo,
-    yfTCPInfo_t         *tcpinfo,
-    size_t              *payoff)
+gboolean
+yfDefragTCP(
+    uint8_t         *pkt,
+    size_t          *caplen,
+    yfFlowKey_t     *key,
+    yfIPFragInfo_t  *fraginfo,
+    yfTCPInfo_t     *tcpinfo,
+    size_t          *payoff)
 {
-
-    const yfHdrTcp_t    *tcph = (const yfHdrTcp_t *)pkt;
-    size_t              tcph_len;
+    const yfHdrTcp_t *tcph = (const yfHdrTcp_t *)pkt;
+    size_t            tcph_len;
 
     /* Verify we have a full TCP header */
     if (*caplen < 13) {
@@ -1292,21 +1290,23 @@ gboolean yfDefragTCP(
     return TRUE;
 }
 
+
 /**
  * yfDecodeUDP
  *
  *
  *
  */
-static const uint8_t *yfDecodeUDP(
-    yfDecodeCtx_t           *ctx,
-    size_t                  *caplen,
-    const uint8_t           *pkt,
-    yfFlowKey_t             *key,
-    yfIPFragInfo_t          *fraginfo)
+static const uint8_t *
+yfDecodeUDP(
+    yfDecodeCtx_t   *ctx,
+    size_t          *caplen,
+    const uint8_t   *pkt,
+    yfFlowKey_t     *key,
+    yfIPFragInfo_t  *fraginfo)
 {
-    const yfHdrUdp_t        *udph = (const yfHdrUdp_t *)pkt;
-    const size_t            udph_len = 8;
+    const yfHdrUdp_t *udph = (const yfHdrUdp_t *)pkt;
+    const size_t      udph_len = 8;
 
     /* Verify we have a full UDP header */
     if (*caplen < udph_len) {
@@ -1331,22 +1331,23 @@ static const uint8_t *yfDecodeUDP(
     return pkt + udph_len;
 }
 
+
 /**
  * yfDecodeICMP
  *
  *
  *
  */
-static const uint8_t *yfDecodeICMP(
-    yfDecodeCtx_t           *ctx,
-    size_t                  *caplen,
-    const uint8_t           *pkt,
-    yfFlowKey_t             *key,
-    yfIPFragInfo_t          *fraginfo)
+static const uint8_t *
+yfDecodeICMP(
+    yfDecodeCtx_t   *ctx,
+    size_t          *caplen,
+    const uint8_t   *pkt,
+    yfFlowKey_t     *key,
+    yfIPFragInfo_t  *fraginfo)
 {
-    const yfHdrIcmp_t       *icmph = (const yfHdrIcmp_t *)pkt;
-    const size_t            icmph_len = 8;
-
+    const yfHdrIcmp_t *icmph = (const yfHdrIcmp_t *)pkt;
+    const size_t       icmph_len = 8;
 
     /* Verify we have a full ICMP header */
     if (*caplen < icmph_len) {
@@ -1371,31 +1372,34 @@ static const uint8_t *yfDecodeICMP(
     return pkt + icmph_len;
 }
 
+
 /* prototype needed for GRE recursion */
-static const uint8_t *yfDecodeIP(
-    yfDecodeCtx_t           *ctx,
-    uint16_t                type,
-    size_t                  *caplen,
-    const uint8_t           *pkt,
-    yfFlowKey_t             *key,
-    uint16_t                *iplen,
-    yfTCPInfo_t             *tcpinfo,
-    yfIPFragInfo_t          *fraginfo);
+static const uint8_t *
+yfDecodeIP(
+    yfDecodeCtx_t   *ctx,
+    uint16_t         type,
+    size_t          *caplen,
+    const uint8_t   *pkt,
+    yfFlowKey_t     *key,
+    uint16_t        *iplen,
+    yfTCPInfo_t     *tcpinfo,
+    yfIPFragInfo_t  *fraginfo);
 
 
-static const uint8_t *yfDecodeERSPAN(
-    yfDecodeCtx_t           *ctx,
-    size_t                  *caplen,
-    const uint8_t           *pkt,
-    yfFlowKey_t             *key,
-    uint16_t                *iplen,
-    yfIPFragInfo_t          *fraginfo,
-    yfTCPInfo_t             *tcpinfo)
+static const uint8_t *
+yfDecodeERSPAN(
+    yfDecodeCtx_t   *ctx,
+    size_t          *caplen,
+    const uint8_t   *pkt,
+    yfFlowKey_t     *key,
+    uint16_t        *iplen,
+    yfIPFragInfo_t  *fraginfo,
+    yfTCPInfo_t     *tcpinfo)
 {
-    uint16_t               version;
-    uint8_t                hdr_len = 0;
-    yfL2Info_t             l2info;
-    uint16_t               type;
+    uint16_t   version;
+    uint8_t    hdr_len = 0;
+    yfL2Info_t l2info;
+    uint16_t   type;
 
     /* do we have a *valid* ERSPAN header? */
     if (*caplen < 8) {
@@ -1411,7 +1415,7 @@ static const uint8_t *yfDecodeERSPAN(
         hdr_len = 8;
     } else {
         /* I think version 3 has a 12 byte header but can't confirm *
-           due to lack of spec */
+         * due to lack of spec */
         ++ctx->stats.fail_erspan;
         return NULL;
     }
@@ -1423,7 +1427,6 @@ static const uint8_t *yfDecodeERSPAN(
 
     /* We are now at the next layer header.Try to decode it as an IP header.*/
     return yfDecodeIP(ctx, type, caplen, pkt, key, iplen, tcpinfo, fraginfo);
-
 }
 
 
@@ -1433,23 +1436,24 @@ static const uint8_t *yfDecodeERSPAN(
  *
  *
  */
-static const uint8_t *yfDecodeGRE(
-    yfDecodeCtx_t           *ctx,
-    size_t                  *caplen,
-    const uint8_t           *pkt,
-    yfFlowKey_t             *key,
-    uint16_t                *iplen,
-    yfIPFragInfo_t          *fraginfo,
-    yfTCPInfo_t             *tcpinfo)
+static const uint8_t *
+yfDecodeGRE(
+    yfDecodeCtx_t   *ctx,
+    size_t          *caplen,
+    const uint8_t   *pkt,
+    yfFlowKey_t     *key,
+    uint16_t        *iplen,
+    yfIPFragInfo_t  *fraginfo,
+    yfTCPInfo_t     *tcpinfo)
 {
-    const yfHdrGre_t        *greh = (const yfHdrGre_t *)pkt;
-    size_t                  greh_len = 4;
-    const yfHdrSre_t        *sreh = NULL;
-    size_t                  sre_len = 0;
+    const yfHdrGre_t *greh = (const yfHdrGre_t *)pkt;
+    size_t            greh_len = 4;
+    const yfHdrSre_t *sreh = NULL;
+    size_t            sre_len = 0;
 
     /* Verify we have a full GRE "mandatory" header */
     /* An IP Frag has to have at least 8 - so we should never
-       enter this IF */
+     * enter this IF */
     if (*caplen < greh_len) {
         ++ctx->stats.fail_l4hdr;
         if (fraginfo && fraginfo->frag) {
@@ -1543,23 +1547,24 @@ static const uint8_t *yfDecodeGRE(
                       key, iplen, tcpinfo, fraginfo);
 }
 
+
 /**
  * yfDecodeIP
  *
  *
  *
  */
-static const uint8_t *yfDecodeIP(
-    yfDecodeCtx_t           *ctx,
-    uint16_t                type,
-    size_t                  *caplen,
-    const uint8_t           *pkt,
-    yfFlowKey_t             *key,
-    uint16_t                *iplen,
-    yfTCPInfo_t             *tcpinfo,
-    yfIPFragInfo_t          *fraginfo)
+static const uint8_t *
+yfDecodeIP(
+    yfDecodeCtx_t   *ctx,
+    uint16_t         type,
+    size_t          *caplen,
+    const uint8_t   *pkt,
+    yfFlowKey_t     *key,
+    uint16_t        *iplen,
+    yfTCPInfo_t     *tcpinfo,
+    yfIPFragInfo_t  *fraginfo)
 {
-
 #if YAF_NONIP
     if (type == 0) {
         key->version = 4;
@@ -1571,10 +1576,10 @@ static const uint8_t *yfDecodeIP(
         key->addr.v4.sip = 0;
         key->addr.v4.dip = 0;
         /* Packet not fragmented - as far as we know and care */
-        if (fraginfo) fraginfo->frag = 0;
+        if (fraginfo) {fraginfo->frag = 0;}
         return pkt;
     }
-#endif
+#endif /* if YAF_NONIP */
 
     /* Check for required IP packet type. */
     if (ctx->reqtype && ctx->reqtype != type) {
@@ -1584,13 +1589,13 @@ static const uint8_t *yfDecodeIP(
 
     /* Unwrap and decode IP headers */
     switch (type) {
-     case YF_TYPE_IPv4:
+      case YF_TYPE_IPv4:
         if (!(pkt = yfDecodeIPv4(ctx, caplen, pkt, key, iplen, fraginfo))) {
             return NULL;
         }
         break;
       case YF_TYPE_IPv6:
-         if (!(pkt = yfDecodeIPv6(ctx, caplen, pkt, key, iplen, fraginfo))) {
+        if (!(pkt = yfDecodeIPv6(ctx, caplen, pkt, key, iplen, fraginfo))) {
             return NULL;
         }
         break;
@@ -1612,7 +1617,7 @@ static const uint8_t *yfDecodeIP(
         return NULL;
     }
 
-        /* Skip layer 4 decode unless we're the first fragment */
+    /* Skip layer 4 decode unless we're the first fragment */
     if (fraginfo && fraginfo->frag && fraginfo->offset) {
         return pkt;
     }
@@ -1638,7 +1643,8 @@ static const uint8_t *yfDecodeIP(
       case YF_PROTO_GRE:
         if (ctx->gremode) {
             if (!(pkt = yfDecodeGRE(ctx, caplen, pkt, key,
-                                    iplen, fraginfo, tcpinfo))) {
+                                    iplen, fraginfo, tcpinfo)))
+            {
                 return NULL;
             }
         } else {
@@ -1657,30 +1663,32 @@ static const uint8_t *yfDecodeIP(
     return pkt;
 }
 
+
 /**
  * yfDecodeToPBuf
  *
  *
  *
  */
-gboolean yfDecodeToPBuf(
-    yfDecodeCtx_t           *ctx,
-    uint64_t                ptime,
-    size_t                  caplen,
-    const uint8_t           *pkt,
-    yfIPFragInfo_t          *fraginfo,
-    size_t                  pbuflen,
-    yfPBuf_t                *pbuf)
+gboolean
+yfDecodeToPBuf(
+    yfDecodeCtx_t   *ctx,
+    uint64_t         ptime,
+    size_t           caplen,
+    const uint8_t   *pkt,
+    yfIPFragInfo_t  *fraginfo,
+    size_t           pbuflen,
+    yfPBuf_t        *pbuf)
 {
-    uint16_t                type;
-    yfFlowKey_t             *key = &(pbuf->key);
-    uint16_t                *iplen = &(pbuf->iplen);
-    yfTCPInfo_t             *tcpinfo = &(pbuf->tcpinfo);
+    uint16_t       type;
+    yfFlowKey_t   *key = &(pbuf->key);
+    uint16_t      *iplen = &(pbuf->iplen);
+    yfTCPInfo_t   *tcpinfo = &(pbuf->tcpinfo);
 /*    yfL2Info_t              *l2info = (pbuflen >= YF_PBUFLEN_NOPAYLOAD) ?
-      &(pbuf->l2info) : NULL;*/
-    yfL2Info_t              *l2info = &(pbuf->l2info);
-    const uint8_t           *ipTcpHeaderStart = NULL;
-    size_t                  capb4l2 = caplen;
+ *    &(pbuf->l2info) : NULL;*/
+    yfL2Info_t    *l2info = &(pbuf->l2info);
+    const uint8_t *ipTcpHeaderStart = NULL;
+    size_t         capb4l2 = caplen;
 
     /* Zero packet buffer time (mark it not yet valid) */
     pbuf->ptime = 0;
@@ -1692,10 +1700,10 @@ gboolean yfDecodeToPBuf(
     pbuf->pcap_caplist = ctx->pcap_caplist;
 
     /* Verify enough bytes are available in the buffer. Die hard for now
-       if not; this is not a valid runtime error. */
+     * if not; this is not a valid runtime error. */
     if (pbuflen < YF_PBUFLEN_NOL2INFO) {
         g_error("YAF internal error: packet buffer too small (%"
-                SIZE_T_FORMAT", need %"SIZE_T_FORMAT")",
+                SIZE_T_FORMAT ", need %"SIZE_T_FORMAT ")",
                 (SIZE_T_CAST)pbuflen, (SIZE_T_CAST)YF_PBUFLEN_NOL2INFO);
     }
 
@@ -1714,12 +1722,15 @@ gboolean yfDecodeToPBuf(
 #if defined(YAF_ENABLE_P0F) || defined(YAF_ENABLE_FPEXPORT)
     /* mark the beginning of the IP/{TCP|UDP} headers */
     memcpy(pbuf->headerVal, pkt,
-           sizeof(pbuf->headerVal)<caplen ? sizeof(pbuf->headerVal)-1 :caplen);
-    pbuf->headerLen = sizeof(pbuf->headerVal)<caplen ? sizeof(pbuf->headerVal)-1 : caplen;
-#endif
+           sizeof(pbuf->headerVal) < caplen ? sizeof(pbuf->headerVal) - 1 :
+           caplen);
+    pbuf->headerLen = sizeof(pbuf->headerVal) < caplen ?
+        sizeof(pbuf->headerVal) - 1 : caplen;
+#endif /* if defined(YAF_ENABLE_P0F) || defined(YAF_ENABLE_FPEXPORT) */
     /* Now we should have an IP packet. Decode it. */
     if (!(pkt = yfDecodeIP(ctx, type, &caplen, pkt, key, iplen,
-                           tcpinfo, fraginfo))) {
+                           tcpinfo, fraginfo)))
+    {
         return FALSE;
     }
 
@@ -1743,21 +1754,23 @@ gboolean yfDecodeToPBuf(
     return TRUE;
 }
 
+
 /**
  * yfDecodeCtxAlloc
  *
  *
  *
  */
-yfDecodeCtx_t *yfDecodeCtxAlloc(
-    int             datalink,
-    uint16_t        reqtype,
-    gboolean        gremode)
+yfDecodeCtx_t *
+yfDecodeCtxAlloc(
+    int        datalink,
+    uint16_t   reqtype,
+    gboolean   gremode)
 {
-    yfDecodeCtx_t   *ctx = NULL;
+    yfDecodeCtx_t *ctx = NULL;
 
     /* Allocate a flow table */
-    ctx = yg_slice_new0(yfDecodeCtx_t);
+    ctx = g_slice_new0(yfDecodeCtx_t);
 
     /* Fill in the configuration */
     ctx->datalink = datalink;
@@ -1769,17 +1782,19 @@ yfDecodeCtx_t *yfDecodeCtxAlloc(
     return ctx;
 }
 
+
 /**
  * yfDecodeCtxFree
  *
  *
  *
  */
-void yfDecodeCtxFree(
-    yfDecodeCtx_t           *ctx)
+void
+yfDecodeCtxFree(
+    yfDecodeCtx_t  *ctx)
 {
     /* just free the context */
-    yg_slice_free(yfDecodeCtx_t, ctx);
+    g_slice_free(yfDecodeCtx_t, ctx);
 }
 
 
@@ -1789,11 +1804,13 @@ void yfDecodeCtxFree(
  *
  *
  */
-uint64_t yfDecodeTimeval(
-    const struct timeval    *tv)
+uint64_t
+yfDecodeTimeval(
+    const struct timeval  *tv)
 {
     return (((uint64_t)tv->tv_sec * 1000) + ((uint64_t)tv->tv_usec / 1000));
 }
+
 
 /**
  * yfDecodeTimeNTP
@@ -1801,10 +1818,11 @@ uint64_t yfDecodeTimeval(
  *
  *
  */
-uint64_t yfDecodeTimeNTP(
-    uint64_t                ntp)
+uint64_t
+yfDecodeTimeNTP(
+    uint64_t   ntp)
 {
-    double          dntp;
+    double dntp;
 
     dntp = (ntp & 0xFFFFFFFF00000000LL) >> 32;
     dntp += ((ntp & 0x00000000FFFFFFFFLL) * 1.0) / (2LL << 32);
@@ -1813,16 +1831,18 @@ uint64_t yfDecodeTimeNTP(
     return (uint64_t)dntp;
 }
 
+
 /**
  * yfGetDecodeStats
  *
  */
-uint32_t yfGetDecodeStats(
-    yfDecodeCtx_t *ctx)
+uint32_t
+yfGetDecodeStats(
+    yfDecodeCtx_t  *ctx)
 {
-    uint32_t            fail_snaptotal;
-    uint32_t            fail_suptotal;
-    uint32_t            fail_total;
+    uint32_t fail_snaptotal;
+    uint32_t fail_suptotal;
+    uint32_t fail_total;
 
     fail_snaptotal =
         ctx->stats.fail_l2hdr + ctx->stats.fail_l2shim +
@@ -1842,12 +1862,14 @@ uint32_t yfGetDecodeStats(
     return fail_total;
 }
 
+
 /**
  * yfDecodeResetOffset
  *
  */
-void yfDecodeResetOffset(
-    yfDecodeCtx_t *ctx)
+void
+yfDecodeResetOffset(
+    yfDecodeCtx_t  *ctx)
 {
     ctx->pcap_caplist++;
 }
@@ -1859,14 +1881,15 @@ void yfDecodeResetOffset(
  *
  *
  */
-void yfDecodeDumpStats(
-    yfDecodeCtx_t       *ctx,
-    uint64_t            packetTotal)
+void
+yfDecodeDumpStats(
+    yfDecodeCtx_t  *ctx,
+    uint64_t        packetTotal)
 {
-    uint32_t            fail_snaptotal;
-    uint32_t            fail_suptotal;
-    uint32_t            fail_total;
-    uint32_t            fail_l3total;
+    uint32_t fail_snaptotal;
+    uint32_t fail_suptotal;
+    uint32_t fail_total;
+    /* uint32_t            fail_l3total; */
 
     fail_snaptotal =
         ctx->stats.fail_l2hdr + ctx->stats.fail_l2shim +
@@ -1883,53 +1906,60 @@ void yfDecodeDumpStats(
     fail_total =
         fail_snaptotal + fail_suptotal;
 
-    fail_l3total = ctx->stats.fail_l3type + ctx->stats.fail_arptype +
-                   ctx->stats.fail_8023type + ctx->stats.fail_lldptype;
+    /* fail_l3total = ctx->stats.fail_l3type + ctx->stats.fail_arptype + */
+    /*                ctx->stats.fail_8023type + ctx->stats.fail_lldptype; */
 
     if (fail_total) {
         g_debug("Rejected %u packets during decode: (%3.2f%%)",
                 fail_total,
-                ((double)(fail_total)/(double)(packetTotal) * 100) );
+                ((double)(fail_total) / (double)(packetTotal) * 100) );
 
         if (fail_snaptotal) {
             g_debug("  %u due to incomplete headers: (%3.2f%%)",
-                fail_snaptotal,
-                ((double)(fail_snaptotal)/(double)(packetTotal) * 100) );
+                    fail_snaptotal,
+                    ((double)(fail_snaptotal) / (double)(packetTotal) * 100) );
             if (ctx->stats.fail_l2hdr) {
                 g_debug("    %u incomplete layer 2 headers. (%3.2f%%)",
-                    ctx->stats.fail_l2hdr,
-                    ((double)(ctx->stats.fail_l2hdr)/(double)(packetTotal) * 100) );
+                        ctx->stats.fail_l2hdr,
+                        ((double)(ctx->stats.fail_l2hdr) /
+                         (double)(packetTotal) * 100) );
             }
             if (ctx->stats.fail_l2shim) {
                 g_debug("    %u incomplete shim headers. (%3.2f%%)",
-                    ctx->stats.fail_l2shim,
-                        ((double)(ctx->stats.fail_l2shim)/(double)(packetTotal) * 100) );
+                        ctx->stats.fail_l2shim,
+                        ((double)(ctx->stats.fail_l2shim) /
+                         (double)(packetTotal) * 100) );
             }
             if (ctx->stats.fail_ip4hdr) {
                 g_debug("    %u incomplete IPv4 headers. (%3.2f%%)",
                         ctx->stats.fail_ip4hdr,
-                        ((double)(ctx->stats.fail_ip4hdr)/(double)(packetTotal) * 100) );
+                        ((double)(ctx->stats.fail_ip4hdr) /
+                         (double)(packetTotal) * 100) );
             }
 
             if (ctx->stats.fail_ip6hdr) {
                 g_debug("    %u incomplete IPv6 headers. (%3.2f%%)",
                         ctx->stats.fail_ip6hdr,
-                        ((double)(ctx->stats.fail_ip6hdr)/(double)(packetTotal) * 100) );
+                        ((double)(ctx->stats.fail_ip6hdr) /
+                         (double)(packetTotal) * 100) );
             }
 
             if (ctx->stats.fail_ip6ext) {
                 g_debug("    %u incomplete IPv6 extension headers. (%3.2f%%)",
                         ctx->stats.fail_ip6ext,
-                        ((double)(ctx->stats.fail_ip6ext)/(double)(packetTotal) * 100) );
+                        ((double)(ctx->stats.fail_ip6ext) /
+                         (double)(packetTotal) * 100) );
             }
             if (ctx->stats.fail_l4hdr) {
                 g_debug("    %u incomplete transport headers. (%3.2f%%)",
                         ctx->stats.fail_l4hdr,
-                        ((double)(ctx->stats.fail_l4hdr)/(double)(packetTotal) * 100) );
+                        ((double)(ctx->stats.fail_l4hdr) /
+                         (double)(packetTotal) * 100) );
                 if (ctx->stats.fail_l4frag) {
                     g_debug("      (%u fragmented.) (%3.2f%%)",
-                        ctx->stats.fail_l4frag,
-                        ((double)(ctx->stats.fail_l4frag)/(double)(packetTotal) * 100) );
+                            ctx->stats.fail_l4frag,
+                            ((double)(ctx->stats.fail_l4frag) /
+                             (double)(packetTotal) * 100) );
                 }
             }
             g_debug("    (Use a larger snaplen to reduce incomplete headers.)");
@@ -1937,61 +1967,70 @@ void yfDecodeDumpStats(
 
         if (fail_suptotal) {
             g_debug("  %u due to unsupported/rejected packet type: (%3.2f%%)",
-                fail_suptotal,
-                ((double)(fail_suptotal)/(double)(packetTotal) * 100) );
+                    fail_suptotal,
+                    ((double)(fail_suptotal) / (double)(packetTotal) * 100) );
             if (ctx->stats.fail_l2type) {
                 g_debug("      %u unsupported/rejected Layer 2 headers. "
                         "(%3.2f%%)",
                         ctx->stats.fail_l2type,
-                        ((double)(ctx->stats.fail_l2type)/(double)(packetTotal) * 100) );
+                        ((double)(ctx->stats.fail_l2type) /
+                         (double)(packetTotal) * 100) );
             }
             if (ctx->stats.fail_l3type) {
                 g_debug("      %u unsupported/rejected Layer 3 headers. "
                         "(%3.2f%%)",
                         ctx->stats.fail_l3type,
-                        ((double)(ctx->stats.fail_l3type)/
+                        ((double)(ctx->stats.fail_l3type) /
                          (double)(packetTotal) * 100) );
             }
             if (ctx->stats.fail_arptype) {
                 g_debug("      %u ARP packets. (%3.2f%%)",
                         ctx->stats.fail_arptype,
-                        ((double)(ctx->stats.fail_arptype)/(double)(packetTotal) * 100));
+                        ((double)(ctx->stats.fail_arptype) /
+                         (double)(packetTotal) * 100));
             }
             if (ctx->stats.fail_lldptype) {
                 g_debug("      %u LLDP packets. (%3.2f%%)",
                         ctx->stats.fail_lldptype,
-                        ((double)(ctx->stats.fail_lldptype)/(double)(packetTotal) * 100));
-
+                        ((double)(ctx->stats.fail_lldptype) /
+                         (double)(packetTotal) * 100));
             }
             if (ctx->stats.fail_8023type) {
                 g_debug("      %u 802.3 packets. (%3.2f%%)",
                         ctx->stats.fail_8023type,
-                        ((double)(ctx->stats.fail_8023type)/(double)(packetTotal) * 100));
+                        ((double)(ctx->stats.fail_8023type) /
+                         (double)(packetTotal) * 100));
             }
             if (ctx->stats.fail_ip4frag) {
                 g_debug("      %u IPv4 fragments. (%3.2f%%)",
-                    ctx->stats.fail_ip4frag,
-                    ((double)(ctx->stats.fail_ip4frag)/(double)(packetTotal) * 100) );
+                        ctx->stats.fail_ip4frag,
+                        ((double)(ctx->stats.fail_ip4frag) /
+                         (double)(packetTotal) * 100) );
             }
             if (ctx->stats.fail_ip6frag) {
                 g_debug("      %u IPv6 fragments. (%3.2f%%)",
-                    ctx->stats.fail_ip6frag,
-                    ((double)(ctx->stats.fail_ip6frag)/(double)(packetTotal) * 100) );
+                        ctx->stats.fail_ip6frag,
+                        ((double)(ctx->stats.fail_ip6frag) /
+                         (double)(packetTotal) * 100) );
             }
             if (ctx->stats.fail_l2loop) {
-                g_debug("      %u unsupported loopback packet families. (%3.2f%%)",
+                g_debug(
+                    "      %u unsupported loopback packet families. (%3.2f%%)",
                     ctx->stats.fail_l2loop,
-                    ((double)(ctx->stats.fail_l2loop)/(double)(packetTotal) * 100) );
+                    ((double)(ctx->stats.fail_l2loop) /
+                     (double)(packetTotal) * 100) );
             }
             if (ctx->stats.fail_grevers) {
                 g_debug("      %u unsupported GRE version headers. (%3.2f%%)",
                         ctx->stats.fail_grevers,
-                        ((double)(ctx->stats.fail_grevers)/(double)(packetTotal) * 100) );
+                        ((double)(ctx->stats.fail_grevers) /
+                         (double)(packetTotal) * 100) );
             }
             if (ctx->stats.fail_erspan) {
                 g_debug("      %u unsupported ERSPAN headers. (%3.2f%%)",
                         ctx->stats.fail_erspan,
-                        ((double)(ctx->stats.fail_erspan)/(double)(packetTotal) * 100) );
+                        ((double)(ctx->stats.fail_erspan) /
+                         (double)(packetTotal) * 100) );
             }
         }
     }

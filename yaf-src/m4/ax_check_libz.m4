@@ -1,11 +1,11 @@
-dnl Copyright (C) 2004-2015 by Carnegie Mellon University.
+dnl Copyright (C) 2004-2020 by Carnegie Mellon University.
 dnl
 dnl @OPENSOURCE_HEADER_START@
 dnl
 dnl Use of the YAF system and related source code is subject to the terms
 dnl of the following licenses:
 dnl
-dnl GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+dnl GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
 dnl Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
 dnl
 dnl NO WARRANTY
@@ -47,8 +47,6 @@ dnl Government purposes only pursuant to the copyright license under the
 dnl contract clause at 252.227.7013.
 dnl
 dnl @OPENSOURCE_HEADER_END@
-
-dnl RCSIDENT("$Id$")
 
 # ---------------------------------------------------------------------------
 # AX_CHECK_LIBZ

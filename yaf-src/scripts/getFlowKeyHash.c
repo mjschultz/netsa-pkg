@@ -1,76 +1,76 @@
 /**
- ** @file getFlowKeyHash.c
- *
- * This program determines the filename for a given flow
- * when using the --pcap-per-flow option with YAF.
- * Given IPs, ports, protocol, vlan, and start time -
- * this program will give the filename of the pcap
- * for the particular flow.  This uses YAF's flow key hash
- * function to calculate the hash, and given the time
- * date can calculate which directory the file resides in.
- *
- * the pcap-per-flow option writes a pcap file for each
- * flow it processes, in the file directory given to --pcap.
- * Based on the last 3 digits of the flow's start time
- * milliseconds, the flow key hash, and the flow's start
- * time, you can find the pcap file which contains the entire
- * flow.
- ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2018 Carnegie Mellon University.
- ** All Rights Reserved.
- **
- ** ------------------------------------------------------------------------
- ** Author: Emily Sarneso <ecoff@cert.org>
- ** ------------------------------------------------------------------------
- ** @OPENSOURCE_HEADER_START@
- ** Use of the YAF system and related source code is subject to the terms
- ** of the following licenses:
- **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
- ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
- **
- ** NO WARRANTY
- **
- ** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
- ** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
- ** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
- ** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
- ** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
- ** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
- ** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
- ** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
- ** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
- ** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
- ** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
- ** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
- ** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
- ** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
- ** DELIVERABLES UNDER THIS LICENSE.
- **
- ** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
- ** Mellon University, its trustees, officers, employees, and agents from
- ** all claims or demands made against them (and any related losses,
- ** expenses, or attorney's fees) arising out of, or relating to Licensee's
- ** and/or its sub licensees' negligent use or willful misuse of or
- ** negligent conduct or willful misconduct regarding the Software,
- ** facilities, or other rights or assistance granted by Carnegie Mellon
- ** University under this License, including, but not limited to, any
- ** claims of product liability, personal injury, death, damage to
- ** property, or violation of any laws or regulations.
- **
- ** Carnegie Mellon University Software Engineering Institute authored
- ** documents are sponsored by the U.S. Department of Defense under
- ** Contract FA8721-05-C-0003. Carnegie Mellon University retains
- ** copyrights in all material produced under this contract. The U.S.
- ** Government retains a non-exclusive, royalty-free license to publish or
- ** reproduce these documents, or allow others to do so, for U.S.
- ** Government purposes only pursuant to the copyright license under the
- ** contract clause at 252.227.7013.
- **
- ** @OPENSOURCE_HEADER_END@
- ** ------------------------------------------------------------------------
- *
- */
+** @file getFlowKeyHash.c
+*
+* This program determines the filename for a given flow
+* when using the --pcap-per-flow option with YAF.
+* Given IPs, ports, protocol, vlan, and start time -
+* this program will give the filename of the pcap
+* for the particular flow.  This uses YAF's flow key hash
+* function to calculate the hash, and given the time
+* date can calculate which directory the file resides in.
+*
+* the pcap-per-flow option writes a pcap file for each
+* flow it processes, in the file directory given to --pcap.
+* Based on the last 3 digits of the flow's start time
+* milliseconds, the flow key hash, and the flow's start
+* time, you can find the pcap file which contains the entire
+* flow.
+** ------------------------------------------------------------------------
+** Copyright (C) 2006-2020 Carnegie Mellon University.
+** All Rights Reserved.
+**
+** ------------------------------------------------------------------------
+** Author: Emily Sarneso <ecoff@cert.org>
+** ------------------------------------------------------------------------
+** @OPENSOURCE_HEADER_START@
+** Use of the YAF system and related source code is subject to the terms
+** of the following licenses:
+**
+** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
+** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
+**
+** NO WARRANTY
+**
+** ANY INFORMATION, MATERIALS, SERVICES, INTELLECTUAL PROPERTY OR OTHER
+** PROPERTY OR RIGHTS GRANTED OR PROVIDED BY CARNEGIE MELLON UNIVERSITY
+** PURSUANT TO THIS LICENSE (HEREINAFTER THE "DELIVERABLES") ARE ON AN
+** "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO WARRANTIES OF ANY
+** KIND, EITHER EXPRESS OR IMPLIED AS TO ANY MATTER INCLUDING, BUT NOT
+** LIMITED TO, WARRANTY OF FITNESS FOR A PARTICULAR PURPOSE,
+** MERCHANTABILITY, INFORMATIONAL CONTENT, NONINFRINGEMENT, OR ERROR-FREE
+** OPERATION. CARNEGIE MELLON UNIVERSITY SHALL NOT BE LIABLE FOR INDIRECT,
+** SPECIAL OR CONSEQUENTIAL DAMAGES, SUCH AS LOSS OF PROFITS OR INABILITY
+** TO USE SAID INTELLECTUAL PROPERTY, UNDER THIS LICENSE, REGARDLESS OF
+** WHETHER SUCH PARTY WAS AWARE OF THE POSSIBILITY OF SUCH DAMAGES.
+** LICENSEE AGREES THAT IT WILL NOT MAKE ANY WARRANTY ON BEHALF OF
+** CARNEGIE MELLON UNIVERSITY, EXPRESS OR IMPLIED, TO ANY PERSON
+** CONCERNING THE APPLICATION OF OR THE RESULTS TO BE OBTAINED WITH THE
+** DELIVERABLES UNDER THIS LICENSE.
+**
+** Licensee hereby agrees to defend, indemnify, and hold harmless Carnegie
+** Mellon University, its trustees, officers, employees, and agents from
+** all claims or demands made against them (and any related losses,
+** expenses, or attorney's fees) arising out of, or relating to Licensee's
+** and/or its sub licensees' negligent use or willful misuse of or
+** negligent conduct or willful misconduct regarding the Software,
+** facilities, or other rights or assistance granted by Carnegie Mellon
+** University under this License, including, but not limited to, any
+** claims of product liability, personal injury, death, damage to
+** property, or violation of any laws or regulations.
+**
+** Carnegie Mellon University Software Engineering Institute authored
+** documents are sponsored by the U.S. Department of Defense under
+** Contract FA8721-05-C-0003. Carnegie Mellon University retains
+** copyrights in all material produced under this contract. The U.S.
+** Government retains a non-exclusive, royalty-free license to publish or
+** reproduce these documents, or allow others to do so, for U.S.
+** Government purposes only pursuant to the copyright license under the
+** contract clause at 252.227.7013.
+**
+** @OPENSOURCE_HEADER_END@
+** ------------------------------------------------------------------------
+*
+*/
 
 
 #include <stdlib.h>
@@ -89,23 +89,23 @@
 /* environment variable */
 #define YAF_IGNORE_SNMP "YAF_IGNORE_SNMP"
 
-static char * sip = NULL;
-static char * dip = NULL;
-static char * sip6 = NULL;
-static char * dip6 = NULL;
-static char * dport = NULL;
-static char * sport = NULL;
-static char * protocol = NULL;
-static char * vlan = NULL;
-static char * date = NULL;
-static char * user_time = NULL;
-static char * input = NULL;
-static char * output = "-";
-static gboolean ipfix = FALSE;
-static gboolean reverse = FALSE;
-static gboolean snmp = FALSE;
+static char           *sip = NULL;
+static char           *dip = NULL;
+static char           *sip6 = NULL;
+static char           *dip6 = NULL;
+static char           *dport = NULL;
+static char           *sport = NULL;
+static char           *protocol = NULL;
+static char           *vlan = NULL;
+static char           *date = NULL;
+static char           *user_time = NULL;
+static char           *input = NULL;
+static char           *output = "-";
+static gboolean        ipfix = FALSE;
+static gboolean        reverse = FALSE;
+static gboolean        snmp = FALSE;
 
-static GOptionEntry md_core_option[] = {
+static GOptionEntry    md_core_option[] = {
     {"in", 'i', 0, G_OPTION_ARG_STRING, &input,
      "IPFIX Input Specifier [stdin]", NULL },
     {"out", 'o', 0, G_OPTION_ARG_STRING, &output,
@@ -132,7 +132,7 @@ static GOptionEntry md_core_option[] = {
     {"ipfix", 'I', 0, G_OPTION_ARG_NONE, &ipfix,
      "Export IPFIX to stdout [no]", NULL},
     {"reverse", 'R', 0, G_OPTION_ARG_NONE, &reverse,
-      "Flip source and destination values to calculate "
+     "Flip source and destination values to calculate "
      "\n\t\t\treverse flow key hash", NULL},
     {"snmp", 0, 0, G_OPTION_ARG_NONE, &snmp,
      "Ignore the ingressInterface value.", NULL},
@@ -140,7 +140,8 @@ static GOptionEntry md_core_option[] = {
 };
 
 static fbInfoElement_t new_info_elements[] = {
-    FB_IE_INIT("yafFlowKeyHash", 6841, 106, 4, FB_IE_F_ENDIAN|FB_IE_F_REVERSIBLE),
+    FB_IE_INIT("yafFlowKeyHash", 6841, 106, 4,
+               FB_IE_F_ENDIAN | FB_IE_F_REVERSIBLE),
     FB_IE_NULL
 };
 
@@ -172,47 +173,48 @@ static fbInfoElementSpec_t simple_out_flow[] = {
 };
 
 typedef struct simpleFlow_st {
-    uint64_t    sms;
-    uint64_t    ems;
-    uint8_t     sip6[16];
-    uint8_t     dip6[16];
-    uint64_t    pkt;
-    uint64_t    dpkt;
-    uint32_t    sip;
-    uint32_t    dip;
-    uint16_t    sport;
-    uint16_t    dport;
-    uint32_t    ingress;
-    uint16_t    vlan;
-    uint8_t     proto;
+    uint64_t   sms;
+    uint64_t   ems;
+    uint8_t    sip6[16];
+    uint8_t    dip6[16];
+    uint64_t   pkt;
+    uint64_t   dpkt;
+    uint32_t   sip;
+    uint32_t   dip;
+    uint16_t   sport;
+    uint16_t   dport;
+    uint32_t   ingress;
+    uint16_t   vlan;
+    uint8_t    proto;
 } simpleFlow_t;
 
 typedef struct simpleOutFlow_st {
-    uint64_t    sms;
-    uint64_t    ems;
-    uint64_t    pkt;
-    uint32_t    hash;
-    uint32_t    rhash;
+    uint64_t   sms;
+    uint64_t   ems;
+    uint64_t   pkt;
+    uint32_t   hash;
+    uint32_t   rhash;
 } simpleOutFlow_t;
 
 
-static uint32_t flowKeyHash(
-    simpleFlow_t *flow,
-    gboolean      rev)
+static uint32_t
+flowKeyHash(
+    simpleFlow_t  *flow,
+    gboolean       rev)
 {
-    uint32_t key_hash = 0;
+    uint32_t  key_hash = 0;
     uint32_t *v6p;
 
     if (rev) {
         if (flow->sip || flow->dip) {
             key_hash = (flow->dport << 16) ^ flow->sport ^
-                       (flow->proto << 12) ^ (4 << 4) ^
-                       (flow->vlan << 20) ^ flow->dip ^ flow->sip;
+                (flow->proto << 12) ^ (4 << 4) ^
+                (flow->vlan << 20) ^ flow->dip ^ flow->sip;
         } else {
             v6p = (uint32_t *)flow->dip6;
             key_hash = (flow->dport << 16) ^ flow->sport ^
-                       (flow->proto << 12) ^ (6 << 4) ^
-                       (flow->vlan << 20) ^ *v6p;
+                (flow->proto << 12) ^ (6 << 4) ^
+                (flow->vlan << 20) ^ *v6p;
             v6p++;
             key_hash ^= *v6p;
             v6p++;
@@ -231,13 +233,13 @@ static uint32_t flowKeyHash(
     } else {
         if (flow->sip || flow->dip) {
             key_hash = (flow->sport << 16) ^ flow->dport ^
-                       (flow->proto << 12) ^ (4 << 4) ^
-                       (flow->vlan << 20) ^ flow->sip ^ flow->dip;
+                (flow->proto << 12) ^ (4 << 4) ^
+                (flow->vlan << 20) ^ flow->sip ^ flow->dip;
         } else {
             v6p = (uint32_t *)flow->sip6;
             key_hash = (flow->sport << 16) ^ flow->dport ^
-                       (flow->proto << 12) ^ (6 << 4) ^
-                       (flow->vlan << 20) ^ *v6p;
+                (flow->proto << 12) ^ (6 << 4) ^
+                (flow->vlan << 20) ^ *v6p;
             v6p++;
             key_hash ^= *v6p;
             v6p++;
@@ -259,11 +261,13 @@ static uint32_t flowKeyHash(
 }
 
 
-static void printIPAddress(char *ipaddr_buf,
-                           uint32_t ip)
+static void
+printIPAddress(
+    char      *ipaddr_buf,
+    uint32_t   ip)
 {
     uint32_t mask = 0xff000000U;
-    uint8_t dqp[4];
+    uint8_t  dqp[4];
 
     /* split the address */
     dqp[0] = (ip & mask) >> 24;
@@ -276,20 +280,20 @@ static void printIPAddress(char *ipaddr_buf,
 
     /* print to it */
     snprintf(ipaddr_buf, 16,
-             "%hhu.%hhu.%hhu.%hhu",dqp[0],dqp[1],dqp[2],dqp[3]);
+             "%hhu.%hhu.%hhu.%hhu", dqp[0], dqp[1], dqp[2], dqp[3]);
 }
 
-static void printIP6Address(
-    char        *ipaddr_buf,
-    uint8_t     *ipaddr)
+
+static void
+printIP6Address(
+    char     *ipaddr_buf,
+    uint8_t  *ipaddr)
 {
-
-    char            *cp = ipaddr_buf;
-    uint16_t        *aqp = (uint16_t *)ipaddr;
-    uint16_t        aq;
-    gboolean        colon_start = FALSE;
-    gboolean        colon_end = FALSE;
-
+    char     *cp = ipaddr_buf;
+    uint16_t *aqp = (uint16_t *)ipaddr;
+    uint16_t  aq;
+    gboolean  colon_start = FALSE;
+    gboolean  colon_end = FALSE;
 
     for (; (uint8_t *)aqp < ipaddr + 16; aqp++) {
         aq = g_ntohs(*aqp);
@@ -317,10 +321,11 @@ static void printIP6Address(
     }
 }
 
-static uint32_t convertIP4Address(
-    char *ipaddr_buf)
-{
 
+static uint32_t
+convertIP4Address(
+    char  *ipaddr_buf)
+{
     uint32_t ip;
 
     if (inet_aton(ipaddr_buf, (struct in_addr *)&ip) == 0) {
@@ -331,9 +336,11 @@ static uint32_t convertIP4Address(
     return g_ntohl(ip);
 }
 
-static void convertIP6Address(
-    char      *ipaddr_buf,
-    uint8_t   *ip6)
+
+static void
+convertIP6Address(
+    char     *ipaddr_buf,
+    uint8_t  *ip6)
 {
     if (inet_pton(AF_INET6, ipaddr_buf, ip6) <= 0) {
         fprintf(stderr, "Invalid IPv6 Address\n");
@@ -342,8 +349,9 @@ static void convertIP6Address(
 }
 
 
-static fBuf_t *exportIPFIX(
-    char *output,
+static fBuf_t *
+exportIPFIX(
+    char    *output,
     GError **err)
 {
     fbInfoModel_t *infoModel = NULL;
@@ -351,7 +359,7 @@ static fBuf_t *exportIPFIX(
     fbTemplate_t  *template = NULL;
     fbSession_t   *esession = NULL;
     fBuf_t        *exbuf = NULL;
-    int           rc;
+    int            rc;
 
     infoModel = fbInfoModelAlloc();
 
@@ -404,31 +412,31 @@ static fBuf_t *exportIPFIX(
     }
 
     return exbuf;
-
 }
 
 
-static gboolean collectIPFIX(
-    char      *input,
-    FILE      *fp,
-    GError    **err)
+static gboolean
+collectIPFIX(
+    char    *input,
+    FILE    *fp,
+    GError **err)
 {
-    fbSession_t *session = NULL;
-    fbTemplate_t *template = NULL;
-    fbTemplate_t *nt = NULL;
-    fBuf_t      *buf = NULL;
-    fBuf_t      *exbuf = NULL;
-    fbCollector_t *coll = NULL;
-    fbInfoModel_t *infoModel = NULL;
-    char         ip_buf[40];
+    fbSession_t    *session = NULL;
+    fbTemplate_t   *template = NULL;
+    fbTemplate_t   *nt = NULL;
+    fBuf_t         *buf = NULL;
+    fBuf_t         *exbuf = NULL;
+    fbCollector_t  *coll = NULL;
+    fbInfoModel_t  *infoModel = NULL;
+    char            ip_buf[40];
     simpleFlow_t    flow;
     simpleOutFlow_t oflow;
-    size_t       len;
-    int          rc;
-    int          ecount = 0;
-    gboolean     hdr = TRUE;
-    uint16_t     tid;
-    char         c = ' ';
+    size_t          len;
+    int             rc;
+    int             ecount = 0;
+    gboolean        hdr = TRUE;
+    uint16_t        tid;
+    char            c = ' ';
 
     infoModel = fbInfoModelAlloc();
 
@@ -471,13 +479,13 @@ static gboolean collectIPFIX(
         if (nt) {
             if (fbTemplateGetOptionsScope(nt)) {
                 rc = fBufNext(buf, (uint8_t *)&flow, &len, err);
-                if (!rc) goto err;
+                if (!rc) {goto err;}
                 continue;
             }
-        } else goto err;
+        } else {goto err;}
 
         rc = fBufNext(buf, (uint8_t *)&flow, &len, err);
-        if (!rc) goto err;
+        if (!rc) {goto err;}
 
         if (hdr && !ipfix) {
             /* if the first record is v6, print the v6 header */
@@ -486,7 +494,7 @@ static gboolean collectIPFIX(
                         "%6chash|%18cms\n", c, c, c, c, c);
             } else {
                 fprintf(fp, "%37csIP|%37cdIP|sPort|dPort|pro|%cvlan|"
-                            "%6chash|%18cms\n", c, c, c, c, c);
+                        "%6chash|%18cms\n", c, c, c, c, c);
             }
             hdr = FALSE;
         }
@@ -512,11 +520,10 @@ static gboolean collectIPFIX(
                 oflow.rhash = flowKeyHash(&flow, TRUE);
             } else { oflow.rhash = 0; }
 
-            if (flow.pkt) oflow.pkt = flow.pkt;
-            else oflow.pkt = flow.dpkt;
+            if (flow.pkt) {oflow.pkt = flow.pkt;} else {oflow.pkt = flow.dpkt;}
 
             rc = fBufAppend(exbuf, (uint8_t *)&oflow, sizeof(oflow), err);
-            if (!rc) goto err;
+            if (!rc) {goto err;}
 
             ecount++;
 
@@ -535,7 +542,7 @@ static gboolean collectIPFIX(
             fprintf(fp, "%40s|", ip_buf);
         }
 
-        fprintf(fp, "%5d|%5d|%3d|%5d|%10u|%20"PRIu64"\n",
+        fprintf(fp, "%5d|%5d|%3d|%5d|%10u|%20" PRIu64 "\n",
                 flow.sport, flow.dport, flow.proto, flow.vlan,
                 flowKeyHash(&flow, reverse), flow.sms);
         continue;
@@ -563,27 +570,26 @@ static gboolean collectIPFIX(
 }
 
 
-
-
-
 /**
  * main
  *
  */
 int
-main (int argc, char *argv[]) {
-
+main(
+    int    argc,
+    char  *argv[])
+{
     GOptionContext *ctx = NULL;
-    GError *err = NULL;
-    simpleFlow_t flow;
+    GError         *err = NULL;
+    simpleFlow_t    flow;
     simpleOutFlow_t oflow;
-    uint32_t year, month, day, hour, sec, min, ms;
-    time_t epoch_ms;
-    gchar **split;
-    uint32_t key_hash = 0;
-    char c = ' ';
-    FILE *fp = NULL;
-    fBuf_t *buf = NULL;
+    uint32_t        year, month, day, hour, sec, min, ms;
+    time_t          epoch_ms;
+    gchar         **split;
+    uint32_t        key_hash = 0;
+    char            c = ' ';
+    FILE           *fp = NULL;
+    fBuf_t         *buf = NULL;
 
     ctx = g_option_context_new(" - getFlowKeyHash Options");
 
@@ -635,7 +641,6 @@ main (int argc, char *argv[]) {
                 fprintf(stderr, "Refusing to read from terminal on stdin\n");
                 exit(1);
             }
-
         }
         if (!collectIPFIX(input, fp, &err)) {
             fprintf(stderr, "Error Processing IPFIX %s\n", err->message);
@@ -643,7 +648,6 @@ main (int argc, char *argv[]) {
         }
         goto end;
     }
-
 
     if (sip) {
         flow.sip = convertIP4Address(sip);
@@ -780,9 +784,7 @@ main (int argc, char *argv[]) {
                 ms, key_hash, year, month, day, hour, min, sec);
 
         g_strfreev(split);
-
     } else {
-
         if (ipfix) {
             buf = exportIPFIX(output, &err);
             if (!buf) {

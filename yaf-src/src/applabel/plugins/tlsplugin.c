@@ -6,7 +6,7 @@
  *
  * Remember to update proxyplugin.c with any changes.
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Chris Inacio <inacio@cert.org>, Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -14,7 +14,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -64,6 +64,7 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 #if YAF_ENABLE_HOOKS
 #include <yaf/yafhooks.h>
@@ -89,35 +90,41 @@
 #define MAX_CERTS 10
 
 /** defining the header structure for SSLv2 is pointless, because the
-    first field of the record is variable length, either 2 or 3 bytes
-    meaning that the first step has to be to figure out how far offset
-    all of the other fields are.  Further, the client can send a v2
-    client_hello stating that it is v3/TLS 1.0 capable, and the server
-    can respond with v3/TLS 1.0 record formats
-    */
+ *  first field of the record is variable length, either 2 or 3 bytes
+ *  meaning that the first step has to be to figure out how far offset
+ *  all of the other fields are.  Further, the client can send a v2
+ *  client_hello stating that it is v3/TLS 1.0 capable, and the server
+ *  can respond with v3/TLS 1.0 record formats
+ */
 
 
 /** this defines the record header for SSL V3 negotiations,
-    it also works for TLS 1.0 */
+ *  it also works for TLS 1.0 */
 typedef struct sslv3RecordHeader_st {
-    uint8_t             contentType;
-    uint8_t             protocolMajor;
-    uint8_t             protocolMinor;
-    uint16_t            length;
+    uint8_t    contentType;
+    uint8_t    protocolMajor;
+    uint8_t    protocolMinor;
+    uint16_t   length;
 } sslv3RecordHeader_t;
 
-gboolean decodeSSLv2(uint8_t *payload,
-                 unsigned int payloadSize,
-                 yfFlow_t *flow,
-                 uint16_t offsetptr,
-                 uint8_t datalength);
+static gboolean
+decodeSSLv2(
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    uint16_t        offsetptr,
+    uint8_t         datalength);
 
-gboolean decodeTLSv1(uint8_t *payload,
-                 unsigned int payloadSize,
-                 yfFlow_t *flow,
-                 uint16_t offsetptr,
-                 uint8_t datalength,
-                 uint8_t type);
+static gboolean
+decodeTLSv1(
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    uint16_t        offsetptr,
+    uint8_t         datalength,
+    uint8_t         type);
+
+YC_SCANNER_PROTOTYPE(tlsplugin_LTX_ycTlsScanScan);
 
 #define TLS_PORT_NUMBER  443
 
@@ -146,38 +153,36 @@ gboolean decodeTLSv1(uint8_t *payload,
  *         otherwise 0
  */
 uint16_t
-tlsplugin_LTX_ycTlsScanScan (
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+tlsplugin_LTX_ycTlsScanScan(
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
-
-    uint8_t ssl_length;
-    uint8_t ssl_msgtype;
+    uint8_t  ssl_length;
+    uint8_t  ssl_msgtype;
     uint16_t tls_version;
     uint16_t offsetptr = 0;
 
     /* every SSL/TLS header has to be at least 2 bytes long... */
     /* we need 5 to determine message type and version */
-    if ( payloadSize < 5 ) {
+    if (payloadSize < 5) {
         return 0;
     }
 
     /*understanding how to determine between SSLv2 and SSLv3/TLS is "borrowed"
-     *from OpenSSL payload byte 0 for v2 is the start of the length field, but
-     *its MSb is always reserved to tell us how long the length field is, and
-     *in some cases, the second MSb is reserved as well */
+     * from OpenSSL payload byte 0 for v2 is the start of the length field, but
+     * its MSb is always reserved to tell us how long the length field is, and
+     * in some cases, the second MSb is reserved as well */
 
     /* when length is 2 bytes in size (MSb == 1), and the message type code is
      * 0x01 (client_hello) we know we're doing SSL v2 */
     if ((payload[0] & 0x80) && (0x01 == payload[2])) {
-
         ssl_length = ((payload[0] & 0x7F) << 8) | payload[1];
 
-        if ( ssl_length < 2 ) {
+        if (ssl_length < 2) {
             return 0;
         }
 
@@ -190,15 +195,13 @@ tlsplugin_LTX_ycTlsScanScan (
         if (tls_version == TLS_VERSION_1 || tls_version == SSL_VERSION_2 ||
             tls_version == SSL_VERSION_3)
         {
-            if ( !decodeSSLv2(payload, payloadSize, flow, offsetptr,
-                              ssl_length))
+            if (!decodeSSLv2(payload, payloadSize, flow, offsetptr,
+                             ssl_length))
             {
                 return 0;
             }
-
         } else {
             return 0;
-
         }
 
         /* SSLv2 (client_hello) */
@@ -208,30 +211,26 @@ tlsplugin_LTX_ycTlsScanScan (
                           TLS_PORT_NUMBER);
 #endif
         return TLS_PORT_NUMBER;
-
     } else {
-
         if ((0x00 == (payload[0] & 0x80)) && (0x00 == (payload[0] & 0x40))
             && (0x01 == payload[3]))
         {
             /* this is ssl v2 but with a 3-byte header */
             /* the second MSb means the record is a data record */
             /* the fourth byte should be 1 for client hello */
-            if ((payload[0] == 0x16) && (payload[1] == 0x03))
-            {
+            if ((payload[0] == 0x16) && (payload[1] == 0x03)) {
                 /* this is most likely tls, not sslv2 */
                 goto tls;
             }
 
             ssl_length = ((payload[0] * 0x3F) << 8) | payload[1];
 
-            if ( ssl_length < 3 ) {
+            if (ssl_length < 3) {
                 return 0;
             }
             offsetptr += 4;
 
-            if ( (offsetptr + 2) < payloadSize ) {
-
+            if ( ((size_t)offsetptr + 2) < payloadSize) {
                 tls_version = ntohs(*(uint16_t *)(payload + offsetptr));
                 offsetptr += 2;
 
@@ -251,20 +250,20 @@ tlsplugin_LTX_ycTlsScanScan (
                 return 0;
             }
 #if YAF_ENABLE_HOOKS
-            yfHookScanPayload(flow,payload, 1, NULL, 2, 88,
+            yfHookScanPayload(flow, payload, 1, NULL, 2, 88,
                               TLS_PORT_NUMBER);
             yfHookScanPayload(flow, payload, 2, NULL, tls_version, 94,
                               TLS_PORT_NUMBER);
-#endif
+#endif /* if YAF_ENABLE_HOOKS */
             return TLS_PORT_NUMBER;
         }
       tls:
-        if ( payloadSize >= 10 ) {
+        if (payloadSize >= 10) {
             /* payload[0] is handshake request [0x16]
-               payload[1] is ssl major version, sslv3 & tls is 3
-               payload[5] is handshake command, 1=client_hello,2=server_hello
-               payload[3,4] is length
-               payload[9] is the version from the record */
+             * payload[1] is ssl major version, sslv3 & tls is 3
+             * payload[5] is handshake command, 1=client_hello,2=server_hello
+             * payload[3,4] is length
+             * payload[9] is the version from the record */
             if ((payload[0] == 0x16) && (payload[1] == 0x03) &&
                 ((payload[5] == 0x01) || (payload[5] == 0x02)) &&
                 (((payload[3] == 0) && (payload[4] < 5)) ||
@@ -285,10 +284,11 @@ tlsplugin_LTX_ycTlsScanScan (
 
                 /* SSLv3 / TLS */
 #if YAF_ENABLE_HOOKS
-                yfHookScanPayload(flow, payload, 1, NULL, 3, 88, TLS_PORT_NUMBER);
+                yfHookScanPayload(flow, payload, 1, NULL, 3, 88,
+                                  TLS_PORT_NUMBER);
                 yfHookScanPayload(flow, payload, 2, NULL, tls_version, 94,
                                   TLS_PORT_NUMBER);
-#endif
+#endif /* if YAF_ENABLE_HOOKS */
                 return TLS_PORT_NUMBER;
             }
         }
@@ -297,25 +297,26 @@ tlsplugin_LTX_ycTlsScanScan (
     return 0;
 }
 
-gboolean decodeTLSv1(
-    uint8_t *payload,
-    unsigned int payloadSize,
-    yfFlow_t *flow,
-    uint16_t offsetptr,
-    uint8_t datalength,
-    uint8_t type)
-{
 
+static gboolean
+decodeTLSv1(
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    uint16_t        offsetptr,
+    uint8_t         datalength,
+    uint8_t         type)
+{
     uint32_t record_len;
     uint16_t header_len = offsetptr - 1;
     uint32_t cert_len, sub_cert_len;
     uint16_t cert_version;
-    int cert_count = 0;
+    int      cert_count = 0;
     uint16_t ciphers = 0;
     uint16_t cipher_suite_len;
-    uint8_t session_len;
-    uint8_t compression_len;
-    uint8_t next_msg;
+    uint8_t  session_len;
+    uint8_t  compression_len;
+    uint8_t  next_msg;
     uint16_t ext_len = 0;
     uint16_t ext_ptr;
     uint16_t sub_ext_len;
@@ -323,7 +324,7 @@ gboolean decodeTLSv1(
 
     /* Both Client and Server Hello's start off the same way */
     /* 3 for Length, 2 for Version, 32 for Random, 1 for session ID Len*/
-    if (offsetptr + 39 > payloadSize) {
+    if ((size_t)offsetptr + 39 > payloadSize) {
         return FALSE;
     }
 
@@ -339,7 +340,7 @@ gboolean decodeTLSv1(
 
     offsetptr += session_len + 1;
 
-    if (offsetptr + 2 > payloadSize){
+    if ((size_t)offsetptr + 2 > payloadSize) {
         return FALSE;
     }
 
@@ -356,7 +357,7 @@ gboolean decodeTLSv1(
             return FALSE;
         }
 
-        if (offsetptr + cipher_suite_len > payloadSize) {
+        if ((size_t)offsetptr + cipher_suite_len > payloadSize) {
             return FALSE;
         }
 
@@ -366,7 +367,7 @@ gboolean decodeTLSv1(
         /* ciphers are here */
         offsetptr += cipher_suite_len;
 
-        if (offsetptr + 1 > payloadSize) {
+        if ((size_t)offsetptr + 1 > payloadSize) {
             return FALSE;
         }
 
@@ -379,11 +380,10 @@ gboolean decodeTLSv1(
                           TLS_PORT_NUMBER);
         yfHookScanPayload(flow, payload, cipher_suite_len, NULL, ciphers,
                           91, TLS_PORT_NUMBER);
-#endif
-
+#endif /* if YAF_ENABLE_HOOKS */
     } else if (type == 2) {
         /* Server Hello */
-        if (offsetptr + 3 > payloadSize) {
+        if ((size_t)offsetptr + 3 > payloadSize) {
             return FALSE;
         }
         /* cipher is here */
@@ -398,12 +398,11 @@ gboolean decodeTLSv1(
                           TLS_PORT_NUMBER);
         yfHookScanPayload(flow, payload, 1, NULL, offsetptr, 90,
                           TLS_PORT_NUMBER);
-#endif
+#endif /* if YAF_ENABLE_HOOKS */
         offsetptr++;
-
     }
 
-    if ((offsetptr - header_len) < record_len) {
+    if (((size_t)offsetptr - header_len) < record_len) {
         /* extensions? */
         int tot_ext = 0;
         ext_len = ntohs(*(uint16_t *)(payload + offsetptr));
@@ -427,7 +426,8 @@ gboolean decodeTLSv1(
                     break;
                 }
                 /* grab server name */
-                /* jump past list length and type to get name length and name */
+                /* jump past list length and type to get name length and name
+                 * */
                 ext_ptr += 3; /* 2 for length, 1 for type */
                 sub_ext_len = ntohs(*(uint16_t *)(payload + ext_ptr));
                 ext_ptr += 2;
@@ -438,14 +438,13 @@ gboolean decodeTLSv1(
                 break;
             }
         }
-#endif
+#endif /* if YAF_ENABLE_HOOKS */
     }
     while (payloadSize > offsetptr) {
-
         next_msg = *(payload + offsetptr);
         if (next_msg == 11) {
             /* certificate */
-            if (offsetptr + 7 > payloadSize) {
+            if ((size_t)offsetptr + 7 > payloadSize) {
                 return TRUE; /* prob should be false */
             }
 
@@ -460,14 +459,13 @@ gboolean decodeTLSv1(
                         0xFFFFFF00) >> 8;
             offsetptr += 3;
 
-            while (payloadSize > (offsetptr + 4)) {
+            while (payloadSize > ((size_t)offsetptr + 4)) {
                 sub_cert_len = (ntohl(*(uint32_t *)(payload + offsetptr)) &
                                 0xFFFFFF00) >> 8;
 
-                if ((sub_cert_len > cert_len) || (sub_cert_len < 2))  {
+                if ((sub_cert_len > cert_len) || (sub_cert_len < 2)) {
                     /* it's at least got to have a version number */
                     return TRUE; /* prob should be false */
-
                 } else if (sub_cert_len > payloadSize) {
                     /* just not enough room */
                     return TRUE;
@@ -476,11 +474,11 @@ gboolean decodeTLSv1(
                 /* offset of certificate */
                 if (cert_count < MAX_CERTS) {
 #if YAF_ENABLE_HOOKS
-                    if ((offsetptr + sub_cert_len + 3) < payloadSize) {
+                    if (((size_t)offsetptr + sub_cert_len + 3) < payloadSize) {
                         yfHookScanPayload(flow, payload, 1, NULL, offsetptr,
                                           93, TLS_PORT_NUMBER);
                     }
-#endif
+#endif /* if YAF_ENABLE_HOOKS */
                 } else {
                     return TRUE;
                 }
@@ -488,16 +486,13 @@ gboolean decodeTLSv1(
                 cert_count++;
                 offsetptr += 3 + sub_cert_len;
             }
-
         } else if (next_msg == 22) {
             /* 1 for type, 2 for version, 2 for length - we know it's long */
             offsetptr += 5;
-
         } else if (next_msg == 20 || next_msg == 21 || next_msg == 23) {
-
             offsetptr += 3; /* 1 for type, 2 for version */
 
-            if ((offsetptr + 2) > payloadSize) {
+            if (((size_t)offsetptr + 2) > payloadSize) {
                 return TRUE; /* prob should be false */
             }
 
@@ -508,36 +503,31 @@ gboolean decodeTLSv1(
             }
 
             offsetptr += record_len + 2;
-
         } else {
-
             return TRUE;
-
         }
-
     }
 
     return TRUE;
-
 }
 
 
-gboolean decodeSSLv2(
-    uint8_t *payload,
-    unsigned int payloadSize,
-    yfFlow_t *flow,
-    uint16_t offsetptr,
-    uint8_t  datalength)
+static gboolean
+decodeSSLv2(
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    uint16_t        offsetptr,
+    uint8_t         datalength)
 {
     uint32_t record_len;
     uint16_t cipher_spec_length;
     uint16_t challenge_length;
     uint32_t cert_len, sub_cert_len;
-    int cert_count = 0;
-    uint8_t next_msg;
+    int      cert_count = 0;
+    uint8_t  next_msg;
 
-
-    if (offsetptr + 6 > payloadSize) {
+    if ((size_t)offsetptr + 6 > payloadSize) {
         return FALSE;
     }
 
@@ -553,7 +543,7 @@ gboolean decodeSSLv2(
 
     offsetptr += 2;
 
-    if (offsetptr + cipher_spec_length > payloadSize) {
+    if ((size_t)offsetptr + cipher_spec_length > payloadSize) {
         return FALSE;
     }
 
@@ -568,12 +558,11 @@ gboolean decodeSSLv2(
     offsetptr += cipher_spec_length + challenge_length;
 
     while (payloadSize > offsetptr) {
-
         next_msg = *(payload + offsetptr);
 
         if (next_msg == 11) {
             /* certificate */
-            if (offsetptr + 7 > payloadSize) {
+            if ((size_t)offsetptr + 7 > payloadSize) {
                 return TRUE; /* prob should be false */
             }
 
@@ -588,14 +577,13 @@ gboolean decodeSSLv2(
                         0xFFFFFF00) >> 8;
             offsetptr += 3;
 
-            while (payloadSize > (offsetptr + 4)) {
+            while (payloadSize > ((size_t)offsetptr + 4)) {
                 sub_cert_len = (ntohl(*(uint32_t *)(payload + offsetptr)) &
                                 0xFFFFFF00) >> 8;
 
-                if ((sub_cert_len > cert_len) || (sub_cert_len < 2))  {
+                if ((sub_cert_len > cert_len) || (sub_cert_len < 2)) {
                     /* it's at least got to have a version number */
                     return TRUE; /* prob should be false */
-
                 } else if (sub_cert_len > payloadSize) {
                     /* just not enough room */
                     return TRUE;
@@ -604,11 +592,11 @@ gboolean decodeSSLv2(
                 /* offset of certificate */
                 if (cert_count < MAX_CERTS) {
 #if YAF_ENABLE_HOOKS
-                    if ((offsetptr + sub_cert_len + 3) < payloadSize) {
+                    if (((size_t)offsetptr + sub_cert_len + 3) < payloadSize) {
                         yfHookScanPayload(flow, payload, 1, NULL, offsetptr,
                                           93, TLS_PORT_NUMBER);
                     }
-#endif
+#endif /* if YAF_ENABLE_HOOKS */
                 } else {
                     return TRUE;
                 }
@@ -616,16 +604,13 @@ gboolean decodeSSLv2(
                 cert_count++;
                 offsetptr += 3 + sub_cert_len;
             }
-
         } else if (next_msg == 22) {
             /* 1 for type, 2 for version, 2 for length - we know it's long */
             offsetptr += 5;
-
         } else if (next_msg == 20 || next_msg == 21 || next_msg == 23) {
-
             offsetptr += 3; /* 1 for type, 2 for version */
 
-            if ((offsetptr + 2) > payloadSize) {
+            if (((size_t)offsetptr + 2) > payloadSize) {
                 return TRUE; /* prob should be false */
             }
 
@@ -636,14 +621,10 @@ gboolean decodeSSLv2(
             }
 
             offsetptr += record_len + 2;
-
         } else {
-
             return TRUE;
-
         }
     }
 
     return TRUE;
-
 }

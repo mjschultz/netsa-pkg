@@ -3,14 +3,14 @@
  ** IPFIX Information Model and IE storage management
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2018-2019 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2018-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Michael Duggan
  ** ------------------------------------------------------------------------
  ** @OPENSOURCE_LICENSE_START@
  ** libfixbuf 2.0
  **
- ** Copyright 2018-2019 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright 2018-2020 Carnegie Mellon University. All Rights Reserved.
  **
  ** NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE
  ** ENGINEERING INSTITUTE MATERIAL IS FURNISHED ON AN "AS-IS"
@@ -670,9 +670,7 @@ static void parse_element_end(
     }
 
     if (strcmp(element_name, "name") == 0) {
-        if (data->ie.ref.name) {
-            g_free((void *)data->ie.ref.name);
-        }
+        g_free((void *)data->ie.ref.name);
         data->ie.ref.name = g_strstrip(g_string_free(data->text, FALSE));
         data->text = g_string_sized_new(32);
         data->name_validity.validity = FOUND_VALID;
@@ -747,9 +745,7 @@ static void parse_element_end(
             }
         }
     } else if (strcmp(element_name, "group") == 0) {
-        if (data->group) {
-            g_free(data->group);
-        }
+        g_free(data->group);
         data->group = g_string_free(data->text, FALSE);
         data->text = g_string_sized_new(32);
         data->group_validity.validity = FOUND_VALID;

@@ -11,13 +11,8 @@
  * capability of automatic allocation of reusable network addresses
  * and add'l config options.
  *
- * @author $Author: ecoff_svn $
- * @date $Date: 2010-07-26 09:28:45 -0400 (Mon, 26 Jul 2010) $
- * @Version $Revision: 16060 $
- *
- *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2015 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -25,7 +20,7 @@
  ** Use of the YAF system and related source code is subject to the terms
  ** of the following licenses:
  **
- ** GNU Public License (GPL) Rights pursuant to Version 2, June 1991
+ ** GNU General Public License (GPL) Rights pursuant to Version 2, June 1991
  ** Government Purpose License Rights (GPLR) pursuant to DFARS 252.227.7013
  **
  ** NO WARRANTY
@@ -75,9 +70,12 @@
 #include <yaf/autoinc.h>
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
+#include <payloadScanner.h>
 
 #define DHCP_PORT_NUMBER 67
 #define MAGICCOOKIE 0x63825363
+
+YC_SCANNER_PROTOTYPE(dhcpplugin_LTX_ycDhcpScanScan);
 
 /**
  * dhcpplugin_LTX_ycDhcpScanScan
@@ -96,21 +94,19 @@
  * @return dhcp port number
  *         otherwise 0
  */
-
 uint16_t
 dhcpplugin_LTX_ycDhcpScanScan(
-    int argc,
-    char *argv[],
-    uint8_t * payload,
-    unsigned int payloadSize,
-    yfFlow_t * flow,
-    yfFlowVal_t * val)
+    int             argc,
+    char           *argv[],
+    const uint8_t  *payload,
+    unsigned int    payloadSize,
+    yfFlow_t       *flow,
+    yfFlowVal_t    *val)
 {
-    uint8_t         op, htype;
-    uint16_t        flags, offsetptr = 0;
-    uint32_t        magic_cookie;
-    int             loop;
-
+    uint8_t  op, htype;
+    uint16_t flags, offsetptr = 0;
+    uint32_t magic_cookie;
+    int      loop;
 
     if (payloadSize < 44) {
         return 0;
@@ -134,7 +130,7 @@ dhcpplugin_LTX_ycDhcpScanScan(
 
     /* hardware len is after type */
 
-    offsetptr+=2;
+    offsetptr += 2;
 
     /* hops should be 0 */
     if (*(payload + offsetptr) != 0) {
@@ -149,7 +145,8 @@ dhcpplugin_LTX_ycDhcpScanScan(
         return 0;  /* only 1 (Broadcast flag) bit can be set) */
     }
 
-    /* client addr is after flags - can be different based on type of message */
+    /* client addr is after flags - can be different based on type of message
+     * */
     offsetptr += 6;
 
     if (op == 1) {
@@ -163,7 +160,7 @@ dhcpplugin_LTX_ycDhcpScanScan(
     /* 12 for above yiaddr, siaddr, and giaddr, 16 for chaddr */
     offsetptr += 28;
     /* 64 for sname, 128 for file, 4 for magic cookie */
-    if (offsetptr + 196 <= payloadSize) {
+    if ((size_t)offsetptr + 196 <= payloadSize) {
         offsetptr += 192;
     } else {
         /* should be good enough - but magic cookie will secure the decision */
