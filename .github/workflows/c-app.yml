@@ -1,0 +1,23 @@
+name: NetSA Package
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-16.04
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install dependencies
+      run: |
+        sudo apt install autoconf automake build-essential git libglib2.0-dev libpcap0.8-dev libsnappy-dev libtool libltdl-dev liblzo2-dev make rpm ruby ruby-dev xsltproc zlib1g zlib1g-dev
+        sudo gem install fpm -v 1.11.0
+    - name: Build packages
+      run: |
+        make build_deb
+    - name: Upload packages
+      uses: actions/upload-artifact@v2
+      with:
+        name: netsa-pkg
+        path: packaging/output/*.deb
