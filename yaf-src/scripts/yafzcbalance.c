@@ -5,7 +5,7 @@
  * PFRING ZC
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2015-2020 Carnegie Mellon University.
+ ** Copyright (C) 2015-2021 Carnegie Mellon University.
  ** All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Author: Emily Sarneso <ecoff@cert.org>
@@ -145,7 +145,7 @@ yzPrintVersion(
 
     g_string_append_printf(versString,
                            "yafzcbalance version %s"
-                           " (c) 2016-2020 Carnegie Mellon University.\n",
+                           " (c) 2016-2021 Carnegie Mellon University.\n",
                            VERSION);
     g_string_append(versString, "GNU General Public License (GPL) Rights "
                     "pursuant to Version 2, June 1991\n");
@@ -361,8 +361,9 @@ sigproc(
 
 static void
 yzSigStat(
-    void)
+    int sig)
 {
+    (void)sig;
     ++yzstat;
 }
 
@@ -377,7 +378,11 @@ time_pulse_thread(
 
     bind2core(time_core);
 
-    while (likely(!yzquit)) {
+    /* mthomas.2021.08.17. The condition used to be "while(likely(!yzquit))" */
+    for (;;) {
+        if (yzquit) {
+            return NULL;
+        }
         /* clock_gettime takes up to 30 nsec to get the time */
         clock_gettime(CLOCK_REALTIME, &tn);
 
@@ -391,11 +396,11 @@ time_pulse_thread(
             pulse_clone = ns;
         }
     }
-
-    return NULL;
 }
 
 
+/* the pfring_zc_distribution_func.  return type of the function's typedef may
+ * by int32_t or int64_t depending an PFRING version */
 int32_t
 yz_multiapp_hash_func(
     pfring_zc_pkt_buff  *pkt_handle,
@@ -664,7 +669,9 @@ main(
 
     zw = pfring_zc_run_balancer(inzqs, outzqs, n, numout, wsp,
                                 round_robin_bursts_policy,
-                                NULL, yz_multiapp_hash_func,
+                                NULL,
+                                ((pfring_zc_distribution_func)
+                                 yz_multiapp_hash_func),
                                 (void *)((long)numout), 0, core);
 
     if (zw == NULL) {

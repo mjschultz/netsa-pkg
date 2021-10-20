@@ -4,7 +4,7 @@
 ** YAF core I/O routines
 **
 ** ------------------------------------------------------------------------
-** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
+** Copyright (C) 2006-2021 Carnegie Mellon University. All Rights Reserved.
 ** ------------------------------------------------------------------------
 ** Authors: Brian Trammell, Chris Inacio, Emily Ecoff <ecoff@cert.org>
 ** ------------------------------------------------------------------------
@@ -964,8 +964,8 @@ yfAddTemplate(
         rtid = tid | YTF_BIF;
     }
 
-    g_debug("yaf: %x (%s), %d (%x)", tid, name, reverse,
-            tid | (reverse ? YTF_BIF : 0));
+    /* g_debug("yaf: %x (%s), %d (%x)", tid, name, reverse, */
+    /*         tid | (reverse ? YTF_BIF : 0)); */
 
     if (!fbTemplateAppendSpecArray(tmpl, spec, flags, err)) {
         return NULL;

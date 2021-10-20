@@ -6,7 +6,7 @@
  * This defines the interface to the YAF application labeler.
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2021 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Chris Inacio <inacio@cert.org>
  ** ------------------------------------------------------------------------

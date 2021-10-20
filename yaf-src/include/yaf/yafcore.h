@@ -4,7 +4,7 @@
  ** YAF core I/O routines
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2021 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Brian Trammell
  ** ------------------------------------------------------------------------
@@ -78,7 +78,7 @@
  * YAF installation process.
  *
  * @section Copyright
- * YAF is copyright 2006-2020 Carnegie Mellon University, and is released
+ * YAF is copyright 2006-2021 Carnegie Mellon University, and is released
  * under the GNU General Public License.  See the COPYING file in the
  * distribution for details.
  *

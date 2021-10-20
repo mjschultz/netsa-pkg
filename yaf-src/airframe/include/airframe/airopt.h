@@ -3,7 +3,7 @@
 ** Airframe options interface
 **
 ** ------------------------------------------------------------------------
-** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
+** Copyright (C) 2007-2021 Carnegie Mellon University. All Rights Reserved.
 ** ------------------------------------------------------------------------
 ** Authors: Tony Cebzanov
 ** ------------------------------------------------------------------------
@@ -89,7 +89,7 @@ typedef GOptionEntry AirOptionEntry;
 /**
  * Macro used to terminate an AF_OPTION list
  */
-#define AF_OPTION_END { NULL }
+#define AF_OPTION_END { NULL, 0, 0, G_OPTION_ARG_NONE, NULL, NULL, NULL }
 
 /**
  * Macro to test if an AF_OPTION structure is empty
@@ -101,6 +101,7 @@ typedef GOptionEntry AirOptionEntry;
 
 /** Integer option argument */
 #define AF_OPT_TYPE_INT    G_OPTION_ARG_INT
+#define AF_OPT_TYPE_INT64  G_OPTION_ARG_INT64
 
 /** String option argument */
 #define AF_OPT_TYPE_STRING G_OPTION_ARG_STRING

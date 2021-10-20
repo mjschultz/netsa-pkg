@@ -16,7 +16,7 @@
 * time, you can find the pcap file which contains the entire
 * flow.
 ** ------------------------------------------------------------------------
-** Copyright (C) 2006-2020 Carnegie Mellon University.
+** Copyright (C) 2006-2021 Carnegie Mellon University.
 ** All Rights Reserved.
 **
 ** ------------------------------------------------------------------------

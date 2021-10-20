@@ -7,7 +7,7 @@
  * It is based on RFC 1939 and some random limited packet capture.
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2021 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Dan Ruef <druef@cert.org>, Emily Ecoff <ecoff@cert.org>
  ** ------------------------------------------------------------------------
@@ -66,12 +66,11 @@
 #include <yaf/yafcore.h>
 #include <yaf/decode.h>
 #include <payloadScanner.h>
+#include <pcre.h>
 
 #if YAF_ENABLE_HOOKS
 #include <yaf/yafhooks.h>
 #endif
-
-#include <pcre.h>
 
 #define POP3DEBUG 0
 #define POP3_PORT 110
@@ -83,10 +82,14 @@ YC_SCANNER_PROTOTYPE(pop3plugin_LTX_ycPop3ScanScan);
  * flags
  *
  */
-static pcre        *pop3ReqRegex = NULL;
-static pcre        *pop3RespRegex = NULL;
+static pcre        *pop3RegexApplabel = NULL;
+#if YAF_ENABLE_HOOKS
+static pcre        *pop3RegexRequest  = NULL;
+static pcre        *pop3RegexResponse = NULL;
+#endif
 
-static unsigned int pcreInitialized = 0;
+/* 1 if initialized; -1 if initialization failed */
+static int pcreInitialized = 0;
 
 
 /**
@@ -103,7 +106,6 @@ static int
 ycDebugBinPrintf(
     uint8_t   *data,
     uint16_t   size);
-
 #endif /* if POP3DEBUG */
 
 /**
@@ -136,39 +138,32 @@ pop3plugin_LTX_ycPop3ScanScan(
     int      rc;
 #   define NUM_CAPT_VECTS 60
     int      vects[NUM_CAPT_VECTS];
-    uint16_t infoElement = 110;
-    pcre    *currentRegex = NULL;
 
-    if (0 == pcreInitialized) {
-        if (0 == ycPop3ScanInit()) {
+    if (1 != pcreInitialized) {
+        if (-1 == pcreInitialized || 0 == ycPop3ScanInit()) {
             return 0;
         }
     }
 
-    currentRegex = pop3ReqRegex;
-    rc = pcre_exec(currentRegex, NULL, (char *)payload, payloadSize, 0,
+    rc = pcre_exec(pop3RegexApplabel, NULL, (char *)payload, payloadSize, 0,
                    0, vects, NUM_CAPT_VECTS);
-
     if (rc <= 0) {
-        currentRegex = pop3RespRegex;
-        rc = pcre_exec(currentRegex, NULL, (char *)payload,
-                       payloadSize, 0, 0, vects,
-                       NUM_CAPT_VECTS);
-        infoElement = 111;
+        return 0;
     }
 
 #if YAF_ENABLE_HOOKS
-    if (rc > 0) {
-        yfHookScanPayload(flow, payload, payloadSize, currentRegex, 0,
-                          infoElement, POP3_PORT);
+    if (rc == 2) {
+        /* server side */
+        yfHookScanPayload(flow, payload, payloadSize, pop3RegexResponse, 0,
+                          111, POP3_PORT);
+    } else {
+        /* client side */
+        yfHookScanPayload(flow, payload, payloadSize, pop3RegexRequest, 0,
+                          110, POP3_PORT);
     }
 #endif /* if YAF_ENABLE_HOOKS */
 
-    if (rc > 0) {
-        return POP3_PORT;
-    }
-
-    return 0;
+    return POP3_PORT;
 }
 
 
@@ -183,49 +178,70 @@ pop3plugin_LTX_ycPop3ScanScan(
  *
  * @return 1 if initialization is complete correctly, 0 otherwise
  */
-static
-uint16_t
+static uint16_t
 ycPop3ScanInit(
     void)
 {
+#if YAF_ENABLE_HOOKS
+    /* capture everything the client says */
+    const char  pop3StringRequest[] =  "(?im)^[ \\t]*([!-~][ !-~]+)";
+
+    /* capture the first line of each response */
+    const char  pop3StringResponse[] = "(?m)^((?:\\+OK|-ERR)[ -~]*)";
+#endif
     const char *errorString;
     int         errorPos;
 
-    const char  pop3ReqRegexString[]   = "(^(?i)(QUIT|STAT|LIST|RETR|DELE|NOOP"
-        "|RSET|TOP|UIDL|USER|PASS|APOP) "
-        "[ a-zA-Z0-9]*)(?:[\r\n])";
-    const char  pop3RespRegexString[]  = "([-+](OK|ERR)[ a-zA-Z0-9]*)"
-        "(?:[ \r\n])";
+    /* used to determine if this connection looks like POP3; capture the
+     * response to distinguish the server from the client */
+    const char  pop3StringApplabel[] =
+        "(?i)^\\s*(?:(?:CAPA\\b|AUTH\\s(?:KERBEROS_V|GSSAPI|SKEY)|"
+        "UIDL\\b|APOP\\s|USER\\s)|(\\+OK\\b|-ERR\\b))";
 
-    pop3ReqRegex = pcre_compile(pop3ReqRegexString,
-                                PCRE_ANCHORED, &errorString,
-                                &errorPos, NULL);
+    pcreInitialized = 1;
 
-    pop3RespRegex = pcre_compile(pop3RespRegexString,
-                                 PCRE_ANCHORED, &errorString,
-                                 &errorPos, NULL);
-
-    if (pop3ReqRegex && pop3RespRegex) {
-        pcreInitialized = 1;
+    pop3RegexApplabel = pcre_compile(
+        pop3StringApplabel, 0, &errorString, &errorPos, NULL);
+    if (!pop3RegexApplabel) {
+        /* g_debug("Failed to compile '%s'; %s at position %d", */
+        /*         pop3StringApplabel, errorString, errorPos); */
+        pcreInitialized = -1;
     }
 
-    return pcreInitialized;
+#if YAF_ENABLE_HOOKS
+    pop3RegexRequest = pcre_compile(
+        pop3StringRequest, 0, &errorString, &errorPos, NULL);
+    pop3RegexResponse = pcre_compile(
+        pop3StringResponse, 0, &errorString, &errorPos, NULL);
+
+    if (!pop3RegexRequest || !pop3RegexResponse) {
+        pcreInitialized = -1;
+    }
+
+#if 0
+    if (!pop3RegexRequest) {
+        g_debug("Failed to compile '%s'; %s at position %d",
+                pop3StringRequest, errorString, errorPos);
+    }
+    if (!pop3RegexResponse) {
+        g_debug("Failed to compile '%s'; %s at position %d",
+                pop3StringResponse, errorString, errorPos);
+    }
+#endif  /* 0 */
+#endif  /* YAF_ENABLE_HOOKS */
+
+    return (1 == pcreInitialized);
 }
 
 
 #if POP3DEBUG
-static
-int
+static int
 ycDebugBinPrintf(
     uint8_t   *data,
     uint16_t   size)
 {
     uint16_t loop;
     int      numPrinted = 0;
-
-    if (0 == size) {
-        return 0;
-    }
 
     for (loop = 0; loop < size; loop++) {
         if (isprint(*(data + loop)) && !iscntrl(*(data + loop))) {
@@ -243,6 +259,4 @@ ycDebugBinPrintf(
 
     return numPrinted;
 }
-
-
 #endif /* if POP3DEBUG */

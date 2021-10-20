@@ -1,9 +1,33 @@
+Version 2.12.2: 2021-10-14
+==========================
+
+Added new protocols to the yafAppLabelRules.conf file and updated several regular expressions.
+
+Changed the regexes used by the SMTP DPI plugin and improved capture when multiple messages appear in a single SMTP session.
+
+Fixed a crash in the SMTP DPI plugin when reading uniflow records.
+
+Updated the POP3 DPI plugin.
+
+Updated yafzcbalance to be compatibile with PF_Ring-8.
+
 Version 2.12.1: 2020-12-22
 ==========================
 
 Changed the templates and IEs used for SMTP DPI.  The new templates use different IDs than those used by previous releases of YAF.  super_mediator-1.8.0 or later is required to read this format.  Currently there is no version of Analysis Pipeline that reads the SMTP DPI.
 
 First public release of YAF 2.12.x.
+
+Version 2.11.3: 2021-10-14
+==========================
+
+Added new protocols to the yafAppLabelRules.conf file and updated several regular expressions.
+
+Updated the SMTP regexes used in the yafDPIRules.conf file to be similar to those used by the smtpplugin in YAF 2.12.2.
+
+Updated yafzcbalance to be compatibile with PF_Ring-8.
+
+Note: The yafAppLabelRules.conf file yafDPIRules.conf files in this release are usuable in prior releases of YAF also.
 
 Version 2.11.2: 2020-11-20
 ==========================
