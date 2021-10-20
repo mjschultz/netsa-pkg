@@ -2,7 +2,7 @@
 ## ------------------------------------------------------------------------
 ## Makefile.am (source)
 ## ------------------------------------------------------------------------
-## Copyright (C) 2018-2020 Carnegie Mellon University. All Rights Reserved.
+## Copyright (C) 2018-2021 Carnegie Mellon University. All Rights Reserved.
 ## ------------------------------------------------------------------------
 
 BUILT_SOURCES = $(INFOMODEL_REGISTRY_INCLUDE_FILES)

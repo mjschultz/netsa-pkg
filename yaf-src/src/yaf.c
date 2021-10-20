@@ -3,7 +3,7 @@
 ** Yet Another Flow generator
 * **
 ** ------------------------------------------------------------------------
-** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
+** Copyright (C) 2006-2021 Carnegie Mellon University. All Rights Reserved.
 ** ------------------------------------------------------------------------
 ** Authors: Brian Trammell
 ** ------------------------------------------------------------------------
@@ -195,7 +195,7 @@ typedef void (*yfClose_fn)(
     void *);
 static yfClose_fn yaf_close_fn = NULL;
 
-#define THE_LAME_80COL_FORMATTER_STRING "\n\t\t\t\t"
+#define AF_OPTION_WRAP "\n\t\t\t\t"
 
 /*local functions */
 #if YAF_ENABLE_HOOKS
@@ -207,305 +207,269 @@ pluginOptParse(
 /* Local derived configutation */
 
 AirOptionEntry yaf_optent_core[] = {
-    AF_OPTION( "in", 'i', 0, AF_OPT_TYPE_STRING, &yaf_config.inspec,
-               THE_LAME_80COL_FORMATTER_STRING "Input (file, - for stdin; "
-               "interface)", "inspec"),
-    AF_OPTION( "out", 'o', 0, AF_OPT_TYPE_STRING, &yaf_config.outspec,
-               THE_LAME_80COL_FORMATTER_STRING "Output (file, - for stdout; "
-               "file prefix,"THE_LAME_80COL_FORMATTER_STRING "address)",
-               "outspec"),
-    AF_OPTION( "config", 'c', 0, AF_OPT_TYPE_STRING, &yaf_config_file,
-               THE_LAME_80COL_FORMATTER_STRING "YAF configuration filename",
-               "file"),
+    AF_OPTION("in", 'i', 0, AF_OPT_TYPE_STRING, &yaf_config.inspec,
+              AF_OPTION_WRAP "Input (file, - for stdin; interface) [-]",
+              "inspec"),
+    AF_OPTION("out", 'o', 0, AF_OPT_TYPE_STRING, &yaf_config.outspec,
+              AF_OPTION_WRAP "Output (file, - for stdout; file prefix;"
+              AF_OPTION_WRAP "address) [-]",
+              "outspec"),
+    AF_OPTION("config", 'c', 0, AF_OPT_TYPE_STRING, &yaf_config_file,
+              AF_OPTION_WRAP "YAF configuration filename",
+              "file"),
 #ifdef HAVE_SPREAD
-    AF_OPTION( "group", 'g', 0, AF_OPT_TYPE_STRING, &yaf_opt_spread_group,
-               THE_LAME_80COL_FORMATTER_STRING "Spread group name (comma "
-               "seperated list). "THE_LAME_80COL_FORMATTER_STRING
-               "For groupby: comma separated "
-               THE_LAME_80COL_FORMATTER_STRING "group_name:value,[group_name:"
-               "value,...]", "group-name"),
-    AF_OPTION( "groupby", (char)0, 0, AF_OPT_TYPE_STRING,
-               &yaf_opt_spread_groupby, THE_LAME_80COL_FORMATTER_STRING
-               "<port, vlan, applabel, protocol, version>"
-               THE_LAME_80COL_FORMATTER_STRING "(Must be used "
-               "with group and group must have"THE_LAME_80COL_FORMATTER_STRING
-               "values to groupby", "type"),
+    AF_OPTION("group", 'g', 0, AF_OPT_TYPE_STRING, &yaf_opt_spread_group,
+              AF_OPTION_WRAP "Spread group name (comma seperated list)."
+              AF_OPTION_WRAP "For groupby: comma separated"
+              AF_OPTION_WRAP "group_name:value,[group_name:value,...]",
+              "group-name"),
+    AF_OPTION("groupby", 0, 0, AF_OPT_TYPE_STRING, &yaf_opt_spread_groupby,
+              AF_OPTION_WRAP "<port, vlan, applabel, protocol, version>"
+              AF_OPTION_WRAP "(Must be used with group and group must have"
+              AF_OPTION_WRAP "values to groupby", "type"),
 #endif /* ifdef HAVE_SPREAD */
-    AF_OPTION( "live", 'P', 0, AF_OPT_TYPE_STRING, &yaf_config.livetype,
-               THE_LAME_80COL_FORMATTER_STRING "Capture from interface in -i; "
-               "type is "THE_LAME_80COL_FORMATTER_STRING "[pcap], dag, "
-               "napatech, netronome, pfring, zc", "type"),
-    AF_OPTION( "filter", 'F', 0, AF_OPT_TYPE_STRING, &yaf_config.bpf_expr,
-               THE_LAME_80COL_FORMATTER_STRING "BPF filtering expression",
-               "expression"),
-    AF_OPTION( "caplist", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_caplist_mode,
-               THE_LAME_80COL_FORMATTER_STRING "Read ordered list of input "
-               "files from "THE_LAME_80COL_FORMATTER_STRING "file in -i", NULL),
+    AF_OPTION("live", 'P', 0, AF_OPT_TYPE_STRING, &yaf_config.livetype,
+              AF_OPTION_WRAP "Capture from interface in -i; type is"
+              AF_OPTION_WRAP "[pcap], dag, napatech, netronome, pfring, zc",
+              "type"),
+    AF_OPTION("filter", 'F', 0, AF_OPT_TYPE_STRING, &yaf_config.bpf_expr,
+              AF_OPTION_WRAP "BPF filtering expression",
+              "expression"),
+    AF_OPTION("caplist", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_caplist_mode,
+              AF_OPTION_WRAP "Read ordered list of input files from"
+              AF_OPTION_WRAP "file in -i", NULL),
 #if YAF_ENABLE_ZLIB
-    AF_OPTION( "decompress", (char)0, 0, AF_OPT_TYPE_STRING, &yaf_tmp_file,
-               THE_LAME_80COL_FORMATTER_STRING "Decompression file directory",
-               "dir"),
+    AF_OPTION("decompress", 0, 0, AF_OPT_TYPE_STRING, &yaf_tmp_file,
+              AF_OPTION_WRAP "Decompression file directory [$TMPDIR]", "dir"),
 #endif
-    AF_OPTION( "rotate", 'R', 0, AF_OPT_TYPE_INT, &yaf_opt_rotate,
-               THE_LAME_80COL_FORMATTER_STRING "Rotate output files every n "
-               "seconds ", "sec" ),
-    AF_OPTION( "lock", 'k', 0, AF_OPT_TYPE_NONE, &yaf_config.lockmode,
-               THE_LAME_80COL_FORMATTER_STRING "Use exclusive .lock files on "
-               "output for"THE_LAME_80COL_FORMATTER_STRING "concurrency", NULL),
-    AF_OPTION( "daemonize", 'd', 0, AF_OPT_TYPE_NONE, &yaf_daemon,
-               THE_LAME_80COL_FORMATTER_STRING "Daemonize yaf.", NULL),
-    AF_OPTION( "pidfile", (char)0, 0, AF_OPT_TYPE_STRING, &yaf_pidfile,
-               THE_LAME_80COL_FORMATTER_STRING
-               "Complete path to the process ID "
-               "file.", NULL),
-    AF_OPTION( "promisc-off", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_promisc,
-               THE_LAME_80COL_FORMATTER_STRING "Do not put the interface in "
-               "promiscuous mode.", NULL),
-    AF_OPTION( "noerror", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_config.noerror,
-               THE_LAME_80COL_FORMATTER_STRING "Do not error out on single "
-               "PCAP file issue"THE_LAME_80COL_FORMATTER_STRING " with "
-               "multiple inputs", NULL ),
+    AF_OPTION("rotate", 'R', 0, AF_OPT_TYPE_INT, &yaf_opt_rotate,
+              AF_OPTION_WRAP "Rotate output files every n seconds", "sec"),
+    AF_OPTION("lock", 'k', 0, AF_OPT_TYPE_NONE, &yaf_config.lockmode,
+              AF_OPTION_WRAP "Use exclusive .lock files on output for"
+              AF_OPTION_WRAP "concurrency", NULL),
+    AF_OPTION("daemonize", 'd', 0, AF_OPT_TYPE_NONE, &yaf_daemon,
+              AF_OPTION_WRAP "Daemonize yaf", NULL),
+    AF_OPTION("pidfile", 0, 0, AF_OPT_TYPE_STRING, &yaf_pidfile,
+              AF_OPTION_WRAP "Complete path to the process ID file", "path"),
+    AF_OPTION("promisc-off", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_promisc,
+              AF_OPTION_WRAP "Do not put the interface in promiscuous mode",
+              NULL),
+    AF_OPTION("noerror", 0, 0, AF_OPT_TYPE_NONE, &yaf_config.noerror,
+              AF_OPTION_WRAP "Do not error out on single PCAP file issue"
+              AF_OPTION_WRAP "with multiple inputs", NULL),
 #ifdef HAVE_SPREAD
-    AF_OPTION("ipfix", (char)0, 0, AF_OPT_TYPE_STRING, &yaf_opt_ipfix_transport,
-              THE_LAME_80COL_FORMATTER_STRING "Export via IPFIX (tcp, udp, "
-              "sctp, spread) to CP "THE_LAME_80COL_FORMATTER_STRING "at -o",
-              "protocol" ),
+    AF_OPTION("ipfix", 0, 0, AF_OPT_TYPE_STRING, &yaf_opt_ipfix_transport,
+              AF_OPTION_WRAP "Export via IPFIX (tcp, udp, sctp, spread) to CP"
+              AF_OPTION_WRAP "at -o",
+              "protocol"),
 #else /* ifdef HAVE_SPREAD */
-    AF_OPTION("ipfix", (char)0, 0, AF_OPT_TYPE_STRING, &yaf_opt_ipfix_transport,
-              THE_LAME_80COL_FORMATTER_STRING "Export via IPFIX (tcp, udp, "
-              "sctp) to CP at -o", "protocol"),
+    AF_OPTION("ipfix", 0, 0, AF_OPT_TYPE_STRING, &yaf_opt_ipfix_transport,
+              AF_OPTION_WRAP "Export via IPFIX (tcp, udp, sctp) to CP at -o",
+              "protocol"),
 #endif /* ifdef HAVE_SPREAD */
     AF_OPTION_END
 };
 
 AirOptionEntry yaf_optent_dec[] = {
-    AF_OPTION( "no-frag", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_nofrag,
-               THE_LAME_80COL_FORMATTER_STRING "Disable IP fragment reassembly",
-               NULL ),
-    AF_OPTION( "max-frags", (char)0, 0, AF_OPT_TYPE_INT, &yaf_opt_max_frags,
-               THE_LAME_80COL_FORMATTER_STRING "Maximum size of fragment table "
-               "[0]", "fragments" ),
-    AF_OPTION( "ip4-only", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_ip4_mode,
-               THE_LAME_80COL_FORMATTER_STRING "Only process IPv4 packets",
-               NULL ),
-    AF_OPTION( "ip6-only", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_ip6_mode,
-               THE_LAME_80COL_FORMATTER_STRING "Only process IPv6 packets",
-               NULL ),
-    AF_OPTION( "gre-decode", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_gre_mode,
-               THE_LAME_80COL_FORMATTER_STRING "Decode GRE encapsulated "
-               "packets", NULL ),
+    AF_OPTION("no-frag", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_nofrag,
+              AF_OPTION_WRAP "Disable IP fragment reassembly",
+              NULL),
+    AF_OPTION("max-frags", 0, 0, AF_OPT_TYPE_INT, &yaf_opt_max_frags,
+              AF_OPTION_WRAP "Maximum size of fragment table [0]", "fragments"),
+    AF_OPTION("ip4-only", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_ip4_mode,
+              AF_OPTION_WRAP "Only process IPv4 packets",
+              NULL),
+    AF_OPTION("ip6-only", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_ip6_mode,
+              AF_OPTION_WRAP "Only process IPv6 packets",
+              NULL),
+    AF_OPTION("gre-decode", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_gre_mode,
+              AF_OPTION_WRAP "Decode GRE encapsulated packets", NULL),
     AF_OPTION_END
 };
 
 AirOptionEntry yaf_optent_flow[] = {
-    AF_OPTION( "idle-timeout", 'I', 0, AF_OPT_TYPE_INT, &yaf_opt_idle,
-               THE_LAME_80COL_FORMATTER_STRING "Idle flow timeout [300, 5m]",
-               "sec" ),
-    AF_OPTION( "active-timeout", 'A', 0, AF_OPT_TYPE_INT, &yaf_opt_active,
-               THE_LAME_80COL_FORMATTER_STRING "Active flow timeout [1800, "
-               "30m]", "sec" ),
-    AF_OPTION( "max-flows", (char)0, 0, AF_OPT_TYPE_INT, &yaf_opt_max_flows,
-               THE_LAME_80COL_FORMATTER_STRING "Maximum size of flow table [0]",
-               "flows" ),
-    AF_OPTION( "udp-temp-timeout", (char)0, 0, AF_OPT_TYPE_INT,
-               &yaf_opt_udp_temp_timeout,
-               THE_LAME_80COL_FORMATTER_STRING "UDP template timeout period "
-               "[600 sec, 10 m]", "sec"),
-    AF_OPTION( "force-read-all", (char)0, 0, AF_OPT_TYPE_NONE,
-               &yaf_opt_force_read_all, THE_LAME_80COL_FORMATTER_STRING "Force "
-               "read of any out of sequence packets", NULL),
-    AF_OPTION( "no-vlan-in-key", (char)0, 0, AF_OPT_TYPE_NONE,
-               &yaf_novlan_in_key, THE_LAME_80COL_FORMATTER_STRING "Do not use "
-               "the VLAN in the flow key hash calculation", NULL),
+    AF_OPTION("idle-timeout", 'I', 0, AF_OPT_TYPE_INT, &yaf_opt_idle,
+              AF_OPTION_WRAP "Idle flow timeout [300, 5m]",
+              "sec"),
+    AF_OPTION("active-timeout", 'A', 0, AF_OPT_TYPE_INT, &yaf_opt_active,
+              AF_OPTION_WRAP "Active flow timeout [1800, 30m]", "sec"),
+    AF_OPTION("max-flows", 0, 0, AF_OPT_TYPE_INT, &yaf_opt_max_flows,
+              AF_OPTION_WRAP "Maximum size of flow table [0]",
+              "flows"),
+    AF_OPTION("udp-temp-timeout", 0, 0, AF_OPT_TYPE_INT,
+              &yaf_opt_udp_temp_timeout,
+              AF_OPTION_WRAP "UDP template timeout period [600, 10m]", "sec"),
+    AF_OPTION("force-read-all", 0, 0, AF_OPT_TYPE_NONE,
+              &yaf_opt_force_read_all,
+              AF_OPTION_WRAP "Force read of any out of sequence packets", NULL),
+    AF_OPTION("no-vlan-in-key", 0, 0, AF_OPT_TYPE_NONE, &yaf_novlan_in_key,
+              AF_OPTION_WRAP "Do not use the VLAN in the flow key hash"
+              AF_OPTION_WRAP "calculation", NULL),
     AF_OPTION_END
 };
 
 AirOptionEntry yaf_optent_exp[] = {
-    AF_OPTION( "no-output", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_config.no_output,
-               THE_LAME_80COL_FORMATTER_STRING "Turn off IPFIX export", NULL),
-    AF_OPTION( "no-stats", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_config.nostats,
-               THE_LAME_80COL_FORMATTER_STRING "Turn off stats option records "
-               "IPFIX export", NULL),
-    AF_OPTION( "stats", (char)0, 0, AF_OPT_TYPE_INT, &yaf_opt_stats,
-               THE_LAME_80COL_FORMATTER_STRING "Export yaf process stats "
-               "every n seconds "THE_LAME_80COL_FORMATTER_STRING
-               "[300 (5 min)]", NULL),
-    AF_OPTION( "no-tombstone", (char)0, 0, AF_OPT_TYPE_NONE,
-               &yaf_opt_no_tombstone,
-               THE_LAME_80COL_FORMATTER_STRING "Turn off tombstone records "
-               "IPFIX export", NULL),
-    AF_OPTION( "tombstone-configured-id", (char)0, 0, AF_OPT_TYPE_INT,
-               &yaf_opt_configured_id,
-               THE_LAME_80COL_FORMATTER_STRING "Set tombstone record's 16 bit "
-               "configured identifier.", NULL),
-    AF_OPTION( "silk", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_silk_mode,
-               THE_LAME_80COL_FORMATTER_STRING "Clamp octets to 32 bits, "
-               "note continued in"THE_LAME_80COL_FORMATTER_STRING
-               "flowEndReason.  Now Exports TCP Fields within "
-               THE_LAME_80COL_FORMATTER_STRING "flow record instead of "
-               "subTemplateMultiList.", NULL ),
-    AF_OPTION( "mac", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_mac_mode,
-               THE_LAME_80COL_FORMATTER_STRING "Export MAC-layer information",
-               NULL ),
-    AF_OPTION( "uniflow", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_uniflow_mode,
-               THE_LAME_80COL_FORMATTER_STRING "Write uniflows for "
-               "compatibility", NULL ),
-    AF_OPTION( "udp-uniflow", 0, 0, AF_OPT_TYPE_INT, &yaf_opt_udp_uniflow_port,
-               THE_LAME_80COL_FORMATTER_STRING "Exports a single UDP packet "
-               "as a flow on the"THE_LAME_80COL_FORMATTER_STRING "given port. "
-               "Use 1 for all ports [0]", "port" ),
-    AF_OPTION( "force-ip6-export", (char)0, 0, AF_OPT_TYPE_NONE,
-               &yaf_opt_ip6map_mode, THE_LAME_80COL_FORMATTER_STRING "Export "
-               "all IPv4 addresses as IPv6 in "THE_LAME_80COL_FORMATTER_STRING
-               "::FFFF/96 [N/A]", NULL ),
-    AF_OPTION( "observation-domain", (char)0, 0, AF_OPT_TYPE_INT,
-               &yaf_config.odid, THE_LAME_80COL_FORMATTER_STRING
-               "Set observationDomainID on exported"
-               THE_LAME_80COL_FORMATTER_STRING "messages [0]", "odId" ),
-    AF_OPTION( "flow-stats", (char)0, 0, AF_OPT_TYPE_NONE,
-               &yaf_opt_extra_stats_mode, THE_LAME_80COL_FORMATTER_STRING
-               "Export extra flow attributes and statistics ", NULL),
-    AF_OPTION( "delta", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_config.deltaMode,
-               THE_LAME_80COL_FORMATTER_STRING "Export packet and octet counts "
-               "using delta "THE_LAME_80COL_FORMATTER_STRING
-               "information elements", NULL),
-    AF_OPTION("ingress", (char)0, 0, AF_OPT_TYPE_INT, &yaf_opt_ingress_int,
-              THE_LAME_80COL_FORMATTER_STRING "Set ingressInterface field in "
-              "flow template", NULL),
-    AF_OPTION( "egress", (char)0, 0, AF_OPT_TYPE_INT, &yaf_opt_egress_int,
-               THE_LAME_80COL_FORMATTER_STRING "Set egressInterface field in "
-               "flow template", NULL),
+    AF_OPTION("no-output", 0, 0, AF_OPT_TYPE_NONE, &yaf_config.no_output,
+              AF_OPTION_WRAP "Turn off IPFIX export", NULL),
+    AF_OPTION("no-stats", 0, 0, AF_OPT_TYPE_NONE, &yaf_config.nostats,
+              AF_OPTION_WRAP "Turn off stats option records IPFIX export",
+              NULL),
+    AF_OPTION("stats", 0, 0, AF_OPT_TYPE_INT, &yaf_opt_stats,
+              AF_OPTION_WRAP "Export yaf process statistics every n seconds"
+              AF_OPTION_WRAP "[300, 5m]", "n"),
+    AF_OPTION("no-tombstone", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_no_tombstone,
+              AF_OPTION_WRAP "Turn off export of tombstone records", NULL),
+    AF_OPTION("tombstone-configured-id", 0, 0, AF_OPT_TYPE_INT,
+              &yaf_opt_configured_id,
+              AF_OPTION_WRAP "Set tombstone record's 16 bit configured"
+              AF_OPTION_WRAP "identifier [0]",
+              "ident"),
+    AF_OPTION("silk", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_silk_mode,
+              AF_OPTION_WRAP "Clamp octets to 32 bits, note continued in"
+              AF_OPTION_WRAP "flowEndReason, export TCP Fields within"
+              AF_OPTION_WRAP "flow record instead of subTemplateMultiList",
+              NULL),
+    AF_OPTION("mac", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_mac_mode,
+              AF_OPTION_WRAP "Export MAC-layer information",
+              NULL),
+    AF_OPTION("uniflow", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_uniflow_mode,
+              AF_OPTION_WRAP "Write uniflows for compatibility", NULL),
+    AF_OPTION("udp-uniflow", 0, 0, AF_OPT_TYPE_INT, &yaf_opt_udp_uniflow_port,
+              AF_OPTION_WRAP "Exports a single UDP packet as a flow on the"
+              AF_OPTION_WRAP "given port. Use 1 for all ports [0]", "port"),
+    AF_OPTION("force-ip6-export", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_ip6map_mode,
+              AF_OPTION_WRAP "Export all IPv4 addresses as IPv6 in ::ffff/96",
+              NULL),
+    AF_OPTION("observation-domain", 0, 0, AF_OPT_TYPE_INT, &yaf_config.odid,
+              AF_OPTION_WRAP "Set observationDomainID on exported"
+              AF_OPTION_WRAP "messages [0]", "odId"),
+    AF_OPTION("flow-stats", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_extra_stats_mode,
+              AF_OPTION_WRAP "Export extra flow attributes and statistics",
+              NULL),
+    AF_OPTION("delta", 0, 0, AF_OPT_TYPE_NONE, &yaf_config.deltaMode,
+              AF_OPTION_WRAP "Export packet and octet counts using delta"
+              AF_OPTION_WRAP "information elements", NULL),
+    AF_OPTION("ingress", 0, 0, AF_OPT_TYPE_INT, &yaf_opt_ingress_int,
+              AF_OPTION_WRAP "Set ingressInterface field in flow template [0]",
+              "ingressId"),
+    AF_OPTION("egress", 0, 0, AF_OPT_TYPE_INT, &yaf_opt_egress_int,
+              AF_OPTION_WRAP "Set egressInterface field in flow template [0]",
+              "egressId"),
 #if YAF_ENABLE_METADATA_EXPORT
-    AF_OPTION( "metadata-export", (char)0, 0, AF_OPT_TYPE_NONE,
-               &yaf_config.tmpl_metadata,
-               THE_LAME_80COL_FORMATTER_STRING "Export template and information"
-               " element metadata before data", NULL),
+    AF_OPTION("metadata-export", 0, 0, AF_OPT_TYPE_NONE,
+              &yaf_config.tmpl_metadata,
+              AF_OPTION_WRAP "Export template and information element"
+              AF_OPTION_WRAP "metadata before data", NULL),
 #endif /* if YAF_ENABLE_METADATA_EXPORT */
 #if YAF_ENABLE_DAG_SEPARATE_INTERFACES || YAF_ENABLE_SEPARATE_INTERFACES
-    AF_OPTION( "export-interface", (char)0, 0, AF_OPT_TYPE_NONE,
-               &yaf_config.exportInterface, THE_LAME_80COL_FORMATTER_STRING
-               "Export DAG, Napatech, or Netronome interface numbers in "
-               "export records", NULL ),
+    AF_OPTION("export-interface", 0, 0, AF_OPT_TYPE_NONE,
+              &yaf_config.exportInterface,
+              AF_OPTION_WRAP "Export DAG, Napatech, or Netronome interface"
+              AF_OPTION_WRAP "numbers in export records", NULL),
 #endif /* if YAF_ENABLE_DAG_SEPARATE_INTERFACES ||
         * YAF_ENABLE_SEPARATE_INTERFACES */
     AF_OPTION_END
 };
 
 AirOptionEntry yaf_optent_ipfix[] = {
-    AF_OPTION( "ipfix-port", (char)0, 0, AF_OPT_TYPE_STRING,
-               &(yaf_config.connspec.svc), THE_LAME_80COL_FORMATTER_STRING
-               "Select IPFIX export port [4739, 4740]", "port" ),
-    AF_OPTION( "tls", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_ipfix_tls,
-               THE_LAME_80COL_FORMATTER_STRING "Use TLS/DTLS to secure IPFIX "
-               "export", NULL ),
-    AF_OPTION( "tls-ca", (char)0, 0, AF_OPT_TYPE_STRING,
-               &(yaf_config.connspec.ssl_ca_file),
-               THE_LAME_80COL_FORMATTER_STRING "Specify TLS Certificate "
-               "Authority file", "cafile" ),
-    AF_OPTION( "tls-cert", (char)0, 0, AF_OPT_TYPE_STRING,
-               &(yaf_config.connspec.ssl_cert_file),
-               THE_LAME_80COL_FORMATTER_STRING "Specify TLS Certificate file",
-               "certfile" ),
-    AF_OPTION( "tls-key", (char)0, 0, AF_OPT_TYPE_STRING,
-               &(yaf_config.connspec.ssl_key_file),
-               THE_LAME_80COL_FORMATTER_STRING "Specify TLS Private Key file",
-               "keyfile" ),
+    AF_OPTION("ipfix-port", 0, 0, AF_OPT_TYPE_STRING,
+              &(yaf_config.connspec.svc),
+              AF_OPTION_WRAP "Select IPFIX export port [4739, 4740]", "port"),
+    AF_OPTION("tls", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_ipfix_tls,
+              AF_OPTION_WRAP "Use TLS/DTLS to secure IPFIX export", NULL),
+    AF_OPTION("tls-ca", 0, 0, AF_OPT_TYPE_STRING,
+              &(yaf_config.connspec.ssl_ca_file),
+              AF_OPTION_WRAP "Specify TLS Certificate Authority file",
+              "cafile"),
+    AF_OPTION("tls-cert", 0, 0, AF_OPT_TYPE_STRING,
+              &(yaf_config.connspec.ssl_cert_file),
+              AF_OPTION_WRAP "Specify TLS Certificate file",
+              "certfile"),
+    AF_OPTION("tls-key", 0, 0, AF_OPT_TYPE_STRING,
+              &(yaf_config.connspec.ssl_key_file),
+              AF_OPTION_WRAP "Specify TLS Private Key file",
+              "keyfile"),
     AF_OPTION_END
 };
 
 AirOptionEntry yaf_optent_pcap[] = {
-    AF_OPTION( "pcap", 'p', 0, AF_OPT_TYPE_STRING, &yaf_config.pcapdir,
-               THE_LAME_80COL_FORMATTER_STRING "Directory/File prefix to store "
-               THE_LAME_80COL_FORMATTER_STRING "rolling pcap files", "dir"),
-    AF_OPTION( "pcap-per-flow", (char)0, 0, AF_OPT_TYPE_NONE,
-               &yaf_config.pcap_per_flow,
-               THE_LAME_80COL_FORMATTER_STRING "Create a separate pcap file for"
-               " each flow"THE_LAME_80COL_FORMATTER_STRING
-               "in the --pcap directory", NULL),
-    AF_OPTION( "max-pcap", (char)0, 0, AF_OPT_TYPE_INT, &yaf_opt_max_pcap,
-               THE_LAME_80COL_FORMATTER_STRING "Max File Size of Pcap File "
-               "[25 MB]", "MB"),
-    AF_OPTION( "pcap-timer", (char)0, 0, AF_OPT_TYPE_INT,
-               &yaf_opt_pcap_timer,
-               THE_LAME_80COL_FORMATTER_STRING "Number of seconds for rolling"
-               THE_LAME_80COL_FORMATTER_STRING " pcap file [300]", "sec"),
-    AF_OPTION( "pcap-meta-file", (char)0, 0, AF_OPT_TYPE_STRING,
-               &yaf_pcap_meta_file,
-               THE_LAME_80COL_FORMATTER_STRING "Metadata file for rolling pcap "
-               THE_LAME_80COL_FORMATTER_STRING "output or indexing input pcap",
-               "path"),
-    AF_OPTION( "index-pcap", (char)0, 0, AF_OPT_TYPE_NONE,
-               &yaf_index_pcap,
-               THE_LAME_80COL_FORMATTER_STRING "Index the pcap with offset and "
-               THE_LAME_80COL_FORMATTER_STRING "lengths per packet", NULL),
-    AF_OPTION( "hash", (char)0, 0, AF_OPT_TYPE_STRING,
-               &yaf_hash_search,
-               THE_LAME_80COL_FORMATTER_STRING "Create only a PCAP for the "
-               THE_LAME_80COL_FORMATTER_STRING "given hash", "hash"),
-    AF_OPTION( "stime", (char)0, 0, AF_OPT_TYPE_STRING,
-               &yaf_stime_search,
-               THE_LAME_80COL_FORMATTER_STRING
-               "Create only a PCAP for the given stime"
-               THE_LAME_80COL_FORMATTER_STRING "(--hash must also be present)",
-               "ms"),
+    AF_OPTION("pcap", 'p', 0, AF_OPT_TYPE_STRING, &yaf_config.pcapdir,
+              AF_OPTION_WRAP "Directory/File prefix to store rolling"
+              AF_OPTION_WRAP "pcap files", "dir"),
+    AF_OPTION("pcap-per-flow", 0, 0, AF_OPT_TYPE_NONE,
+              &yaf_config.pcap_per_flow,
+              AF_OPTION_WRAP "Create a separate pcap file for each flow"
+              AF_OPTION_WRAP "in the --pcap directory", NULL),
+    AF_OPTION("max-pcap", 0, 0, AF_OPT_TYPE_INT, &yaf_opt_max_pcap,
+              AF_OPTION_WRAP "Max File Size of Pcap File [25 MB]", "MB"),
+    AF_OPTION("pcap-timer", 0, 0, AF_OPT_TYPE_INT, &yaf_opt_pcap_timer,
+              AF_OPTION_WRAP "Number of seconds for rolling pcap file [300]",
+              "sec"),
+    AF_OPTION("pcap-meta-file", 0, 0, AF_OPT_TYPE_STRING, &yaf_pcap_meta_file,
+              AF_OPTION_WRAP "Metadata file for rolling pcap output or"
+              AF_OPTION_WRAP "indexing input pcap",
+              "path"),
+    AF_OPTION("index-pcap", 0, 0, AF_OPT_TYPE_NONE, &yaf_index_pcap,
+              AF_OPTION_WRAP "Index the pcap with offset and lengths"
+              AF_OPTION_WRAP "per packet", NULL),
+    AF_OPTION("hash", 0, 0, AF_OPT_TYPE_STRING, &yaf_hash_search,
+              AF_OPTION_WRAP "Create only a PCAP for the given hash", "hash"),
+    AF_OPTION("stime", 0, 0, AF_OPT_TYPE_STRING, &yaf_stime_search,
+              AF_OPTION_WRAP "Create only a PCAP for the given stime"
+              AF_OPTION_WRAP "(--hash must also be present)",
+              "ms"),
     AF_OPTION_END
 };
 
 
 #if YAF_ENABLE_PAYLOAD
 AirOptionEntry yaf_optent_payload[] = {
-    AF_OPTION( "max-payload", 's', 0, AF_OPT_TYPE_INT, &yaf_opt_max_payload,
-               THE_LAME_80COL_FORMATTER_STRING "Maximum payload to capture per "
-               "flow [0]", "octets" ),
-    AF_OPTION( "export-payload", (char)0, 0, AF_OPT_TYPE_NONE,
-               &yaf_opt_payload_export_on, THE_LAME_80COL_FORMATTER_STRING
-               "Maximum payload to export per flow direction [0]", NULL),
-    AF_OPTION( "udp-payload", (char)0, 0, AF_OPT_TYPE_NONE,
-               &yaf_opt_udp_max_payload, THE_LAME_80COL_FORMATTER_STRING
-               "Capture maximum payload for udp flow", NULL),
-    AF_OPTION( "max-export", (char)0, 0, AF_OPT_TYPE_INT,
-               &yaf_opt_payload_export, THE_LAME_80COL_FORMATTER_STRING
-               "Maximum payload to export per flow direction[0]", NULL),
+    AF_OPTION("max-payload", 's', 0, AF_OPT_TYPE_INT, &yaf_opt_max_payload,
+              AF_OPTION_WRAP "Maximum payload to capture per flow [0]",
+              "octets"),
+    AF_OPTION("export-payload", 0, 0, AF_OPT_TYPE_NONE,
+              &yaf_opt_payload_export_on,
+              AF_OPTION_WRAP "Enable payload export", NULL),
+    AF_OPTION("udp-payload", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_udp_max_payload,
+              AF_OPTION_WRAP "Capture maximum payload for udp flow", NULL),
+    AF_OPTION("max-export", 0, 0, AF_OPT_TYPE_INT, &yaf_opt_payload_export,
+              AF_OPTION_WRAP "Maximum payload to export per flow direction"
+              AF_OPTION_WRAP "when export-payload is active [max-payload]",
+              "octets"),
 #if YAF_ENABLE_ENTROPY
-    AF_OPTION( "entropy", (char)0, 0, AF_OPT_TYPE_NONE, &yaf_opt_entropy_mode,
-               THE_LAME_80COL_FORMATTER_STRING "Export Shannon entropy of "
-               "captured payload", NULL),
+    AF_OPTION("entropy", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_entropy_mode,
+              AF_OPTION_WRAP "Export Shannon entropy of captured payload",
+              NULL),
 #endif
 #if YAF_ENABLE_APPLABEL
-    AF_OPTION( "applabel-rules", 0, 0, AF_OPT_TYPE_STRING,
-               &yaf_opt_applabel_rules,
-               THE_LAME_80COL_FORMATTER_STRING "specify the name of the "
-               "application labeler"THE_LAME_80COL_FORMATTER_STRING "rules "
-               "file", "file"),
+    AF_OPTION("applabel-rules", 0, 0, AF_OPT_TYPE_STRING,
+              &yaf_opt_applabel_rules,
+              AF_OPTION_WRAP "Specify the name of the application labeler"
+              AF_OPTION_WRAP "rules file", "file"),
     AF_OPTION("applabel", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_applabel_mode,
-              THE_LAME_80COL_FORMATTER_STRING "enable the packet inspection "
-              "protocol"THE_LAME_80COL_FORMATTER_STRING "application labeler "
-              "engine", NULL ),
+              AF_OPTION_WRAP "Enable the packet inspection protocol"
+              AF_OPTION_WRAP "application labeler engine", NULL),
 #endif /* if YAF_ENABLE_APPLABEL */
 #if YAF_ENABLE_NDPI
-    AF_OPTION( "ndpi", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_ndpi,
-               THE_LAME_80COL_FORMATTER_STRING "enable nDPI application "
-               "labeling.", NULL),
-    AF_OPTION( "ndpi-protocol-file", 0, 0, AF_OPT_TYPE_STRING,
-               &yaf_ndpi_proto_file, THE_LAME_80COL_FORMATTER_STRING "Specify"
-               " protocol file for sub-protocol"THE_LAME_80COL_FORMATTER_STRING
-               "and port-based protocol detection", "file"),
+    AF_OPTION("ndpi", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_ndpi,
+              AF_OPTION_WRAP "Enable nDPI application labeling", NULL),
+    AF_OPTION("ndpi-protocol-file", 0, 0, AF_OPT_TYPE_STRING,
+              &yaf_ndpi_proto_file,
+              AF_OPTION_WRAP "Specify protocol file for sub-protocol"
+              AF_OPTION_WRAP "and port-based protocol detection", "file"),
 #endif /* if YAF_ENABLE_NDPI */
 #if YAF_ENABLE_P0F
-    AF_OPTION( "p0f-fingerprints", 0, 0, AF_OPT_TYPE_STRING,
-               &yaf_opt_p0f_fingerprints,
-               THE_LAME_80COL_FORMATTER_STRING "specify the location of the "
-               "p0f fingerprint "THE_LAME_80COL_FORMATTER_STRING
-               "files", "file"),
+    AF_OPTION("p0f-fingerprints", 0, 0, AF_OPT_TYPE_STRING,
+              &yaf_opt_p0f_fingerprints,
+              AF_OPTION_WRAP "Specify the location of the p0f fingerprint"
+              AF_OPTION_WRAP "files", "file"),
     AF_OPTION("p0fprint", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_p0fprint_mode,
-              THE_LAME_80COL_FORMATTER_STRING "enable the p0f OS "
-              "fingerprinter", NULL ),
+              AF_OPTION_WRAP "Enable the p0f OS fingerprinter", NULL),
 #endif /* if YAF_ENABLE_P0F */
 #if YAF_ENABLE_FPEXPORT
     AF_OPTION("fpexport", 0, 0, AF_OPT_TYPE_NONE, &yaf_opt_fpExport_mode,
-              THE_LAME_80COL_FORMATTER_STRING "enable export of handshake "
-              "headers for"THE_LAME_80COL_FORMATTER_STRING "external OS "
-              "fingerprinters", NULL ),
+              AF_OPTION_WRAP "Enable export of handshake headers for"
+              AF_OPTION_WRAP "external OS fingerprinters", NULL),
 #endif /* if YAF_ENABLE_FPEXPORT */
     AF_OPTION_END
 };
@@ -513,15 +477,15 @@ AirOptionEntry yaf_optent_payload[] = {
 
 #ifdef YAF_ENABLE_HOOKS
 AirOptionEntry yaf_optent_plugin[] = {
-    AF_OPTION( "plugin-name", '\0', 0, AF_OPT_TYPE_STRING, &pluginName,
-               THE_LAME_80COL_FORMATTER_STRING "load a yaf plugin(s)",
-               "libplugin_name[,libplugin_name...]"),
-    AF_OPTION( "plugin-opts", '\0', 0, AF_OPT_TYPE_STRING, &pluginOpts,
-               THE_LAME_80COL_FORMATTER_STRING "parse options to the "
-               "plugin(s)", "\"plugin_opts[,plugin_opts...]\""),
-    AF_OPTION( "plugin-conf", '\0', 0, AF_OPT_TYPE_STRING, &pluginConf,
-               THE_LAME_80COL_FORMATTER_STRING "configuration file for the "
-               "plugin(s)", "\"plugin_conf[,plugin_conf...]\""),
+    AF_OPTION("plugin-name", 0, 0, AF_OPT_TYPE_STRING, &pluginName,
+              AF_OPTION_WRAP "Load a yaf plugin(s)",
+              "libplugin_name[,libplugin_name...]"),
+    AF_OPTION("plugin-opts", 0, 0, AF_OPT_TYPE_STRING, &pluginOpts,
+              AF_OPTION_WRAP "Parse options to the plugin(s)",
+              "\"plugin_opts[,plugin_opts...]\""),
+    AF_OPTION("plugin-conf", 0, 0, AF_OPT_TYPE_STRING, &pluginConf,
+              AF_OPTION_WRAP "Configuration file for the plugin(s)",
+              "\"plugin_conf[,plugin_conf...]\""),
     AF_OPTION_END
 };
 #endif /* ifdef YAF_ENABLE_HOOKS */
@@ -1037,8 +1001,8 @@ yfLuaLoadConfig(
                         air_opterr("group must be a valid table. Should be "
                                    "in the form: {name=\"NAME\", [value=]}");
                     }
-                    yaf_config.spreadparams.groups[i - 1] = yfLuaGetStrField(L,
-                                                                             "name");
+                    yaf_config.spreadparams.groups[i - 1] =
+                        yfLuaGetStrField(L, "name");
                     yf_lua_gettableint("value",
                                        yaf_config.spreadGroupIndex[i - 1]);
                     lua_pop(L, 1);
@@ -1216,32 +1180,31 @@ yfParseOptions(
 
     aoctx = air_option_context_new("", argc, argv, yaf_optent_core);
 
-    air_option_context_add_group(aoctx, "decode", "Decoder Options:",
-                                 THE_LAME_80COL_FORMATTER_STRING "Show help "
-                                 "for packet decoder options", yaf_optent_dec);
-    air_option_context_add_group(aoctx, "flow", "Flow table Options:",
-                                 THE_LAME_80COL_FORMATTER_STRING "Show help "
-                                 "for flow table options", yaf_optent_flow);
-    air_option_context_add_group(aoctx, "export", "Export Options:",
-                                 THE_LAME_80COL_FORMATTER_STRING "Show help "
-                                 "for export format options", yaf_optent_exp);
-    air_option_context_add_group(aoctx, "ipfix", "IPFIX Options:",
-                                 THE_LAME_80COL_FORMATTER_STRING "Show help "
-                                 "for IPFIX export options", yaf_optent_ipfix);
-    air_option_context_add_group(aoctx, "pcap", "PCAP Options:",
-                                 THE_LAME_80COL_FORMATTER_STRING "Show help "
-                                 "for PCAP Export Options", yaf_optent_pcap);
+    air_option_context_add_group(
+        aoctx, "decode", "Decoder Options:",
+        AF_OPTION_WRAP "Show help for packet decoder options", yaf_optent_dec);
+    air_option_context_add_group(
+        aoctx, "flow", "Flow table Options:",
+        AF_OPTION_WRAP "Show help for flow table options", yaf_optent_flow);
+    air_option_context_add_group(
+        aoctx, "export", "Export Options:",
+        AF_OPTION_WRAP "Show help for export format options", yaf_optent_exp);
+    air_option_context_add_group(
+        aoctx, "ipfix", "IPFIX Options:",
+        AF_OPTION_WRAP "Show help for IPFIX export options", yaf_optent_ipfix);
+    air_option_context_add_group(
+        aoctx, "pcap", "PCAP Options:",
+        AF_OPTION_WRAP "Show help for PCAP Export Options", yaf_optent_pcap);
 #if YAF_ENABLE_PAYLOAD
-    air_option_context_add_group(aoctx, "payload", "Payload Options:",
-                                 THE_LAME_80COL_FORMATTER_STRING "Show the "
-                                 "help for payload options",
-                                 yaf_optent_payload);
+    air_option_context_add_group(
+        aoctx, "payload", "Payload Options:",
+        AF_OPTION_WRAP "Show help for payload options", yaf_optent_payload);
 #endif /* if YAF_ENABLE_PAYLOAD */
 #ifdef YAF_ENABLE_HOOKS
-    air_option_context_add_group(aoctx, "plugin", "Plugin Options:",
-                                 THE_LAME_80COL_FORMATTER_STRING "Show help "
-                                 "for plugin interface options",
-                                 yaf_optent_plugin);
+    air_option_context_add_group(
+        aoctx, "plugin", "Plugin Options:",
+        AF_OPTION_WRAP "Show help for plugin interface options",
+        yaf_optent_plugin);
 #endif /* ifdef YAF_ENABLE_HOOKS */
     privc_add_option_group(aoctx);
 

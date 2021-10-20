@@ -3,7 +3,7 @@
 ** Generic glib-based logging configuration support
 **
 ** ------------------------------------------------------------------------
-** Copyright (C) 2005-2020 Carnegie Mellon University. All Rights Reserved.
+** Copyright (C) 2005-2021 Carnegie Mellon University. All Rights Reserved.
 ** ------------------------------------------------------------------------
 ** Authors: Brian Trammell
 ** ------------------------------------------------------------------------
@@ -61,7 +61,7 @@
 #include <airframe/daeconfig.h>
 #include <airframe/airutil.h>
 
-#define THE_LAME_80COL_FORMATTER_STRING "\n\t\t\t\t"
+#define AF_OPTION_WRAP "\n\t\t\t\t"
 
 
 typedef struct logc_st {
@@ -79,19 +79,16 @@ typedef struct logc_st {
 static logc_t  logc = { "", "", NULL, NULL, FALSE, FALSE, NULL };
 
 AirOptionEntry logc_optentries[] = {
-    AF_OPTION( "log", 'l', 0, AF_OPT_TYPE_STRING, &(logc.logspec),
-               THE_LAME_80COL_FORMATTER_STRING "Log facility, log file path, "
-               "or 'stderr'", "logspec" ),
-    AF_OPTION( "loglevel", 'L', 0, AF_OPT_TYPE_STRING, &(logc.loglevel),
-               THE_LAME_80COL_FORMATTER_STRING "Log level (debug, message, "
-               "warning, critical,"
-               THE_LAME_80COL_FORMATTER_STRING "error, quiet)", "level" ),
-    AF_OPTION( "verbose", 'v', 0, AF_OPT_TYPE_NONE, &(logc.opt_verbose),
-               THE_LAME_80COL_FORMATTER_STRING "Verbose logging, equivalent "
-               "to -L debug", NULL ),
-    AF_OPTION( "version", 'V', 0, AF_OPT_TYPE_NONE, &(logc.opt_version),
-               THE_LAME_80COL_FORMATTER_STRING "Print application version and "
-               "exit", NULL ),
+    AF_OPTION("log", 'l', 0, AF_OPT_TYPE_STRING, &(logc.logspec),
+              AF_OPTION_WRAP "Log facility, log file path, or stderr [stderr]",
+              "logspec"),
+    AF_OPTION("loglevel", 'L', 0, AF_OPT_TYPE_STRING, &(logc.loglevel),
+              AF_OPTION_WRAP "Log level (debug, message, warning, critical,"
+              AF_OPTION_WRAP "error, quiet)", "level"),
+    AF_OPTION("verbose", 'v', 0, AF_OPT_TYPE_NONE, &(logc.opt_verbose),
+              AF_OPTION_WRAP "Verbose logging, equivalent to -L debug", NULL),
+    AF_OPTION("version", 'V', 0, AF_OPT_TYPE_NONE, &(logc.opt_version),
+              AF_OPTION_WRAP "Print application version and exit", NULL),
     AF_OPTION_END
 };
 
@@ -108,9 +105,9 @@ logc_add_option_group(
     logc.appname = appname;
     logc.version = version;
 
-    air_option_context_add_group(aoctx, "log", "Logging Options:",
-                                 THE_LAME_80COL_FORMATTER_STRING "Show help "
-                                 "for logging options", logc_optentries);
+    air_option_context_add_group(
+        aoctx, "log", "Logging Options:",
+        AF_OPTION_WRAP "Show help for logging options", logc_optentries);
 
     return TRUE;
 }
@@ -120,7 +117,7 @@ static void
 logc_print_version(
     )
 {
-    fprintf(stderr, "%s version %s (c) 2000-2020 Carnegie Mellon University.\n",
+    fprintf(stderr, "%s version %s (c) 2000-2021 Carnegie Mellon University.\n",
             logc.appname, logc.version);
     fprintf(stderr, "GNU General Public License (GPL) Rights "
             "pursuant to Version 2, June 1991\n");

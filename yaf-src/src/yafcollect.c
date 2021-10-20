@@ -3,7 +3,7 @@
 ** Yet Another Flow IPFIX collector
 **
 ** ------------------------------------------------------------------------
-** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
+** Copyright (C) 2006-2021 Carnegie Mellon University. All Rights Reserved.
 ** ------------------------------------------------------------------------
 ** Authors: Brian Trammell
 ** ------------------------------------------------------------------------

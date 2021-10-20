@@ -9,7 +9,7 @@
  * see http://www.ietf.org/rfc/rfc4271 for more info
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2021 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------

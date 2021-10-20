@@ -6,7 +6,7 @@
  * header file for dpacketplugin.c
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2021 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso
  ** ------------------------------------------------------------------------
@@ -821,7 +821,7 @@ typedef struct yfSMTPFlow_st {
     uint32_t              smtpSize;
     uint8_t               smtpStartTLS;
     uint8_t               padding[3];
-    fbBasicList_t         smtpFailedCodes;
+    fbBasicList_t         smtpResponseList;
     fbSubTemplateList_t   smtpMessageList;
 } yfSMTPFlow_t;
 

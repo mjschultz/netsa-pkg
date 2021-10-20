@@ -1,5 +1,5 @@
 %define name yaf
-%define version 2.12.1
+%define version 2.12.2
 %define release 1
 
 Summary: Yet Another Flow sensor
@@ -91,7 +91,7 @@ rm -rf $RPM_BUILD_ROOT
 %config(noreplace) %{_sysconfdir}/yafDPIRules.conf
 %config(noreplace) %{_sysconfdir}/dhcp_fingerprints.conf
 %endif
-%if "x" == "x1"
+%if "x@YAF_REQ_P0F_CONF@" == "x1"
 %config(noreplace) %{_sysconfdir}/p0f.fp
 %endif
 %config(noreplace) %{_sysconfdir}/yaf.conf

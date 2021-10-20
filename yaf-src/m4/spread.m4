@@ -83,7 +83,7 @@ AC_DEFUN([AC_PATH_SPREAD],[
     te_pthread="yes"
 
     AC_ARG_WITH([spread],
-        AC_HELP_STRING([--with-spread=DIR],[location of Spread]),
+        AS_HELP_STRING([--with-spread=DIR],[location of Spread]),
             [   case $withval in
                     yes) te_install_path="yes" ;;
                     no) PT_SPREAD_REQUIRED([spread]) ;;
@@ -93,7 +93,7 @@ AC_DEFUN([AC_PATH_SPREAD],[
 
     if test "$te_install_path" = "no"; then
         AC_ARG_WITH([spread-include],
-            AC_HELP_STRING([--with-spread-include=DIR],[location of Spread headers]),
+            AS_HELP_STRING([--with-spread-include=DIR],[location of Spread headers]),
                 [   case $withval in
                         yes) ;;
                         no) PT_SPREAD_REQUIRED([spread-include]) ;;
@@ -101,7 +101,7 @@ AC_DEFUN([AC_PATH_SPREAD],[
                     esac ], [te_req_err="true"])
 
         AC_ARG_WITH([spread-lib],
-            AC_HELP_STRING([--with-spread-lib=DIR],[location of Spread libraries]),
+            AS_HELP_STRING([--with-spread-lib=DIR],[location of Spread libraries]),
                 [   case $withval in
                         yes) ;;
                         no) PT_SPREAD_REQUIRED([spread-lib]) ;;
@@ -162,7 +162,6 @@ AC_DEFUN([AC_PATH_SPREAD],[
     if test "$te_pthread" == "yes"; then
         if test "$te_library_found" == "true"; then
             if test "$te_header_found" == "true"; then
-	        OPTION_CONFIG_STRING=${OPTION_CONFIG_STRING}"spread|"
                 if test "x$te_inc_path" != "x"; then
                     AC_MSG_NOTICE(using sp.h found in $te_inc_path)
                     AC_SUBST([SPREAD_CFLAGS],["-I$te_inc_path -DHAVE_SPREAD"])

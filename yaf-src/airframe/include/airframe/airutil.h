@@ -3,7 +3,7 @@
 ** General utility functions
 **
 ** ------------------------------------------------------------------------
-** Copyright (C) 2005-2020 Carnegie Mellon University. All Rights Reserved.
+** Copyright (C) 2005-2021 Carnegie Mellon University. All Rights Reserved.
 ** ------------------------------------------------------------------------
 ** Authors: Brian Trammell
 ** ------------------------------------------------------------------------
@@ -113,7 +113,7 @@
  *
  * @section Copyright
  *
- * Airframe is copyright 2006-2020 Carnegie Mellon University, and is released
+ * Airframe is copyright 2006-2021 Carnegie Mellon University, and is released
  * under the GNU Lesser General Public License. See the COPYING file in the
  * distribution for details.
  *

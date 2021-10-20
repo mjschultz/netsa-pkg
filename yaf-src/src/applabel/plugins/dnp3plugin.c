@@ -7,7 +7,7 @@
  * 65b4a3780db3b3f3c2256e68003dffe6/$file/rec523_dnpprotmanend.pdf
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2015-2020 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2015-2021 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------

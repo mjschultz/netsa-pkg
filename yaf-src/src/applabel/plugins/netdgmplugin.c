@@ -6,7 +6,7 @@
  * RFC 1002
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2015-2020 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2015-2021 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------

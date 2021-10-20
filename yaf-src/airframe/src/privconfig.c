@@ -3,7 +3,7 @@
 ** Generic privilege configuration support.
 **
 ** ------------------------------------------------------------------------
-** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
+** Copyright (C) 2006-2021 Carnegie Mellon University. All Rights Reserved.
 ** ------------------------------------------------------------------------
 ** Authors: Brian Trammell
 ** ------------------------------------------------------------------------
@@ -67,15 +67,15 @@ static gid_t    new_group = 0;
 
 static gboolean did_become = FALSE;
 
-#define THE_LAME_80COL_FORMATTER_STRING "\n\t\t\t\t"
+#define AF_OPTION_WRAP "\n\t\t\t\t"
 
 AirOptionEntry privc_optentries[] = {
-    AF_OPTION( "become-user", 'U', 0, AF_OPT_TYPE_STRING, &opt_user,
-               THE_LAME_80COL_FORMATTER_STRING "Become user after setup if "
-               "started as root", NULL ),
-    AF_OPTION( "become-group", (char)0, 0, AF_OPT_TYPE_STRING, &opt_group,
-               THE_LAME_80COL_FORMATTER_STRING "Become group after setup if "
-               "started as root", NULL ),
+    AF_OPTION("become-user", 'U', 0, AF_OPT_TYPE_STRING, &opt_user,
+              AF_OPTION_WRAP "Become user after setup if started as root",
+              "user"),
+    AF_OPTION("become-group", (char)0, 0, AF_OPT_TYPE_STRING, &opt_group,
+              AF_OPTION_WRAP "Become group after setup if started as root",
+              "group"),
     AF_OPTION_END
 };
 
@@ -85,9 +85,9 @@ privc_add_option_group(
 {
     g_assert(aoctx != NULL);
 
-    air_option_context_add_group(aoctx, "privilege", "Privilege Options:",
-                                 THE_LAME_80COL_FORMATTER_STRING "Show help "
-                                 "for privilege options", privc_optentries);
+    air_option_context_add_group(
+        aoctx, "privilege", "Privilege Options:",
+        AF_OPTION_WRAP "Show help for privilege options", privc_optentries);
 
     return TRUE;
 }

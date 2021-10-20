@@ -5,7 +5,7 @@
  ** YAF Active Flow Table
  **
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2020 Carnegie Mellon University.
+ ** Copyright (C) 2006-2021 Carnegie Mellon University.
  ** All Rights Reserved.
  **
  ** ------------------------------------------------------------------------

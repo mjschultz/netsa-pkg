@@ -20,7 +20,6 @@ AC_LANG(C)
 LT_INIT
 
 AC_PROG_MAKE_SET
-AC_HEADER_STDC
 
 AC_SEARCH_LIBS([sqrt], [m])
 # Add dynamic library library if needed

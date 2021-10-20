@@ -12,7 +12,7 @@
  * @sa rfc 4380  href="http://tools.ietf.org/html/rfc4380"
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2021 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Dan Ruef <druef@cert.org>
  ** ------------------------------------------------------------------------

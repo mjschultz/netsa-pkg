@@ -7,7 +7,7 @@
  * in ipfix template format.  See yafdpi(1)
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2006-2020 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2006-2021 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso
  ** ------------------------------------------------------------------------
@@ -432,6 +432,9 @@ ypHookInitialize(
 /**
  * flowAlloc
  *
+ * Callback invoked by yfHookFlowAlloc().  Function signature defined by
+ * yfHookFlowAlloc_fn.  Referenced by yfHooksFuncs_t.flowAlloc.
+ *
  * Allocate the hooks struct here, but don't allocate the DPI struct
  * until we want to fill it so we don't have to hold empty memory for long.
  *
@@ -482,6 +485,9 @@ ypGetDPIInfoModel(
 
 /**
  * flowClose
+ *
+ * Callback invoked by yfHookFlowClose().  Function signature defined by
+ * yfHookFlowClose_fn.  Referenced by yfHooksFuncs_t.flowClose.
  *
  *
  * @param flow a pointer to the flow structure that maintains all the flow
@@ -539,6 +545,9 @@ ypFlowClose(
 
 /**
  * ypValidateFlowTab
+ *
+ * Callback invoked by yfHookValidateFlowTab().  Function signature defined by
+ * yfHookValidateFlowTab_fn.  Referenced by yfHooksFuncs_t.validateFlowTab.
  *
  * returns FALSE if applabel mode is disabled, true otherwise
  *
@@ -734,11 +743,12 @@ ypInitializeProtocolRules(
     const char  ruleScannerExp[] =
         "^[[:space:]]*label[[:space:]]+([[:digit:]]+)"
         "[[:space:]]+yaf[[:space:]]+([[:digit:]]+)[[:space:]]+"
-        "([^\\n].*)\\n";
+        "((?:[^ \\n]| +[^ \\n])+)[ \\t]*\\n";
     const char newRuleScannerExp[] =
         "^[[:space:]]*label[[:space:]]+([[:digit:]]+)"
         "[[:space:]]+user[[:space:]]+([[:digit:]]+)[[:space:]]+"
-        "name[[:space:]]+([a-zA-Z0-9_]+)[[:space:]]+([^\\n].*)\\n";
+        "name[[:space:]]+([a-zA-Z0-9_]+)[[:space:]]+"
+        "((?:[^ \\n]| +[^ \\n])+)[ \\t]*\\n";
     const char   fieldLimitExp[] =
         "^[[:space:]]*limit[[:space:]]+field[[:space:]]+"
         "([[:digit:]]+)\\n";
@@ -776,60 +786,60 @@ ypInitializeProtocolRules(
     ruleScanner = pcre_compile(ruleScannerExp, PCRE_MULTILINE, &errorString,
                                &errorPos, NULL);
     if (ruleScanner == NULL) {
-        *err = g_error_new(YAF_ERROR_DOMAIN, YAF_ERROR_INTERNAL, "Couldn't "
-                           "build the DPI Rule Scanner");
+        g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_INTERNAL,
+                    "Couldn't build the DPI Rule Scanner: %s", errorString);
         return FALSE;
     }
 
     commentScanner = pcre_compile(commentScannerExp, PCRE_MULTILINE,
                                   &errorString, &errorPos, NULL);
     if (commentScanner == NULL) {
-        *err = g_error_new(YAF_ERROR_DOMAIN, YAF_ERROR_INTERNAL, "Couldn't "
-                           "build the DPI Comment Scanner");
+        g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_INTERNAL,
+                    "Couldn't build the DPI Comment Scanner: %s", errorString);
         return FALSE;
     }
 
     newRuleScanner = pcre_compile(newRuleScannerExp, PCRE_MULTILINE,
-                                  &errorString,
-                                  &errorPos, NULL);
+                                  &errorString, &errorPos, NULL);
     if (newRuleScanner == NULL) {
-        *err = g_error_new(YAF_ERROR_DOMAIN, YAF_ERROR_INTERNAL, "Couldn't "
-                           "build the DPI New Rule Scanner");
+        g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_INTERNAL,
+                    "Couldn't build the DPI New Rule Scanner: %s", errorString);
         return FALSE;
     }
 
     fieldScanner = pcre_compile(fieldLimitExp, PCRE_MULTILINE,
-                                &errorString,
-                                &errorPos, NULL);
+                                &errorString, &errorPos, NULL);
     if (fieldScanner == NULL) {
-        *err = g_error_new(YAF_ERROR_DOMAIN, YAF_ERROR_INTERNAL, "Couldn't "
-                           "build the DPI field Limit Scanner");
+        g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_INTERNAL,
+                    "Couldn't build the DPI field Limit Scanner: %s",
+                          errorString);
         return FALSE;
     }
 
     totalScanner = pcre_compile(totalLimitExp, PCRE_MULTILINE,
-                                &errorString,
-                                &errorPos, NULL);
+                                &errorString, &errorPos, NULL);
     if (totalScanner == NULL) {
-        *err = g_error_new(YAF_ERROR_DOMAIN, YAF_ERROR_INTERNAL, "Couldn't "
-                           "build the DPI total Limit Scanner");
+        g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_INTERNAL,
+                    "Couldn't build the DPI total Limit Scanner: %s",
+                    errorString);
         return FALSE;
     }
 
     certExpScanner = pcre_compile(certExportExp, PCRE_MULTILINE,
                                   &errorString, &errorPos, NULL);
     if (certExpScanner == NULL) {
-        *err = g_error_new(YAF_ERROR_DOMAIN, YAF_ERROR_INTERNAL, "Couldn't "
-                           "build the DPI Cert Exporter Scanner %s",
-                           errorString);
+        g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_INTERNAL,
+                    "Couldn't build the DPI Cert Exporter Scanner %s",
+                    errorString);
         return FALSE;
     }
 
     certHashScanner = pcre_compile(certHashExp, PCRE_MULTILINE,
                                    &errorString, &errorPos, NULL);
     if (certHashScanner == NULL) {
-        *err = g_error_new(YAF_ERROR_DOMAIN, YAF_ERROR_INTERNAL, "Couldn't "
-                           "build the DPI Cert Hash Scanner");
+        g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_INTERNAL,
+                    "Couldn't build the DPI Cert Hash Scanner: %s",
+                    errorString);
         return FALSE;
     }
 
@@ -838,9 +848,9 @@ ypInitializeProtocolRules(
                            bufferOffset, dpiRuleFile);
         if (readLength == 0) {
             if (ferror(dpiRuleFile)) {
-                *err = g_error_new(YAF_ERROR_DOMAIN, YAF_ERROR_IO,
-                                   "Couldn't read the DPI Rule File: %s",
-                                   strerror(errno));
+                g_set_error(err, YAF_ERROR_DOMAIN, YAF_ERROR_IO,
+                            "Couldn't read the DPI Rule File: %s",
+                            strerror(errno));
                 return FALSE;
             }
             break;
@@ -870,6 +880,7 @@ ypInitializeProtocolRules(
                            substringVects[1], PCRE_ANCHORED, substringVects,
                            NUM_SUBSTRING_VECTS);
             if (rc > 0) {
+                /* the applabel */
                 pcre_get_substring(lineBuffer, substringVects, rc, 1,
                                    (const char **)&captString);
                 applabel = strtoul(captString, NULL, 10);
@@ -880,12 +891,12 @@ ypInitializeProtocolRules(
                     continue;
                 }
                 ruleSet = &ctx->ruleSet[rulePos];
-
                 pcre_free(captString);
+
+                /* the info element */
                 pcre_get_substring(lineBuffer, substringVects, rc, 2,
                                    (const char **)&captString);
                 elem_id = strtoul(captString, NULL, 10);
-
                 elem = fbInfoModelGetElementByID(model, elem_id, CERT_PEN);
                 if (!elem) {
                     g_warning("Element %d does not exist in Info Model.  "
@@ -901,12 +912,17 @@ ypInitializeProtocolRules(
                     elem;
                 ruleSet->ruleType = ycGetRuleType(applabel);
                 pcre_free(captString);
+
+                /* the regex */
                 pcre_get_substring(lineBuffer, substringVects, rc, 3,
                                    (const char **)&captString);
                 newRule = pcre_compile(captString, PCRE_MULTILINE,
                                        &errorString, &errorPos, NULL);
                 if (NULL == newRule) {
-                    g_warning("Error Parsing DPI Rule \"%s\"", captString);
+                    g_warning("Error Parsing DPI Rule for label %d yaf %d:"
+                              " \"%s\": %s at position %d",
+                              applabel, elem_id, captString,
+                              errorString, errorPos);
                 } else {
                     newExtra = pcre_study(newRule, 0, &errorString);
                     ruleSet->regexFields[ruleSet->numRules].rule = newRule;
@@ -939,6 +955,7 @@ ypInitializeProtocolRules(
                            substringVects[1], PCRE_ANCHORED, substringVects,
                            NUM_SUBSTRING_VECTS);
             if (rc > 0) {
+                /* the applabel */
                 pcre_get_substring(lineBuffer, substringVects, rc, 1,
                                    (const char **)&captString);
                 applabel = strtoul(captString, NULL, 10);
@@ -952,10 +969,14 @@ ypInitializeProtocolRules(
                 ruleSet->applabel = applabel;
                 ruleSet->ruleType = ycGetRuleType(applabel);
                 pcre_free(captString);
+
+                /* the info element id */
                 pcre_get_substring(lineBuffer, substringVects, rc, 2,
                                    (const char **)&captString);
                 elem_id = strtoul(captString, NULL, 10);
                 pcre_free(captString);
+
+                /* the info element name */
                 pcre_get_substring(lineBuffer, substringVects, rc, 3,
                                    (const char **)&captString);
                 elem = fbInfoModelGetElementByID(model, elem_id, CERT_PEN);
@@ -963,6 +984,14 @@ ypInitializeProtocolRules(
                     g_warning("Info Element already exists with ID %d "
                               "in default Info Model. Ignoring rule.",
                               elem_id);
+                    pcre_free(captString);
+                    continue;
+                }
+                elem = fbInfoModelGetElementByName(model, captString);
+                if (elem) {
+                    g_warning("Info Element already exists with name %s "
+                              "in default Info Model. Ignoring rule.",
+                              captString);
                     pcre_free(captString);
                     continue;
                 }
@@ -989,12 +1018,17 @@ ypInitializeProtocolRules(
                 ruleSet->regexFields[ruleSet->numRules].elem =
                     fbInfoModelGetElementByName(model, captString);
                 pcre_free(captString);
+
+                /* the regex */
                 pcre_get_substring(lineBuffer, substringVects, rc, 4,
                                    (const char **)&captString);
                 newRule = pcre_compile(captString, PCRE_MULTILINE,
                                        &errorString, &errorPos, NULL);
                 if (NULL == newRule) {
-                    g_warning("Error Parsing DPI Rule \"%s\"", captString);
+                    g_warning("Error Parsing DPI Rule for label %d user %d:"
+                              " \"%s\": %s at position %d",
+                              applabel, elem_id, captString,
+                              errorString, errorPos);
                 } else {
                     newExtra = pcre_study(newRule, 0, &errorString);
                     ruleSet->regexFields[ruleSet->numRules].rule = newRule;
@@ -1154,6 +1188,9 @@ ypInitializeProtocolRules(
 /**
  * flowFree
  *
+ * Callback invoked by yfHookFlowFree().  Function signature defined by
+ * yfHookFlowFree_fn.  Referenced by yfHooksFuncs_t.flowFree.
+ *
  *
  * @param flow pointer to the flow structure with the context information
  *
@@ -1183,6 +1220,9 @@ ypFlowFree(
 
 /**
  * hookPacket
+ *
+ * Callback invoked by yfHookPacket().  Function signature defined by
+ * yfHookPacket_fn.  Referenced by yfHooksFuncs_t.hookPacket.
  *
  * allows the plugin to examine the start of a flow capture and decide if a
  * flow capture should be dropped from processing
@@ -1214,6 +1254,9 @@ ypHookPacket(
 
 /**
  * flowPacket
+ *
+ * Callback invoked by yfHookFlowPacket().  Function signature defined by
+ * yfHookFlowPacket_fn.  Referenced by yfHooksFuncs_t.flowPacket.
  *
  * gets called whenever a packet gets processed, relevant to the given flow
  *
@@ -1316,6 +1359,9 @@ ypInitializeBLs(
 
 /**
  * flowWrite
+ *
+ * Callback invoked by yfHookFlowWrite().  Function signature defined by
+ * yfHookFlowWrite_fn.  Referenced by yfHooksFuncs_t.flowWrite.
  *
  *  this function gets called when the flow data is getting serialized to be
  *  written into ipfix format.  This function must put its data into the
@@ -1535,6 +1581,9 @@ ypFlowWrite(
 /**
  * getInfoModel
  *
+ * Callback invoked by yfHookGetInfoModel().  Function signature defined by
+ * yfHookGetInfoModel_fn.  Referenced by yfHooksFuncs_t.getInfoModel.
+ *
  * gets the IPFIX information model elements
  *
  *
@@ -1551,6 +1600,9 @@ ypGetInfoModel(
 
 /**
  * getTemplate
+ *
+ * Callback invoked by yfHookGetTemplate().  Function signature defined by
+ * yfHookGetTemplate_fn.  Referenced by yfHooksFuncs_t.getTemplate.
  *
  * gets the IPFIX data template for the information that will be returned
  *
@@ -1917,6 +1969,9 @@ ypGetTemplate(
 /**
  * setPluginOpt
  *
+ * Callback invoked by yfHookAddNewHook().  Function signature defined by
+ * yfHookSetPluginOpt_fn.  Referenced by yfHooksFuncs_t.setPluginOpt.
+ *
  * sets the pluginOpt variable passed from the command line
  *
  */
@@ -1940,6 +1995,9 @@ ypSetPluginOpt(
 
 /**
  * setPluginConf
+ *
+ * Callback invoked by yfHookAddNewHook().  Function signature defined by
+ * yfHookSetPluginConf_fn.  Referenced by yfHooksFuncs_t.setPluginConf.
  *
  * sets the pluginConf variable passed from the command line
  *
@@ -2195,6 +2253,9 @@ ypPluginRegex(
 /**
  * scanPayload
  *
+ * Callback invoked by yfHookScanPayload().  Function signature defined by
+ * yfHookScanPayload_fn.  Referenced by yfHooksFuncs_t.scanPayload.
+ *
  * gets the important strings out of the payload by executing the passed pcre
  * or the offset/length to the bytes of interest.
  *
@@ -2222,7 +2283,6 @@ ypScanPayload(
     yfDPIContext_t *ctx = NULL;
     int          rulePos = 0;
     protocolRegexRules_t *ruleSet;
-    gboolean     scanner = FALSE;
 
     if (NULL == flowContext) {
         return;
@@ -2239,10 +2299,6 @@ ypScanPayload(
     }
 
     /* determine if DPI is turned on for this appLabel */
-    /*if (!ypSearchPlugOpts(applabel)) {
-     *  return;
-     *  }*/
-
     rulePos = ypProtocolHashSearch(ctx->dpiActiveHash, applabel, 0);
     if (!rulePos) {
         return;
@@ -2256,28 +2312,15 @@ ypScanPayload(
 
     captCount = flowContext->dpinum;
 
-    if ((captCount >= YAF_MAX_CAPTURE_FIELDS) &&
+    if ((captCount >= YAF_MAX_CAPTURE_FIELDS) ||
         (flowContext->dpi_len >= ctx->dpi_total_limit))
     {
         return;
     }
 
-    if ((expression == NULL) && ruleSet->numRules) {
-        /* determine if the plugin has regexs in yafDPIRules.conf */
-        if (ypPluginRegex(ctx, elementID, rulePos)) {
-            scanner = TRUE;
-        } else {
-            scanner = FALSE;
-        }
-    }
-
     if (expression) {
-        rc = pcre_exec(expression, NULL, (const char *)pkt, caplen, 0,
-                       0, vects, NUM_SUBSTRING_VECTS);
-
-        while ((rc > 0) && (captCount < YAF_MAX_CAPTURE_FIELDS) &&
-               (captCountCurrent < YAF_MAX_CAPTURE_SIDE) &&
-               (flowContext->dpi_len < ctx->dpi_total_limit))
+        while (((rc = pcre_exec(expression, NULL, (const char *)pkt, caplen,
+                                offset, 0, vects, NUM_SUBSTRING_VECTS)) > 0))
         {
             if (rc > 1) {
                 flowContext->dpi[captCount].dpacketCaptLen =
@@ -2298,7 +2341,6 @@ ypScanPayload(
 
             flowContext->dpi[captCount].dpacketID = elementID;
             flowContext->dpi_len += flowContext->dpi[captCount].dpacketCaptLen;
-
             if (flowContext->dpi_len > ctx->dpi_total_limit) {
                 /* if we passed the limit - don't add this one */
                 flowContext->dpinum = captCount;
@@ -2306,11 +2348,15 @@ ypScanPayload(
             }
             captCount++;
             captCountCurrent++;
-
-            rc = pcre_exec(expression, NULL, (char *)(pkt), caplen, offset,
-                           0, vects, NUM_SUBSTRING_VECTS);
+            if ((captCount >= YAF_MAX_CAPTURE_FIELDS) ||
+                (captCountCurrent >= YAF_MAX_CAPTURE_SIDE))
+            {
+                flowContext->dpinum = captCount;
+                return;
+            }
         }
-    } else if (scanner) {
+    } else if (ruleSet->numRules && ypPluginRegex(ctx, elementID, rulePos)) {
+        /* the plugin has regexs in yafDPIRules.conf */
         flow->appLabel = applabel;
         captCount += ypDPIScanner(flowContext, pkt, caplen, offset, flow, NULL);
     } else {
@@ -2333,6 +2379,9 @@ ypScanPayload(
 /**
  * ypGetMetaData
  *
+ * Callback invoked by yfHookAddNewHook().  Function signature defined by
+ * yfHookGetMetaData_fn.  Referenced by yfHooksFuncs_t.getMetaData.
+ *
  * this returns the meta information about this plugin, the interface version
  * it was built with, and the amount of export data it will send
  *
@@ -2350,6 +2399,10 @@ ypGetMetaData(
 
 /**
  * ypGetTemplateCount
+ *
+ * Callback invoked by yfHookGetTemplateCount().  Function signature defined
+ * by yfHookGetTemplateCount_fn.  Referenced by
+ * yfHooksFuncs_t.getTemplateCount.
  *
  * this returns the number of templates we are adding to yaf's
  * main subtemplatemultilist, for DPI - this is usually just 1
@@ -2441,6 +2494,9 @@ ypFreeBLRec(
 
 /**
  * ypFreeLists
+ *
+ * Callback invoked by yfHookFreeLists().  Function signature defined by
+ * yfHookFreeLists_fn.  Referenced by yfHooksFuncs_t.freeLists.
  *
  *
  *
@@ -2580,7 +2636,6 @@ ypDPIScanner(
     int         subVects[NUM_SUBSTRING_VECTS];
     int         offsetptr;
     uint8_t     captCount = flowContext->dpinum;
-    uint8_t     newCapture = flowContext->dpinum;
     uint8_t     captDirection = 0;
     uint16_t    captLen = 0;
     pcre       *ruleHolder;
@@ -2589,6 +2644,12 @@ ypDPIScanner(
     protocolRegexRules_t *ruleSet;
     yfDPIContext_t       *ctx = flowContext->yfctx;
 
+    if ((captCount >= YAF_MAX_CAPTURE_FIELDS) ||
+        (flowContext->dpi_len >= ctx->dpi_total_limit))
+    {
+        return 0;
+    }
+
     rulePos = ypProtocolHashSearch(ctx->dpiActiveHash, flow->appLabel, 0);
     ruleSet = &ctx->ruleSet[rulePos];
 
@@ -2596,11 +2657,10 @@ ypDPIScanner(
         ruleHolder = ruleSet->regexFields[loop].rule;
         extraHolder = ruleSet->regexFields[loop].extra;
         offsetptr = offset;
-        rc = pcre_exec(ruleHolder, extraHolder,
-                       (char *)(payloadData), payloadSize, offsetptr,
-                       0, subVects, NUM_SUBSTRING_VECTS);
-        while ( (rc > 0) && (captDirection < YAF_MAX_CAPTURE_SIDE)) {
-            /*Get only matched substring - don't need Labels*/
+        while (((rc = pcre_exec(ruleHolder, extraHolder,
+                                (char *)payloadData, payloadSize, offsetptr,
+                                0, subVects, NUM_SUBSTRING_VECTS)) > 0))
+        {
             if (rc > 1) {
                 captLen = subVects[3] - subVects[2];
                 flowContext->dpi[captCount].dpacketCapt = subVects[2];
@@ -2608,19 +2668,18 @@ ypDPIScanner(
                 captLen = subVects[1] - subVects[0];
                 flowContext->dpi[captCount].dpacketCapt = subVects[0];
             }
-
-            if (captLen <= 0) {
+            if (captLen == 0) {
                 flowContext->dpinum = captCount;
-                return (flowContext->dpinum - newCapture);
+                return captDirection;
             }
 
             /* truncate capture length to capture limit */
             flowContext->dpi[captCount].dpacketID =
                 ruleSet->regexFields[loop].info_element_id;
             if (captLen > ctx->dpi_user_limit) {captLen = ctx->dpi_user_limit;}
-            flowContext->dpi[captCount].dpacketCaptLen =  captLen;
-            flowContext->dpi_len += captLen;
+            flowContext->dpi[captCount].dpacketCaptLen = captLen;
 
+            flowContext->dpi_len += captLen;
             if (flowContext->dpi_len > ctx->dpi_total_limit) {
                 /* buffer full */
                 flowContext->dpinum = captCount;
@@ -2629,9 +2688,13 @@ ypDPIScanner(
             offsetptr = subVects[0] + captLen;
             captCount++;
             captDirection++;
-            rc = pcre_exec(ruleHolder, extraHolder, (char *)(payloadData),
-                           payloadSize, offsetptr, 0, subVects,
-                           NUM_SUBSTRING_VECTS);
+            if ((captCount >= YAF_MAX_CAPTURE_FIELDS) ||
+                (captDirection >= YAF_MAX_CAPTURE_SIDE))
+            {
+                /* limits reached */
+                flowContext->dpinum = captCount;
+                return captDirection;
+            }
         }
         if (rc < -5) {
             /* print regular expression error */
@@ -2877,18 +2940,16 @@ ypProcessSMTP(
 {
     yfDPIData_t   *dpi = flowContext->dpi;
     yfSMTPFlow_t  *rec = NULL;
-    int            count = flowContext->startOffset;
+    int            count;
     fbInfoModel_t *model = ypGetDPIInfoModel();
 
-    int            failedCodes[YAF_MAX_CAPTURE_SIDE];
-    int            failedCodeIndex = 0;
-    int            i;
-    const fbInfoElement_t *smtpToElem;
-    const fbInfoElement_t *smtpFromElem;
-    const fbInfoElement_t *smtpFileElem;
-    const fbInfoElement_t *smtpURLElem;
-    const fbInfoElement_t *smtpResponseElem;
-    fbVarfield_t          *failedCode = NULL;
+    const fbInfoElement_t *smtpElemTo;
+    const fbInfoElement_t *smtpElemFrom;
+    const fbInfoElement_t *smtpElemFile;
+    const fbInfoElement_t *smtpElemURL;
+    const fbInfoElement_t *smtpElemResponse;
+
+    fbVarfield_t          *responseCode = NULL;
     fbVarfield_t          *smtpTo = NULL;
     fbVarfield_t          *smtpFrom = NULL;
     fbVarfield_t          *smtpFilename = NULL;
@@ -2897,22 +2958,22 @@ ypProcessSMTP(
     yfSMTPHeader_t        *smtpHeader;
 
     /* DPI counts, one for each list */
-    int      numToMatches;
-    int      numFromMatches;
-    int      numFileMatches;
-    int      numURLMatches;
-    int      numHeaderMatches;
-    char    *msgStarts[SMTP_MAX_EMAILS];
-    char    *msgHeaderEnds[SMTP_MAX_EMAILS];
-    char    *msgEnds[SMTP_MAX_EMAILS];
-    int      msgStartIndex = 0;
-    int      msgHeaderEndIndex = 0;
-    int      msgEndIndex = 0;
+    int      numMatchesTo;
+    int      numMatchesFrom;
+    int      numMatchesFile;
+    int      numMatchesURL;
+    int      numMatchesHeader;
+    const uint8_t *msgBound[SMTP_MAX_EMAILS + 1];
+    int      numMessages;
     int      msgIndex;
-    uint8_t *separatorPtr;
-    uint8_t *currentPayload;
-    uint8_t *msgPayload = flow->val.payload;
-    uint8_t *failedCodePayload = flow->rval.payload;
+
+    unsigned int  maxMsgCapt = 0;
+    const uint8_t *msgBegin;
+    const uint8_t *msgEnd;
+    const uint8_t *colon;
+
+    const yfFlowVal_t *current;
+    const yfFlowVal_t *msgData = NULL;
 
     rec = (yfSMTPFlow_t *)fbSubTemplateMultiListEntryInit(
         stml, YAF_SMTP_FLOW_TID, smtpTemplate, 1);
@@ -2921,239 +2982,249 @@ ypProcessSMTP(
     rec->smtpSize = 0;
     rec->smtpStartTLS = 0;
 
-    /* Establish message bounds */
-    for ( ; count < totalcap; ++count) {
-        if(count < fwdcap) {
-            currentPayload = flow->val.payload;
-        } else {
-            currentPayload = flow->rval.payload;
-        }
+    /* Create an empty basicList of SMTP response codes; fill the list as we
+     * scan the data. */
+    smtpElemResponse = fbInfoModelGetElementByName(model, "smtpResponse");
+    fbBasicListInit(&rec->smtpResponseList, 3, smtpElemResponse, 0);
+
+    if (!flow->rval.payload) {
+        totalcap = fwdcap;
+    }
+
+    /* Assume one message */
+    numMessages = 1;
+
+    /* Capture top-level data; determine whether forward or reverse direction
+     * captured the client; capture the response codes; note bounds between
+     * messages when multiple in a single conversation */
+    for (count = flowContext->startOffset; count < totalcap; ++count) {
+        current = ((count < fwdcap) ? &flow->val : &flow->rval);
         switch (dpi[count].dpacketID) {
           case 26:   /* Hello */
             if (rec->smtpHello.buf == NULL) {
-                rec->smtpHello.buf = currentPayload + dpi[count].dpacketCapt;
+                rec->smtpHello.buf = current->payload + dpi[count].dpacketCapt;
                 rec->smtpHello.len = dpi[count].dpacketCaptLen;
+            }
+            if (msgData != current) {
+                if (NULL == msgData) {
+                    msgData = current;
+                } else {
+                    break;
+                }
+            }
+            if (dpi[count].dpacketCapt > maxMsgCapt) {
+                maxMsgCapt = dpi[count].dpacketCapt;
             }
             break;
           case 27:   /* Enhanced */
             if (rec->smtpEnhanced.buf == NULL) {
-                rec->smtpEnhanced.buf = currentPayload +
-                    dpi[count].dpacketCapt;
+                rec->smtpEnhanced.buf =
+                    current->payload + dpi[count].dpacketCapt;
                 rec->smtpEnhanced.len = dpi[count].dpacketCaptLen;
             }
             break;
           case 28:   /* Size */
-            rec->smtpSize = (uint32_t)strtol((char *)(currentPayload +
-                                                      dpi[count].dpacketCapt),
-                                             NULL, 10);
+            if (0 == rec->smtpSize) {
+                rec->smtpSize = (uint32_t)strtoul(
+                    (char *)(msgData->payload + dpi[count].dpacketCapt),
+                    NULL, 10);
+            }
             break;
           case 29:   /* StartTLS */
             rec->smtpStartTLS = 1;
             break;
-          case 30:   /* Failed codes */
-            failedCodes[failedCodeIndex++] = count;
-            failedCodePayload = currentPayload;
+          case 30:   /* Response codes */
+            responseCode = (fbVarfield_t *)
+                fbBasicListAddNewElements(&rec->smtpResponseList, 1);
+            responseCode->buf = current->payload + dpi[count].dpacketCapt;
+            responseCode->len = dpi[count].dpacketCaptLen;
             break;
-          case 38:   /* Starts of messages */
-            msgStarts[msgStartIndex++] = (char *)(currentPayload +
-                                                  dpi[count].dpacketCapt);
-            msgPayload = currentPayload;
+          case 38:   /* End of one message / Start of another */
+            if (msgData != current) {
+                if (NULL == msgData) {
+                    msgData = current;
+                } else {
+                    break;
+                }
+            }
+            msgBound[numMessages] = current->payload + dpi[count].dpacketCapt;
+            ++numMessages;
+            if (dpi[count].dpacketCapt > maxMsgCapt) {
+                maxMsgCapt = dpi[count].dpacketCapt;
+            }
             break;
-          case 39:   /* Ends of messages */
-            msgEnds[msgEndIndex++] = (char *)(currentPayload +
-                                              dpi[count].dpacketCapt);
-            break;
-          case 40:   /* Ends of header sections */
-            msgHeaderEnds[msgHeaderEndIndex++] = (char *)(currentPayload +
-                                                          dpi[count].dpacketCapt);
+          case 31:   /* Subject */
+          case 32:   /* To */
+          case 33:   /* From */
+          case 34:   /* File */
+          case 35:   /* URL */
+          case 36:   /* Header */
+            if (msgData != current) {
+                if (NULL == msgData) {
+                    msgData = current;
+                } else {
+                    break;
+                }
+            }
+            if (dpi[count].dpacketCapt > maxMsgCapt) {
+                maxMsgCapt = dpi[count].dpacketCapt;
+            }
             break;
         }
     }
 
-    if (msgStartIndex > msgEndIndex) {
-        msgEnds[msgEndIndex++] = (char *)(msgPayload + flow->val.paylen);
-        if (msgStartIndex != msgEndIndex) {
-            msgStartIndex = msgEndIndex;
-        }
+    if (NULL == msgData) {
+        fbSubTemplateListInit(&rec->smtpMessageList, 3,
+                              YAF_SMTP_MESSAGE_TID, smtpMessageTemplate, 0);
+        return rec;
     }
 
-    if (msgStartIndex > msgHeaderEndIndex) {
-        msgHeaderEnds[msgHeaderEndIndex++] = (char *)(msgPayload +
-                                                      flow->val.paylen);
+    /* the first message begins at the start of the payload */
+    msgBound[0] = msgData->payload;
+
+    /* if no data was captured within the last bounded message, decrement the
+     * number of messages; otherwise, set the bound of the final message to
+     * the end of the payload */
+    if (msgData->payload + maxMsgCapt <= msgBound[numMessages - 1]) {
+        --numMessages;
+    } else {
+        msgBound[numMessages] = msgData->payload + msgData->paylen;
     }
 
-    smtpResponseElem = fbInfoModelGetElementByName(model, "smtpResponse");
-    failedCode = (fbVarfield_t *)fbBasicListInit(
-        &(rec->smtpFailedCodes), 3, smtpResponseElem, failedCodeIndex);
-
-    for (i = 0; i < failedCodeIndex; ++i) {
-        failedCode->buf = failedCodePayload + dpi[failedCodes[i]].dpacketCapt;
-        failedCode->len = dpi[failedCodes[i]].dpacketCaptLen;
-        failedCode = fbBasicListGetNextPtr(&(rec->smtpFailedCodes), failedCode);
-    }
-
+    /* Create the STL of messages */
     smtpEmail = ((yfSMTPMessage_t *)fbSubTemplateListInit(
-                     &(rec->smtpMessageList), 3,
+                     &rec->smtpMessageList, 3,
                      YAF_SMTP_MESSAGE_TID, smtpMessageTemplate,
-                     msgEndIndex));
+                     numMessages));
 
-    for (msgIndex = 0; msgIndex < msgEndIndex; ++msgIndex) {
-        count = flowContext->startOffset;
+    smtpElemTo = fbInfoModelGetElementByName(model, "smtpTo");
+    smtpElemFrom = fbInfoModelGetElementByName(model, "smtpFrom");
+    smtpElemFile = fbInfoModelGetElementByName(model, "smtpFilename");
+    smtpElemURL = fbInfoModelGetElementByName(model, "smtpURL");
 
-        numToMatches = 0;
-        numFromMatches = 0;
-        numFileMatches = 0;
-        numURLMatches = 0;
-        numHeaderMatches = 0;
+    /* Process each message */
+    for (msgIndex = 0; msgIndex < numMessages; ++msgIndex) {
+        msgBegin = msgBound[msgIndex];
+        msgEnd = msgBound[msgIndex + 1];
 
-        for ( ; count < totalcap; ++count) {
-            if (msgPayload + dpi[count].dpacketCapt <
-                (uint8_t *)msgEnds[msgIndex] &&
-                (msgIndex == 0 ||
-                 msgPayload + dpi[count].dpacketCapt >
-                 (uint8_t *)msgEnds[msgIndex - 1]))
+        /* for IEs stored in basicLists or STLs, count the number of items to
+         * know how big to make the lists. */
+        numMatchesTo = 0;
+        numMatchesFrom = 0;
+        numMatchesFile = 0;
+        numMatchesURL = 0;
+        numMatchesHeader = 0;
+
+        for (count = flowContext->startOffset; count < totalcap; ++count) {
+            if (msgData->payload + dpi[count].dpacketCapt >= msgBegin &&
+                (msgData->payload + dpi[count].dpacketCapt <= msgEnd))
             {
                 switch (dpi[count].dpacketID) {
                   case 32:   /* To */
-                    numToMatches++;
+                    numMatchesTo++;
                     break;
                   case 33:   /* From */
-                    numFromMatches++;
+                    numMatchesFrom++;
                     break;
                   case 34:   /* File */
-                    numFileMatches++;
+                    numMatchesFile++;
                     break;
                   case 35:   /* URL */
-                    numURLMatches++;
+                    numMatchesURL++;
                     break;
                   case 36:   /* Header */
-                    if (msgPayload + dpi[count].dpacketCapt >
-                        (uint8_t *)msgStarts[msgIndex] &&
-                        msgPayload + dpi[count].dpacketCapt <
-                        (uint8_t *)msgHeaderEnds[msgIndex])
-                    {
-                        numHeaderMatches++;
-                    }
+                    numMatchesHeader++;
                     break;
                 }
             }
         }
 
-        smtpToElem = fbInfoModelGetElementByName(model, "smtpTo");
+        /* Create the basicLists and STLs */
         smtpTo = (fbVarfield_t *)fbBasicListInit(
-            &(smtpEmail->smtpToList), 3, smtpToElem, numToMatches);
+            &smtpEmail->smtpToList, 3, smtpElemTo, numMatchesTo);
 
-        smtpFromElem = fbInfoModelGetElementByName(model, "smtpFrom");
         smtpFrom = (fbVarfield_t *)fbBasicListInit(
-            &(smtpEmail->smtpFromList), 3, smtpFromElem, numFromMatches);
+            &smtpEmail->smtpFromList, 3, smtpElemFrom, numMatchesFrom);
 
-        smtpFileElem = fbInfoModelGetElementByName(model, "smtpFilename");
         smtpFilename = (fbVarfield_t *)fbBasicListInit(
-            &(smtpEmail->smtpFilenameList), 3, smtpFileElem, numFileMatches);
+            &smtpEmail->smtpFilenameList, 3, smtpElemFile, numMatchesFile);
 
-        smtpURLElem = fbInfoModelGetElementByName(model, "smtpURL");
         smtpURL = (fbVarfield_t *)fbBasicListInit(
-            &(smtpEmail->smtpURLList), 3, smtpURLElem, numURLMatches);
+            &smtpEmail->smtpURLList, 3, smtpElemURL, numMatchesURL);
 
         smtpHeader = ((yfSMTPHeader_t *)fbSubTemplateListInit(
-                          &(smtpEmail->smtpHeaderList), 3,
+                          &smtpEmail->smtpHeaderList, 3,
                           YAF_SMTP_HEADER_TID, smtpHeaderTemplate,
-                          numHeaderMatches));
+                          numMatchesHeader));
 
-        count = flowContext->startOffset;
-
-        for ( ; count < totalcap; ++count) {
-            if (msgPayload + dpi[count].dpacketCapt <
-                (uint8_t *)msgEnds[msgIndex] &&
-                (msgIndex == 0 ||
-                 msgPayload + dpi[count].dpacketCapt >
-                 (uint8_t *)msgEnds[msgIndex - 1]))
+        /* Fill the lists we just created */
+        for (count = flowContext->startOffset; count < totalcap; ++count) {
+            if (msgData->payload + dpi[count].dpacketCapt >= msgBegin &&
+                msgData->payload + dpi[count].dpacketCapt <= msgEnd)
             {
-                if(count < fwdcap) {
-                    currentPayload = flow->val.payload;
-                } else {
-                    currentPayload = flow->rval.payload;
-                }
                 switch (dpi[count].dpacketID) {
                   case 31:   /* Subject */
-                    if (msgPayload + dpi[count].dpacketCapt >
-                        (uint8_t *)msgStarts[msgIndex] &&
-                        msgPayload + dpi[count].dpacketCapt <
-                        (uint8_t *)msgHeaderEnds[msgIndex])
-                    {
+                    if (NULL == smtpEmail->smtpSubject.buf) {
                         smtpEmail->smtpSubject.buf =
-                            currentPayload + dpi[count].dpacketCapt;
+                            msgData->payload + dpi[count].dpacketCapt;
                         smtpEmail->smtpSubject.len = dpi[count].dpacketCaptLen;
                     }
                     break;
                   case 32:   /* To */
-                    smtpTo->buf = currentPayload + dpi[count].dpacketCapt;
+                    smtpTo->buf = msgData->payload + dpi[count].dpacketCapt;
                     smtpTo->len = dpi[count].dpacketCaptLen;
-                    smtpTo = fbBasicListGetNextPtr(&(smtpEmail->smtpToList),
+                    smtpTo = fbBasicListGetNextPtr(&smtpEmail->smtpToList,
                                                    smtpTo);
                     break;
                   case 33:   /* From */
-                    smtpFrom->buf = currentPayload + dpi[count].dpacketCapt;
+                    smtpFrom->buf = msgData->payload + dpi[count].dpacketCapt;
                     smtpFrom->len = dpi[count].dpacketCaptLen;
-                    smtpFrom = fbBasicListGetNextPtr(&(smtpEmail->smtpFromList),
+                    smtpFrom = fbBasicListGetNextPtr(&smtpEmail->smtpFromList,
                                                      smtpFrom);
                     break;
-                  case 34:   /* File */
-                    smtpFilename->buf = currentPayload +
+                  case 34:   /* Filename */
+                    smtpFilename->buf = msgData->payload +
                         dpi[count].dpacketCapt;
                     smtpFilename->len = dpi[count].dpacketCaptLen;
                     smtpFilename = fbBasicListGetNextPtr(
-                        &(smtpEmail->smtpFilenameList), smtpFilename);
+                        &smtpEmail->smtpFilenameList, smtpFilename);
                     break;
                   case 35:   /* URL */
-                    smtpURL->buf = currentPayload + dpi[count].dpacketCapt;
+                    smtpURL->buf = msgData->payload + dpi[count].dpacketCapt;
                     smtpURL->len = dpi[count].dpacketCaptLen;
-                    smtpURL = fbBasicListGetNextPtr(&(smtpEmail->smtpURLList),
+                    smtpURL = fbBasicListGetNextPtr(&smtpEmail->smtpURLList,
                                                     smtpURL);
                     break;
                   case 36:   /* Header */
-                    if (msgPayload + dpi[count].dpacketCapt >
-                        (uint8_t *)msgStarts[msgIndex] &&
-                        msgPayload + dpi[count].dpacketCapt <
-                        (uint8_t *)msgHeaderEnds[msgIndex])
-                    {
-                        separatorPtr = memchr(currentPayload +
-                                              dpi[count].dpacketCapt,
-                                              (int)(':'),
-                                              dpi[count].dpacketCaptLen);
-
-                        if (separatorPtr != NULL) {
-                            smtpHeader->smtpKey.buf = currentPayload +
-                                dpi[count].dpacketCapt;
-                            smtpHeader->smtpKey.len = separatorPtr -
-                                (currentPayload + dpi[count].dpacketCapt);
-
-                            /* Advance past the colon */
-                            separatorPtr++;
-
-                            /* If there is also a space, skip it too */
-                            if (*separatorPtr == ' ') {
-                                separatorPtr++;
-                            }
-
-                            smtpHeader->smtpValue.buf = separatorPtr;
-                            smtpHeader->smtpValue.len =
-                                currentPayload + dpi[count].dpacketCapt +
-                                dpi[count].dpacketCaptLen - separatorPtr;
-                        } else {
-                            smtpHeader->smtpKey.buf = 0;
-                            smtpHeader->smtpKey.len = 0;
-                            smtpHeader->smtpValue.buf = 0;
-                            smtpHeader->smtpValue.len = 0;
-                        }
-                        smtpHeader = fbSubTemplateListGetNextPtr(
-                            &(smtpEmail->smtpHeaderList), smtpHeader);
+                    smtpHeader->smtpKey.buf =
+                        msgData->payload + dpi[count].dpacketCapt;
+                    colon = memchr(smtpHeader->smtpKey.buf, (int)(':'),
+                                   dpi[count].dpacketCaptLen);
+                    if (NULL == colon) {
+                        smtpHeader->smtpKey.buf = NULL;
+                        g_debug("Unable to find ':' in Email header");
+                        break;
                     }
+                    smtpHeader->smtpKey.len = colon - smtpHeader->smtpKey.buf;
+
+                    /* initialze value length to remainder of capture len */
+                    smtpHeader->smtpValue.len =
+                        dpi[count].dpacketCaptLen - smtpHeader->smtpKey.len;
+
+                    /* Move over the colon and any whitespace */
+                    do {
+                        ++colon;
+                        --smtpHeader->smtpValue.len;
+                    } while (isspace(*colon) && smtpHeader->smtpValue.len > 0);
+                    smtpHeader->smtpValue.buf = (uint8_t *)colon;
+
+                    smtpHeader = fbSubTemplateListGetNextPtr(
+                        &smtpEmail->smtpHeaderList, smtpHeader);
                     break;
                 }
             }
         }
-        smtpEmail = fbSubTemplateListGetNextPtr(&(rec->smtpMessageList),
+        smtpEmail = fbSubTemplateListGetNextPtr(&rec->smtpMessageList,
                                                 smtpEmail);
     }
     return (void *)rec;
@@ -3842,7 +3913,7 @@ ypFreeSMTPRec(
     yfSMTPFlow_t    *rec = (yfSMTPFlow_t *)flowContext->rec;
     yfSMTPMessage_t *message = NULL;
 
-    fbBasicListClear(&(rec->smtpFailedCodes));
+    fbBasicListClear(&(rec->smtpResponseList));
 
     while ((message = fbSubTemplateListGetNextPtr(&(rec->smtpMessageList),
                                                   message)))

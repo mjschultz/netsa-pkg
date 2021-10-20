@@ -3,7 +3,7 @@
 ** General ring array implementation
 **
 ** ------------------------------------------------------------------------
-** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
+** Copyright (C) 2007-2021 Carnegie Mellon University. All Rights Reserved.
 ** ------------------------------------------------------------------------
 ** Authors: Brian Trammell
 ** ------------------------------------------------------------------------

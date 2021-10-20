@@ -3,7 +3,7 @@
 ** Generic glib-based logging configuration support
 **
 ** ------------------------------------------------------------------------
-** Copyright (C) 2005-2020 Carnegie Mellon University. All Rights Reserved.
+** Copyright (C) 2005-2021 Carnegie Mellon University. All Rights Reserved.
 ** ------------------------------------------------------------------------
 ** Authors: Brian Trammell
 **          Tony Cebzanov

@@ -6,7 +6,7 @@
  * http://www.modbus.org/docs/Modbus_Application_Protocol_V1_1b3.pdf
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2014-2020 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2014-2021 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Sarneso <ecoff@cert.org>
  ** ------------------------------------------------------------------------

@@ -11,7 +11,7 @@
  * @sa rfc 1350  href="http://www.ietf.org/rfc/rfc1350.txt"
  *
  ** ------------------------------------------------------------------------
- ** Copyright (C) 2007-2020 Carnegie Mellon University. All Rights Reserved.
+ ** Copyright (C) 2007-2021 Carnegie Mellon University. All Rights Reserved.
  ** ------------------------------------------------------------------------
  ** Authors: Emily Ecoff <ecoff@cert.org>
  ** ------------------------------------------------------------------------
