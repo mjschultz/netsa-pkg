@@ -1131,8 +1131,8 @@ static gboolean     fbCollectorPostProcV9(
     /* iterate through the flowsets */
     /* a flowset can contain more than 1 record */
     /* recordLength is the TOTAL Length of the flowset - not each record */
-
-    while ( msgOsetPtr < (dataBuf + *bufLen) ) {
+    /* Add a fix in case there are 0 paddings in palo-alto's V9 netflow */
+    while ( msgOsetPtr < (dataBuf + *bufLen) && recordCount > recordCounter ) {
 
         /* read the set ID, and adjust the reserved ones from
            Netflow to IPFIX */
@@ -1329,6 +1329,8 @@ static gboolean     fbCollectorPostProcV9(
     *lengthCountPtr = g_htons(msgOsetPtr - dataBuf);
 
     if ((msgOsetPtr - dataBuf) < (long)*bufLen) {
+        *bufLen = msgOsetPtr - dataBuf;
+#if 0
         g_set_error(err, FB_ERROR_DOMAIN, FB_ERROR_NETFLOWV9,
                     "NetFlow Record Length Mismatch: (buffer has "
                     "%u, processed %u)", (unsigned int)(*bufLen),
@@ -1336,6 +1338,7 @@ static gboolean     fbCollectorPostProcV9(
         currentSession->netflowSeqNum++;
         pthread_mutex_unlock(&transState->ts_lock);
         return FALSE;
+#endif
     }
 
     /* fixup the sequence number */
