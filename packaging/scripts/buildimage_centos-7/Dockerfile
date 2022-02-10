@@ -20,7 +20,9 @@ RUN yum install -y \
     snappy-devel \
     zlib-devel
 
-RUN gem install ffi -v 1.9.18
+RUN gem install git -v 1.7.0
+RUN gem install backports -v 3.21.0
+RUN gem install rexml -v 3.2.4
 RUN gem install fpm
 
 ADD ["./libfixbuf-src/", "/netsa-pkg/libfixbuf-src/"]
